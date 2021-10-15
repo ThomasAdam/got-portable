@@ -643,6 +643,8 @@ cmd_pack(int argc, char *argv[])
 		goto done;
 	printf("\nIndexed %s.pack\n", id_str);
 done:
+	if (repo)
+		got_repo_close(repo);
 	got_pathlist_free(&exclude_args);
 	got_ref_list_free(&exclude_refs);
 	got_ref_list_free(&include_refs);
@@ -724,6 +726,8 @@ cmd_indexpack(int argc, char *argv[])
 		goto done;
 	printf("\nIndexed %s.pack\n", id_str);
 done:
+	if (repo)
+		got_repo_close(repo);
 	free(id_str);
 	free(pack_hash);
 	return error;
@@ -897,6 +901,8 @@ cmd_listpack(int argc, char *argv[])
 		    lpa.noffdeltas, lpa.nrefdeltas);
 	}
 done:
+	if (repo)
+		got_repo_close(repo);
 	free(id_str);
 	free(pack_hash);
 	free(packfile_path);
