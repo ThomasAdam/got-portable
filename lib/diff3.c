@@ -1048,7 +1048,7 @@ edscript(int n, struct diff3_state *d3s)
 				goto done;
 		} else {
 			err = diff_output(d3s->diffbuf, "%s%s\n.\n",
-			    line[linelen] == '\n' ? ":" : "",
+			    linelen > 0 && line[linelen] == '\n' ? ":" : "",
 			    d3s->f3mark);
 			if (err)
 				goto done;
