@@ -1,3 +1,27 @@
+* got 0.62; 2021-10-16
+- man pages: document command aliases in tmux(1) style, add tags (kn)
+- ignore unversioned files while aborting rebase, histedit, merge or operations
+- let 'got fetch' send all references to the server to avoid redundant downloads
+- plug memory leaks in got-fetch-pack and got-send-pack
+- provide lib/Makefile to enable tags file generation (kn)
+- add support for multiple path arguments to 'got diff'
+- fix merging of lines inserted at the top of a file (reported by Omar Polo)
+- display the requested object type in "object not found" error messages
+- implement 'got diff -c' for diffing commits with optional filtering by path
+- speed up 'got histedit -l' and 'got rebase -l'
+- fix merging of files which contain a dot on a line by itself
+- sort and de-duplicate work tree path command line arguments (suggested by kn)
+- fix pack index cache element rotation; keep often used entries near the front
+- use a bloom filter to avoid pointless pack index searches
+- do not skip ignored directories in 'got status' if they contain tracked files
+- FreeBSD's ed(1) does not accept "0i"; use the equivalent "1i" instead (naddy)
+- speed up pack file creation a little by caching raw objects
+- limit delta chain length in newly created pack files to 32 deltas
+- while packing, store encoded deltas in temporary files instead of in memory
+- sync with OpenBSD parse.y (naddy)
+- make 'gotadmin indexpack' unveil the repository read/write, not read-only
+- plug memory leak in an error path of read_packed_object()
+
 * got 0.61; 2021-10-03
 - fix list of 'got status' options in the got.1 man page
 - tog: use sched_yield(2) for better portability (patch by Quentin Rameau)
