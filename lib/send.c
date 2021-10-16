@@ -508,6 +508,8 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		if (!got_ref_name_is_valid(refname))
 			continue;
 
+		if (strncmp(refname, "refs/tags/", 10) == 0)
+			is_tag = 1;
 		/*
 		 * Find out whether this is a reference we want to upload.
 		 * Otherwise we can still use this reference as a hint to
@@ -519,20 +521,17 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			err = got_ref_resolve(&my_id, repo, my_ref);
 			if (err)
 				goto done;
-			if (got_object_id_cmp(my_id, their_id) != 0)
+			if (got_object_id_cmp(my_id, their_id) != 0) {
+				if (!overwrite_refs && is_tag) {
+					err = got_error_fmt(
+					    GOT_ERR_SEND_TAG_EXISTS,
+					    "%s", refname);
+					free(my_id);
+					goto done;
+				}
 				refs_to_send++;
+			}
 			free(my_id);
-
-		}
-
-		if (strncmp(refname, "refs/tags/", 10) == 0)
-			is_tag = 1;
-
-		/* Prevent tags from being overwritten by default. */ 
-		if (!overwrite_refs && my_ref && is_tag) {
-			err = got_error_fmt(GOT_ERR_SEND_TAG_EXISTS,
-			    "%s", refname);
-			goto done;
 		}
 
 		/* Check if their object exists locally. */

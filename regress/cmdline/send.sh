@@ -687,6 +687,24 @@ EOF
 		return 1
 	fi
 
+	# Send the same tags again. This should be a no-op.
+	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	# Overwriting an existing tag 'got send -f'.
 	got ref -r $testroot/repo -d refs/tags/1.0 >/dev/null
 	got tag -r $testroot/repo -m '1.0' 1.0 >/dev/null
