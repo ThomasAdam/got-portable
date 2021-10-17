@@ -2421,6 +2421,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_UP:
 	case '<':
 	case ',':
+	case CTRL('p'):
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (s->selected > 0)
@@ -2449,6 +2450,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_DOWN:
 	case '>':
 	case '.':
+	case CTRL('n'):
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (s->selected < MIN(view->nlines - 2,
@@ -3729,6 +3731,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'k':
 	case KEY_UP:
+	case CTRL('p'):
 		if (s->first_displayed_line > 1)
 			s->first_displayed_line--;
 		break;
@@ -3743,6 +3746,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'j':
 	case KEY_DOWN:
+	case CTRL('n'):
 		if (!s->eof)
 			s->first_displayed_line++;
 		break;
@@ -4589,6 +4593,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'k':
 	case KEY_UP:
+	case CTRL('p'):
 		if (s->selected_line > 1)
 			s->selected_line--;
 		else if (s->selected_line == 1 &&
@@ -4609,6 +4614,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'j':
 	case KEY_DOWN:
+	case CTRL('n'):
 		if (s->selected_line < view->nlines - 2 &&
 		    s->first_displayed_line +
 		    s->selected_line <= s->blame.nlines)
@@ -5511,6 +5517,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'k':
 	case KEY_UP:
+	case CTRL('p'):
 		if (s->selected > 0) {
 			s->selected--;
 			break;
@@ -5531,6 +5538,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'j':
 	case KEY_DOWN:
+	case CTRL('n'):
 		if (s->selected < s->ndisplayed - 1) {
 			s->selected++;
 			break;
@@ -6291,6 +6299,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'k':
 	case KEY_UP:
+	case CTRL('p'):
 		if (s->selected > 0) {
 			s->selected--;
 			break;
@@ -6305,6 +6314,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'j':
 	case KEY_DOWN:
+	case CTRL('n'):
 		if (s->selected < s->ndisplayed - 1) {
 			s->selected++;
 			break;
