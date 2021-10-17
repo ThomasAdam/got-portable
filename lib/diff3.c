@@ -925,6 +925,10 @@ duplicate(int *dpl, int j, struct line_range *r1, struct line_range *r2,
 			}
 		} while (c != '\n');
 	}
+
+	/* original lines end here */
+	d3s->de[j + 1].oldo.to = off + nchar;
+
 	err = repos(nchar, d3s);
 	if (err)
 		return err;
