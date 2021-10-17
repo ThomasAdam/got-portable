@@ -6,6 +6,10 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.62; (2021-10-17)
+
+* Changes from got-0.62
+
 # got-portable 0.61; (2021-10-09)
 
 * Port regress tests.
