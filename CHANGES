@@ -1,3 +1,10 @@
+* got 0.63; 2021-10-17
+- fix 'got send -T' regression if tag already exists on server (found by Omar)
+- fix another regression where a 3-way merge would segfault (naddy)
+- tog: add Ctrl-n/Ctrl-p for scrolling one line down/up (patch by Omar Polo)
+- always initialize output parameter "n" of get_line() in diff3.c
+- set oldo.to in diff3.c's duplicate() even if the file contains no newlines
+
 * got 0.62; 2021-10-16
 - man pages: document command aliases in tmux(1) style, add tags (kn)
 - ignore unversioned files while aborting rebase, histedit, merge or operations
