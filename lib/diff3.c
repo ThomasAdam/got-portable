@@ -683,6 +683,8 @@ get_line(char **ret, FILE *b, size_t *n, struct diff3_state *d3s)
 	char *new;
 
 	*ret = NULL;
+	if (n != NULL)
+		*n = 0;
 
 	len = getline(&cp, &size, b);
 	if (len == -1) {
