@@ -23,6 +23,7 @@ Got requires the following dependencies:
 * `libuuid` (for UUID generation)
 * `libz` (for Z compression)
 * `pkg-config` (for searching libraries)
+* `bison` (for configuration file grammar)
 
 TESTS (REGRESS)
 ===============
