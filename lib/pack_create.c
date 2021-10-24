@@ -261,7 +261,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 	struct got_raw_object *raw = NULL, *base_raw = NULL;
 	struct got_delta_instruction *deltas = NULL, *best_deltas = NULL;
 	int i, j, size, best_size, ndeltas, best_ndeltas;
-	const int max_base_candidates = 10;
+	const int max_base_candidates = 3;
 	int outfd = -1;
 
 	qsort(meta, nmeta, sizeof(struct got_pack_meta *), delta_order_cmp);
