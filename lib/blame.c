@@ -124,8 +124,7 @@ blame_changes(struct got_blame *blame, struct diff_result *diff_result,
 	for (i = 0; i < diff_result->chunks.len &&
 	    blame->nannotated < blame->nlines; i++) {
 		struct diff_chunk *c = diff_chunk_get(diff_result, i);
-		unsigned int left_start, left_count;
-		unsigned int right_start, right_count;
+		unsigned int left_count, right_count;
 		int j;
 
 		/*
@@ -134,9 +133,7 @@ blame_changes(struct got_blame *blame, struct diff_result *diff_result,
 		 * that chunk ranges never exceed the number of lines
 		 * in the left/right input files.
 		 */
-		left_start = diff_chunk_get_left_start(c, diff_result, 0);
 		left_count = diff_chunk_get_left_count(c);
-		right_start = diff_chunk_get_right_start(c, diff_result, 0);
 		right_count = diff_chunk_get_right_count(c);
 
 		if (left_count == right_count) {
