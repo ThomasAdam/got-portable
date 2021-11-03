@@ -1816,6 +1816,15 @@ commands will refuse to run while a rebase operation is in progress.
 Other commands which manipulate the work tree may be used for
 conflict resolution purposes.
 .Pp
+If the specified
+.Ar branch
+is already based on the work tree's current branch then no commits
+need to be rebased and
+.Cm got rebase
+will simply switch the work tree to the specified
+.Ar branch
+and update files in the work tree accordingly.
+.Pp
 The options for
 .Cm got rebase
 are as follows:
