@@ -246,11 +246,18 @@ test_rebase_ancestry_check() {
 	(cd $testroot/repo && git checkout -q -b newbranch)
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
+	local newbranch_id=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
 		2> $testroot/stderr)
 
-	echo -n > $testroot/stdout.expected
+	echo "refs/heads/newbranch is already based on refs/heads/master" \
+		> $testroot/stdout.expected
+	echo "Switching work tree from refs/heads/master to refs/heads/newbranch" \
+		>> $testroot/stdout.expected
+	echo "U  gamma/delta" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/newbranch: ${newbranch_id}" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -259,8 +266,7 @@ test_rebase_ancestry_check() {
 		return 1
 	fi
 
-	echo "got: refs/heads/newbranch is already based on refs/heads/master" \
-		> $testroot/stderr.expected
+	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

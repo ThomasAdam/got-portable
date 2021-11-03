@@ -9147,12 +9147,41 @@ cmd_rebase(int argc, char *argv[])
 				goto done;
 			error = NULL;
 		} else {
-			static char msg[128];
-			snprintf(msg, sizeof(msg),
-			    "%s is already based on %s",
+			struct got_pathlist_head paths;
+			printf("%s is already based on %s\n",
 			    got_ref_get_name(branch),
 			    got_worktree_get_head_ref_name(worktree));
-			error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
+			error = switch_head_ref(branch, branch_head_commit_id,
+			    worktree, repo);
+			if (error)
+				goto done;
+			error = got_worktree_set_base_commit_id(worktree, repo,
+			    branch_head_commit_id);
+			if (error)
+				goto done;
+			TAILQ_INIT(&paths);
+			error = got_pathlist_append(&paths, "", NULL);
+			if (error)
+				goto done;
+			error = got_worktree_checkout_files(worktree,
+			    &paths, repo, update_progress, &upa,
+			    check_cancelled, NULL);
+			got_pathlist_free(&paths);
+			if (error)
+				goto done;
+			if (upa.did_something) {
+				char *id_str;
+				error = got_object_id_str(&id_str,
+				    branch_head_commit_id);
+				if (error)
+					goto done;
+				printf("Updated to %s: %s\n",
+				    got_worktree_get_head_ref_name(worktree),
+				    id_str);
+				free(id_str);
+			} else
+				printf("Already up-to-date\n");
+			print_update_progress_stats(&upa);
 			goto done;
 		}
 		error = got_worktree_rebase_prepare(&new_base_branch,
