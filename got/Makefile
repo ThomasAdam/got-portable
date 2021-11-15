@@ -7,7 +7,7 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
-		inflate.c buf.c rcsutil.c diff3.c lockfile.c \
+		worktree_open.c inflate.c buf.c rcsutil.c diff3.c lockfile.c \
 		deflate.c object_create.c delta_cache.c fetch.c \
 		gotconfig.c diff_main.c diff_atomize_text.c \
 		diff_myers.c diff_output.c diff_output_plain.c \

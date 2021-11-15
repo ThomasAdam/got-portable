@@ -42,6 +42,7 @@
 #include "got_path.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
+#include "got_worktree.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -232,10 +233,43 @@ usage_info(void)
 }
 
 static const struct got_error *
+get_repo_path(char **repo_path)
+{
+	const struct got_error *err = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd;
+
+	*repo_path = NULL;
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	err = got_worktree_open(&worktree, cwd);
+	if (err) {
+		if (err->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		err = NULL;
+	}
+
+	if (worktree)
+		*repo_path = strdup(got_worktree_get_repo_path(worktree));
+	else
+		*repo_path = strdup(cwd);
+	if (*repo_path == NULL)
+		err = got_error_from_errno("strdup");
+done:
+	if (worktree)
+		got_worktree_close(worktree);
+	free(cwd);
+	return err;
+}
+
+static const struct got_error *
 cmd_info(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
-	char *cwd = NULL, *repo_path = NULL;
+	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
 	const struct got_gotconfig *gotconfig = NULL;
 	int ch, npackfiles, npackedobj, nobj;
@@ -265,13 +299,12 @@ cmd_info(int argc, char *argv[])
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
-	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
+	if (repo_path == NULL) {
+		error = get_repo_path(&repo_path);
+		if (error)
+			goto done;
 	}
-
-	error = got_repo_open(&repo, repo_path ? repo_path : cwd, NULL);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
 
@@ -333,7 +366,7 @@ cmd_info(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
-	free(cwd);
+	free(repo_path);
 	return error;
 }
 
@@ -521,7 +554,7 @@ static const struct got_error *
 cmd_pack(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
-	char *cwd = NULL, *repo_path = NULL;
+	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
 	int ch, i, loose_obj_only = 1;
 	struct got_object_id *pack_hash = NULL;
@@ -571,13 +604,12 @@ cmd_pack(int argc, char *argv[])
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
-	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
+	if (repo_path == NULL) {
+		error = get_repo_path(&repo_path);
+		if (error)
+			goto done;
 	}
-
-	error = got_repo_open(&repo, repo_path ? repo_path : cwd, NULL);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
 
@@ -651,7 +683,7 @@ done:
 	got_ref_list_free(&include_refs);
 	free(id_str);
 	free(pack_hash);
-	free(cwd);
+	free(repo_path);
 	return error;
 }
 
@@ -1002,7 +1034,7 @@ static const struct got_error *
 cmd_cleanup(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
-	char *cwd = NULL, *repo_path = NULL;
+	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
 	int ch, dry_run = 0, npacked = 0, verbosity = 0;
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
@@ -1050,13 +1082,12 @@ cmd_cleanup(int argc, char *argv[])
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
-	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
+	if (repo_path == NULL) {
+		error = get_repo_path(&repo_path);
+		if (error)
+			goto done;
 	}
-
-	error = got_repo_open(&repo, repo_path ? repo_path : cwd, NULL);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
 
@@ -1121,6 +1152,6 @@ cmd_cleanup(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
-	free(cwd);
+	free(repo_path);
 	return error;
 }
