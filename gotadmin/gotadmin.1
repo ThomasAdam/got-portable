@@ -68,6 +68,9 @@ are as follows:
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .El
 .It Cm pack Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Op Ar reference ...
 Generate a new pack file and a corresponding pack file index.
@@ -101,6 +104,9 @@ Unless this option is specified, only loose objects will be added.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .It Fl x Ar reference
 Exclude objects reachable via the specified
 .Ar reference
@@ -274,6 +280,9 @@ remove any files from disk.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .It Fl q
 Suppress progress reporting and disk space summary output.
 .El
