@@ -1462,6 +1462,233 @@ test_cherrypick_dot_on_a_line_by_itself() {
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_binary_file() {
+	local testroot=`test_init cherrypick_binary_file`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp /bin/ls $testroot/wt/foo
+	chmod 755 $testroot/wt/foo
+	(cd $testroot/wt && got add foo >/dev/null)
+	(cd $testroot/wt && got commit -m 'add binary file' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	cp /bin/cat $testroot/wt/foo
+	chmod 755 $testroot/wt/foo
+	(cd $testroot/wt && got commit -m 'change binary file' > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	cp /bin/cp $testroot/wt/foo
+	chmod 755 $testroot/wt/foo
+	(cd $testroot/wt && got commit -m 'change binary file' > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got rm foo >/dev/null)
+	(cd $testroot/wt && got commit -m 'remove binary file' > /dev/null)
+	local commit_id4=`git_show_head $testroot/repo`
+
+	# backdate the work tree to make it usable for cherry-picking
+	(cd $testroot/wt && got up -c $commit_id0 > /dev/null)
+
+	# cherry-pick addition of a binary file
+	(cd $testroot/wt && got cy $commit_id1 > $testroot/stdout)
+
+	echo "A  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id1" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp /bin/ls $testroot/content.expected
+	chmod 755 $testroot/content.expected
+	cp $testroot/wt/foo $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cherry-pick modification of a binary file
+	(cd $testroot/wt && got cy $commit_id2 > $testroot/stdout)
+
+	echo "G  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp /bin/cat $testroot/content.expected
+	chmod 755 $testroot/content.expected
+	cp $testroot/wt/foo $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cherry-pick conflicting addition of a binary file
+	(cd $testroot/wt && got cy $commit_id1 > $testroot/stdout)
+
+	echo "C  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id1" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Binary files differ and cannot be merged automatically:" \
+		> $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo -n "file " >> $testroot/content.expected
+	ls $testroot/wt/foo-1-* >> $testroot/content.expected
+	echo '=======' >> $testroot/content.expected
+	echo -n "file " >> $testroot/content.expected
+	ls $testroot/wt/foo-2-* >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	cp $testroot/wt/foo $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# revert local changes to allow further testing
+	(cd $testroot/wt && got revert -R . >/dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo '?  foo' > $testroot/stdout.expected
+	echo -n '?  ' >> $testroot/stdout.expected
+	(cd $testroot/wt && ls foo-1-* >> $testroot/stdout.expected)
+	echo -n '?  ' >> $testroot/stdout.expected
+	(cd $testroot/wt && ls foo-2-* >> $testroot/stdout.expected)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# tidy up
+	rm $testroot/wt/foo $testroot/wt/foo-1-* $testroot/wt/foo-2-*
+	(cd $testroot/wt && got up -c $commit_id1 > /dev/null)
+
+	# cherry-pick conflicting modification of a binary file
+	(cd $testroot/wt && got cy $commit_id3 > $testroot/stdout)
+
+	echo "C  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id3" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Binary files differ and cannot be merged automatically:" \
+		> $testroot/content.expected
+	echo '<<<<<<<' >> $testroot/content.expected
+	echo -n "file " >> $testroot/content.expected
+	ls $testroot/wt/foo-1-* >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo -n "file " >> $testroot/content.expected
+	ls $testroot/wt/foo-orig-* >> $testroot/content.expected
+	echo '=======' >> $testroot/content.expected
+	echo -n "file " >> $testroot/content.expected
+	ls $testroot/wt/foo-2-* >> $testroot/content.expected
+	echo ">>>>>>> merged change: commit $commit_id3" \
+		>> $testroot/content.expected
+	cp $testroot/wt/foo $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp /bin/ls $testroot/content.expected
+	chmod 755 $testroot/content.expected
+	cat $testroot/wt/foo-1-* > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp /bin/cp $testroot/content.expected
+	chmod 755 $testroot/content.expected
+	cat $testroot/wt/foo-2-* > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# revert local changes to allow further testing
+	(cd $testroot/wt && got revert -R . > /dev/null)
+	rm $testroot/wt/foo-1-*
+	rm $testroot/wt/foo-2-*
+	(cd $testroot/wt && got up -c $commit_id3 > /dev/null)
+
+	# cherry-pick deletion of a binary file
+	(cd $testroot/wt && got cy $commit_id4 > $testroot/stdout)
+
+	echo "D  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id4" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/foo ]; then
+		echo "removed file foo still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	test_done "$testroot" "0"
+}
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -1478,3 +1705,4 @@ run_test test_cherrypick_conflict_no_eol2
 run_test test_cherrypick_unrelated_changes
 run_test test_cherrypick_same_branch
 run_test test_cherrypick_dot_on_a_line_by_itself
+run_test test_cherrypick_binary_file

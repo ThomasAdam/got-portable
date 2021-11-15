@@ -161,6 +161,7 @@
 #define GOT_ERR_MERGE_COMMIT_OUT_OF_DATE 143
 #define GOT_ERR_MERGE_BUSY	144
 #define GOT_ERR_MERGE_PATH	145
+#define GOT_ERR_FILE_BINARY	146
 
 static const struct got_error {
 	int code;
@@ -337,6 +338,7 @@ static const struct got_error {
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_MERGE_PATH,	"cannot merge branch which contains "
 	    "changes outside of this work tree's path prefix" },
+	{ GOT_ERR_FILE_BINARY, "found a binary file instead of text" },
 };
 
 /*
