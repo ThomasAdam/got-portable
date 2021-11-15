@@ -222,9 +222,19 @@ diffreg(BUF **d, const char *path1, const char *path2,
 	if (err)
 		goto done;
 
-	err = got_diffreg(&diffreg_result, f1, f2, diff_algo, 0, 1);
+	err = got_diffreg(&diffreg_result, f1, f2, diff_algo, 0, 0);
 	if (err)
 		goto done;
+
+	if (diffreg_result) {
+		struct diff_result *diff_result = diffreg_result->result;
+		int atomizer_flags = (diff_result->left->atomizer_flags |
+		    diff_result->right->atomizer_flags);
+		if ((atomizer_flags & DIFF_ATOMIZER_FOUND_BINARY_DATA)) {
+			err = got_error(GOT_ERR_FILE_BINARY);
+			goto done;
+		}
+	}
 
 	err = got_diffreg_output(NULL, NULL, diffreg_result, 1, 1, "", "",
 	    GOT_DIFF_OUTPUT_EDSCRIPT, 0, outfile);

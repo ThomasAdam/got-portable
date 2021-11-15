@@ -474,6 +474,159 @@ check_files_equal(int *same, FILE *f1, FILE *f2)
 	return check_file_contents_equal(same, f1, f2);
 }
 
+static const struct got_error *
+copy_file_to_fd(off_t *outsize, FILE *f, int outfd)
+{
+	uint8_t fbuf[65536];
+	size_t flen;
+	ssize_t outlen;
+
+	*outsize = 0;
+
+	if (fseek(f, 0L, SEEK_SET) == -1)
+		return got_ferror(f, GOT_ERR_IO);
+
+	for (;;) {
+		flen = fread(fbuf, 1, sizeof(fbuf), f);
+		if (flen == 0) {
+			if (ferror(f))
+				return got_error_from_errno("fread");
+			if (feof(f))
+				break;
+		}
+		outlen = write(outfd, fbuf, flen);
+		if (outlen == -1)
+			return got_error_from_errno("write");
+		if (outlen != flen)
+			return got_error(GOT_ERR_IO);
+		*outsize += outlen;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+merge_binary_file(int *overlapcnt, int merged_fd,
+    FILE *f_deriv, FILE *f_orig, FILE *f_deriv2,
+    const char *label_deriv, const char *label_orig, const char *label_deriv2,
+    const char *ondisk_path)
+{
+	const struct got_error *err = NULL;
+	int same_content, changed_deriv, changed_deriv2;
+	int fd_orig = -1, fd_deriv = -1, fd_deriv2 = -1;
+	off_t size_orig = 0, size_deriv = 0, size_deriv2 = 0;
+	char *path_orig = NULL, *path_deriv = NULL, *path_deriv2 = NULL;
+	char *base_path_orig = NULL, *base_path_deriv = NULL;
+	char *base_path_deriv2 = NULL;
+
+	*overlapcnt = 0;
+
+	err = check_files_equal(&same_content, f_deriv, f_deriv2);
+	if (err)
+		return err;
+
+	if (same_content)
+		return copy_file_to_fd(&size_deriv, f_deriv, merged_fd);
+
+	err = check_files_equal(&same_content, f_deriv, f_orig);
+	if (err)
+		return err;
+	changed_deriv = !same_content;
+	err = check_files_equal(&same_content, f_deriv2, f_orig);
+	if (err)
+		return err;
+	changed_deriv2 = !same_content;
+
+	if (changed_deriv && changed_deriv2) {
+		*overlapcnt = 1;
+		if (asprintf(&base_path_orig, "%s-orig", ondisk_path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		if (asprintf(&base_path_deriv, "%s-1", ondisk_path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		if (asprintf(&base_path_deriv2, "%s-2", ondisk_path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		err = got_opentemp_named_fd(&path_orig, &fd_orig,
+		    base_path_orig);
+		if (err)
+			goto done;
+		err = got_opentemp_named_fd(&path_deriv, &fd_deriv,
+		    base_path_deriv);
+		if (err)
+			goto done;
+		err = got_opentemp_named_fd(&path_deriv2, &fd_deriv2,
+		    base_path_deriv2);
+		if (err)
+			goto done;
+		err = copy_file_to_fd(&size_orig, f_orig, fd_orig);
+		if (err)
+			goto done;
+		err = copy_file_to_fd(&size_deriv, f_deriv, fd_deriv);
+		if (err)
+			goto done;
+		err = copy_file_to_fd(&size_deriv2, f_deriv2, fd_deriv2);
+		if (err)
+			goto done;
+		if (dprintf(merged_fd, "Binary files differ and cannot be "
+		    "merged automatically:\n") < 0) {
+			err = got_error_from_errno("dprintf");
+			goto done;
+		}
+		if (dprintf(merged_fd, "%s%s%s\nfile %s\n",
+		    GOT_DIFF_CONFLICT_MARKER_BEGIN,
+		    label_deriv ? " " : "",
+		    label_deriv ? label_deriv : "",
+		    path_deriv) < 0) {
+			err = got_error_from_errno("dprintf");
+			goto done;
+		}
+		if (size_orig > 0) {
+			if (dprintf(merged_fd, "%s%s%s\nfile %s\n",
+			    GOT_DIFF_CONFLICT_MARKER_ORIG,
+			    label_orig ? " " : "",
+			    label_orig ? label_orig : "",
+			    path_orig) < 0) {
+				err = got_error_from_errno("dprintf");
+				goto done;
+			}
+		}
+		if (dprintf(merged_fd, "%s\nfile %s\n%s%s%s\n",
+		    GOT_DIFF_CONFLICT_MARKER_SEP,
+		    path_deriv2,
+		    GOT_DIFF_CONFLICT_MARKER_END,
+		    label_deriv2 ?  " " : "",
+		    label_deriv2 ? label_deriv2 : "") < 0) {
+			err = got_error_from_errno("dprintf");
+			goto done;
+		}
+	} else if (changed_deriv)
+		err = copy_file_to_fd(&size_deriv, f_deriv, merged_fd);
+	else if (changed_deriv2)
+		err = copy_file_to_fd(&size_deriv2, f_deriv2, merged_fd);
+done:
+	if (size_orig == 0 && path_orig && unlink(path_orig) == -1 &&
+	    err == NULL)
+		err = got_error_from_errno2("unlink", path_orig);
+	if (fd_orig != -1 && close(fd_orig) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path_orig);
+	if (fd_deriv != -1 && close(fd_deriv) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path_deriv);
+	if (fd_deriv2 != -1 && close(fd_deriv2) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path_deriv2);
+	free(path_orig);
+	free(path_deriv);
+	free(path_deriv2);
+	free(base_path_orig);
+	free(base_path_deriv);
+	free(base_path_deriv2);
+	return err;
+}
+
 /*
  * Perform a 3-way merge where the file f_orig acts as the common
  * ancestor, the file f_deriv acts as the first derived version,
@@ -513,8 +666,15 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 
 	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig,
 	    f_deriv2, label_deriv, label_orig, label_deriv2, diff_algo);
-	if (err)
-		goto done;
+	if (err) {
+		if (err->code != GOT_ERR_FILE_BINARY)
+			goto done;
+		err = merge_binary_file(&overlapcnt, merged_fd, f_deriv,
+		    f_orig, f_deriv2, label_deriv, label_orig, label_deriv2,
+		    ondisk_path);
+		if (err)
+			goto done;
+	}
 
 	err = (*progress_cb)(progress_arg,
 	    overlapcnt > 0 ? GOT_STATUS_CONFLICT : GOT_STATUS_MERGE, path);
