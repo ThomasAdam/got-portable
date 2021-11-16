@@ -768,50 +768,76 @@ done:
 	return err;
 }
 
+static const struct got_error *
+get_committer_time(struct got_reference *ref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	int obj_type;
+	struct got_commit_object *commit = NULL;
+	struct got_tag_object *tag = NULL;
+	struct got_object_id *id = NULL;
+
+	err = got_ref_resolve(&id, repo, ref);
+	if (err)
+		return err;
+
+	err = got_object_get_type(&obj_type, repo, id);
+	if (err)
+		goto done;
+
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_COMMIT:
+		err = got_object_open_as_commit(&commit, repo, id);
+		if (err)
+			goto done;
+		ref->committer_time =
+		    got_object_commit_get_committer_time(commit);
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		err = got_object_open_as_tag(&tag, repo, id);
+		if (err)
+			goto done;
+		ref->committer_time = got_object_tag_get_tagger_time(tag);
+		break;
+	default:
+		/* best effort for other object types */
+		ref->committer_time = got_ref_get_mtime(ref);
+		break;
+	}
+done:
+	free(id);
+	if (commit)
+		got_object_commit_close(commit);
+	if (tag)
+		got_object_tag_close(tag);
+	return err;
+}
+
 const struct got_error *
 got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
     struct got_reference *ref1, struct got_reference *ref2)
 {
 	const struct got_error *err;
 	struct got_repository *repo = arg;
-	struct got_object_id *id1 = NULL, *id2 = NULL;
-	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 
 	*cmp = 0;
 
 	if (ref1->committer_time == 0) {
-		err = got_ref_resolve(&id1, repo, ref1);
+		err = get_committer_time(ref1, repo);
 		if (err)
 			return err;
-		err = got_object_open_as_commit(&commit1, repo, id1);
-		if (err)
-			goto done;
-		ref1->committer_time =
-		    got_object_commit_get_committer_time(commit1);
 	}
-
 	if (ref2->committer_time == 0) {
-		err = got_ref_resolve(&id2, repo, ref2);
+		err = get_committer_time(ref2, repo);
 		if (err)
 			return err;
-		err = got_object_open_as_commit(&commit2, repo, id2);
-		if (err)
-			goto done;
-		ref2->committer_time =
-		    got_object_commit_get_committer_time(commit2);
 	}
 
 	if (ref1->committer_time < ref2->committer_time)
 		*cmp = 1;
 	else if (ref2->committer_time < ref1->committer_time)
 		*cmp = -1;
-done:
-	free(id1);
-	free(id2);
-	if (commit1)
-		got_object_commit_close(commit1);
-	if (commit2)
-		got_object_commit_close(commit2);
+
 	return err;
 }
 
