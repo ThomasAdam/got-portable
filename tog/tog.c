@@ -129,11 +129,13 @@ static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
 
 static const struct got_error *
-tog_load_refs(struct got_repository *repo)
+tog_load_refs(struct got_repository *repo, int sort_by_date)
 {
 	const struct got_error *err;
 
-	err = got_ref_list(&tog_refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	err = got_ref_list(&tog_refs, repo, NULL, sort_by_date ?
+	    got_ref_cmp_by_commit_timestamp_descending : got_ref_cmp_by_name,
+	    repo);
 	if (err)
 		return err;
 
@@ -439,7 +441,7 @@ struct tog_ref_view_state {
 	struct tog_reflist_entry *first_displayed_entry;
 	struct tog_reflist_entry *last_displayed_entry;
 	struct tog_reflist_entry *selected_entry;
-	int nrefs, ndisplayed, selected, show_ids;
+	int nrefs, ndisplayed, selected, show_ids, sort_by_date;
 	struct got_repository *repo;
 	struct tog_reflist_entry *matched_entry;
 	struct tog_colors colors;
@@ -2586,7 +2588,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (err)
 			return err;
 		tog_free_refs();
-		err = tog_load_refs(s->repo);
+		err = tog_load_refs(s->repo, 0);
 		if (err)
 			return err;
 		err = got_commit_graph_open(&s->thread_args.graph,
@@ -2793,7 +2795,7 @@ cmd_log(int argc, char *argv[])
 
 	/* already loaded by tog_log_with_path()? */
 	if (TAILQ_EMPTY(&tog_refs)) {
-		error = tog_load_refs(repo);
+		error = tog_load_refs(repo, 0);
 		if (error)
 			goto done;
 	}
@@ -3914,7 +3916,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
+	error = tog_load_refs(repo, 0);
 	if (error)
 		goto done;
 
@@ -4842,7 +4844,7 @@ cmd_blame(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
+	error = tog_load_refs(repo, 0);
 	if (error)
 		goto done;
 
@@ -5695,7 +5697,7 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
+	error = tog_load_refs(repo, 0);
 	if (error)
 		goto done;
 
@@ -6230,6 +6232,15 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'i':
 		s->show_ids = !s->show_ids;
 		break;
+	case 's':
+		s->sort_by_date = !s->sort_by_date;
+		tog_free_refs();
+		err = tog_load_refs(s->repo, s->sort_by_date);
+		if (err)
+			break;
+		ref_view_free_refs(s);
+		err = ref_view_load_refs(s);
+		break;
 	case KEY_ENTER:
 	case '\r':
 		if (!s->selected_entry)
@@ -6326,7 +6337,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case CTRL('l'):
 		tog_free_refs();
-		err = tog_load_refs(s->repo);
+		err = tog_load_refs(s->repo, s->sort_by_date);
 		if (err)
 			break;
 		ref_view_free_refs(s);
@@ -6410,7 +6421,7 @@ cmd_ref(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
+	error = tog_load_refs(repo, 0);
 	if (error)
 		goto done;
 
@@ -6535,7 +6546,7 @@ tog_log_with_path(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
+	error = tog_load_refs(repo, 0);
 	if (error)
 		goto done;
 	error = got_repo_match_object_id(&commit_id, NULL, worktree ?
