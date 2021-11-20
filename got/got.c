@@ -5878,8 +5878,8 @@ __dead static void
 usage_branch(void)
 {
 	fprintf(stderr,
-	    "usage: %s branch [-c commit] [-d] [-r repository] [-l] [-n] "
-	        "[name]\n", getprogname());
+	    "usage: %s branch [-c commit] [-d] [-r repository] [-l] [-t] "
+	        "[-n] [name]\n", getprogname());
 	exit(1);
 }
 
@@ -5944,7 +5944,8 @@ show_current_branch(struct got_repository *repo, struct got_worktree *worktree)
 }
 
 static const struct got_error *
-list_branches(struct got_repository *repo, struct got_worktree *worktree)
+list_branches(struct got_repository *repo, struct got_worktree *worktree,
+    int sort_by_time)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
@@ -5975,8 +5976,9 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 		}
 	}
 
-	err = got_ref_list(&refs, repo, "refs/heads",
-	    got_ref_cmp_by_name, NULL);
+	err = got_ref_list(&refs, repo, "refs/heads", sort_by_time ?
+	    got_ref_cmp_by_commit_timestamp_descending : got_ref_cmp_by_name,
+	    repo);
 	if (err)
 		return err;
 
@@ -5985,8 +5987,9 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 
 	got_ref_list_free(&refs);
 
-	err = got_ref_list(&refs, repo, "refs/remotes",
-	    got_ref_cmp_by_name, NULL);
+	err = got_ref_list(&refs, repo, "refs/remotes", sort_by_time ?
+	    got_ref_cmp_by_commit_timestamp_descending : got_ref_cmp_by_name,
+	    repo);
 	if (err)
 		return err;
 
@@ -6106,7 +6109,7 @@ cmd_branch(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0, do_show = 0, do_update = 1;
+	int ch, do_list = 0, do_show = 0, do_update = 1, sort_by_time = 0;
 	const char *delref = NULL, *commit_id_arg = NULL;
 	struct got_reference *ref = NULL;
 	struct got_pathlist_head paths;
@@ -6116,7 +6119,7 @@ cmd_branch(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "c:d:r:ln")) != -1) {
+	while ((ch = getopt(argc, argv, "c:d:r:lnt")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -6137,6 +6140,9 @@ cmd_branch(int argc, char *argv[])
 		case 'n':
 			do_update = 0;
 			break;
+		case 't':
+			sort_by_time = 1;
+			break;
 		default:
 			usage_branch();
 			/* NOTREACHED */
@@ -6145,6 +6151,8 @@ cmd_branch(int argc, char *argv[])
 
 	if (do_list && delref)
 		option_conflict('l', 'd');
+	if (sort_by_time && !do_list)
+		errx(1, "-t option requires -l option");
 
 	argc -= optind;
 	argv += optind;
@@ -6212,7 +6220,7 @@ cmd_branch(int argc, char *argv[])
 	if (do_show)
 		error = show_current_branch(repo, worktree);
 	else if (do_list)
-		error = list_branches(repo, worktree);
+		error = list_branches(repo, worktree, sort_by_time);
 	else if (delref)
 		error = delete_branch(repo, worktree, delref);
 	else {
