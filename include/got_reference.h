@@ -140,6 +140,11 @@ const struct got_error *
 got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
     struct got_reference *ref, got_ref_cmp_cb cmp_cb, void *cmp_arg);
 
+/* Sort a list of references with the provided comparison callback. */
+const struct got_error *
+got_reflist_sort(struct got_reflist_head *refs, got_ref_cmp_cb cmp_cb,
+    void *cmp_arg);
+
 /* Indicate whether the provided reference is symbolic (points at another
  * refernce) or not (points at an object ID). */
 int got_ref_is_symbolic(struct got_reference *);
