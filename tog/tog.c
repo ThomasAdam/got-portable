@@ -6244,8 +6244,14 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 's':
 		s->sort_by_date = !s->sort_by_date;
-		tog_free_refs();
-		err = tog_load_refs(s->repo, s->sort_by_date);
+		err = got_reflist_sort(&tog_refs, s->sort_by_date ?
+		    got_ref_cmp_by_commit_timestamp_descending :
+		    got_ref_cmp_by_name, s->repo);
+		if (err)
+			break;
+		got_reflist_object_id_map_free(tog_refs_idmap);
+		err = got_reflist_object_id_map_create(&tog_refs_idmap,
+		    &tog_refs, s->repo);
 		if (err)
 			break;
 		ref_view_free_refs(s);
