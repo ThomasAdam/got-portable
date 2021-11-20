@@ -838,6 +838,8 @@ got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
 		*cmp = 1;
 	else if (ref2->committer_time < ref1->committer_time)
 		*cmp = -1;
+	else
+		return got_ref_cmp_by_name(arg, cmp, ref1, ref2);
 
 	return err;
 }
