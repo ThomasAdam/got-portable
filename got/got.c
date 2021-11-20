@@ -5596,21 +5596,23 @@ __dead static void
 usage_ref(void)
 {
 	fprintf(stderr,
-	    "usage: %s ref [-r repository] [-l] [-c object] [-s reference] "
-	        "[-d] [name]\n",
+	    "usage: %s ref [-r repository] [-l] [-t] [-c object] "
+	        "[-s reference] [-d] [name]\n",
 	    getprogname());
 	exit(1);
 }
 
 static const struct got_error *
-list_refs(struct got_repository *repo, const char *refname)
+list_refs(struct got_repository *repo, const char *refname, int sort_by_time)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 
 	TAILQ_INIT(&refs);
-	err = got_ref_list(&refs, repo, refname, got_ref_cmp_by_name, NULL);
+	err = got_ref_list(&refs, repo, refname, sort_by_time ?
+	    got_ref_cmp_by_commit_timestamp_descending : got_ref_cmp_by_name,
+	    repo);
 	if (err)
 		return err;
 
@@ -5724,11 +5726,11 @@ cmd_ref(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0, do_delete = 0;
+	int ch, do_list = 0, do_delete = 0, sort_by_time = 0;
 	const char *obj_arg = NULL, *symref_target= NULL;
 	char *refname = NULL;
 
-	while ((ch = getopt(argc, argv, "c:dr:ls:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dr:ls:t")) != -1) {
 		switch (ch) {
 		case 'c':
 			obj_arg = optarg;
@@ -5749,6 +5751,9 @@ cmd_ref(int argc, char *argv[])
 		case 's':
 			symref_target = optarg;
 			break;
+		case 't':
+			sort_by_time = 1;
+			break;
 		default:
 			usage_ref();
 			/* NOTREACHED */
@@ -5767,6 +5772,8 @@ cmd_ref(int argc, char *argv[])
 		option_conflict('s', 'l');
 	if (do_delete && do_list)
 		option_conflict('d', 'l');
+	if (sort_by_time && !do_list)
+		errx(1, "-t option requires -l option");
 
 	argc -= optind;
 	argv += optind;
@@ -5843,7 +5850,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	if (do_list)
-		error = list_refs(repo, refname);
+		error = list_refs(repo, refname, sort_by_time);
 	else if (do_delete)
 		error = delete_ref_by_name(repo, refname);
 	else if (symref_target)
