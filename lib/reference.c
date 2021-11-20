@@ -889,6 +889,31 @@ got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *ref
 	return NULL;
 }
 
+const struct got_error *
+got_reflist_sort(struct got_reflist_head *refs,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_entry *re, *tmp, *new;
+	struct got_reflist_head sorted;
+
+	TAILQ_INIT(&sorted);
+
+	TAILQ_FOREACH_SAFE(re, refs, entry, tmp) {
+		struct got_reference *ref = re->ref;
+		TAILQ_REMOVE(refs, re, entry);
+		free(re);
+		err = got_reflist_insert(&new, &sorted, ref, cmp_cb, cmp_arg);
+		if (err || new == NULL /* duplicate */)
+			got_ref_close(ref);
+		if (err)
+			return err;
+	}
+
+	TAILQ_CONCAT(refs, &sorted, entry);
+	return NULL;
+}
+
 static const struct got_error *
 gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
     const char *subdir, struct got_repository *repo,
