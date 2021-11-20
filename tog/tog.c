@@ -6232,7 +6232,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'i':
 		s->show_ids = !s->show_ids;
 		break;
-	case 's':
+	case 'o':
 		s->sort_by_date = !s->sort_by_date;
 		err = got_reflist_sort(&tog_refs, s->sort_by_date ?
 		    got_ref_cmp_by_commit_timestamp_descending :
