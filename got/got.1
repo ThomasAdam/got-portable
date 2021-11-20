@@ -986,7 +986,7 @@ Show object IDs of files (blob objects) and directories (tree objects).
 .It Fl R
 Recurse into sub-directories in the repository.
 .El
-.It Cm ref Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl c Ar object Oc Oo Fl s Ar reference Oc Oo Fl d Oc Op Ar name
+.It Cm ref Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl t Oc Oo Fl c Ar object Oc Oo Fl s Ar reference Oc Oo Fl d Oc Op Ar name
 Manage references in a repository.
 .Pp
 References may be listed, created, deleted, and changed.
@@ -1017,7 +1017,15 @@ is a reference namespace, list all references in this namespace.
 Otherwise, show only the reference with the given
 .Ar name .
 Cannot be used together with any other options except
-.Fl r .
+.Fl r
+and
+.Fl t .
+.It Fl t
+Sort listed references by modification time (most recently modified first)
+instead of sorting by lexicographical order.
+Use of this option requires the
+.Fl l
+option to be used as well.
 .It Fl c Ar object
 Create a reference or change an existing reference.
 The reference with the specified
