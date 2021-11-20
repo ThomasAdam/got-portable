@@ -817,7 +817,7 @@ const struct got_error *
 got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
     struct got_reference *ref1, struct got_reference *ref2)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	struct got_repository *repo = arg;
 
 	*cmp = 0;
