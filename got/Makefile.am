@@ -22,6 +22,7 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/repository.c \
 	$(top_srcdir)/lib/sha1.c \
 	$(top_srcdir)/lib/worktree.c \
+	$(top_srcdir)/lib/worktree_open.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/buf.c \
 	$(top_srcdir)/lib/rcsutil.c \
