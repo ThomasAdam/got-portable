@@ -1137,6 +1137,17 @@ with one the following annotations:
 .It * Ta work tree's base commit matches the branch tip
 .It \(a~ Ta work tree's base commit is out-of-date
 .El
+.It Fl t
+Sort listed branches by modification time (most recently modified first)
+instead of sorting by lexicographical order.
+Branches in the
+.Dq refs/heads/
+reference namespace are listed before branches in
+.Dq refs/remotes/
+regardless.
+Use of this option requires the
+.Fl l
+option to be used as well.
 .It Fl d Ar name
 Delete the branch with the specified
 .Ar name
