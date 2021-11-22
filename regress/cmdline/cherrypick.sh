@@ -588,7 +588,7 @@ EOF
 	(cd $testroot/wt && got commit -m 'commit cherrypick result' \
 		> /dev/null 2>$testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1

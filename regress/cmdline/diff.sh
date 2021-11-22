@@ -278,7 +278,7 @@ test_diff_basic() {
 	# -P can only be used in a work tree
 	got diff -r $testroot/repo -P new master 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1092,7 +1092,7 @@ test_diff_commits() {
 	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 -c foo \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1110,7 +1110,7 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -P foo \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1129,7 +1129,7 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -s foo \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1148,7 +1148,7 @@ test_diff_commits() {
 	(cd $testroot/repo && got diff $commit_id0 $commit_id1 foo \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1167,7 +1167,7 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff $commit_id0 master foo \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
