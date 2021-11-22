@@ -177,6 +177,7 @@
 /lib/sha1.c
 /lib/utf8.c
 /lib/worktree.c
+/lib/worktree_open.c
 /libexec
 /libexec/Makefile
 /libexec/Makefile.inc
