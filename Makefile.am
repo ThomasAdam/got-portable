@@ -17,7 +17,8 @@ GOT_TEST_ROOT=/tmp
 tests: $(TEST_TARGETS)
 
 regress-cmdline:
-	(cd $(top_builddir)/regress/cmdline || exit $$?; 	\
+	(export PLATFORM=@PLATFORM@; 				\
+	cd $(top_builddir)/regress/cmdline || exit $$?; 	\
 	./checkout.sh -r "$(GOT_TEST_ROOT)";			\
 	./update.sh -r "$(GOT_TEST_ROOT)";			\
 	./status.sh -r "$(GOT_TEST_ROOT)";			\

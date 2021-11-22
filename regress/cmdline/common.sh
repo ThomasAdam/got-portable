@@ -29,7 +29,7 @@ export MALLOC_OPTIONS=S
 date()
 {
 	DATECMD="date"
-	[ "$OSTYPE" != "linux-gnu" ] && DATECMD="gdate"
+	[ "$PLATFORM" != "linux" ] && DATECMD="gdate"
 
 	command "$DATECMD" "$@"
 }
@@ -37,7 +37,7 @@ date()
 ln()
 {
 	LNCMD="ln"
-	[ "$OSTYPE" != "linux-gnu" ] && LNCMD="gln"
+	[ "$PLATFORM" != "linux" ] && LNCMD="gln"
 
 	command "$LNCMD" "$@"
 }
@@ -45,7 +45,7 @@ ln()
 sed()
 {
 	SEDCMD="sed"
-	[ "$OSTYPE" == "linux-gnu" ] && {
+	[ "$PLATFORM" = "linux" ] && {
 		set -- "$@"
 		[ $# -ge 4 ] && {
 			shift 2
