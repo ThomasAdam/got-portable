@@ -1098,6 +1098,7 @@ diff_algo_myers(const struct diff_algo_config *algo_config,
 	size_t kd_state_size = kd_buf_size * sizeof(int);
 	debug("state size: %zu\n", kd_state_size);
 	if (kd_buf_size < kd_len /* overflow? */
+	    || (SIZE_MAX / kd_len ) < kd_len
 	    || kd_state_size > algo_config->permitted_state_size) {
 		debug("state size %zu > permitted_state_size %zu, use fallback_algo\n",
 		      kd_state_size, algo_config->permitted_state_size);
