@@ -1,3 +1,16 @@
+* got 0.64; 2021-11-23
+- try only 3 delta base candidates instead of 10 to speed up packing
+- use up to 128 delta chain elements again; creates smaller packs at same speed
+- remove unused variables to fix LLVM 13 warnings (naddy)
+- make 'got rebase' switch the work tree if no commits need rebasing (jrick)
+- fix man page HTML rendering for command aliases (kn)
+- let gotadmin find the repository automatically if invoked in a work tree
+- preserve binary files during updates and merges instead of leaving them empty
+- allow sorting references by timestamp in tog ref view
+- add got ref -t option to sort listed references by modification time
+- add got branch -t option to sort listed branches by modification time
+- regress: make test operands POSIX compliant (thomas_adam)
+
 * got 0.63; 2021-10-17
 - fix 'got send -T' regression if tag already exists on server (found by Omar)
 - fix another regression where a 3-way merge would segfault (naddy)
