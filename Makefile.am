@@ -38,6 +38,7 @@ regress-cmdline:
 	./import.sh -r "$(GOT_TEST_ROOT)";			\
 	./histedit.sh -r "$(GOT_TEST_ROOT)";			\
 	./integrate.sh -r "$(GOT_TEST_ROOT)";			\
+	./merge.sh -r "$(GOT_TEST_ROOT)"; 			\
 	./stage.sh -r "$(GOT_TEST_ROOT)";			\
 	./unstage.sh -r "$(GOT_TEST_ROOT)"; 			\
 	./cat.sh -r "$(GOT_TEST_ROOT)"; 			\
