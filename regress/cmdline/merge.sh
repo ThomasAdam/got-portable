@@ -56,7 +56,7 @@ test_merge_basic() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -86,7 +86,7 @@ test_merge_basic() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -121,7 +121,7 @@ test_merge_basic() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -158,7 +158,7 @@ test_merge_basic() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -183,7 +183,7 @@ test_merge_basic() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -418,7 +418,7 @@ test_merge_continue() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -643,7 +643,7 @@ test_merge_abort() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -824,7 +824,7 @@ test_merge_in_progress() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -928,7 +928,7 @@ test_merge_path_prefix() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -982,7 +982,7 @@ test_merge_missing_file() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1065,7 +1065,7 @@ test_merge_no_op() {
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1114,7 +1114,7 @@ test_merge_no_op() {
 	(cd $testroot/wt && got merge -c > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
