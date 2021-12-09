@@ -2766,10 +2766,8 @@ got_privsep_exec_child(int imsg_fds[2], const char *path, const char *repo_path)
 		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
 		_exit(1);
 	}
-	if (closefrom(GOT_IMSG_FD_CHILD + 1) == -1) {
-		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
-		_exit(1);
-	}
+
+	closefrom(GOT_IMSG_FD_CHILD + 1);
 
 	if (execl(path, path, repo_path, (char *)NULL) == -1) {
 		fprintf(stderr, "%s: %s: %s\n", getprogname(), path,
