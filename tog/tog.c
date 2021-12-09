@@ -2201,10 +2201,7 @@ search_next_log_view(struct tog_view *view)
 			entry = TAILQ_PREV(s->matched_entry,
 			    commit_queue_head, entry);
 	} else {
-		if (view->searching == TOG_SEARCH_FORWARD)
-			entry = TAILQ_FIRST(&s->commits.head);
-		else
-			entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
+		entry = s->selected_entry;
 	}
 
 	while (1) {
