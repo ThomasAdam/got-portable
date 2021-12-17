@@ -3428,12 +3428,8 @@ search_next_diff_view(struct tog_view *view)
 			lineno = s->matched_line + 1;
 		else
 			lineno = s->matched_line - 1;
-	} else {
-		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = 1;
-		else
-			lineno = s->nlines;
-	}
+	} else
+		lineno = s->first_displayed_line;
 
 	while (1) {
 		off_t offset;
@@ -4478,12 +4474,8 @@ search_next_blame_view(struct tog_view *view)
 			lineno = s->matched_line + 1;
 		else
 			lineno = s->matched_line - 1;
-	} else {
-		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = 1;
-		else
-			lineno = s->blame.nlines;
-	}
+	} else
+		lineno = s->first_displayed_line - 1 + s->selected_line;
 
 	while (1) {
 		off_t offset;
@@ -5368,7 +5360,9 @@ search_next_tree_view(struct tog_view *view)
 				    s->selected_entry);
 		}
 	} else {
-		if (view->searching == TOG_SEARCH_FORWARD)
+		if (s->selected_entry)
+			te = s->selected_entry;
+		else if (view->searching == TOG_SEARCH_FORWARD)
 			te = got_object_tree_get_first_entry(s->tree);
 		else
 			te = got_object_tree_get_last_entry(s->tree);
@@ -6027,7 +6021,9 @@ search_next_ref_view(struct tog_view *view)
 				    tog_reflist_head, entry);
 		}
 	} else {
-		if (view->searching == TOG_SEARCH_FORWARD)
+		if (s->selected_entry)
+			re = s->selected_entry;
+		else if (view->searching == TOG_SEARCH_FORWARD)
 			re = TAILQ_FIRST(&s->refs);
 		else
 			re = TAILQ_LAST(&s->refs, tog_reflist_head);
