@@ -626,7 +626,7 @@ got_diff_tree_collect_changed_paths(void *arg, struct got_blob_object *blob1,
 			change->status = GOT_STATUS_MODE_CHANGE;
 	}
 
-	err = got_pathlist_insert(NULL, paths, path, change);
+	err = got_pathlist_append(paths, path, change);
 done:
 	if (err) {
 		free(path);
