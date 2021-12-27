@@ -1658,6 +1658,11 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 	}
 
+	if (pack_hash == NULL) {
+		error = got_error_fmt(GOT_ERR_FETCH_FAILED, "%s",
+		    "server sent an empty pack file");
+		goto done;
+	}
 	error = got_object_id_str(&id_str, pack_hash);
 	if (error)
 		goto done;
