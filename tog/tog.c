@@ -3699,6 +3699,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		wclear(view->window);
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
+		s->matched_line = 0;
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
 		break;
@@ -3757,6 +3758,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case '[':
 		if (s->diff_context > 0) {
 			s->diff_context--;
+			s->matched_line = 0;
 			diff_view_indicate_progress(view);
 			err = create_diff(s);
 			if (s->first_displayed_line + view->nlines - 1 >
@@ -3769,6 +3771,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case ']':
 		if (s->diff_context < GOT_DIFF_MAX_CONTEXT) {
 			s->diff_context++;
+			s->matched_line = 0;
 			diff_view_indicate_progress(view);
 			err = create_diff(s);
 		}
@@ -3793,6 +3796,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
+		s->matched_line = 0;
 
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
@@ -3817,6 +3821,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
+		s->matched_line = 0;
 
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
@@ -4369,6 +4374,7 @@ run_blame(struct tog_view *view)
 		s->last_displayed_line = view->nlines;
 		s->selected_line = 1;
 	}
+	s->matched_line = 0;
 
 done:
 	if (blob)
