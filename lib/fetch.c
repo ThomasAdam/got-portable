@@ -93,7 +93,7 @@ got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
 	return err;
 }
 
-const struct got_error*
+const struct got_error *
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, const char *remote_name,
     int mirror_references, int fetch_all_branches,
