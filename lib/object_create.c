@@ -246,7 +246,6 @@ te_mode2str(char *buf, size_t len, struct got_tree_entry *te)
 	/*
 	 * Some Git implementations are picky about modes seen in tree entries.
 	 * For best compatibility we normalize the file/directory mode here.
-	 * Note that we do not support committing symlinks.
 	 */
 	if (S_ISREG(te->mode)) {
 		mode = GOT_DEFAULT_FILE_MODE;
