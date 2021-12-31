@@ -386,7 +386,8 @@ open_repo(struct got_repository *repo, const char *path)
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		repo->gitdir_fd = open(repo->path_git_dir, O_DIRECTORY);
+		repo->gitdir_fd = open(repo->path_git_dir,
+		    O_DIRECTORY | O_CLOEXEC);
 		if (repo->gitdir_fd == -1) {
 			err = got_error_from_errno2("open",
 			    repo->path_git_dir);
@@ -408,7 +409,8 @@ open_repo(struct got_repository *repo, const char *path)
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		repo->gitdir_fd = open(repo->path_git_dir, O_DIRECTORY);
+		repo->gitdir_fd = open(repo->path_git_dir,
+		    O_DIRECTORY | O_CLOEXEC);
 		if (repo->gitdir_fd == -1) {
 			err = got_error_from_errno2("open",
 			    repo->path_git_dir);
@@ -459,7 +461,7 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 	if (gitconfig_owner)
 		*gitconfig_owner = NULL;
 
-	fd = open(gitconfig_path, O_RDONLY);
+	fd = open(gitconfig_path, O_RDONLY | O_CLOEXEC);
 	if (fd == -1) {
 		if (errno == ENOENT)
 			return NULL;

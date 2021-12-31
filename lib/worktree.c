@@ -1042,7 +1042,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 			goto done;
 	} else {
 		int fd;
-		fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+		fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd == -1) {
 			err = got_error_from_errno2("open", ondisk_path);
 			goto done;
@@ -1157,7 +1157,7 @@ replace_existing_symlink(int *did_something, const char *ondisk_path,
 	 * caller. If we can successfully open a regular file then we simply
 	 * replace this file with a symlink below.
 	 */
-	fd = open(ondisk_path, O_RDWR | O_EXCL | O_NOFOLLOW);
+	fd = open(ondisk_path, O_RDWR | O_EXCL | O_NOFOLLOW | O_CLOEXEC);
 	if (fd == -1) {
 		if (!got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", ondisk_path);
@@ -1387,8 +1387,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	int update = 0;
 	char *tmppath = NULL;
 
-	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
-	    GOT_DEFAULT_FILE_MODE);
+	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW |
+	    O_CLOEXEC, GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		if (errno == ENOENT) {
 			char *parent;
@@ -1400,7 +1400,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			if (err)
 				return err;
 			fd = open(ondisk_path,
-			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
 			    GOT_DEFAULT_FILE_MODE);
 			if (fd == -1)
 				return got_error_from_errno2("open",
@@ -1655,7 +1655,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 			goto done;
 		}
 	} else {
-		fd = open(abspath, O_RDONLY | O_NOFOLLOW);
+		fd = open(abspath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd == -1 && errno != ENOENT &&
 		    !got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", abspath);
@@ -2814,7 +2814,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (err)
 				goto done;
 
-			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
 				err = got_error_from_errno2("open",
 				    ondisk_path);
@@ -3647,7 +3647,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
 		return got_error_from_errno("asprintf");
 
-	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
 	if (fd == -1) {
 		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES &&
 		    !got_err_open_nofollow_on_symlink())
@@ -4368,7 +4368,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 			sb2.st_size = link_len;
 		}
 	} else {
-		fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
+		fd2 = open(path2, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd2 == -1) {
 			if (!got_err_open_nofollow_on_symlink()) {
 				err = got_error_from_errno2("open", path2);
@@ -8345,7 +8345,8 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 				goto done;
 		} else {
 			int fd;
-			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+			fd = open(ondisk_path,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
 				err = got_error_from_errno2("open", ondisk_path);
 				goto done;

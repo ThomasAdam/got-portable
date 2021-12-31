@@ -279,7 +279,7 @@ buf_write(BUF *b, const char *path, mode_t mode)
 	const struct got_error *err = NULL;
 	int fd;
  open:
-	if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, mode)) == -1) {
+	if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, mode)) == -1) {
 		err = got_error_from_errno2("open", path);
 		if (errno == EACCES && unlink(path) != -1)
 			goto open;
