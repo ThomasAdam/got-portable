@@ -169,7 +169,8 @@ static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
 static const struct got_error *skip(size_t *, int, int, struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
-static const struct got_error *prange(struct line_range *, struct diff3_state *);
+static const struct got_error *prange(struct line_range *,
+    struct diff3_state *);
 static const struct got_error *repos(int, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,

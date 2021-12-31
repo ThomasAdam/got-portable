@@ -844,8 +844,9 @@ got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
 }
 
 const struct got_error *
-got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
-    struct got_reference *ref, got_ref_cmp_cb cmp_cb, void *cmp_arg)
+got_reflist_insert(struct got_reflist_entry **newp,
+    struct got_reflist_head *refs, struct got_reference *ref,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
 	struct got_reflist_entry *new, *re;

@@ -186,7 +186,8 @@ void got_object_tree_close(struct got_tree_object *);
 int got_object_tree_get_nentries(struct got_tree_object *);
 
 /* Get the first tree entry from a tree, or NULL if there is none. */
-struct got_tree_entry *got_object_tree_get_first_entry(struct got_tree_object *);
+struct got_tree_entry *got_object_tree_get_first_entry(
+    struct got_tree_object *);
 
 /* Get the last tree entry from a tree, or NULL if there is none. */
 struct got_tree_entry *got_object_tree_get_last_entry(struct got_tree_object *);

@@ -44,5 +44,6 @@ struct got_pack;
 struct got_packidx;
 struct got_inflate_checksum;
 
-const struct got_error *got_object_parse_header(struct got_object **, char *, size_t);
+const struct got_error *got_object_parse_header(struct got_object **, char *,
+    size_t);
 const struct got_error *got_object_read_header(struct got_object **, int);

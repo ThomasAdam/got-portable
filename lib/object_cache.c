@@ -144,7 +144,8 @@ get_size_raw(struct got_raw_object *raw)
 }
 
 const struct got_error *
-got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
+got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id,
+    void *item)
 {
 	const struct got_error *err = NULL;
 	struct got_object_cache_entry *ce;

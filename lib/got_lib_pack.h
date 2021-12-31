@@ -193,4 +193,5 @@ const struct got_error *got_packfile_extract_object(struct got_pack *,
     struct got_object *, FILE *, FILE *, FILE *);
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
     struct got_object *, struct got_pack *);
-struct got_pack *got_repo_get_cached_pack(struct got_repository *, const char *);
+struct got_pack *got_repo_get_cached_pack(struct got_repository *,
+    const char *);
