@@ -2816,7 +2816,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (err)
 				goto done;
 
-			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+			fd = open(ondisk_path,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
 				err = got_error_from_errno2("open",
 				    ondisk_path);
@@ -4366,8 +4367,10 @@ create_patched_content(char **path_outfile, int reverse_patch,
 			}
 			link_len = readlinkat(dirfd2, de_name2,
 			    link_target, sizeof(link_target));
-			if (link_len == -1)
-				return got_error_from_errno2("readlinkat", path2);
+			if (link_len == -1) {
+				return got_error_from_errno2("readlinkat",
+				    path2);
+			}
 			sb2.st_mode = S_IFLNK;
 			sb2.st_size = link_len;
 		}

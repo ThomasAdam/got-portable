@@ -485,7 +485,8 @@ got_packidx_get_object_offset(struct got_packidx *packidx, int idx)
 }
 
 int
-got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
+got_packidx_get_object_idx(struct got_packidx *packidx,
+    struct got_object_id *id)
 {
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
@@ -730,8 +731,8 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 }
 
 const struct got_error *
-got_pack_parse_offset_delta(off_t *base_offset, size_t *len, struct got_pack *pack,
-    off_t offset, int tslen)
+got_pack_parse_offset_delta(off_t *base_offset, size_t *len,
+    struct got_pack *pack, off_t offset, int tslen)
 {
 	const struct got_error *err;
 	int64_t negoffset;
@@ -1028,8 +1029,8 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 }
 
 const struct got_error *
-got_pack_get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
-    struct got_pack *pack)
+got_pack_get_delta_chain_max_size(uint64_t *max_size,
+    struct got_delta_chain *deltas, struct got_pack *pack)
 {
 	struct got_delta *delta;
 	uint64_t base_size = 0, result_size = 0;

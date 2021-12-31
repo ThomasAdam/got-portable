@@ -8449,7 +8449,8 @@ done:
 }
 
 static const struct got_error *
-show_rebase_merge_conflict(struct got_object_id *id, struct got_repository *repo)
+show_rebase_merge_conflict(struct got_object_id *id,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit = NULL;
@@ -8833,7 +8834,8 @@ done:
 }
 
 static const struct got_error *
-process_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
+process_backup_refs(const char *backup_ref_prefix,
+    const char *wanted_branch_name,
     int delete, struct got_repository *repo)
 {
 	const struct got_error *err;

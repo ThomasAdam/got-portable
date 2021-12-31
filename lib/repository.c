@@ -1410,8 +1410,10 @@ match_packed_object(struct got_object_id **unique_id,
 	packdir_fd = openat(got_repo_get_fd(repo),
 	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
 	if (packdir_fd == -1) {
-		if (errno != ENOENT)
-			err = got_error_from_errno2("openat", GOT_OBJECTS_PACK_DIR);
+		if (errno != ENOENT) {
+			err = got_error_from_errno2("openat",
+			    GOT_OBJECTS_PACK_DIR);
+		}
 		goto done;
 	}
 

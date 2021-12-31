@@ -55,4 +55,5 @@ int      got_gitconfig_match_num(struct got_gitconfig *, char *, char *, int);
 const struct got_error *got_gitconfig_reinit(struct got_gitconfig *, int);
 int      got_gitconfig_remove(struct got_gitconfig *, int, char *, char *);
 int      got_gitconfig_remove_section(struct got_gitconfig *, int, char *);
-int      got_gitconfig_set(struct got_gitconfig *, int, char *, char *, char *, int, int);
+int      got_gitconfig_set(struct got_gitconfig *, int, char *, char *, char *,
+    int, int);

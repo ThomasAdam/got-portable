@@ -773,8 +773,9 @@ done:
 }
 
 static const struct got_error *
-raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx, struct got_object_cache *objcache)
+raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	uint8_t *buf = NULL;

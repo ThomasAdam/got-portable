@@ -220,7 +220,8 @@ got_fileindex_entry_filetype_set(struct got_fileindex_entry *ie, int type)
 }
 
 void
-got_fileindex_entry_staged_filetype_set(struct got_fileindex_entry *ie, int type)
+got_fileindex_entry_staged_filetype_set(struct got_fileindex_entry *ie,
+    int type)
 {
 	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE_STAGED;
 	ie->mode |= ((type << GOT_FILEIDX_MODE_FILE_TYPE_STAGED_SHIFT) &

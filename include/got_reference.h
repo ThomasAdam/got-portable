@@ -137,8 +137,9 @@ void got_ref_list_free(struct got_reflist_head *);
  * elements by got_ref_list_free().
  */
 const struct got_error *
-got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
-    struct got_reference *ref, got_ref_cmp_cb cmp_cb, void *cmp_arg);
+got_reflist_insert(struct got_reflist_entry **newp,
+    struct got_reflist_head *refs, struct got_reference *ref,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg);
 
 /* Sort a list of references with the provided comparison callback. */
 const struct got_error *
