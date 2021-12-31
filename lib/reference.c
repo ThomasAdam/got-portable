@@ -188,7 +188,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		}
 	}
 
-	f = fopen(abspath, "rb");
+	f = fopen(abspath, "rbe");
 	if (f == NULL) {
 		if (errno != ENOTDIR && errno != ENOENT)
 			err = got_error_from_errno2("fopen", abspath);
@@ -494,7 +494,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 			if (err)
 				goto done;
 		}
-		f = fopen(packed_refs_path, "rb");
+		f = fopen(packed_refs_path, "rbe");
 		free(packed_refs_path);
 		if (f != NULL) {
 			struct stat sb;
@@ -1087,7 +1087,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		goto done;
 	}
 
-	f = fopen(packed_refs_path, "r");
+	f = fopen(packed_refs_path, "re");
 	free(packed_refs_path);
 	if (f) {
 		size_t linesize = 0;
@@ -1341,7 +1341,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			goto done;
 	}
 
-	f = fopen(packed_refs_path, "r");
+	f = fopen(packed_refs_path, "re");
 	if (f == NULL) {
 		err = got_error_from_errno2("fopen", packed_refs_path);
 		goto done;

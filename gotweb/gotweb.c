@@ -2669,7 +2669,7 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 	if (asprintf(&d_file, "%s/description", dir) == -1)
 		return got_error_from_errno("asprintf");
 
-	f = fopen(d_file, "r");
+	f = fopen(d_file, "re");
 	if (f == NULL) {
 		if (errno == ENOENT || errno == EACCES)
 			return NULL;
@@ -2972,7 +2972,7 @@ gw_get_clone_url(char **url, struct gw_trans *gw_trans, char *dir)
 	if (asprintf(&d_file, "%s/cloneurl", dir) == -1)
 		return got_error_from_errno("asprintf");
 
-	f = fopen(d_file, "r");
+	f = fopen(d_file, "re");
 	if (f == NULL) {
 		if (errno != ENOENT && errno != EACCES)
 			error = got_error_from_errno2("fopen", d_file);

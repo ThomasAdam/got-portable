@@ -2340,7 +2340,7 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 	if (err)
 		goto done;
 
-	index = fopen(*fileindex_path, "rb");
+	index = fopen(*fileindex_path, "rbe");
 	if (index == NULL) {
 		if (errno != ENOENT)
 			err = got_error_from_errno2("fopen", *fileindex_path);
@@ -3474,7 +3474,7 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 			}
 		}
 	} else {
-		ignoresfile = fopen(ignorespath, "r");
+		ignoresfile = fopen(ignorespath, "re");
 		if (ignoresfile == NULL) {
 			if (errno != ENOENT && errno != EACCES)
 				err = got_error_from_errno2("fopen",
@@ -8284,7 +8284,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 			goto done;
 	}
 
-	f = fopen(path_unstaged_content, "r");
+	f = fopen(path_unstaged_content, "re");
 	if (f == NULL) {
 		err = got_error_from_errno2("fopen",
 		    path_unstaged_content);

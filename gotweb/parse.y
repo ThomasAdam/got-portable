@@ -503,7 +503,7 @@ pushfile(struct file **nfile, const char *name)
 		free(nfile);
 		return got_error_from_errno2(__func__, "strdup");
 	}
-	if (((*nfile)->stream = fopen((*nfile)->name, "r")) == NULL) {
+	if (((*nfile)->stream = fopen((*nfile)->name, "re")) == NULL) {
 		char *msg = NULL;
 		if (asprintf(&msg, "%s", (*nfile)->name) == -1)
 			return got_error_from_errno("asprintf");
