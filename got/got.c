@@ -504,7 +504,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		return got_error_from_errno("malloc");
 	(*logmsg)[0] = '\0';
 
-	fp = fopen(logmsg_path, "r");
+	fp = fopen(logmsg_path, "re");
 	if (fp == NULL) {
 		err = got_error_from_errno("fopen");
 		goto done;
@@ -1236,7 +1236,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 		err = got_error_from_errno("got_repo_get_path_gotconfig");
 		goto done;
 	}
-	gotconfig_file = fopen(gotconfig_path, "a");
+	gotconfig_file = fopen(gotconfig_path, "ae");
 	if (gotconfig_file == NULL) {
 		err = got_error_from_errno2("fopen", gotconfig_path);
 		goto done;
@@ -1296,7 +1296,7 @@ create_gitconfig(const char *git_url, const char *default_branch,
 		err = got_error_from_errno("got_repo_get_path_gitconfig");
 		goto done;
 	}
-	gitconfig_file = fopen(gitconfig_path, "a");
+	gitconfig_file = fopen(gitconfig_path, "ae");
 	if (gitconfig_file == NULL) {
 		err = got_error_from_errno2("fopen", gitconfig_path);
 		goto done;
@@ -7296,7 +7296,7 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	if (patch_script_path) {
-		patch_script_file = fopen(patch_script_path, "r");
+		patch_script_file = fopen(patch_script_path, "re");
 		if (patch_script_file == NULL) {
 			error = got_error_from_errno2("fopen",
 			    patch_script_path);
@@ -7392,7 +7392,7 @@ read_prepared_logmsg(char **logmsg, const char *path)
 	*logmsg = NULL;
 	memset(&sb, 0, sizeof(sb));
 
-	f = fopen(path, "r");
+	f = fopen(path, "re");
 	if (f == NULL)
 		return got_error_from_errno2("fopen", path);
 
@@ -9824,7 +9824,7 @@ histedit_run_editor(struct got_histedit_list *histedit_cmds,
 		goto done;
 	}
 
-	f = fopen(path, "r");
+	f = fopen(path, "re");
 	if (f == NULL) {
 		err = got_error_from_errno("fopen");
 		goto done;
@@ -9910,7 +9910,7 @@ histedit_save_list(struct got_histedit_list *histedit_cmds,
 	if (err)
 		return err;
 
-	f = fopen(path, "w");
+	f = fopen(path, "we");
 	if (f == NULL) {
 		err = got_error_from_errno2("fopen", path);
 		goto done;
@@ -9957,7 +9957,7 @@ histedit_load_list(struct got_histedit_list *histedit_cmds,
 	const struct got_error *err = NULL;
 	FILE *f = NULL;
 
-	f = fopen(path, "r");
+	f = fopen(path, "re");
 	if (f == NULL) {
 		err = got_error_from_errno2("fopen", path);
 		goto done;
@@ -11241,7 +11241,7 @@ cmd_stage(int argc, char *argv[])
 		goto done;
 
 	if (patch_script_path) {
-		patch_script_file = fopen(patch_script_path, "r");
+		patch_script_file = fopen(patch_script_path, "re");
 		if (patch_script_file == NULL) {
 			error = got_error_from_errno2("fopen",
 			    patch_script_path);
@@ -11361,7 +11361,7 @@ cmd_unstage(int argc, char *argv[])
 		goto done;
 
 	if (patch_script_path) {
-		patch_script_file = fopen(patch_script_path, "r");
+		patch_script_file = fopen(patch_script_path, "re");
 		if (patch_script_file == NULL) {
 			error = got_error_from_errno2("fopen",
 			    patch_script_path);

@@ -207,12 +207,12 @@ diffreg(BUF **d, const char *path1, const char *path2,
 
 	*d = NULL;
 
-	f1 = fopen(path1, "r");
+	f1 = fopen(path1, "re");
 	if (f1 == NULL) {
 		err = got_error_from_errno2("fopen", path1);
 		goto done;
 	}
-	f2 = fopen(path2, "r");
+	f2 = fopen(path2, "re");
 	if (f1 == NULL) {
 		err = got_error_from_errno2("fopen", path2);
 		goto done;
@@ -460,11 +460,11 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 	if (err)
 		return err;
 
-	if ((d3s->fp[0] = fopen(path1, "r")) == NULL)
+	if ((d3s->fp[0] = fopen(path1, "re")) == NULL)
 		return got_error_from_errno2("fopen", path1);
-	if ((d3s->fp[1] = fopen(path2, "r")) == NULL)
+	if ((d3s->fp[1] = fopen(path2, "re")) == NULL)
 		return got_error_from_errno2("fopen", path2);
-	if ((d3s->fp[2] = fopen(path3, "r")) == NULL)
+	if ((d3s->fp[2] = fopen(path3, "re")) == NULL)
 		return got_error_from_errno2("fopen", path3);
 
 	return merge(m, n, d3s);
@@ -604,7 +604,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 
 	*n = 0;
 
-	f = fopen(name, "r");
+	f = fopen(name, "re");
 	if (f == NULL)
 		return got_error_from_errno2("fopen", name);
 	err = getchange(&p, f, d3s);
