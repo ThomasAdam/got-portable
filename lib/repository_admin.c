@@ -483,7 +483,7 @@ got_repo_find_pack(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	packfd = open(packfile_path, O_RDONLY | O_NOFOLLOW);
+	packfd = open(packfile_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (packfd == -1) {
 		err = got_error_from_errno2("open", packfile_path);
 		goto done;

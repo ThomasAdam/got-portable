@@ -136,7 +136,7 @@ got_object_open_loose_fd(int *fd, struct got_object_id *id,
 	err = got_object_get_path(&path, id, repo);
 	if (err)
 		return err;
-	*fd = open(path, O_RDONLY | O_NOFOLLOW);
+	*fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (*fd == -1) {
 		err = got_error_from_errno2("open", path);
 		goto done;

@@ -127,7 +127,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 
 	SHA1Init(&sha1_ctx);
 
-	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (fd == -1) {
 		if (!got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", ondisk_path);

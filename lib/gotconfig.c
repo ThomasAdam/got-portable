@@ -51,7 +51,7 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	if (*conf == NULL)
 		return got_error_from_errno("calloc");
 
-	fd = open(gotconfig_path, O_RDONLY);
+	fd = open(gotconfig_path, O_RDONLY | O_CLOEXEC);
 	if (fd == -1) {
 		if (errno == ENOENT)
 			return NULL;

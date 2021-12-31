@@ -500,7 +500,7 @@ got_path_create_file(const char *path, const char *content)
 	const struct got_error *err = NULL;
 	int fd = -1;
 
-	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		err = got_error_from_errno2("open", path);
