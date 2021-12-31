@@ -1215,7 +1215,7 @@ got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
 	struct stat sb;
 
 	packdir_fd = openat(got_repo_get_fd(repo),
-	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
 	if (packdir_fd == -1) {
 		if (errno == ENOENT)
 			return NULL;

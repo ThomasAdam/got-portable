@@ -1125,7 +1125,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	/* No luck. Search the filesystem. */
 
 	packdir_fd = openat(got_repo_get_fd(repo),
-	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
 	if (packdir_fd == -1) {
 		if (errno == ENOENT)
 			err = got_error_no_obj(id);
@@ -1233,7 +1233,8 @@ open_packfile(int *fd, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 
-	*fd = openat(got_repo_get_fd(repo), relpath, O_RDONLY | O_NOFOLLOW);
+	*fd = openat(got_repo_get_fd(repo), relpath,
+	    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (*fd == -1)
 		return got_error_from_errno_fmt("openat: %s/%s",
 		    got_repo_get_path_git_dir(repo), relpath);
@@ -1407,7 +1408,7 @@ match_packed_object(struct got_object_id **unique_id,
 	STAILQ_INIT(&matched_ids);
 
 	packdir_fd = openat(got_repo_get_fd(repo),
-	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
 	if (packdir_fd == -1) {
 		if (errno != ENOENT)
 			err = got_error_from_errno2("openat", GOT_OBJECTS_PACK_DIR);

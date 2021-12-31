@@ -1717,7 +1717,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 	}
 
 	if (dirfd != -1) {
-		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
+		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd == -1) {
 			err = got_error_from_errno2("openat", abspath);
 			goto done;
@@ -3460,7 +3460,8 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 		return got_error_from_errno("asprintf");
 
 	if (dirfd != -1) {
-		fd = openat(dirfd, ignores_filename, O_RDONLY | O_NOFOLLOW);
+		fd = openat(dirfd, ignores_filename,
+		    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd == -1) {
 			if (errno != ENOENT && errno != EACCES)
 				err = got_error_from_errno2("openat",
@@ -4356,7 +4357,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		return err;
 
 	if (dirfd2 != -1) {
-		fd2 = openat(dirfd2, de_name2, O_RDONLY | O_NOFOLLOW);
+		fd2 = openat(dirfd2, de_name2,
+		    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd2 == -1) {
 			if (!got_err_open_nofollow_on_symlink()) {
 				err = got_error_from_errno2("openat", path2);

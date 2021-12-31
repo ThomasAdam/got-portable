@@ -4435,7 +4435,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		}
 
 		if (dirfd != -1) {
-			fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
+			fd = openat(dirfd, de_name,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
 				if (!got_err_open_nofollow_on_symlink()) { 
 					err = got_error_from_errno2("openat",
