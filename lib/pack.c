@@ -364,7 +364,7 @@ got_packidx_open(struct got_packidx **packidx,
 		goto done;
 	}
 
-	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW);
+	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (p->fd == -1) {
 		err = got_error_from_errno2("openat", relpath);
 		free(p);

@@ -1057,7 +1057,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 		}
 
 		subdirfd = openat(fd, de->d_name,
-		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
 		if (subdirfd == -1) {
 			if (errno == EACCES) {
 				*next = TAILQ_NEXT(dle, entry);
