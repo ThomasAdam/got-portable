@@ -148,11 +148,7 @@ test_cherrypick_root_commit() {
 	git_commit $testroot/repo -m "committing on newbranch again"
 
 	tree=`git_show_tree $testroot/repo`
-	# new root commit will not be referenced; disable automatic packing
-	_GOT_TEST_PACK="$GOT_TEST_PACK"
-	export GOT_TEST_PACK=""
 	root_commit=`git_commit_tree $testroot/repo "new root commit" $tree`
-	export GOT_TEST_PACK="$_GOT_TEST_PACK"
 
 	(cd $testroot/wt && got cherrypick $root_commit > $testroot/stdout)
 
