@@ -159,7 +159,6 @@ git_commit_tree()
 	local msg="$2"
 	local tree="$3"
 	(cd $repo && git commit-tree -m "$msg" "$tree")
-	maybe_pack_repo $repo
 }
 
 git_fsck()
