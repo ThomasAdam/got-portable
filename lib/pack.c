@@ -523,7 +523,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	char hex[3];
 	size_t prefix_len = strlen(id_str_prefix);
 	struct got_packidx_object_id *oid;
-	uint32_t i;
+	uint32_t i = 0;
 
 	STAILQ_INIT(matched_ids);
 
@@ -536,7 +536,8 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	if (!got_parse_xdigit(&id0, hex))
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
-	i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
+	if (id0 > 0)
+		i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 	oid = &packidx->hdr.sorted_ids[i];
 	while (i < totobj && oid->sha1[0] == id0) {
 		char id_str[SHA1_DIGEST_STRING_LENGTH];
