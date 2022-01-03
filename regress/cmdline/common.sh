@@ -46,7 +46,7 @@ maybe_pack_repo()
 {
 	local repo="$1"
 	if [ -n "$GOT_TEST_PACK" ]; then
-		(cd $repo && git repack -a -q)
+		(cd $repo && gotadmin pack -a > /dev/null)
 	fi
 }
 
