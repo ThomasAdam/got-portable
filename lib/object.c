@@ -166,6 +166,42 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	return NULL;
 }
 
+/* Create temporary files used during delta application. */
+static const struct got_error *
+pack_child_send_tempfiles(struct imsgbuf *ibuf, struct got_pack *pack)
+{
+	const struct got_error *err;
+	int basefd, accumfd;
+
+	/* 
+	 * For performance reasons, the child will keep reusing the
+	 * same temporary files during every object request.
+	 * Opening and closing new files for every object request is
+	 * too expensive during operations such as 'gotadmin pack'.
+	 */
+	if (pack->child_has_tempfiles)
+		return NULL;
+
+	basefd = got_opentempfd();
+	if (basefd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	err = got_privsep_send_tmpfd(ibuf, basefd);
+	if (err)
+		return err;
+
+	accumfd = got_opentempfd();
+	if (accumfd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	err = got_privsep_send_tmpfd(ibuf, accumfd);
+	if (err)
+		return err;
+
+	pack->child_has_tempfiles = 1;
+	return NULL;
+}
+
 static const struct got_error *
 request_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
     int outfd, struct got_pack *pack, int idx, struct got_object_id *id)
@@ -173,51 +209,22 @@ request_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
 	int outfd_child;
-	int basefd, accumfd; /* temporary files for delta application */
 
-	basefd = got_opentempfd();
-	if (basefd == -1)
-		return got_error_from_errno("got_opentempfd");
-
-	accumfd = got_opentempfd();
-	if (accumfd == -1) {
-		close(basefd);
-		return got_error_from_errno("got_opentempfd");
-	}
+	 err = pack_child_send_tempfiles(ibuf, pack);
+	 if (err)
+		return err;
 
 	outfd_child = dup(outfd);
-	if (outfd_child == -1) {
-		err = got_error_from_errno("dup");
-		close(basefd);
-		close(accumfd);
-		return err;
-	}
+	if (outfd_child == -1)
+		return got_error_from_errno("dup");
 
 	err = got_privsep_send_packed_raw_obj_req(ibuf, idx, id);
 	if (err) {
-		close(basefd);
-		close(accumfd);
 		close(outfd_child);
 		return err;
 	}
 
 	err = got_privsep_send_raw_obj_outfd(ibuf, outfd_child);
-	if (err) {
-		close(basefd);
-		close(accumfd);
-		return err;
-	}
-
-
-	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
-	    basefd);
-	if (err) {
-		close(accumfd);
-		return err;
-	}
-
-	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
-	    accumfd);
 	if (err)
 		return err;
 
@@ -258,6 +265,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		free(ibuf);
 		return err;
 	}
+	pack->child_has_tempfiles = 0;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
 		err = got_error_from_errno("socketpair");
@@ -1191,15 +1199,12 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
     struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
 	int outfd_child;
-	int basefd, accumfd; /* temporary files for delta application */
 
-	basefd = got_opentempfd();
-	if (basefd == -1)
-		return got_error_from_errno("got_opentempfd");
-	accumfd = got_opentempfd();
-	if (accumfd == -1)
-		return got_error_from_errno("got_opentempfd");
+	 err = pack_child_send_tempfiles(ibuf, pack);
+	 if (err)
+		return err;
 
 	outfd_child = dup(outfd);
 	if (outfd_child == -1)
@@ -1212,22 +1217,8 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	err = got_privsep_send_blob_outfd(pack->privsep_child->ibuf,
 	    outfd_child);
 	if (err) {
-		close(basefd);
-		close(accumfd);
 		return err;
 	}
-
-	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
-	    basefd);
-	if (err) {
-		close(accumfd);
-		return err;
-	}
-
-	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
-	    accumfd);
-	if (err)
-		return err;
 
 	err = got_privsep_recv_blob(outbuf, size, hdrlen,
 	    pack->privsep_child->ibuf);
