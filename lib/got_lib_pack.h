@@ -21,6 +21,7 @@ struct got_pack {
 	uint8_t *map;
 	size_t filesize;
 	struct got_privsep_child *privsep_child;
+	int child_has_tempfiles;
 	struct got_delta_cache *delta_cache;
 };
 

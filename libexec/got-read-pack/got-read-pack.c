@@ -288,13 +288,43 @@ done:
 }
 
 static const struct got_error *
+receive_tempfile(FILE **basefile, FILE **accumfile, struct imsg *imsg,
+    struct imsgbuf *ibuf)
+{
+	size_t datalen;
+	FILE **f;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	if (imsg->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	if (*basefile == NULL)
+		f = basefile;
+	else if (*accumfile == NULL)
+		f = accumfile;
+	else
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	*f = fdopen(imsg->fd, "w+");
+	if (*f == NULL)
+		return got_error_from_errno("fdopen");
+	imsg->fd = -1;
+
+	return NULL;
+}
+
+static const struct got_error *
 blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx, struct got_object_cache *objcache)
+    struct got_packidx *packidx, struct got_object_cache *objcache,
+    FILE *basefile, FILE *accumfile)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
-	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
+	FILE *outfile = NULL;
 	struct got_object_id id;
 	size_t datalen;
 	uint64_t blob_size;
@@ -319,12 +349,6 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	err = receive_file(&outfile, ibuf, GOT_IMSG_BLOB_OUTFD);
 	if (err)
 		goto done;
-	err = receive_file(&basefile, ibuf, GOT_IMSG_TMPFD);
-	if (err)
-		goto done;
-	err = receive_file(&accumfile, ibuf, GOT_IMSG_TMPFD);
-	if (err)
-		goto done;
 
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
 		err = got_pack_get_max_delta_object_size(&blob_size, obj, pack);
@@ -346,10 +370,6 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 done:
 	free(buf);
 	if (outfile && fclose(outfile) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (basefile && fclose(basefile) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (accumfile && fclose(accumfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
@@ -774,12 +794,12 @@ done:
 static const struct got_error *
 raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_pack *pack, struct got_packidx *packidx,
-    struct got_object_cache *objcache)
+    struct got_object_cache *objcache, FILE *basefile, FILE *accumfile)
 {
 	const struct got_error *err = NULL;
 	uint8_t *buf = NULL;
 	uint64_t size = 0;
-	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
+	FILE *outfile = NULL;
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj;
 	struct got_object_id id;
@@ -804,12 +824,6 @@ raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	err = receive_file(&outfile, ibuf, GOT_IMSG_RAW_OBJECT_OUTFD);
 	if (err)
 		return err;
-	err = receive_file(&basefile, ibuf, GOT_IMSG_TMPFD);
-	if (err)
-		goto done;
-	err = receive_file(&accumfile, ibuf, GOT_IMSG_TMPFD);
-	if (err)
-		goto done;
 
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
 		err = got_pack_get_max_delta_object_size(&size, obj, pack);
@@ -831,10 +845,6 @@ raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf,
 done:
 	free(buf);
 	if (outfile && fclose(outfile) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (basefile && fclose(basefile) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (accumfile && fclose(accumfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
@@ -998,6 +1008,7 @@ main(int argc, char *argv[])
 	struct got_packidx *packidx = NULL;
 	struct got_pack *pack = NULL;
 	struct got_object_cache objcache;
+	FILE *basefile = NULL, *accumfile = NULL;
 
 	//static int attached;
 	//while (!attached) sleep(1);
@@ -1053,13 +1064,21 @@ main(int argc, char *argv[])
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOT_IMSG_TMPFD:
+			err = receive_tempfile(&basefile, &accumfile,
+			    &imsg, &ibuf);
+			break;
 		case GOT_IMSG_PACKED_OBJECT_REQUEST:
 			err = object_request(&imsg, &ibuf, pack, packidx,
 			    &objcache);
 			break;
 		case GOT_IMSG_PACKED_RAW_OBJECT_REQUEST:
+			if (basefile == NULL || accumfile == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
 			err = raw_object_request(&imsg, &ibuf, pack, packidx,
-			    &objcache);
+			    &objcache, basefile, accumfile);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,
@@ -1070,8 +1089,12 @@ main(int argc, char *argv[])
 			    &objcache);
 			break;
 		case GOT_IMSG_BLOB_REQUEST:
+			if (basefile == NULL || accumfile == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
 			err = blob_request(&imsg, &ibuf, pack, packidx,
-			    &objcache);
+			    &objcache, basefile, accumfile);
 			break;
 		case GOT_IMSG_TAG_REQUEST:
 			err = tag_request(&imsg, &ibuf, pack, packidx,
@@ -1099,6 +1122,10 @@ main(int argc, char *argv[])
 		got_pack_close(pack);
 	got_object_cache_close(&objcache);
 	imsg_clear(&ibuf);
+	if (basefile && fclose(basefile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (accumfile && fclose(accumfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {
 			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
