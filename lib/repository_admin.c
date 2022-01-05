@@ -1193,8 +1193,7 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 
 	/* Produce a final progress report. */
 	if (progress_cb) {
-		err = progress_cb(progress_arg, nloose, ncommits,
-		    got_object_idset_num_elements(loose_ids));
+		err = progress_cb(progress_arg, nloose, ncommits, arg.npurged);
 		if (err)
 			goto done;
 	}
