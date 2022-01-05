@@ -230,6 +230,35 @@ int	BSDgetopt(int, char *const *, const char *);
 #endif
 #endif
 
+/* Check for some of the non-portable timespec*() functions.
+ * This should largely come from libbsd for systems which
+ * aren't BSD, but this will depend on how old the library
+ * is.
+ */
+#ifndef timespecisset
+#define	timespecisset(tsp) \
+	((tsp)->tv_sec || (tsp)->tv_nsec)
+#endif
+
+#ifndef timespecsub
+#define	timespecsub(tsp, usp, vsp)					\
+	do {								\
+		(vsp)->tv_sec = (tsp)->tv_sec - (usp)->tv_sec;		\
+		(vsp)->tv_nsec = (tsp)->tv_nsec - (usp)->tv_nsec;	\
+		if ((vsp)->tv_nsec < 0) {				\
+			(vsp)->tv_sec--;				\
+			(vsp)->tv_nsec += 1000000000L;			\
+		}							\
+	} while (0)
+#endif
+
+#ifndef timespeccmp
+#define timespeccmp(tvp, uvp, cmp) 					\
+(((tvp)->tv_sec == (uvp)->tv_sec) ? 					\
+	((tvp)->tv_nsec cmp (uvp)->tv_nsec) : 				\
+	((tvp)->tv_sec cmp (uvp)->tv_sec))
+#endif
+
 #ifndef HAVE_BSD_MERGESORT
 /* mergesort.c */
 int mergesort(void *, size_t, size_t, int (*)(const void *, const void *));

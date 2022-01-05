@@ -23,6 +23,7 @@
 
 #include "got_lib_ratelimit.h"
 
+#include "got_compat.h"
 #include "got_error.h"
 
 void
