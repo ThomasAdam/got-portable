@@ -18,6 +18,7 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/path.c \
 	$(top_srcdir)/lib/pack.c \
 	$(top_srcdir)/lib/privsep.c \
+	$(top_srcdir)/lib/ratelimit.c \
 	$(top_srcdir)/lib/reference.c \
 	$(top_srcdir)/lib/repository.c \
 	$(top_srcdir)/lib/sha1.c \
