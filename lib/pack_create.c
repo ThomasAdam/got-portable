@@ -20,6 +20,7 @@
 #include <sys/tree.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <stdint.h>
 #include <imsg.h>
@@ -27,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sha1.h>
+#include <time.h>
 #include <limits.h>
 #include <zlib.h>
 
@@ -47,6 +49,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
 #include "got_lib_repository.h"
+#include "got_lib_ratelimit.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -249,12 +252,30 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 	return NULL;
 }
 
+static const struct got_error *
+report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, off_t packfile_size, int ncommits,
+    int nobj_total, int obj_deltify, int nobj_written)
+{
+	const struct got_error *err;
+	int elapsed;
+
+	if (progress_cb == NULL)
+		return NULL;
+
+	err = got_ratelimit_check(&elapsed, rl);
+	if (err || !elapsed)
+		return err;
+
+	return progress_cb(progress_arg, packfile_size, ncommits,
+	    nobj_total, obj_deltify, nobj_written);
+}
 
 static const struct got_error *
 pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
     FILE *delta_cache, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_pack_meta *m = NULL, *base = NULL;
@@ -271,11 +292,10 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			if (err)
 				break;
 		}
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours, nmeta, i, 0);
-			if (err)
-				goto done;
-		}
+		err = report_progress(progress_cb, progress_arg, rl,
+		    0L, nours, nmeta, i, 0);
+		if (err)
+			goto done;
 		m = meta[i];
 
 		if (m->obj_type == GOT_OBJ_TYPE_COMMIT ||
@@ -923,7 +943,7 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours, struct got_repository *repo,
     int loose_obj_only, got_pack_progress_cb progress_cb, void *progress_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
@@ -964,12 +984,10 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours,
-			    v.nmeta, 0, 0);
-			if (err)
-				goto done;
-		}
+		err = report_progress(progress_cb, progress_arg, rl,
+		    0L, nours, v.nmeta, 0, 0);
+		if (err)
+			goto done;
 	}
 
 	for (i = 0; i < ntheirs; i++) {
@@ -990,12 +1008,10 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours,
-			    v.nmeta, 0, 0);
-			if (err)
-				goto done;
-		}
+		err = report_progress(progress_cb, progress_arg, rl,
+		    0L, nours, v.nmeta, 0, 0);
+		if (err)
+			goto done;
 	}
 
 	for (i = 0; i < nobj; i++) {
@@ -1003,12 +1019,12 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours,
-			    v.nmeta, 0, 0);
-			if (err)
-				goto done;
-		}
+		if (err)
+			goto done;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    0L, nours, v.nmeta, 0, 0);
+		if (err)
+			goto done;
 	}
 
 	for (i = 0; i < nours; i++) {
@@ -1029,14 +1045,17 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours,
-			    v.nmeta, 0, 0);
-			if (err)
-				goto done;
-		}
+		err = report_progress(progress_cb, progress_arg, rl,
+		    0L, nours, v.nmeta, 0, 0);
+		if (err)
+			goto done;
 	}
 
+	if (progress_cb) {
+		err = progress_cb(progress_arg, 0L, nours, v.nmeta, 0, 0);
+		if (err)
+			goto done;
+	}
 done:
 	for (i = 0; i < nobj; i++) {
 		free(ids[i]);
@@ -1136,6 +1155,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
     struct got_pack_meta **meta, int nmeta, int nours,
     int use_offset_deltas, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
@@ -1167,12 +1187,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		goto done;
 	qsort(meta, nmeta, sizeof(struct got_pack_meta *), write_order_cmp);
 	for (i = 0; i < nmeta; i++) {
-		if (progress_cb) {
-			err = progress_cb(progress_arg, packfile_size, nours,
-			    nmeta, nmeta, i);
-			if (err)
-				goto done;
-		}
+		err = report_progress(progress_cb, progress_arg, rl,
+		    packfile_size, nours, nmeta, nmeta, i);
+		if (err)
+			goto done;
 		m = meta[i];
 		m->off = ftello(packfile);
 		err = got_object_raw_open(&raw, &outfd, repo, &m->id);
@@ -1281,10 +1299,12 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		err = got_ferror(packfile, GOT_ERR_IO);
 	packfile_size += SHA1_DIGEST_LENGTH;
 	packfile_size += sizeof(struct got_packfile_hdr);
-	err = progress_cb(progress_arg, packfile_size, nours,
-	    nmeta, nmeta, nmeta);
-	if (err)
-		goto done;
+	if (progress_cb) {
+		err = progress_cb(progress_arg, packfile_size, nours,
+		    nmeta, nmeta, nmeta);
+		if (err)
+			goto done;
+	}
 done:
 	if (delta_file && fclose(delta_file) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -1307,9 +1327,13 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	struct got_pack_meta **meta;
 	int nmeta;
 	FILE *delta_cache = NULL;
+	struct got_ratelimit rl;
+
+	got_ratelimit_init(&rl, 0, 500);
 
 	err = read_meta(&meta, &nmeta, theirs, ntheirs, ours, nours, repo,
-	    loose_obj_only, progress_cb, progress_arg, cancel_cb, cancel_arg);
+	    loose_obj_only, progress_cb, progress_arg, &rl,
+	    cancel_cb, cancel_arg);
 	if (err)
 		return err;
 
@@ -1326,7 +1350,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 
 	if (nmeta > 0) {
 		err = pick_deltas(meta, nmeta, nours, delta_cache, repo,
-		    progress_cb, progress_arg, cancel_cb, cancel_arg);
+		    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 		if (fseeko(delta_cache, 0L, SEEK_SET) == -1) {
@@ -1336,7 +1360,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	}
 
 	err = genpack(packsha1, packfile, delta_cache, meta, nmeta, nours, 1,
-	    repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
+	    repo, progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 done:

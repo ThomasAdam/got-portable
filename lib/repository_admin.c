@@ -54,6 +54,7 @@
 #include "got_lib_pack_create.h"
 #include "got_lib_sha1.h"
 #include "got_lib_lockfile.h"
+#include "got_lib_ratelimit.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -598,9 +599,27 @@ done:
 }
 
 static const struct got_error *
+report_cleanup_progress(got_cleanup_progress_cb progress_cb,
+    void *progress_arg, struct got_ratelimit *rl,
+    int nloose, int ncommits, int npurged)
+{
+	const struct got_error *err;
+	int elapsed;
+
+	if (progress_cb == NULL)
+		return NULL;
+
+	err = got_ratelimit_check(&elapsed, rl);
+	if (err || !elapsed)
+		return err;
+
+	return progress_cb(progress_arg, nloose, ncommits, npurged);
+}
+
+static const struct got_error *
 get_loose_object_ids(struct got_object_idset **loose_ids, off_t *ondisk_size,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
-    struct got_repository *repo)
+    struct got_ratelimit *rl, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path_objects = NULL, *path = NULL;
@@ -688,13 +707,11 @@ get_loose_object_ids(struct got_object_idset **loose_ids, off_t *ondisk_size,
 			err = got_object_idset_add(*loose_ids, &id, NULL);
 			if (err)
 				goto done;
-			if (progress_cb) {
-				err = progress_cb(progress_arg,
-				    got_object_idset_num_elements(*loose_ids),
-				    -1, -1);
-				if (err)
-					goto done;
-			}
+			err = report_cleanup_progress(progress_cb,
+			    progress_arg, rl,
+			    got_object_idset_num_elements(*loose_ids), -1, -1);
+			if (err)
+				goto done;
 		}
 
 		if (closedir(dir) != 0) {
@@ -878,7 +895,8 @@ static const struct got_error *
 load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
     int *npacked, struct got_object_idset *traversed_ids,
     struct got_object_id *id, struct got_repository *repo,
-    got_cleanup_progress_cb progress_cb, void *progress_arg, int nloose,
+    got_cleanup_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, int nloose,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
@@ -986,11 +1004,10 @@ load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
 		if (commit || tag)
 			(*ncommits)++; /* scanned tags are counted as commits */
 
-		if (progress_cb) {
-			err = progress_cb(progress_arg, nloose, *ncommits, -1);
-			if (err)
-				break;
-		}
+		err = report_cleanup_progress(progress_cb, progress_arg, rl,
+		    nloose, *ncommits, -1);
+		if (err)
+			break;
  
 		if (commit) {
 			/* Find parent commits to scan. */
@@ -1024,6 +1041,7 @@ struct purge_loose_object_arg {
 	struct got_repository *repo;
 	got_cleanup_progress_cb progress_cb;
 	void *progress_arg;
+	struct got_ratelimit *rl;
 	int nloose;
 	int ncommits;
 	int npurged;
@@ -1075,10 +1093,10 @@ purge_loose_object(struct got_object_id *id, void *data, void *arg)
 
 		a->npurged++;
 		a->size_purged += sb.st_size;
-		if (a->progress_cb) {
-			err = a->progress_cb(a->progress_arg, a->nloose,
-			    a->ncommits, a->npurged);
-		}
+		err = report_cleanup_progress(a->progress_cb, a->progress_arg,
+		    a->rl, a->nloose, a->ncommits, a->npurged);
+		if (err)
+			goto done;
 	}
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
@@ -1104,15 +1122,17 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	struct got_reflist_entry *re;
 	struct purge_loose_object_arg arg;
 	time_t max_mtime = 0;
+	struct got_ratelimit rl;
 
 	TAILQ_INIT(&refs);
+	got_ratelimit_init(&rl, 0, 500);
 
 	*size_before = 0;
 	*size_after = 0;
 	*npacked = 0;
 
 	err = get_loose_object_ids(&loose_ids, size_before,
-	    progress_cb, progress_arg, repo);
+	    progress_cb, progress_arg, &rl, repo);
 	if (err)
 		return err;
 	nloose = got_object_idset_num_elements(loose_ids);
@@ -1153,15 +1173,8 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	for (i = 0; i < nreferenced; i++) {
 		struct got_object_id *id = referenced_ids[i];
 		err = load_commit_or_tag(loose_ids, &ncommits, npacked,
-		    traversed_ids, id, repo, progress_cb, progress_arg, nloose, 
-		    cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-	}
-
-	/* Produce a final progress report in case no objects can be purged. */
-	if (got_object_idset_num_elements(loose_ids) == 0 && progress_cb) {
-		err = progress_cb(progress_arg, nloose, ncommits, 0);
+		    traversed_ids, id, repo, progress_cb, progress_arg, &rl,
+		    nloose, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1170,6 +1183,7 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	arg.repo = repo;
 	arg.progress_arg = progress_arg;
 	arg.progress_cb = progress_cb;
+	arg.rl = &rl;
 	arg.nloose = nloose;
 	arg.npurged = 0;
 	arg.size_purged = 0;
@@ -1181,6 +1195,14 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	if (err)
 		goto done;
 	*size_after = *size_before - arg.size_purged;
+
+	/* Produce a final progress report. */
+	if (progress_cb) {
+		err = progress_cb(progress_arg, nloose, ncommits,
+		    got_object_idset_num_elements(loose_ids));
+		if (err)
+			goto done;
+	}
 done:
 	got_object_idset_free(loose_ids);
 	got_object_idset_free(traversed_ids);
