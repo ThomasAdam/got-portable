@@ -149,6 +149,7 @@
 /lib/got_lib_pack_create.h
 /lib/got_lib_pkt.h
 /lib/got_lib_privsep.h
+/lib/got_lib_ratelimit.h
 /lib/got_lib_repository.h
 /lib/got_lib_sha1.h
 /lib/got_lib_worktree.h
@@ -168,6 +169,7 @@
 /lib/path.c
 /lib/pkt.c
 /lib/privsep.c
+/lib/ratelimit.c
 /lib/rcsutil.c
 /lib/rcsutil.h
 /lib/reference.c
