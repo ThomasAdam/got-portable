@@ -1133,6 +1133,11 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	nloose = got_object_idset_num_elements(loose_ids);
 	if (nloose == 0) {
 		got_object_idset_free(loose_ids);
+		if (progress_cb) {
+			err = progress_cb(progress_arg, 0, 0, 0);
+			if (err)
+				return err;
+		}
 		return NULL;
 	}
 
