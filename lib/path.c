@@ -440,7 +440,7 @@ got_path_strip_trailing_slashes(char *path)
 		path[x] = '\0';
 }
 
-/* based on findprog() from usr.sbin/which/which.c */
+/* based on findprog() from usr.bin/which/which.c */
 const struct got_error *
 got_path_find_prog(char **filename, const char *prog)
 {
