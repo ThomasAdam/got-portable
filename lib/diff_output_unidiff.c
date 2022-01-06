@@ -425,7 +425,8 @@ diff_output_unidiff(struct diff_output_info **output_info,
 	bool show_function_prototypes = (flags & DIFF_FLAG_SHOW_PROTOTYPES);
 	bool force_text = (flags & DIFF_FLAG_FORCE_TEXT_DATA);
 	bool have_binary = (atomizer_flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
-	int i;
+	off_t outoff = 0, *offp;
+	int rc, i;
 
 	if (!result)
 		return EINVAL;
@@ -447,9 +448,23 @@ diff_output_unidiff(struct diff_output_info **output_info,
 			if (t != CHUNK_MINUS && t != CHUNK_PLUS)
 				continue;
 
-			fprintf(dest, "Binary files %s and %s differ\n",
+			if (outinfo && outinfo->line_offsets.len > 0) {
+				unsigned int idx =
+				    outinfo->line_offsets.len - 1;
+				outoff = outinfo->line_offsets.head[idx];
+			}
+
+			rc = fprintf(dest, "Binary files %s and %s differ\n",
 			    diff_output_get_label_left(info),
 			    diff_output_get_label_right(info));
+			if (outinfo) {
+				ARRAYLIST_ADD(offp, outinfo->line_offsets);
+				if (offp == NULL)
+					return ENOMEM;
+				outoff += rc;
+				*offp = outoff;
+
+			}
 			break;
 		}
 
