@@ -1,3 +1,18 @@
+* got 0.65; 2022-01-06
+- fix 32-bit size_t multiplication overflow in meyrs diff code
+- ignore the return value of closefrom(2) (patch by Anna a.k.a. CyberTailor)
+- sort paths in got log -Pp and tog's diff view the same way as in the diff
+- fix NULL dereference in 'got clone' if server sends an empty pack file
+- tog: make searches start from the current position in all views
+- tog: clear search highlighting when reloading view (naddy)
+- set close-on-exec flag on files opened by main process (suggested by millert)
+- use 'gotadmin pack' when running tests with GOT_TEST_PACK=1, not 'git repack'
+- fix bogus "object not found" errors when specified object ID begins with 00
+- avoid creation of new temporary files whenever a packed object is read
+- use time-based rate-limiting for gotadmin progress output
+- print status output even when 'gotadmin cleanup' finds no objects to remove
+- tog: fix a scrolling problem when diffing binary files
+
 * got 0.64; 2021-11-23
 - try only 3 delta base candidates instead of 10 to speed up packing
 - use up to 128 delta chain elements again; creates smaller packs at same speed
