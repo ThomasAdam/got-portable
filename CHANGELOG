@@ -6,6 +6,10 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.65; (2021-01-06)
+
+* Added timespec*() compat-wrappers for BSD-time functions.
+
 # got-portable 0.64; (2021-11-24)
 
 * regress: make tests POSIX-compliant by making them run under dash (Ubuntu)
