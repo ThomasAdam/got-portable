@@ -1193,10 +1193,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			goto done;
 		m = meta[i];
 		m->off = ftello(packfile);
-		err = got_object_raw_open(&raw, &outfd, repo, &m->id);
-		if (err)
-			goto done;
 		if (m->delta_len == 0) {
+			err = got_object_raw_open(&raw, &outfd, repo, &m->id);
+			if (err)
+				goto done;
 			err = packhdr(&nh, buf, sizeof(buf),
 			    m->obj_type, raw->size);
 			if (err)
@@ -1214,6 +1214,8 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			if (err)
 				goto done;
 			packfile_size += outlen;
+			got_object_raw_close(raw);
+			raw = NULL;
 		} else {
 			off_t remain;
 			if (delta_file == NULL) {
@@ -1290,8 +1292,6 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 				goto done;
 			packfile_size += outlen;
 		}
-		got_object_raw_close(raw);
-		raw = NULL;
 	}
 	SHA1Final(pack_sha1, &ctx);
 	n = fwrite(pack_sha1, 1, SHA1_DIGEST_LENGTH, packfile);
