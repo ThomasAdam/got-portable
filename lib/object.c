@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -596,13 +597,9 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
+	(*obj)->fd = -1;
 
 	if (outbuf) {
-		(*obj)->f = fmemopen(outbuf, hdrlen + size, "r");
-		if ((*obj)->f == NULL) {
-			err = got_error_from_errno("fdopen");
-			goto done;
-		}
 		(*obj)->data = outbuf;
 	} else {
 		struct stat sb;
@@ -615,14 +612,30 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-
-		(*obj)->f = fdopen(*outfd, "r");
-		if ((*obj)->f == NULL) {
-			err = got_error_from_errno("fdopen");
-			goto done;
+#ifndef GOT_PACK_NO_MMAP
+		if (hdrlen + size > 0) {
+			(*obj)->data = mmap(NULL, hdrlen + size, PROT_READ,
+			    MAP_PRIVATE, *outfd, 0);
+			if ((*obj)->data == MAP_FAILED) {
+				if (errno != ENOMEM) {
+					err = got_error_from_errno("mmap");
+					goto done;
+				}
+				(*obj)->data = NULL;
+			} else {
+				(*obj)->fd = *outfd;
+				*outfd = -1;
+			}
 		}
-		(*obj)->data = NULL;
-		*outfd = -1;
+#endif
+		if (*outfd != -1) {
+			(*obj)->f = fdopen(*outfd, "r");
+			if ((*obj)->f == NULL) {
+				err = got_error_from_errno("fdopen");
+				goto done;
+			}
+			*outfd = -1;
+		}
 	}
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;

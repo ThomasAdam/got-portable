@@ -19,6 +19,7 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -142,9 +143,18 @@ got_object_raw_close(struct got_raw_object *obj)
 			return NULL;
 	}
 
-	if (obj->f != NULL && fclose(obj->f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	free(obj->data);
+	if (obj->f == NULL) {
+		if (obj->fd != -1) {
+			if (munmap(obj->data, obj->hdrlen + obj->size) == -1)
+				err = got_error_from_errno("munmap");
+			if (close(obj->fd) == -1 && err == NULL)
+				err = got_error_from_errno("close");
+		} else
+			free(obj->data);
+	} else {
+		if (fclose(obj->f) == EOF && err == NULL)
+			err = got_error_from_errno("fclose");
+	}
 	free(obj);
 	return err;
 }

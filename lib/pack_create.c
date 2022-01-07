@@ -227,6 +227,19 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 			w = fwrite(buf, 1, bp - buf, f);
 			if (w != bp - buf)
 				return got_ferror(f, GOT_ERR_IO);
+		} else if (o->f == NULL) {
+			n = 0;
+			while (n != d->len) {
+				buf[0] = (d->len - n < 127) ? d->len - n : 127;
+				w = fwrite(buf, 1, 1, f);
+				if (w != 1)
+					return got_ferror(f, GOT_ERR_IO);
+				w = fwrite(o->data + o->hdrlen + d->offset + n,
+				    1, buf[0], f);
+				if (w != buf[0])
+					return got_ferror(f, GOT_ERR_IO);
+				n += buf[0];
+			}
 		} else {
 			char content[128];
 			size_t r;
@@ -307,8 +320,13 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			goto done;
 		m->size = raw->size;
 
-		err = got_deltify_init(&m->dtab, raw->f, raw->hdrlen,
-		    raw->size + raw->hdrlen);
+		if (raw->f == NULL) {
+			err = got_deltify_init_mem(&m->dtab, raw->data,
+			    raw->hdrlen, raw->size + raw->hdrlen);
+		} else {
+			err = got_deltify_init(&m->dtab, raw->f, raw->hdrlen,
+			    raw->size + raw->hdrlen);
+		}
 		if (err)
 			goto done;
 
@@ -337,10 +355,34 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			    &base->id);
 			if (err)
 				goto done;
-			err = got_deltify(&deltas, &ndeltas,
-			    raw->f, raw->hdrlen, raw->size + raw->hdrlen,
-			    base->dtab, base_raw->f, base_raw->hdrlen,
-			    base_raw->size + base_raw->hdrlen);
+			if (raw->f == NULL && base_raw->f == NULL) {
+				err = got_deltify_mem_mem(&deltas, &ndeltas,
+				    raw->data, raw->hdrlen,
+				    raw->size + raw->hdrlen,
+				    base->dtab, base_raw->data,
+				    base_raw->hdrlen,
+				    base_raw->size + base_raw->hdrlen);
+			} else if (raw->f == NULL) {
+				err = got_deltify_mem_file(&deltas, &ndeltas,
+				    raw->data, raw->hdrlen,
+				    raw->size + raw->hdrlen,
+				    base->dtab, base_raw->f,
+				    base_raw->hdrlen,
+				    base_raw->size + base_raw->hdrlen);
+			} else if (base_raw->f == NULL) {
+				err = got_deltify_file_mem(&deltas, &ndeltas,
+				    raw->f, raw->hdrlen,
+				    raw->size + raw->hdrlen,
+				    base->dtab, base_raw->data,
+				    base_raw->hdrlen,
+				    base_raw->size + base_raw->hdrlen);
+			} else {
+				err = got_deltify(&deltas, &ndeltas,
+				    raw->f, raw->hdrlen,
+				    raw->size + raw->hdrlen,
+				    base->dtab, base_raw->f, base_raw->hdrlen,
+				    base_raw->size + base_raw->hdrlen);
+			}
 			got_object_raw_close(base_raw);
 			base_raw = NULL;
 			if (err)
@@ -1205,14 +1247,23 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			if (err)
 				goto done;
 			packfile_size += nh;
-			if (fseeko(raw->f, raw->hdrlen, SEEK_SET) == -1) {
-				err = got_error_from_errno("fseeko");
-				goto done;
+			if (raw->f == NULL) {
+				err = got_deflate_to_file_mmap(&outlen,
+				    raw->data + raw->hdrlen, 0, raw->size,
+				    packfile, &csum);
+				if (err)
+					goto done;
+			} else {
+				if (fseeko(raw->f, raw->hdrlen, SEEK_SET)
+				    == -1) {
+					err = got_error_from_errno("fseeko");
+					goto done;
+				}
+				err = got_deflate_to_file(&outlen, raw->f,
+				    packfile, &csum);
+				if (err)
+					goto done;
 			}
-			err = got_deflate_to_file(&outlen, raw->f, packfile,
-			    &csum);
-			if (err)
-				goto done;
 			packfile_size += outlen;
 			got_object_raw_close(raw);
 			raw = NULL;
