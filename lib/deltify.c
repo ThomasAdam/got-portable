@@ -179,6 +179,70 @@ addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
 }
 
 static const struct got_error *
+addblk_mem(struct got_delta_table *dt, uint8_t *data, off_t file_offset0,
+    off_t len, off_t offset, uint64_t h)
+{
+	const struct got_error *err = NULL;
+	int i;
+	uint8_t *block1;
+	uint8_t *block2;
+
+	if (len == 0)
+		return NULL;
+
+	i = h % dt->nalloc;
+	while (dt->blocks[i].len != 0) {
+		/*
+		 * Avoid adding duplicate blocks.
+		 * NB: A matching hash is insufficient for detecting equality.
+		 * The hash can only detect inequality.
+		 */
+		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
+			block1 = data + file_offset0 + dt->blocks[i].offset;
+			block2 = data + file_offset0 + offset;
+			if (memcmp(block1, block2, len) == 0)
+				return NULL;
+		}
+
+		i = (i + 1) % dt->nalloc;
+	}
+	assert(dt->blocks[i].len == 0);
+	dt->blocks[i].len = len;
+	dt->blocks[i].offset = offset;
+	dt->blocks[i].hash = h;
+	dt->nblocks++;
+	if (dt->nalloc < dt->nblocks + 64) {
+		struct got_delta_block *db;
+		size_t old_size = dt->nalloc;
+		db = dt->blocks;
+		dt->blocks = calloc(dt->nalloc + 64,
+		    sizeof(struct got_delta_block));
+		if (dt->blocks == NULL) {
+			err = got_error_from_errno("calloc");
+			dt->blocks = db;
+			return err;
+		}
+		dt->nalloc += 64;
+		/*
+		 * Recompute all block positions. Hash-based indices of blocks
+		 * in the array depend on the allocated length of the array.
+		 */
+		dt->nblocks = 0;
+		for (i = 0; i < old_size; i++) {
+			if (db[i].len == 0)
+				continue;
+			err = addblk_mem(dt, data, file_offset0, db[i].len,
+			    db[i].offset, db[i].hash);
+			if (err)
+				break;
+		}
+		free(db);
+	}
+
+	return err;
+}
+
+static const struct got_error *
 lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
     unsigned char *p, off_t len, FILE *basefile, off_t basefile_offset0)
 {
@@ -202,6 +266,31 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 		if (r != len)
 			return got_ferror(basefile, GOT_ERR_IO);
 		if (memcmp(p, buf, len) == 0) {
+			*block = &dt->blocks[i];
+			break;
+		}
+	}
+	return NULL;
+}
+
+static const struct got_error *
+lookupblk_mem(struct got_delta_block **block, struct got_delta_table *dt,
+    unsigned char *p, off_t len, uint8_t *basedata, off_t basefile_offset0)
+{
+	int i;
+	uint64_t h;
+	uint8_t *b;
+
+	*block = NULL;
+
+	h = hashblk(p, len);
+	for (i = h % dt->nalloc; dt->blocks[i].len != 0;
+	     i = (i + 1) % dt->nalloc) {
+		if (dt->blocks[i].hash != h ||
+		    dt->blocks[i].len != len)
+			continue;
+		b = basedata + basefile_offset0 + dt->blocks[i].offset;
+		if (memcmp(p, b, len) == 0) {
 			*block = &dt->blocks[i];
 			break;
 		}
@@ -238,6 +327,31 @@ nextblk(uint8_t *buf, off_t *blocklen, FILE *f)
 	if (fseeko(f, pos + *blocklen, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
+	return NULL;
+}
+
+static const struct got_error *
+nextblk_mem(off_t *blocklen, uint8_t *data, off_t fileoffset, off_t filesize)
+{
+	uint32_t gh;
+	const unsigned char *p;
+
+	*blocklen = 0;
+
+	if (fileoffset >= filesize ||
+	    filesize - fileoffset < GOT_DELTIFY_MINCHUNK)
+		return NULL; /* no more delta-worthy blocks left */
+
+	/* Got a deltifiable block. Find the split-point where it ends. */
+	p = data + fileoffset + GOT_DELTIFY_MINCHUNK;
+	gh = 0;
+	while (p != data + MIN(fileoffset + GOT_DELTIFY_MAXCHUNK, filesize)) {
+		gh = (gh << 1) + geartab[*p++];
+		if ((gh & GOT_DELTIFY_SPLITMASK) == 0)
+			break;
+	}
+
+	*blocklen = (p - (data + fileoffset));
 	return NULL;
 }
 
@@ -280,6 +394,50 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 		fileoffset += blocklen;
 		if (fseeko(f, fileoffset, SEEK_SET) == -1)
 			return got_error_from_errno("fseeko");
+	}
+done:
+	if (err) {
+		free((*dt)->blocks);
+		free(*dt);
+		*dt = NULL;
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
+    off_t fileoffset, off_t filesize)
+{
+	const struct got_error *err = NULL;
+	uint64_t h;
+	const off_t offset0 = fileoffset;
+
+	*dt = calloc(1, sizeof(**dt));
+	if (*dt == NULL)
+		return got_error_from_errno("calloc");
+
+	(*dt)->nblocks = 0;
+	(*dt)->nalloc = 128;
+	(*dt)->blocks = calloc((*dt)->nalloc, sizeof(struct got_delta_block));
+	if ((*dt)->blocks == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	while (fileoffset < filesize) {
+		off_t blocklen;
+		err = nextblk_mem(&blocklen, data, fileoffset, filesize);
+		if (err)
+			goto done;
+		if (blocklen == 0)
+			break;
+		h = hashblk(data + fileoffset, blocklen);
+		err = addblk_mem(*dt, data, offset0, blocklen,
+		    fileoffset - offset0, h);
+		if (err)
+			goto done;
+		fileoffset += blocklen;
 	}
 done:
 	if (err) {
@@ -354,6 +512,115 @@ stretchblk(FILE *basefile, off_t base_offset0, struct got_delta_block *block,
 			}
 			(*blocklen)++;
 		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+stretchblk_file_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
+     struct got_delta_block *block, FILE *f, off_t filesize, off_t *blocklen)
+{
+	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
+	size_t r, i;
+	int buf_equal = 1;
+	off_t base_offset = base_offset0 + block->offset + *blocklen;
+
+	if (base_offset > basefile_size) {
+		return got_error_fmt(GOT_ERR_RANGE,
+		    "read beyond the size of delta base at offset %llu",
+		    base_offset);
+	}
+
+	while (buf_equal && *blocklen < (1 << 24) - 1) {
+		if (base_offset + *blocklen >= basefile_size)
+			break;
+		r = fread(buf, 1, sizeof(buf), f);
+		if (r == 0) {
+			if (ferror(f))
+				return got_ferror(f, GOT_ERR_IO);
+			break;
+		}
+		for (i = 0; i < MIN(basefile_size - base_offset, r); i++) {
+			if (buf[i] != *(basedata + base_offset + i)) {
+				buf_equal = 0;
+				break;
+			}
+			(*blocklen)++;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+stretchblk_mem_file(FILE *basefile, off_t base_offset0,
+    struct got_delta_block *block, uint8_t *data, off_t fileoffset,
+    off_t filesize, off_t *blocklen)
+{
+	uint8_t basebuf[GOT_DELTIFY_MAXCHUNK];
+	size_t base_r, i;
+	int buf_equal = 1;
+
+	if (fileoffset > filesize) {
+		return got_error_fmt(GOT_ERR_RANGE,
+		    "read beyond the size of deltify file at offset %llu",
+		    fileoffset);
+	}
+
+	if (fseeko(basefile, base_offset0 + block->offset + *blocklen,
+	    SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	while (buf_equal && *blocklen < (1 << 24) - 1) {
+		if (fileoffset + *blocklen >= filesize)
+			break;
+		base_r = fread(basebuf, 1, sizeof(basebuf), basefile);
+		if (base_r == 0) {
+			if (ferror(basefile))
+				return got_ferror(basefile, GOT_ERR_IO);
+			break;
+		}
+		for (i = 0; i < MIN(base_r, filesize - fileoffset); i++) {
+			if (*(data + fileoffset + i) != basebuf[i]) {
+				buf_equal = 0;
+				break;
+			}
+			(*blocklen)++;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+stretchblk_mem_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
+    struct got_delta_block *block, uint8_t *data, off_t fileoffset,
+    off_t filesize, off_t *blocklen)
+{
+	off_t i, maxlen;
+	off_t base_offset = base_offset0 + block->offset + *blocklen;
+	uint8_t *p, *q;
+
+	if (base_offset > basefile_size) {
+		return got_error_fmt(GOT_ERR_RANGE,
+		    "read beyond the size of delta base at offset %llu",
+		    base_offset);
+	}
+
+	if (fileoffset > filesize) {
+		return got_error_fmt(GOT_ERR_RANGE,
+		    "read beyond the size of deltify file at offset %llu",
+		    fileoffset);
+	}
+
+	p = data + fileoffset;
+	q = basedata + base_offset;
+	maxlen = MIN(basefile_size - base_offset, filesize - fileoffset);
+	for (i = 0; i < maxlen && *blocklen < (1 << 24) - 1; i++) {
+		if (p[i] != q[i])
+			break;
+		(*blocklen)++;
 	}
 
 	return NULL;
@@ -436,6 +703,243 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			err = got_error_from_errno("fseeko");
 			break;
 		}
+	}
+
+	if (err) {
+		free(*deltas);
+		*deltas = NULL;
+		*ndeltas = 0;
+	}
+	return err;
+}
+
+const struct got_error *
+got_deltify_file_mem(struct got_delta_instruction **deltas, int *ndeltas,
+    FILE *f, off_t fileoffset, off_t filesize,
+    struct got_delta_table *dt, uint8_t *basedata,
+    off_t basefile_offset0, off_t basefile_size)
+{
+	const struct got_error *err = NULL;
+	const off_t offset0 = fileoffset;
+	size_t nalloc = 0;
+	const size_t alloc_chunk_size = 64;
+
+	*deltas = NULL;
+	*ndeltas = 0;
+
+	/*
+	 * offset0 indicates where data to be deltified begins.
+	 * For example, we want to avoid deltifying a Git object header at
+	 * the beginning of the file.
+	 */
+	if (fseeko(f, offset0, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	*deltas = reallocarray(NULL, alloc_chunk_size,
+	    sizeof(struct got_delta_instruction));
+	if (*deltas == NULL)
+		return got_error_from_errno("reallocarray");
+	nalloc = alloc_chunk_size;
+
+	while (fileoffset < filesize) {
+		uint8_t buf[GOT_DELTIFY_MAXCHUNK];
+		off_t blocklen;
+		struct got_delta_block *block;
+		err = nextblk(buf, &blocklen, f);
+		if (err)
+			break;
+		if (blocklen == 0) {
+			/* Source remainder from the file itself. */
+			if (fileoffset < filesize) {
+				err = emitdelta(deltas, &nalloc, ndeltas,
+				    alloc_chunk_size, 0, fileoffset - offset0,
+				    filesize - fileoffset);
+			}
+			break;
+		}
+		err = lookupblk_mem(&block, dt, buf, blocklen, basedata,
+		    basefile_offset0);
+		if (err)
+			break;
+		if (block != NULL) {
+			/*
+			 * We have found a matching block in the delta base.
+			 * Attempt to stretch the block as far as possible and
+			 * generate a copy instruction.
+			 */
+			err = stretchblk_file_mem(basedata, basefile_offset0,
+			    basefile_size, block, f, filesize, &blocklen);
+			if (err)
+				break;
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 1, block->offset, blocklen);
+			if (err)
+				break;
+		} else {
+			/*
+			 * No match.
+			 * This block needs to be sourced from the file itself.
+			 */
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 0, fileoffset - offset0, blocklen);
+			if (err)
+				break;
+		}
+		fileoffset += blocklen;
+		if (fseeko(f, fileoffset, SEEK_SET) == -1) {
+			err = got_error_from_errno("fseeko");
+			break;
+		}
+	}
+
+	if (err) {
+		free(*deltas);
+		*deltas = NULL;
+		*ndeltas = 0;
+	}
+	return err;
+}
+
+const struct got_error *
+got_deltify_mem_file(struct got_delta_instruction **deltas, int *ndeltas,
+    uint8_t *data, off_t fileoffset, off_t filesize,
+    struct got_delta_table *dt, FILE *basefile,
+    off_t basefile_offset0, off_t basefile_size)
+{
+	const struct got_error *err = NULL;
+	const off_t offset0 = fileoffset;
+	size_t nalloc = 0;
+	const size_t alloc_chunk_size = 64;
+
+	*deltas = NULL;
+	*ndeltas = 0;
+
+	*deltas = reallocarray(NULL, alloc_chunk_size,
+	    sizeof(struct got_delta_instruction));
+	if (*deltas == NULL)
+		return got_error_from_errno("reallocarray");
+	nalloc = alloc_chunk_size;
+
+	while (fileoffset < filesize) {
+		off_t blocklen;
+		struct got_delta_block *block;
+		err = nextblk_mem(&blocklen, data, fileoffset, filesize);
+		if (err)
+			break;
+		if (blocklen == 0) {
+			/* Source remainder from the file itself. */
+			if (fileoffset < filesize) {
+				err = emitdelta(deltas, &nalloc, ndeltas,
+				    alloc_chunk_size, 0, fileoffset - offset0,
+				    filesize - fileoffset);
+			}
+			break;
+		}
+		err = lookupblk(&block, dt, data + fileoffset, blocklen,
+		    basefile, basefile_offset0);
+		if (err)
+			break;
+		if (block != NULL) {
+			/*
+			 * We have found a matching block in the delta base.
+			 * Attempt to stretch the block as far as possible and
+			 * generate a copy instruction.
+			 */
+			err = stretchblk_mem_file(basefile, basefile_offset0,
+			    block, data, fileoffset + blocklen, filesize,
+			    &blocklen);
+			if (err)
+				break;
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 1, block->offset, blocklen);
+			if (err)
+				break;
+		} else {
+			/*
+			 * No match.
+			 * This block needs to be sourced from the file itself.
+			 */
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 0, fileoffset - offset0, blocklen);
+			if (err)
+				break;
+		}
+		fileoffset += blocklen;
+	}
+
+	if (err) {
+		free(*deltas);
+		*deltas = NULL;
+		*ndeltas = 0;
+	}
+	return err;
+}
+
+const struct got_error *
+got_deltify_mem_mem(struct got_delta_instruction **deltas, int *ndeltas,
+    uint8_t *data, off_t fileoffset, off_t filesize,
+    struct got_delta_table *dt, uint8_t *basedata,
+    off_t basefile_offset0, off_t basefile_size)
+{
+	const struct got_error *err = NULL;
+	const off_t offset0 = fileoffset;
+	size_t nalloc = 0;
+	const size_t alloc_chunk_size = 64;
+
+	*deltas = NULL;
+	*ndeltas = 0;
+
+	*deltas = reallocarray(NULL, alloc_chunk_size,
+	    sizeof(struct got_delta_instruction));
+	if (*deltas == NULL)
+		return got_error_from_errno("reallocarray");
+	nalloc = alloc_chunk_size;
+
+	while (fileoffset < filesize) {
+		off_t blocklen;
+		struct got_delta_block *block;
+		err = nextblk_mem(&blocklen, data, fileoffset, filesize);
+		if (err)
+			break;
+		if (blocklen == 0) {
+			/* Source remainder from the file itself. */
+			if (fileoffset < filesize) {
+				err = emitdelta(deltas, &nalloc, ndeltas,
+				    alloc_chunk_size, 0, fileoffset - offset0,
+				    filesize - fileoffset);
+			}
+			break;
+		}
+		err = lookupblk_mem(&block, dt, data + fileoffset, blocklen,
+		    basedata, basefile_offset0);
+		if (err)
+			break;
+		if (block != NULL) {
+			/*
+			 * We have found a matching block in the delta base.
+			 * Attempt to stretch the block as far as possible and
+			 * generate a copy instruction.
+			 */
+			err = stretchblk_mem_mem(basedata, basefile_offset0,
+			    basefile_size, block, data, fileoffset + blocklen,
+			    filesize, &blocklen);
+			if (err)
+				break;
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 1, block->offset, blocklen);
+			if (err)
+				break;
+		} else {
+			/*
+			 * No match.
+			 * This block needs to be sourced from the file itself.
+			 */
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 0, fileoffset - offset0, blocklen);
+			if (err)
+				break;
+		}
+		fileoffset += blocklen;
 	}
 
 	if (err) {

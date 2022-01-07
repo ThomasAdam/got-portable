@@ -42,3 +42,5 @@ const struct got_error *got_deflate_read(struct got_deflate_buf *, FILE *,
 void got_deflate_end(struct got_deflate_buf *);
 const struct got_error *got_deflate_to_file(size_t *, FILE *, FILE *,
     struct got_deflate_checksum *);
+const struct got_error *got_deflate_to_file_mmap(size_t *, uint8_t *,
+    size_t, size_t, FILE *, struct got_deflate_checksum *);

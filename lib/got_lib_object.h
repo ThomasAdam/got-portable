@@ -36,7 +36,8 @@ struct got_object {
 };
 
 struct got_raw_object {
-	FILE *f;
+	FILE *f;		/* NULL if data buffer is being used */
+	int fd;			/* -1 unless data buffer is memory-mapped */
 	uint8_t *data;
 	off_t size;
 	size_t hdrlen;

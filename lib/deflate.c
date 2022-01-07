@@ -128,6 +128,46 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 	return NULL;
 }
 
+const struct got_error *
+got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
+    size_t len, size_t *outlenp, size_t *consumed)
+{
+	z_stream *z = &zb->z;
+	size_t last_total_out = z->total_out;
+	int ret = Z_ERRNO;
+
+	z->next_out = zb->outbuf;
+	z->avail_out = zb->outlen;
+
+	*outlenp = 0;
+	*consumed = 0;
+	do {
+		size_t last_total_in = z->total_in;
+		if (z->avail_in == 0) {
+			z->next_in = map + offset + *consumed;
+			z->avail_in = len - *consumed;
+			if (z->avail_in == 0) {
+				/* EOF */
+				ret = deflate(z, Z_FINISH);
+				break;
+			}
+		}
+		ret = deflate(z, Z_NO_FLUSH);
+		*consumed += z->total_in - last_total_in;
+	} while (ret == Z_OK && z->avail_out > 0);
+
+	if (ret == Z_OK) {
+		zb->flags |= GOT_DEFLATE_F_HAVE_MORE;
+	} else {
+		if (ret != Z_STREAM_END)
+			return got_error(GOT_ERR_COMPRESSION);
+		zb->flags &= ~GOT_DEFLATE_F_HAVE_MORE;
+	}
+
+	*outlenp = z->total_out - last_total_out;
+	return NULL;
+}
+
 void
 got_deflate_end(struct got_deflate_buf *zb)
 {
@@ -155,6 +195,44 @@ got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile,
 		err = got_deflate_read(&zb, infile, &avail);
 		if (err)
 			goto done;
+		if (avail > 0) {
+			size_t n;
+			n = fwrite(zb.outbuf, avail, 1, outfile);
+			if (n != 1) {
+				err = got_ferror(outfile, GOT_ERR_IO);
+				goto done;
+			}
+			if (csum)
+				csum_output(csum, zb.outbuf, avail);
+			*outlen += avail;
+		}
+	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
+
+done:
+	got_deflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_deflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
+    size_t len, FILE *outfile, struct got_deflate_checksum *csum)
+{
+	const struct got_error *err;
+	size_t avail, consumed;
+	struct got_deflate_buf zb;
+
+	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+	do {
+		err = got_deflate_read_mmap(&zb, map, offset, len, &avail,
+		    &consumed);
+		if (err)
+			goto done;
+		offset += consumed;
+		len -= consumed;
 		if (avail > 0) {
 			size_t n;
 			n = fwrite(zb.outbuf, avail, 1, outfile);
