@@ -635,6 +635,8 @@ got_pack_parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 			return got_error(GOT_ERR_NO_SPACE);
 
 		if (pack->map) {
+			if (mapoff + sizeof(sizeN) >= pack->filesize)
+				return got_error(GOT_ERR_BAD_PACKFILE);
 			sizeN = *(pack->map + mapoff);
 			mapoff += sizeof(sizeN);
 		} else {
@@ -699,9 +701,9 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 
 		if (pack->map) {
 			size_t mapoff;
-			if (delta_offset >= pack->filesize)
-				return got_error(GOT_ERR_PACK_OFFSET);
 			mapoff = (size_t)delta_offset + *len;
+			if (mapoff + sizeof(offN) >= pack->filesize)
+				return got_error(GOT_ERR_PACK_OFFSET);
 			offN = *(pack->map + mapoff);
 		} else {
 			ssize_t n;
@@ -841,6 +843,8 @@ got_pack_parse_ref_delta(struct got_object_id *id,
 {
 	if (pack->map) {
 		size_t mapoff = delta_offset + tslen;
+		if (mapoff + sizeof(*id) >= pack->filesize)
+			return got_error(GOT_ERR_PACK_OFFSET);
 		memcpy(id, pack->map + mapoff, sizeof(*id));
 	} else {
 		ssize_t n;
