@@ -431,6 +431,8 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 	int i, j, ndeltas, best_ndeltas;
 	off_t size, best_size;
 	const int max_base_candidates = 3;
+	size_t delta_memsize = 0;
+	const size_t max_delta_memsize = 25 * GOT_DELTA_RESULT_SIZE_CACHED_MAX;
 	int outfd = -1;
 
 	qsort(meta, nmeta, sizeof(struct got_pack_meta *), delta_order_cmp);
@@ -547,7 +549,9 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		}
 
 		if (best_ndeltas > 0) {
-			if (best_size <= GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+			if (best_size <= GOT_DELTA_RESULT_SIZE_CACHED_MAX &&
+			    delta_memsize + best_size <= max_delta_memsize) {
+				delta_memsize += best_size;
 				err = encode_delta_in_mem(m, raw, best_deltas,
 				    best_ndeltas, best_size, m->prev->size);
 			} else {
