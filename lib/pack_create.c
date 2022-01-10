@@ -69,8 +69,9 @@ struct got_pack_meta {
 	/* The best delta we picked */
 	struct got_pack_meta *head;
 	struct got_pack_meta *prev;
+	unsigned char *delta_buf; /* if not encoded in delta cache file */
 	off_t	delta_offset;	/* offset in delta cache file */
-	off_t	delta_len;	/* length in delta cache file */
+	off_t	delta_len;	/* encoded delta length */
 	int	nchain;
 
 	/* Only used for delta window */
@@ -121,6 +122,8 @@ clear_meta(struct got_pack_meta *meta)
 		return;
 	free(meta->path);
 	meta->path = NULL;
+	free(meta->delta_buf);
+	meta->delta_buf = NULL;
 }
 
 static void
@@ -152,10 +155,11 @@ delta_order_cmp(const void *pa, const void *pb)
 	return got_object_id_cmp(&a->id, &b->id);
 }
 
-static int
+static off_t
 delta_size(struct got_delta_instruction *deltas, int ndeltas)
 {
-	int i, size = 32;
+	int i;
+	off_t size = 32;
 	for (i = 0; i < ndeltas; i++) {
 		if (deltas[i].copy)
 			size += GOT_DELTA_SIZE_SHIFT;
@@ -163,6 +167,135 @@ delta_size(struct got_delta_instruction *deltas, int ndeltas)
 			size += deltas[i].len + 1;
 	}
 	return size;
+}
+
+static const struct got_error *
+append(unsigned char **p, size_t *len, off_t *sz, void *seg, int nseg)
+{
+	char *n;
+
+	if (*len + nseg >= *sz) {
+		while (*len + nseg >= *sz)
+			*sz += *sz / 2;
+		n = realloc(*p, *sz);
+		if (n == NULL)
+			return got_error_from_errno("realloc");
+		*p = n;
+	}
+	memcpy(*p + *len, seg, nseg);
+	*len += nseg;
+	return NULL;
+}
+
+static const struct got_error *
+encode_delta_in_mem(struct got_pack_meta *m, struct got_raw_object *o,
+    struct got_delta_instruction *deltas, int ndeltas,
+    off_t delta_size, off_t base_size)
+{
+	const struct got_error *err;
+	unsigned char buf[16], *bp;
+	int i, j;
+	size_t len = 0;
+	off_t n;
+	struct got_delta_instruction *d;
+
+	m->delta_buf = malloc(delta_size);
+	if (m->delta_buf == NULL)
+		return got_error_from_errno("calloc");
+
+	/* base object size */
+	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
+	n = base_size >> GOT_DELTA_SIZE_SHIFT;
+	for (i = 1; n > 0; i++) {
+		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
+		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
+		n >>= GOT_DELTA_SIZE_SHIFT;
+	}
+	err = append(&m->delta_buf, &len, &delta_size, buf, i);
+	if (err)
+		return err;
+
+	/* target object size */
+	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
+	n = o->size >> GOT_DELTA_SIZE_SHIFT;
+	for (i = 1; n > 0; i++) {
+		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
+		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
+		n >>= GOT_DELTA_SIZE_SHIFT;
+	}
+	err = append(&m->delta_buf, &len, &delta_size, buf, i);
+	if (err)
+		return err;
+
+	for (j = 0; j < ndeltas; j++) {
+		d = &deltas[j];
+		if (d->copy) {
+			n = d->offset;
+			bp = &buf[1];
+			buf[0] = GOT_DELTA_BASE_COPY;
+			for (i = 0; i < 4; i++) {
+				/* DELTA_COPY_OFF1 ... DELTA_COPY_OFF4 */
+				buf[0] |= 1 << i;
+				*bp++ = n & 0xff;
+				n >>= 8;
+				if (n == 0)
+					break;
+			}
+
+			n = d->len;
+			if (n != GOT_DELTA_COPY_DEFAULT_LEN) {
+				/* DELTA_COPY_LEN1 ... DELTA_COPY_LEN3 */
+				for (i = 0; i < 3 && n > 0; i++) {
+					buf[0] |= 1 << (i + 4);
+					*bp++ = n & 0xff;
+					n >>= 8;
+				}
+			}
+			err = append(&m->delta_buf, &len, &delta_size,
+			    buf, bp - buf);
+			if (err)
+				return err;
+		} else if (o->f == NULL) {
+			n = 0;
+			while (n != d->len) {
+				buf[0] = (d->len - n < 127) ? d->len - n : 127;
+				err = append(&m->delta_buf, &len, &delta_size,
+				    buf, 1);
+				if (err)
+					return err;
+				err = append(&m->delta_buf, &len, &delta_size,
+				    o->data + o->hdrlen + d->offset + n,
+				    buf[0]);
+				if (err)
+					return err;
+				n += buf[0];
+			}
+		} else {
+			char content[128];
+			size_t r;
+			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1)
+				return got_error_from_errno("fseeko");
+			n = 0;
+			while (n != d->len) {
+				buf[0] = (d->len - n < 127) ? d->len - n : 127;
+				err = append(&m->delta_buf, &len, &delta_size,
+				    buf, 1);
+				if (err)
+					return err;
+				r = fread(content, 1, buf[0], o->f);
+				if (r != buf[0])
+					return got_ferror(o->f, GOT_ERR_IO);
+				err = append(&m->delta_buf, &len, &delta_size,
+				    content, buf[0]);
+				if (err)
+					return err;
+				n += buf[0];
+			}
+		}
+	}
+
+	m->delta_len = len;
+	return NULL;
 }
 
 static const struct got_error *
@@ -262,6 +395,7 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 		}
 	}
 
+	m->delta_len = ftello(f) - m->delta_offset;
 	return NULL;
 }
 
@@ -294,7 +428,8 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 	struct got_pack_meta *m = NULL, *base = NULL;
 	struct got_raw_object *raw = NULL, *base_raw = NULL;
 	struct got_delta_instruction *deltas = NULL, *best_deltas = NULL;
-	int i, j, size, best_size, ndeltas, best_ndeltas;
+	int i, j, ndeltas, best_ndeltas;
+	off_t size, best_size;
 	const int max_base_candidates = 3;
 	int outfd = -1;
 
@@ -412,15 +547,19 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		}
 
 		if (best_ndeltas > 0) {
-			m->delta_offset = ftello(delta_cache);
-			err = encode_delta(m, raw, best_deltas,
-			    best_ndeltas, m->prev->size, delta_cache);
+			if (best_size <= GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+				err = encode_delta_in_mem(m, raw, best_deltas,
+				    best_ndeltas, best_size, m->prev->size);
+			} else {
+				m->delta_offset = ftello(delta_cache);
+				err = encode_delta(m, raw, best_deltas,
+				    best_ndeltas, m->prev->size, delta_cache);
+			}
 			free(best_deltas);
 			best_deltas = NULL;
 			best_ndeltas = 0;
 			if (err)
 				goto done;
-			m->delta_len = ftello(delta_cache) - m->delta_offset;
 		}
 
 		got_object_raw_close(raw);
@@ -1193,6 +1332,43 @@ packoff(char *hdr, off_t off)
 }
 
 static const struct got_error *
+deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
+    struct got_pack_meta *m, int use_offset_deltas)
+{
+	const struct got_error *err;
+	char buf[32];
+	int nh;
+
+	if (use_offset_deltas && m->prev->off != 0) {
+		err = packhdr(&nh, buf, sizeof(buf),
+		    GOT_OBJ_TYPE_OFFSET_DELTA, m->delta_len);
+		if (err)
+			return err;
+		nh += packoff(buf + nh, m->off - m->prev->off);
+		err = hwrite(packfile, buf, nh, ctx);
+		if (err)
+			return err;
+		*packfile_size += nh;
+	} else {
+		err = packhdr(&nh, buf, sizeof(buf),
+		    GOT_OBJ_TYPE_REF_DELTA, m->delta_len);
+		if (err)
+			return err;
+		err = hwrite(packfile, buf, nh, ctx);
+		if (err)
+			return err;
+		*packfile_size += nh;
+		err = hwrite(packfile, m->prev->id.sha1,
+		    sizeof(m->prev->id.sha1), ctx);
+		if (err)
+			return err;
+		*packfile_size += sizeof(m->prev->id.sha1);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
     struct got_pack_meta **meta, int nmeta, int nours,
     int use_offset_deltas, struct got_repository *repo,
@@ -1267,6 +1443,18 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			packfile_size += outlen;
 			got_object_raw_close(raw);
 			raw = NULL;
+		} else if (m->delta_buf) {
+			err = deltahdr(&packfile_size, &ctx, packfile,
+			    m, use_offset_deltas);
+			if (err)
+				goto done;
+ 			err = got_deflate_to_file_mmap(&outlen,
+			    m->delta_buf, 0, m->delta_len, packfile, &csum);
+ 			if (err)
+ 				goto done;
+ 			packfile_size += outlen;
+			free(m->delta_buf);
+			m->delta_buf = NULL;
 		} else {
 			off_t remain;
 			if (delta_file == NULL) {
@@ -1309,30 +1497,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 				}
 				remain -= n;
 			}
-			if (use_offset_deltas && m->prev->off != 0) {
-				err = packhdr(&nh, buf, sizeof(buf),
-				    GOT_OBJ_TYPE_OFFSET_DELTA, m->delta_len);
-				if (err)
-					goto done;
-				nh += packoff(buf + nh,
-				    m->off - m->prev->off);
-				err = hwrite(packfile, buf, nh, &ctx);
-				if (err)
-					goto done;
-				packfile_size += nh;
-			} else {
-				err = packhdr(&nh, buf, sizeof(buf),
-				    GOT_OBJ_TYPE_REF_DELTA, m->delta_len);
-				err = hwrite(packfile, buf, nh, &ctx);
-				if (err)
-					goto done;
-				packfile_size += nh;
-				err = hwrite(packfile, m->prev->id.sha1,
-				    sizeof(m->prev->id.sha1), &ctx);
-				packfile_size += sizeof(m->prev->id.sha1);
-				if (err)
-					goto done;
-			}
+			err = deltahdr(&packfile_size, &ctx, packfile,
+			    m, use_offset_deltas);
+			if (err)
+				goto done;
 			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
 				err = got_error_from_errno("fseeko");
 				goto done;
