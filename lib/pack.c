@@ -1123,6 +1123,11 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			return got_error_from_errno("malloc");
 		base_file = NULL;
 		accum_file = NULL;
+	} else {
+		if (fseeko(base_file, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("fseeko");
+		if (fseeko(accum_file, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("fseeko");
 	}
 
 	/* Deltas are ordered in ascending order. */
