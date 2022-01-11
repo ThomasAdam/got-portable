@@ -1,3 +1,10 @@
+* got 0.66; 2022-01-11
+- only open raw objects if necessary while writing out pack file data
+- map raw object files into memory while packing if possible
+- encode short deltas in memory instead of writing them to a temporary file
+- add missing checks for reads beyond the mapped memory area of a pack file
+- fix file corruption regression in 'got checkout' from 0.65 (reported by naddy)
+
 * got 0.65; 2022-01-06
 - fix 32-bit size_t multiplication overflow in meyrs diff code
 - ignore the return value of closefrom(2) (patch by Anna a.k.a. CyberTailor)
