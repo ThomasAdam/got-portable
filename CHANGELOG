@@ -6,7 +6,11 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
-# got-portable 0.65; (2021-01-06)
+# got-portable 0.66; (2022-01-12)
+
+* Changes from got-0.65
+
+# got-portable 0.65; (2022-01-06)
 
 * Added timespec*() compat-wrappers for BSD-time functions.
 
