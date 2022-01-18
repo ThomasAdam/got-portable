@@ -423,6 +423,8 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen,
 		}
 	} else {
 		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, csum);
+		if (err)
+			return err;
 	}
 
 	*outlen = 0;
