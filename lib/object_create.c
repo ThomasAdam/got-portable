@@ -49,13 +49,13 @@
 
 static const struct got_error *
 create_object_file(struct got_object_id *id, FILE *content,
-    struct got_repository *repo)
+    off_t content_len, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
 	char *objpath = NULL, *tmppath = NULL;
 	FILE *tmpfile = NULL;
 	struct got_lockfile *lf = NULL;
-	size_t tmplen = 0;
+	off_t tmplen = 0;
 
 	err = got_object_get_path(&objpath, id, repo);
 	if (err)
@@ -83,7 +83,7 @@ create_object_file(struct got_object_id *id, FILE *content,
 		goto done;
 	}
 
-	err = got_deflate_to_file(&tmplen, content, tmpfile, NULL);
+	err = got_deflate_to_file(&tmplen, content, content_len, tmpfile, NULL);
 	if (err)
 		goto done;
 
@@ -113,7 +113,7 @@ done:
 
 const struct got_error *
 got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
-    const char *ondisk_path)
+    off_t *blobsize, const char *ondisk_path)
 {
 	const struct got_error *err = NULL;
 	char *header = NULL;
@@ -124,6 +124,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 
 	*id = NULL;
 	*blobfile = NULL;
+	*blobsize = 0;
 
 	SHA1Init(&sha1_ctx);
 
@@ -160,6 +161,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 		err = got_ferror(*blobfile, GOT_ERR_IO);
 		goto done;
 	}
+	*blobsize += headerlen;
 	for (;;) {
 		char buf[PATH_MAX * 8];
 		ssize_t inlen;
@@ -185,6 +187,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 			err = got_ferror(*blobfile, GOT_ERR_IO);
 			goto done;
 		}
+		*blobsize += n;
 		if (S_ISLNK(sb.st_mode))
 			break;
 	}
@@ -222,12 +225,14 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 {
 	const struct got_error *err = NULL;
 	FILE *blobfile = NULL;
+	off_t blobsize;
 
-	err = got_object_blob_file_create(id, &blobfile, ondisk_path);
+	err = got_object_blob_file_create(id, &blobfile, &blobsize,
+	    ondisk_path);
 	if (err)
 		return err;
 
-	err = create_object_file(*id, blobfile, repo);
+	err = create_object_file(*id, blobfile, blobsize, repo);
 	if (fclose(blobfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
@@ -299,6 +304,7 @@ got_object_tree_create(struct got_object_id **id,
 	char *header = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *treefile = NULL;
+	off_t treesize = 0;
 	struct got_pathlist_entry *pe;
 	struct got_tree_entry **sorted_entries;
 	struct got_tree_entry *te;
@@ -345,6 +351,7 @@ got_object_tree_create(struct got_object_id **id,
 		err = got_ferror(treefile, GOT_ERR_IO);
 		goto done;
 	}
+	treesize += headerlen;
 
 	for (i = 0; i < nentries; i++) {
 		te = sorted_entries[i];
@@ -358,6 +365,7 @@ got_object_tree_create(struct got_object_id **id,
 			goto done;
 		}
 		SHA1Update(&sha1_ctx, modebuf, len);
+		treesize += n;
 
 		len = strlen(te->name) + 1; /* must include NUL */
 		n = fwrite(te->name, 1, len, treefile);
@@ -366,6 +374,7 @@ got_object_tree_create(struct got_object_id **id,
 			goto done;
 		}
 		SHA1Update(&sha1_ctx, te->name, len);
+		treesize += n;
 
 		len = SHA1_DIGEST_LENGTH;
 		n = fwrite(te->id.sha1, 1, len, treefile);
@@ -374,6 +383,7 @@ got_object_tree_create(struct got_object_id **id,
 			goto done;
 		}
 		SHA1Update(&sha1_ctx, te->id.sha1, len);
+		treesize += n;
 	}
 
 	*id = malloc(sizeof(**id));
@@ -389,7 +399,7 @@ got_object_tree_create(struct got_object_id **id,
 	}
 	rewind(treefile);
 
-	err = create_object_file(*id, treefile, repo);
+	err = create_object_file(*id, treefile, treesize, repo);
 done:
 	free(header);
 	free(sorted_entries);
@@ -416,6 +426,7 @@ got_object_commit_create(struct got_object_id **id,
 	char *id_str = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *commitfile = NULL;
+	off_t commitsize = 0;
 	struct got_object_qid *qid;
 	char *msg0, *msg;
 
@@ -471,6 +482,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += headerlen;
 
 	err = got_object_id_str(&id_str, tree_id);
 	if (err)
@@ -487,6 +499,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	if (parent_ids) {
 		free(id_str);
@@ -510,6 +523,7 @@ got_object_commit_create(struct got_object_id **id,
 				free(parent_str);
 				goto done;
 			}
+			commitsize += n;
 			free(parent_str);
 			free(id_str);
 			id_str = NULL;
@@ -523,6 +537,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	len = strlen(committer_str);
 	SHA1Update(&sha1_ctx, committer_str, len);
@@ -531,6 +546,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	SHA1Update(&sha1_ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, commitfile);
@@ -538,6 +554,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	len = strlen(msg);
 	SHA1Update(&sha1_ctx, msg, len);
@@ -546,6 +563,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	SHA1Update(&sha1_ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, commitfile);
@@ -553,6 +571,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
 	}
+	commitsize += n;
 
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
@@ -567,7 +586,7 @@ got_object_commit_create(struct got_object_id **id,
 	}
 	rewind(commitfile);
 
-	err = create_object_file(*id, commitfile, repo);
+	err = create_object_file(*id, commitfile, commitsize, repo);
 done:
 	free(id_str);
 	free(msg0);
@@ -596,6 +615,7 @@ got_object_tag_create(struct got_object_id **id,
 	char *id_str = NULL, *obj_str = NULL, *type_str = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *tagfile = NULL;
+	off_t tagsize = 0;
 	char *msg0 = NULL, *msg;
 	const char *obj_type_str;
 	int obj_type;
@@ -681,6 +701,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += headerlen;
 	len = strlen(obj_str);
 	SHA1Update(&sha1_ctx, obj_str, len);
 	n = fwrite(obj_str, 1, len, tagfile);
@@ -688,6 +709,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 	len = strlen(type_str);
 	SHA1Update(&sha1_ctx, type_str, len);
 	n = fwrite(type_str, 1, len, tagfile);
@@ -695,6 +717,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	len = strlen(tag_str);
 	SHA1Update(&sha1_ctx, tag_str, len);
@@ -703,6 +726,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	len = strlen(tagger_str);
 	SHA1Update(&sha1_ctx, tagger_str, len);
@@ -711,6 +735,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	SHA1Update(&sha1_ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, tagfile);
@@ -718,6 +743,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	len = strlen(msg);
 	SHA1Update(&sha1_ctx, msg, len);
@@ -726,6 +752,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	SHA1Update(&sha1_ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, tagfile);
@@ -733,6 +760,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_ferror(tagfile, GOT_ERR_IO);
 		goto done;
 	}
+	tagsize += n;
 
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
@@ -747,7 +775,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	rewind(tagfile);
 
-	err = create_object_file(*id, tagfile, repo);
+	err = create_object_file(*id, tagfile, tagsize, repo);
 done:
 	free(msg0);
 	free(header);

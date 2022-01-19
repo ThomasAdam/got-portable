@@ -2882,11 +2882,13 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		case GOT_STATUS_ADD: {
 			struct got_object_id *id;
 			FILE *blob1_f;
+			off_t blob1_size;
 			/*
 			 * Delete the added file only if its content already
 			 * exists in the repository.
 			 */
-			err = got_object_blob_file_create(&id, &blob1_f, path1);
+			err = got_object_blob_file_create(&id, &blob1_f,
+			    &blob1_size, path1);
 			if (err)
 				goto done;
 			if (got_object_id_cmp(id, id1) == 0) {

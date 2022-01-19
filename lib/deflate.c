@@ -88,7 +88,8 @@ csum_output(struct got_deflate_checksum *csum, const uint8_t *buf, size_t len)
 }
 
 const struct got_error *
-got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
+got_deflate_read(struct got_deflate_buf *zb, FILE *f, off_t len,
+    size_t *outlenp, off_t *consumed)
 {
 	size_t last_total_out = zb->z.total_out;
 	z_stream *z = &zb->z;
@@ -98,9 +99,15 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 	z->avail_out = zb->outlen;
 
 	*outlenp = 0;
+	*consumed = 0;
 	do {
+		size_t last_total_in = z->total_in;
 		if (z->avail_in == 0) {
-			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
+			size_t n = 0;
+			if (*consumed < len) {
+				n = fread(zb->inbuf, 1,
+				    MIN(zb->inlen, len - *consumed), f);
+			}
 			if (n == 0) {
 				if (ferror(f))
 					return got_ferror(f, GOT_ERR_IO);
@@ -112,6 +119,7 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 			z->avail_in = n;
 		}
 		ret = deflate(z, Z_NO_FLUSH);
+		*consumed += z->total_in - last_total_in;
 	} while (ret == Z_OK && z->avail_out > 0);
 
 	if (ret == Z_OK) {
@@ -176,11 +184,12 @@ got_deflate_end(struct got_deflate_buf *zb)
 }
 
 const struct got_error *
-got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile,
-    struct got_deflate_checksum *csum)
+got_deflate_to_file(off_t *outlen, FILE *infile, off_t len,
+    FILE *outfile, struct got_deflate_checksum *csum)
 {
 	const struct got_error *err;
 	size_t avail;
+	off_t consumed;
 	struct got_deflate_buf zb;
 
 	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
@@ -190,9 +199,10 @@ got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile,
 	*outlen = 0;
 
 	do {
-		err = got_deflate_read(&zb, infile, &avail);
+		err = got_deflate_read(&zb, infile, len, &avail, &consumed);
 		if (err)
 			goto done;
+		len -= consumed;
 		if (avail > 0) {
 			size_t n;
 			n = fwrite(zb.outbuf, avail, 1, outfile);
@@ -212,7 +222,7 @@ done:
 }
 
 const struct got_error *
-got_deflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
+got_deflate_to_file_mmap(off_t *outlen, uint8_t *map, size_t offset,
     size_t len, FILE *outfile, struct got_deflate_checksum *csum)
 {
 	const struct got_error *err;
