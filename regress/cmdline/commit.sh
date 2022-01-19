@@ -1458,6 +1458,54 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_commit_large_file() {
+	local testroot=`test_init commit_large_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	dd status=none if=/dev/zero of=$testroot/wt/new bs=1m count=64
+	(cd $testroot/wt && got add new >/dev/null)
+
+	(cd $testroot/wt && got commit -m 'test commit_large_file' \
+		> $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  new" > $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	new_id=`get_blob_id $testroot/repo "" new`
+	got cat -r $testroot/repo $new_id > $testroot/new
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/new $testroot/wt/new
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/new $testroot/wt/new
+	fi
+	test_done "$testroot" "$ret"
+
+
+}
+
+
 test_parseargs "$@"
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -1484,3 +1532,4 @@ run_test test_commit_with_unrelated_submodule
 run_test test_commit_symlink
 run_test test_commit_fix_bad_symlink
 run_test test_commit_prepared_logmsg
+run_test test_commit_large_file

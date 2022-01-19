@@ -1385,11 +1385,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
 	struct got_raw_object *raw = NULL;
-	FILE *delta_file = NULL;
 	char buf[32];
-	size_t outlen, n;
+	size_t n;
 	struct got_deflate_checksum csum;
-	off_t packfile_size = 0;
+	off_t outlen, packfile_size = 0;
 	int outfd = -1;
 
 	SHA1Init(&ctx);
@@ -1440,7 +1439,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 					goto done;
 				}
 				err = got_deflate_to_file(&outlen, raw->f,
-				    packfile, &csum);
+				    raw->size, packfile, &csum);
 				if (err)
 					goto done;
 			}
@@ -1460,57 +1459,17 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			free(m->delta_buf);
 			m->delta_buf = NULL;
 		} else {
-			off_t remain;
-			if (delta_file == NULL) {
-				delta_file = got_opentemp();
-				if (delta_file == NULL) {
-					err = got_error_from_errno(
-					    "got_opentemp");
-					goto done;
-				}
-			}
-			if (ftruncate(fileno(delta_file), 0L) == -1) {
-				err = got_error_from_errno("ftruncate");
-				goto done;
-			}
-			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
-				err = got_error_from_errno("fseeko");
-				goto done;
-			}
 			if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
 			    == -1) {
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
-			remain = m->delta_len;
-			while (remain > 0) {
-				char delta_buf[8192];
-				size_t r, w, n;
-				n = MIN(remain, sizeof(delta_buf));
-				r = fread(delta_buf, 1, n, delta_cache);
-				if (r != n) {
-					err = got_ferror(delta_cache,
-					    GOT_ERR_IO);
-					goto done;
-				}
-				w = fwrite(delta_buf, 1, n, delta_file);
-				if (w != n) {
-					err = got_ferror(delta_file,
-					    GOT_ERR_IO);
-					goto done;
-				}
-				remain -= n;
-			}
 			err = deltahdr(&packfile_size, &ctx, packfile,
 			    m, use_offset_deltas);
 			if (err)
 				goto done;
-			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
-				err = got_error_from_errno("fseeko");
-				goto done;
-			}
-			err = got_deflate_to_file(&outlen, delta_file,
-			    packfile, &csum);
+			err = got_deflate_to_file(&outlen, delta_cache,
+			    m->delta_len, packfile, &csum);
 			if (err)
 				goto done;
 			packfile_size += outlen;
@@ -1529,8 +1488,6 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			goto done;
 	}
 done:
-	if (delta_file && fclose(delta_file) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	if (raw)
 		got_object_raw_close(raw);
 	if (outfd != -1 && close(outfd) == -1 && err == NULL)
