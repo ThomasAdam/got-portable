@@ -129,12 +129,35 @@ static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
 
 static const struct got_error *
+tog_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
+    struct got_reference* re2)
+{
+	const char *name1 = got_ref_get_name(re1);
+	const char *name2 = got_ref_get_name(re2);
+	int isbackup1, isbackup2;
+
+	/* Sort backup refs towards the bottom of the list. */
+	isbackup1 = strncmp(name1, "refs/got/backup/", 16) == 0;
+	isbackup2 = strncmp(name2, "refs/got/backup/", 16) == 0;
+	if (!isbackup1 && isbackup2) {
+		*cmp = -1;
+		return NULL;
+	} else if (isbackup1 && !isbackup2) {
+		*cmp = 1;
+		return NULL;
+	}
+
+	*cmp = got_path_cmp(name1, name2, strlen(name1), strlen(name2));
+	return NULL;
+}
+
+static const struct got_error *
 tog_load_refs(struct got_repository *repo, int sort_by_date)
 {
 	const struct got_error *err;
 
 	err = got_ref_list(&tog_refs, repo, NULL, sort_by_date ?
-	    got_ref_cmp_by_commit_timestamp_descending : got_ref_cmp_by_name,
+	    got_ref_cmp_by_commit_timestamp_descending : tog_ref_cmp_by_name,
 	    repo);
 	if (err)
 		return err;
@@ -244,6 +267,8 @@ default_color_value(const char *envvar)
 		return COLOR_MAGENTA;
 	if (strcmp(envvar, "TOG_COLOR_REFS_REMOTES") == 0)
 		return COLOR_YELLOW;
+	if (strcmp(envvar, "TOG_COLOR_REFS_BACKUP") == 0)
+		return COLOR_CYAN;
 
 	return -1;
 }
@@ -354,6 +379,7 @@ struct tog_log_view_state {
 #define TOG_COLOR_REFS_HEADS		12
 #define TOG_COLOR_REFS_TAGS		13
 #define TOG_COLOR_REFS_REMOTES		14
+#define TOG_COLOR_REFS_BACKUP		15
 
 struct tog_blame_cb_args {
 	struct tog_blame_line *lines; /* one per line */
@@ -1262,7 +1288,8 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			continue;
 		if (strncmp(name, "refs/", 5) == 0)
 			name += 5;
-		if (strncmp(name, "got/", 4) == 0)
+		if (strncmp(name, "got/", 4) == 0 &&
+		    strncmp(name, "got/backup/", 11) != 0)
 			continue;
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
@@ -5762,7 +5789,10 @@ ref_view_load_refs(struct tog_ref_view_state *s)
 
 	s->nrefs = 0;
 	TAILQ_FOREACH(sre, &tog_refs, entry) {
-		if (strncmp(got_ref_get_name(sre->ref), "refs/got/", 9) == 0)
+		if (strncmp(got_ref_get_name(sre->ref),
+		    "refs/got/", 9) == 0 &&
+		    strncmp(got_ref_get_name(sre->ref),
+		    "refs/got/backup/", 16) != 0)
 			continue;
 
 		re = malloc(sizeof(*re));
@@ -5825,6 +5855,12 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 		err = add_color(&s->colors, "^refs/remotes/",
 		    TOG_COLOR_REFS_REMOTES,
 		    get_color_value("TOG_COLOR_REFS_REMOTES"));
+		if (err)
+			goto done;
+
+		err = add_color(&s->colors, "^refs/got/backup/",
+		    TOG_COLOR_REFS_BACKUP,
+		    get_color_value("TOG_COLOR_REFS_BACKUP"));
 		if (err)
 			goto done;
 	}
@@ -6235,7 +6271,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->sort_by_date = !s->sort_by_date;
 		err = got_reflist_sort(&tog_refs, s->sort_by_date ?
 		    got_ref_cmp_by_commit_timestamp_descending :
-		    got_ref_cmp_by_name, s->repo);
+		    tog_ref_cmp_by_name, s->repo);
 		if (err)
 			break;
 		got_reflist_object_id_map_free(tog_refs_idmap);
