@@ -2001,7 +2001,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 			error = NULL;
 			continue;
 		}
-		else if (error)
+		else if (error && error->code != GOT_ERR_LONELY_PACKIDX)
 			goto done;
 
 		if (lstat(gw_dir->path, &st) == 0 && S_ISDIR(st.st_mode) &&
