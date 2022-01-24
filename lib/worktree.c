@@ -3573,7 +3573,6 @@ report_single_file_status(const char *path, const char *ondisk_path,
 			return got_error_from_errno2("lstat", ondisk_path);
 		return (*status_cb)(status_arg, GOT_STATUS_NONEXISTENT,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
-		return NULL;
 	}
 
 	if (S_ISREG(sb.st_mode) || S_ISLNK(sb.st_mode))
