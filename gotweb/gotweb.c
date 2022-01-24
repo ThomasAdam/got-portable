@@ -2000,8 +2000,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
 			error = NULL;
 			continue;
-		}
-		else if (error && error->code != GOT_ERR_LONELY_PACKIDX)
+		} else if (error && error->code != GOT_ERR_LONELY_PACKIDX)
 			goto done;
 
 		if (lstat(gw_dir->path, &st) == 0 && S_ISDIR(st.st_mode) &&
