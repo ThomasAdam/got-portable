@@ -3976,7 +3976,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
-		return got_error_path(relpath, GOT_ERR_BAD_PATH);
+		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 
 	staged_status = get_staged_status(ie);
 	if (staged_status != GOT_STATUS_NO_CHANGE) {
