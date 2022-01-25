@@ -159,8 +159,51 @@ test_rm_and_add_elsewhere() {
 		return 1
 	fi
 
+	(cd $testroot/wt && got rm alpha > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rm command succeeded unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: alpha: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm -f alpha > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got rm command failed unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	echo 'D  alpha' > $testroot/stdout.expected
-	(cd $testroot/wt && got rm alpha > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -514,6 +557,78 @@ test_rm_status_code() {
 	test_done "$testroot" "$ret"
 }
 
+test_rm_nonexistent_directory() {
+	local testroot=`test_init rm_nonexistent_directory`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm -r $testroot/wt/epsilon
+
+	(cd $testroot/wt && got rm epsilon > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rm command succeeded unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: epsilon: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm -f epsilon > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got rm command failed unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 
 test_parseargs "$@"
 run_test test_rm_basic
@@ -525,3 +640,4 @@ run_test test_rm_directory_keep_files
 run_test test_rm_subtree
 run_test test_rm_symlink
 run_test test_rm_status_code
+run_test test_rm_nonexistent_directory

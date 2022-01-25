@@ -3954,6 +3954,7 @@ struct schedule_deletion_args {
 	struct got_repository *repo;
 	int delete_local_mods;
 	int keep_on_disk;
+	int ignore_missing_paths;
 	const char *status_codes;
 };
 
@@ -3968,6 +3969,12 @@ schedule_for_deletion(void *arg, unsigned char status,
 	struct got_fileindex_entry *ie = NULL;
 	struct stat sb;
 	char *ondisk_path;
+
+	if (status == GOT_STATUS_NONEXISTENT) {
+		if (a->ignore_missing_paths)
+			return NULL;
+		return got_error_set_errno(ENOENT, relpath);
+	}
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
@@ -4016,6 +4023,10 @@ schedule_for_deletion(void *arg, unsigned char status,
 			goto done;
 		if (status == GOT_STATUS_MODIFY && !a->delete_local_mods) {
 			err = got_error_path(relpath, GOT_ERR_FILE_MODIFIED);
+			goto done;
+		}
+		if (status == GOT_STATUS_MISSING && !a->ignore_missing_paths) {
+			err = got_error_set_errno(ENOENT, relpath);
 			goto done;
 		}
 		if (status != GOT_STATUS_MODIFY &&
@@ -4073,7 +4084,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
     struct got_pathlist_head *paths, int delete_local_mods,
     const char *status_codes,
     got_worktree_delete_cb progress_cb, void *progress_arg,
-    struct got_repository *repo, int keep_on_disk)
+    struct got_repository *repo, int keep_on_disk, int ignore_missing_paths)
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
@@ -4096,6 +4107,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	sda.repo = repo;
 	sda.delete_local_mods = delete_local_mods;
 	sda.keep_on_disk = keep_on_disk;
+	sda.ignore_missing_paths = ignore_missing_paths;
 	sda.status_codes = status_codes;
 
 	TAILQ_FOREACH(pe, paths, entry) {
