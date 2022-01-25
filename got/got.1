@@ -1259,7 +1259,10 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl f
-Perform the operation even if a file contains local modifications.
+Perform the operation even if a file contains local modifications,
+and do not raise an error if a specified
+.Ar path
+does not exist on disk.
 .It Fl k
 Keep affected files on disk.
 .It Fl R

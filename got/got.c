@@ -6981,6 +6981,7 @@ cmd_remove(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0, i;
+	int ignore_missing_paths = 0;
 
 	TAILQ_INIT(&paths);
 
@@ -6988,6 +6989,7 @@ cmd_remove(int argc, char *argv[])
 		switch (ch) {
 		case 'f':
 			delete_local_mods = 1;
+			ignore_missing_paths = 1;
 			break;
 		case 'k':
 			keep_on_disk = 1;
@@ -7002,6 +7004,7 @@ cmd_remove(int argc, char *argv[])
 					delete_local_mods = 1;
 					break;
 				case GOT_STATUS_MISSING:
+					ignore_missing_paths = 1;
 					break;
 				default:
 					errx(1, "invalid status code '%c'",
@@ -7084,7 +7087,7 @@ cmd_remove(int argc, char *argv[])
 
 	error = got_worktree_schedule_delete(worktree, &paths,
 	    delete_local_mods, status_codes, print_remove_status, NULL,
-	    repo, keep_on_disk);
+	    repo, keep_on_disk, ignore_missing_paths);
 done:
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
