@@ -213,6 +213,66 @@ test_rm_and_add_elsewhere() {
 		return 1
 	fi
 
+	# While here, test behaviour of rm on files in unversioned status.
+	(cd $testroot/wt && got rm epsilon/alpha > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rm command succeeded unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: epsilon/alpha: file has unexpected status" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# And test the same case with -f.
+	(cd $testroot/wt && got rm -f epsilon/alpha > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rm command succeeded unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n '' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: epsilon/alpha: file has unexpected status" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	echo 'A  epsilon/alpha' > $testroot/stdout.expected
 	(cd $testroot/wt && got add epsilon/alpha > $testroot/stdout)
 
