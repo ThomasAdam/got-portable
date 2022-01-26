@@ -1186,7 +1186,6 @@ const struct got_error *
 got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
     struct imsgbuf *ibuf)
 {
-	const struct got_error *err = NULL;
 	struct got_imsg_object *iobj;
 	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 
@@ -1209,7 +1208,7 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
 		(*obj)->pack_idx = iobj->pack_idx;
 	}
 	STAILQ_INIT(&(*obj)->deltas.entries);
-	return err;
+	return NULL;
 }
 
 const struct got_error *
