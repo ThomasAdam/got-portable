@@ -371,21 +371,16 @@ got_packidx_open(struct got_packidx **packidx,
 	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (p->fd == -1) {
 		err = got_error_from_errno2("openat", relpath);
-		free(p);
 		goto done;
 	}
 
 	if (fstat(p->fd, &idx_sb) != 0) {
 		err = got_error_from_errno2("fstat", relpath);
-		close(p->fd);
-		free(p);
 		goto done;
 	}
 	p->len = idx_sb.st_size;
 	if (p->len < sizeof(p->hdr)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
-		close(p->fd);
-		free(p);
 		goto done;
 	}
 
