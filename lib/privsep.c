@@ -1208,7 +1208,7 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
 		(*obj)->pack_offset = iobj->pack_offset;
 		(*obj)->pack_idx = iobj->pack_idx;
 	}
-
+	STAILQ_INIT(&(*obj)->deltas.entries);
 	return err;
 }
 
