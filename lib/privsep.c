@@ -427,14 +427,14 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 		return got_error_from_errno("imsg_create TREE_REQUEST");
 
 	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add TREE_ENTRY");
+		err = got_error_from_errno("imsg_add TREE_REQUEST");
 		ibuf_free(wbuf);
 		return err;
 	}
 
 	if (pack_idx != -1) { /* tree is packed */
 		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
+			err = got_error_from_errno("imsg_add TREE_REQUEST");
 			ibuf_free(wbuf);
 			return err;
 		}
