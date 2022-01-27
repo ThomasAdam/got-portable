@@ -1020,28 +1020,15 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 	struct dirent *de = dle->data;
 	DIR *subdir = NULL;
 	int subdirfd = -1;
-	int type;
 
 	*next = NULL;
 
-	if (de->d_type == DT_UNKNOWN) {
-		/* Occurs on NFS mounts without "readdir plus" RPC. */
-		char *dir_path;
-		if (asprintf(&dir_path, "%s/%s", rootpath, path) == -1)
-			return got_error_from_errno("asprintf");
-		err = got_path_dirent_type(&type, dir_path, de);
-		free(dir_path);
-		if (err)
-			return err;
-	} else
-		type = de->d_type;
-
 	/* Must traverse ignored directories if they contain tracked files. */
-	if (type == DT_DIR && ignore &&
+	if (de->d_type == DT_DIR && ignore &&
 	    have_tracked_file_in_dir(fileindex, path))
 		ignore = 0;
 
-	if (type == DT_DIR && !ignore) {
+	if (de->d_type == DT_DIR && !ignore) {
 		char *subpath;
 		char *subdirpath;
 		struct got_pathlist_head subdirlist;
@@ -1097,6 +1084,28 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 }
 
 static const struct got_error *
+dirent_type_fixup(struct dirent *de, const char *rootpath, const char *path)
+{
+	const struct got_error *err;
+	char *dir_path;
+	int type;
+
+	if (de->d_type != DT_UNKNOWN)
+		return NULL;
+
+	/* DT_UNKNOWN occurs on NFS mounts without "readdir plus" RPC. */
+	if (asprintf(&dir_path, "%s/%s", rootpath, path) == -1)
+		return got_error_from_errno("asprintf");
+	err = got_path_dirent_type(&type, dir_path, de);
+	free(dir_path);
+	if (err)
+		return err;
+
+	de->d_type = type;
+	return NULL;
+}
+
+static const struct got_error *
 diff_fileindex_dir(struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_pathlist_head *dirlist,
     int dirfd, const char *rootpath, const char *path,
@@ -1121,6 +1130,9 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			char *de_path;
 			int cmp;
 			de = dle->data;
+			err = dirent_type_fixup(de, rootpath, path);
+			if (err)
+				break;
 			if (asprintf(&de_path, "%s/%s", path,
 			    de->d_name) == -1) {
 				err = got_error_from_errno("asprintf");
@@ -1160,6 +1172,9 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
 			de = dle->data;
+			err = dirent_type_fixup(de, rootpath, path);
+			if (err)
+				break;
 			err = cb->diff_new(&ignore, cb_arg, de, path, dirfd);
 			if (err)
 				break;
