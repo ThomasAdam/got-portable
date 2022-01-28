@@ -194,13 +194,14 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 		GOT_OBJ_TYPE_TAG,
 	};
 	int type = 0;
-	size_t size = 0, hdrlen = 0;
+	size_t size = 0;
 	size_t i;
+	char *end;
 
 	*obj = NULL;
 
-	hdrlen = strnlen(buf, len) + 1 /* '\0' */;
-	if (hdrlen > len)
+	end = memchr(buf, '\0', len);
+	if (end == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
 	for (i = 0; i < nitems(obj_labels); i++) {
@@ -208,12 +209,11 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 		size_t label_len = strlen(label);
 		const char *errstr;
 
-		if (strncmp(buf, label, label_len) != 0)
+		if (len <= label_len || buf + label_len >= end ||
+		    strncmp(buf, label, label_len) != 0)
 			continue;
 
 		type = obj_types[i];
-		if (len <= label_len)
-			return got_error(GOT_ERR_BAD_OBJ_HDR);
 		size = strtonum(buf + label_len, 0, LONG_MAX, &errstr);
 		if (errstr != NULL)
 			return got_error(GOT_ERR_BAD_OBJ_HDR);
@@ -227,7 +227,7 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 	if (*obj == NULL)
 		return got_error_from_errno("calloc");
 	(*obj)->type = type;
-	(*obj)->hdrlen = hdrlen;
+	(*obj)->hdrlen = end - buf + 1;
 	(*obj)->size = size;
 	return NULL;
 }
@@ -247,6 +247,7 @@ got_object_read_header(struct got_object **obj, int fd)
 	buf = malloc(zbsize);
 	if (buf == NULL)
 		return got_error_from_errno("malloc");
+	buf[0] = '\0';
 
 	err = got_inflate_init(&zb, buf, zbsize, NULL);
 	if (err)
