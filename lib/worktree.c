@@ -3872,7 +3872,10 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	if (status != GOT_STATUS_UNVERSIONED) {
-		err = got_error_path(ondisk_path, GOT_ERR_FILE_STATUS);
+		if (status == GOT_STATUS_NONEXISTENT)
+			err = got_error_set_errno(ENOENT, ondisk_path);
+		else
+			err = got_error_path(ondisk_path, GOT_ERR_FILE_STATUS);
 		goto done;
 	}
 
