@@ -43,6 +43,12 @@
 #define unveil(s, p) (0)
 #endif
 
+#ifndef HAVE_LINUX_LANDLOCK_H
+#define landlock_no_fs() (0)
+#else
+int	landlock_no_fs(void);
+#endif
+
 #ifndef INFTIM
 #define INFTIM -1
 #endif

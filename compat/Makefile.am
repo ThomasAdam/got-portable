@@ -31,6 +31,10 @@ else
 libopenbsd_compat_a_SOURCES += uuid.c
 endif
 
+if HAVE_LINUX_LANDLOCK
+libopenbsd_compat_a_SOURCES += landlock.c
+endif
+
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \

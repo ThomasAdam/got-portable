@@ -809,6 +809,13 @@ main(int argc, char **argv)
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
+
+	/* revoke fs access */
+	if (landlock_no_fs() == -1) {
+		err = got_error_from_errno("landlock_no_fs");
+		got_privsep_send_error(&ibuf, err);
+		return 1;
+	}
 #endif
 	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 	if (err) {
