@@ -649,11 +649,10 @@ test_commit_no_email() {
 		got commit -m 'test no email' > $testroot/stdout \
 		2> $testroot/stderr)
 
-	echo -n "got: GOT_AUTHOR environment variable contains no email " \
+	echo -n "got: :flan_hacker:: commit author's email address " \
 		> $testroot/stderr.expected
-	echo -n "address; an email address is required for compatibility "\
+	echo "is required for compatibility with Git" \
 		>> $testroot/stderr.expected
-	echo "with Git" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

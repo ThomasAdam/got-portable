@@ -596,6 +596,26 @@ import_progress(void *arg, const char *path)
 	return NULL;
 }
 
+static int
+valid_author(const char *author)
+{
+	/*
+	 * Really dumb email address check; we're only doing this to
+	 * avoid git's object parser breaking on commits we create.
+	 */
+	while (*author && *author != '<')
+		author++;
+	if (*author != '<')
+		return 0;
+	while (*author && *author != '@')
+		author++;
+	if (*author != '@')
+		return 0;
+	while (*author && *author != '>')
+		author++;
+	return *author == '>';
+}
+
 static const struct got_error *
 get_author(char **author, struct got_repository *repo,
     struct got_worktree *worktree)
@@ -653,28 +673,8 @@ get_author(char **author, struct got_repository *repo,
 	if (*author == NULL)
 		return got_error_from_errno("strdup");
 
-	/*
-	 * Really dumb email address check; we're only doing this to
-	 * avoid git's object parser breaking on commits we create.
-	 */
-	while (*got_author && *got_author != '<')
-		got_author++;
-	if (*got_author != '<') {
-		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
-		goto done;
-	}
-	while (*got_author && *got_author != '@')
-		got_author++;
-	if (*got_author != '@') {
-		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
-		goto done;
-	}
-	while (*got_author && *got_author != '>')
-		got_author++;
-	if (*got_author != '>')
-		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
-done:
-	if (err) {
+	if (!valid_author(*author)) {
+		err = got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", *author);
 		free(*author);
 		*author = NULL;
 	}
