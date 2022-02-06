@@ -289,9 +289,8 @@ static const struct got_error {
 	{ GOT_ERR_STAGED_PATHS, "work tree contains files with staged "
 	    "changes; these changes must be committed or unstaged first" },
 	{ GOT_ERR_PATCH_CHOICE, "invalid patch choice" },
-	{ GOT_ERR_COMMIT_NO_EMAIL,"GOT_AUTHOR environment variable contains "
-	    "no email address; an email address is required for compatibility "
-	    "with Git" },
+	{ GOT_ERR_COMMIT_NO_EMAIL, "commit author's email address is required "
+	    "for compatibility with Git" },
 	{ GOT_ERR_TAG_EXISTS,"specified tag already exists" },
 	{ GOT_ERR_GIT_REPO_FORMAT,"unknown git repository format version" },
 	{ GOT_ERR_REBASE_REQUIRED,"specified branch must be rebased first" },
