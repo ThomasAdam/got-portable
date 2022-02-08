@@ -323,7 +323,6 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
 			if (outbuf == NULL)
 				continue;
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
@@ -335,6 +334,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_INFLATE_F_HAVE_MORE);
 
@@ -383,7 +383,6 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
 			if (outbuf == NULL)
 				continue;
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
@@ -395,6 +394,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_INFLATE_F_HAVE_MORE);
 
