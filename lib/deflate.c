@@ -153,7 +153,10 @@ got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
 		size_t last_total_in = z->total_in;
 		if (z->avail_in == 0) {
 			z->next_in = map + offset + *consumed;
-			z->avail_in = len - *consumed;
+			if (len - *consumed > UINT_MAX)
+				z->avail_in = UINT_MAX;
+			else
+				z->avail_in = len - *consumed;
 			if (z->avail_in == 0) {
 				/* EOF */
 				ret = deflate(z, Z_FINISH);
