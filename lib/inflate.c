@@ -247,7 +247,10 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 				break;
 			}
 			z->next_in = map + offset + *consumed;
-			z->avail_in = len - *consumed;
+			if (len - *consumed > UINT_MAX)
+				z->avail_in = UINT_MAX;
+			else
+				z->avail_in = len - *consumed;
 		}
 		if (zb->csum) {
 			csum_in = z->next_in;
