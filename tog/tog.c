@@ -3884,7 +3884,8 @@ cmd_diff(int argc, char *argv[])
 			diff_context = strtonum(optarg, 0, GOT_DIFF_MAX_CONTEXT,
 			    &errstr);
 			if (errstr != NULL)
-				err(1, "-C option %s", errstr);
+				errx(1, "number of context lines is %s: %s",
+				    errstr, errstr);
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
