@@ -26,11 +26,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
 
 #include "got_error.h"
 
 #include "got_lib_deltify.h"
+#include "murmurhash2.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -87,17 +87,10 @@ static uint32_t geartab[256] = {
     0xf1f6e72c, 0x5551128a, 0x83af87e2, 0x6f0342ba,
 };
 
-static uint64_t
+static uint32_t
 hashblk(const unsigned char *p, off_t n)
 {
-	unsigned char buf[SHA1_DIGEST_LENGTH];
-	uint64_t h;
-	SHA1_CTX ctx;
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, p, n);
-	SHA1Final(buf, &ctx);
-	memcpy(&h, buf, sizeof(h));
-	return be64toh(h);
+	return murmurhash2(p, n, 0x1d7c5ac3);
 }
 
 static const struct got_error *
@@ -247,7 +240,7 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
     unsigned char *p, off_t len, FILE *basefile, off_t basefile_offset0)
 {
 	int i;
-	uint64_t h;
+	uint32_t h;
 	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
 	size_t r;
 
@@ -278,7 +271,7 @@ lookupblk_mem(struct got_delta_block **block, struct got_delta_table *dt,
     unsigned char *p, off_t len, uint8_t *basedata, off_t basefile_offset0)
 {
 	int i;
-	uint64_t h;
+	uint32_t h;
 	uint8_t *b;
 
 	*block = NULL;
@@ -360,7 +353,7 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
     off_t filesize)
 {
 	const struct got_error *err = NULL;
-	uint64_t h;
+	uint32_t h;
 	const off_t offset0 = fileoffset;
 
 	*dt = calloc(1, sizeof(**dt));
