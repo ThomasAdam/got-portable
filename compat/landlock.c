@@ -18,14 +18,9 @@
 #include <linux/prctl.h>
 
 #include <sys/prctl.h>
-#include <sys/stat.h>
 #include <sys/syscall.h>
 
 #include <errno.h>
-#include <fcntl.h>
-#include <libgen.h>
-#include <limits.h>
-#include <string.h>
 #include <unistd.h>
 
 #include "got_compat.h"
