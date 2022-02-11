@@ -34,7 +34,7 @@ struct got_delta_instruction {
 };
 
 enum {
-	GOT_DELTIFY_MINCHUNK	= 128,
+	GOT_DELTIFY_MINCHUNK	= 32,
 	GOT_DELTIFY_MAXCHUNK	= 8192,
 	GOT_DELTIFY_SPLITMASK	= (1 << 8) - 1,
 	
