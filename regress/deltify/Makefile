@@ -1,7 +1,7 @@
 .PATH:${.CURDIR}/../../lib
 
 PROG = deltify_test
-SRCS = deltify.c error.c opentemp.c sha1.c deltify_test.c
+SRCS = deltify.c error.c opentemp.c sha1.c deltify_test.c murmurhash2.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lz
