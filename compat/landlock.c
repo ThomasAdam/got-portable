@@ -86,7 +86,7 @@ landlock_no_fs(void)
 	fd = landlock_create_ruleset(&rattr, sizeof(rattr), 0);
 	if (fd == -1) {
 		/* this kernel doesn't have landlock built in */
-		if (errno == ENOSYS || errno == ENOTSUP)
+		if (errno == ENOSYS || errno == EOPNOTSUPP)
 			return 0;
 		return -1;
 	}
