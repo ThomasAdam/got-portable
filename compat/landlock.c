@@ -70,13 +70,24 @@ int
 landlock_no_fs(void)
 {
 	struct landlock_ruleset_attr rattr = {
-		/*
-		 * handled_access_fs can't be zero!  Even if we don't
-		 * add any path at all with landlock_add_rule, and thus
-		 * rejecting *any* filesystem access, we still have to
-		 * list some "possible actions" here.
+		/* 
+		 * List all capabilities currently defined by landlock.
+		 * Failure in doing so will implicitly allow those actions
+		 * (i.e. omitting READ_FILE will allow to read _any_ file.)
 		 */
-		.handled_access_fs = LANDLOCK_ACCESS_FS_READ_FILE,
+		.handled_access_fs = LANDLOCK_ACCESS_FS_EXECUTE | \
+				     LANDLOCK_ACCESS_FS_READ_FILE | \
+				     LANDLOCK_ACCESS_FS_READ_DIR | \
+				     LANDLOCK_ACCESS_FS_WRITE_FILE | \
+				     LANDLOCK_ACCESS_FS_REMOVE_DIR | \
+				     LANDLOCK_ACCESS_FS_REMOVE_FILE | \
+				     LANDLOCK_ACCESS_FS_MAKE_CHAR | \
+				     LANDLOCK_ACCESS_FS_MAKE_DIR | \
+				     LANDLOCK_ACCESS_FS_MAKE_REG | \
+				     LANDLOCK_ACCESS_FS_MAKE_SOCK | \
+				     LANDLOCK_ACCESS_FS_MAKE_FIFO | \
+				     LANDLOCK_ACCESS_FS_MAKE_BLOCK | \
+				     LANDLOCK_ACCESS_FS_MAKE_SYM,
 	};
 	int fd, saved_errno;
 
