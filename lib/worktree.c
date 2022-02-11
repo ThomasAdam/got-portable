@@ -3560,9 +3560,6 @@ report_single_file_status(const char *path, const char *ondisk_path,
 	struct got_fileindex_entry *ie;
 	struct stat sb;
 
-	if (!no_ignores && match_ignores(ignores, path))
-		return NULL;
-
 	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
 		return report_file_status(ie, ondisk_path, -1, NULL,
@@ -3574,6 +3571,9 @@ report_single_file_status(const char *path, const char *ondisk_path,
 		return (*status_cb)(status_arg, GOT_STATUS_NONEXISTENT,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 	}
+
+	if (!no_ignores && match_ignores(ignores, path))
+		return NULL;
 
 	if (S_ISREG(sb.st_mode) || S_ISLNK(sb.st_mode))
 		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED,
