@@ -457,7 +457,7 @@ pack_progress(void *arg, off_t packfile_size, int ncommits,
 	if (print_deltify)
 		printf("; deltify: %d%%", p_deltify);
 	if (print_written)
-		printf("; writing pack: %*s %d%%", FMT_SCALED_STRSIZE,
+		printf("; writing pack: %*s %d%%", FMT_SCALED_STRSIZE - 2,
 		    scaled_size, p_written);
 	if (print_searching || print_total || print_deltify ||
 	    print_written) {
@@ -511,7 +511,7 @@ pack_index_progress(void *arg, off_t packfile_size, int nobj_total,
 	if (print_size || print_indexed || print_resolved)
 		printf("\r");
 	if (print_size)
-		printf("%*s packed", FMT_SCALED_STRSIZE, scaled_size);
+		printf("%*s packed", FMT_SCALED_STRSIZE - 2, scaled_size);
 	if (print_indexed)
 		printf("; indexing %d%%", p_indexed);
 	if (print_resolved)
