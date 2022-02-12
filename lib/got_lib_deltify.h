@@ -18,7 +18,7 @@
 struct got_delta_block {
 	off_t		len;
 	off_t		offset;
-	uint64_t	hash;
+	uint32_t	hash;
 };
 
 struct got_delta_table {
