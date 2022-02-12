@@ -1182,6 +1182,36 @@ test_diff_commits() {
 	test_done "$testroot" "$ret"
 }
 
+test_diff_ignored_file() {
+	local testroot=`test_init diff_ignored_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret != 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 1 > $testroot/wt/number
+	(cd $testroot/wt && got add number >/dev/null)
+	(cd $testroot/wt && got commit -m 'add number' >/dev/null)
+
+	echo "**/number" > $testroot/wt/.gitignore
+
+	echo 2 > $testroot/wt/number
+	(cd $testroot/wt && got diff number | sed '1,/^@@/d' > $testroot/stdout)
+
+	echo "-1"  > $testroot/stdout.expected
+	echo "+2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret != 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1193,3 +1223,4 @@ run_test test_diff_symlinks_in_work_tree
 run_test test_diff_symlinks_in_repo
 run_test test_diff_binary_files
 run_test test_diff_commits
+run_test test_diff_ignored_file
