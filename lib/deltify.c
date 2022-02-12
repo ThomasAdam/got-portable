@@ -95,7 +95,7 @@ hashblk(const unsigned char *p, off_t n)
 
 static const struct got_error *
 addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
-    off_t offset, uint64_t h)
+    off_t offset, uint32_t h)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -173,7 +173,7 @@ addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
 
 static const struct got_error *
 addblk_mem(struct got_delta_table *dt, uint8_t *data, off_t file_offset0,
-    off_t len, off_t offset, uint64_t h)
+    off_t len, off_t offset, uint32_t h)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -403,7 +403,7 @@ got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
     off_t fileoffset, off_t filesize)
 {
 	const struct got_error *err = NULL;
-	uint64_t h;
+	uint32_t h;
 	const off_t offset0 = fileoffset;
 
 	*dt = calloc(1, sizeof(**dt));
