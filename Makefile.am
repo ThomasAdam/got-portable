@@ -70,6 +70,7 @@ regress-deltify:
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/lib/murmurhash2.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/deltify/deltify_test
 
