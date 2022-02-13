@@ -1227,7 +1227,8 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name)))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
