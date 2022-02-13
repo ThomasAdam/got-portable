@@ -1338,8 +1338,7 @@ static const struct got_error *
 load_object_ids(struct got_object_idset *idset,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours, struct got_repository *repo,
-    int loose_obj_only, got_pack_progress_cb progress_cb, void *progress_arg,
-    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
+    int loose_obj_only, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
@@ -1363,11 +1362,6 @@ load_object_ids(struct got_object_idset *idset,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, got_object_idset_num_elements(idset),
-		    0, 0);
-		if (err)
-			goto done;
 	}
 
 	for (i = 0; i < ntheirs; i++) {
@@ -1388,21 +1382,11 @@ load_object_ids(struct got_object_idset *idset,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
-		if (err)
-			goto done;
 	}
 
 	for (i = 0; i < nobj; i++) {
 		err = load_commit(1, idset, ids[i], repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-		if (err)
-			goto done;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
@@ -1423,17 +1407,6 @@ load_object_ids(struct got_object_idset *idset,
 			continue;
 		err = load_tag(1, idset, id, repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
-		if (err)
-			goto done;
-	}
-
-	if (progress_cb) {
-		err = progress_cb(progress_arg, 0L, nours,
-		    got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
@@ -1795,8 +1768,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		return got_error_from_errno("got_object_idset_alloc");
 
 	err = load_object_ids(idset, theirs, ntheirs, ours, nours,
-	    repo, loose_obj_only, progress_cb, progress_arg, &rl,
-	    cancel_cb, cancel_arg);
+	    repo, loose_obj_only, cancel_cb, cancel_arg);
 	if (err)
 		return err;
 
@@ -1804,6 +1776,13 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	    remove_unused_object, idset);
 	if (err)
 		goto done;
+
+	if (progress_cb) {
+		err = progress_cb(progress_arg, 0L, nours,
+		    got_object_idset_num_elements(idset), 0, 0);
+		if (err)
+			goto done;
+	}
 
 	if (got_object_idset_num_elements(idset) == 0 && !allow_empty) {
 		err = got_error(GOT_ERR_CANNOT_PACK);
