@@ -22,6 +22,7 @@ struct got_pack {
 	size_t filesize;
 	struct got_privsep_child *privsep_child;
 	int child_has_tempfiles;
+	int child_has_delta_outfd;
 	struct got_delta_cache *delta_cache;
 };
 
@@ -96,6 +97,16 @@ struct got_packidx_v2_hdr {
 	struct got_packidx_trailer *trailer;
 };
 
+struct got_pack_offset_index {
+	uint32_t offset;
+	uint32_t idx;
+};
+
+struct got_pack_large_offset_index {
+	uint64_t offset;
+	uint32_t idx;
+};
+
 /* An open pack index file. */
 struct got_packidx {
 	char *path_packidx; /* actual on-disk path */
@@ -104,6 +115,8 @@ struct got_packidx {
 	size_t len;
 	size_t nlargeobj;
 	struct got_packidx_v2_hdr hdr; /* convenient pointers into map */
+	struct got_pack_offset_index *sorted_offsets;
+	struct got_pack_large_offset_index *sorted_large_offsets;
 };
 
 struct got_packfile_hdr {
@@ -177,6 +190,10 @@ const struct got_error *got_packidx_close(struct got_packidx *);
 const struct got_error *got_packidx_get_packfile_path(char **, const char *);
 off_t got_packidx_get_object_offset(struct got_packidx *, int idx);
 int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
+const struct got_error *got_packidx_get_offset_idx(int *, struct got_packidx *,
+    off_t);
+const struct got_error *got_packidx_get_object_id(struct got_object_id *,
+    struct got_packidx *, int);
 const struct got_error *got_packidx_match_id_str_prefix(
     struct got_object_id_queue *, struct got_packidx *, const char *);
 
@@ -194,5 +211,8 @@ const struct got_error *got_packfile_extract_object(struct got_pack *,
     struct got_object *, FILE *, FILE *, FILE *);
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
     struct got_object *, struct got_pack *);
+const struct got_error *got_packfile_extract_raw_delta(uint8_t **, size_t *,
+    off_t *, off_t *, struct got_object_id *, uint64_t *, uint64_t *,
+    struct got_pack *, struct got_packidx *, int);
 struct got_pack *got_repo_get_cached_pack(struct got_repository *,
     const char *);

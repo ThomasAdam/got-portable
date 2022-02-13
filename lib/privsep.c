@@ -2728,6 +2728,107 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 }
 
 const struct got_error *
+got_privsep_send_raw_delta_req(struct imsgbuf *ibuf, int idx,
+    struct got_object_id *id)
+{
+	struct got_imsg_raw_delta_request dreq;
+
+	dreq.idx = idx;
+	memcpy(dreq.id, id->sha1, SHA1_DIGEST_LENGTH);
+
+	if (imsg_compose(ibuf, GOT_IMSG_RAW_DELTA_REQUEST, 0, 0, -1,
+	    &dreq, sizeof(dreq)) == -1)
+		return got_error_from_errno("imsg_compose RAW_DELTA_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_raw_delta_outfd(struct imsgbuf *ibuf, int fd)
+{
+	return send_fd(ibuf, GOT_IMSG_RAW_DELTA_OUTFD, fd);
+}
+
+const struct got_error *
+got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
+    uint64_t result_size,  off_t delta_size, off_t delta_offset,
+    off_t delta_out_offset, struct got_object_id *base_id)
+{
+	struct got_imsg_raw_delta idelta;
+	int ret;
+
+	idelta.base_size = base_size;
+	idelta.result_size = result_size;
+	idelta.delta_size = delta_size;
+	idelta.delta_offset = delta_offset;
+	idelta.delta_out_offset = delta_out_offset;
+	memcpy(idelta.base_id, base_id->sha1, SHA1_DIGEST_LENGTH);
+
+	ret = imsg_compose(ibuf, GOT_IMSG_RAW_DELTA, 0, 0, -1,
+	    &idelta, sizeof(idelta));
+	if (ret == -1)
+		return got_error_from_errno("imsg_compose RAW_DELTA");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
+    off_t *delta_size, off_t *delta_offset, off_t *delta_out_offset,
+    struct got_object_id **base_id, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_raw_delta *delta;
+	size_t datalen;
+
+	*base_size = 0;
+	*result_size = 0;
+	*delta_size = 0;
+	*delta_offset = 0;
+	*delta_out_offset = 0;
+	*base_id = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_RAW_DELTA:
+		if (datalen != sizeof(*delta)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		delta = imsg.data;
+		*base_size = delta->base_size;
+		*result_size = delta->result_size;
+		*delta_size = delta->delta_size;
+		*delta_offset = delta->delta_offset;
+		*delta_out_offset = delta->delta_out_offset;
+		*base_id = calloc(1, sizeof(**base_id));
+		if (*base_id == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		memcpy((*base_id)->sha1, delta->base_id, SHA1_DIGEST_LENGTH);
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	if (err) {
+		free(*base_id);
+		*base_id = NULL;
+	}
+	return err;
+}
+
+const struct got_error *
 got_privsep_unveil_exec_helpers(void)
 {
 	const char *helpers[] = {

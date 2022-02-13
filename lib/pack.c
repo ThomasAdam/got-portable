@@ -433,6 +433,8 @@ got_packidx_close(struct got_packidx *packidx)
 	}
 	if (close(packidx->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	free(packidx->sorted_offsets);
+	free(packidx->sorted_large_offsets);
 	free(packidx);
 
 	return err;
@@ -506,6 +508,154 @@ got_packidx_get_object_idx(struct got_packidx *packidx,
 	}
 
 	return -1;
+}
+
+static int
+offset_cmp(const void *pa, const void *pb)
+{
+	const struct got_pack_offset_index *a, *b;
+
+	a = (const struct got_pack_offset_index *)pa;
+	b = (const struct got_pack_offset_index *)pb;
+
+	if (a->offset < b->offset)
+		return -1;
+	else if (a->offset > b->offset)
+		return 1;
+
+	return 0;
+}
+
+static int
+large_offset_cmp(const void *pa, const void *pb)
+{
+	const struct got_pack_large_offset_index *a, *b;
+
+	a = (const struct got_pack_large_offset_index *)pa;
+	b = (const struct got_pack_large_offset_index *)pb;
+
+	if (a->offset < b->offset)
+		return -1;
+	else if (a->offset > b->offset)
+		return 1;
+
+	return 0;
+}
+
+static const struct got_error *
+build_offset_index(struct got_packidx *p)
+{
+	uint32_t nobj = be32toh(p->hdr.fanout_table[0xff]);
+	unsigned int i, j, k;
+
+	p->sorted_offsets = calloc(nobj - p->nlargeobj,
+	    sizeof(p->sorted_offsets[0]));
+	if (p->sorted_offsets == NULL)
+		return got_error_from_errno("calloc");
+
+	if (p->nlargeobj > 0) {
+		p->sorted_large_offsets = calloc(p->nlargeobj,
+		    sizeof(p->sorted_large_offsets[0]));
+		if (p->sorted_large_offsets == NULL)
+			return got_error_from_errno("calloc");
+	}
+
+	j = 0;
+	k = 0;
+	for (i = 0; i < nobj; i++) {
+		uint32_t offset = be32toh(p->hdr.offsets[i]);
+		if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
+			uint64_t loffset;
+			uint32_t idx;
+			idx = offset & GOT_PACKIDX_OFFSET_VAL_MASK;
+			if (idx >= p->nlargeobj ||
+			    p->nlargeobj == 0 ||
+			    p->hdr.large_offsets == NULL)
+				return got_error(GOT_ERR_BAD_PACKIDX);
+			loffset = be64toh(p->hdr.large_offsets[idx]);
+			p->sorted_large_offsets[j].offset = loffset;
+			p->sorted_large_offsets[j].idx = i;
+			j++;
+		} else {
+			p->sorted_offsets[k].offset = offset;
+			p->sorted_offsets[k].idx = i;
+			k++;
+		}
+	}
+	if (j != p->nlargeobj || k != nobj - p->nlargeobj)
+		return got_error(GOT_ERR_BAD_PACKIDX);
+
+	qsort(p->sorted_offsets, nobj - p->nlargeobj,
+	    sizeof(p->sorted_offsets[0]), offset_cmp);
+
+	if (p->sorted_large_offsets)
+		qsort(p->sorted_large_offsets, p->nlargeobj,
+		    sizeof(p->sorted_large_offsets[0]), large_offset_cmp);
+
+	return NULL;
+}
+
+const struct got_error *
+got_packidx_get_offset_idx(int *idx, struct got_packidx *packidx, off_t offset)
+{
+	const struct got_error *err;
+	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
+	int i, left, right;
+
+	*idx = -1;
+
+	if (packidx->sorted_offsets == NULL) {
+		err = build_offset_index(packidx);
+		if (err)
+			return err;
+	}
+
+	if (offset >= 0x7fffffff) {
+		uint64_t lo;
+		left = 0, right = packidx->nlargeobj - 1;
+		while (left <= right) {
+			i = ((left + right) / 2);
+			lo = packidx->sorted_large_offsets[i].offset;
+			if (lo == offset) {
+				*idx = packidx->sorted_large_offsets[i].idx;
+				break;
+			} else if (offset > lo)
+				left = i + 1;
+			else if (offset < lo)
+				right = i - 1;
+		}
+	} else {
+		uint32_t o;
+		left = 0, right = totobj - packidx->nlargeobj - 1;
+		while (left <= right) {
+			i = ((left + right) / 2);
+			o = packidx->sorted_offsets[i].offset;
+			if (o == offset) {
+				*idx = packidx->sorted_offsets[i].idx;
+				break;
+			} else if (offset > o)
+				left = i + 1;
+			else if (offset < o)
+				right = i - 1;
+		}
+	}
+
+	return NULL;
+}
+
+const struct got_error *
+got_packidx_get_object_id(struct got_object_id *id,
+    struct got_packidx *packidx, int idx)
+{
+	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
+	struct got_packidx_object_id *oid;
+
+	if (idx < 0 || idx >= totobj)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	oid = &packidx->hdr.sorted_ids[idx];
+	memcpy(id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+	return NULL;
 }
 
 const struct got_error *
@@ -1450,5 +1600,86 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 		err = got_pack_dump_delta_chain_to_mem(buf, len, &obj->deltas,
 		    pack);
 
+	return err;
+}
+
+const struct got_error *
+got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
+    off_t *delta_offset, off_t *base_offset, struct got_object_id *base_id,
+    uint64_t *base_size, uint64_t *result_size, struct got_pack *pack,
+    struct got_packidx *packidx, int idx)
+{
+	const struct got_error *err = NULL;
+	off_t offset;
+	uint8_t type;
+	uint64_t size;
+	size_t tslen, delta_hdrlen;
+
+	*delta_buf = NULL;
+	*delta_size = 0;
+	*delta_offset = 0;
+	*base_offset = 0;
+	*base_size = 0;
+	*result_size = 0;
+
+	offset = got_packidx_get_object_offset(packidx, idx);
+	if (offset == (uint64_t)-1)
+		return got_error(GOT_ERR_BAD_PACKIDX);
+
+	if (offset >= pack->filesize)
+		return got_error(GOT_ERR_PACK_OFFSET);
+
+	err = got_pack_parse_object_type_and_size(&type, &size, &tslen,
+	    pack, offset);
+	if (err)
+		return err;
+
+	if (tslen + size < tslen || offset + size < size ||
+	    tslen + offset < tslen)
+		return got_error(GOT_ERR_PACK_OFFSET);
+
+	switch (type) {
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		err = got_pack_parse_offset_delta(base_offset, &delta_hdrlen,
+		    pack, offset, tslen);
+		if (err)
+			return err;
+		break;
+	case GOT_OBJ_TYPE_REF_DELTA:
+		err = got_pack_parse_ref_delta(base_id, pack, offset, tslen);
+		if (err)
+			return err;
+		delta_hdrlen = SHA1_DIGEST_LENGTH;
+		break;
+	default:
+		return got_error_fmt(GOT_ERR_OBJ_TYPE,
+		    "non-delta object type %d found at offset %llu",
+		    type, offset);
+	}
+
+	if (tslen + delta_hdrlen < delta_hdrlen ||
+	    offset + delta_hdrlen < delta_hdrlen)
+		return got_error(GOT_ERR_BAD_DELTA);
+
+	err = read_delta_data(delta_buf, delta_size,
+	    offset + tslen + delta_hdrlen, pack);
+	if (err)
+		return err;
+
+	if (*delta_size != size) {
+		err = got_error(GOT_ERR_BAD_DELTA);
+		goto done;
+	}
+
+	err = got_delta_get_sizes(base_size, result_size, *delta_buf, size);
+	if (err)
+		goto done;
+
+	*delta_offset = offset;
+done:
+	if (err) {
+		free(*delta_buf);
+		*delta_buf = NULL;
+	}
 	return err;
 }

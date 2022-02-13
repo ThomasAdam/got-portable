@@ -190,5 +190,42 @@ got_object_idset_num_elements(struct got_object_idset *set)
 	return set->totelem;
 }
 
+struct got_object_idset_element *
+got_object_idset_get_element(struct got_object_idset *set, struct got_object_id *id)
+{
+	return find_element(set, id);
+}
+
+void *
+got_object_idset_get_element_data(struct got_object_idset_element *entry)
+{
+	return entry->data;
+}
+
+const struct got_error *
+got_object_idset_for_each_element(struct got_object_idset *set,
+    const struct got_error *(*cb)(struct got_object_idset_element *, void *),
+    void *arg)
+{
+	const struct got_error *err;
+	struct got_object_idset_element *entry, *tmp;
+
+	RB_FOREACH_SAFE(entry, got_object_idset_tree, &set->entries, tmp) {
+		err = (*cb)(entry, arg);
+		if (err)
+			return err;
+	}
+	return NULL;
+}
+
+void
+got_object_idset_remove_element(struct got_object_idset *set,
+    struct got_object_idset_element *entry)
+{
+	RB_REMOVE(got_object_idset_tree, &set->entries, entry);
+	free(entry);
+	set->totelem--;
+}
+
 RB_GENERATE(got_object_idset_tree, got_object_idset_element, entry,
     cmp_elements);

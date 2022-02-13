@@ -289,11 +289,10 @@ done:
 }
 
 static const struct got_error *
-receive_tempfile(FILE **basefile, FILE **accumfile, struct imsg *imsg,
+receive_tempfile(FILE **f, const char *mode, struct imsg *imsg,
     struct imsgbuf *ibuf)
 {
 	size_t datalen;
-	FILE **f;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != 0)
@@ -302,14 +301,7 @@ receive_tempfile(FILE **basefile, FILE **accumfile, struct imsg *imsg,
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	if (*basefile == NULL)
-		f = basefile;
-	else if (*accumfile == NULL)
-		f = accumfile;
-	else
-		return got_error(GOT_ERR_PRIVSEP_MSG);
-
-	*f = fdopen(imsg->fd, "w+");
+	*f = fdopen(imsg->fd, mode);
 	if (*f == NULL)
 		return got_error_from_errno("fdopen");
 	imsg->fd = -1;
@@ -854,7 +846,78 @@ done:
 	return err;
 }
 
+static const struct got_error *
+get_base_object_id(struct got_object_id *base_id, struct got_packidx *packidx,
+    off_t base_offset)
+{
+	const struct got_error *err;
+	int idx;
 
+	err = got_packidx_get_offset_idx(&idx, packidx, base_offset); 
+	if (err)
+		return err;
+	if (idx == -1)
+		return got_error(GOT_ERR_BAD_PACKIDX);
+
+	return got_packidx_get_object_id(base_id, packidx, idx);
+}
+
+static const struct got_error *
+raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    FILE *delta_outfile, struct got_pack *pack,
+    struct got_packidx *packidx)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_raw_delta_request req;
+	size_t datalen, delta_size;
+	off_t delta_offset;
+	uint8_t *delta_buf = NULL;
+	struct got_object_id id, base_id;
+	off_t base_offset, delta_out_offset = 0;
+	uint64_t base_size = 0, result_size = 0;
+	size_t w;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(req))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&req, imsg->data, sizeof(req));
+	memcpy(id.sha1, req.id, SHA1_DIGEST_LENGTH);
+
+	imsg->fd = -1;
+
+	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
+	    &delta_offset, &base_offset, &base_id, &base_size, &result_size,
+	    pack, packidx, req.idx);
+	if (err)
+		goto done;
+
+	/*
+	 * If this is an offset delta we must determine the base
+	 * object ID ourselves.
+	 */
+	if (base_offset != 0) {
+		err = get_base_object_id(&base_id, packidx, base_offset);
+		if (err)
+			goto done;
+	}
+
+	delta_out_offset = ftello(delta_outfile);
+	w = fwrite(delta_buf, 1, delta_size, delta_outfile);
+	if (w != delta_size) {
+		err = got_ferror(delta_outfile, GOT_ERR_IO);
+		goto done;
+	}
+	if (fflush(delta_outfile) == -1) {
+		err = got_error_from_errno("fflush");
+		goto done;
+	}
+
+	err = got_privsep_send_raw_delta(ibuf, base_size, result_size,
+	    delta_size, delta_offset, delta_out_offset, &base_id);
+done:
+	free(delta_buf);
+	return err;
+}
 
 static const struct got_error *
 receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
@@ -1009,7 +1072,7 @@ main(int argc, char *argv[])
 	struct got_packidx *packidx = NULL;
 	struct got_pack *pack = NULL;
 	struct got_object_cache objcache;
-	FILE *basefile = NULL, *accumfile = NULL;
+	FILE *basefile = NULL, *accumfile = NULL, *delta_outfile = NULL;
 
 	//static int attached;
 	//while (!attached) sleep(1);
@@ -1066,8 +1129,14 @@ main(int argc, char *argv[])
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_TMPFD:
-			err = receive_tempfile(&basefile, &accumfile,
-			    &imsg, &ibuf);
+			if (basefile == NULL) {
+				err = receive_tempfile(&basefile, "w+",
+				   &imsg, &ibuf);
+			} else if (accumfile == NULL) {
+				err = receive_tempfile(&accumfile, "w+",
+				   &imsg, &ibuf);
+			} else
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		case GOT_IMSG_PACKED_OBJECT_REQUEST:
 			err = object_request(&imsg, &ibuf, pack, packidx,
@@ -1080,6 +1149,22 @@ main(int argc, char *argv[])
 			}
 			err = raw_object_request(&imsg, &ibuf, pack, packidx,
 			    &objcache, basefile, accumfile);
+			break;
+		case GOT_IMSG_RAW_DELTA_OUTFD:
+			if (delta_outfile != NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = receive_tempfile(&delta_outfile, "w",
+			    &imsg, &ibuf);
+			break;
+		case GOT_IMSG_RAW_DELTA_REQUEST:
+			if (delta_outfile == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			}
+			err = raw_delta_request(&imsg, &ibuf, delta_outfile,
+			    pack, packidx);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,
@@ -1126,6 +1211,8 @@ main(int argc, char *argv[])
 	if (basefile && fclose(basefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (accumfile && fclose(accumfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (delta_outfile && fclose(delta_outfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {

@@ -174,6 +174,11 @@ enum got_imsg_type {
 	GOT_IMSG_RAW_OBJECT_OUTFD,
 	GOT_IMSG_PACKED_RAW_OBJECT_REQUEST,
 	GOT_IMSG_RAW_OBJECT,
+
+	/* Read raw delta data from pack files. */
+	GOT_IMSG_RAW_DELTA_OUTFD,
+	GOT_IMSG_RAW_DELTA_REQUEST,
+	GOT_IMSG_RAW_DELTA,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -260,6 +265,21 @@ struct got_imsg_raw_obj {
 	 */
 #define GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX \
 	(MAX_IMSGSIZE - IMSG_HEADER_SIZE - sizeof(struct got_imsg_raw_obj))
+};
+
+/* Structure for GOT_IMSG_RAW_DELTA. */
+struct got_imsg_raw_delta {
+	uint8_t base_id[SHA1_DIGEST_LENGTH];
+	uint64_t base_size;
+	uint64_t result_size;
+	off_t delta_size;
+	off_t delta_offset;
+	off_t delta_out_offset;
+
+	/*
+	 * Delta data has been written at delta_out_offset to the file
+	 * descriptor passed via the GOT_IMSG_RAW_DELTA_OUTFD imsg.
+	 */
 };
 
 /* Structure for GOT_IMSG_TAG data. */
@@ -428,6 +448,26 @@ struct got_imsg_packed_object {
 	int idx;
 } __attribute__((__packed__));
 
+/*
+ * Structure for GOT_IMSG_DELTA data.
+ */
+struct got_imsg_delta {
+	/* These fields are the same as in struct got_delta. */
+	off_t offset;
+	size_t tslen;
+	int type;
+	size_t size;
+	off_t data_offset;
+};
+
+/*
+ * Structure for GOT_IMSG_RAW_DELTA_REQUEST data.
+ */
+struct got_imsg_raw_delta_request {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	int idx;
+};
+
 /* Structure for GOT_IMSG_COMMIT_TRAVERSAL_REQUEST  */
 struct got_imsg_commit_traversal_request {
 	uint8_t id[SHA1_DIGEST_LENGTH];
@@ -587,5 +627,13 @@ const struct got_error *got_privsep_send_commit_traversal_request(
 const struct got_error *got_privsep_recv_traversed_commits(
     struct got_commit_object **, struct got_object_id **,
     struct got_object_id_queue *, struct imsgbuf *);
+
+const struct got_error *got_privsep_send_raw_delta_req(struct imsgbuf *, int,
+    struct got_object_id *);
+const struct got_error *got_privsep_send_raw_delta_outfd(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_raw_delta(struct imsgbuf *, uint64_t,
+    uint64_t,  off_t, off_t, off_t, struct got_object_id *);
+const struct got_error *got_privsep_recv_raw_delta(uint64_t *, uint64_t *,
+    off_t *, off_t *, off_t *, struct got_object_id **, struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);
