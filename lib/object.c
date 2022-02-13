@@ -265,6 +265,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		return err;
 	}
 	pack->child_has_tempfiles = 0;
+	pack->child_has_delta_outfd = 0;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
 		err = got_error_from_errno("socketpair");
@@ -372,6 +373,71 @@ got_object_open_packed(struct got_object **obj, struct got_object_id *id,
 done:
 	free(path_packfile);
 	return err;
+}
+
+const struct got_error *
+got_object_open_from_packfile(struct got_object **obj, struct got_object_id *id,
+    struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
+    struct got_repository *repo)
+{
+	return read_packed_object_privsep(obj, repo, pack, packidx,
+	    obj_idx, id);
+}
+
+const struct got_error *
+got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
+    off_t *delta_size, off_t *delta_offset, off_t *delta_out_offset,
+    struct got_object_id **base_id, int delta_cache_fd,
+    struct got_packidx *packidx, int obj_idx, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack *pack = NULL;
+	char *path_packfile;
+
+	*base_size = 0;
+	*result_size = 0;
+	*delta_size = 0;
+	*delta_offset = 0;
+	*delta_out_offset = 0;
+
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
+	if (err)
+		return err;
+
+	pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+		if (err)
+			return err;
+	}
+
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			return err;
+	}
+
+	if (!pack->child_has_delta_outfd) {
+		int outfd_child;
+		outfd_child = dup(delta_cache_fd);
+		if (outfd_child == -1)
+			return got_error_from_errno("dup");
+		err = got_privsep_send_raw_delta_outfd(
+		    pack->privsep_child->ibuf, outfd_child);
+		if (err)
+			return err;
+		pack->child_has_delta_outfd = 1;
+	}
+
+	err = got_privsep_send_raw_delta_req(pack->privsep_child->ibuf,
+	    obj_idx, id);
+	if (err)
+		return err;
+
+	return got_privsep_recv_raw_delta(base_size, result_size, delta_size,
+	    delta_offset, delta_out_offset, base_id, pack->privsep_child->ibuf);
 }
 
 static const struct got_error *

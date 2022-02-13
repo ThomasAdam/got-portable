@@ -31,3 +31,13 @@ const struct got_error *got_object_idset_for_each(struct got_object_idset *,
     const struct got_error *(*cb)(struct got_object_id *, void *, void *),
     void *);
 int got_object_idset_num_elements(struct got_object_idset *);
+
+struct got_object_idset_element;
+struct got_object_idset_element *got_object_idset_get_element(
+    struct got_object_idset *, struct got_object_id *);
+void *got_object_idset_get_element_data(struct got_object_idset_element *);
+const struct got_error *got_object_idset_for_each_element(struct got_object_idset *,
+    const struct got_error *(*cb)(struct got_object_idset_element *, void *), void *);
+void got_object_idset_remove_element(struct got_object_idset *,
+    struct got_object_idset_element *);
+

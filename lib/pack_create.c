@@ -74,6 +74,10 @@ struct got_pack_meta {
 	off_t	delta_len;	/* encoded delta length */
 	int	nchain;
 
+	int	have_reused_delta;
+	off_t   reused_delta_offset; /* offset of delta in reused pack file */
+	struct got_object_id *base_obj_id;
+
 	/* Only used for delta window */
 	struct got_delta_table *dtab;
 
@@ -124,6 +128,8 @@ clear_meta(struct got_pack_meta *meta)
 	meta->path = NULL;
 	free(meta->delta_buf);
 	meta->delta_buf = NULL;
+	free(meta->base_obj_id);
+	meta->base_obj_id = NULL;
 }
 
 static void
@@ -419,8 +425,225 @@ report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
 }
 
 static const struct got_error *
-pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
-    FILE *delta_cache, struct got_repository *repo,
+add_meta(struct got_pack_meta *m, struct got_pack_metavec *v)
+{
+	if (v->nmeta == v->metasz){
+		size_t newsize = 2 * v->metasz;
+		struct got_pack_meta **new;
+		new = reallocarray(v->meta, newsize, sizeof(*new));
+		if (new == NULL)
+			return got_error_from_errno("reallocarray");
+		v->meta = new;
+		v->metasz = newsize; 
+	}
+
+	v->meta[v->nmeta++] = m;
+	return NULL;
+}
+
+static const struct got_error *
+reuse_delta(int idx, struct got_pack_meta *m, struct got_pack_metavec *v,
+    struct got_object_idset *idset, struct got_pack *pack,
+    struct got_packidx *packidx, int delta_cache_fd,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack_meta *base = NULL;
+	struct got_object_id *base_obj_id = NULL;
+	off_t delta_len = 0, delta_offset = 0, delta_cache_offset = 0;
+	uint64_t base_size, result_size;
+
+	if (m->have_reused_delta)
+		return NULL;
+
+	err = got_object_read_raw_delta(&base_size, &result_size, &delta_len,
+	    &delta_offset, &delta_cache_offset, &base_obj_id, delta_cache_fd,
+	    packidx, idx, &m->id, repo);
+	if (err)
+		return err;
+
+	if (delta_offset + delta_len < delta_offset)
+		return got_error(GOT_ERR_BAD_PACKFILE);
+
+	base = got_object_idset_get(idset, base_obj_id);
+	if (base == NULL)
+		goto done;
+
+	m->delta_len = delta_len;
+	m->delta_offset = delta_cache_offset;
+	m->prev = base;
+	m->size = result_size;
+	m->have_reused_delta = 1;
+	m->reused_delta_offset = delta_offset;
+	m->base_obj_id = base_obj_id;
+	base_obj_id = NULL;
+	err = add_meta(m, v);
+done:
+	free(base_obj_id);
+	return err;
+}
+
+static const struct got_error *
+find_pack_for_reuse(struct got_packidx **best_packidx,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_pathlist_head packidx_paths;
+	struct got_pathlist_entry *pe;
+	const char *best_packidx_path = NULL;
+	int nobj_max = 0;
+
+	TAILQ_INIT(&packidx_paths);
+	*best_packidx = NULL;
+
+	err = got_repo_list_packidx(&packidx_paths, repo);
+	if (err)
+		return err;
+
+	TAILQ_FOREACH(pe, &packidx_paths, entry) {
+		const char *path_packidx = pe->path;
+		struct got_packidx *packidx;
+		int nobj;
+
+		err = got_repo_get_packidx(&packidx, path_packidx, repo);
+		if (err)
+			break;
+
+		nobj = be32toh(packidx->hdr.fanout_table[0xff]);
+		if (nobj > nobj_max) {
+			best_packidx_path = path_packidx;
+			nobj_max = nobj;
+		}
+	}
+
+	if (best_packidx_path) {
+		err = got_repo_get_packidx(best_packidx, best_packidx_path,
+		    repo);
+	}
+
+	TAILQ_FOREACH(pe, &packidx_paths, entry)
+		free((void *)pe->path);
+	got_pathlist_free(&packidx_paths);
+	return err;
+}
+
+struct search_deltas_arg {
+	struct got_packidx *packidx;
+	struct got_pack *pack;
+	struct got_object_idset *idset;
+	struct got_pack_metavec *v;
+	int delta_cache_fd;
+	struct got_repository *repo;
+	got_pack_progress_cb progress_cb;
+	void *progress_arg;
+	struct got_ratelimit *rl;
+	got_cancel_cb cancel_cb;
+	void *cancel_arg;
+	int ncommits;
+};
+
+static const struct got_error *
+search_delta_for_object(struct got_object_id *id, void *data, void *arg)
+{
+	const struct got_error *err;
+	struct got_pack_meta *m = data;
+	struct search_deltas_arg *a = arg;
+	int obj_idx;
+	struct got_object *obj = NULL;
+
+	if (a->cancel_cb) {
+		err = (*a->cancel_cb)(a->cancel_arg);
+		if (err)
+			return err;
+	}
+
+	if (!got_repo_check_packidx_bloom_filter(a->repo,
+	    a->packidx->path_packidx, id))
+		return NULL;
+
+	obj_idx = got_packidx_get_object_idx(a->packidx, id);
+	if (obj_idx == -1)
+		return NULL;
+
+	/* TODO:
+	 * Opening and closing an object just to check its flags
+	 * is a bit expensive. We could have an imsg which requests
+	 * plain type/size information for an object without doing
+	 * work such as traversing the object's entire delta chain
+	 * to find the base object type, and other such info which
+	 * we don't really need here.
+	 */
+	err = got_object_open_from_packfile(&obj, &m->id, a->pack,
+	    a->packidx, obj_idx, a->repo);
+	if (err)
+		return err;
+
+	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		reuse_delta(obj_idx, m, a->v, a->idset, a->pack, a->packidx,
+		    a->delta_cache_fd, a->repo);
+		if (err)
+			goto done;
+		err = report_progress(a->progress_cb, a->progress_arg, a->rl,
+		    0L, a->ncommits, got_object_idset_num_elements(a->idset),
+		    a->v->nmeta, 0);
+	}
+done:
+	got_object_close(obj);
+	return err;
+}
+
+static const struct got_error *
+search_deltas(struct got_pack_metavec *v, struct got_object_idset *idset,
+    int delta_cache_fd, int ncommits, struct got_repository *repo,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	char *path_packfile = NULL;
+	struct got_packidx *packidx;
+	struct got_pack *pack;
+	struct search_deltas_arg sda;
+
+	err = find_pack_for_reuse(&packidx, repo);
+	if (err)
+		return err;
+
+	if (packidx == NULL)
+		return NULL;
+
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
+	if (err)
+		return err;
+
+	pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+		if (err)
+			goto done;
+	}
+
+	sda.packidx = packidx;
+	sda.pack = pack;
+	sda.idset = idset;
+	sda.v = v;
+	sda.delta_cache_fd = delta_cache_fd;
+	sda.repo = repo;
+	sda.progress_cb = progress_cb;
+	sda.progress_arg = progress_arg;
+	sda.rl = rl;
+	sda.cancel_cb = cancel_cb;
+	sda.cancel_arg = cancel_arg;
+	sda.ncommits = ncommits;
+	err = got_object_idset_for_each(idset, search_delta_for_object, &sda);
+done:
+	free(path_packfile);
+	return err;
+}
+
+static const struct got_error *
+pick_deltas(struct got_pack_meta **meta, int nmeta, int ncommits,
+    int nreused, FILE *delta_cache, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -443,7 +666,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				break;
 		}
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, nmeta, i, 0);
+		    0L, ncommits, nreused + nmeta, nreused + i, 0);
 		if (err)
 			goto done;
 		m = meta[i];
@@ -492,6 +715,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			    &base->id);
 			if (err)
 				goto done;
+
 			if (raw->f == NULL && base_raw->f == NULL) {
 				err = got_deltify_mem_mem(&deltas, &ndeltas,
 				    raw->data, raw->hdrlen,
@@ -556,6 +780,15 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				    best_ndeltas, best_size, m->prev->size);
 			} else {
 				m->delta_offset = ftello(delta_cache);
+				/*
+				 * TODO:
+				 * Storing compressed delta data in the delta
+				 * cache file would probably be more efficient
+				 * than writing uncompressed delta data here
+				 * and compressing it while writing the pack
+				 * file. This would also allow for reusing
+				 * deltas in their compressed form.
+				 */
 				err = encode_delta(m, raw, best_deltas,
 				    best_ndeltas, m->prev->size, delta_cache);
 			}
@@ -614,12 +847,12 @@ static const int obj_types[] = {
 };
 
 static const struct got_error *
-add_meta(struct got_pack_metavec *v, struct got_object_idset *idset,
+add_object(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, const char *path, int obj_type,
     time_t mtime, int loose_obj_only, struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct got_pack_meta *m;
+	struct got_pack_meta *m = NULL;
 
 	if (loose_obj_only) {
 		int is_packed;
@@ -630,40 +863,17 @@ add_meta(struct got_pack_metavec *v, struct got_object_idset *idset,
 			return NULL;
 	}
 
-	err = got_object_idset_add(idset, id, (void *)&obj_types[obj_type]);
-	if (err)
-		return err;
-
-	if (v == NULL)
-		return NULL;
-
-	err = alloc_meta(&m, id, path, obj_type, mtime);
-	if (err)
-		goto done;
-
-	if (v->nmeta == v->metasz){
-		size_t newsize = 2 * v->metasz;
-		struct got_pack_meta **new;
-		new = reallocarray(v->meta, newsize, sizeof(*new));
-		if (new == NULL) {
-			err = got_error_from_errno("reallocarray");
-			goto done;
-		}
-		v->meta = new;
-		v->metasz = newsize; 
+	if (want_meta) {
+		err = alloc_meta(&m, id, path, obj_type, mtime);
+		if (err)
+			return err;
 	}
-done:
-	if (err) {
-		clear_meta(m);
-		free(m);
-	} else
-		v->meta[v->nmeta++] = m;
 
-	return err;
+	return got_object_idset_add(idset, id, m);
 }
 
 static const struct got_error *
-load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
+load_tree_entries(struct got_object_id_queue *ids, int want_meta,
     struct got_object_idset *idset, struct got_object_id *tree_id,
     const char *dpath, time_t mtime, struct got_repository *repo,
     int loose_obj_only, got_cancel_cb cancel_cb, void *cancel_arg)
@@ -705,8 +915,8 @@ load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
 				break;
 			STAILQ_INSERT_TAIL(ids, qid, entry);
 		} else if (S_ISREG(mode) || S_ISLNK(mode)) {
-			err = add_meta(v, idset, id, p, GOT_OBJ_TYPE_BLOB,
-			    mtime, loose_obj_only, repo);
+			err = add_object(want_meta, idset, id, p,
+			    GOT_OBJ_TYPE_BLOB, mtime, loose_obj_only, repo);
 			if (err)
 				break;
 		}
@@ -720,7 +930,7 @@ load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
 }
 
 static const struct got_error *
-load_tree(struct got_pack_metavec *v, struct got_object_idset *idset,
+load_tree(int want_meta, struct got_object_idset *idset,
     struct got_object_id *tree_id, const char *dpath, time_t mtime,
     int loose_obj_only, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
@@ -754,15 +964,15 @@ load_tree(struct got_pack_metavec *v, struct got_object_idset *idset,
 			continue;
 		}
 
-		err = add_meta(v, idset, qid->id, dpath, GOT_OBJ_TYPE_TREE,
-		    mtime, loose_obj_only, repo);
+		err = add_object(want_meta, idset, qid->id, dpath,
+		    GOT_OBJ_TYPE_TREE, mtime, loose_obj_only, repo);
 		if (err) {
 			got_object_qid_free(qid);
 			break;
 		}
 
-		err = load_tree_entries(&tree_ids, v, idset, qid->id, dpath,
-		    mtime, repo, loose_obj_only, cancel_cb, cancel_arg);
+		err = load_tree_entries(&tree_ids, want_meta, idset, qid->id,
+		    dpath, mtime, repo, loose_obj_only, cancel_cb, cancel_arg);
 		got_object_qid_free(qid);
 		if (err)
 			break;
@@ -773,7 +983,7 @@ load_tree(struct got_pack_metavec *v, struct got_object_idset *idset,
 }
 
 static const struct got_error *
-load_commit(struct got_pack_metavec *v, struct got_object_idset *idset,
+load_commit(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, struct got_repository *repo, int loose_obj_only,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -796,13 +1006,13 @@ load_commit(struct got_pack_metavec *v, struct got_object_idset *idset,
 	if (err)
 		return err;
 
-	err = add_meta(v, idset, id, "", GOT_OBJ_TYPE_COMMIT,
+	err = add_object(want_meta, idset, id, "", GOT_OBJ_TYPE_COMMIT,
 	    got_object_commit_get_committer_time(commit),
 	    loose_obj_only, repo);
 	if (err)
 		goto done;
 
-	err = load_tree(v, idset, got_object_commit_get_tree_id(commit),
+	err = load_tree(want_meta, idset, got_object_commit_get_tree_id(commit),
 	    "", got_object_commit_get_committer_time(commit),
 	    loose_obj_only, repo, cancel_cb, cancel_arg);
 done:
@@ -811,7 +1021,7 @@ done:
 }
 
 static const struct got_error *
-load_tag(struct got_pack_metavec *v, struct got_object_idset *idset,
+load_tag(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, struct got_repository *repo, int loose_obj_only,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -834,7 +1044,7 @@ load_tag(struct got_pack_metavec *v, struct got_object_idset *idset,
 	if (err)
 		return err;
 
-	err = add_meta(v, idset, id, "", GOT_OBJ_TYPE_TAG,
+	err = add_object(want_meta, idset, id, "", GOT_OBJ_TYPE_TAG,
 	    got_object_tag_get_tagger_time(tag),
 	    loose_obj_only, repo);
 	if (err)
@@ -842,13 +1052,14 @@ load_tag(struct got_pack_metavec *v, struct got_object_idset *idset,
 
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_COMMIT:
-		err = load_commit(v, idset,
+		err = load_commit(want_meta, idset,
 		    got_object_tag_get_object_id(tag), repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = load_tree(v, idset, got_object_tag_get_object_id(tag),
-		    "", got_object_tag_get_tagger_time(tag),
+		err = load_tree(want_meta, idset,
+		    got_object_tag_get_object_id(tag), "",
+		    got_object_tag_get_tagger_time(tag),
 		    loose_obj_only, repo, cancel_cb, cancel_arg);
 		break;
 	default:
@@ -1124,7 +1335,7 @@ done:
 }
 
 static const struct got_error *
-read_meta(struct got_pack_meta ***meta, int *nmeta,
+load_object_ids(struct got_object_idset *idset,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours, struct got_repository *repo,
     int loose_obj_only, got_pack_progress_cb progress_cb, void *progress_arg,
@@ -1132,24 +1343,7 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
-	struct got_object_idset *idset;
 	int i, nobj = 0, obj_type;
-	struct got_pack_metavec v;
-
-	*meta = NULL;
-	*nmeta = 0;
-
-	idset = got_object_idset_alloc();
-	if (idset == NULL)
-		return got_error_from_errno("got_object_idset_alloc");
-
-	v.nmeta = 0;
-	v.metasz = 64;
-	v.meta = calloc(v.metasz, sizeof(struct got_pack_meta *));
-	if (v.meta == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
 
 	err = findtwixt(&ids, &nobj, ours, nours, theirs, ntheirs, repo,
 	    cancel_cb, cancel_arg);
@@ -1165,79 +1359,81 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 			return err;
 		if (obj_type != GOT_OBJ_TYPE_COMMIT)
 			continue;
-		err = load_commit(NULL, idset, id, repo,
+		err = load_commit(0, idset, id, repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, v.nmeta, 0, 0);
+		    0L, nours, got_object_idset_num_elements(idset),
+		    0, 0);
 		if (err)
 			goto done;
 	}
 
 	for (i = 0; i < ntheirs; i++) {
 		struct got_object_id *id = theirs[i];
-		int *cached_type;
+		struct got_pack_meta *m;
 		if (id == NULL)
 			continue;
-		cached_type = got_object_idset_get(idset, id);
-		if (cached_type == NULL) {
+		m = got_object_idset_get(idset, id);
+		if (m == NULL) {
 			err = got_object_get_type(&obj_type, repo, id);
 			if (err)
 				goto done;
 		} else
-			obj_type = *cached_type;
+			obj_type = m->obj_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
-		err = load_tag(NULL, idset, id, repo,
+		err = load_tag(0, idset, id, repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, v.nmeta, 0, 0);
+		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
 
 	for (i = 0; i < nobj; i++) {
-		err = load_commit(&v, idset, ids[i], repo,
+		err = load_commit(1, idset, ids[i], repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 		if (err)
 			goto done;
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, v.nmeta, 0, 0);
+		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
 
 	for (i = 0; i < nours; i++) {
 		struct got_object_id *id = ours[i];
-		int *cached_type;
+		struct got_pack_meta *m;
 		if (id == NULL)
 			continue;
-		cached_type = got_object_idset_get(idset, id);
-		if (cached_type == NULL) {
+		m = got_object_idset_get(idset, id);
+		if (m == NULL) {
 			err = got_object_get_type(&obj_type, repo, id);
 			if (err)
 				goto done;
 		} else
-			obj_type = *cached_type;
+			obj_type = m->obj_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
-		err = load_tag(&v, idset, id, repo,
+		err = load_tag(1, idset, id, repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, nours, v.nmeta, 0, 0);
+		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
 
 	if (progress_cb) {
-		err = progress_cb(progress_arg, 0L, nours, v.nmeta, 0, 0);
+		err = progress_cb(progress_arg, 0L, nours,
+		    got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
@@ -1246,13 +1442,6 @@ done:
 		free(ids[i]);
 	}
 	free(ids);
-	got_object_idset_free(idset);
-	if (err == NULL) {
-		*meta = v.meta;
-		*nmeta = v.nmeta;
-	} else
-		free(v.meta);
-
 	return err;
 }
 
@@ -1293,6 +1482,21 @@ write_order_cmp(const void *pa, const void *pb)
 	if (a->nchain != b->nchain)
 		return a->nchain - b->nchain;
 	return a->mtime - b->mtime;
+}
+
+static int
+reuse_write_order_cmp(const void *pa, const void *pb)
+{
+	struct got_pack_meta *a, *b;
+
+	a = *(struct got_pack_meta **)pa;
+	b = *(struct got_pack_meta **)pb;
+
+	if (a->reused_delta_offset < b->reused_delta_offset)
+		return -1;
+	if (a->reused_delta_offset > b->reused_delta_offset)
+		return 1;
+	return 0;
 }
 
 static const struct got_error *
@@ -1337,13 +1541,13 @@ packoff(char *hdr, off_t off)
 
 static const struct got_error *
 deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
-    struct got_pack_meta *m, int use_offset_deltas)
+    struct got_pack_meta *m)
 {
 	const struct got_error *err;
 	char buf[32];
 	int nh;
 
-	if (use_offset_deltas && m->prev->off != 0) {
+	if (m->prev->off != 0) {
 		err = packhdr(&nh, buf, sizeof(buf),
 		    GOT_OBJ_TYPE_OFFSET_DELTA, m->delta_len);
 		if (err)
@@ -1373,27 +1577,104 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
 }
 
 static const struct got_error *
+write_packed_object(off_t *packfile_size, FILE *packfile,
+    FILE *delta_cache, struct got_pack_meta *m, int *outfd,
+    SHA1_CTX *ctx, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_deflate_checksum csum;
+	char buf[32];
+	int nh;
+	struct got_raw_object *raw = NULL;
+	off_t outlen;
+
+	csum.output_sha1 = ctx;
+	csum.output_crc = NULL;
+
+	m->off = ftello(packfile);
+	if (m->delta_len == 0) {
+		err = got_object_raw_open(&raw, outfd, repo, &m->id);
+		if (err)
+			goto done;
+		err = packhdr(&nh, buf, sizeof(buf),
+		    m->obj_type, raw->size);
+		if (err)
+			goto done;
+		err = hwrite(packfile, buf, nh, ctx);
+		if (err)
+			goto done;
+		*packfile_size += nh;
+		if (raw->f == NULL) {
+			err = got_deflate_to_file_mmap(&outlen,
+			    raw->data + raw->hdrlen, 0, raw->size,
+			    packfile, &csum);
+			if (err)
+				goto done;
+		} else {
+			if (fseeko(raw->f, raw->hdrlen, SEEK_SET)
+			    == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
+			}
+			err = got_deflate_to_file(&outlen, raw->f,
+			    raw->size, packfile, &csum);
+			if (err)
+				goto done;
+		}
+		*packfile_size += outlen;
+		got_object_raw_close(raw);
+		raw = NULL;
+	} else if (m->delta_buf) {
+		err = deltahdr(packfile_size, ctx, packfile, m);
+		if (err)
+			goto done;
+		err = got_deflate_to_file_mmap(&outlen,
+		    m->delta_buf, 0, m->delta_len, packfile, &csum);
+		if (err)
+			goto done;
+		*packfile_size += outlen;
+		free(m->delta_buf);
+		m->delta_buf = NULL;
+	} else {
+		if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
+		    == -1) {
+			err = got_error_from_errno("fseeko");
+			goto done;
+		}
+		err = deltahdr(packfile_size, ctx, packfile, m);
+		if (err)
+			goto done;
+		err = got_deflate_to_file(&outlen, delta_cache,
+		    m->delta_len, packfile, &csum);
+		if (err)
+			goto done;
+		*packfile_size += outlen;
+	}
+done:
+	if (raw)
+		got_object_raw_close(raw);
+	return err;
+}
+
+static const struct got_error *
 genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
-    struct got_pack_meta **meta, int nmeta, int nours,
-    int use_offset_deltas, struct got_repository *repo,
+    struct got_pack_meta **deltify, int ndeltify,
+    struct got_pack_meta **reuse, int nreuse,
+    int nours, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	int i, nh;
+	int i;
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
-	struct got_raw_object *raw = NULL;
 	char buf[32];
 	size_t n;
-	struct got_deflate_checksum csum;
-	off_t outlen, packfile_size = 0;
+	off_t packfile_size = 0;
 	int outfd = -1;
 
 	SHA1Init(&ctx);
-	csum.output_sha1 = &ctx;
-	csum.output_crc = NULL;
 
 	err = hwrite(packfile, "PACK", 4, &ctx);
 	if (err)
@@ -1402,79 +1683,41 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	err = hwrite(packfile, buf, 4, &ctx);
 	if (err)
 		goto done;
-	putbe32(buf, nmeta);
+	putbe32(buf, ndeltify + nreuse);
 	err = hwrite(packfile, buf, 4, &ctx);
 	if (err)
 		goto done;
-	qsort(meta, nmeta, sizeof(struct got_pack_meta *), write_order_cmp);
-	for (i = 0; i < nmeta; i++) {
+
+	qsort(deltify, ndeltify, sizeof(struct got_pack_meta *),
+	    write_order_cmp);
+	for (i = 0; i < ndeltify; i++) {
 		err = report_progress(progress_cb, progress_arg, rl,
-		    packfile_size, nours, nmeta, nmeta, i);
+		    packfile_size, nours, ndeltify + nreuse,
+		    ndeltify + nreuse, i);
 		if (err)
 			goto done;
-		m = meta[i];
-		m->off = ftello(packfile);
-		if (m->delta_len == 0) {
-			err = got_object_raw_open(&raw, &outfd, repo, &m->id);
-			if (err)
-				goto done;
-			err = packhdr(&nh, buf, sizeof(buf),
-			    m->obj_type, raw->size);
-			if (err)
-				goto done;
-			err = hwrite(packfile, buf, nh, &ctx);
-			if (err)
-				goto done;
-			packfile_size += nh;
-			if (raw->f == NULL) {
-				err = got_deflate_to_file_mmap(&outlen,
-				    raw->data + raw->hdrlen, 0, raw->size,
-				    packfile, &csum);
-				if (err)
-					goto done;
-			} else {
-				if (fseeko(raw->f, raw->hdrlen, SEEK_SET)
-				    == -1) {
-					err = got_error_from_errno("fseeko");
-					goto done;
-				}
-				err = got_deflate_to_file(&outlen, raw->f,
-				    raw->size, packfile, &csum);
-				if (err)
-					goto done;
-			}
-			packfile_size += outlen;
-			got_object_raw_close(raw);
-			raw = NULL;
-		} else if (m->delta_buf) {
-			err = deltahdr(&packfile_size, &ctx, packfile,
-			    m, use_offset_deltas);
-			if (err)
-				goto done;
- 			err = got_deflate_to_file_mmap(&outlen,
-			    m->delta_buf, 0, m->delta_len, packfile, &csum);
- 			if (err)
- 				goto done;
- 			packfile_size += outlen;
-			free(m->delta_buf);
-			m->delta_buf = NULL;
-		} else {
-			if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
-			    == -1) {
-				err = got_error_from_errno("fseeko");
-				goto done;
-			}
-			err = deltahdr(&packfile_size, &ctx, packfile,
-			    m, use_offset_deltas);
-			if (err)
-				goto done;
-			err = got_deflate_to_file(&outlen, delta_cache,
-			    m->delta_len, packfile, &csum);
-			if (err)
-				goto done;
-			packfile_size += outlen;
-		}
+		m = deltify[i];
+		err = write_packed_object(&packfile_size, packfile,
+		    delta_cache, m, &outfd, &ctx, repo);
+		if (err)
+			goto done;
 	}
+
+	qsort(reuse, nreuse, sizeof(struct got_pack_meta *),
+	    reuse_write_order_cmp);
+	for (i = 0; i < nreuse; i++) {
+		err = report_progress(progress_cb, progress_arg, rl,
+		    packfile_size, nours, ndeltify + nreuse,
+		    ndeltify + nreuse, ndeltify + i);
+		if (err)
+			goto done;
+		m = reuse[i];
+		err = write_packed_object(&packfile_size, packfile,
+		    delta_cache, m, &outfd, &ctx, repo);
+		if (err)
+			goto done;
+	}
+
 	SHA1Final(pack_sha1, &ctx);
 	n = fwrite(pack_sha1, 1, SHA1_DIGEST_LENGTH, packfile);
 	if (n != SHA1_DIGEST_LENGTH)
@@ -1483,16 +1726,48 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	packfile_size += sizeof(struct got_packfile_hdr);
 	if (progress_cb) {
 		err = progress_cb(progress_arg, packfile_size, nours,
-		    nmeta, nmeta, nmeta);
+		    ndeltify + nreuse, ndeltify + nreuse,
+		    ndeltify + nreuse);
 		if (err)
 			goto done;
 	}
 done:
-	if (raw)
-		got_object_raw_close(raw);
 	if (outfd != -1 && close(outfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err;
+}
+
+static const struct got_error *
+remove_unused_object(struct got_object_idset_element *entry, void *arg)
+{
+	struct got_object_idset *idset = arg;
+
+	if (got_object_idset_get_element_data(entry) == NULL)
+		got_object_idset_remove_element(idset, entry);
+
+	return NULL;
+}
+
+static const struct got_error *
+remove_reused_object(struct got_object_idset_element *entry, void *arg)
+{
+	struct got_object_idset *idset = arg;
+	struct got_pack_meta *m;
+
+	m = got_object_idset_get_element_data(entry);
+	if (m->have_reused_delta)
+		got_object_idset_remove_element(idset, entry);
+
+	return NULL;
+}
+
+static const struct got_error *
+add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
+{
+	struct got_pack_meta *m = data;
+	struct got_pack_metavec *v = arg;
+
+	return add_meta(m, v);
 }
 
 const struct got_error *
@@ -1504,32 +1779,88 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
-	struct got_pack_meta **meta;
-	int nmeta;
+	int delta_cache_fd = -1;
 	FILE *delta_cache = NULL;
+	struct got_object_idset *idset;
 	struct got_ratelimit rl;
+	struct got_pack_metavec deltify, reuse;
+
+	memset(&deltify, 0, sizeof(deltify));
+	memset(&reuse, 0, sizeof(reuse));
 
 	got_ratelimit_init(&rl, 0, 500);
 
-	err = read_meta(&meta, &nmeta, theirs, ntheirs, ours, nours, repo,
-	    loose_obj_only, progress_cb, progress_arg, &rl,
+	idset = got_object_idset_alloc();
+	if (idset == NULL)
+		return got_error_from_errno("got_object_idset_alloc");
+
+	err = load_object_ids(idset, theirs, ntheirs, ours, nours,
+	    repo, loose_obj_only, progress_cb, progress_arg, &rl,
 	    cancel_cb, cancel_arg);
 	if (err)
 		return err;
 
-	if (nmeta == 0 && !allow_empty) {
+	err = got_object_idset_for_each_element(idset,
+	    remove_unused_object, idset);
+	if (err)
+		goto done;
+
+	if (got_object_idset_num_elements(idset) == 0 && !allow_empty) {
 		err = got_error(GOT_ERR_CANNOT_PACK);
 		goto done;
 	}
 
-	delta_cache = got_opentemp();
-	if (delta_cache == NULL) {
+	delta_cache_fd = got_opentempfd();
+	if (delta_cache_fd == -1) {
 		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
-	if (nmeta > 0) {
-		err = pick_deltas(meta, nmeta, nours, delta_cache, repo,
+	reuse.metasz = 64;
+	reuse.meta = calloc(reuse.metasz,
+	    sizeof(struct got_pack_meta *));
+	if (reuse.meta == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	err = search_deltas(&reuse, idset, delta_cache_fd, nours, repo,
+	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	if (err)
+		goto done;
+	if (reuse.nmeta > 0) {
+		err = got_object_idset_for_each_element(idset,
+		    remove_reused_object, idset);
+		if (err)
+			goto done;
+	}
+
+	delta_cache = fdopen(delta_cache_fd, "a+");
+	if (delta_cache == NULL) {
+		err = got_error_from_errno("fdopen");
+		goto done;
+	}
+	delta_cache_fd = -1;
+
+	if (fseeko(delta_cache, 0L, SEEK_END) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
+
+	deltify.meta = calloc(got_object_idset_num_elements(idset),
+	    sizeof(struct got_pack_meta *));
+	if (deltify.meta == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	deltify.metasz = got_object_idset_num_elements(idset);
+
+	err = got_object_idset_for_each(idset, add_meta_idset_cb, &deltify);
+	if (err)
+		goto done;
+	if (deltify.nmeta > 0) {
+		err = pick_deltas(deltify.meta, deltify.nmeta, nours,
+		    reuse.nmeta, delta_cache, repo,
 		    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
@@ -1539,12 +1870,17 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		}
 	}
 
-	err = genpack(packsha1, packfile, delta_cache, meta, nmeta, nours, 1,
-	    repo, progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	err = genpack(packsha1, packfile, delta_cache, deltify.meta,
+	    deltify.nmeta, reuse.meta, reuse.nmeta, nours, repo,
+	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 done:
-	free_nmeta(meta, nmeta);
+	free_nmeta(deltify.meta, deltify.nmeta);
+	free_nmeta(reuse.meta, reuse.nmeta);
+	got_object_idset_free(idset);
+	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;

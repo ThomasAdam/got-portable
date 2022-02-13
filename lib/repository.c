@@ -1015,8 +1015,8 @@ get_packidx_bloom_filter(struct got_repository *repo,
 	    &repo->packidx_bloom_filters, &key);
 }
 
-static int
-check_packidx_bloom_filter(struct got_repository *repo,
+int
+got_repo_check_packidx_bloom_filter(struct got_repository *repo,
     const char *path_packidx, struct got_object_id *id)
 {
 	struct got_packidx_bloom_filter *bf;
@@ -1098,7 +1098,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
-		if (!check_packidx_bloom_filter(repo,
+		if (!got_repo_check_packidx_bloom_filter(repo,
 		    repo->packidx_cache[i]->path_packidx, id))
 			continue; /* object will not be found in this index */
 		*idx = got_packidx_get_object_idx(repo->packidx_cache[i], id);
@@ -1150,7 +1150,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 		}
 
-		if (!check_packidx_bloom_filter(repo, path_packidx, id)) {
+		if (!got_repo_check_packidx_bloom_filter(repo,
+		    path_packidx, id)) {
 			free(path_packidx);
 			continue; /* object will not be found in this index */
 		}
@@ -1198,6 +1199,92 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 done:
 	if (packdir && closedir(packdir) != 0 && err == NULL)
 		err = got_error_from_errno("closedir");
+	return err;
+}
+
+const struct got_error *
+got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	DIR *packdir = NULL;
+	struct dirent *dent;
+	char *path_packidx = NULL;
+	int packdir_fd;
+
+	packdir_fd = openat(got_repo_get_fd(repo),
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
+	if (packdir_fd == -1) {
+		return got_error_from_errno_fmt("openat: %s/%s",
+		    got_repo_get_path_git_dir(repo),
+		    GOT_OBJECTS_PACK_DIR);
+	}
+
+	packdir = fdopendir(packdir_fd);
+	if (packdir == NULL) {
+		err = got_error_from_errno("fdopendir");
+		goto done;
+	}
+
+	while ((dent = readdir(packdir)) != NULL) {
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+			continue;
+
+		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
+		    dent->d_name) == -1) {
+			err = got_error_from_errno("asprintf");
+			path_packidx = NULL;
+			break;
+		}
+
+		err = got_pathlist_append(packidx_paths, path_packidx, NULL);
+		if (err)
+			break;
+	}
+done:
+	if (err)
+		free(path_packidx);
+	if (packdir && closedir(packdir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+	return err;
+}
+
+const struct got_error *
+got_repo_get_packidx(struct got_packidx **packidx, const char *path_packidx,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	size_t i;
+
+	*packidx = NULL;
+
+	/* Search pack index cache. */
+	for (i = 0; i < repo->pack_cache_size; i++) {
+		if (repo->packidx_cache[i] == NULL)
+			break;
+		if (strcmp(repo->packidx_cache[i]->path_packidx,
+		    path_packidx) == 0) {
+			*packidx = repo->packidx_cache[i];
+			return NULL;
+		}
+	}
+	/* No luck. Search the filesystem. */
+
+	err = got_packidx_open(packidx, got_repo_get_fd(repo),
+	    path_packidx, 0);
+	if (err)
+		return err;
+
+	err = add_packidx_bloom_filter(repo, *packidx, path_packidx);
+	if (err)
+		goto done;
+
+	err = cache_packidx(repo, *packidx, path_packidx);
+done:
+	if (err) {
+		got_packidx_close(*packidx);
+		*packidx = NULL;
+	}
 	return err;
 }
 
