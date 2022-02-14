@@ -476,7 +476,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			if (err)
 				break;
 		}
-		imsg_clear(&idxibuf);
 	}
 	if (close(imsg_idxfds[0]) == -1) {
 		err = got_error_from_errno("close");
