@@ -107,7 +107,6 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	if (err)
 		goto done;
 
-	imsg_clear(ibuf);
 	err = got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
 	if (child_err && err == NULL)

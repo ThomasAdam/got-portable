@@ -382,7 +382,6 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 			if (err)
 				break;
 		}
-		imsg_clear(&idxibuf);
 	}
 	if (close(imsg_idxfds[0]) == -1) {
 		err = got_error_from_errno("close");

@@ -572,7 +572,6 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 			goto done;
 	}
 
-	imsg_clear(ibuf);
 	err = got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
 	if (child_err && err == NULL)
