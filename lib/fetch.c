@@ -353,6 +353,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			packfile_size = packfile_size_cur;
 		}
 	}
+	if (close(imsg_fetchfds[0]) == -1) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
 	if (waitpid(fetchpid, &fetchstatus, 0) == -1) {
 		err = got_error_from_errno("waitpid");
 		goto done;
