@@ -11471,7 +11471,7 @@ format_gmtoff(char *buf, size_t sz, time_t gmtoff)
 {
 	long long h, m;
 	char sign = '+';
-	
+
 	if (gmtoff < 0) {
 		sign = '-';
 		gmtoff = -gmtoff;
