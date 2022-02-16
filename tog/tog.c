@@ -96,7 +96,7 @@ static const struct got_error*	cmd_blame(int, char *[]);
 static const struct got_error*	cmd_tree(int, char *[]);
 static const struct got_error*	cmd_ref(int, char *[]);
 
-static struct tog_cmd tog_commands[] = {
+static const struct tog_cmd tog_commands[] = {
 	{ "log",	cmd_log,	usage_log },
 	{ "diff",	cmd_diff,	usage_diff },
 	{ "blame",	cmd_blame,	usage_blame },
@@ -6512,7 +6512,7 @@ list_commands(FILE *fp)
 
 	fprintf(fp, "commands:");
 	for (i = 0; i < nitems(tog_commands); i++) {
-		struct tog_cmd *cmd = &tog_commands[i];
+		const struct tog_cmd *cmd = &tog_commands[i];
 		fprintf(fp, " %s", cmd->name);
 	}
 	fputc('\n', fp);
@@ -6565,7 +6565,7 @@ static const struct got_error *
 tog_log_with_path(int argc, char *argv[])
 {
 	const struct got_error *error = NULL, *close_err;
-	struct tog_cmd *cmd = NULL;
+	const struct tog_cmd *cmd = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *commit_id = NULL, *id = NULL;
@@ -6663,10 +6663,10 @@ int
 main(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
-	struct tog_cmd *cmd = NULL;
+	const struct tog_cmd *cmd = NULL;
 	int ch, hflag = 0, Vflag = 0;
 	char **cmd_argv = NULL;
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 	    { "version", no_argument, NULL, 'V' },
 	    { NULL, 0, NULL, 0}
 	};
