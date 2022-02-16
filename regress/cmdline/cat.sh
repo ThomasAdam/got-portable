@@ -20,6 +20,7 @@ test_cat_basic() {
 	local testroot=`test_init cat_basic`
 	local commit_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
+	local gmtoff=`date +%z`
 	local alpha_id=`got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1`
 	local gamma_id=`got tree -r $testroot/repo -i | grep 'gamma/$' | cut -d' ' -f 1`
 	local delta_id=`got tree -r $testroot/repo -i gamma | grep 'delta$' | cut -d' ' -f 1`
@@ -51,8 +52,8 @@ test_cat_basic() {
 	git_show_tree $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "numparents 0" >> $testroot/stdout.expected
-	echo "author $GOT_AUTHOR $author_time +0000" >> $testroot/stdout.expected
-	echo "committer $GOT_AUTHOR $author_time +0000" \
+	echo "author $GOT_AUTHOR $author_time $gmtoff" >> $testroot/stdout.expected
+	echo "committer $GOT_AUTHOR $author_time $gmtoff" \
 		>> $testroot/stdout.expected
 	echo "messagelen 22" >> $testroot/stdout.expected
 	printf "\nadding the test tree\n" >> $testroot/stdout.expected
@@ -234,6 +235,7 @@ test_cat_submodule_of_same_repo() {
 	local testroot=`test_init cat_submodule_of_same_repo`
 	local commit_id0=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
+	local gmtoff=`date +%z`
 
 	(cd $testroot && git clone -q repo repo2 >/dev/null)
 	(cd $testroot/repo && git submodule -q add ../repo2)
@@ -243,8 +245,8 @@ test_cat_submodule_of_same_repo() {
 	# because a commit with the same ID exists in the outer repository
 	got cat -r $testroot/repo $commit_id0 | grep ^tree > $testroot/stdout.expected
 	echo "numparents 0" >> $testroot/stdout.expected
-	echo "author $GOT_AUTHOR $author_time +0000" >> $testroot/stdout.expected
-	echo "committer $GOT_AUTHOR $author_time +0000" \
+	echo "author $GOT_AUTHOR $author_time $gmtoff" >> $testroot/stdout.expected
+	echo "committer $GOT_AUTHOR $author_time $gmtoff" \
 		>> $testroot/stdout.expected
 	echo "messagelen 22" >> $testroot/stdout.expected
 	printf "\nadding the test tree\n" >> $testroot/stdout.expected

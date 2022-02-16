@@ -11466,6 +11466,22 @@ cat_tree(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	return err;
 }
 
+static void
+format_gmtoff(char *buf, size_t sz, time_t gmtoff)
+{
+	long long h, m;
+	char sign = '+';
+	
+	if (gmtoff < 0) {
+		sign = '-';
+		gmtoff = -gmtoff;
+	}
+
+	h = (long long)gmtoff / 3600;
+	m = ((long long)gmtoff - h*3600) / 60;
+	snprintf(buf, sz, "%c%02lld%02lld", sign, h, m);
+}
+
 static const struct got_error *
 cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 {
@@ -11475,6 +11491,7 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	struct got_object_qid *pid;
 	char *id_str = NULL;
 	const char *logmsg = NULL;
+	char gmtoff[6];
 
 	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
@@ -11496,13 +11513,19 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 		fprintf(outfile, "%s%s\n", GOT_COMMIT_LABEL_PARENT, pid_str);
 		free(pid_str);
 	}
-	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_AUTHOR,
+	format_gmtoff(gmtoff, sizeof(gmtoff),
+	    got_object_commit_get_author_gmtoff(commit));
+	fprintf(outfile, "%s%s %lld %s\n", GOT_COMMIT_LABEL_AUTHOR,
 	    got_object_commit_get_author(commit),
-	    (long long)got_object_commit_get_author_time(commit));
+	    (long long)got_object_commit_get_author_time(commit),
+	    gmtoff);
 
-	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_COMMITTER,
+	format_gmtoff(gmtoff, sizeof(gmtoff),
+	    got_object_commit_get_committer_gmtoff(commit));
+	fprintf(outfile, "%s%s %lld %s\n", GOT_COMMIT_LABEL_COMMITTER,
 	    got_object_commit_get_author(commit),
-	    (long long)got_object_commit_get_committer_time(commit));
+	    (long long)got_object_commit_get_committer_time(commit),
+	    gmtoff);
 
 	logmsg = got_object_commit_get_logmsg_raw(commit);
 	fprintf(outfile, "messagelen %zd\n", strlen(logmsg));
@@ -11520,6 +11543,7 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	struct got_tag_object *tag;
 	char *id_str = NULL;
 	const char *tagmsg = NULL;
+	char gmtoff[6];
 
 	err = got_object_open_as_tag(&tag, repo, id);
 	if (err)
@@ -11555,9 +11579,12 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TAG,
 	    got_object_tag_get_name(tag));
 
-	fprintf(outfile, "%s%s %lld +0000\n", GOT_TAG_LABEL_TAGGER,
+	format_gmtoff(gmtoff, sizeof(gmtoff),
+	    got_object_tag_get_tagger_gmtoff(tag));
+	fprintf(outfile, "%s%s %lld %s\n", GOT_TAG_LABEL_TAGGER,
 	    got_object_tag_get_tagger(tag),
-	    (long long)got_object_tag_get_tagger_time(tag));
+	    (long long)got_object_tag_get_tagger_time(tag),
+	    gmtoff);
 
 	tagmsg = got_object_tag_get_message(tag);
 	fprintf(outfile, "messagelen %zd\n", strlen(tagmsg));
