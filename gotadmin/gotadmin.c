@@ -91,7 +91,7 @@ static const struct got_error*		cmd_indexpack(int, char *[]);
 static const struct got_error*		cmd_listpack(int, char *[]);
 static const struct got_error*		cmd_cleanup(int, char *[]);
 
-static struct gotadmin_cmd gotadmin_commands[] = {
+static const struct gotadmin_cmd gotadmin_commands[] = {
 	{ "info",	cmd_info,	usage_info,	"" },
 	{ "pack",	cmd_pack,	usage_pack,	"" },
 	{ "indexpack",	cmd_indexpack,	usage_indexpack,"ix" },
@@ -106,7 +106,7 @@ list_commands(FILE *fp)
 
 	fprintf(fp, "commands:");
 	for (i = 0; i < nitems(gotadmin_commands); i++) {
-		struct gotadmin_cmd *cmd = &gotadmin_commands[i];
+		const struct gotadmin_cmd *cmd = &gotadmin_commands[i];
 		fprintf(fp, " %s", cmd->cmd_name);
 	}
 	fputc('\n', fp);
@@ -115,11 +115,11 @@ list_commands(FILE *fp)
 int
 main(int argc, char *argv[])
 {
-	struct gotadmin_cmd *cmd;
+	const struct gotadmin_cmd *cmd;
 	size_t i;
 	int ch;
 	int hflag = 0, Vflag = 0;
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 	    { "version", no_argument, NULL, 'V' },
 	    { NULL, 0, NULL, 0 }
 	};
@@ -166,9 +166,9 @@ main(int argc, char *argv[])
 			continue;
 
 		if (hflag)
-			gotadmin_commands[i].cmd_usage();
+			cmd->cmd_usage();
 
-		error = gotadmin_commands[i].cmd_main(argc, argv);
+		error = cmd->cmd_main(argc, argv);
 		if (error && error->code != GOT_ERR_CANCELLED &&
 		    error->code != GOT_ERR_PRIVSEP_EXIT &&
 		    !(sigpipe_received &&

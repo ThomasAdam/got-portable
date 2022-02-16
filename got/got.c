@@ -145,7 +145,7 @@ static const struct got_error*		cmd_unstage(int, char *[]);
 static const struct got_error*		cmd_cat(int, char *[]);
 static const struct got_error*		cmd_info(int, char *[]);
 
-static struct got_cmd got_commands[] = {
+static const struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
 	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "clone",	cmd_clone,	usage_clone,	"cl" },
@@ -184,7 +184,7 @@ list_commands(FILE *fp)
 
 	fprintf(fp, "commands:");
 	for (i = 0; i < nitems(got_commands); i++) {
-		struct got_cmd *cmd = &got_commands[i];
+		const struct got_cmd *cmd = &got_commands[i];
 		fprintf(fp, " %s", cmd->cmd_name);
 	}
 	fputc('\n', fp);
@@ -199,11 +199,11 @@ option_conflict(char a, char b)
 int
 main(int argc, char *argv[])
 {
-	struct got_cmd *cmd;
+	const struct got_cmd *cmd;
 	size_t i;
 	int ch;
 	int hflag = 0, Vflag = 0;
-	static struct option longopts[] = {
+	static const struct option longopts[] = {
 	    { "version", no_argument, NULL, 'V' },
 	    { NULL, 0, NULL, 0 }
 	};
@@ -250,9 +250,9 @@ main(int argc, char *argv[])
 			continue;
 
 		if (hflag)
-			got_commands[i].cmd_usage();
+			cmd->cmd_usage();
 
-		error = got_commands[i].cmd_main(argc, argv);
+		error = cmd->cmd_main(argc, argv);
 		if (error && error->code != GOT_ERR_CANCELLED &&
 		    error->code != GOT_ERR_PRIVSEP_EXIT &&
 		    !(sigpipe_received &&
@@ -9374,7 +9374,7 @@ usage_histedit(void)
 #define GOT_HISTEDIT_DROP 'd'
 #define GOT_HISTEDIT_MESG 'm'
 
-static struct got_histedit_cmd {
+static const struct got_histedit_cmd {
 	unsigned char code;
 	const char *name;
 	const char *desc;
@@ -9493,7 +9493,7 @@ write_cmd_list(FILE *f, const char *branch_name,
 	}
 
 	for (i = 0; i < nitems(got_histedit_cmds); i++) {
-		struct got_histedit_cmd *cmd = &got_histedit_cmds[i];
+		const struct got_histedit_cmd *cmd = &got_histedit_cmds[i];
 		n = fprintf(f, "#   %s (%c): %s\n", cmd->name, cmd->code,
 		    cmd->desc);
 		if (n < 0) {
