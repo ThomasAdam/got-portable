@@ -1,3 +1,27 @@
+* got 0.67; 2022-02-18
+- compress delta data from delta_cache directly into pack file
+- show rebase and histedit backups in tog ref view
+- gotweb: unbreak index page when pack files are missing (tracey)
+- make 'got rm' behave like rm(1) for paths found missing on disk
+- make 'got rm' report an "unexpected status" error for unversioned files
+- fix double-free and double-close issues in error paths of got_packidx_open()
+- fix 'got status' showing unversioned directories on NFS (found by Ted Bullock)
+- fix loose object file header parser for zero-length headers
+- improve 'got add' error message if file does not exist (found by Timo Myyrä)
+- improve error message due to malformed `author' in got.conf (omar)
+- fix infinite loop triggered by pack files >= 4GB in size (found by semarie)
+- set zlib output buffer length properly after resizing the output buffer
+- improve error reporting for invalid numbers given on command line (omar)
+- fix 'got diff' on files which match an ignore pattern (found by omar)
+- reduce minimum deltification chunk size to 32 (suggested by ori)
+- use murmurhash instead of sha1 for deltification blocks (suggested by ori)
+- shrink the width of formatted output fields to their expected size (naddy)
+- reuse existing deltas when creating pack files
+- fix fd leak in got_fetch_pack (omar)
+- fix imsg_clear calls after imsg_flush failures (omar)
+- display GMT offset in 'got cat' command (jrick)
+- const-ify command and option tables (naddy)
+
 * got 0.66; 2022-01-11
 - only open raw objects if necessary while writing out pack file data
 - map raw object files into memory while packing if possible
