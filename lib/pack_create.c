@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include <endian.h>
 #include <stdint.h>
 #include <imsg.h>
 #include <stdio.h>
