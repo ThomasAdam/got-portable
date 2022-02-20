@@ -6,6 +6,13 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.67; (2022-02-20)
+
+* Changes from got-0.66
+* Landlock support: portable now has support for the landlock API which
+  is similar to unveil(), allowing restrictions to which part of the
+  filesystem a process can access.
+
 # got-portable 0.66; (2022-01-12)
 
 * Changes from got-0.65
