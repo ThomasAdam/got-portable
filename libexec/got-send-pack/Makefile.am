@@ -11,7 +11,8 @@ got_send_pack_SOURCES = \
 	$(top_srcdir)/lib/privsep.c \
 	$(top_srcdir)/lib/sha1.c \
 	$(top_srcdir)/lib/pkt.c \
-	$(top_srcdir)/lib/gitproto.c
+	$(top_srcdir)/lib/gitproto.c \
+	$(top_srcdir)/lib/ratelimit.c
 
 got_send_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
