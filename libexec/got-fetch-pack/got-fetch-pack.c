@@ -50,6 +50,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_pkt.h"
 #include "got_lib_gitproto.h"
+#include "got_lib_ratelimit.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -140,8 +141,18 @@ send_fetch_server_progress(struct imsgbuf *ibuf, const char *msg, size_t msglen)
 }
 
 static const struct got_error *
-send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes)
+send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes,
+    struct got_ratelimit *rl)
 {
+	const struct got_error *err;
+	int elapsed = 0;
+
+	if (rl) {
+		err = got_ratelimit_check(&elapsed, rl);
+		if (err || !elapsed)
+			return err;
+	}
+
 	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DOWNLOAD_PROGRESS, 0, 0, -1,
 	    &bytes, sizeof(bytes)) == -1)
 		return got_error_from_errno(
@@ -324,9 +335,11 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	uint8_t sha1_buf[SHA1_DIGEST_LENGTH];
 	size_t sha1_buf_len = 0;
 	ssize_t w;
+	struct got_ratelimit rl;
 
 	TAILQ_INIT(&symrefs);
 	SHA1Init(&sha1_ctx);
+	got_ratelimit_init(&rl, 0, 500);
 
 	have = malloc(refsz * sizeof(have[0]));
 	if (have == NULL)
@@ -744,13 +757,13 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 
 		/* Don't send too many progress privsep messages. */
 		if (packsz > last_reported_packsz + 1024) {
-			err = send_fetch_download_progress(ibuf, packsz);
+			err = send_fetch_download_progress(ibuf, packsz, &rl);
 			if (err)
 				goto done;
 			last_reported_packsz = packsz;
 		}
 	}
-	err = send_fetch_download_progress(ibuf, packsz);
+	err = send_fetch_download_progress(ibuf, packsz, NULL);
 	if (err)
 		goto done;
 
