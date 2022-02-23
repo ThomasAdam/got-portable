@@ -50,6 +50,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 #include "got_lib_delta_cache.h"
+#include "got_lib_ratelimit.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -592,9 +593,18 @@ update_packidx(struct got_packidx *packidx, int nobj,
 
 static const struct got_error *
 send_index_pack_progress(struct imsgbuf *ibuf, int nobj_total,
-    int nobj_indexed, int nobj_loose, int nobj_resolved)
+    int nobj_indexed, int nobj_loose, int nobj_resolved,
+    struct got_ratelimit *rl)
 {
+	const struct got_error *err;
 	struct got_imsg_index_pack_progress iprogress;
+	int elapsed = 0;
+
+	if (rl) {
+		err = got_ratelimit_check(&elapsed, rl);
+		if (err || !elapsed)
+			return err;
+	}
 
 	iprogress.nobj_total = nobj_total;
 	iprogress.nobj_indexed = nobj_indexed;
@@ -636,6 +646,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	size_t mapoff = 0;
 	int p_indexed = 0, last_p_indexed = -1;
 	int p_resolved = 0, last_p_resolved = -1;
+	struct got_ratelimit rl;
 
 	/* Require that pack file header and SHA1 trailer are present. */
 	if (pack->filesize < sizeof(hdr) + SHA1_DIGEST_LENGTH)
@@ -723,6 +734,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	if (objects == NULL)
 		return got_error_from_errno("calloc");
 
+	got_ratelimit_init(&rl, 0, 500);
+
 	/*
 	 * First pass: locate all objects and identify un-deltified objects.
 	 *
@@ -737,7 +750,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		p_indexed = ((i + 1) * 100) / nobj;
 		if (p_indexed != last_p_indexed) {
 			err = send_index_pack_progress(ibuf, nobj, i + 1,
-			    nloose, 0);
+			    nloose, 0, &rl);
 			if (err)
 				goto done;
 			last_p_indexed = p_indexed;
@@ -882,7 +895,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			p_resolved = ((nresolved + n) * 100) / nobj;
 			if (p_resolved != last_p_resolved) {
 				err = send_index_pack_progress(ibuf, nobj,
-				    nobj, nloose, nresolved + n);
+				    nobj, nloose, nresolved + n, &rl);
 				if (err)
 					goto done;
 				last_p_resolved = p_resolved;
@@ -909,7 +922,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		goto done;
 	}
 
-	err = send_index_pack_progress(ibuf, nobj, nobj, nloose, nresolved);
+	err = send_index_pack_progress(ibuf, nobj, nobj, nloose, nresolved,
+	    NULL);
 	if (err)
 		goto done;
 
