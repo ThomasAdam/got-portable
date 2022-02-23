@@ -48,6 +48,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_pkt.h"
 #include "got_lib_gitproto.h"
+#include "got_lib_ratelimit.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -67,8 +68,18 @@ static const struct got_capability got_capabilities[] = {
 };
 
 static const struct got_error *
-send_upload_progress(struct imsgbuf *ibuf, off_t bytes)
+send_upload_progress(struct imsgbuf *ibuf, off_t bytes,
+    struct got_ratelimit *rl)
 {
+	const struct got_error *err = NULL;
+	int elapsed = 0;
+
+	if (rl) {
+		err = got_ratelimit_check(&elapsed, rl);
+		if (err || !elapsed)
+			return err;
+	}
+
 	if (imsg_compose(ibuf, GOT_IMSG_SEND_UPLOAD_PROGRESS, 0, 0, -1,
 	    &bytes, sizeof(bytes)) == -1)
 		return got_error_from_errno(
@@ -134,9 +145,12 @@ send_pack_file(int sendfd, int packfd, struct imsgbuf *ibuf)
 	unsigned char buf[8192];
 	ssize_t r, w;
 	off_t wtotal = 0;
+	struct got_ratelimit rl;
 
 	if (lseek(packfd, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("lseek");
+
+	got_ratelimit_init(&rl, 0, 500);
 
 	for (;;) {
 		r = read(packfd, buf, sizeof(buf));
@@ -150,12 +164,12 @@ send_pack_file(int sendfd, int packfd, struct imsgbuf *ibuf)
 		if (w != r)
 			return got_error(GOT_ERR_IO);
 		wtotal += w;
-		err = send_upload_progress(ibuf, wtotal);
+		err = send_upload_progress(ibuf, wtotal, &rl);
 		if (err)
 			return err;
 	}
 
-	return NULL;
+	return send_upload_progress(ibuf, wtotal, NULL);
 }
 
 static const struct got_error *
