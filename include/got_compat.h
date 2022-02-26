@@ -6,7 +6,33 @@
 #include <sys/uio.h>
 #if defined(__FreeBSD__)
 #include <sys/endian.h>
-#else
+#elif defined(__APPLE__)
+#include <machine/endian.h>
+#include <libkern/OSByteOrder.h>
+#include "compat/bsd-poll.h"
+
+#define FMT_SCALED_STRSIZE	7  /* minus sign, 4 digits, suffix, null byte */
+
+#define htobe16(x) OSSwapHostToBigInt16(x)
+#define htole16(x) OSSwapHostToLittleInt16(x)
+#define be16toh(x) OSSwapBigToHostInt16(x)
+#define le16toh(x) OSSwapLittleToHostInt16(x)
+
+#define htobe32(x) OSSwapHostToBigInt32(x)
+#define htole32(x) OSSwapHostToLittleInt32(x)
+#define be32toh(x) OSSwapBigToHostInt32(x)
+#define le32toh(x) OSSwapLittleToHostInt32(x)
+
+#define htobe64(x) OSSwapHostToBigInt64(x)
+#define htole64(x) OSSwapHostToLittleInt64(x)
+#define be64toh(x) OSSwapBigToHostInt64(x)
+#define le64toh(x) OSSwapLittleToHostInt64(x)
+
+#define st_atim st_atimespec
+#define st_ctim st_ctimespec
+#define st_mtim st_mtimespec
+
+#else /* Linux, etc... */
 #include <endian.h>
 #endif
 
@@ -113,11 +139,19 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include "compat/imsg.h"
 #endif
 
-#ifdef HAVE_LIBCRYPTO
-#include <sha1.h>
-#else
-#include <sha.h>
+/* Include Apple-specific headers when libcrypto is in use. */
+#if defined(HAVE_LIBCRYPTO) && defined(__APPLE__)
+#define COMMON_DIGEST_FOR_OPENSSL
+#include <CommonCrypto/CommonDigest.h>
+#endif
 
+#if defined(HAVE_LIBCRYPTO) && !defined(__APPLE__)
+#include <sha1.h>
+#elif !defined(__APPLE__)
+#include <sha.h>
+#endif
+
+#if !defined(HAVE_LIBCRYPTO) || defined(__APPLE__)
 #define SHA1_DIGEST_LENGTH		SHA_DIGEST_LENGTH
 #define SHA1_DIGEST_STRING_LENGTH	(SHA1_DIGEST_LENGTH * 2 + 1)
 
@@ -145,8 +179,7 @@ int		 getdtablecount(void);
 
 #ifndef HAVE_CLOSEFROM
 /* closefrom.c */
-//void		 closefrom(int);
-#define closefrom(fd) (closefrom(fd), 0)
+void		 closefrom(int);
 #endif
 
 #if defined (__FreeBSD__)
@@ -218,7 +251,6 @@ void		*recallocarray(void *, size_t, size_t, size_t);
 int fmt_scaled(long long, char *);
 int scan_scaled(char *, long long *);
 #define FMT_SCALED_STRSIZE	7  /* minus sign, 4 digits, suffix, null byte */
-
 #endif
 
 #ifndef HAVE_LIBBSD

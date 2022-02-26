@@ -19,7 +19,7 @@
 
 #include <ctype.h>
 #include <errno.h>
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #define _XOPEN_SOURCE_EXTENDED /* for ncurses wide-character functions */
 #endif
 #include <curses.h>

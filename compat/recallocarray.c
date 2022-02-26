@@ -73,7 +73,11 @@ recallocarray(void *ptr, size_t oldnmemb, size_t newnmemb, size_t size)
 	} else
 		memcpy(newptr, ptr, newsize);
 
+#ifdef __APPLE__
+	memset_s(ptr, oldsize, 0, oldsize);
+#else
 	explicit_bzero(ptr, oldsize);
+#endif
 	free(ptr);
 
 	return newptr;

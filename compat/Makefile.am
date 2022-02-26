@@ -2,7 +2,6 @@ noinst_LIBRARIES = libopenbsd-compat.a
 
 include $(top_builddir)/Makefile.common
 
-
 libopenbsd_compat_a_SOURCES =  \
 	asprintf.c \
 	base64.c \
@@ -17,8 +16,6 @@ libopenbsd_compat_a_SOURCES =  \
 	merge.c \
 	reallocarray.c \
 	recallocarray.c \
-	strlcat.c \
-	strlcpy.c \
 	strndup.c \
 	strnlen.c \
 	strsep.c \
@@ -26,8 +23,18 @@ libopenbsd_compat_a_SOURCES =  \
 	imsg.h \
 	queue.h \
 	tree.h
-if HOST_FREEBSD
-else
+
+# For MacOS, don't build the compat versions of strl{cat,cpy}, but do for all
+# other systems.
+if !HOST_DARWIN
+libopenbsd_compat_a_SOURCES += strlcat.c strlcpy.c
+endif
+
+if HOST_DARWIN
+libopenbsd_compat_a_SOURCES += uuid.c bsd-poll.c bsd-poll.h
+endif
+
+if HOST_LINUX
 libopenbsd_compat_a_SOURCES += uuid.c
 endif
 
@@ -39,4 +46,5 @@ EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \
 	queue.h \
-	tree.h
+	tree.h \
+	bsd-poll.h

@@ -47,12 +47,14 @@ AC_CHECK_HEADERS([ \
 	netdb.h \
 	netinet/in.h \
 	paths.h \
+	poll.h \
 	stddef.h \
 	stdint.h \
 	stdlib.h \
 	string.h \
 	sys/ioctl.h \
 	sys/param.h \
+	sys/poll.h \
 	sys/socket.h \
 	sys/time.h \
 	sys/tree.h \
@@ -155,6 +157,10 @@ case "$host_os" in
 		AC_MSG_RESULT(freebsd)
 		PLATFORM=freebsd
 		;;
+	*darwin*)
+		AC_MSG_RESULT(darwin)
+		PLATFORM=darwin
+		;;
 	*)
 		AC_MSG_RESULT(unknown)
 		PLATFORM=unknown
@@ -163,6 +169,7 @@ esac
 AC_SUBST(PLATFORM)
 AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
 AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
+AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 
 # Landlock detection.
 AC_MSG_CHECKING([for landlock])
@@ -226,7 +233,10 @@ AC_SEARCH_LIBS(uuid_create, , AC_DEFINE(HAVE_BSD_UUID))
 AC_SEARCH_LIBS(uuid_create, found_uuid=no, found_uuid=yes)
 AC_SEARCH_LIBS(mergesort, , AC_DEFINE(HAVE_BSD_MERGESORT))
 
-if test "x$found_uuid" = "xyes"; then
+# Don't define HAVE_BSD_UUID on darwin (Apple) as this breaks the BSD API.
+# Instead, use the UUID implementation wrapper that's in compat/ plus uuid
+# ossp
+if test "x$found_uuid" = "xyes" -a "x$PLATFORM" != "darwin"; then
 	AC_DEFINE(HAVE_BSD_UUID)
 else
 	PKG_CHECK_MODULES(
