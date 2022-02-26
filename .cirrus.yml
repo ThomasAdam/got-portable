@@ -9,3 +9,9 @@ got_freebsd_task:
     image_family: freebsd-13-0
   before_build_script: .github/ci/before-install.sh
   build:script: .github/ci/build.sh
+
+got_macos_task:
+  macos_instance:
+    image: monterey-xcode
+  before_build_script: .github/ci/before-install.sh
+  build:script: .github/ci/build.sh
