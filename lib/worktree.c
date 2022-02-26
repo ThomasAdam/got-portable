@@ -29,7 +29,6 @@
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>
-#include <uuid.h>
 
 #include "got_compat.h"
 

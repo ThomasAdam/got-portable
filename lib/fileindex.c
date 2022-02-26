@@ -24,7 +24,6 @@
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
-#include <uuid.h>
 
 #include "got_compat.h"
 

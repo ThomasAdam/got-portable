@@ -35,7 +35,6 @@
 #include <errno.h>
 #include <libgen.h>
 #include <stdint.h>
-#include <uuid.h>
 
 #include "bloom.h"
 

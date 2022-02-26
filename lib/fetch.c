@@ -34,7 +34,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <time.h>
-#include <uuid.h>
 
 #include "got_error.h"
 #include "got_reference.h"

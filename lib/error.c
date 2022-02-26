@@ -22,7 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
-#include <uuid.h>
 
 #include "got_compat.h"
 

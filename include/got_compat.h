@@ -78,6 +78,8 @@ void uuid_create(uuid_t *, uint32_t *);
 void uuid_create_nil(struct uuid *, uint32_t *);
 void uuid_from_string(const char *, uuid_t *, uint32_t *);
 void uuid_to_string(uuid_t *, char **, uint32_t *);
+#else
+#include <uuid.h>
 #endif
 
 #ifdef HAVE_STDINT_H
