@@ -34,6 +34,10 @@ if HOST_DARWIN
 libopenbsd_compat_a_SOURCES += uuid.c bsd-poll.c bsd-poll.h
 endif
 
+if HOST_NETBSD
+libopenbsd_compat_a_SOURCES += bsd-poll.c bsd-poll.h
+endif
+
 if HOST_LINUX
 libopenbsd_compat_a_SOURCES += uuid.c
 endif

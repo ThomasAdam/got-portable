@@ -161,6 +161,10 @@ case "$host_os" in
 		AC_MSG_RESULT(darwin)
 		PLATFORM=darwin
 		;;
+	*netbsd*)
+		AC_MSG_RESULT(netbsd)
+		PLATFORM=netbsd
+		;;
 	*)
 		AC_MSG_RESULT(unknown)
 		PLATFORM=unknown
@@ -170,6 +174,7 @@ AC_SUBST(PLATFORM)
 AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
 AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
 AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
+AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
 
 # Landlock detection.
 AC_MSG_CHECKING([for landlock])
@@ -382,6 +387,13 @@ if test "$PLATFORM" = "linux"; then
 		panelw,
 		found_panel=yes,
 		AC_MSG_ERROR("*** couldn't find -lpanel from ncurses")
+	)
+elif test "$PLATFORM" = "netbsd"; then
+	PKG_CHECK_MODULES(
+		LIBPANELW,
+		gnupanelw,
+		found_panel=yes,
+		AC_MSG_ERROR("*** couldn't find -lgnupanelw from ncurses")
 	)
 else
 	AC_CHECK_LIB(panelw, update_panels,,

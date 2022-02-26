@@ -75,6 +75,8 @@ recallocarray(void *ptr, size_t oldnmemb, size_t newnmemb, size_t size)
 
 #ifdef __APPLE__
 	memset_s(ptr, oldsize, 0, oldsize);
+#elif defined(__NetBSD__)
+	explicit_memset(ptr, oldsize, 0);
 #else
 	explicit_bzero(ptr, oldsize);
 #endif

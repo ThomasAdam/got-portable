@@ -27,6 +27,10 @@
 #define MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
 #endif
 
+#ifndef howmany
+#define howmany(x,y) (((x)+((y)-1))/(y))
+#endif
+
 /*
  * A minimal implementation of ppoll(2), built on top of pselect(2).
  *
