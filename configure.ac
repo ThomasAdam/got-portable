@@ -165,6 +165,10 @@ case "$host_os" in
 		AC_MSG_RESULT(netbsd)
 		PLATFORM=netbsd
 		;;
+	*dragonfly*)
+		AC_MSG_RESULT(dragonfly)
+		PLATFORM=dragonflybsd
+		;;
 	*)
 		AC_MSG_RESULT(unknown)
 		PLATFORM=unknown
@@ -175,6 +179,7 @@ AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
 AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
 AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
+AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 
 # Landlock detection.
 AC_MSG_CHECKING([for landlock])
@@ -395,6 +400,12 @@ PKG_CHECK_MODULES(
 	found_panel=no
 )
 
+PKG_CHECK_MODULES(
+	LIBPANELW,
+	panel,
+	found_panel=yes,
+	found_panel=no
+)
 if test "x$found_panel" = "xno"; then
 	AC_CHECK_LIB(panelw, update_panels,,
 		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"])

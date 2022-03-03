@@ -145,13 +145,15 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include <CommonCrypto/CommonDigest.h>
 #endif
 
-#if defined(HAVE_LIBCRYPTO) && !defined(__APPLE__)
+#if defined(HAVE_LIBCRYPTO) && !defined(__APPLE__) && !defined(__DragonFly__)
 #include <sha1.h>
-#elif !defined(__APPLE__)
+#elif !defined(__APPLE__) && !defined(__DragonFly__)
 #include <sha.h>
+#elif defined(__DragonFly__)
+#include <openssl/sha.h>
 #endif
 
-#if !defined(HAVE_LIBCRYPTO) || defined(__APPLE__)
+#if !defined(HAVE_LIBCRYPTO) || defined(__APPLE__) || defined(__DragonFly__)
 #define SHA1_DIGEST_LENGTH		SHA_DIGEST_LENGTH
 #define SHA1_DIGEST_STRING_LENGTH	(SHA1_DIGEST_LENGTH * 2 + 1)
 

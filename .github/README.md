@@ -11,6 +11,7 @@ The following operating systems are supported:
 
 * FreeBSD
 * NetBSD
+* DragonFlyBSD
 * MacOS
 * Linux
 
@@ -37,6 +38,12 @@ NetBSD:
 * `automake`
 * `libuuid`
 * `ncuresesw`
+
+DragonFlyBSD:
+
+* `automake`
+* `pkgconf`
+* `openssl`
 
 Darwin (MacOS):
 
