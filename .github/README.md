@@ -5,17 +5,19 @@ README.portable
 got-portable repository for CI purposes.**
 
 This is the portable version of got[1] (Game of Trees), using autotools to
-provide the library checks required for Got's dependencies.
+provide the library checks required for GoT's dependencies.
 
-Currently this has only been tested on Linux and FreeBSD, although the BSDs
-are already packaging Got via ports so this isn't a core focus of this
-portable repository, but patches to improve portability across systems are
-welcomed.
+The following operating systems are supported:
+
+* FreeBSD
+* NetBSD
+* MacOS
+* Linux
 
 DEPENDENCIES
 ============
 
-Got requires the following dependencies:
+Linux:
 
 * `libncurses` (for tog(1))
 * `libmd` (BSD's digest routines)
@@ -24,6 +26,26 @@ Got requires the following dependencies:
 * `libz` (for Z compression)
 * `pkg-config` (for searching libraries)
 * `bison` (for configuration file grammar)
+
+FreeBSD:
+
+* `automake`
+* `pkgconf`
+
+NetBSD:
+
+* `automake`
+* `libuuid`
+* `ncuresesw`
+
+Darwin (MacOS):
+
+* `automake`
+* `bison`
+* `pkg-config`
+* `ncurses`
+* `openssl`
+* `ossp-uuid`
 
 TESTS (REGRESS)
 ===============
