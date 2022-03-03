@@ -381,21 +381,21 @@ AC_LINK_IFELSE([AC_LANG_SOURCE(
 	AC_MSG_RESULT(no)
 )
 
-if test "$PLATFORM" = "linux"; then
-	PKG_CHECK_MODULES(
-		LIBPANELW,
-		panelw,
-		found_panel=yes,
-		AC_MSG_ERROR("*** couldn't find -lpanel from ncurses")
-	)
-elif test "$PLATFORM" = "netbsd"; then
-	PKG_CHECK_MODULES(
-		LIBPANELW,
-		gnupanelw,
-		found_panel=yes,
-		AC_MSG_ERROR("*** couldn't find -lgnupanelw from ncurses")
-	)
-else
+PKG_CHECK_MODULES(
+	LIBPANELW,
+	panelw,
+	found_panel=yes,
+	found_panel=no
+)
+
+PKG_CHECK_MODULES(
+	LIBPANELW,
+	gnupanelw,
+	found_panel=yes,
+	found_panel=no
+)
+
+if test "x$found_panel" = "xno"; then
 	AC_CHECK_LIB(panelw, update_panels,,
 		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"])
 	)
