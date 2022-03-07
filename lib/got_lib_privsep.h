@@ -44,6 +44,7 @@
 #define GOT_PROG_READ_PACK	got-read-pack
 #define GOT_PROG_READ_GITCONFIG	got-read-gitconfig
 #define GOT_PROG_READ_GOTCONFIG	got-read-gotconfig
+#define GOT_PROG_READ_PATCH	got-read-patch
 #define GOT_PROG_FETCH_PACK	got-fetch-pack
 #define GOT_PROG_INDEX_PACK	got-index-pack
 #define GOT_PROG_SEND_PACK	got-send-pack
@@ -68,6 +69,8 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GITCONFIG)
 #define GOT_PATH_PROG_READ_GOTCONFIG \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GOTCONFIG)
+#define GOT_PATH_PROG_READ_PATCH \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PATCH)
 #define GOT_PATH_PROG_FETCH_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_FETCH_PACK)
 #define GOT_PATH_PROG_SEND_PACK \
@@ -179,6 +182,14 @@ enum got_imsg_type {
 	GOT_IMSG_RAW_DELTA_OUTFD,
 	GOT_IMSG_RAW_DELTA_REQUEST,
 	GOT_IMSG_RAW_DELTA,
+
+	/* Messages related to patch files. */
+	GOT_IMSG_PATCH_FILE,
+	GOT_IMSG_PATCH_HUNK,
+	GOT_IMSG_PATCH_DONE,
+	GOT_IMSG_PATCH_LINE,
+	GOT_IMSG_PATCH,
+	GOT_IMSG_PATCH_EOF,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -508,6 +519,24 @@ struct got_imsg_remote {
  */
 struct got_imsg_remotes {
 	int nremotes; /* This many GOT_IMSG_GITCONFIG_REMOTE messages follow. */
+};
+
+/*
+ * Structure for GOT_IMSG_PATCH data.
+ */
+struct got_imsg_patch {
+	char	old[PATH_MAX];
+	char	new[PATH_MAX];
+};
+
+/*
+ * Structure for GOT_IMSG_PATCH_HUNK data.
+ */
+struct got_imsg_patch_hunk {
+	long	oldfrom;
+	long	oldlines;
+	long	newfrom;
+	long	newlines;
 };
 
 struct got_remote_repo;

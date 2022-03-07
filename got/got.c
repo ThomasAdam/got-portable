@@ -56,6 +56,7 @@
 #include "got_opentemp.h"
 #include "got_gotconfig.h"
 #include "got_dial.h"
+#include "got_patch.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -101,6 +102,7 @@ __dead static void	usage_branch(void);
 __dead static void	usage_tag(void);
 __dead static void	usage_add(void);
 __dead static void	usage_remove(void);
+__dead static void	usage_patch(void);
 __dead static void	usage_revert(void);
 __dead static void	usage_commit(void);
 __dead static void	usage_send(void);
@@ -131,6 +133,7 @@ static const struct got_error*		cmd_branch(int, char *[]);
 static const struct got_error*		cmd_tag(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_remove(int, char *[]);
+static const struct got_error*		cmd_patch(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
 static const struct got_error*		cmd_commit(int, char *[]);
 static const struct got_error*		cmd_send(int, char *[]);
@@ -162,6 +165,7 @@ static const struct got_cmd got_commands[] = {
 	{ "tag",	cmd_tag,	usage_tag,	"" },
 	{ "add",	cmd_add,	usage_add,	"" },
 	{ "remove",	cmd_remove,	usage_remove,	"rm" },
+	{ "patch",	cmd_patch,	usage_patch,	"pa" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
 	{ "commit",	cmd_commit,	usage_commit,	"ci" },
 	{ "send",	cmd_send,	usage_send,	"se" },
@@ -7107,6 +7111,133 @@ done:
 }
 
 __dead static void
+usage_patch(void)
+{
+	fprintf(stderr, "usage: %s patch [patchfile]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+patch_from_stdin(int *patchfd)
+{
+	const struct got_error *err = NULL;
+	ssize_t r;
+	char *path, buf[BUFSIZ];
+	sig_t sighup, sigint, sigquit;
+
+	err = got_opentemp_named_fd(&path, patchfd,
+	    GOT_TMPDIR_STR "/got-patch");
+	if (err)
+		return err;
+	unlink(path);
+	free(path);
+
+	sighup = signal(SIGHUP, SIG_DFL);
+	sigint = signal(SIGINT, SIG_DFL);
+	sigquit = signal(SIGQUIT, SIG_DFL);
+
+	for (;;) {
+		r = read(0, buf, sizeof(buf));
+		if (r == -1) {
+			err = got_error_from_errno("read");
+			break;
+		}
+		if (r == 0)
+			break;
+		if (write(*patchfd, buf, r) == -1) {
+			err = got_error_from_errno("write");
+			break;
+		}
+	}
+
+	signal(SIGHUP, sighup);
+	signal(SIGINT, sigint);
+	signal(SIGQUIT, sigquit);
+
+	if (err != NULL)
+		close(*patchfd);
+	return NULL;
+}
+
+static const struct got_error *
+cmd_patch(int argc, char *argv[])
+{
+	const struct got_error *error = NULL, *close_error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL;
+	int ch;
+	int patchfd;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_patch();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		error = patch_from_stdin(&patchfd);
+		if (error)
+			return error;
+	} else if (argc == 1) {
+		patchfd = open(argv[0], O_RDONLY);
+		if (patchfd == -1) {
+			error = got_error_from_errno2("open", argv[0]);
+			return error;
+		}
+	} else
+		usage_patch();
+
+	if ((cwd = getcwd(NULL, 0)) == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error != NULL)
+		goto done;
+
+	const char *repo_path = got_worktree_get_repo_path(worktree);
+	error = got_repo_open(&repo, repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error != NULL)
+		goto done;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath proc exec sendfd flock",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	error = got_patch(patchfd, worktree, repo, &print_remove_status,
+	    &add_progress);
+
+done:
+	if (repo) {
+		close_error = got_repo_close(repo);
+		if (error == NULL)
+			error = close_error;
+	}
+	if (worktree != NULL) {
+		close_error = got_worktree_close(worktree);
+		if (error == NULL)
+			error = close_error;
+	}
+	free(cwd);
+	return error;
+}
+
+__dead static void
 usage_revert(void)
 {
 	fprintf(stderr, "usage: %s revert [-p] [-F response-script] [-R] "
@@ -7237,7 +7368,6 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 
 	return NULL;
 }
-
 
 static const struct got_error *
 cmd_revert(int argc, char *argv[])

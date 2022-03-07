@@ -1,6 +1,7 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	ref commit revert cherrypick backout rebase import histedit \
-	integrate merge stage unstage cat clone fetch tree pack cleanup
+	integrate merge stage unstage cat clone fetch tree patch pack \
+	cleanup
 NOOBJ=Yes
 
 GOT_TEST_ROOT=/tmp
@@ -85,6 +86,9 @@ send:
 
 tree:
 	./tree.sh -q -r "$(GOT_TEST_ROOT)"
+
+patch:
+	./patch.sh -q -r "$(GOT_TEST_ROOT)"
 
 pack:
 	./pack.sh -q -r "$(GOT_TEST_ROOT)"
