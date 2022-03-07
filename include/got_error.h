@@ -162,6 +162,11 @@
 #define GOT_ERR_MERGE_BUSY	144
 #define GOT_ERR_MERGE_PATH	145
 #define GOT_ERR_FILE_BINARY	146
+#define GOT_ERR_PATCH_MALFORMED	147
+#define GOT_ERR_PATCH_TRUNCATED	148
+#define GOT_ERR_PATCH_DONT_APPLY 149
+#define GOT_ERR_PATCH_PATHS_DIFFER 150
+#define GOT_ERR_NO_PATCH	151
 
 static const struct got_error {
 	int code;
@@ -338,6 +343,12 @@ static const struct got_error {
 	{ GOT_ERR_MERGE_PATH,	"cannot merge branch which contains "
 	    "changes outside of this work tree's path prefix" },
 	{ GOT_ERR_FILE_BINARY, "found a binary file instead of text" },
+	{ GOT_ERR_PATCH_MALFORMED, "malformed patch" },
+	{ GOT_ERR_PATCH_TRUNCATED, "patch truncated" },
+	{ GOT_ERR_PATCH_DONT_APPLY, "patch doesn't apply" },
+	{ GOT_ERR_PATCH_PATHS_DIFFER, "the paths mentioned in the patch "
+	    "are different." },
+	{ GOT_ERR_NO_PATCH, "no patch found" },
 };
 
 /*

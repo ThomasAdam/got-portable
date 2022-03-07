@@ -1285,6 +1285,35 @@ option)
 .It ! Ta versioned file expected on disk but missing
 .El
 .El
+.Tg pa
+.It Cm patch Op Ar patchfile
+.Dl Pq alias: Cm pa
+Apply changes from
+.Ar patchfile
+.Pq or standard input
+and record the state of the affected files afterwards.
+The content of
+.Ar patchfile
+must be an unified diff.
+If
+.Ar patchfile
+contains more than one patch,
+.Nm
+.Cm patch
+will try to apply them all.
+.Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column XYZ description
+.It M Ta modified file
+.It D Ta deleted file
+.It A Ta added file
+.El
+.Pp
+If a change does not match at its exact line number,
+.Nm
+.Cm patch
+applies it somewhere else in the file if it can find a good spot before
+giving up.
 .Tg rv
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
 .Dl Pq alias: Cm rv

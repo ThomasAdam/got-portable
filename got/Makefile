@@ -13,7 +13,7 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		diff_myers.c diff_output.c diff_output_plain.c \
 		diff_output_unidiff.c diff_output_edscript.c \
 		diff_patience.c send.c deltify.c pack_create.c dial.c \
-		bloom.c murmurhash2.c ratelimit.c
+		bloom.c murmurhash2.c ratelimit.c patch.c
 
 MAN =		${PROG}.1 got-worktree.5 git-repository.5 got.conf.5
 
