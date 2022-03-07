@@ -6,6 +6,7 @@ SUBDIRS = got-fetch-pack \
 	  got-read-gotconfig \
 	  got-read-object \
 	  got-read-pack \
+	  got-read-patch \
 	  got-read-tag \
 	  got-read-tree \
 	  got-send-pack

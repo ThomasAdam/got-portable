@@ -29,7 +29,6 @@
 #include <sys/uio.h>
 
 #include <limits.h>
-#include <sha1.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

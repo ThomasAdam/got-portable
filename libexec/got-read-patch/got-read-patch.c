@@ -42,7 +42,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <paths.h>
-#include <sha1.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +51,8 @@
 
 #include "got_error.h"
 #include "got_object.h"
+
+#include "got_compat.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"

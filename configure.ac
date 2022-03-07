@@ -486,6 +486,7 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-read-gotconfig/Makefile
 		 libexec/got-read-object/Makefile
 		 libexec/got-read-pack/Makefile
+		 libexec/got-read-patch/Makefile
 		 libexec/got-read-tag/Makefile
 		 libexec/got-send-pack/Makefile
 		 got/Makefile
