@@ -91,7 +91,7 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 	if (!p) {
 		/* Try parsing Git's "scp" style URL syntax. */
 		*proto = strdup("ssh");
-		if (proto == NULL) {
+		if (*proto == NULL) {
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
@@ -119,7 +119,7 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 		p = q + 1;
 	} else {
 		*proto = strndup(uri, p - uri);
-		if (proto == NULL) {
+		if (*proto == NULL) {
 			err = got_error_from_errno("strndup");
 			goto done;
 		}
