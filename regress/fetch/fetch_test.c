@@ -76,7 +76,7 @@ fetch_parse_uri(void)
 		{ "git://localhost////",
 		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
 		{ "git://127.0.0.1/git/",
-		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
+		    "git", "127.0.0.1", NULL, "/git", "git", GOT_ERR_OK },
 		{ "git:///127.0.0.1/git/",
 		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
 		{ "/127.0.0.1:/git/",

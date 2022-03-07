@@ -84,7 +84,6 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 {
 	const struct got_error *err = NULL;
 	char *s, *p, *q;
-	int n;
 
 	*proto = *host = *port = *server_path = *repo_name = NULL;
 
@@ -113,6 +112,10 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 			err = got_error_from_errno("strndup");
 			goto done;
 		}
+		if ((*host)[0] == '\0') {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
 		p = q + 1;
 	} else {
 		*proto = strndup(uri, p - uri);
@@ -135,15 +138,27 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 				err = got_error_from_errno("strndup");
 				goto done;
 			}
+			if ((*host)[0] == '\0') {
+				err = got_error(GOT_ERR_PARSE_URI);
+				goto done;
+			}
 			*port = strndup(q + 1, p - (q + 1));
 			if (*port == NULL) {
 				err = got_error_from_errno("strndup");
+				goto done;
+			}
+			if ((*port)[0] == '\0') {
+				err = got_error(GOT_ERR_PARSE_URI);
 				goto done;
 			}
 		} else {
 			*host = strndup(s, p - s);
 			if (*host == NULL) {
 				err = got_error_from_errno("strndup");
+				goto done;
+			}
+			if ((*host)[0] == '\0') {
+				err = got_error(GOT_ERR_PARSE_URI);
 				goto done;
 			}
 		}
@@ -157,25 +172,18 @@ got_dial_parse_uri(char **proto, char **host, char **port,
 		goto done;
 	}
 	got_path_strip_trailing_slashes(*server_path);
+	if ((*server_path)[0] == '\0') {
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
+	}
 
-	p = strrchr(p, '/');
-	if (!p || strlen(p) <= 1) {
+	err = got_path_basename(repo_name, *server_path);
+	if (err)
+		goto done;
+	if (hassuffix(*repo_name, ".git"))
+		(*repo_name)[strlen(*repo_name) - 4] = '\0';
+	if ((*repo_name)[0] == '\0')
 		err = got_error(GOT_ERR_PARSE_URI);
-		goto done;
-	}
-	p++;
-	n = strlen(p);
-	if (n == 0) {
-		err = got_error(GOT_ERR_PARSE_URI);
-		goto done;
-	}
-	if (hassuffix(p, ".git"))
-		n -= 4;
-	*repo_name = strndup(p, (p + n) - p);
-	if (*repo_name == NULL) {
-		err = got_error_from_errno("strndup");
-		goto done;
-	}
 done:
 	if (err) {
 		free(*proto);
