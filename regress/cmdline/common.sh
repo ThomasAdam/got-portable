@@ -45,14 +45,26 @@ ln()
 sed()
 {
 	SEDCMD="sed"
+
+	# On non-linux systems, the sed command can happily accept "-i ''" as
+	# a valid command to not save backup files for in-place edits.
+	# However, on linux, "-i ''" would be treated as "-i" with a blank
+	# argument, and hence, no file to edit in-place, which is an error.
+	#
+	# Therefore, scan the argument list and remove "-i ''", replacing it
+	# with just "-i".
 	[ "$PLATFORM" = "linux" ] && {
 		set -- "$@"
-		[ $# -ge 4 ] && {
-			shift 2
-			
-			command "$SEDCMD" -i "$@"
-			return
-		}
+		i=1
+		while [ "$i" -le "$#" ]; do
+			m=$((i + 1))
+			[ "${!i}" = "-i" ] && [ -z "${!m}" ] && {
+				shift 2
+				command "$SEDCMD" -i "$@"
+				return
+			}
+			i=$((i + 1))
+		done
 	}
 	command "$SEDCMD" "$@"
 }
