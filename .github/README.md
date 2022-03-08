@@ -57,14 +57,14 @@ Darwin (MacOS):
 TESTS (REGRESS)
 ===============
 
-There are tests under regress/ -- these are designed to work on OpenBSD.  For
-now, the cmdline/ tests have been prioritised.
-
 To run the test suite:
 
 ```
  $ make tests
 ```
+
+NOTE: For Linux, you must have the jot(1) command which is typically in the
+`athena-jot` package, or similar.
 
 NOTE:  THIS ONLY WORKS AFTER `make install` DUE TO HOW PATHS TO LIBEXEC
        HELPERS ARE HARD-CODED INTO THE BINARIES.
