@@ -7220,7 +7220,7 @@ cmd_patch(int argc, char *argv[])
 #endif
 
 	error = got_patch(patchfd, worktree, repo, &print_remove_status,
-	    &add_progress);
+	    NULL, &add_progress, NULL);
 
 done:
 	if (repo) {
