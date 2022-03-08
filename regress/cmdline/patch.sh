@@ -21,7 +21,7 @@ test_patch_simple_add_file() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -35,7 +35,7 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -43,7 +43,7 @@ EOF
 	echo "A  eta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -52,7 +52,7 @@ EOF
 	echo eta > $testroot/wt/eta.expected
 	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/eta.expected $testroot/wt/eta
 	fi
 	test_done $testroot $ret
@@ -63,7 +63,7 @@ test_patch_simple_rm_file() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -79,14 +79,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -104,7 +104,7 @@ test_patch_simple_edit_file() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -121,14 +121,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -137,7 +137,7 @@ EOF
 	echo 'alpha is my favourite character' > $testroot/wt/alpha.expected
 	cmp -s $testroot/wt/alpha.expected $testroot/wt/alpha
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
 	fi
 	test_done $testroot $ret
@@ -148,7 +148,7 @@ test_patch_prepend_line() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -165,14 +165,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -182,7 +182,7 @@ EOF
 	echo alpha    >> $testroot/wt/alpha.expected
 	cmp -s $testroot/wt/alpha.expected $testroot/wt/alpha
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
 	fi
 	test_done $testroot $ret
@@ -193,7 +193,7 @@ test_patch_replace_line() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -202,7 +202,7 @@ test_patch_replace_line() {
 	(cd $testroot/wt/ && got add numbers && got ci -m 'add numbers') \
 		>/dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -225,14 +225,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -241,7 +241,7 @@ EOF
 	jot 10 | sed 's/6/foo/' > $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers.expected $testroot/wt/numbers
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/numbers.expected $testroot/wt/numbers
 	fi
 	test_done $testroot $ret
@@ -252,7 +252,7 @@ test_patch_multiple_hunks() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -261,7 +261,7 @@ test_patch_multiple_hunks() {
 	(cd $testroot/wt/ && got add numbers && got ci -m 'add numbers') \
 		>/dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -300,14 +300,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -321,7 +321,7 @@ EOF
 
 	cmp -s $testroot/wt/numbers.expected $testroot/wt/numbers
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/numbers.expected $testroot/wt/numbers
 	fi
 	test_done $testroot $ret
@@ -332,7 +332,7 @@ test_patch_multiple_files() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -363,14 +363,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -383,7 +383,7 @@ EOF
 	for f in alpha beta gamma/delta; do
 		cmp -s $testroot/wt/$f.expected $testroot/wt/$f
 		ret=$?
-		if [ $ret != 0 ]; then
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/wt/$f.expected $testroot/wt/$f
 			test_done $testroot $ret
 			return 1
@@ -398,7 +398,7 @@ test_patch_dont_apply() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -418,14 +418,14 @@ EOF
 		 > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
-	if [ $ret == 0 ]; then # should fail
+	if [ $ret -eq 0 ]; then # should fail
 		test_done $testroot 1
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -433,7 +433,7 @@ EOF
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done $testroot $ret
 		return 1
@@ -447,7 +447,7 @@ test_patch_malformed() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -468,7 +468,7 @@ EOF
 		 > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
-	if [ $ret == 0 ]; then
+	if [ $ret -eq 0 ]; then
 		echo "got managed to apply an invalid patch"
 		test_done $testroot 1
 		return 1
@@ -476,7 +476,7 @@ EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -484,7 +484,7 @@ EOF
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done $testroot $ret
 		return 1
@@ -503,7 +503,7 @@ EOF
 		 > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
-	if [ $ret == 0 ]; then
+	if [ $ret -eq 0 ]; then
 		echo "got managed to apply an invalid patch"
 		test_done $testroot 1
 		return 1
@@ -511,7 +511,7 @@ EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -519,7 +519,7 @@ EOF
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done $testroot $ret
 		return 1
@@ -533,7 +533,7 @@ test_patch_no_patch() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -555,15 +555,14 @@ EOF
 		 > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
-	if [ $ret == 0 ]; then # should fail
+	if [ $ret -eq 0 ]; then # should fail
 		test_done $testroot 1
 		return 1
 	fi
-
 	
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -571,7 +570,7 @@ EOF
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done $testroot $ret
 		return 1
@@ -585,7 +584,7 @@ test_patch_equals_for_context() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
@@ -602,14 +601,14 @@ EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done $testroot $ret
 		return 1
@@ -619,7 +618,7 @@ EOF
 	echo alpha    >> $testroot/wt/alpha.expected
 	cmp -s $testroot/wt/alpha.expected $testroot/wt/alpha
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
 	fi
 	test_done $testroot $ret
