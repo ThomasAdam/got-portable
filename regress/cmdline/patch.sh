@@ -248,7 +248,7 @@ EOF
 }
 
 test_patch_multiple_hunks() {
-	local testroot=`test_init patch_replace_multiple_lines`
+	local testroot=`test_init patch_replace_multiple_hunks`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -364,7 +364,7 @@ EOF
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
 	if [ $ret != 0 ]; then
-		test_done $testrot $ret
+		test_done $testroot $ret
 		return 1
 	fi
 
