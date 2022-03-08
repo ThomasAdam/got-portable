@@ -95,6 +95,10 @@ typedef struct {
 	int lineno;
 } YYSTYPE;
 
+#if defined(__APPLE__) && !defined(YYSTYPE)
+#warning "Setting YYSTYPE - is GNU Bison installed?"
+#define YYSTYPE YYSTYPE
+#endif
 %}
 
 %token	ERROR
