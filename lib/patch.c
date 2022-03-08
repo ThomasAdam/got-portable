@@ -383,7 +383,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	char *path = NULL, *tmppath = NULL;
+	char *path = NULL, *tmppath = NULL, *template = NULL;
 	FILE *orig = NULL, *tmp = NULL;
 	struct got_patch_hunk *h;
 	size_t i;
@@ -419,8 +419,13 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	err = got_opentemp_named(&tmppath, &tmp,
-	    got_worktree_get_root_path(worktree));
+	if (asprintf(&template, "%s/got-patch",
+	    got_worktree_get_root_path(worktree)) == -1) {
+		err = got_error_from_errno(template);
+		goto done;
+	}
+
+	err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
 
@@ -509,6 +514,7 @@ rename:
 	else
 		printf("M  %s\n", path); /* XXX */
 done:
+	free(template);
 	if (err != NULL && p->old == NULL && path != NULL)
 		unlink(path);
 	if (tmp != NULL)
