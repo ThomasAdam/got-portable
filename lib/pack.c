@@ -31,7 +31,6 @@
 
 #include "got_error.h"
 #include "got_object.h"
-#include "got_opentemp.h"
 #include "got_path.h"
 
 #include "got_lib_sha1.h"
