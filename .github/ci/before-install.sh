@@ -22,9 +22,7 @@ fi
 if [ "$CIRRUS_OS" = "darwin" ]; then
 	brew install autoconf \
 		automake \
-		bison \
 		pkg-config \
 		ncurses \
-		openssl \
 		ossp-uuid
 fi

@@ -139,8 +139,8 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include "compat/imsg.h"
 #endif
 
-/* Include Apple-specific headers when libcrypto is in use. */
-#if defined(HAVE_LIBCRYPTO) && defined(__APPLE__)
+/* Include Apple-specific headers.  Mostly for crypto.*/
+#if defined(__APPLE__)
 #define COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonDigest.h>
 #endif
