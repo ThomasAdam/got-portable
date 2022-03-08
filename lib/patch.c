@@ -376,8 +376,8 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 
 static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_patch *p, got_worktree_delete_cb delete_cb,
-    got_worktree_checkout_cb add_cb)
+    struct got_patch *p, got_worktree_delete_cb delete_cb, void *delete_arg,
+    got_worktree_checkout_cb add_cb, void *add_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_head paths;
@@ -411,7 +411,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		 * the lines but just schedule the removal.
 		 */
 		err = got_worktree_schedule_delete(worktree, &paths,
-		    0, NULL, delete_cb, NULL, repo, 0, 0);
+		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
 		goto done;
 	} else if (p->old != NULL && strcmp(p->old, p->new)) {
 		err = got_error(GOT_ERR_PATCH_PATHS_DIFFER);
@@ -509,7 +509,7 @@ rename:
 
 	if (p->old == NULL)
 		err = got_worktree_schedule_add(worktree, &paths,
-		    add_cb, NULL, repo, 1);
+		    add_cb, add_arg, repo, 1);
 	else
 		printf("M  %s\n", path); /* XXX */
 done:
@@ -534,7 +534,8 @@ done:
 
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    got_worktree_delete_cb delete_cb, got_worktree_checkout_cb add_cb)
+    got_worktree_delete_cb delete_cb, void *delete_arg,
+    got_worktree_checkout_cb add_cb, void *add_arg)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
@@ -582,7 +583,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err || done)
 			break;
 
-		err = apply_patch(worktree, repo, &p, delete_cb, add_cb);
+		err = apply_patch(worktree, repo, &p, delete_cb, delete_arg,
+		    add_cb, add_arg);
 		patch_free(&p);
 		if (err)
 			break;
