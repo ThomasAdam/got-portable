@@ -46,6 +46,7 @@ regress-cmdline:
 	./fetch.sh -r "$(GOT_TEST_ROOT)"; 			\
 	./send.sh -r "$(GOT_TEST_ROOT)"; 			\
 	./tree.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./patch.sh -q -r "$(GOT_TEST_ROOT)" 			\
 	./pack.sh -r "$(GOT_TEST_ROOT)"; 			\
 	./cleanup.sh -r "$(GOT_TEST_ROOT)")
 
