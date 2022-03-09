@@ -36,7 +36,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 
 #include <ctype.h>
@@ -47,7 +46,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <imsg.h>
 
 #include "got_error.h"
 #include "got_object.h"
