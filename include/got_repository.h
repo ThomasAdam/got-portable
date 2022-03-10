@@ -139,7 +139,7 @@ const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
 
 /*
  * Given an object ID string or reference name, attempt to find a corresponding
- * commit object.
+ * object.
  * The object type may be restricted to commit, tree, blob, or tag.
  * Tags will only be matched if a list of references is provided.
  * GOT_OBJ_TYPE_ANY will match any type of object.
