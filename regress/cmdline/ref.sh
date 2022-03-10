@@ -93,7 +93,7 @@ test_ref_create() {
 		2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" = "0" ]; then
-		echo "git ref command succeeded unexpectedly"
+		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -111,7 +111,7 @@ test_ref_create() {
 	(cd $testroot/wt && got ref -c $commit_id 2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" = "0" ]; then
-		echo "git ref command succeeded unexpectedly"
+		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -130,7 +130,7 @@ test_ref_create() {
 		2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" = "0" ]; then
-		echo "git ref command succeeded unexpectedly"
+		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -166,7 +166,7 @@ test_ref_create() {
 	(cd $testroot/wt && got update -b HEAD >/dev/null)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo "got checkout command failed unexpectedly"
+		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
