@@ -172,6 +172,9 @@ must be located within the
 .Pa objects/pack/
 directory of the repository and should end in
 .Pa .pack .
+The corresponding pack index must exist and can be created with
+.Cm gotadmin indexpack
+if it is missing.
 .Pp
 The options for
 .Cm gotadmin listpack
