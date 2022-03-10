@@ -5661,8 +5661,9 @@ static const struct got_error *
 add_ref(struct got_repository *repo, const char *refname, const char *target)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *id;
+	struct got_object_id *id = NULL;
 	struct got_reference *ref = NULL;
+	struct got_reflist_head refs;
 
 	/*
 	 * Don't let the user create a reference name with a leading '-'.
@@ -5672,21 +5673,15 @@ add_ref(struct got_repository *repo, const char *refname, const char *target)
 	if (refname[0] == '-')
 		return got_error_path(refname, GOT_ERR_REF_NAME_MINUS);
 
-	err = got_repo_match_object_id_prefix(&id, target, GOT_OBJ_TYPE_ANY,
-	    repo);
-	if (err) {
-		struct got_reference *target_ref;
-
-		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
-			return err;
-		err = got_ref_open(&target_ref, repo, target, 0);
-		if (err)
-			return err;
-		err = got_ref_resolve(&id, repo, target_ref);
-		got_ref_close(target_ref);
-		if (err)
-			return err;
-	}
+	TAILQ_INIT(&refs);
+	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+	err = got_repo_match_object_id(&id, NULL, target, GOT_OBJ_TYPE_ANY,
+	    &refs, repo);
+	got_ref_list_free(&refs);
+	if (err)
+		goto done;
 
 	err = got_ref_alloc(&ref, refname, id);
 	if (err)
