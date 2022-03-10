@@ -1668,13 +1668,16 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 
 	*id = NULL;
 
-	for (i = 0; i < strlen(id_str_prefix); i++) {
+	len = strlen(id_str_prefix);
+	if (len > SHA1_DIGEST_STRING_LENGTH - 1)
+		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
+
+	for (i = 0; i < len; i++) {
 		if (isxdigit((unsigned char)id_str_prefix[i]))
 			continue;
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 	}
 
-	len = strlen(id_str_prefix);
 	if (len >= 2) {
 		err = match_packed_object(id, repo, id_str_prefix, obj_type);
 		if (err)
