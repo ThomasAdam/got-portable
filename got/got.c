@@ -8372,20 +8372,10 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&commit_id, argv[0],
-	    GOT_OBJ_TYPE_COMMIT, repo);
-	if (error != NULL) {
-		struct got_reference *ref;
-		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
-			goto done;
-		error = got_ref_open(&ref, repo, argv[0], 0);
-		if (error != NULL)
-			goto done;
-		error = got_ref_resolve(&commit_id, repo, ref);
-		got_ref_close(ref);
-		if (error != NULL)
-			goto done;
-	}
+	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
+	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
+	if (error)
+		goto done;
 	error = got_object_id_str(&commit_id_str, commit_id);
 	if (error)
 		goto done;
@@ -8479,20 +8469,10 @@ cmd_backout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&commit_id, argv[0],
-	    GOT_OBJ_TYPE_COMMIT, repo);
-	if (error != NULL) {
-		struct got_reference *ref;
-		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
-			goto done;
-		error = got_ref_open(&ref, repo, argv[0], 0);
-		if (error != NULL)
-			goto done;
-		error = got_ref_resolve(&commit_id, repo, ref);
-		got_ref_close(ref);
-		if (error != NULL)
-			goto done;
-	}
+	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
+	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
+	if (error)
+		goto done;
 	error = got_object_id_str(&commit_id_str, commit_id);
 	if (error)
 		goto done;
