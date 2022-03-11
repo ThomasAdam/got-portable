@@ -275,7 +275,7 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 }
 
 static const struct got_error *
-locate_hunk(FILE *orig, struct got_patch_hunk *h, long *lineno)
+locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -313,6 +313,7 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, long *lineno)
 	}
 
 	if (err == NULL) {
+		*pos = match;
 		*lineno = match_lineno;
 		if (fseek(orig, match, SEEK_SET) == -1)
 			err = got_error_from_errno("fseek");
@@ -418,11 +419,10 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 			break;
 
 	tryagain:
-		err = locate_hunk(orig, h, &lineno);
+		err = locate_hunk(orig, h, &pos, &lineno);
 		if (err != NULL)
 			goto done;
-		if (!p->nop)
-			err = copy(tmp, orig, copypos, pos);
+		err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
 			goto done;
 		copypos = pos;
