@@ -269,7 +269,7 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 }
 
 static const struct got_error *
-locate_hunk(FILE *orig, struct got_patch_hunk *h, long *lineno)
+locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -307,6 +307,7 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, long *lineno)
 	}
 
 	if (err == NULL) {
+		*pos = match;
 		*lineno = match_lineno;
 		if (fseek(orig, match, SEEK_SET) == -1)
 			err = got_error_from_errno("fseek");
@@ -452,13 +453,9 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	copypos = 0;
 	STAILQ_FOREACH(h, &p->head, entries) {
 	tryagain:
-		err = locate_hunk(orig, h, &lineno);
+		err = locate_hunk(orig, h, &pos, &lineno);
 		if (err != NULL)
 			goto done;
-		if ((pos = ftello(orig)) == -1) {
-			err = got_error_from_errno("ftello");
-			goto done;
-		}
 		err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
 			goto done;
