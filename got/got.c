@@ -7150,9 +7150,15 @@ patch_from_stdin(int *patchfd)
 	signal(SIGINT, sigint);
 	signal(SIGQUIT, sigquit);
 
-	if (err != NULL)
+	if (err == NULL && lseek(*patchfd, 0, SEEK_SET) == -1)
+		err = got_error_from_errno("lseek");
+
+	if (err != NULL) {
 		close(*patchfd);
-	return NULL;
+		*patchfd = -1;
+	}
+
+	return err;
 }
 
 static const struct got_error *
