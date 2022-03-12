@@ -152,6 +152,16 @@ test_status_obstructed() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status epsilon/zeta > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }

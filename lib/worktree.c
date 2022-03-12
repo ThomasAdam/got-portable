@@ -3642,12 +3642,21 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
 	struct got_pathlist_head ignores;
+	struct got_fileindex_entry *ie;
 
 	TAILQ_INIT(&ignores);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
 		return got_error_from_errno("asprintf");
+
+	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
+	if (ie) {
+		err = report_single_file_status(path, ondisk_path,
+		    fileindex, status_cb, status_arg, repo,
+		    report_unchanged, &ignores, no_ignores);
+		goto done;
+	}
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
 	if (fd == -1) {
