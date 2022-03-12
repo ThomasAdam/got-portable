@@ -171,6 +171,10 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p)
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
+	if (p->old == NULL && p->new == NULL) {
+		err = got_error(GOT_ERR_PATCH_MALFORMED);
+		goto done;
+	}
 
 	imsg_free(&imsg);
 
@@ -393,9 +397,6 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	ssize_t linelen;
 
 	TAILQ_INIT(&paths);
-
-	if (p->old == NULL && p->new == NULL)
-		return got_error(GOT_ERR_PATCH_MALFORMED);
 
 	err = got_worktree_resolve_path(&path, worktree,
 	    p->new != NULL ? p->new : p->old);
