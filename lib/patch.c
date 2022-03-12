@@ -381,69 +381,65 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 }
 
 static const struct got_error *
-apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_patch *p, got_worktree_delete_cb delete_cb, void *delete_arg,
-    got_worktree_checkout_cb add_cb, void *add_arg)
+schedule_add(const char *path, struct got_worktree *worktree,
+    struct got_repository *repo, got_worktree_checkout_cb add_cb,
+    void *add_arg)
 {
-	const struct got_error *err = NULL;
+	static const struct got_error *err = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	char *path = NULL, *tmppath = NULL, *template = NULL;
-	FILE *orig = NULL, *tmp = NULL;
+
+	TAILQ_INIT(&paths);
+
+	err = got_pathlist_insert(&pe, &paths, path, NULL);
+	if (err == NULL)
+		err = got_worktree_schedule_add(worktree, &paths,
+		    add_cb, add_arg, repo, 1);
+	got_pathlist_free(&paths);
+	return err;
+}
+
+static const struct got_error *
+schedule_del(const char *path, struct got_worktree *worktree,
+    struct got_repository *repo, got_worktree_delete_cb delete_cb,
+    void *delete_arg)
+{
+	static const struct got_error *err = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&paths);
+
+	err = got_pathlist_insert(&pe, &paths, path, NULL);
+	if (err == NULL)
+		err = got_worktree_schedule_delete(worktree, &paths,
+		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
+	got_pathlist_free(&paths);
+	return err;
+}
+
+static const struct got_error *
+patch_file(struct got_patch *p, const char *path, FILE *tmp)
+{
+	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
 	size_t i;
 	long lineno = 0;
+	FILE *orig;
 	off_t copypos, pos;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
 
-	TAILQ_INIT(&paths);
-
-	err = got_worktree_resolve_path(&path, worktree,
-	    p->new != NULL ? p->new : p->old);
-	if (err)
-		return err;
-	err = got_pathlist_insert(&pe, &paths, path, NULL);
-	if (err)
-		goto done;
-
-	if (p->old != NULL && p->new == NULL) {
-		/*
-		 * special case: delete a file.  don't try to match
-		 * the lines but just schedule the removal.
-		 */
-		err = got_worktree_schedule_delete(worktree, &paths,
-		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
-		goto done;
-	} else if (p->old != NULL && strcmp(p->old, p->new)) {
-		err = got_error(GOT_ERR_PATCH_PATHS_DIFFER);
-		goto done;
-	}
-
-	if (asprintf(&template, "%s/got-patch",
-	    got_worktree_get_root_path(worktree)) == -1) {
-		err = got_error_from_errno(template);
-		goto done;
-	}
-
-	err = got_opentemp_named(&tmppath, &tmp, template);
-	if (err)
-		goto done;
-
 	if (p->old == NULL) {				/* create */
 		h = STAILQ_FIRST(&p->head);
-		if (h == NULL || STAILQ_NEXT(h, entries) != NULL) {
-			err = got_error(GOT_ERR_PATCH_MALFORMED);
-			goto done;
-		}
+		if (h == NULL || STAILQ_NEXT(h, entries) != NULL)
+			return got_error(GOT_ERR_PATCH_MALFORMED);
 		for (i = 0; i < h->len; ++i) {
-			if (fprintf(tmp, "%s", h->lines[i]+1) < 0) {
-				err = got_error_from_errno("fprintf");
-				goto done;
-			}
+			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
+				return got_error_from_errno("fprintf");
 		}
-		goto rename;
+		return err;
 	}
 
 	if ((orig = fopen(path, "r")) == NULL) {
@@ -453,6 +449,9 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 
 	copypos = 0;
 	STAILQ_FOREACH(h, &p->head, entries) {
+		if (h->lines == NULL)
+			break;
+
 	tryagain:
 		err = locate_hunk(orig, h, &pos, &lineno);
 		if (err != NULL)
@@ -494,40 +493,86 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		}
 	}
 
-	if (!feof(orig)) {
+	if (!feof(orig))
 		err = copy(tmp, orig, copypos, -1);
-		if (err)
-			goto done;
-	}
 
-rename:
-	if (rename(tmppath, path) == -1) {
-		err = got_error_from_errno3("rename", tmppath, path);
+done:
+	if (orig != NULL)
+		fclose(orig);
+	return err;
+}
+
+static const struct got_error *
+apply_patch(struct got_worktree *worktree, struct got_repository *repo,
+    struct got_patch *p, got_worktree_delete_cb delete_cb, void *delete_arg,
+    got_worktree_checkout_cb add_cb, void *add_arg)
+{
+	const struct got_error *err = NULL;
+	int file_renamed = 0;
+	char *oldpath = NULL, *newpath = NULL;
+	char *tmppath = NULL, *template = NULL;
+	FILE *tmp = NULL;
+
+	err = got_worktree_resolve_path(&oldpath, worktree,
+	    p->old != NULL ? p->old : p->new);
+	if (err)
+		goto done;
+
+	err = got_worktree_resolve_path(&newpath, worktree,
+	    p->new != NULL ? p->new : p->old);
+	if (err)
+		goto done;
+
+	if (p->old != NULL && p->new == NULL) {
+		/*
+		 * special case: delete a file.  don't try to match
+		 * the lines but just schedule the removal.
+		 */
+		err = schedule_del(p->old, worktree, repo, delete_cb,
+		    delete_arg);
 		goto done;
 	}
 
-	if (p->old == NULL)
-		err = got_worktree_schedule_add(worktree, &paths,
-		    add_cb, add_arg, repo, 1);
+	if (asprintf(&template, "%s/got-patch",
+	    got_worktree_get_root_path(worktree)) == -1) {
+		err = got_error_from_errno(template);
+		goto done;
+	}
+
+	err = got_opentemp_named(&tmppath, &tmp, template);
+	if (err)
+		goto done;
+	err = patch_file(p, oldpath, tmp);
+	if (err)
+		goto done;
+
+	if (rename(tmppath, newpath) == -1) {
+		err = got_error_from_errno3("rename", tmppath, newpath);
+		goto done;
+	}
+
+	file_renamed = p->old != NULL && strcmp(p->old, p->new);
+	if (file_renamed) {
+		err = schedule_del(oldpath, worktree, repo, delete_cb,
+		    delete_arg);
+		if (err == NULL)
+			err = schedule_add(newpath, worktree, repo,
+			    add_cb, add_arg);
+	} else if (p->old == NULL)
+		err = schedule_add(newpath, worktree, repo, add_cb,
+		    add_arg);
 	else
-		printf("M  %s\n", path); /* XXX */
+		printf("M  %s\n", oldpath); /* XXX */
+
 done:
+	if (err != NULL && (file_renamed || p->old == NULL))
+		unlink(newpath);
 	free(template);
-	if (err != NULL && p->old == NULL && path != NULL)
-		unlink(path);
-	if (tmp != NULL)
-		fclose(tmp);
 	if (tmppath != NULL)
 		unlink(tmppath);
 	free(tmppath);
-	if (orig != NULL) {
-		if (p->old == NULL && err != NULL)
-			unlink(path);
-		fclose(orig);
-	}
-	free(path);
-	free(line);
-	got_pathlist_free(&paths);
+	free(oldpath);
+	free(newpath);
 	return err;
 }
 
