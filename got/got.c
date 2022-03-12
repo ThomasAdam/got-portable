@@ -4266,6 +4266,12 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
+
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_patch, search_pattern, diff_context,
 	    limit, log_branches, reverse_display_order, refs_idmap);
@@ -4798,6 +4804,12 @@ cmd_diff(int argc, char *argv[])
 			goto done;
 	}
 
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
+
 	switch (type1 == GOT_OBJ_TYPE_ANY ? type2 : type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, ids[0], ids[1],
@@ -5091,6 +5103,12 @@ cmd_blame(int argc, char *argv[])
 		got_ref_list_free(&refs);
 		if (error)
 			goto done;
+	}
+
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
 	}
 
 	error = got_object_resolve_symlinks(&link_target, in_repo_path,
@@ -5433,6 +5451,12 @@ cmd_tree(int argc, char *argv[])
 		got_ref_list_free(&refs);
 		if (error)
 			goto done;
+	}
+
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
 	}
 
 	error = print_tree(in_repo_path, commit_id, show_ids, recurse,
@@ -11767,6 +11791,10 @@ cmd_cat(int argc, char *argv[])
 				goto done;
 			}
 		}
+
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
 	}
 
 	if (repo_path == NULL) {
