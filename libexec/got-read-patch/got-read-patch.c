@@ -171,9 +171,6 @@ find_patch(FILE *fp)
 			else
 				err = send_patch(old, new);
 
-			free(old);
-			free(new);
-
 			if (err)
 				break;
 
@@ -184,6 +181,8 @@ find_patch(FILE *fp)
 		}
 	}
 
+	free(old);
+	free(new);
 	free(line);
 	if (ferror(fp) && err == NULL)
 		err = got_error_from_errno("getline");
