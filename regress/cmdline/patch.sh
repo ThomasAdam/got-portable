@@ -624,6 +624,112 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_rename() {
+	local testroot=`test_init patch_rename`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ eta
+@@ -0,0 +0,0 @@
+EOF
+
+	echo 'D  alpha' > $testroot/stdout.expected
+	echo 'A  eta'  >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ -f $testroot/wt/alpha ]; then
+		echo "alpha was not removed" >&2
+		test_done $testroot 1
+		return 1
+	fi
+	if [ ! -f $testroot/wt/eta ]; then
+		echo "eta was not created" >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	echo alpha > $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# revert the changes and try again with a rename + edit
+	(cd $testroot/wt && got revert alpha eta) > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ eta
+@@ -1 +1,2 @@
+ alpha
++but now is eta
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ -f $testroot/wt/alpha ]; then
+		echo "alpha was not removed" >&2
+		test_done $testroot 1
+		return 1
+	fi
+	if [ ! -f $testroot/wt/eta ]; then
+		echo "eta was not created" >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	echo alpha > $testroot/wt/eta.expected
+	echo 'but now is eta' >> $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -636,3 +742,4 @@ run_test test_patch_dont_apply
 run_test test_patch_malformed
 run_test test_patch_no_patch
 run_test test_patch_equals_for_context
+run_test test_patch_rename
