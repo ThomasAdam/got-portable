@@ -1293,7 +1293,7 @@ to files in a work tree.
 .Pp
 The patch must be in the unified diff format as produced by
 .Cm got diff ,
-or
+or by
 .Xr diff 1
 when invoked with the
 .Fl u
@@ -1309,9 +1309,7 @@ contains multiple patches then attempt to apply each of them in sequence.
 Files added or removed by a patch will be scheduled for addition or removal in
 the work tree.
 .Pp
-While applying the
-.Ar patchfile ,
-show the status of each affected file, using the following status codes:
+Show the status of each affected file, using the following status codes:
 .Bl -column XYZ description
 .It M Ta file was modified
 .It D Ta file was deleted
@@ -1319,17 +1317,18 @@ show the status of each affected file, using the following status codes:
 .El
 .Pp
 If a change does not match at its exact line number, attempt to
-apply it somewhere else in the file if a good spot can be found,
-before giving up.
+apply it somewhere else in the file if a good spot can be found.
+Otherwise, the patch will fail to apply.
 .Pp
 .Nm
 .Cm patch
 will refuse to apply a patch if certain preconditions are not met.
-Files to be deleted must be present in the work tree and not have been
-scheduled for deletion already.
-Files to be added must be unknown and not present in the work tree.
-Files to be modified must be already be present in the work tree and
-not contain conflicts or be obstructed.
+Files to be deleted must already be under version control, and must
+not have been scheduled for deletion already.
+Files to be added must not yet be under version control and must not
+already be present on disk.
+Files to be modified must already be under version control and may not
+contain conflict markers.
 .Pp
 If an error occurs, the
 .Cm patch
