@@ -21,6 +21,6 @@
  * The patch file descriptor *must* be seekable.
  */
 const struct got_error *
-got_patch(int, struct got_worktree *, struct got_repository *, int,
+got_patch(int, struct got_worktree *, struct got_repository *,
     got_worktree_delete_cb, void *, got_worktree_checkout_cb, void *,
     got_cancel_cb, void *);
