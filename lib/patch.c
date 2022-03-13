@@ -65,6 +65,7 @@ struct got_patch_hunk {
 };
 
 struct got_patch {
+	int	 nop;
 	char	*old;
 	char	*new;
 	STAILQ_HEAD(, got_patch_hunk) head;
@@ -397,6 +398,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		h = STAILQ_FIRST(&p->head);
 		if (h == NULL || STAILQ_NEXT(h, entries) != NULL)
 			return got_error(GOT_ERR_PATCH_MALFORMED);
+		if (p->nop)
+			return NULL;
 		for (i = 0; i < h->len; ++i) {
 			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
 				return got_error_from_errno("fprintf");
@@ -418,11 +421,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		err = locate_hunk(orig, h, &lineno);
 		if (err != NULL)
 			goto done;
-		if ((pos = ftello(orig)) == -1) {
-			err = got_error_from_errno("ftello");
-			goto done;
-		}
-		err = copy(tmp, orig, copypos, pos);
+		if (!p->nop)
+			err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
 			goto done;
 		copypos = pos;
@@ -448,7 +448,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		if (err != NULL)
 			goto done;
 
-		err = apply_hunk(tmp, h, &lineno);
+		if (!p->nop)
+			err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
 			goto done;
 		
@@ -467,7 +468,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 			err = got_error_from_errno("fstat");
 		else if (sb.st_size != copypos)
 			err = got_error(GOT_ERR_PATCH_DONT_APPLY);
-	} else if (!feof(orig))
+	} else if (!p->nop && !feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 done:
@@ -601,11 +602,15 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	err = got_opentemp_named(&tmppath, &tmp, template);
+	if (!p->nop)
+		err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
 	err = patch_file(p, oldpath, tmp);
 	if (err)
+		goto done;
+
+	if (p->nop)
 		goto done;
 
 	if (p->old != NULL && p->new == NULL) {
@@ -647,7 +652,7 @@ done:
 
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    got_worktree_delete_cb delete_cb, void *delete_arg,
+    int nop, got_worktree_delete_cb delete_cb, void *delete_arg,
     got_worktree_checkout_cb add_cb, void *add_arg, got_cancel_cb cancel_cb,
     void *cancel_arg)
 {
@@ -697,6 +702,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err || done)
 			break;
 
+		p.nop = nop;
 		err = apply_patch(worktree, repo, &p, delete_cb, delete_arg,
 		    add_cb, add_arg, cancel_cb, cancel_arg);
 		patch_free(&p);

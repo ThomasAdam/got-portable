@@ -7132,7 +7132,7 @@ done:
 __dead static void
 usage_patch(void)
 {
-	fprintf(stderr, "usage: %s patch [patchfile]\n",
+	fprintf(stderr, "usage: %s patch [-n] [patchfile]\n",
 	    getprogname());
 	exit(1);
 }
@@ -7192,11 +7192,14 @@ cmd_patch(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
 	char *cwd = NULL;
-	int ch;
+	int ch, nop = 0;
 	int patchfd;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "n")) != -1) {
 		switch (ch) {
+		case 'n':
+			nop = 1;
+			break;
 		default:
 			usage_patch();
 			/* NOTREACHED */
@@ -7244,7 +7247,7 @@ cmd_patch(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_patch(patchfd, worktree, repo, &print_remove_status,
+	error = got_patch(patchfd, worktree, repo, nop, &print_remove_status,
 	    NULL, &add_progress, NULL, check_cancelled, NULL);
 
 done:

@@ -914,6 +914,59 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_nop() {
+	local testroot=`test_init patch_nop`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++cafe alpha
+--- beta
++++ /dev/null
+@@ -1 +0,0 @@
+-beta
+--- gamma/delta
++++ gamma/delta.new
+@@ -1 +1 @@
+-delta
++delta updated and renamed!
+EOF
+
+	(cd $testroot/wt && got patch -n patch)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# remove the patch to avoid the ? entry
+	rm $testroot/wt/patch
+
+	(cd $testroot/wt && got status) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -928,3 +981,4 @@ run_test test_patch_no_patch
 run_test test_patch_equals_for_context
 run_test test_patch_rename
 run_test test_patch_illegal_status
+run_test test_patch_nop
