@@ -889,7 +889,6 @@ arguments are provided, only show differences for the specified paths.
 Cannot be used together with the
 .Fl P
 option.
-.Pp
 .It Fl C Ar number
 Set the number of context lines shown in the diff.
 By default, 3 lines of context are shown.
@@ -1291,18 +1290,19 @@ option)
 Apply changes from
 .Ar patchfile
 .Pq or standard input
-and record the state of the affected files afterwards.
-The content of
-.Ar patchfile
-must be an unified diff.
+that must be a unified diff.
 If
 .Ar patchfile
 contains more than one patch,
 .Nm
 .Cm patch
-will try to apply them all.
+will try to apply each of them in sequence.
+Files added or removed by the patch scheduled for addition or removal in
+the work tree.
 .Pp
-Show the status of each affected file, using the following status codes:
+While applying the
+.Ar patchfile ,
+show the status of each affected file, using the following status codes:
 .Bl -column XYZ description
 .It M Ta modified file
 .It D Ta deleted file
@@ -1314,6 +1314,25 @@ If a change does not match at its exact line number,
 .Cm patch
 applies it somewhere else in the file if it can find a good spot before
 giving up.
+.Pp
+.Nm
+.Cm patch
+will refuse to apply a patch if certain preconditions are not met.
+Files to be deleted must be present in the work tree and not have been
+scheduled for deletion already.
+Files to be added must be unknown and not present in the work tree.
+Files to be modified must be already present in the the work tree and
+not have conflicts or being obstructed.
+.Pp
+If an error occurs, the
+.Cm patch
+operation will be aborted.
+Any changes made to the work tree up to this point will be left behind.
+Such cahnges can be viewed with
+.Cm got diff
+and can be reverted with
+.Cm got revert
+if needed.
 .Tg rv
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
 .Dl Pq alias: Cm rv
