@@ -1285,7 +1285,7 @@ option)
 .El
 .El
 .Tg pa
-.It Cm patch Op Ar patchfile
+.It Cm patch Oo Fl n Oc Op Ar patchfile
 .Dl Pq alias: Cm pa
 Apply changes from
 .Ar patchfile
@@ -1338,6 +1338,19 @@ Such changes can be viewed with
 and can be reverted with
 .Cm got revert
 if needed.
+.Pp
+The options for
+.Cm got patch
+are as follows:
+.Bl -tag -width Ds
+.It Fl n
+Do not make any modifications to the work tree.
+This can be used to check whether a patch would apply without issues.
+If the
+.Ar patchfile
+contains diffs that affect the same file multiple times the results
+displayed may be incorrect.
+.El
 .Tg rv
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
 .Dl Pq alias: Cm rv
