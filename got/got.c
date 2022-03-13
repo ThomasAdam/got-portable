@@ -7247,7 +7247,7 @@ cmd_patch(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_patch(patchfd, worktree, repo, &print_remove_status,
+	error = got_patch(patchfd, worktree, repo, nop, &print_remove_status,
 	    NULL, &add_progress, NULL, check_cancelled, NULL);
 
 done:
