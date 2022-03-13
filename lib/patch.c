@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 
 #include <errno.h>
@@ -456,7 +457,15 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		}
 	}
 
-	if (!feof(orig))
+	
+	if (p->new == NULL) {
+		struct stat sb;
+
+		if (fstat(fileno(orig), &sb) == -1)
+			err = got_error_from_errno("fstat");
+		else if (sb.st_size != copypos)
+			err = got_error(GOT_ERR_PATCH_DONT_APPLY);
+	} else if (!feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 done:
@@ -584,16 +593,6 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	if (p->old != NULL && p->new == NULL) {
-		/*
-		 * special case: delete a file.  don't try to match
-		 * the lines but just schedule the removal.
-		 */
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
-		goto done;
-	}
-
 	if (asprintf(&template, "%s/got-patch",
 	    got_worktree_get_root_path(worktree)) == -1) {
 		err = got_error_from_errno(template);
@@ -606,6 +605,12 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	err = patch_file(p, oldpath, tmp);
 	if (err)
 		goto done;
+
+	if (p->old != NULL && p->new == NULL) {
+		err = got_worktree_schedule_delete(worktree, &oldpaths,
+		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
+		goto done;
+	}
 
 	if (rename(tmppath, newpath) == -1) {
 		err = got_error_from_errno3("rename", tmppath, newpath);

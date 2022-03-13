@@ -439,6 +439,44 @@ EOF
 		return 1
 	fi
 
+	# try to delete a file with a patch that doesn't match
+	jot 100 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m 'add numbers') \
+		>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- numbers
++++ /dev/null
+@@ -1,9 +0,0 @@
+-1
+-2
+-3
+-4
+-5
+-6
+-7
+-8
+-9
+EOF
+
+	(cd $testroot/wt && got patch patch) > /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then # should fail
+		test_done $testroot 1
+		return 1
+	fi
+
+	echo "got: patch doesn't apply" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
 	test_done $testroot $ret
 }
 
