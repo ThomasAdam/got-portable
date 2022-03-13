@@ -1290,6 +1290,8 @@ option)
 Apply changes from
 .Ar patchfile
 to files in a work tree.
+Files added or removed by a patch will be scheduled for addition or removal in
+the work tree.
 .Pp
 The patch must be in the unified diff format as produced by
 .Cm got diff ,
@@ -1298,7 +1300,6 @@ or by
 when invoked with the
 .Fl u
 option.
-.Pp
 If no
 .Ar patchfile
 argument is provided, read unified diff data from standard input instead.
@@ -1306,8 +1307,6 @@ argument is provided, read unified diff data from standard input instead.
 If the
 .Ar patchfile
 contains multiple patches then attempt to apply each of them in sequence.
-Files added or removed by a patch will be scheduled for addition or removal in
-the work tree.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column XYZ description
