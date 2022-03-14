@@ -670,6 +670,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 	}
 
 	RB_INIT(&repo->packidx_bloom_filters);
+	TAILQ_INIT(&repo->packidx_paths);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		memset(&repo->privsep_children[i], 0,
@@ -750,6 +751,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 			goto done;
 		}
 	}
+
+	err = got_repo_list_packidx(&repo->packidx_paths, repo);
 done:
 	if (err)
 		got_repo_close(repo);
@@ -764,6 +767,7 @@ got_repo_close(struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *child_err;
 	struct got_packidx_bloom_filter *bf;
+	struct got_pathlist_entry *pe;
 	size_t i;
 
 	for (i = 0; i < repo->pack_cache_size; i++) {
@@ -824,6 +828,10 @@ got_repo_close(struct got_repository *repo)
 	for (i = 0; i < repo->nextensions; i++)
 		free(repo->extensions[i]);
 	free(repo->extensions);
+
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry)
+		free((void *)pe->path);
+	got_pathlist_free(&repo->packidx_paths);
 	free(repo);
 
 	return err;
@@ -1092,11 +1100,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
     struct got_repository *repo, struct got_object_id *id)
 {
 	const struct got_error *err;
-	DIR *packdir = NULL;
-	struct dirent *dent;
-	char *path_packidx;
+	struct got_pathlist_entry *pe;
 	size_t i;
-	int packdir_fd;
 
 	/* Search pack index cache. */
 	for (i = 0; i < repo->pack_cache_size; i++) {
@@ -1123,41 +1128,13 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	}
 	/* No luck. Search the filesystem. */
 
-	packdir_fd = openat(got_repo_get_fd(repo),
-	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
-	if (packdir_fd == -1) {
-		if (errno == ENOENT)
-			err = got_error_no_obj(id);
-		else
-			err = got_error_from_errno_fmt("openat: %s/%s",
-			    got_repo_get_path_git_dir(repo),
-			    GOT_OBJECTS_PACK_DIR);
-		goto done;
-	}
-
-	packdir = fdopendir(packdir_fd);
-	if (packdir == NULL) {
-		err = got_error_from_errno("fdopendir");
-		goto done;
-	}
-
-	while ((dent = readdir(packdir)) != NULL) {
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+		const char *path_packidx = pe->path;
 		int is_cached = 0;
 
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
-			continue;
-
-		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
-		    dent->d_name) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-
 		if (!got_repo_check_packidx_bloom_filter(repo,
-		    path_packidx, id)) {
-			free(path_packidx);
+		    pe->path, id))
 			continue; /* object will not be found in this index */
-		}
 
 		for (i = 0; i < repo->pack_cache_size; i++) {
 			if (repo->packidx_cache[i] == NULL)
@@ -1168,26 +1145,19 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 				break;
 			}
 		}
-		if (is_cached) {
-			free(path_packidx);
+		if (is_cached)
 			continue; /* already searched */
-		}
 
 		err = got_packidx_open(packidx, got_repo_get_fd(repo),
 		    path_packidx, 0);
-		if (err) {
-			free(path_packidx);
+		if (err)
 			goto done;
-		}
 
 		err = add_packidx_bloom_filter(repo, *packidx, path_packidx);
-		if (err) {
-			free(path_packidx);
+		if (err)
 			goto done;
-		}
 
 		err = cache_packidx(repo, *packidx, path_packidx);
-		free(path_packidx);
 		if (err)
 			goto done;
 
@@ -1200,8 +1170,6 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 	err = got_error_no_obj(id);
 done:
-	if (packdir && closedir(packdir) != 0 && err == NULL)
-		err = got_error_from_errno("closedir");
 	return err;
 }
 
@@ -1485,46 +1453,18 @@ match_packed_object(struct got_object_id **unique_id,
     struct got_repository *repo, const char *id_str_prefix, int obj_type)
 {
 	const struct got_error *err = NULL;
-	DIR *packdir = NULL;
-	struct dirent *dent;
-	char *path_packidx;
 	struct got_object_id_queue matched_ids;
-	int packdir_fd;
+	struct got_pathlist_entry *pe;
 
 	STAILQ_INIT(&matched_ids);
 
-	packdir_fd = openat(got_repo_get_fd(repo),
-	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
-	if (packdir_fd == -1) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno2("openat",
-			    GOT_OBJECTS_PACK_DIR);
-		}
-		goto done;
-	}
-
-	packdir = fdopendir(packdir_fd);
-	if (packdir == NULL) {
-		err = got_error_from_errno("fdopendir");
-		goto done;
-	}
-
-	while ((dent = readdir(packdir)) != NULL) {
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+		const char *path_packidx = pe->path;
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
 
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
-			continue;
-
-		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
-		    dent->d_name) == -1) {
-			err = got_error_from_errno("strdup");
-			break;
-		}
-
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
 		    path_packidx, 0);
-		free(path_packidx);
 		if (err)
 			break;
 
@@ -1564,8 +1504,6 @@ match_packed_object(struct got_object_id **unique_id,
 	}
 done:
 	got_object_id_queue_free(&matched_ids);
-	if (packdir && closedir(packdir) != 0 && err == NULL)
-		err = got_error_from_errno("closedir");
 	if (err) {
 		free(*unique_id);
 		*unique_id = NULL;
