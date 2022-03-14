@@ -664,10 +664,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 		return got_error_from_errno("getrlimit");
 
 	repo = calloc(1, sizeof(*repo));
-	if (repo == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
+	if (repo == NULL)
+		return got_error_from_errno("calloc");
 
 	RB_INIT(&repo->packidx_bloom_filters);
 	TAILQ_INIT(&repo->packidx_paths);
