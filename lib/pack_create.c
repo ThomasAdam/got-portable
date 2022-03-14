@@ -487,20 +487,14 @@ static const struct got_error *
 find_pack_for_reuse(struct got_packidx **best_packidx,
     struct got_repository *repo)
 {
-	const struct got_error *err;
-	struct got_pathlist_head packidx_paths;
+	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
 	const char *best_packidx_path = NULL;
 	int nobj_max = 0;
 
-	TAILQ_INIT(&packidx_paths);
 	*best_packidx = NULL;
 
-	err = got_repo_list_packidx(&packidx_paths, repo);
-	if (err)
-		return err;
-
-	TAILQ_FOREACH(pe, &packidx_paths, entry) {
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
 		const char *path_packidx = pe->path;
 		struct got_packidx *packidx;
 		int nobj;
@@ -521,9 +515,6 @@ find_pack_for_reuse(struct got_packidx **best_packidx,
 		    repo);
 	}
 
-	TAILQ_FOREACH(pe, &packidx_paths, entry)
-		free((void *)pe->path);
-	got_pathlist_free(&packidx_paths);
 	return err;
 }
 
