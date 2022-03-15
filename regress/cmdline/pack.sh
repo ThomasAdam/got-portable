@@ -304,20 +304,11 @@ test_pack_ambiguous_arg() {
 	local commit1=`git_show_branch_head $testroot/repo mybranch`
 
 	gotadmin pack -r $testroot/repo -x master master \
-		> $testroot/stdout 2> $testroot/stderr
+		> /dev/null 2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" = "0" ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
-		return 1
-	fi
-
-	printf "\rpacking 1 reference\n" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
 		return 1
 	fi
 

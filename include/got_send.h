@@ -36,8 +36,8 @@ const struct got_error *got_send_connect(pid_t *, int *, const char *,
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_send_progress_cb)(void *,
-    off_t packfile_size, int ncommits, int nobj_total,
-    int nobj_deltify, int nobj_written, off_t bytes_sent,
+    int ncolored, int nfound, int ntrees, off_t packfile_size, int ncommits,
+    int nobj_total, int nobj_deltify, int nobj_written, off_t bytes_sent,
     const char *refname, int success);
 
 /*
