@@ -16,8 +16,8 @@
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_pack_progress_cb)(void *arg,
-    off_t packfile_size, int ncommits, int nobj_total, int obj_deltify,
-    int nobj_written);
+    int ncolored, int nfound, int ntrees, off_t packfile_size, int ncommits,
+    int nobj_total, int obj_deltify, int nobj_written);
 
 /*
  * Attempt to pack objects reachable via 'include_refs' into a new packfile.

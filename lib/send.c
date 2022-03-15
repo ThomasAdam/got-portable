@@ -105,6 +105,9 @@ struct pack_progress_arg {
     got_send_progress_cb progress_cb;
     void *progress_arg;
 
+    int ncolored;
+    int nfound;
+    int ntrees;
     off_t packfile_size;
     int ncommits;
     int nobj_total;
@@ -113,17 +116,22 @@ struct pack_progress_arg {
 };
 
 static const struct got_error *
-pack_progress(void *arg, off_t packfile_size, int ncommits,
-    int nobj_total, int nobj_deltify, int nobj_written)
+pack_progress(void *arg, int ncolored, int nfound, int ntrees,
+    off_t packfile_size, int ncommits, int nobj_total, int nobj_deltify,
+    int nobj_written)
 {
 	const struct got_error *err;
 	struct pack_progress_arg *a = arg;
 
-	err = a->progress_cb(a->progress_arg, packfile_size, ncommits,
-	    nobj_total, nobj_deltify, nobj_written, 0, NULL, 0);
+	err = a->progress_cb(a->progress_arg, ncolored, nfound, ntrees,
+	    packfile_size, ncommits, nobj_total, nobj_deltify,
+	    nobj_written, 0, NULL, 0);
 	if (err)
 		return err;
 
+	a->ncolored= ncolored;
+	a->nfound = nfound;
+	a->ntrees = ntrees;
 	a->packfile_size = packfile_size;
 	a->ncommits = ncommits;
 	a->nobj_total = nobj_total;
@@ -684,7 +692,8 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		}
 		if (refname != NULL ||
 		    bytes_sent_cur != bytes_sent) {
-			err = progress_cb(progress_arg, ppa.packfile_size,
+			err = progress_cb(progress_arg, ppa.ncolored,
+			    ppa.nfound, ppa.ntrees, ppa.packfile_size,
 			    ppa.ncommits, ppa.nobj_total, ppa.nobj_deltify,
 			    ppa.nobj_written, bytes_sent,
 			    refname, success);

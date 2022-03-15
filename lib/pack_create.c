@@ -408,8 +408,9 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 
 static const struct got_error *
 report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
-    struct got_ratelimit *rl, off_t packfile_size, int ncommits,
-    int nobj_total, int obj_deltify, int nobj_written)
+    struct got_ratelimit *rl, int ncolored, int nfound, int ntrees,
+    off_t packfile_size, int ncommits, int nobj_total, int obj_deltify,
+    int nobj_written)
 {
 	const struct got_error *err;
 	int elapsed;
@@ -421,8 +422,8 @@ report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
 	if (err || !elapsed)
 		return err;
 
-	return progress_cb(progress_arg, packfile_size, ncommits,
-	    nobj_total, obj_deltify, nobj_written);
+	return progress_cb(progress_arg, ncolored, nfound, ntrees,
+	    packfile_size, ncommits, nobj_total, obj_deltify, nobj_written);
 }
 
 static const struct got_error *
@@ -531,6 +532,9 @@ struct search_deltas_arg {
 	struct got_ratelimit *rl;
 	got_cancel_cb cancel_cb;
 	void *cancel_arg;
+	int ncolored;
+	int nfound;
+	int ntrees;
 	int ncommits;
 };
 
@@ -576,8 +580,8 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 		if (err)
 			goto done;
 		err = report_progress(a->progress_cb, a->progress_arg, a->rl,
-		    0L, a->ncommits, got_object_idset_num_elements(a->idset),
-		    a->v->nmeta, 0);
+		    a->ncolored, a->nfound, a->ntrees, 0L, a->ncommits,
+		    got_object_idset_num_elements(a->idset), a->v->nmeta, 0);
 	}
 done:
 	got_object_close(obj);
@@ -586,7 +590,8 @@ done:
 
 static const struct got_error *
 search_deltas(struct got_pack_metavec *v, struct got_object_idset *idset,
-    int delta_cache_fd, int ncommits, struct got_repository *repo,
+    int delta_cache_fd, int ncolored, int nfound, int ntrees, int ncommits,
+    struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -626,6 +631,9 @@ search_deltas(struct got_pack_metavec *v, struct got_object_idset *idset,
 	sda.rl = rl;
 	sda.cancel_cb = cancel_cb;
 	sda.cancel_arg = cancel_arg;
+	sda.ncolored = ncolored;
+	sda.nfound = nfound;
+	sda.ntrees = ntrees;
 	sda.ncommits = ncommits;
 	err = got_object_idset_for_each(idset, search_delta_for_object, &sda);
 done:
@@ -634,8 +642,9 @@ done:
 }
 
 static const struct got_error *
-pick_deltas(struct got_pack_meta **meta, int nmeta, int ncommits,
-    int nreused, FILE *delta_cache, struct got_repository *repo,
+pick_deltas(struct got_pack_meta **meta, int nmeta, int ncolored,
+    int nfound, int ntrees, int ncommits, int nreused, FILE *delta_cache,
+    struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -658,7 +667,8 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int ncommits,
 				break;
 		}
 		err = report_progress(progress_cb, progress_arg, rl,
-		    0L, ncommits, nreused + nmeta, nreused + i, 0);
+		    ncolored, nfound, ntrees, 0L, ncommits, nreused + nmeta,
+		    nreused + i, 0);
 		if (err)
 			goto done;
 		m = meta[i];
@@ -868,7 +878,9 @@ static const struct got_error *
 load_tree_entries(struct got_object_id_queue *ids, int want_meta,
     struct got_object_idset *idset, struct got_object_id *tree_id,
     const char *dpath, time_t mtime, struct got_repository *repo,
-    int loose_obj_only, got_cancel_cb cancel_cb, void *cancel_arg)
+    int loose_obj_only, int *ncolored, int *nfound, int *ntrees,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree;
@@ -876,6 +888,12 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 	int i;
 
 	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		return err;
+
+	(*ntrees)++;
+	err = report_progress(progress_cb, progress_arg, rl,
+	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
 	if (err)
 		return err;
 
@@ -911,6 +929,11 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 			    GOT_OBJ_TYPE_BLOB, mtime, loose_obj_only, repo);
 			if (err)
 				break;
+			(*nfound)++;
+			err = report_progress(progress_cb, progress_arg, rl,
+			    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+			if (err)
+				break;
 		}
 		free(p);
 		p = NULL;
@@ -924,8 +947,10 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 static const struct got_error *
 load_tree(int want_meta, struct got_object_idset *idset,
     struct got_object_id *tree_id, const char *dpath, time_t mtime,
-    int loose_obj_only, struct got_repository *repo,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_repository *repo, int loose_obj_only,
+    int *ncolored, int *nfound, int *ntrees,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id_queue tree_ids;
@@ -963,8 +988,16 @@ load_tree(int want_meta, struct got_object_idset *idset,
 			break;
 		}
 
+		(*nfound)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+		if (err)
+			break;
+
 		err = load_tree_entries(&tree_ids, want_meta, idset, qid->id,
-		    dpath, mtime, repo, loose_obj_only, cancel_cb, cancel_arg);
+		    dpath, mtime, repo, loose_obj_only, ncolored, nfound,
+		    ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		got_object_qid_free(qid);
 		if (err)
 			break;
@@ -977,7 +1010,9 @@ load_tree(int want_meta, struct got_object_idset *idset,
 static const struct got_error *
 load_commit(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, struct got_repository *repo, int loose_obj_only,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    int *ncolored, int *nfound, int *ntrees,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit;
@@ -1004,9 +1039,16 @@ load_commit(int want_meta, struct got_object_idset *idset,
 	if (err)
 		goto done;
 
+	(*nfound)++;
+	err = report_progress(progress_cb, progress_arg, rl,
+	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+	if (err)
+		goto done;
+
 	err = load_tree(want_meta, idset, got_object_commit_get_tree_id(commit),
 	    "", got_object_commit_get_committer_time(commit),
-	    loose_obj_only, repo, cancel_cb, cancel_arg);
+	    repo, loose_obj_only, ncolored, nfound, ntrees,
+	    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 done:
 	got_object_commit_close(commit);
 	return err;
@@ -1015,7 +1057,9 @@ done:
 static const struct got_error *
 load_tag(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, struct got_repository *repo, int loose_obj_only,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    int *ncolored, int *nfound, int *ntrees,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_tag_object *tag = NULL;
@@ -1042,17 +1086,25 @@ load_tag(int want_meta, struct got_object_idset *idset,
 	if (err)
 		goto done;
 
+	(*nfound)++;
+	err = report_progress(progress_cb, progress_arg, rl,
+	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+	if (err)
+		goto done;
+
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_COMMIT:
 		err = load_commit(want_meta, idset,
-		    got_object_tag_get_object_id(tag), repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
+		    got_object_tag_get_object_id(tag), repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = load_tree(want_meta, idset,
 		    got_object_tag_get_object_id(tag), "",
-		    got_object_tag_get_tagger_time(tag),
-		    loose_obj_only, repo, cancel_cb, cancel_arg);
+		    got_object_tag_get_tagger_time(tag), repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		break;
 	default:
 		break;
@@ -1174,11 +1226,12 @@ append_id(struct got_object_id *id, void *data, void *arg)
 }
 
 static const struct got_error *
-findtwixt(struct got_object_id ***res, int *nres,
+findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
     struct got_object_id **head, int nhead,
     struct got_object_id **tail, int ntail,
     struct got_repository *repo,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id_queue ids;
@@ -1189,6 +1242,7 @@ findtwixt(struct got_object_id ***res, int *nres,
 	STAILQ_INIT(&ids);
 	*res = NULL;
 	*nres = 0;
+	*ncolored = 0;
 
 	keep = got_object_idset_alloc();
 	if (keep == NULL)
@@ -1238,6 +1292,12 @@ findtwixt(struct got_object_id ***res, int *nres,
 			ncolor = COLOR_KEEP;
 		else
 			ncolor = COLOR_BLANK;
+
+		(*ncolored)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
+		if (err)
+			goto done;
 
 		if (ncolor == COLOR_DROP || (ncolor == COLOR_KEEP &&
 		    qcolor == COLOR_KEEP)) {
@@ -1327,17 +1387,22 @@ done:
 }
 
 static const struct got_error *
-load_object_ids(struct got_object_idset *idset,
-    struct got_object_id **theirs, int ntheirs,
+load_object_ids(int *ncolored, int *nfound, int *ntrees,
+    struct got_object_idset *idset, struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours, struct got_repository *repo,
-    int loose_obj_only, got_cancel_cb cancel_cb, void *cancel_arg)
+    int loose_obj_only, got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
 	int i, nobj = 0, obj_type;
 
-	err = findtwixt(&ids, &nobj, ours, nours, theirs, ntheirs, repo,
-	    cancel_cb, cancel_arg);
+	*ncolored = 0;
+	*nfound = 0;
+	*ntrees = 0;
+
+	err = findtwixt(&ids, &nobj, ncolored, ours, nours, theirs, ntheirs,
+	    repo, progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 	if (err || nobj == 0)
 		goto done;
 
@@ -1350,8 +1415,9 @@ load_object_ids(struct got_object_idset *idset,
 			return err;
 		if (obj_type != GOT_OBJ_TYPE_COMMIT)
 			continue;
-		err = load_commit(0, idset, id, repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
+		err = load_commit(0, idset, id, repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1370,15 +1436,17 @@ load_object_ids(struct got_object_idset *idset,
 			obj_type = m->obj_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
-		err = load_tag(0, idset, id, repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
+		err = load_tag(0, idset, id, repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
 
 	for (i = 0; i < nobj; i++) {
-		err = load_commit(1, idset, ids[i], repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
+		err = load_commit(1, idset, ids[i], repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1397,8 +1465,9 @@ load_object_ids(struct got_object_idset *idset,
 			obj_type = m->obj_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
-		err = load_tag(1, idset, id, repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
+		err = load_tag(1, idset, id, repo, loose_obj_only,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
+		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1625,7 +1694,8 @@ static const struct got_error *
 genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
     struct got_pack_meta **deltify, int ndeltify,
     struct got_pack_meta **reuse, int nreuse,
-    int nours, struct got_repository *repo,
+    int ncolored, int nfound, int ntrees, int nours,
+    struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl,
     got_cancel_cb cancel_cb, void *cancel_arg)
@@ -1657,8 +1727,8 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	    write_order_cmp);
 	for (i = 0; i < ndeltify; i++) {
 		err = report_progress(progress_cb, progress_arg, rl,
-		    packfile_size, nours, ndeltify + nreuse,
-		    ndeltify + nreuse, i);
+		    ncolored, nfound, ntrees, packfile_size, nours,
+		    ndeltify + nreuse, ndeltify + nreuse, i);
 		if (err)
 			goto done;
 		m = deltify[i];
@@ -1672,8 +1742,8 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	    reuse_write_order_cmp);
 	for (i = 0; i < nreuse; i++) {
 		err = report_progress(progress_cb, progress_arg, rl,
-		    packfile_size, nours, ndeltify + nreuse,
-		    ndeltify + nreuse, ndeltify + i);
+		    ncolored, nfound, ntrees, packfile_size, nours,
+		    ndeltify + nreuse, ndeltify + nreuse, ndeltify + i);
 		if (err)
 			goto done;
 		m = reuse[i];
@@ -1690,9 +1760,9 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	packfile_size += SHA1_DIGEST_LENGTH;
 	packfile_size += sizeof(struct got_packfile_hdr);
 	if (progress_cb) {
-		err = progress_cb(progress_arg, packfile_size, nours,
-		    ndeltify + nreuse, ndeltify + nreuse,
-		    ndeltify + nreuse);
+		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
+		    packfile_size, nours, ndeltify + nreuse,
+		    ndeltify + nreuse, ndeltify + nreuse);
 		if (err)
 			goto done;
 	}
@@ -1749,6 +1819,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	struct got_object_idset *idset;
 	struct got_ratelimit rl;
 	struct got_pack_metavec deltify, reuse;
+	int ncolored = 0, nfound = 0, ntrees = 0;
 
 	memset(&deltify, 0, sizeof(deltify));
 	memset(&reuse, 0, sizeof(reuse));
@@ -1759,8 +1830,9 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	if (idset == NULL)
 		return got_error_from_errno("got_object_idset_alloc");
 
-	err = load_object_ids(idset, theirs, ntheirs, ours, nours,
-	    repo, loose_obj_only, cancel_cb, cancel_arg);
+	err = load_object_ids(&ncolored, &nfound, &ntrees, idset, theirs,
+	    ntheirs, ours, nours, repo, loose_obj_only,
+	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 	if (err)
 		return err;
 
@@ -1770,8 +1842,8 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		goto done;
 
 	if (progress_cb) {
-		err = progress_cb(progress_arg, 0L, nours,
-		    got_object_idset_num_elements(idset), 0, 0);
+		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
+		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
 		if (err)
 			goto done;
 	}
@@ -1795,8 +1867,9 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		goto done;
 	}
 
-	err = search_deltas(&reuse, idset, delta_cache_fd, nours, repo,
-	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	err = search_deltas(&reuse, idset, delta_cache_fd, ncolored, nfound,
+	    ntrees, nours, repo, progress_cb, progress_arg, &rl,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 	if (reuse.nmeta > 0) {
@@ -1830,8 +1903,8 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	if (err)
 		goto done;
 	if (deltify.nmeta > 0) {
-		err = pick_deltas(deltify.meta, deltify.nmeta, nours,
-		    reuse.nmeta, delta_cache, repo,
+		err = pick_deltas(deltify.meta, deltify.nmeta, ncolored,
+		    nfound, ntrees, nours, reuse.nmeta, delta_cache, repo,
 		    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
@@ -1842,8 +1915,9 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	}
 
 	err = genpack(packsha1, packfile, delta_cache, deltify.meta,
-	    deltify.nmeta, reuse.meta, reuse.nmeta, nours, repo,
-	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
+	    nours, repo, progress_cb, progress_arg, &rl,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 done:

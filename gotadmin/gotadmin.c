@@ -381,6 +381,10 @@ usage_pack(void)
 
 struct got_pack_progress_arg {
 	char last_scaled_size[FMT_SCALED_STRSIZE];
+	int last_ncolored;
+	int last_nfound;
+	int last_ntrees;
+	int loading_done;
 	int last_ncommits;
 	int last_nobj_total;
 	int last_p_deltify;
@@ -391,18 +395,72 @@ struct got_pack_progress_arg {
 	int printed_something;
 };
 
+static void
+print_load_info(int print_colored, int print_found, int print_trees,
+    int ncolored, int nfound, int ntrees)
+{
+	if (print_colored) {
+		printf("%d commit%s colored", ncolored,
+		    ncolored == 1 ? "" : "s");
+	}
+	if (print_found) {
+		printf("%s%d object%s found",
+		    ncolored > 0 ? "; " : "",
+		    nfound, nfound == 1 ? "" : "s");
+	}
+	if (print_trees) {
+		printf("; %d tree%s scanned", ntrees,
+		    ntrees == 1 ? "" : "s");
+	}
+}
+
 static const struct got_error *
-pack_progress(void *arg, off_t packfile_size, int ncommits,
-    int nobj_total, int nobj_deltify, int nobj_written)
+pack_progress(void *arg, int ncolored, int nfound, int ntrees,
+    off_t packfile_size, int ncommits, int nobj_total, int nobj_deltify,
+    int nobj_written)
 {
 	struct got_pack_progress_arg *a = arg;
 	char scaled_size[FMT_SCALED_STRSIZE];
 	int p_deltify, p_written;
+	int print_colored = 0, print_found = 0, print_trees = 0;
 	int print_searching = 0, print_total = 0;
 	int print_deltify = 0, print_written = 0;
 
 	if (a->verbosity < 0)
 		return NULL;
+
+	if (a->last_ncolored != ncolored) {
+		print_colored = 1;
+		a->last_ncolored = ncolored;
+	}
+
+	if (a->last_nfound != nfound) {
+		print_colored = 1;
+		print_found = 1;
+		a->last_nfound = nfound;
+	}
+
+	if (a->last_ntrees != ntrees) {
+		print_colored = 1;
+		print_found = 1;
+		print_trees = 1;
+		a->last_ntrees = ntrees;
+	}
+
+	if ((print_colored || print_found || print_trees) &&
+	    !a->loading_done) {
+		printf("\r");
+		print_load_info(print_colored, print_found, print_trees,
+		    ncolored, nfound, ntrees);
+		a->printed_something = 1;
+		fflush(stdout);
+		return NULL;
+	} else if (!a->loading_done) {
+		printf("\r");
+		print_load_info(1, 1, 1, ncolored, nfound, ntrees);
+		printf("\n");
+		a->loading_done = 1;
+	}
 
 	if (fmt_scaled(packfile_size, scaled_size) == -1)
 		return got_error_from_errno("fmt_scaled");
