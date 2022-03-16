@@ -594,7 +594,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_pathlist_head oldpaths, newpaths;
 	int file_renamed = 0;
-	char *oldpath = NULL, *newpath = NULL;
+	char *oldpath = NULL, *newpath = NULL, *parent = NULL;
 	char *tmppath = NULL, *template = NULL;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
@@ -659,8 +659,23 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 	if (rename(tmppath, newpath) == -1) {
-		err = got_error_from_errno3("rename", tmppath, newpath);
-		goto done;
+		if (errno != ENOENT) {
+			err = got_error_from_errno3("rename", tmppath,
+			    newpath);
+			goto done;
+		}
+
+		err = got_path_dirname(&parent, newpath);
+		if (err != NULL)
+			goto done;
+		err = got_path_mkdir(parent);
+		if (err != NULL)
+			goto done;
+		if (rename(tmppath, newpath) == -1) {
+			err = got_error_from_errno3("rename", tmppath,
+			    newpath);
+			goto done;
+		}
 	}
 
 	if (file_renamed) {
@@ -679,6 +694,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 done:
 	if (err != NULL && newpath != NULL && (file_renamed || p->old == NULL))
 		unlink(newpath);
+	free(parent);
 	free(template);
 	if (tmppath != NULL)
 		unlink(tmppath);

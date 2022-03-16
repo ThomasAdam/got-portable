@@ -1008,6 +1008,47 @@ EOF
 	test_done $testroot 0
 }
 
+test_patch_create_dirs() {
+	local testroot=`test_init patch_create_dirs`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- /dev/null
++++ iota/kappa/lambda
+@@ -0,0 +1 @@
++lambda
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'A  iota/kappa/lambda' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ ! -f $testroot/wt/iota/kappa/lambda ]; then
+		echo "file not created!" >&2
+		test_done $testroot $ret
+		return 1
+	fi
+	test_done $testroot 0
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1024,3 +1065,4 @@ run_test test_patch_rename
 run_test test_patch_illegal_status
 run_test test_patch_nop
 run_test test_patch_preserve_perm
+run_test test_patch_create_dirs
