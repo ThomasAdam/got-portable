@@ -967,6 +967,47 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_preserve_perm() {
+	local testroot=`test_init patch_preserve_perm`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	chmod +x $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'alpha executable') > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1,2 @@
+ alpha
++was edited
+EOF
+
+	(cd $testroot/wt && got patch patch) > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ ! -x $testroot/wt/alpha ]; then
+		echo "alpha is no more executable!" >&2
+		test_done $testroot 1
+		return 1
+	fi
+	test_done $testroot 0
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -982,3 +1023,4 @@ run_test test_patch_equals_for_context
 run_test test_patch_rename
 run_test test_patch_illegal_status
 run_test test_patch_nop
+run_test test_patch_preserve_perm

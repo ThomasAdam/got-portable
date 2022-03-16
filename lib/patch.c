@@ -387,10 +387,12 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 }
 
 static const struct got_error *
-patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop)
+patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
+    mode_t *mode)
 {
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
+	struct stat sb;
 	size_t i;
 	long lineno = 0;
 	FILE *orig;
@@ -416,6 +418,12 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop)
 		err = got_error_from_errno2("fopen", path);
 		goto done;
 	}
+
+	if (fstat(fileno(orig), &sb) == -1) {
+		err = got_error_from_errno("fstat");
+		goto done;
+	}
+	*mode = sb.st_mode;
 
 	copypos = 0;
 	STAILQ_FOREACH(h, &p->head, entries) {
@@ -465,15 +473,9 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop)
 		}
 	}
 
-	
-	if (p->new == NULL) {
-		struct stat sb;
-
-		if (fstat(fileno(orig), &sb) == -1)
-			err = got_error_from_errno("fstat");
-		else if (sb.st_size != copypos)
-			err = got_error(GOT_ERR_PATCH_DONT_APPLY);
-	} else if (!nop && !feof(orig))
+	if (p->new == NULL && sb.st_size != copypos)
+		err = got_error(GOT_ERR_PATCH_DONT_APPLY);
+	else if (!nop && !feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 done:
@@ -595,6 +597,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL;
 	FILE *tmp = NULL;
+	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
 	TAILQ_INIT(&oldpaths);
 	TAILQ_INIT(&newpaths);
@@ -637,7 +640,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
-	err = patch_file(p, oldpath, tmp, nop);
+	err = patch_file(p, oldpath, tmp, nop, &mode);
 	if (err)
 		goto done;
 
@@ -647,6 +650,11 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	if (p->old != NULL && p->new == NULL) {
 		err = got_worktree_schedule_delete(worktree, &oldpaths,
 		    0, NULL, patch_delete, pa, repo, 0, 0);
+		goto done;
+	}
+
+	if (fchmod(fileno(tmp), mode) == -1) {
+		err = got_error_from_errno2("chmod", newpath);
 		goto done;
 	}
 

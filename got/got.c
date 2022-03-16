@@ -7253,7 +7253,7 @@ cmd_patch(int argc, char *argv[])
 		goto done;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath proc exec sendfd flock",
+	if (pledge("stdio rpath wpath cpath fattr proc exec sendfd flock",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
