@@ -7186,6 +7186,17 @@ patch_from_stdin(int *patchfd)
 }
 
 static const struct got_error *
+patch_progress(void *arg, const char *old, const char *new, unsigned char mode)
+{
+	const char *path = new == NULL ? old : new;
+
+	while (*path == '/')
+		path++;
+	printf("%c  %s\n", mode, path);
+	return NULL;
+}
+
+static const struct got_error *
 cmd_patch(int argc, char *argv[])
 {
 	const struct got_error *error = NULL, *close_error = NULL;
@@ -7247,8 +7258,8 @@ cmd_patch(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_patch(patchfd, worktree, repo, nop, &print_remove_status,
-	    NULL, &add_progress, NULL, check_cancelled, NULL);
+	error = got_patch(patchfd, worktree, repo, nop, &patch_progress,
+	    NULL, check_cancelled, NULL);
 
 done:
 	if (repo) {

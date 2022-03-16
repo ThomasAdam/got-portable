@@ -66,10 +66,14 @@ struct got_patch_hunk {
 };
 
 struct got_patch {
-	int	 nop;
 	char	*old;
 	char	*new;
 	STAILQ_HEAD(, got_patch_hunk) head;
+};
+
+struct patch_args {
+	got_patch_progress_cb progress_cb;
+	void	*progress_arg;
 };
 
 static const struct got_error *
@@ -384,7 +388,7 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 }
 
 static const struct got_error *
-patch_file(struct got_patch *p, const char *path, FILE *tmp)
+patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop)
 {
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
@@ -400,7 +404,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		h = STAILQ_FIRST(&p->head);
 		if (h == NULL || STAILQ_NEXT(h, entries) != NULL)
 			return got_error(GOT_ERR_PATCH_MALFORMED);
-		if (p->nop)
+		if (nop)
 			return NULL;
 		for (i = 0; i < h->len; ++i) {
 			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
@@ -423,7 +427,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		err = locate_hunk(orig, h, &pos, &lineno);
 		if (err != NULL)
 			goto done;
-		if (!p->nop)
+		if (!nop)
 			err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
 			goto done;
@@ -450,7 +454,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 		if (err != NULL)
 			goto done;
 
-		if (!p->nop)
+		if (!nop)
 			err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
 			goto done;
@@ -470,7 +474,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp)
 			err = got_error_from_errno("fstat");
 		else if (sb.st_size != copypos)
 			err = got_error(GOT_ERR_PATCH_DONT_APPLY);
-	} else if (!p->nop && !feof(orig))
+	} else if (!nop && !feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 done:
@@ -565,10 +569,26 @@ check_file_status(struct got_patch *p, int file_renamed,
 }
 
 static const struct got_error *
+patch_delete(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path)
+{
+	struct patch_args *pa = arg;
+
+	return pa->progress_cb(pa->progress_arg, path, NULL, status);
+}
+
+static const struct got_error *
+patch_add(void *arg, unsigned char status, const char *path)
+{
+	struct patch_args *pa = arg;
+
+	return pa->progress_cb(pa->progress_arg, NULL, path, status);
+}
+
+static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_patch *p, got_worktree_delete_cb delete_cb, void *delete_arg,
-    got_worktree_checkout_cb add_cb, void *add_arg, got_cancel_cb cancel_cb,
-    void *cancel_arg)
+    struct got_patch *p, int nop, struct patch_args *pa,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_head oldpaths, newpaths;
@@ -604,20 +624,20 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	if (!p->nop)
+	if (!nop)
 		err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
-	err = patch_file(p, oldpath, tmp);
+	err = patch_file(p, oldpath, tmp, nop);
 	if (err)
 		goto done;
 
-	if (p->nop)
+	if (nop)
 		goto done;
 
 	if (p->old != NULL && p->new == NULL) {
 		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
+		    0, NULL, patch_delete, pa, repo, 0, 0);
 		goto done;
 	}
 
@@ -628,15 +648,16 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 
 	if (file_renamed) {
 		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
+		    0, NULL, patch_delete, pa, repo, 0, 0);
 		if (err == NULL)
 			err = got_worktree_schedule_add(worktree, &newpaths,
-			    add_cb, add_arg, repo, 1);
+			    patch_add, pa, repo, 1);
 	} else if (p->old == NULL)
 		err = got_worktree_schedule_add(worktree, &newpaths,
-		    add_cb, add_arg, repo, 1);
+		    patch_add, pa, repo, 1);
 	else
-		printf("M  %s\n", oldpath); /* XXX */
+		err = pa->progress_cb(pa->progress_arg, oldpath, newpath,
+		    GOT_STATUS_MODIFY);
 
 done:
 	if (err != NULL && newpath != NULL && (file_renamed || p->old == NULL))
@@ -654,15 +675,18 @@ done:
 
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    int nop, got_worktree_delete_cb delete_cb, void *delete_arg,
-    got_worktree_checkout_cb add_cb, void *add_arg, got_cancel_cb cancel_cb,
-    void *cancel_arg)
+    int nop, got_patch_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct patch_args pa;
 	struct imsgbuf *ibuf;
 	int imsg_fds[2] = {-1, -1};
 	int done = 0;
 	pid_t pid;
+
+	pa.progress_cb = progress_cb;
+	pa.progress_arg = progress_arg;
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL) {
@@ -704,9 +728,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err || done)
 			break;
 
-		p.nop = nop;
-		err = apply_patch(worktree, repo, &p, delete_cb, delete_arg,
-		    add_cb, add_arg, cancel_cb, cancel_arg);
+		err = apply_patch(worktree, repo, &p, nop, &pa,
+		    cancel_cb, cancel_arg);
 		patch_free(&p);
 		if (err)
 			break;

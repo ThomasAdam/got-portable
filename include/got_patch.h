@@ -15,6 +15,14 @@
  */
 
 /*
+ * A callback that gets invoked during the patch application.
+ *
+ * Receives the old and new path and a status code.
+ */
+typedef const struct got_error *(*got_patch_progress_cb)(void *,
+    const char *, const char *, unsigned char);
+
+/*
  * Apply the (already opened) patch to the repository and register the
  * status of the added and removed files.
  *
@@ -22,5 +30,4 @@
  */
 const struct got_error *
 got_patch(int, struct got_worktree *, struct got_repository *, int,
-    got_worktree_delete_cb, void *, got_worktree_checkout_cb, void *,
-    got_cancel_cb, void *);
+    got_patch_progress_cb, void *, got_cancel_cb, void *);
