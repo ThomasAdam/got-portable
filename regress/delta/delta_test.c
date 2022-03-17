@@ -32,7 +32,7 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-struct delta_test {
+const struct delta_test {
 	const char *base;
 	size_t base_len;
 	const char *delta;
@@ -66,7 +66,7 @@ delta_apply(void)
 		return 1;
 
 	for (i = 0; i < nitems(delta_tests); i++) {
-		struct delta_test *dt = &delta_tests[i];
+		const struct delta_test *dt = &delta_tests[i];
 		FILE *base_file;
 		char buf[1024];
 		size_t n, result_len;

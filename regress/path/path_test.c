@@ -48,7 +48,7 @@ test_printf(char *fmt, ...)
 static int
 path_cmp(void)
 {
-	struct path_cmp_test {
+	const struct path_cmp_test {
 		const char *path1;
 		const char *path2;
 		int expected;

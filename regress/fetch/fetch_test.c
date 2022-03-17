@@ -60,7 +60,7 @@ static int
 fetch_parse_uri(void)
 {
 	const struct got_error *err = NULL;
-	struct parse_uri_test {
+	const struct parse_uri_test {
 		const char *uri;
 		const char *proto;
 		const char *host;

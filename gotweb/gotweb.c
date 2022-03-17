@@ -250,7 +250,7 @@ enum gw_query_actions {
 	GW_TREE,
 };
 
-static struct gw_query_action gw_query_funcs[] = {
+static const struct gw_query_action gw_query_funcs[] = {
 	{ GW_BLAME,	"blame",	gw_blame,	"gw_tmpl/blame.tmpl" },
 	{ GW_BLOB,	"blob",		NULL,		NULL },
 	{ GW_BRIEFS,	"briefs",	gw_briefs,	"gw_tmpl/briefs.tmpl" },
@@ -2021,7 +2021,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct kpair *p;
-	struct gw_query_action *action = NULL;
+	const struct gw_query_action *action = NULL;
 	unsigned int i;
 
 	if (gw_trans->gw_req->fieldnmap[0]) {
