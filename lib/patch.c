@@ -304,8 +304,8 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 		}
 		(*lineno)++;
 
-		if ((mode == ' ' && !strcmp(h->lines[0]+1, line)) ||
-		    (mode == '-' && !strcmp(h->lines[0]+1, line)) ||
+		if ((mode == ' ' && !strcmp(h->lines[0] + 1, line)) ||
+		    (mode == '-' && !strcmp(h->lines[0] + 1, line)) ||
 		    (mode == '+' && *lineno == h->old_from)) {
 			match = ftello(orig);
 			if (match == -1) {
@@ -354,7 +354,7 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 					    GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
-			if (strcmp(h->lines[i]+1, line)) {
+			if (strcmp(h->lines[i] + 1, line)) {
 				err = got_error(GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
@@ -375,14 +375,14 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 	for (i = 0; i < h->len; ++i) {
 		switch (*h->lines[i]) {
 		case ' ':
-			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
+			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
 			/* fallthrough */
 		case '-':
 			(*lineno)++;
 			break;
 		case '+':
-			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
+			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
 			break;
 		}
@@ -412,7 +412,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		if (nop)
 			return NULL;
 		for (i = 0; i < h->len; ++i) {
-			if (fprintf(tmp, "%s", h->lines[i]+1) < 0)
+			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
 		}
 		return err;

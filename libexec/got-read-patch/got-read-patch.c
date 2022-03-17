@@ -102,7 +102,7 @@ filename(const char *at, char **name, int strip)
 		at++;
 
 	/* files can be created or removed by diffing against /dev/null */
-	if (!strncmp(at, _PATH_DEVNULL, sizeof(_PATH_DEVNULL)-1))
+	if (!strncmp(at, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1))
 		return NULL;
 
 	t = strdup(at);
@@ -117,7 +117,7 @@ filename(const char *at, char **name, int strip)
 	    ++t) {
 		if (t[0] == '/' && t[1] != '/' && t[1] != '\0')
 			if (--l >= 0)
-				*name = t+1;
+				*name = t + 1;
 	}
 	*t = '\0';
 
@@ -291,7 +291,7 @@ send_line(const char *line)
 	}
 
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH_LINE, 0, 0, -1,
-	    line, strlen(line)+1) == -1)
+	    line, strlen(line) + 1) == -1)
 		err = got_error_from_errno(
 		    "imsg_compose GOT_IMSG_PATCH_LINE");
 
