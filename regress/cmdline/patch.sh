@@ -403,43 +403,6 @@ test_patch_dont_apply() {
 		return 1
 	fi
 
-	cat <<EOF > $testroot/wt/patch
---- alpha
-+++ alpha
-@@ -1 +1,2 @@
-+hatsuseno
- alpha something
-EOF
-
-	echo -n > $testroot/stdout.expected
-	echo "got: patch doesn't apply" > $testroot/stderr.expected
-
-	(cd $testroot/wt && got patch patch) \
-		 > $testroot/stdout \
-		2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then # should fail
-		test_done $testroot 1
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done $testroot $ret
-		return 1
-	fi
-
-	# try to delete a file with a patch that doesn't match
 	jot 100 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m 'add numbers') \
 		>/dev/null
@@ -450,6 +413,11 @@ EOF
 	fi
 
 	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1,2 @@
++hatsuseno
+ alpha something
 --- numbers
 +++ /dev/null
 @@ -1,9 +0,0 @@
@@ -464,18 +432,24 @@ EOF
 -9
 EOF
 
-	(cd $testroot/wt && got patch patch) > /dev/null 2> $testroot/stderr
+	(cd $testroot/wt && got patch patch) > $testroot/stdout 2> /dev/null
 	ret=$?
 	if [ $ret -eq 0 ]; then # should fail
 		test_done $testroot 1
 		return 1
 	fi
 
-	echo "got: patch doesn't apply" > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
+	cat <<EOF > $testroot/stdout.expected
+#  alpha
+@@ -1,1 +1,2 @@ hunk failed to apply
+#  numbers
+@@ -1,9 +0,0 @@ hunk failed to apply
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done $testroot $ret
 }
@@ -779,75 +753,40 @@ test_patch_illegal_status() {
 		return 1
 	fi
 
-	# edit an non-existent and unknown file
-	cat <<EOF > $testroot/wt/patch
---- iota
-+++ iota
-@@ -1 +1 @@
-- iota
-+ IOTA
-EOF
-
-	(cd $testroot/wt && got patch patch) > /dev/null \
-		2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "edited a missing file" >&2
-		test_done $testroot $ret
-		return 1
-	fi
-
-	echo "got: iota: No such file or directory" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done $testroot $ret
-		return 1
-	fi
-
-	# create iota and re-try
-	echo iota > $testroot/wt/iota
-
-	(cd $testroot/wt && got patch patch) > /dev/null \
-		2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "patched an unknown file" >&2
-		test_done $testroot $ret
-		return 1
-	fi
-
-	echo "got: iota: file has unexpected status" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done $testroot $ret
-		return 1
-	fi
-	
-	rm $testroot/wt/iota
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	# edit obstructed file
-	rm $testroot/wt/alpha
-	mkdir $testroot/wt/alpha
+	# try to patch an obstructed file, add a versioned one, edit a
+	# non existent file and an unversioned one, and remove a
+	# non existent file.
 	cat <<EOF > $testroot/wt/patch
 --- alpha
 +++ alpha
 @@ -1 +1,2 @@
  alpha
 +was edited
+--- /dev/null
++++ beta
+@@ -0,0 +1 @@
++beta
+--- iota
++++ iota
+@@ -1 +1 @@
+-iota
++IOTA
+--- kappa
++++ kappa
+@@ -1 +1 @@
+-kappa
++KAPPA
+--- lambda
++++ /dev/null
+@@ -1 +0,0 @@
+-lambda
 EOF
 
-	(cd $testroot/wt && got patch patch) > /dev/null \
+	echo kappa > $testroot/wt/kappa
+	rm $testroot/wt/alpha
+	mkdir $testroot/wt/alpha
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -856,59 +795,34 @@ EOF
 		return 1
 	fi
 
-	echo "got: alpha: file has unexpected status" \
-		> $testroot/stderr.expected
+	cat <<EOF > $testroot/stdout.expected
+#  alpha
+#  beta
+#  iota
+#  kappa
+#  lambda
+EOF
+
+	cat <<EOF > $testroot/stderr.expected
+got: alpha: file has unexpected status
+got: beta: file has unexpected status
+got: iota: No such file or directory
+got: kappa: file has unexpected status
+got: lambda: No such file or directory
+got: patch failed to apply
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done $testroot $ret
-		return 1
-	fi
-
-	# delete an unknown file
-	cat <<EOF > $testroot/wt/patch
---- iota
-+++ /dev/null
-@@ -1 +0,0 @@
--iota
-EOF
-
-	(cd $testroot/wt && got patch patch) > /dev/null \
-		2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "deleted a missing file?" >&2
-		test_done $testroot $ret
-		return 1
-	fi
-
-	echo "got: iota: No such file or directory" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done $testroot $ret
-		return 1
-	fi
-
-	# try again with iota in place but still not registered
-	echo iota > $testroot/wt/iota
-	(cd $testroot/wt && got patch patch) > /dev/null \
-		2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "deleted an unversioned file?" >&2
-		test_done $testroot $ret
-		return 1
-	fi
-
-	echo "got: iota: file has unexpected status" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done $testroot $ret
@@ -1049,6 +963,76 @@ EOF
 	test_done $testroot 0
 }
 
+test_patch_with_offset() {
+	local testroot=`test_init patch_with_offset`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- numbers
++++ numbers
+@@ -47,7 +47,7 @@
+ 47
+ 48
+ 49
+-50
++midway tru it!
+ 51
+ 52
+ 53
+@@ -87,7 +87,7 @@
+ 87
+ 88
+ 89
+-90
++almost there!
+ 91
+ 92
+ 93
+EOF
+
+	jot 100 > $testroot/wt/numbers
+	ed $testroot/wt/numbers <<EOF > /dev/null 2> /dev/null
+1,10d
+50r !jot 20
+w
+q
+EOF
+
+	(cd $testroot/wt && got add numbers && got commit -m '+numbers') \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot/wt $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/stdout.expected
+M  numbers
+@@ -47,7 +47,7 @@ applied with offset -10
+@@ -87,7 +87,7 @@ applied with offset 10
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1066,3 +1050,4 @@ run_test test_patch_illegal_status
 run_test test_patch_nop
 run_test test_patch_preserve_perm
 run_test test_patch_create_dirs
+run_test test_patch_with_offset

@@ -7186,13 +7186,31 @@ patch_from_stdin(int *patchfd)
 }
 
 static const struct got_error *
-patch_progress(void *arg, const char *old, const char *new, unsigned char mode)
+patch_progress(void *arg, const char *old, const char *new,
+    unsigned char status, const struct got_error *error, long old_from,
+    long old_lines, long new_from, long new_lines, long offset,
+    const struct got_error *hunk_err)
 {
 	const char *path = new == NULL ? old : new;
 
 	while (*path == '/')
 		path++;
-	printf("%c  %s\n", mode, path);
+
+	if (status != 0)
+		printf("%c  %s\n", status, path);
+
+	if (error != NULL)
+		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+
+	if (offset != 0 || hunk_err != NULL) {
+		printf("@@ -%ld,%ld +%ld,%ld @@ ", old_from,
+		    old_lines, new_from, new_lines);
+		if (hunk_err != NULL)
+			printf("%s\n", hunk_err->msg);
+		else
+			printf("applied with offset %ld\n", offset);
+	}
+
 	return NULL;
 }
 

@@ -17,10 +17,12 @@
 /*
  * A callback that gets invoked during the patch application.
  *
- * Receives the old and new path and a status code.
+ * Receives the old and new path, a status code, if an error occurred while
+ * applying the patch, and a hunk applied with offset or its error.
  */
 typedef const struct got_error *(*got_patch_progress_cb)(void *,
-    const char *, const char *, unsigned char);
+    const char *, const char *, unsigned char, const struct got_error *,
+    long, long, long, long, long, const struct got_error *);
 
 /*
  * Apply the (already opened) patch to the repository and register the
