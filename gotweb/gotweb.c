@@ -3386,8 +3386,6 @@ prev:
 	commit_found = 0;
 	TAILQ_FOREACH_REVERSE(re, &refs, got_reflist_head, entry) {
 		const char *refname;
-		const char *tagger;
-		time_t tagger_time;
 		struct got_object_id *id;
 		struct got_commit_object *commit = NULL;
 
@@ -3413,15 +3411,10 @@ prev:
 				free(id);
 				goto done;
 			}
-			tagger = got_object_commit_get_committer(commit);
-			tagger_time =
-			    got_object_commit_get_committer_time(commit);
 			error = got_object_id_str(&id_str, id);
 			free(id);
 		} else {
 			free(id);
-			tagger = got_object_tag_get_tagger(tag);
-			tagger_time = got_object_tag_get_tagger_time(tag);
 			error = got_object_id_str(&id_str,
 			    got_object_tag_get_object_id(tag));
 		}
