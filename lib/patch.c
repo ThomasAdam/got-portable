@@ -56,6 +56,8 @@
 
 struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
+	const struct got_error *err;
+	long	offset;
 	long	old_from;
 	long	old_lines;
 	long	new_from;
@@ -65,15 +67,17 @@ struct got_patch_hunk {
 	char	**lines;
 };
 
+STAILQ_HEAD(got_patch_hunk_head, got_patch_hunk);
 struct got_patch {
 	char	*old;
 	char	*new;
-	STAILQ_HEAD(, got_patch_hunk) head;
+	struct got_patch_hunk_head head;
 };
 
 struct patch_args {
 	got_patch_progress_cb progress_cb;
 	void	*progress_arg;
+	struct got_patch_hunk_head *head;
 };
 
 static const struct got_error *
@@ -273,7 +277,7 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 		if (r != len && feof(orig)) {
 			if (pos == -1)
 				return NULL;
-			return got_error(GOT_ERR_PATCH_DONT_APPLY);
+			return got_error(GOT_ERR_HUNK_FAILED);
 		}
 	}
 	return NULL;
@@ -296,7 +300,7 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 			if (ferror(orig))
 				err = got_error_from_errno("getline");
 			else if (match == -1)
-				err = got_error(GOT_ERR_PATCH_DONT_APPLY);
+				err = got_error(GOT_ERR_HUNK_FAILED);
 			break;
 		}
 		(*lineno)++;
@@ -348,11 +352,11 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 					err = got_error_from_errno("getline");
 				else
 					err = got_error(
-					    GOT_ERR_PATCH_DONT_APPLY);
+					    GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
 			if (strcmp(h->lines[i]+1, line)) {
-				err = got_error(GOT_ERR_PATCH_DONT_APPLY);
+				err = got_error(GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
 			break;
@@ -433,6 +437,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 
 	tryagain:
 		err = locate_hunk(orig, h, &pos, &lineno);
+		if (err != NULL && err->code == GOT_ERR_HUNK_FAILED)
+			h->err = err;
 		if (err != NULL)
 			goto done;
 		if (!nop)
@@ -442,7 +448,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		copypos = pos;
 
 		err = test_hunk(orig, h);
-		if (err != NULL && err->code == GOT_ERR_PATCH_DONT_APPLY) {
+		if (err != NULL && err->code == GOT_ERR_HUNK_FAILED) {
 			/*
 			 * try to apply the hunk again starting the search
 			 * after the previous partial match.
@@ -462,6 +468,9 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		if (err != NULL)
 			goto done;
 
+		if (lineno + 1 != h->old_from)
+			h->offset = lineno + 1 - h->old_from;
+
 		if (!nop)
 			err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
@@ -474,9 +483,11 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		}
 	}
 
-	if (p->new == NULL && sb.st_size != copypos)
-		err = got_error(GOT_ERR_PATCH_DONT_APPLY);
-	else if (!nop && !feof(orig))
+	if (p->new == NULL && sb.st_size != copypos) {
+		h = STAILQ_FIRST(&p->head);
+		h->err = got_error(GOT_ERR_HUNK_FAILED);
+		err = h->err;
+	} else if (!nop && !feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 done:
@@ -571,53 +582,60 @@ check_file_status(struct got_patch *p, int file_renamed,
 }
 
 static const struct got_error *
+report_progress(struct patch_args *pa, const char *old, const char *new,
+    unsigned char status, const struct got_error *orig_error)
+{
+	const struct got_error *err;
+	struct got_patch_hunk *h;
+
+	err = pa->progress_cb(pa->progress_arg, old, new, status,
+	    orig_error, 0, 0, 0, 0, 0, NULL);
+	if (err)
+		return err;
+
+	STAILQ_FOREACH(h, pa->head, entries) {
+		if (h->offset == 0 && h->err == NULL)
+			continue;
+
+		err = pa->progress_cb(pa->progress_arg, old, new, 0, NULL,
+		    h->old_from, h->old_lines, h->new_from, h->new_lines,
+		    h->offset, h->err);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 patch_delete(void *arg, unsigned char status, unsigned char staged_status,
     const char *path)
 {
-	struct patch_args *pa = arg;
-
-	return pa->progress_cb(pa->progress_arg, path, NULL, status);
+	return report_progress(arg, path, NULL, status, NULL);
 }
 
 static const struct got_error *
 patch_add(void *arg, unsigned char status, const char *path)
 {
-	struct patch_args *pa = arg;
-
-	return pa->progress_cb(pa->progress_arg, NULL, path, status);
+	return report_progress(arg, NULL, path, status, NULL);
 }
 
 static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_patch *p, int nop, struct patch_args *pa,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_pathlist_head *oldpaths, struct got_pathlist_head *newpaths,
+    const char *oldpath, const char *newpath, struct got_patch *p,
+    int nop, struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_pathlist_head oldpaths, newpaths;
 	int file_renamed = 0;
-	char *oldpath = NULL, *newpath = NULL, *parent = NULL;
-	char *tmppath = NULL, *template = NULL;
+	char *tmppath = NULL, *template = NULL, *parent = NULL;;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
-	TAILQ_INIT(&oldpaths);
-	TAILQ_INIT(&newpaths);
+	file_renamed = strcmp(oldpath, newpath);
 
-	err = build_pathlist(p->old != NULL ? p->old : p->new, &oldpath,
-	    &oldpaths, worktree);
-	if (err)
-		goto done;
-
-	err = build_pathlist(p->new != NULL ? p->new : p->old, &newpath,
-	    &newpaths, worktree);
-	if (err)
-		goto done;
-
-	if (p->old != NULL && p->new != NULL && strcmp(p->old, p->new))
-		file_renamed = 1;
-
-	err = check_file_status(p, file_renamed, worktree, repo, &oldpaths,
-	    &newpaths, cancel_cb, cancel_arg);
+	err = check_file_status(p, file_renamed, worktree, repo, oldpaths,
+	    newpaths, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -639,7 +657,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 
 	if (p->old != NULL && p->new == NULL) {
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
+		err = got_worktree_schedule_delete(worktree, oldpaths,
 		    0, NULL, patch_delete, pa, repo, 0, 0);
 		goto done;
 	}
@@ -670,17 +688,17 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 	if (file_renamed) {
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
+		err = got_worktree_schedule_delete(worktree, oldpaths,
 		    0, NULL, patch_delete, pa, repo, 0, 0);
 		if (err == NULL)
-			err = got_worktree_schedule_add(worktree, &newpaths,
+			err = got_worktree_schedule_add(worktree, newpaths,
 			    patch_add, pa, repo, 1);
 	} else if (p->old == NULL)
-		err = got_worktree_schedule_add(worktree, &newpaths,
+		err = got_worktree_schedule_add(worktree, newpaths,
 		    patch_add, pa, repo, 1);
 	else
-		err = pa->progress_cb(pa->progress_arg, oldpath, newpath,
-		    GOT_STATUS_MODIFY);
+		err = report_progress(pa, oldpath, newpath, GOT_STATUS_MODIFY,
+		    NULL);
 
 done:
 	if (err != NULL && newpath != NULL && (file_renamed || p->old == NULL))
@@ -690,10 +708,37 @@ done:
 	if (tmppath != NULL)
 		unlink(tmppath);
 	free(tmppath);
-	got_pathlist_free(&oldpaths);
-	got_pathlist_free(&newpaths);
-	free(oldpath);
-	free(newpath);
+	return err;
+}
+
+static const struct got_error *
+resolve_paths(struct got_patch *p, struct got_worktree *worktree,
+    struct got_repository *repo, struct got_pathlist_head *oldpaths,
+    struct got_pathlist_head *newpaths, char **old, char **new)
+{
+	const struct got_error *err;
+
+	TAILQ_INIT(oldpaths);
+	TAILQ_INIT(newpaths);
+	*old = NULL;
+	*new = NULL;
+
+	err = build_pathlist(p->old != NULL ? p->old : p->new, old,
+	    oldpaths, worktree);
+	if (err)
+		goto err;
+
+	err = build_pathlist(p->new != NULL ? p->new : p->old, new,
+	    newpaths, worktree);
+	if (err)
+		goto err;
+	return NULL;
+
+err:
+	free(*old);
+	free(*new);
+	got_pathlist_free(oldpaths);
+	got_pathlist_free(newpaths);
 	return err;
 }
 
@@ -703,14 +748,12 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct patch_args pa;
+	struct got_pathlist_head oldpaths, newpaths;
+	char *oldpath, *newpath;
 	struct imsgbuf *ibuf;
 	int imsg_fds[2] = {-1, -1};
-	int done = 0;
+	int done = 0, failed = 0;
 	pid_t pid;
-
-	pa.progress_cb = progress_cb;
-	pa.progress_arg = progress_arg;
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL) {
@@ -747,14 +790,41 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 
 	while (!done && err == NULL) {
 		struct got_patch p;
+		struct patch_args pa;
+
+		pa.progress_cb = progress_cb;
+		pa.progress_arg = progress_arg;
+		pa.head = &p.head;
 
 		err = recv_patch(ibuf, &done, &p);
 		if (err || done)
 			break;
 
-		err = apply_patch(worktree, repo, &p, nop, &pa,
-		    cancel_cb, cancel_arg);
+		err = resolve_paths(&p, worktree, repo, &oldpaths,
+		    &newpaths, &oldpath, &newpath);
+		if (err)
+			break;
+
+		err = apply_patch(worktree, repo, &oldpaths, &newpaths,
+		    oldpath, newpath, &p, nop, &pa, cancel_cb, cancel_arg);
+		if (err != NULL) {
+			failed = 1;
+			/* recoverable errors */
+			if (err->code == GOT_ERR_FILE_STATUS ||
+			    (err->code == GOT_ERR_ERRNO && errno == ENOENT))
+				err = report_progress(&pa, p.old, p.new,
+				    GOT_STATUS_CANNOT_UPDATE, err);
+			else if (err->code == GOT_ERR_HUNK_FAILED)
+				err = report_progress(&pa, p.old, p.new,
+				    GOT_STATUS_CANNOT_UPDATE, NULL);
+		}
+
+		free(oldpath);
+		free(newpath);
+		got_pathlist_free(&oldpaths);
+		got_pathlist_free(&newpaths);
 		patch_free(&p);
+
 		if (err)
 			break;
 	}
@@ -768,5 +838,7 @@ done:
 		err = got_error_from_errno("close");
 	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (err == NULL && failed)
+		err = got_error(GOT_ERR_PATCH_FAILED);
 	return err;
 }
