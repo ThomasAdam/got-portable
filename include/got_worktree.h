@@ -544,3 +544,21 @@ got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
 
 /* References pointing at pre-histedit commit backups. */
 #define GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX "refs/got/backup/histedit"
+
+/*
+ * Prepare for applying a patch.
+ */
+const struct got_error *
+got_worktree_patch_prepare(struct got_fileindex **, struct got_worktree *);
+
+/*
+ * Lookup paths for the "old" and "new" file before patching and check their
+ * status.
+ */
+const struct got_error *
+got_worktree_patch_check_path(const char *, const char *, char **, char **,
+    struct got_worktree *, struct got_repository *, struct got_fileindex *);
+
+/* Complete the patch operation. */
+const struct got_error *
+got_worktree_patch_complete(struct got_fileindex *);

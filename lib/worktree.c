@@ -8709,3 +8709,150 @@ done:
 		err = unlockerr;
 	return err;
 }
+
+static const struct got_error *
+patch_check_path(const char *p, char **path, unsigned char *status,
+    unsigned char *staged_status, struct got_fileindex *fileindex,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_fileindex_entry *ie;
+	struct stat sb;
+	char *ondisk_path = NULL;
+
+	err = got_worktree_resolve_path(path, worktree, p);
+	if (err)
+		return err;
+
+	if (asprintf(&ondisk_path, "%s%s%s", worktree->root_path,
+	    *path[0] ? "/" : "", *path) == -1)
+		return got_error_from_errno("asprintf");
+
+	ie = got_fileindex_entry_get(fileindex, *path, strlen(*path));
+	if (ie) {
+		*staged_status = get_staged_status(ie);
+		err = get_file_status(status, &sb, ie, *path, -1, NULL, repo);
+		if (err)
+			goto done;
+	} else {
+		*staged_status = GOT_STATUS_NO_CHANGE;
+		*status = GOT_STATUS_UNVERSIONED;
+		if (lstat(ondisk_path, &sb) == -1) {
+			if (errno != ENOENT) {
+				err = got_error_from_errno2("lstat",
+				    ondisk_path);
+				goto done;
+			}
+			*status = GOT_STATUS_NONEXISTENT;
+		}
+	}
+
+done:
+	free(ondisk_path);
+	return err;
+}
+
+static const struct got_error *
+patch_can_rm(const char *path, unsigned char status,
+    unsigned char staged_status)
+{
+	if (status == GOT_STATUS_NONEXISTENT)
+		return got_error_set_errno(ENOENT, path);
+	if (status != GOT_STATUS_NO_CHANGE &&
+	    status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_MODIFY &&
+	    status != GOT_STATUS_MODE_CHANGE)
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	if (staged_status == GOT_STATUS_DELETE)
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	return NULL;
+}
+
+static const struct got_error *
+patch_can_add(const char *path, unsigned char status)
+{
+	if (status != GOT_STATUS_NONEXISTENT)
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	return NULL;
+}
+
+static const struct got_error *
+patch_can_edit(const char *path, unsigned char status,
+    unsigned char staged_status)
+{
+	if (status == GOT_STATUS_NONEXISTENT)
+		return got_error_set_errno(ENOENT, path);
+	if (status != GOT_STATUS_NO_CHANGE &&
+	    status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_MODIFY)
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	if (staged_status == GOT_STATUS_DELETE)
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	return NULL;
+}
+
+const struct got_error *
+got_worktree_patch_prepare(struct got_fileindex **fileindex,
+    struct got_worktree *worktree)
+{
+	const struct got_error *err;
+	char *fileindex_path = NULL;
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	free(fileindex_path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_patch_check_path(const char *old, const char *new,
+    char **oldpath, char **newpath, struct got_worktree *worktree,
+    struct got_repository *repo, struct got_fileindex *fileindex)
+{
+	const struct got_error *err = NULL;
+	int file_renamed = 0;
+	unsigned char status_old, staged_status_old;
+	unsigned char status_new, staged_status_new;
+
+	*oldpath = NULL;
+	*newpath = NULL;
+
+	err = patch_check_path(old != NULL ? old : new, oldpath,
+	    &status_old, &staged_status_old, fileindex, worktree, repo);
+	if (err)
+		goto done;
+
+	err = patch_check_path(new != NULL ? new : old, newpath,
+	    &status_new, &staged_status_new, fileindex, worktree, repo);
+	if (err)
+		goto done;
+
+	if (old != NULL && new != NULL && strcmp(old, new) != 0)
+		file_renamed = 1;
+
+	if (old != NULL && new == NULL)
+		err = patch_can_rm(*oldpath, status_old, staged_status_old);
+	else if (file_renamed) {
+		err = patch_can_rm(*oldpath, status_old, staged_status_old);
+		if (err == NULL)
+			err = patch_can_add(*newpath, status_new);
+	} else if (old == NULL)
+		err = patch_can_add(*newpath, status_new);
+	else
+		err = patch_can_edit(*newpath, status_new, staged_status_new);
+
+done:
+	if (err) {
+		free(*oldpath);
+		*oldpath = NULL;
+		free(*newpath);
+		*newpath = NULL;
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_patch_complete(struct got_fileindex *fileindex)
+{
+	got_fileindex_free(fileindex);
+	return NULL;
+}

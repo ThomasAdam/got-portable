@@ -824,6 +824,21 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got status) > $testroot/stdout
+	cat <<EOF > $testroot/stdout.expected
+~  alpha
+?  kappa
+?  patch
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done $testroot $ret
 }
