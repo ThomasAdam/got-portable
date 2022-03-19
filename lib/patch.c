@@ -497,91 +497,6 @@ done:
 }
 
 static const struct got_error *
-build_pathlist(const char *p, char **path, struct got_pathlist_head *head,
-    struct got_worktree *worktree)
-{
-	const struct got_error *err;
-	struct got_pathlist_entry *pe;
-
-	err = got_worktree_resolve_path(path, worktree, p);
-	if (err == NULL)
-		err = got_pathlist_insert(&pe, head, *path, NULL);
-	return err;
-}
-
-static const struct got_error *
-can_rm(void *arg, unsigned char status, unsigned char staged_status,
-    const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
-    int dirfd, const char *de_name)
-{
-	if (status == GOT_STATUS_NONEXISTENT)
-		return got_error_set_errno(ENOENT, path);
-	if (status != GOT_STATUS_NO_CHANGE &&
-	    status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_MODIFY &&
-	    status != GOT_STATUS_MODE_CHANGE)
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	if (staged_status == GOT_STATUS_DELETE)
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	return NULL;
-}
-
-static const struct got_error *
-can_add(void *arg, unsigned char status, unsigned char staged_status,
-    const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
-    int dirfd, const char *de_name)
-{
-	if (status != GOT_STATUS_NONEXISTENT)
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	return NULL;
-}
-
-static const struct got_error *
-can_edit(void *arg, unsigned char status, unsigned char staged_status,
-    const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
-    int dirfd, const char *de_name)
-{
-	if (status == GOT_STATUS_NONEXISTENT)
-		return got_error_set_errno(ENOENT, path);
-	if (status != GOT_STATUS_NO_CHANGE &&
-	    status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_MODIFY)
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	if (staged_status == GOT_STATUS_DELETE)
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	return NULL;
-}
-
-static const struct got_error *
-check_file_status(struct got_patch *p, int file_renamed,
-    struct got_worktree *worktree, struct got_repository *repo,
-    struct got_pathlist_head *old, struct got_pathlist_head *new,
-    got_cancel_cb cancel_cb, void *cancel_arg)
-{
-	static const struct got_error *err;
-
-	if (p->old != NULL && p->new == NULL)
-		return got_worktree_status(worktree, old, repo, 0,
-		    can_rm, NULL, cancel_cb, cancel_arg);
-	else if (file_renamed) {
-		err = got_worktree_status(worktree, old, repo, 0,
-		    can_rm, NULL, cancel_cb, cancel_arg);
-		if (err)
-			return err;
-		return got_worktree_status(worktree, new, repo, 0,
-		    can_add, NULL, cancel_cb, cancel_arg);
-	} else if (p->old == NULL)
-		return got_worktree_status(worktree, new, repo, 0,
-		    can_add, NULL, cancel_cb, cancel_arg);
-	else
-		return got_worktree_status(worktree, new, repo, 0,
-		    can_edit, NULL, cancel_cb, cancel_arg);
-}
-
-static const struct got_error *
 report_progress(struct patch_args *pa, const char *old, const char *new,
     unsigned char status, const struct got_error *orig_error)
 {
@@ -622,22 +537,28 @@ patch_add(void *arg, unsigned char status, const char *path)
 
 static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_pathlist_head *oldpaths, struct got_pathlist_head *newpaths,
     const char *oldpath, const char *newpath, struct got_patch *p,
     int nop, struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct got_pathlist_head oldpaths, newpaths;
+	struct got_pathlist_entry *pe;
 	int file_renamed = 0;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
-	file_renamed = strcmp(oldpath, newpath);
+	TAILQ_INIT(&oldpaths);
+	TAILQ_INIT(&newpaths);
 
-	err = check_file_status(p, file_renamed, worktree, repo, oldpaths,
-	    newpaths, cancel_cb, cancel_arg);
+	err = got_pathlist_insert(&pe, &oldpaths, oldpath, NULL);
 	if (err)
 		goto done;
+	err = got_pathlist_insert(&pe, &newpaths, newpath, NULL);
+	if (err)
+		goto done;
+
+	file_renamed = strcmp(oldpath, newpath);
 
 	if (asprintf(&template, "%s/got-patch",
 	    got_worktree_get_root_path(worktree)) == -1) {
@@ -657,7 +578,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 
 	if (p->old != NULL && p->new == NULL) {
-		err = got_worktree_schedule_delete(worktree, oldpaths,
+		err = got_worktree_schedule_delete(worktree, &oldpaths,
 		    0, NULL, patch_delete, pa, repo, 0, 0);
 		goto done;
 	}
@@ -688,57 +609,30 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 	if (file_renamed) {
-		err = got_worktree_schedule_delete(worktree, oldpaths,
+		err = got_worktree_schedule_delete(worktree, &oldpaths,
 		    0, NULL, patch_delete, pa, repo, 0, 0);
 		if (err == NULL)
-			err = got_worktree_schedule_add(worktree, newpaths,
+			err = got_worktree_schedule_add(worktree, &newpaths,
 			    patch_add, pa, repo, 1);
-	} else if (p->old == NULL)
-		err = got_worktree_schedule_add(worktree, newpaths,
+		if (err)
+			unlink(newpath);
+	} else if (p->old == NULL) {
+		err = got_worktree_schedule_add(worktree, &newpaths,
 		    patch_add, pa, repo, 1);
-	else
+		if (err)
+			unlink(newpath);
+	} else
 		err = report_progress(pa, oldpath, newpath, GOT_STATUS_MODIFY,
 		    NULL);
 
 done:
-	if (err != NULL && newpath != NULL && (file_renamed || p->old == NULL))
-		unlink(newpath);
+	got_pathlist_free(&oldpaths);
+	got_pathlist_free(&newpaths);
 	free(parent);
 	free(template);
 	if (tmppath != NULL)
 		unlink(tmppath);
 	free(tmppath);
-	return err;
-}
-
-static const struct got_error *
-resolve_paths(struct got_patch *p, struct got_worktree *worktree,
-    struct got_repository *repo, struct got_pathlist_head *oldpaths,
-    struct got_pathlist_head *newpaths, char **old, char **new)
-{
-	const struct got_error *err;
-
-	TAILQ_INIT(oldpaths);
-	TAILQ_INIT(newpaths);
-	*old = NULL;
-	*new = NULL;
-
-	err = build_pathlist(p->old != NULL ? p->old : p->new, old,
-	    oldpaths, worktree);
-	if (err)
-		goto err;
-
-	err = build_pathlist(p->new != NULL ? p->new : p->old, new,
-	    newpaths, worktree);
-	if (err)
-		goto err;
-	return NULL;
-
-err:
-	free(*old);
-	free(*new);
-	got_pathlist_free(oldpaths);
-	got_pathlist_free(newpaths);
 	return err;
 }
 
@@ -748,7 +642,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_pathlist_head oldpaths, newpaths;
+	struct got_fileindex *fileindex = NULL;
 	char *oldpath, *newpath;
 	struct imsgbuf *ibuf;
 	int imsg_fds[2] = {-1, -1};
@@ -788,6 +682,10 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	if (err)
 		goto done;
 
+	err = got_worktree_patch_prepare(&fileindex, worktree);
+	if (err)
+		goto done;
+
 	while (!done && err == NULL) {
 		struct got_patch p;
 		struct patch_args pa;
@@ -800,13 +698,11 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err || done)
 			break;
 
-		err = resolve_paths(&p, worktree, repo, &oldpaths,
-		    &newpaths, &oldpath, &newpath);
-		if (err)
-			break;
-
-		err = apply_patch(worktree, repo, &oldpaths, &newpaths,
-		    oldpath, newpath, &p, nop, &pa, cancel_cb, cancel_arg);
+		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
+		    &newpath, worktree, repo, fileindex);
+		if (err == NULL)
+			err = apply_patch(worktree, repo, oldpath, newpath,
+			    &p, nop, &pa, cancel_cb, cancel_arg);
 		if (err != NULL) {
 			failed = 1;
 			/* recoverable errors */
@@ -821,8 +717,6 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 
 		free(oldpath);
 		free(newpath);
-		got_pathlist_free(&oldpaths);
-		got_pathlist_free(&newpaths);
 		patch_free(&p);
 
 		if (err)
@@ -830,6 +724,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 done:
+	if (fileindex)
+		got_worktree_patch_complete(fileindex);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (ibuf != NULL)
