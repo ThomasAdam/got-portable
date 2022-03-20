@@ -647,8 +647,9 @@ test_patch_rename() {
 	fi
 
 	cat <<EOF > $testroot/wt/patch
---- alpha
-+++ eta
+diff --git a/alpha b/eta
+--- a/alpha
++++ b/eta
 @@ -0,0 +0,0 @@
 EOF
 
@@ -700,8 +701,9 @@ EOF
 	rm $testroot/wt/eta
 
 	cat <<EOF > $testroot/wt/patch
---- alpha
-+++ eta
+diff --git a/alpha b/eta
+--- a/alpha
++++ b/eta
 @@ -1 +1,2 @@
  alpha
 +but now is eta
@@ -863,6 +865,7 @@ test_patch_nop() {
 +++ /dev/null
 @@ -1 +0,0 @@
 -beta
+diff --git a/gamma/delta b/gamma/delta.new
 --- gamma/delta
 +++ gamma/delta.new
 @@ -1 +1 @@
@@ -1048,6 +1051,40 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_prefer_new_path() {
+	local testroot=`test_init patch_orig`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha.orig
++++ alpha
+@@ -1 +1,2 @@
+ alpha
++was edited
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected	
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1066,3 +1103,4 @@ run_test test_patch_nop
 run_test test_patch_preserve_perm
 run_test test_patch_create_dirs
 run_test test_patch_with_offset
+run_test test_patch_prefer_new_path
