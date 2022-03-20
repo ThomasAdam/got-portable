@@ -59,14 +59,21 @@
 struct imsgbuf ibuf;
 
 static const struct got_error *
-send_patch(const char *oldname, const char *newname)
+send_patch(const char *oldname, const char *newname, int git)
 {
 	struct got_imsg_patch p;
 
 	memset(&p, 0, sizeof(p));
 
-	if (oldname != NULL)
+	/*
+	 * Prefer the new name if it's not /dev/null and it's not
+	 * a git-style diff.
+	 */
+	if (!git && newname != NULL && oldname != NULL)
+		strlcpy(p.old, newname, sizeof(p.old));
+	else if (oldname != NULL)
 		strlcpy(p.old, oldname, sizeof(p.old));
+
 	if (newname != NULL)
 		strlcpy(p.new, newname, sizeof(p.new));
 
@@ -168,7 +175,7 @@ find_patch(FILE *fp)
 			    (!create && old == NULL))
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 			else
-				err = send_patch(old, new);
+				err = send_patch(old, new, git);
 
 			if (err)
 				break;
