@@ -160,7 +160,7 @@ Each object contained in the pack file will be displayed on a single line.
 The information shown includes the object ID, object type, object offset,
 and object size.
 .Pp
-If a packed object is deltified against another object the delta base
+If a packed object is deltified against another object, the delta base
 will be shown as well.
 For offset deltas, the delta base is identified via an offset into the
 pack file.
@@ -251,8 +251,8 @@ pack file, which is an inconsistent repository state.
 In such cases,
 .Cm gotadmin cleanup -p -n
 will display a list of affected pack index files.
-Whenever possible the missing pack files should be restored.
-If restoring missing pack files is not possible then affected pack index
+Whenever possible, the missing pack files should be restored.
+If restoring missing pack files is not possible, then affected pack index
 files can be removed with
 .Cm gotadmin cleanup -p .
 .Pp
