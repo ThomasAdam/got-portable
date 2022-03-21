@@ -930,11 +930,14 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 			    GOT_OBJ_TYPE_BLOB, mtime, loose_obj_only, repo);
 			if (err)
 				break;
-			(*nfound)++;
-			err = report_progress(progress_cb, progress_arg, rl,
-			    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-			if (err)
-				break;
+			if (want_meta) {
+				(*nfound)++;
+				err = report_progress(progress_cb, progress_arg,
+				    rl, *ncolored, *nfound, *ntrees,
+				    0L, 0, 0, 0, 0);
+				if (err)
+					break;
+			}
 		}
 		free(p);
 		p = NULL;
@@ -989,12 +992,14 @@ load_tree(int want_meta, struct got_object_idset *idset,
 			break;
 		}
 
-		(*nfound)++;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-		if (err)
-			break;
-
+		if (want_meta) {
+			(*nfound)++;
+			err = report_progress(progress_cb, progress_arg, rl,
+			    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+			if (err)
+				break;
+		}
+	
 		err = load_tree_entries(&tree_ids, want_meta, idset, qid->id,
 		    dpath, mtime, repo, loose_obj_only, ncolored, nfound,
 		    ntrees, progress_cb, progress_arg, rl,
@@ -1040,11 +1045,13 @@ load_commit(int want_meta, struct got_object_idset *idset,
 	if (err)
 		goto done;
 
-	(*nfound)++;
-	err = report_progress(progress_cb, progress_arg, rl,
-	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-	if (err)
-		goto done;
+	if (want_meta) {
+		(*nfound)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+		if (err)
+			goto done;
+	}
 
 	err = load_tree(want_meta, idset, got_object_commit_get_tree_id(commit),
 	    "", got_object_commit_get_committer_time(commit),
@@ -1087,11 +1094,13 @@ load_tag(int want_meta, struct got_object_idset *idset,
 	if (err)
 		goto done;
 
-	(*nfound)++;
-	err = report_progress(progress_cb, progress_arg, rl,
-	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-	if (err)
-		goto done;
+	if (want_meta) {
+		(*nfound)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+		if (err)
+			goto done;
+	}
 
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_COMMIT:
