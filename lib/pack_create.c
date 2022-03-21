@@ -862,7 +862,7 @@ add_object(int want_meta, struct got_object_idset *idset,
 		err = search_packidx(&is_packed, id, repo);
 		if (err)
 			return err;
-		if (is_packed)
+		if (is_packed && want_meta)
 			return NULL;
 	}
 
@@ -1026,7 +1026,7 @@ load_commit(int want_meta, struct got_object_idset *idset,
 		err = search_packidx(&is_packed, id, repo);
 		if (err)
 			return err;
-		if (is_packed)
+		if (is_packed && want_meta)
 			return NULL;
 	}
 
@@ -1073,7 +1073,7 @@ load_tag(int want_meta, struct got_object_idset *idset,
 		err = search_packidx(&is_packed, id, repo);
 		if (err)
 			return err;
-		if (is_packed)
+		if (is_packed && want_meta)
 			return NULL;
 	}
 
