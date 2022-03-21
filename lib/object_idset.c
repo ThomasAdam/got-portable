@@ -144,12 +144,15 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 	if (set->totelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	if (id == NULL)
+	if (id == NULL) {
 		entry = RB_ROOT(&set->entries);
-	else
+		if (entry == NULL)
+			return got_error(GOT_ERR_NO_OBJ);
+	} else {
 		entry = find_element(set, id);
-	if (entry == NULL)
-		return got_error_no_obj(id);
+		if (entry == NULL)
+			return got_error_no_obj(id);
+	}
 
 	RB_REMOVE(got_object_idset_tree, &set->entries, entry);
 	if (data)
