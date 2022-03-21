@@ -852,7 +852,10 @@ static const int obj_types[] = {
 static const struct got_error *
 add_object(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, const char *path, int obj_type,
-    time_t mtime, int loose_obj_only, struct got_repository *repo)
+    time_t mtime, int loose_obj_only, struct got_repository *repo,
+    int *ncolored, int *nfound, int *ntrees,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl)
 {
 	const struct got_error *err;
 	struct got_pack_meta *m = NULL;
@@ -868,6 +871,12 @@ add_object(int want_meta, struct got_object_idset *idset,
 
 	if (want_meta) {
 		err = alloc_meta(&m, id, path, obj_type, mtime);
+		if (err)
+			return err;
+
+		(*nfound)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
 		if (err)
 			return err;
 	}
@@ -927,17 +936,11 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 			STAILQ_INSERT_TAIL(ids, qid, entry);
 		} else if (S_ISREG(mode) || S_ISLNK(mode)) {
 			err = add_object(want_meta, idset, id, p,
-			    GOT_OBJ_TYPE_BLOB, mtime, loose_obj_only, repo);
+			    GOT_OBJ_TYPE_BLOB, mtime, loose_obj_only, repo,
+			    ncolored, nfound, ntrees,
+			    progress_cb, progress_arg, rl);
 			if (err)
 				break;
-			if (want_meta) {
-				(*nfound)++;
-				err = report_progress(progress_cb, progress_arg,
-				    rl, *ncolored, *nfound, *ntrees,
-				    0L, 0, 0, 0, 0);
-				if (err)
-					break;
-			}
 		}
 		free(p);
 		p = NULL;
@@ -986,20 +989,13 @@ load_tree(int want_meta, struct got_object_idset *idset,
 		}
 
 		err = add_object(want_meta, idset, qid->id, dpath,
-		    GOT_OBJ_TYPE_TREE, mtime, loose_obj_only, repo);
+		    GOT_OBJ_TYPE_TREE, mtime, loose_obj_only, repo,
+		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl);
 		if (err) {
 			got_object_qid_free(qid);
 			break;
 		}
 
-		if (want_meta) {
-			(*nfound)++;
-			err = report_progress(progress_cb, progress_arg, rl,
-			    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-			if (err)
-				break;
-		}
-	
 		err = load_tree_entries(&tree_ids, want_meta, idset, qid->id,
 		    dpath, mtime, repo, loose_obj_only, ncolored, nfound,
 		    ntrees, progress_cb, progress_arg, rl,
@@ -1041,17 +1037,10 @@ load_commit(int want_meta, struct got_object_idset *idset,
 
 	err = add_object(want_meta, idset, id, "", GOT_OBJ_TYPE_COMMIT,
 	    got_object_commit_get_committer_time(commit),
-	    loose_obj_only, repo);
+	    loose_obj_only, repo,
+	    ncolored, nfound, ntrees, progress_cb, progress_arg, rl);
 	if (err)
 		goto done;
-
-	if (want_meta) {
-		(*nfound)++;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-		if (err)
-			goto done;
-	}
 
 	err = load_tree(want_meta, idset, got_object_commit_get_tree_id(commit),
 	    "", got_object_commit_get_committer_time(commit),
@@ -1089,18 +1078,10 @@ load_tag(int want_meta, struct got_object_idset *idset,
 		return err;
 
 	err = add_object(want_meta, idset, id, "", GOT_OBJ_TYPE_TAG,
-	    got_object_tag_get_tagger_time(tag),
-	    loose_obj_only, repo);
+	    got_object_tag_get_tagger_time(tag), loose_obj_only, repo,
+	    ncolored, nfound, ntrees, progress_cb, progress_arg, rl);
 	if (err)
 		goto done;
-
-	if (want_meta) {
-		(*nfound)++;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-		if (err)
-			goto done;
-	}
 
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_COMMIT:
