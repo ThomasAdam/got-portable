@@ -292,7 +292,7 @@ send_line(const char *line)
 	static const struct got_error *err = NULL;
 	char *p = NULL;
 
-	if (*line != '+' && *line != '-' && *line != ' ') {
+	if (*line != '+' && *line != '-' && *line != ' ' && *line != '\\') {
 		if (asprintf(&p, " %s", line) == -1)
 			return got_error_from_errno("asprintf");
 		line = p;
@@ -305,6 +305,32 @@ send_line(const char *line)
 
 	free(p);
 	return err;
+}
+
+static const struct got_error *
+peek_special_line(FILE *fp, int send)
+{
+	const struct got_error *err;
+	char ch;
+
+	ch = fgetc(fp);
+	if (ch != EOF && ch != '\\') {
+		ungetc(ch, fp);
+		return NULL;
+	}
+
+	if (ch == '\\' && send) {
+		err = send_line("\\");
+		if (err)
+			return err;
+	}
+
+	while (ch != EOF && ch != '\n')
+		ch = fgetc(fp);
+
+	if (ch != EOF || feof(fp))
+		return NULL;
+	return got_error(GOT_ERR_IO);
 }
 
 static const struct got_error *
@@ -352,13 +378,15 @@ parse_hunk(FILE *fp, int *ok)
 			err = got_error(GOT_ERR_PATCH_TRUNCATED);
 			goto done;
 		}
+		if (line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
 
 		/* usr.bin/patch allows '=' as context char */
 		if (*line == '=')
 			*line = ' ';
 
 		ch = *line;
-		if (ch == '\t' || ch == '\n')
+		if (ch == '\t' || ch == '\0')
 			ch = ' ';	/* the space got eaten */
 
 		switch (ch) {
@@ -385,6 +413,13 @@ parse_hunk(FILE *fp, int *ok)
 		err = send_line(line);
 		if (err)
 			goto done;
+
+		if ((ch == '-' && leftold == 0) ||
+		    (ch == '+' && leftnew == 0)) {
+			err = peek_special_line(fp, ch == '+');
+			if (err)
+				goto done;
+		}
 	}
 
 done:

@@ -1085,6 +1085,132 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_no_newline() {
+	local testroot=`test_init patch_no_newline`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- /dev/null
++++ eta
+@@ -0,0 +1 @@
++eta
+\ No newline at end of file
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo "A  eta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo -n eta > $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m 'add eta') > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- eta
++++ eta
+@@ -1 +1 @@
+-eta
+\ No newline at end of file
++ETA
+\ No newline at end of file
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo "M  eta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo -n ETA > $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m 'edit eta') > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- eta
++++ eta
+@@ -1 +1 @@
+-ETA
+\ No newline at end of file
++eta
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo "M  eta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo eta > $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1104,3 +1230,4 @@ run_test test_patch_preserve_perm
 run_test test_patch_create_dirs
 run_test test_patch_with_offset
 run_test test_patch_prefer_new_path
+run_test test_patch_no_newline

@@ -15,9 +15,6 @@
  *
  * Apply patches.
  *
- * Things that are still missing:
- *     + "No final newline" handling
- *
  * Things that we may want to support:
  *     + support indented patches?
  *     + support other kinds of patches?
@@ -58,6 +55,7 @@ struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
 	const struct got_error *err;
 	long	offset;
+	int	nonl;
 	long	old_from;
 	long	old_lines;
 	long	new_from;
@@ -201,6 +199,10 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p)
 		case GOT_IMSG_PATCH_DONE:
 			goto done;
 		case GOT_IMSG_PATCH_HUNK:
+			if (h != NULL && h->nonl) {
+				err = got_error(GOT_ERR_PATCH_MALFORMED);
+				goto done;
+			}
 			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 			if (datalen != sizeof(hdr)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -224,16 +226,22 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p)
 			}
 			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 			t = imsg.data;
-			/* at least one char plus newline */
+			/* at least one char */
 			if (datalen < 2 || t[datalen-1] != '\0') {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				goto done;
 			}
-			if (*t != ' ' && *t != '-' && *t != '+') {
+			if (*t != ' ' && *t != '-' && *t != '+' &&
+			    *t != '\\') {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				goto done;
 			}
-			err = pushline(h, t);
+			if (h->nonl)
+				err = got_error(GOT_ERR_PATCH_MALFORMED);
+			if (*t == '\\')
+				h->nonl = 1;
+			else
+				err = pushline(h, t);
 			if (err)
 				goto done;
 			break;
@@ -303,6 +311,8 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 				err = got_error(GOT_ERR_HUNK_FAILED);
 			break;
 		}
+		if (line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
 		(*lineno)++;
 
 		if ((mode == ' ' && !strcmp(h->lines[0] + 1, line)) ||
@@ -355,6 +365,8 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 					    GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
+			if (line[linelen - 1] == '\n')
+				line[linelen - 1] = '\0';
 			if (strcmp(h->lines[i] + 1, line)) {
 				err = got_error(GOT_ERR_HUNK_FAILED);
 				goto done;
@@ -376,7 +388,7 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 	for (i = 0; i < h->len; ++i) {
 		switch (*h->lines[i]) {
 		case ' ':
-			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
+			if (fprintf(tmp, "%s\n", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
 			/* fallthrough */
 		case '-':
@@ -385,6 +397,11 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 		case '+':
 			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
+			if (i != h->len - 1 || !h->nonl) {
+				if (fprintf(tmp, "\n") < 0)
+					return got_error_from_errno(
+					    "fprintf");
+			}
 			break;
 		}
 	}
