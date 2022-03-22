@@ -4049,6 +4049,8 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	int i, obj_type;
 	off_t filesize;
 
+	memset(&bca, 0, sizeof(bca));
+
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 	    gw_trans->repo_folder ? "/" : "",
