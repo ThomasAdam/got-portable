@@ -84,6 +84,7 @@
 /include/got_gotconfig.h
 /include/got_object.h
 /include/got_opentemp.h
+/include/got_patch.h
 /include/got_path.h
 /include/got_privsep.h
 /include/got_reference.h
@@ -166,6 +167,7 @@
 /lib/opentemp.c
 /lib/pack.c
 /lib/pack_create.c
+/lib/patch.c
 /lib/path.c
 /lib/pkt.c
 /lib/privsep.c
@@ -209,6 +211,9 @@
 /libexec/got-read-pack
 /libexec/got-read-pack/Makefile
 /libexec/got-read-pack/got-read-pack.c
+/libexec/got-read-patch
+/libexec/got-read-patch/Makefile
+/libexec/got-read-patch/got-read-patch.c
 /libexec/got-read-tag
 /libexec/got-read-tag/Makefile
 /libexec/got-read-tag/got-read-tag.c
@@ -242,6 +247,7 @@
 /regress/cmdline/log.sh
 /regress/cmdline/merge.sh
 /regress/cmdline/pack.sh
+/regress/cmdline/patch.sh
 /regress/cmdline/rebase.sh
 /regress/cmdline/ref.sh
 /regress/cmdline/revert.sh
