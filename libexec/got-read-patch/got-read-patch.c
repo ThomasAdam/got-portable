@@ -310,7 +310,7 @@ static const struct got_error *
 peek_special_line(FILE *fp, int send)
 {
 	const struct got_error *err;
-	char ch;
+	int ch;
 
 	ch = fgetc(fp);
 	if (ch != EOF && ch != '\\') {
