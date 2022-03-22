@@ -397,7 +397,6 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
 	struct stat sb;
-	size_t i;
 	long lineno = 0;
 	FILE *orig;
 	off_t copypos, pos;
@@ -411,11 +410,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 			return got_error(GOT_ERR_PATCH_MALFORMED);
 		if (nop)
 			return NULL;
-		for (i = 0; i < h->len; ++i) {
-			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
-				return got_error_from_errno("fprintf");
-		}
-		return err;
+		return apply_hunk(tmp, h, &lineno);
 	}
 
 	if ((orig = fopen(path, "r")) == NULL) {
