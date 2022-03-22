@@ -1,3 +1,22 @@
+* got 0.68; 2022-03-22
+- explicitly include <endian.h> for be32toh() (naddy)
+- apply time-based rate-limiting to send-/fetch-/index-pack progress output
+- make the URI parser tolerate trailing slashes at the end of the input URI
+- add 'got patch' command for applying unified diffs (op)
+- handle reference arguments which look like short object IDs (with naddy)
+- make got log, diff, blame, tree, and cat unlock the work tree earlier
+- fix 'got status' with an obstructed file given as argument (found by op)
+- cache a list of known pack index files when the repository is opened
+- print additional progress information while packing
+- const-ify data tables which contain only constants (naddy)
+- fix gotweb build failure with -Werror due to write-only variable warnings
+- move got_errors[] table into a single compilation unit, error.c (naddy)
+- explicitly include <unistd.h> for close(2) (naddy)
+- fix potential NULL deref in error path of got_object_idset_remove()
+- man pages: fix missing commas between subordinate and main clauses (naddy)
+- fix a bug where 'gotadmin pack' packed too many objects unless -a was used
+- gotweb: fix free() on uninitialized variable upon error during blame
+
 * got 0.67; 2022-02-18
 - compress delta data from delta_cache directly into pack file
 - show rebase and histedit backups in tog ref view
