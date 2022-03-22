@@ -6,6 +6,15 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.68 (2022-03-22)
+
+* Changes from got-0.68
+* portable: support for the following operating systems:
+  - FreeBSD
+  - NetBSD
+  - DragonFlyBSD
+  - MacOS
+
 # got-portable 0.67; (2022-02-20)
 
 * Changes from got-0.66
