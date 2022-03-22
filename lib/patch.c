@@ -21,7 +21,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -33,7 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <imsg.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -577,7 +575,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		 * the lines but just schedule the removal.
 		 */
 		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, delete_cb, delete_arg, repo, 0, 0);
+		    0, NULL, patch_delete, pa, repo, 0, 0);
 		goto done;
 	}
 
