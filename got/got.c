@@ -5656,14 +5656,16 @@ list_refs(struct got_repository *repo, const char *refname, int sort_by_time)
 	TAILQ_FOREACH(re, &refs, entry) {
 		char *refstr;
 		refstr = got_ref_to_str(re->ref);
-		if (refstr == NULL)
-			return got_error_from_errno("got_ref_to_str");
+		if (refstr == NULL) {
+			err = got_error_from_errno("got_ref_to_str");
+			break;
+		}
 		printf("%s: %s\n", got_ref_get_name(re->ref), refstr);
 		free(refstr);
 	}
 
 	got_ref_list_free(&refs);
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
