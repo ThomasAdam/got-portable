@@ -500,6 +500,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
+	free(id_str);
+	id_str = NULL;
 
 	if (rename(tmppackpath, packpath) == -1) {
 		err = got_error_from_errno3("rename", tmppackpath, packpath);
@@ -534,6 +536,7 @@ done:
 	free(tmppackpath);
 	free(tmpidxpath);
 	free(idxpath);
+	free(id_str);
 	free(packpath);
 	free(progress);
 
