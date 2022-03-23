@@ -569,16 +569,6 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 
 	file_renamed = strcmp(oldpath, newpath);
 
-	if (p->old != NULL && p->new == NULL) {
-		/*
-		 * special case: delete a file.  don't try to match
-		 * the lines but just schedule the removal.
-		 */
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, patch_delete, pa, repo, 0, 0);
-		goto done;
-	}
-
 	if (asprintf(&template, "%s/got-patch",
 	    got_worktree_get_root_path(worktree)) == -1) {
 		err = got_error_from_errno(template);
