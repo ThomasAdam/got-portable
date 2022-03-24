@@ -8,7 +8,13 @@ SRCS=		got-read-pack.c delta.c error.c inflate.c object_cache.c \
 		privsep.c sha1.c delta_cache.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
+
+.if defined(PROFILE)
+LDADD = -lutil_p -lz_p
+.else
 LDADD = -lutil -lz
+.endif
+
 DPADD = ${LIBZ} ${LIBUTIL}
 
 .include <bsd.prog.mk>
