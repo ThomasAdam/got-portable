@@ -484,7 +484,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 			err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
 			goto done;
-		
+
 		copypos = ftello(orig);
 		if (copypos == -1) {
 			err = got_error_from_errno("ftello");
