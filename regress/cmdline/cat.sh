@@ -29,8 +29,8 @@ test_cat_basic() {
 	echo "alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo $alpha_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -40,8 +40,8 @@ test_cat_basic() {
 	echo "$delta_id 0100644 delta" > $testroot/stdout.expected
 	got cat -r $testroot/repo $gamma_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -60,8 +60,8 @@ test_cat_basic() {
 
 	got cat -r $testroot/repo $commit_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -85,8 +85,8 @@ test_cat_path() {
 	echo "alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo alpha > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -96,8 +96,8 @@ test_cat_path() {
 	echo "$delta_id 0100644 delta" > $testroot/stdout.expected
 	got cat -r $testroot/repo gamma > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -114,8 +114,8 @@ test_cat_path() {
 	echo "alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo -c $commit_id alpha > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -123,8 +123,8 @@ test_cat_path() {
 	echo "modified alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo -c $commit_id2 alpha > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -153,8 +153,8 @@ test_cat_path() {
 	for arg in master $commit_id3; do
 		got cat -r $testroot/repo $arg > $testroot/stdout
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -172,8 +172,8 @@ test_cat_path() {
 
 	got cat -r $testroot/repo $commit_id2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -183,8 +183,8 @@ test_cat_path() {
 	echo "new file called master" > $testroot/stdout.expected
 	got cat -r $testroot/repo -P master > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -194,8 +194,8 @@ test_cat_path() {
 	echo "new file called $commit_id2" > $testroot/stdout.expected
 	got cat -r $testroot/repo -P $commit_id2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -213,8 +213,8 @@ test_cat_submodule() {
 
 	got cat -r $testroot/repo repo2 > $testroot/stdout \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "cat command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -224,8 +224,8 @@ test_cat_submodule() {
 	echo "got: object $submodule_id not found" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -253,8 +253,8 @@ test_cat_submodule_of_same_repo() {
 
 	got cat -r $testroot/repo repo2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
@@ -284,8 +284,8 @@ test_cat_symlink() {
 	echo -n "alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo $alpha_link_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -295,8 +295,8 @@ test_cat_symlink() {
 	echo -n "../beta" > $testroot/stdout.expected
 	got cat -r $testroot/repo $epsilon_beta_link_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -306,8 +306,8 @@ test_cat_symlink() {
 	echo -n "epsilon" > $testroot/stdout.expected
 	got cat -r $testroot/repo $epsilon_link_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -317,8 +317,8 @@ test_cat_symlink() {
 	echo -n "/etc/passwd" > $testroot/stdout.expected
 	got cat -r $testroot/repo $passwd_link_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -327,8 +327,8 @@ test_cat_symlink() {
 	echo -n "nonexistent" > $testroot/stdout.expected
 	got cat -r $testroot/repo $nonexistent_link_id > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1

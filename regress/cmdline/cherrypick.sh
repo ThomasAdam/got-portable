@@ -20,8 +20,8 @@ test_cherrypick_basic() {
 	local testroot=`test_init cherrypick_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -50,8 +50,8 @@ test_cherrypick_basic() {
 	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -60,8 +60,8 @@ test_cherrypick_basic() {
 	echo "modified alpha on branch" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -76,8 +76,8 @@ test_cherrypick_basic() {
 	echo "new file on branch" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -90,8 +90,8 @@ test_cherrypick_basic() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -103,8 +103,8 @@ test_cherrypick_basic() {
 	echo "Merged commit $branch_rev2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -117,8 +117,8 @@ test_cherrypick_basic() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -128,8 +128,8 @@ test_cherrypick_root_commit() {
 	local testroot=`test_init cherrypick_root_commit`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -156,8 +156,8 @@ test_cherrypick_root_commit() {
 	echo "Merged commit $root_commit" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -167,8 +167,8 @@ test_cherrypick_root_commit() {
 	echo "modified new file on branch" >> $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -179,8 +179,8 @@ test_cherrypick_root_commit() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -190,8 +190,8 @@ test_cherrypick_into_work_tree_with_conflicts() {
 	local testroot=`test_init cherrypick_into_work_tree_with_conflicts`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -219,8 +219,8 @@ test_cherrypick_into_work_tree_with_conflicts() {
 	echo "C  alpha" > $testroot/stdout.expected
 	(cd $testroot/wt && got status  > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -228,8 +228,8 @@ test_cherrypick_into_work_tree_with_conflicts() {
 
 	(cd $testroot/wt && got cherrypick $branch_rev \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "cherrypick succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -242,24 +242,24 @@ test_cherrypick_into_work_tree_with_conflicts() {
 		>> $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/content.expected $testroot/wt/alpha
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/wt/alpha
 	fi
 	test_done "$testroot" "$ret"
@@ -274,8 +274,8 @@ test_cherrypick_into_work_tree_with_mixed_commits() {
 	local second_rev=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -295,8 +295,8 @@ test_cherrypick_into_work_tree_with_mixed_commits() {
 
 	(cd $testroot/wt && got cherrypick $branch_rev \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "cherrypick succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -309,16 +309,16 @@ test_cherrypick_into_work_tree_with_mixed_commits() {
 		>> $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -351,8 +351,8 @@ test_cherrypick_modified_submodule() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -376,8 +376,8 @@ test_cherrypick_added_submodule() {
 	echo "A  .gitmodules" > $testroot/stdout.expected
 	echo "Merged commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -392,8 +392,8 @@ test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 	echo "This is a file called repo2" > $testroot/wt/repo2
 	(cd $testroot/wt && got add repo2 > /dev/null)
 	(cd $testroot/wt && got commit -m 'add file repo2' > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -417,8 +417,8 @@ test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 	echo "A  .gitmodules" > $testroot/stdout.expected
 	echo "Merged commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -429,8 +429,8 @@ test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 	echo "A  .gitmodules" > $testroot/stdout.expected
 	echo "M  repo2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -464,8 +464,8 @@ nonexistent.link@ -> nonexistent
 passwd.link@ -> /etc/passwd
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -495,8 +495,8 @@ EOF
 	echo "A  zeta.link" >> $testroot/stdout.expected
 	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -511,8 +511,8 @@ EOF
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -527,8 +527,8 @@ EOF
 	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
 	echo ".got/foo" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -543,8 +543,8 @@ EOF
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "gamma" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -561,8 +561,8 @@ EOF
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -571,8 +571,8 @@ EOF
 	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
 	echo "../gamma/delta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -587,8 +587,8 @@ EOF
 
 	(cd $testroot/wt && got commit -m 'commit cherrypick result' \
 		> /dev/null 2>$testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -598,8 +598,8 @@ EOF
 	echo "outside of paths under version control" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -607,8 +607,8 @@ EOF
 
 	(cd $testroot/wt && got commit -S -m 'commit cherrypick result' \
 		> /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -632,8 +632,8 @@ passwd.link@ -> /etc/passwd
 zeta.link@ -> epsilon/zeta
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -715,8 +715,8 @@ test_cherrypick_symlink_conflicts() {
 		>> $testroot/stdout.expected
 	echo "the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -741,8 +741,8 @@ test_cherrypick_symlink_conflicts() {
 
 	cp $testroot/wt/alpha.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -757,8 +757,8 @@ test_cherrypick_symlink_conflicts() {
 	echo "this is unversioned file boo" > $testroot/content.expected
 	cp $testroot/wt/boo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -783,8 +783,8 @@ test_cherrypick_symlink_conflicts() {
 
 	cp $testroot/wt/epsilon.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -801,8 +801,8 @@ test_cherrypick_symlink_conflicts() {
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -827,8 +827,8 @@ test_cherrypick_symlink_conflicts() {
 
 	cp $testroot/wt/epsilon/beta.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -855,8 +855,8 @@ test_cherrypick_symlink_conflicts() {
 	echo '>>>>>>>' >> $testroot/content.expected
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -876,8 +876,8 @@ test_cherrypick_symlink_conflicts() {
 	echo -n "" >> $testroot/content.expected
 	cp $testroot/wt/dotgotbar.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -899,8 +899,8 @@ test_cherrypick_symlink_conflicts() {
 
 	cp $testroot/wt/new.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -910,7 +910,7 @@ test_cherrypick_symlink_conflicts() {
 	echo "M  new.link" >> $testroot/stdout.expected
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -934,8 +934,8 @@ test_cherrypick_with_path_prefix_and_empty_tree() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout -b bar $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -947,8 +947,8 @@ test_cherrypick_with_path_prefix_and_empty_tree() {
 	(cd $testroot/wt && got commit -m "add file on branch bar" > /dev/null)
 
 	got checkout -b bar -p epsilon $testroot/repo $testroot/wt2 > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -959,8 +959,8 @@ test_cherrypick_with_path_prefix_and_empty_tree() {
 	echo "Merged commit $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -986,8 +986,8 @@ test_cherrypick_conflict_no_eol() {
 	local ccc_commit=`git_show_head $testroot/repo`
 
 	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -999,8 +999,8 @@ test_cherrypick_conflict_no_eol() {
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1026,8 +1026,8 @@ test_cherrypick_conflict_no_eol2() {
 	local ccc_commit=`git_show_head $testroot/repo`
 
 	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1040,8 +1040,8 @@ test_cherrypick_conflict_no_eol2() {
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1315,8 +1315,8 @@ EOF
 	local base_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1351,8 +1351,8 @@ EOF
 	echo "Merged commit $branch_rev2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1373,8 +1373,8 @@ EOF
 	(cd $testroot/wt && got diff |
 		egrep -v '^(diff|blob|file)' > $testroot/diff)
 	cmp -s $testroot/diff.expected $testroot/diff
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/diff.expected $testroot/diff
 	fi
 
@@ -1385,8 +1385,8 @@ test_cherrypick_same_branch() {
 	local testroot=`test_init cherrypick_same_branch`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1417,8 +1417,8 @@ test_cherrypick_same_branch() {
 	echo "in the work tree: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1428,8 +1428,8 @@ test_cherrypick_dot_on_a_line_by_itself() {
 	local testroot=`test_init cherrypick_dot_on_a_line_by_itself`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1445,8 +1445,8 @@ test_cherrypick_dot_on_a_line_by_itself() {
 	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1455,8 +1455,8 @@ test_cherrypick_dot_on_a_line_by_itself() {
 	printf "modified\n:delta\n.\non\n:branch\n" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -1467,8 +1467,8 @@ test_cherrypick_binary_file() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1503,8 +1503,8 @@ test_cherrypick_binary_file() {
 	echo "Merged commit $commit_id1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1514,8 +1514,8 @@ test_cherrypick_binary_file() {
 	chmod 755 $testroot/content.expected
 	cp $testroot/wt/foo $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1528,8 +1528,8 @@ test_cherrypick_binary_file() {
 	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1539,8 +1539,8 @@ test_cherrypick_binary_file() {
 	chmod 755 $testroot/content.expected
 	cp $testroot/wt/foo $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1554,8 +1554,8 @@ test_cherrypick_binary_file() {
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1573,8 +1573,8 @@ test_cherrypick_binary_file() {
 	echo '>>>>>>>' >> $testroot/content.expected
 	cp $testroot/wt/foo $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1590,8 +1590,8 @@ test_cherrypick_binary_file() {
 	echo -n '?  ' >> $testroot/stdout.expected
 	(cd $testroot/wt && ls foo-2-* >> $testroot/stdout.expected)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1609,8 +1609,8 @@ test_cherrypick_binary_file() {
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1632,8 +1632,8 @@ test_cherrypick_binary_file() {
 		>> $testroot/content.expected
 	cp $testroot/wt/foo $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1643,8 +1643,8 @@ test_cherrypick_binary_file() {
 	chmod 755 $testroot/content.expected
 	cat $testroot/wt/foo-1-* > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1654,8 +1654,8 @@ test_cherrypick_binary_file() {
 	chmod 755 $testroot/content.expected
 	cat $testroot/wt/foo-2-* > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1674,8 +1674,8 @@ test_cherrypick_binary_file() {
 	echo "Merged commit $commit_id4" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1

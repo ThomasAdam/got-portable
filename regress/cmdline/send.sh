@@ -22,8 +22,8 @@ test_send_basic() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -48,8 +48,8 @@ EOF
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -57,15 +57,15 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -78,15 +78,15 @@ EOF
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -100,8 +100,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -112,16 +112,16 @@ EOF
 	got tree -r $testroot/repo -c $commit_id2 -i -R \
 		> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got send -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -130,15 +130,15 @@ EOF
 	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -148,8 +148,8 @@ test_send_rebase_required() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -170,8 +170,8 @@ EOF
 	(cd $testroot/wt-clone && got commit -m 'change alpha' >/dev/null)
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -179,8 +179,8 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -189,15 +189,15 @@ EOF
 	echo "got: refs/heads/master: fetch and rebase required" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -207,8 +207,8 @@ test_send_rebase_required_overwrite() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -232,8 +232,8 @@ EOF
 	# non-default remote requires an explicit argument
 	got send -q -r $testroot/repo -f > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -241,8 +241,8 @@ EOF
 	echo "got: origin: remote repository not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -250,8 +250,8 @@ EOF
 
 	got send -q -r $testroot/repo -f foobar > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -259,15 +259,15 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -279,15 +279,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -305,15 +305,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -326,8 +326,8 @@ test_send_delete() {
 	got branch -r $testroot/repo branch1
 
 	got clone -a -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -343,7 +343,7 @@ EOF
 	got branch -r $testroot/repo-clone branch2
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -358,8 +358,8 @@ EOF
 	# time is not allowed.
 	got send -q -r $testroot/repo -d branch1 -b branch1 \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -368,8 +368,8 @@ EOF
 		> $testroot/stderr.expected
 	echo ": reference cannot be deleted" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -377,8 +377,8 @@ EOF
 
 	got send -q -r $testroot/repo -d refs/heads/branch1 origin \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -386,8 +386,8 @@ EOF
 
 	got send -r $testroot/repo -d refs/heads/branch2 origin \
 		> $testroot/stdout 2>$testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -398,8 +398,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -408,8 +408,8 @@ EOF
 	# branchX exists in neither repository
 	got send -q -r $testroot/repo -d refs/heads/branchX origin \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -419,8 +419,8 @@ EOF
 	echo "repository: no such reference found" >> $testroot/stderr.expected
 	echo "got: no such reference found" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -429,8 +429,8 @@ EOF
 	# References outside of refs/heads/ cannot be deleted with 'got send'.
 	got send -q -r $testroot/repo -d refs/tags/1.0 origin \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -441,15 +441,15 @@ EOF
 		>> $testroot/stderr.expected
 	echo "got: no such reference found" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -460,15 +460,15 @@ EOF
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -484,15 +484,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -504,8 +504,8 @@ test_send_clone_and_send() {
 	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -517,8 +517,8 @@ test_send_clone_and_send() {
 	local commit_id2=`git_show_head $testroot/repo-clone`
 
 	(cd $testroot/wt && got send -q > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -526,15 +526,15 @@ test_send_clone_and_send() {
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -544,15 +544,15 @@ test_send_clone_and_send() {
 	echo "refs/heads/master: $commit_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -570,15 +570,15 @@ test_send_clone_and_send() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -588,8 +588,8 @@ test_send_tags() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -614,8 +614,8 @@ EOF
 		| tr -d ' ' | cut -d: -f2`
 
 	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -623,15 +623,15 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -645,15 +645,15 @@ EOF
 	echo "refs/tags/2.0: $tag_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -669,8 +669,8 @@ EOF
 	echo "refs/tags/2.0: $tag_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -680,8 +680,8 @@ EOF
 	echo "tag 1.0 $tag_id" > $testroot/stdout.expected
 	echo "tag 2.0 $tag_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -689,8 +689,8 @@ EOF
 
 	# Send the same tags again. This should be a no-op.
 	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -698,8 +698,8 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -713,8 +713,8 @@ EOF
 
 	got send -q -r $testroot/repo -t 1.0 > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -723,8 +723,8 @@ EOF
 	echo "got: refs/tags/1.0: tag already exists on server" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -733,8 +733,8 @@ EOF
 	# attempting the same with -T should fail, too
 	got send -q -r $testroot/repo -T > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -743,8 +743,8 @@ EOF
 	echo "got: refs/tags/1.0: tag already exists on server" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -754,8 +754,8 @@ EOF
 	echo "tag 1.0 $tag_id" > $testroot/stdout.expected
 	echo "tag 2.0 $tag_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -764,8 +764,8 @@ EOF
 	# overwrite the 1.0 tag only
 	got send -q -r $testroot/repo -t 1.0 -f > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -775,8 +775,8 @@ EOF
 	echo "tag 1.0 $tag_id3" > $testroot/stdout.expected
 	echo "tag 2.0 $tag_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -789,8 +789,8 @@ EOF
 	# Send the new commit in isolation.
 	got send -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -804,8 +804,8 @@ EOF
 
 	got send -r $testroot/repo -t 3.0 > $testroot/stdout.raw \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -820,7 +820,7 @@ EOF
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -830,8 +830,8 @@ test_send_tag_of_deleted_branch() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -867,8 +867,8 @@ EOF
 	local commit_id3=`git_show_head $testroot/repo`
 
 	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -876,15 +876,15 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -901,15 +901,15 @@ EOF
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -924,8 +924,8 @@ EOF
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -935,15 +935,15 @@ EOF
 	echo "tag 1.0 $tag_id" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -955,8 +955,8 @@ test_send_new_branch() {
 	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -969,8 +969,8 @@ test_send_new_branch() {
 	local commit_id2=`git_show_branch_head $testroot/repo-clone foo`
 
 	(cd $testroot/wt && got send -q > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -978,15 +978,15 @@ test_send_new_branch() {
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -997,15 +997,15 @@ test_send_new_branch() {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1026,15 +1026,15 @@ test_send_new_branch() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -1046,8 +1046,8 @@ test_send_all_branches() {
 	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1071,7 +1071,7 @@ test_send_all_branches() {
 	local commit_id4=`git_show_branch_head $testroot/repo-clone bar`
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1084,8 +1084,8 @@ test_send_all_branches() {
 
 	got send -a -q -r $testroot/repo-clone -b master > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1093,8 +1093,8 @@ test_send_all_branches() {
 	echo "got: -a and -b options are mutually exclusive" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1102,8 +1102,8 @@ test_send_all_branches() {
 
 	got send -a -q -r $testroot/repo-clone > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1111,15 +1111,15 @@ test_send_all_branches() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1131,15 +1131,15 @@ test_send_all_branches() {
 	echo "refs/heads/master: $commit_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1163,15 +1163,15 @@ test_send_all_branches() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -1182,8 +1182,8 @@ test_send_to_empty_repo() {
 
 	got init $testroot/repo2
 
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1200,8 +1200,8 @@ EOF
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1209,8 +1209,8 @@ EOF
 	
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1220,7 +1220,7 @@ EOF
 	got ref -r $testroot/repo2 -s refs/heads/master HEAD
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1232,15 +1232,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo2 > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1250,16 +1250,16 @@ EOF
 	echo "refs/heads/master: $commit_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got send -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1268,15 +1268,15 @@ EOF
 	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo2"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -1286,8 +1286,8 @@ test_send_and_fetch_config() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1315,7 +1315,7 @@ remote "origin" {
 }
 EOF
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1325,8 +1325,8 @@ EOF
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1334,15 +1334,15 @@ EOF
 
 	# fetch tag 2.0 from repo-clone2
 	got fetch -q -r $testroot/repo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1357,8 +1357,8 @@ EOF
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	echo "refs/tags/2.0: $tag_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1366,15 +1366,15 @@ EOF
 
 	# send tag 1.0 to repo-clone
 	got send -q -r $testroot/repo -t 1.0 > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1389,15 +1389,15 @@ EOF
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -1407,8 +1407,8 @@ test_send_config() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1423,7 +1423,7 @@ remote "origin" {
 }
 EOF
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1437,8 +1437,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1447,15 +1447,15 @@ EOF
 	got branch -r $testroot/repo foo
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1470,15 +1470,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	git_fsck "$testroot" "$testroot/repo-clone"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 

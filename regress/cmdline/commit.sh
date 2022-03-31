@@ -20,8 +20,8 @@ test_commit_basic() {
 	local testroot=`test_init commit_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -40,8 +40,8 @@ test_commit_basic() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -51,8 +51,8 @@ test_commit_new_subdir() {
 	local testroot=`test_init commit_new_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -72,8 +72,8 @@ test_commit_new_subdir() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -83,8 +83,8 @@ test_commit_subdir() {
 	local testroot=`test_init commit_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -100,8 +100,8 @@ test_commit_subdir() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -111,8 +111,8 @@ test_commit_single_file() {
 	local testroot=`test_init commit_single_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -128,8 +128,8 @@ test_commit_single_file() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -140,8 +140,8 @@ test_commit_out_of_date() {
 	local first_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -159,16 +159,16 @@ test_commit_out_of_date() {
 		"changes can be committed" > $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -181,8 +181,8 @@ test_commit_out_of_date() {
 	echo "modified alpha" > $testroot/wt/alpha
 
 	(cd $testroot/wt && got commit -m 'changed alpha ' > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -192,8 +192,8 @@ test_commit_out_of_date() {
 	echo "M  alpha" > $testroot/stdout.expected
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -203,8 +203,8 @@ test_commit_added_subdirs() {
 	local testroot=`test_init commit_added_subdirs`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -231,8 +231,8 @@ test_commit_added_subdirs() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -242,8 +242,8 @@ test_commit_deleted_subdirs() {
 	local testroot=`test_init commit_deleted_subdirs`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -260,8 +260,8 @@ test_commit_deleted_subdirs() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -273,8 +273,8 @@ test_commit_deleted_subdirs() {
 	echo "beta" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -286,8 +286,8 @@ test_commit_rejects_conflicted_file() {
 	local initial_rev=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -308,8 +308,8 @@ test_commit_rejects_conflicted_file() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -323,15 +323,15 @@ test_commit_rejects_conflicted_file() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -341,8 +341,8 @@ test_commit_single_file_multiple() {
 	local testroot=`test_init commit_single_file_multiple`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -358,8 +358,8 @@ test_commit_single_file_multiple() {
 		echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -373,8 +373,8 @@ test_commit_added_and_modified_in_same_dir() {
 	local testroot=`test_init commit_added_and_modified_in_same_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -393,8 +393,8 @@ test_commit_added_and_modified_in_same_dir() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -405,8 +405,8 @@ test_commit_path_prefix() {
 	local commit1=`git_show_head $testroot/repo`
 
 	got checkout -p gamma $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -420,8 +420,8 @@ test_commit_path_prefix() {
 	echo "Created commit $commit2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -442,8 +442,8 @@ test_commit_path_prefix() {
 
 	got diff -r $testroot/repo $commit1 $commit2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -462,8 +462,8 @@ test_commit_path_prefix() {
 	echo "Created commit $commit3" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -491,8 +491,8 @@ test_commit_path_prefix() {
 
 	got diff -r $testroot/repo $commit2 $commit3 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -503,8 +503,8 @@ test_commit_dir_path() {
 	local testroot=`test_init commit_dir_path`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -520,8 +520,8 @@ test_commit_dir_path() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -530,8 +530,8 @@ test_commit_dir_path() {
 	echo "M  alpha" > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -541,8 +541,8 @@ test_commit_selected_paths() {
 	local testroot=`test_init commit_selected_paths`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -556,8 +556,8 @@ test_commit_selected_paths() {
 
 	(cd $testroot/wt && got commit -m 'many paths' nonexistent alpha \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "commit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -565,8 +565,8 @@ test_commit_selected_paths() {
 	echo "got: nonexistent: bad path" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -582,8 +582,8 @@ test_commit_selected_paths() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -596,8 +596,8 @@ test_commit_outside_refs_heads() {
 
 	got checkout -b refs/remotes/origin/master \
 	    $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -606,8 +606,8 @@ test_commit_outside_refs_heads() {
 
 	(cd $testroot/wt && got commit -m 'change alpha' \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "commit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -615,8 +615,8 @@ test_commit_outside_refs_heads() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -627,8 +627,8 @@ test_commit_outside_refs_heads() {
 	echo '"refs/heads/" reference namespace' \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -638,8 +638,8 @@ test_commit_no_email() {
 	local testroot=`test_init commit_no_email`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -654,8 +654,8 @@ test_commit_no_email() {
 	echo "is required for compatibility with Git" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -663,8 +663,8 @@ test_commit_no_email() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -674,8 +674,8 @@ test_commit_tree_entry_sorting() {
 	local testroot=`test_init commit_tree_entry_sorting`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -695,7 +695,7 @@ test_commit_tree_entry_sorting() {
 	# Let git-fsck verify the newly written tree to make sure Git is happy
 	(cd $testroot/repo && git fsck --strict  \
 		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -703,8 +703,8 @@ test_commit_gotconfig_author() {
 	local testroot=`test_init commit_gotconfig_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -713,15 +713,15 @@ test_commit_gotconfig_author() {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'test gotconfig author' > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -729,8 +729,8 @@ test_commit_gotconfig_author() {
 	echo "from: Flan Luck <flan_luck@openbsd.org>" \
 		> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -740,8 +740,8 @@ test_commit_gotconfig_worktree_author() {
 	local testroot=`test_init commit_gotconfig_worktree_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -752,15 +752,15 @@ test_commit_gotconfig_worktree_author() {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'test gotconfig author' > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -768,8 +768,8 @@ test_commit_gotconfig_worktree_author() {
 	echo "from: Flan Squee <flan_squee@openbsd.org>" \
 		> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -779,8 +779,8 @@ test_commit_gitconfig_author() {
 	local testroot=`test_init commit_gitconfig_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -790,15 +790,15 @@ test_commit_gitconfig_author() {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'test gitconfig author' > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -806,8 +806,8 @@ test_commit_gitconfig_author() {
 	echo "from: Flan Luck <flan_luck@openbsd.org>" \
 		> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -817,8 +817,8 @@ test_commit_xbit_change() {
 	local testroot=`test_init commit_xbit_change`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -829,16 +829,16 @@ test_commit_xbit_change() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got commit -mx > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -848,8 +848,8 @@ test_commit_xbit_change() {
 	echo 'm  alpha' > $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -859,8 +859,8 @@ test_commit_xbit_change() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -872,16 +872,16 @@ test_commit_xbit_change() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got commit -mx > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -891,8 +891,8 @@ test_commit_xbit_change() {
 	echo 'm  alpha' > $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -904,8 +904,8 @@ test_commit_xbit_change() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -920,8 +920,8 @@ commit_check_mode() {
 	chmod $mode $testroot/wt/alpha
 
 	(cd $testroot/wt && got commit -mm > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -931,8 +931,8 @@ commit_check_mode() {
 	echo 'M  alpha' > $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -945,8 +945,8 @@ commit_check_mode() {
 	echo "$alpha_id $expected_mode alpha" > $testroot/stdout.expected
 	got cat -r $testroot/repo $tree_id | grep 'alpha$' > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	return $ret
@@ -956,8 +956,8 @@ test_commit_normalizes_filemodes() {
 	local testroot=`test_init commit_normalizes_filemodes`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -965,24 +965,24 @@ test_commit_normalizes_filemodes() {
 	modes="600 400 460 640 440 660 444 666"
 	for m in $modes; do
 		commit_check_mode "$m" "0100644"
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			break
 		fi
 	done
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	modes="700 500 570 750 550 770 555 777"
 	for m in $modes; do
 		commit_check_mode "$m" "0100755"
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			break
 		fi
 	done
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -998,8 +998,8 @@ test_commit_with_unrelated_submodule() {
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1010,8 +1010,8 @@ test_commit_with_unrelated_submodule() {
 	echo "" > $testroot/stdout.expected
 
 	(cd $testroot/wt && got commit -m 'modify alpha' > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1022,8 +1022,8 @@ test_commit_with_unrelated_submodule() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1039,8 +1039,8 @@ check_symlinks() {
 	readlink $wtpath/alpha.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1053,8 +1053,8 @@ check_symlinks() {
 	readlink $wtpath/epsilon.link > $testroot/stdout
 	echo "epsilon" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1067,15 +1067,15 @@ check_symlinks() {
 
 	echo -n "/etc/passwd" > $testroot/content.expected
 	cp $wtpath/passwd.link $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "cp command failed unexpectedly" >&2
 		return 1
 	fi
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		return 1
 	fi
@@ -1083,8 +1083,8 @@ check_symlinks() {
 	readlink $wtpath/epsilon/beta.link > $testroot/stdout
 	echo "../beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1092,8 +1092,8 @@ check_symlinks() {
 	readlink $wtpath/nonexistent.link > $testroot/stdout
 	echo "nonexistent" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1105,8 +1105,8 @@ test_commit_symlink() {
 	local testroot=`test_init commit_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1121,8 +1121,8 @@ test_commit_symlink() {
 
 	(cd $testroot/wt && got commit -m 'test commit_symlink' \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1131,8 +1131,8 @@ test_commit_symlink() {
 	echo "symbolic link points outside of paths under version control" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1150,8 +1150,8 @@ test_commit_symlink() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1159,14 +1159,14 @@ test_commit_symlink() {
 
 	# verify created in-repository tree
 	got checkout $testroot/repo $testroot/wt2 > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	check_symlinks $testroot/wt2
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1180,8 +1180,8 @@ test_commit_symlink() {
 	# 'got update' should reinstall passwd.link as a regular file
 	(cd $testroot/wt && got update > /dev/null)
 	check_symlinks $testroot/wt
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1199,8 +1199,8 @@ test_commit_symlink() {
 
 	(cd $testroot/wt && got commit -m 'test commit_symlink' \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1209,8 +1209,8 @@ test_commit_symlink() {
 	echo "symbolic link points outside of paths under version control" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1229,8 +1229,8 @@ test_commit_symlink() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1252,8 +1252,8 @@ new.link@ -> alpha
 passwd.link@ -> /etc/passwd
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1263,8 +1263,8 @@ test_commit_fix_bad_symlink() {
 	local testroot=`test_init commit_fix_bad_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1290,8 +1290,8 @@ test_commit_fix_bad_symlink() {
 
 	# create another work tree which will contain the "bad" symlink
 	got checkout $testroot/repo $testroot/wt2 > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1308,8 +1308,8 @@ test_commit_fix_bad_symlink() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1324,16 +1324,16 @@ test_commit_fix_bad_symlink() {
 	readlink $testroot/wt/passwd.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
 
 	# Update the other work tree; the bad symlink should be fixed
 	(cd $testroot/wt2 && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1348,8 +1348,8 @@ test_commit_fix_bad_symlink() {
 	readlink $testroot/wt2/passwd.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1361,8 +1361,8 @@ test_commit_prepared_logmsg() {
 	local testroot=`test_init commit_prepared_logmsg`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1392,8 +1392,8 @@ EOF
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1414,8 +1414,8 @@ EOF
 
 	(cd $testroot/wt && got log -l 1 > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1434,8 +1434,8 @@ EOF
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1458,8 +1458,8 @@ EOF
 
 	(cd $testroot/wt && got log -l 1 > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1469,8 +1469,8 @@ test_commit_large_file() {
 	local testroot=`test_init commit_large_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1486,8 +1486,8 @@ test_commit_large_file() {
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1495,16 +1495,16 @@ test_commit_large_file() {
 
 	new_id=`get_blob_id $testroot/repo "" new`
 	got cat -r $testroot/repo $new_id > $testroot/new
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	cmp -s $testroot/new $testroot/wt/new
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/new $testroot/wt/new
 	fi
 	test_done "$testroot" "$ret"

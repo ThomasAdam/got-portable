@@ -27,23 +27,23 @@ test_pack_all_loose_objects() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	gotadmin pack -r $testroot/repo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -64,7 +64,7 @@ test_pack_all_loose_objects() {
 			ret=1
 			break
 		done
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
@@ -78,30 +78,30 @@ test_pack_exclude() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -110,8 +110,8 @@ test_pack_exclude() {
 	(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
 
 	gotadmin pack -r $testroot/repo -x master > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -131,11 +131,11 @@ test_pack_exclude() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
-	if [ "$ret" = "1" ]; then
+	if [ $ret -eq 1 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -162,7 +162,7 @@ test_pack_exclude() {
 			ret=1
 			break
 		done
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
@@ -176,30 +176,30 @@ test_pack_include() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -209,8 +209,8 @@ test_pack_include() {
 	local commit1=`git_show_branch_head $testroot/repo mybranch`
 
 	gotadmin pack -r $testroot/repo master > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -230,11 +230,11 @@ test_pack_include() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
-	if [ "$ret" = "1" ]; then
+	if [ $ret -eq 1 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -271,30 +271,30 @@ test_pack_ambiguous_arg() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -305,8 +305,8 @@ test_pack_ambiguous_arg() {
 
 	gotadmin pack -r $testroot/repo -x master master \
 		> /dev/null 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -314,8 +314,8 @@ test_pack_ambiguous_arg() {
 
 	echo "gotadmin: not enough objects to pack" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -327,30 +327,30 @@ test_pack_loose_only() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -362,16 +362,16 @@ test_pack_loose_only() {
 	# should then be excluded while packing 'mybranch' since they
 	# are already packed
 	gotadmin pack -r $testroot/repo master > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	gotadmin pack -r $testroot/repo mybranch > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -391,11 +391,11 @@ test_pack_loose_only() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
-	if [ "$ret" = "1" ]; then
+	if [ $ret -eq 1 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -422,7 +422,7 @@ test_pack_loose_only() {
 			ret=1
 			break
 		done
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
@@ -436,30 +436,30 @@ test_pack_all_objects() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -469,8 +469,8 @@ test_pack_all_objects() {
 
 	# pack objects belonging to the 'master' branch
 	gotadmin pack -r $testroot/repo master > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -479,8 +479,8 @@ test_pack_all_objects() {
 	# pack mybranch, including already packed objects on the
 	# 'master' branch which are reachable from mybranch
 	gotadmin pack -r $testroot/repo -a mybranch > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -501,7 +501,7 @@ test_pack_all_objects() {
 			ret=1
 			break
 		done
-		if [ "$ret" = "1" ]; then
+		if [ $ret -eq 1 ]; then
 			break
 		fi
 	done
@@ -515,38 +515,38 @@ test_pack_bad_ref() {
 
 	# no pack files should exist yet
 	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -r $testroot/repo mybranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b mybranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	gotadmin pack -r $testroot/repo refs/got/worktree/ \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -554,8 +554,8 @@ test_pack_bad_ref() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -563,8 +563,8 @@ test_pack_bad_ref() {
 
 	echo "gotadmin: not enough objects to pack" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"

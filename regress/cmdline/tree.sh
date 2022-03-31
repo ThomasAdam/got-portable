@@ -35,8 +35,8 @@ test_tree_basic() {
 	(cd $testroot/wt && got tree > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
@@ -47,8 +47,8 @@ test_tree_branch() {
 	local testroot=`test_init tree_branch`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -69,8 +69,8 @@ test_tree_branch() {
 	(cd $testroot/wt && got tree > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
@@ -90,8 +90,8 @@ test_tree_submodule() {
 
 	# Currently fails in open(2)
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "tree command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -100,8 +100,8 @@ test_tree_submodule() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		return 1
 	fi
@@ -117,8 +117,8 @@ test_tree_submodule_of_same_repo() {
 
 	# Currently fails with "bad object data"
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "tree command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -133,8 +133,8 @@ test_tree_submodule_of_same_repo() {
 	echo "got: bad object data" >> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		return 1
 	fi

@@ -21,8 +21,8 @@ test_diff_basic() {
 	local head_rev=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -59,8 +59,8 @@ test_diff_basic() {
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -70,8 +70,8 @@ test_diff_basic() {
 	(cd $testroot/repo && got diff 2> $testroot/stderr)
 	echo "got: no got work tree found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -82,8 +82,8 @@ test_diff_basic() {
 	(cd $testroot/repo && got diff $head_rev foo 2> $testroot/stderr)
 	echo "got: foo: object not found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -95,8 +95,8 @@ test_diff_basic() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -105,8 +105,8 @@ test_diff_basic() {
 	echo "got: nonexistent: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -151,8 +151,8 @@ test_diff_basic() {
 
 	(cd $testroot/wt && got diff new alpha epsilon beta > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -161,15 +161,15 @@ test_diff_basic() {
 	# different order of arguments results in same output order
 	(cd $testroot/wt && got diff alpha new epsilon beta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -180,15 +180,15 @@ test_diff_basic() {
 	got br -r $testroot/repo -c master new > /dev/null
 	(cd $testroot/wt && got diff new alpha epsilon beta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -198,8 +198,8 @@ test_diff_basic() {
 	echo master > $testroot/wt/master
 	(cd $testroot/wt && got add master > /dev/null)
 	(cd $testroot/wt && got diff master new > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -207,40 +207,40 @@ test_diff_basic() {
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
 	# diff between the branches is empty
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	# same without a work tree
 	(cd $testroot/repo && got diff master new > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	# same with -r argument
 	got diff -r $testroot/repo master new > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -248,8 +248,8 @@ test_diff_basic() {
 
 	# -P can be used to force use of paths
 	(cd $testroot/wt && got diff -P new master > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -268,8 +268,8 @@ test_diff_basic() {
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+new file' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -277,8 +277,8 @@ test_diff_basic() {
 
 	# -P can only be used in a work tree
 	got diff -r $testroot/repo -P new master 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -286,8 +286,8 @@ test_diff_basic() {
 	echo "got: -P option can only be used when diffing a work tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -302,15 +302,15 @@ test_diff_basic() {
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+new file' >> $testroot/stdout.expected
 	(cd $testroot/wt && got diff new > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -319,8 +319,8 @@ test_diff_basic() {
 	# diff with just one object ID argument results in
 	# interpretation of argument as a path
 	(cd $testroot/wt && got diff $head_rev 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -328,8 +328,8 @@ test_diff_basic() {
 	echo "got: $head_rev: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -339,8 +339,8 @@ test_diff_basic() {
 	# interpretation of arguments as paths
 	(cd $testroot/wt && got diff new $head_rev master \
 		> $testroot/stout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -354,8 +354,8 @@ test_diff_basic() {
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+new file' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -364,8 +364,8 @@ test_diff_basic() {
 	echo "got: $head_rev: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		return 1
 	fi
@@ -388,8 +388,8 @@ test_diff_shows_conflict() {
 	local base_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -412,8 +412,8 @@ test_diff_shows_conflict() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -455,8 +455,8 @@ test_diff_shows_conflict() {
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -496,8 +496,8 @@ test_diff_tag() {
 
 	got diff -r $testroot/repo $commit_id0 $tag1 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -516,8 +516,8 @@ test_diff_tag() {
 
 	got diff -r $testroot/repo $tag1 $tag2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -557,8 +557,8 @@ test_diff_lightweight_tag() {
 
 	got diff -r $testroot/repo $commit_id0 $tag1 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -577,8 +577,8 @@ test_diff_lightweight_tag() {
 
 	got diff -r $testroot/repo $tag1 $tag2 > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -589,8 +589,8 @@ test_diff_ignore_whitespace() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -606,8 +606,8 @@ test_diff_ignore_whitespace() {
 	echo 'file + alpha' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -629,8 +629,8 @@ test_diff_submodule_of_same_repo() {
 	# Currently fails with "wrong type of object" error
 	got diff -r $testroot/repo $epsilon_id $submodule_id \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -638,8 +638,8 @@ test_diff_submodule_of_same_repo() {
 	echo "got: wrong type of object" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		return 1
 	fi
@@ -660,8 +660,8 @@ test_diff_symlinks_in_work_tree() {
 	local commit_id1=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -743,8 +743,8 @@ test_diff_symlinks_in_work_tree() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -860,8 +860,8 @@ test_diff_symlinks_in_repo() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -872,8 +872,8 @@ test_diff_binary_files() {
 	local head_rev=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -889,8 +889,8 @@ test_diff_binary_files() {
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -a -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -907,8 +907,8 @@ test_diff_binary_files() {
 
 	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -a -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -934,8 +934,8 @@ test_diff_binary_files() {
 
 	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -a -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -948,8 +948,8 @@ test_diff_commits() {
 	beta_id0=`get_blob_id $testroot/repo "" beta`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -987,8 +987,8 @@ test_diff_commits() {
 
 	(cd $testroot/wt && got diff -c master > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -998,8 +998,8 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff -c $commit_id0 -c master \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1029,8 +1029,8 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1048,8 +1048,8 @@ test_diff_commits() {
 	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 alpha \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1058,8 +1058,8 @@ test_diff_commits() {
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 alpha \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1081,8 +1081,8 @@ test_diff_commits() {
 	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 \
 		beta new > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1091,16 +1091,16 @@ test_diff_commits() {
 	# more than two -c options are not allowed
 	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 -c foo \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo "got: too many -c options used" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1109,8 +1109,8 @@ test_diff_commits() {
 	# use of -c options implies a repository diff; use with -P is an error
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -P foo \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1118,8 +1118,8 @@ test_diff_commits() {
 	echo "got: -P option can only be used when diffing a work tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1128,8 +1128,8 @@ test_diff_commits() {
 	# use of -c options implies a repository diff; use with -s is an error
 	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -s foo \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1137,8 +1137,8 @@ test_diff_commits() {
 	echo "got: -s option can only be used when diffing a work tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1147,8 +1147,8 @@ test_diff_commits() {
 	# three arguments imply use of path filtering (repository case)
 	(cd $testroot/repo && got diff $commit_id0 $commit_id1 foo \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1156,8 +1156,8 @@ test_diff_commits() {
 	echo "got: specified paths cannot be resolved: no got work tree found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1166,8 +1166,8 @@ test_diff_commits() {
 	# three arguments imply use of path filtering (work tree case)
 	(cd $testroot/wt && got diff $commit_id0 master foo \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "diff succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1175,8 +1175,8 @@ test_diff_commits() {
 	echo "got: $commit_id0: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -1187,7 +1187,7 @@ test_diff_ignored_file() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1206,7 +1206,7 @@ test_diff_ignored_file() {
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

@@ -22,8 +22,8 @@ test_ref_create() {
 
 	# Create a ref pointing at a commit ID
 	got ref -r $testroot/repo -c $commit_id refs/heads/commitref
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -31,8 +31,8 @@ test_ref_create() {
 
 	# Create a ref based on repository's HEAD reference
 	got ref -r $testroot/repo -c HEAD refs/heads/newref
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -40,8 +40,8 @@ test_ref_create() {
 
 	# Ensure that Git recognizes the ref Got has created
 	(cd $testroot/repo && git checkout -q newref)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -49,8 +49,8 @@ test_ref_create() {
 
 	# Ensure Got recognizes the new ref
 	got checkout -b newref $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -58,15 +58,15 @@ test_ref_create() {
 
 	# Create a head ref based on another specific ref
 	(cd $testroot/wt && got ref -c refs/heads/master refs/heads/anotherref)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q anotherref)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -74,15 +74,15 @@ test_ref_create() {
 
 	# Create a symbolic ref
 	(cd $testroot/wt && got ref -s refs/heads/master refs/heads/symbolicref)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q symbolicref)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -91,8 +91,8 @@ test_ref_create() {
 	# Attempt to create a symbolic ref pointing at a non-reference
 	(cd $testroot/wt && got ref -s $commit_id refs/heads/symbolicref \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
@@ -100,8 +100,8 @@ test_ref_create() {
 
 	echo "got: reference $commit_id not found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -109,16 +109,16 @@ test_ref_create() {
 
 	# Attempt to create a reference without specifying a name
 	(cd $testroot/wt && got ref -c $commit_id 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	grep -q '^usage: got ref' $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "unexpected usage error message: " >&2
 		cat $testroot/stderr >&2
 		test_done "$testroot" "$ret"
@@ -128,16 +128,16 @@ test_ref_create() {
 	# Attempt to create a symbolic reference without specifying a name
 	(cd $testroot/wt && got ref -s refs/heads/symbolicref \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	grep -q '^usage: got ref' $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "unexpected usage error message: " >&2
 		cat $testroot/stderr >&2
 		test_done "$testroot" "$ret"
@@ -146,8 +146,8 @@ test_ref_create() {
 
 	# Change HEAD
 	got ref -r $testroot/repo -s refs/heads/newref HEAD
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -155,8 +155,8 @@ test_ref_create() {
 
 	# Ensure that Git recognizes the ref Got has created
 	(cd $testroot/repo && git checkout -q HEAD)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -164,8 +164,8 @@ test_ref_create() {
 
 	# Ensure Got recognizes the new ref
 	(cd $testroot/wt && got update -b HEAD >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -182,8 +182,8 @@ test_ref_create() {
 	echo "refs/heads/symbolicref: refs/heads/master" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -195,8 +195,8 @@ test_ref_delete() {
 
 	for b in ref1 ref2 ref3; do
 		got ref -r $testroot/repo -c refs/heads/master refs/heads/$b
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got ref command failed unexpectedly"
 			test_done "$testroot" "$ret"
 			return 1
@@ -204,16 +204,16 @@ test_ref_delete() {
 	done
 
 	got ref -d -r $testroot/repo refs/heads/ref2 > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo "Deleted refs/heads/ref2: $commit_id" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -225,8 +225,8 @@ test_ref_delete() {
 	echo "refs/heads/ref1: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -234,8 +234,8 @@ test_ref_delete() {
 
 	got ref -r $testroot/repo -d refs/heads/bogus_ref_name \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got ref succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -244,8 +244,8 @@ test_ref_delete() {
 	echo "got: reference refs/heads/bogus_ref_name not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -265,8 +265,8 @@ test_ref_delete() {
 	echo "refs/heads/ref1: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -279,8 +279,8 @@ test_ref_delete() {
 	echo "refs/heads/ref1: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -292,8 +292,8 @@ test_ref_list() {
 
 	# Create a tag pointing at a commit ID
 	got tag -r $testroot/repo -c $commit_id -m "1.0" "1.0" >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got tag command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -303,8 +303,8 @@ test_ref_list() {
 
 	# Create a ref based on repository's HEAD reference
 	got ref -r $testroot/repo -c HEAD refs/foo/zoo
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -312,8 +312,8 @@ test_ref_list() {
 
 	# Create a head ref based on another specific ref
 	(cd $testroot/repo && got ref -c refs/heads/master refs/foo/bar/baz)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -321,8 +321,8 @@ test_ref_list() {
 	# Create a HEAD ref in the namespace of a remote repository
 	(cd $testroot/repo && got ref -s refs/heads/master \
 		refs/remotes/origin/HEAD)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -337,8 +337,8 @@ test_ref_list() {
 		>> $testroot/stdout.expected
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -353,8 +353,8 @@ test_ref_list() {
 		>> $testroot/stdout.expected
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -364,8 +364,8 @@ test_ref_list() {
 
 	echo "refs/tags/1.0: $tag_id" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -376,8 +376,8 @@ test_ref_list() {
 
 		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
 		cmp -s $testroot/stdout $testroot/stdout.expected
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -390,8 +390,8 @@ test_ref_list() {
 		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
 		echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
 		cmp -s $testroot/stdout $testroot/stdout.expected
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -404,8 +404,8 @@ test_ref_list() {
 
 		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout $testroot/stdout.expected
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -413,8 +413,8 @@ test_ref_list() {
 
 		echo "got: $r: bad reference name" > $testroot/stderr.expected
 		cmp -s $testroot/stderr $testroot/stderr.expected
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
 			return 1
@@ -427,8 +427,8 @@ test_ref_list() {
 
 		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout $testroot/stdout.expected
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1

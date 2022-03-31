@@ -180,8 +180,8 @@ git_fsck()
 
 	(cd $repo && git fsck --strict \
 		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo -n "git fsck: "
 		cat $testroot/fsck.stderr
 		echo "git fsck failed; leaving test data in $testroot"
@@ -259,8 +259,8 @@ test_cleanup()
 	local testroot="$1"
 
 	git_fsck $testroot $testroot/repo
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		return $ret
 	fi
 

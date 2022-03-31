@@ -22,8 +22,8 @@ test_branch_create() {
 
 	# Create a branch based on repository's HEAD reference
 	got branch -r $testroot/repo newbranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -31,8 +31,8 @@ test_branch_create() {
 
 	# Ensure that Git recognizes the branch Got has created
 	(cd $testroot/repo && git checkout -q newbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -41,8 +41,8 @@ test_branch_create() {
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	got checkout -b newbranch $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -51,8 +51,8 @@ test_branch_create() {
 	echo "modified delta on branch" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -60,15 +60,15 @@ test_branch_create() {
 
 	# Create a branch based on the work tree's branch
 	(cd $testroot/wt && got branch -n refs/heads/anotherbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q anotherbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -76,15 +76,15 @@ test_branch_create() {
 
 	# Create a branch based on another specific branch
 	(cd $testroot/wt && got branch -n -c master yetanotherbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q yetanotherbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -93,16 +93,16 @@ test_branch_create() {
 	# Create a branch based on a specific commit
 	local commit_id=`git_show_head $testroot/repo`
 	got branch -r $testroot/repo -c $commit_id commitbranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q commitbranch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -120,8 +120,8 @@ test_branch_create() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -133,8 +133,8 @@ test_branch_list() {
 
 	for b in branch1 branch2 branch3; do
 		got branch -r $testroot/repo $b
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got branch command failed unexpectedly"
 			test_done "$testroot" "$ret"
 			return 1
@@ -147,16 +147,16 @@ test_branch_list() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "  master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -168,8 +168,8 @@ test_branch_list() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "* master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -185,16 +185,16 @@ test_branch_list() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "~ master: $commit_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -206,16 +206,16 @@ test_branch_list() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "* master: $commit_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update -b branch1 > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -227,8 +227,8 @@ test_branch_list() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "  master: $commit_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -240,8 +240,8 @@ test_branch_delete() {
 
 	for b in branch1 branch2 branch3; do
 		got branch -r $testroot/repo $b
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got branch command failed unexpectedly"
 			test_done "$testroot" "$ret"
 			return 1
@@ -249,8 +249,8 @@ test_branch_delete() {
 	done
 
 	got branch -d branch2 -r $testroot/repo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -261,8 +261,8 @@ test_branch_delete() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "  master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -274,8 +274,8 @@ test_branch_delete() {
 	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -283,8 +283,8 @@ test_branch_delete() {
 
 	got branch -d bogus_branch_name -r $testroot/repo \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got branch succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -293,8 +293,8 @@ test_branch_delete() {
 	echo "got: reference refs/heads/bogus_branch_name not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -316,16 +316,16 @@ test_branch_delete() {
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got branch -d origin/branch1 -r $testroot/repo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -333,8 +333,8 @@ test_branch_delete() {
 
 	got branch -d refs/remotes/origin/branch3 -r $testroot/repo \
 		> $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -348,8 +348,8 @@ test_branch_delete() {
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -360,8 +360,8 @@ test_branch_delete_current_branch() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -373,8 +373,8 @@ test_branch_delete_current_branch() {
 	echo "got: will not delete this work tree's current branch" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -386,8 +386,8 @@ test_branch_delete_packed() {
 
 	for b in branch1 branch2 branch3; do
 		got branch -r $testroot/repo $b
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got branch command failed unexpectedly"
 			test_done "$testroot" "$ret"
 			return 1
@@ -397,8 +397,8 @@ test_branch_delete_packed() {
 	(cd $testroot/repo && git pack-refs --all)
 
 	got branch -d refs/heads/branch2 -r $testroot/repo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -409,8 +409,8 @@ test_branch_delete_packed() {
 	echo "  branch3: $commit_id" >> $testroot/stdout.expected
 	echo "  master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -422,8 +422,8 @@ test_branch_delete_packed() {
 	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -431,8 +431,8 @@ test_branch_delete_packed() {
 
 	got branch -d bogus_branch_name -r $testroot/repo \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got update succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -441,8 +441,8 @@ test_branch_delete_packed() {
 	echo "got: reference refs/heads/bogus_branch_name not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -454,8 +454,8 @@ test_branch_show() {
 
 	for b in branch1 branch2 branch3; do
 		got branch -r $testroot/repo $b
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got branch command failed unexpectedly"
 			test_done "$testroot" "$ret"
 			return 1
@@ -463,8 +463,8 @@ test_branch_show() {
 	done
 
 	got checkout $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -473,16 +473,16 @@ test_branch_show() {
 	(cd $testroot/wt && got branch > $testroot/stdout)
 	echo "master" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update -b branch1 > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -491,8 +491,8 @@ test_branch_show() {
 	(cd $testroot/wt && got branch > $testroot/stdout)
 	echo "branch1" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

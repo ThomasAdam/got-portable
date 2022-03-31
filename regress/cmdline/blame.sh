@@ -28,8 +28,8 @@ blame_cmp() {
 		> $testroot/${file}.blame.git)
 
 	cmp -s $testroot/${file}.blame.git $testroot/${file}.blame.got
-	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" = "" ]; then
+	ret=$?
+	if [ $ret -ne 0 -a "$xfail" = "" ]; then
 		diff -u $testroot/${file}.blame.git $testroot/${file}.blame.got
 		return 1
 	fi
@@ -40,8 +40,8 @@ test_blame_basic() {
 	local testroot=`test_init blame_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -71,15 +71,15 @@ test_blame_basic() {
 	echo "3) $short_commit3 $d $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -88,8 +88,8 @@ test_blame_tag() {
 	local tag=1.0.0
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -118,15 +118,15 @@ test_blame_tag() {
 	echo "2) $short_commit2 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -134,8 +134,8 @@ test_blame_file_single_line() {
 	local testroot=`test_init blame_file_single_line`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -153,15 +153,15 @@ test_blame_file_single_line() {
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -169,8 +169,8 @@ test_blame_file_single_line_no_newline() {
 	local testroot=`test_init blame_file_single_line_no_newline`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -188,8 +188,8 @@ test_blame_file_single_line_no_newline() {
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -199,8 +199,8 @@ test_blame_all_lines_replaced() {
 	local testroot=`test_init blame_all_lines_replaced`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -224,8 +224,8 @@ test_blame_all_lines_replaced() {
 	echo "8) $short_commit1 $d $GOT_AUTHOR_8 8" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -236,8 +236,8 @@ test_blame_lines_shifted_up() {
 	local testroot=`test_init blame_lines_shifted_up`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -276,15 +276,15 @@ test_blame_lines_shifted_up() {
 	echo "8) $short_commit1 $d $GOT_AUTHOR_8 8" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -292,8 +292,8 @@ test_blame_lines_shifted_down() {
 	local testroot=`test_init blame_lines_shifted_down`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -346,15 +346,15 @@ test_blame_lines_shifted_down() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -362,8 +362,8 @@ test_blame_commit_subsumed() {
 	local testroot=`test_init blame_commit_subsumed`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -525,15 +525,15 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -541,8 +541,8 @@ test_blame_blame_h() {
 	local testroot=`test_init blame_blame_h`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -677,7 +677,7 @@ EOF
 	(cd $testroot/wt && got commit -m "change 5" > /dev/null)
 
 	blame_cmp "$testroot" "got_blame.h"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 
@@ -685,15 +685,15 @@ test_blame_added_on_branch() {
 	local testroot=`test_init blame_added_on_branch`
 
 	got branch -r $testroot/repo -c master newbranch
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -724,8 +724,8 @@ test_blame_added_on_branch() {
 	echo "3) $short_commit3 $d $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -744,8 +744,8 @@ test_blame_submodule() {
 	# Attempt a (nonsensical) blame of a submodule.
 	got blame -r $testroot/repo repo2 \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -755,8 +755,8 @@ test_blame_submodule() {
 	echo "got: object $submodule_id not found" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -781,8 +781,8 @@ test_blame_symlink() {
 
 	# got blame dereferences symlink to a regular file
 	got blame -r $testroot/repo alpha.link > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "blame command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -793,8 +793,8 @@ test_blame_symlink() {
 		> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" = "" ]; then
+	ret=$?
+	if [ $ret -ne 0 -a "$xfail" = "" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -802,8 +802,8 @@ test_blame_symlink() {
 
 	# got blame dereferences symlink with relative path
 	got blame -r $testroot/repo epsilon/beta.link > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "blame command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -814,8 +814,8 @@ test_blame_symlink() {
 		> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" = "" ]; then
+	ret=$?
+	if [ $ret -ne 0 -a "$xfail" = "" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -823,8 +823,8 @@ test_blame_symlink() {
 
 	got blame -r $testroot/repo epsilon.link > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -833,8 +833,8 @@ test_blame_symlink() {
 	# blame dereferences symlink to a directory
 	echo "got: /epsilon: wrong type of object" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
@@ -843,8 +843,8 @@ test_blame_symlink() {
 	# got blame fails if symlink target does not exist in repo
 	got blame -r $testroot/repo passwd.link > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -853,8 +853,8 @@ test_blame_symlink() {
 	echo "got: /etc/passwd: no such entry found in tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
@@ -862,8 +862,8 @@ test_blame_symlink() {
 
 	got blame -r $testroot/repo nonexistent.link > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -872,8 +872,8 @@ test_blame_symlink() {
 	echo "got: /nonexistent: no such entry found in tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
@@ -886,8 +886,8 @@ test_blame_lines_shifted_skip() {
 	local testroot=`test_init blame_lines_shifted_skip`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -968,15 +968,15 @@ EOF
 	echo "7) $short_commit2 $d $GOT_AUTHOR_8 Q" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	blame_cmp "$testroot" "alpha"
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 }
 

@@ -20,8 +20,8 @@ test_revert_basic() {
 	local testroot=`test_init revert_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -33,8 +33,8 @@ test_revert_basic() {
 	(cd $testroot/wt && got revert epsilon/zeta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -44,8 +44,8 @@ test_revert_basic() {
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -56,8 +56,8 @@ test_revert_rm() {
 	local testroot=`test_init revert_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -69,8 +69,8 @@ test_revert_rm() {
 	(cd $testroot/wt && got revert beta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -80,8 +80,8 @@ test_revert_rm() {
 	cat $testroot/wt/beta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 		test_done "$testroot" "$ret"
@@ -91,8 +91,8 @@ test_revert_add() {
 	local testroot=`test_init revert_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -105,8 +105,8 @@ test_revert_add() {
 	(cd $testroot/wt && got revert new > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -116,8 +116,8 @@ test_revert_add() {
 	cat $testroot/wt/new > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -128,8 +128,8 @@ test_revert_add() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -139,8 +139,8 @@ test_revert_multiple() {
 	local testroot=`test_init revert_multiple`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -154,8 +154,8 @@ test_revert_multiple() {
 	(cd $testroot/wt && got revert alpha epsilon/zeta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -165,8 +165,8 @@ test_revert_multiple() {
 	cat $testroot/wt/alpha > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -176,8 +176,8 @@ test_revert_multiple() {
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -187,8 +187,8 @@ test_revert_file_in_new_subdir() {
 	local testroot=`test_init revert_file_in_new_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -202,8 +202,8 @@ test_revert_file_in_new_subdir() {
 
 	echo "R  newdir/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -213,8 +213,8 @@ test_revert_file_in_new_subdir() {
 
 	echo "?  newdir/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -225,8 +225,8 @@ test_revert_no_arguments() {
 	local testroot=`test_init revert_no_arguments`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -234,8 +234,8 @@ test_revert_no_arguments() {
 	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
 
 	(cd $testroot/wt && got revert > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "revert command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -243,8 +243,8 @@ test_revert_no_arguments() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -253,8 +253,8 @@ test_revert_no_arguments() {
 	echo "usage: got revert [-p] [-F response-script] [-R] path ..." \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -264,8 +264,8 @@ test_revert_directory() {
 	local testroot=`test_init revert_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -273,8 +273,8 @@ test_revert_directory() {
 	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
 
 	(cd $testroot/wt && got revert . > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got revert command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -282,8 +282,8 @@ test_revert_directory() {
 	echo "got: reverting directories requires -R option" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -291,8 +291,8 @@ test_revert_directory() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -302,8 +302,8 @@ test_revert_directory() {
 
 	echo 'R  epsilon/zeta' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -313,8 +313,8 @@ test_revert_directory() {
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -324,8 +324,8 @@ test_revert_directory_unknown() {
 	local testroot=`test_init revert_directory_unknown`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -339,8 +339,8 @@ test_revert_directory_unknown() {
 	echo 'R  alpha' > $testroot/stdout.expected
 	echo 'R  epsilon/zeta' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -350,8 +350,8 @@ test_revert_directory_unknown() {
 	cat $testroot/wt/epsilon/new_file > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -361,8 +361,8 @@ test_revert_directory_unknown() {
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 
@@ -378,8 +378,8 @@ test_revert_patch() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -394,8 +394,8 @@ test_revert_patch() {
 	printf "n\nn\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -437,8 +437,8 @@ M  numbers (change 3 of 3)
 revert this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -447,8 +447,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -456,8 +456,8 @@ EOF
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	cmp -s $testroot/numbers.diff $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/numbers.diff $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -467,8 +467,8 @@ EOF
 	printf "y\nn\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -510,8 +510,8 @@ M  numbers (change 3 of 3)
 revert this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -520,8 +520,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -554,8 +554,8 @@ EOF
 EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -606,8 +606,8 @@ M  numbers (change 3 of 3)
 revert this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -616,8 +616,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -649,8 +649,8 @@ EOF
 +c
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -684,8 +684,8 @@ M  numbers (change 2 of 2)
 revert this change? [y/n/q] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -711,8 +711,8 @@ EOF
  5
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -723,8 +723,8 @@ test_revert_patch_added() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -739,8 +739,8 @@ test_revert_patch_added() {
 	echo "A  epsilon/new" > $testroot/stdout.expected
 	echo "revert this addition? [y/n] n" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -749,8 +749,8 @@ test_revert_patch_added() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "A  epsilon/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -764,8 +764,8 @@ test_revert_patch_added() {
 	echo "revert this addition? [y/n] y" >> $testroot/stdout.expected
 	echo "R  epsilon/new" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -774,8 +774,8 @@ test_revert_patch_added() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "?  epsilon/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -786,8 +786,8 @@ test_revert_patch_removed() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -800,8 +800,8 @@ test_revert_patch_removed() {
 	echo "D  beta" > $testroot/stdout.expected
 	echo "revert this deletion? [y/n] n" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -810,8 +810,8 @@ test_revert_patch_removed() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "D  beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -825,8 +825,8 @@ test_revert_patch_removed() {
 	echo "revert this deletion? [y/n] y" >> $testroot/stdout.expected
 	echo "R  beta" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -835,8 +835,8 @@ test_revert_patch_removed() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -851,8 +851,8 @@ test_revert_patch_one_change() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -866,8 +866,8 @@ test_revert_patch_one_change() {
 	printf "y\n" > $testroot/patchscript
 	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -885,16 +885,16 @@ test_revert_patch_one_change() {
 M  numbers (change 1 of 1)
 revert this change? [y/n/q] y
 EOF
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -903,8 +903,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -913,8 +913,8 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -924,8 +924,8 @@ test_revert_added_subtree() {
 	local testroot=`test_init revert_added_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -961,8 +961,8 @@ test_revert_added_subtree() {
 	(cd $testroot/wt && got revert -R . > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -983,8 +983,8 @@ test_revert_added_subtree() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -994,8 +994,8 @@ test_revert_deleted_subtree() {
 	local testroot=`test_init revert_deleted_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1035,8 +1035,8 @@ test_revert_deleted_subtree() {
 	(cd $testroot/wt && got revert -R . > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1046,8 +1046,8 @@ test_revert_deleted_subtree() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1100,8 +1100,8 @@ R  passwd.link
 R  zeta.link
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1116,8 +1116,8 @@ EOF
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1132,8 +1132,8 @@ EOF
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "epsilon" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1149,8 +1149,8 @@ EOF
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1159,8 +1159,8 @@ EOF
 	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
 	echo "../beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1169,8 +1169,8 @@ EOF
 	readlink $testroot/wt/nonexistent.link > $testroot/stdout
 	echo "nonexistent" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1184,8 +1184,8 @@ EOF
 	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
 	echo ".got/foo" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1200,8 +1200,8 @@ EOF
 	readlink $testroot/wt/zeta.link > $testroot/stdout
 	echo "epsilon/zeta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1217,8 +1217,8 @@ EOF
 	echo "?  dotgotfoo.link" > $testroot/stdout.expected
 	echo "?  new.link" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -1265,8 +1265,8 @@ test_revert_patch_symlink() {
 	printf "y\nn\ny\nn\ny\ny\nn\ny\ny\n" > $testroot/patchscript
 	(cd $testroot/wt && got revert -F $testroot/patchscript -p -R . \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1332,8 +1332,8 @@ revert this addition? [y/n] y
 R  zeta3.link
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1348,8 +1348,8 @@ EOF
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1364,8 +1364,8 @@ EOF
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "epsilon" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1381,8 +1381,8 @@ EOF
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1391,8 +1391,8 @@ EOF
 	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
 	echo "../gamma" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1401,8 +1401,8 @@ EOF
 	readlink $testroot/wt/nonexistent.link > $testroot/stdout
 	echo "nonexistent" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1416,8 +1416,8 @@ EOF
 	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
 	echo ".got/foo" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1439,8 +1439,8 @@ EOF
 	readlink $testroot/wt/zeta2.link > $testroot/stdout
 	echo "epsilon/zeta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1455,8 +1455,8 @@ EOF
 	readlink $testroot/wt/zeta3.link > $testroot/stdout
 	echo "beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1475,8 +1475,8 @@ EOF
 	echo "D  zeta.link" >> $testroot/stdout.expected
 	echo "?  zeta3.link" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi

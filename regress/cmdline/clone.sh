@@ -22,35 +22,35 @@ test_clone_basic() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo-clone
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/log-repo $testroot/log-repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "log -p output of cloned repository differs" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -60,15 +60,15 @@ test_clone_basic() {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -82,8 +82,8 @@ test_clone_basic() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -98,8 +98,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -118,8 +118,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -136,8 +136,8 @@ test_clone_list() {
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 
 	got clone -l $testurl/repo > $testroot/stdout 2>$testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -147,8 +147,8 @@ test_clone_list() {
 	got ref -l -r $testroot/repo >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -166,8 +166,8 @@ test_clone_branch() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -b foo $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -183,8 +183,8 @@ test_clone_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -199,8 +199,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -219,8 +219,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -239,8 +239,8 @@ test_clone_all() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -a $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -260,8 +260,8 @@ test_clone_all() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -276,8 +276,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -296,8 +296,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -316,8 +316,8 @@ test_clone_mirror() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -m $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -332,8 +332,8 @@ test_clone_mirror() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -349,8 +349,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -369,8 +369,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -389,8 +389,8 @@ test_clone_mirror_all() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -m -a $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -405,8 +405,8 @@ test_clone_mirror_all() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -422,8 +422,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -442,8 +442,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -462,8 +462,8 @@ test_clone_reference() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -R hoo $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -482,8 +482,8 @@ test_clone_reference() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -499,8 +499,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -520,8 +520,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -540,8 +540,8 @@ test_clone_branch_and_reference() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -R hoo/boo/zoo -b foo $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -558,8 +558,8 @@ test_clone_branch_and_reference() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -575,8 +575,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -596,8 +596,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -616,8 +616,8 @@ test_clone_reference_mirror() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q -R hoo -m $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -631,8 +631,8 @@ test_clone_reference_mirror() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -649,8 +649,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -670,8 +670,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi
@@ -687,8 +687,8 @@ test_clone_multiple_branches() {
 	got branch -r $testroot/repo -c $commit_id bar
 
 	got clone -q -b foo -b bar $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -705,8 +705,8 @@ test_clone_multiple_branches() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -721,8 +721,8 @@ remote "origin" {
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/got.conf.expected \
 			$testroot/repo-clone/got.conf
 		test_done "$testroot" "$ret"
@@ -742,8 +742,8 @@ EOF
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/config.expected \
 			$testroot/repo-clone/config
 	fi

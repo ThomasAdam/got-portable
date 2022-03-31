@@ -20,8 +20,8 @@ test_stage_basic() {
 	local testroot=`test_init stage_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -37,8 +37,8 @@ test_stage_basic() {
 	(cd $testroot/wt && got stage > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -48,16 +48,16 @@ test_stage_no_changes() {
 	local testroot=`test_init stage_no_changes`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got stage alpha beta > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -66,8 +66,8 @@ test_stage_no_changes() {
 	echo "got: no changes to stage" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -75,8 +75,8 @@ test_stage_no_changes() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -86,8 +86,8 @@ test_stage_unversioned() {
 	local testroot=`test_init stage_unversioned`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -99,16 +99,16 @@ test_stage_unversioned() {
 	echo "M  alpha" > $testroot/stdout.expected
 	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got stage > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -116,8 +116,8 @@ test_stage_unversioned() {
 
 	echo " M alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -127,8 +127,8 @@ test_stage_unversioned() {
 
 	(cd $testroot/wt && got stage unversioned-file > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -136,8 +136,8 @@ test_stage_unversioned() {
 
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -148,8 +148,8 @@ test_stage_nonexistent() {
 	local testroot=`test_init stage_nonexistent`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -159,8 +159,8 @@ test_stage_nonexistent() {
 	echo "got: nonexistent-file: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -170,8 +170,8 @@ test_stage_list() {
 	local testroot=`test_init stage_list`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -197,8 +197,8 @@ test_stage_list() {
 		cut -d' ' -f3 | tr -d '\n' >> $testroot/stdout.expected)
 	echo " A foo" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -209,8 +209,8 @@ test_stage_list() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -222,8 +222,8 @@ test_stage_list() {
 		cut -d' ' -f3 | tr -d '\n' > $testroot/stdout.expected)
 	echo " M alpha" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -235,8 +235,8 @@ test_stage_conflict() {
 	local initial_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -257,8 +257,8 @@ test_stage_conflict() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -266,8 +266,8 @@ test_stage_conflict() {
 
 	(cd $testroot/wt && got stage alpha > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -278,15 +278,15 @@ test_stage_conflict() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -297,8 +297,8 @@ test_stage_out_of_date() {
 	local initial_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -311,8 +311,8 @@ test_stage_out_of_date() {
 	echo "modified alpha again" > $testroot/wt/alpha
 	(cd $testroot/wt && got stage alpha > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -323,15 +323,15 @@ test_stage_out_of_date() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -342,8 +342,8 @@ test_double_stage() {
 	local testroot=`test_init double_stage`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -356,8 +356,8 @@ test_double_stage() {
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	(cd $testroot/wt && got stage alpha 2> $testroot/stderr)
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -365,16 +365,16 @@ test_double_stage() {
 
 	(cd $testroot/wt && got stage beta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -383,8 +383,8 @@ test_double_stage() {
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	(cd $testroot/wt && got stage foo 2> $testroot/stderr)
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -393,16 +393,16 @@ test_double_stage() {
 	printf "q\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -411,8 +411,8 @@ test_double_stage() {
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	(cd $testroot/wt && got stage foo 2> $testroot/stderr)
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -425,8 +425,8 @@ test_double_stage() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -438,8 +438,8 @@ test_double_stage() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -449,8 +449,8 @@ test_stage_status() {
 	local testroot=`test_init stage_status`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -474,8 +474,8 @@ test_stage_status() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -493,8 +493,8 @@ test_stage_status() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -505,8 +505,8 @@ test_stage_status() {
 	echo ' A foo' > $testroot/stdout.expected
 	(cd $testroot/wt && got status foo > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -517,8 +517,8 @@ test_stage_status() {
 	echo ' D beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got status beta > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -529,8 +529,8 @@ test_stage_add_already_staged_file() {
 	local testroot=`test_init stage_add_already_staged_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -549,15 +549,15 @@ test_stage_add_already_staged_file() {
 		echo "got: $f: file has unexpected status" \
 			> $testroot/stderr.expected
 		cmp -s $testroot/stderr.expected $testroot/stderr
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
 			return 1
 		fi
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -570,8 +570,8 @@ test_stage_add_already_staged_file() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -581,8 +581,8 @@ test_stage_rm_already_staged_file() {
 	local testroot=`test_init stage_rm_already_staged_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -596,24 +596,24 @@ test_stage_rm_already_staged_file() {
 
 	(cd $testroot/wt && got rm beta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rm command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -623,15 +623,15 @@ test_stage_rm_already_staged_file() {
 		echo "got: $f: file is staged" > $testroot/stderr.expected
 		(cd $testroot/wt && got rm $f \
 			> $testroot/stdout 2> $testroot/stderr)
-		ret="$?"
-		if [ "$ret" = "0" ]; then
+		ret=$?
+		if [ $ret -eq 0 ]; then
 			echo "got rm command succeeded unexpectedly" >&2
 			test_done "$testroot" "1"
 			return 1
 		fi
 		cmp -s $testroot/stderr.expected $testroot/stderr
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
 			return 1
@@ -644,8 +644,8 @@ test_stage_rm_already_staged_file() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -655,8 +655,8 @@ test_stage_revert() {
 	local testroot=`test_init stage_revert`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -671,8 +671,8 @@ test_stage_revert() {
 	echo "modified added file again" >> $testroot/wt/foo
 
 	(cd $testroot/wt && got revert alpha > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -680,8 +680,8 @@ test_stage_revert() {
 
 	echo "R  alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -690,8 +690,8 @@ test_stage_revert() {
 	echo "modified alpha" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -702,16 +702,16 @@ test_stage_revert() {
 	echo 'MA foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got revert alpha > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -719,8 +719,8 @@ test_stage_revert() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -729,8 +729,8 @@ test_stage_revert() {
 	echo "modified alpha" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -738,8 +738,8 @@ test_stage_revert() {
 
 	(cd $testroot/wt && got revert beta > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -747,8 +747,8 @@ test_stage_revert() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -756,16 +756,16 @@ test_stage_revert() {
 
 	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got revert foo > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -773,8 +773,8 @@ test_stage_revert() {
 
 	echo "R  foo" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -783,8 +783,8 @@ test_stage_revert() {
 	echo "new file" > $testroot/content.expected
 	cat $testroot/wt/foo > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -795,16 +795,16 @@ test_stage_revert() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got revert foo > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -812,8 +812,8 @@ test_stage_revert() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -822,8 +822,8 @@ test_stage_revert() {
 	echo "new file" > $testroot/content.expected
 	cat $testroot/wt/foo > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -834,8 +834,8 @@ test_stage_revert() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -846,8 +846,8 @@ test_stage_revert() {
 
 	(cd $testroot/wt && got revert -R . > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -856,8 +856,8 @@ test_stage_revert() {
 	echo "R  alpha" > $testroot/stdout.expected
 	echo "R  foo" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -865,8 +865,8 @@ test_stage_revert() {
 
 	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -877,8 +877,8 @@ test_stage_revert() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -889,8 +889,8 @@ test_stage_diff() {
 	local head_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -903,8 +903,8 @@ test_stage_diff() {
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -918,8 +918,8 @@ test_stage_diff() {
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -953,8 +953,8 @@ test_stage_diff() {
 	echo '+new file changed' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -993,8 +993,8 @@ test_stage_diff() {
 	echo '+new file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1006,8 +1006,8 @@ test_stage_histedit() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1031,8 +1031,8 @@ test_stage_histedit() {
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got histedit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1042,15 +1042,15 @@ test_stage_histedit() {
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1079,8 +1079,8 @@ test_stage_rebase() {
 	local master_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1090,8 +1090,8 @@ test_stage_rebase() {
 
 	(cd $testroot/wt && got rebase newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got rebase command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1101,15 +1101,15 @@ test_stage_rebase() {
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1119,8 +1119,8 @@ test_stage_update() {
 	local testroot=`test_init stage_update`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1133,8 +1133,8 @@ test_stage_update() {
 
 	(cd $testroot/wt && got update > $testroot/stdout  \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got update command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1144,15 +1144,15 @@ test_stage_update() {
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1162,8 +1162,8 @@ test_stage_commit_non_staged() {
 	local testroot=`test_init stage_commit_non_staged`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1177,8 +1177,8 @@ test_stage_commit_non_staged() {
 	echo "modified file" > $testroot/wt/gamma/delta
 	(cd $testroot/wt && got commit -m "change delta" gamma/delta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got commit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1188,15 +1188,15 @@ test_stage_commit_non_staged() {
 	echo "got: gamma/delta: file is not staged" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1206,8 +1206,8 @@ test_stage_commit_out_of_date() {
 	local testroot=`test_init stage_commit_out_of_date`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1223,8 +1223,8 @@ test_stage_commit_out_of_date() {
 
 	(cd $testroot/wt && got commit -m "try to commit" > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got commit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1236,15 +1236,15 @@ test_stage_commit_out_of_date() {
 	echo "can be committed" >> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1256,15 +1256,15 @@ test_stage_commit_out_of_date() {
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1272,8 +1272,8 @@ test_stage_commit_out_of_date() {
 
 	(cd $testroot/wt && got unstage > /dev/null)
 	(cd $testroot/wt && got update > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1284,8 +1284,8 @@ test_stage_commit_out_of_date() {
 	echo "D  beta" >> $testroot/stdout.expected
 	echo "A  foo" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1297,8 +1297,8 @@ test_stage_commit_out_of_date() {
 	(cd $testroot/wt && got stage > /dev/null)
 
 	(cd $testroot/wt && got commit -m "try again" > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1310,8 +1310,8 @@ test_stage_commit_out_of_date() {
 	echo "D  beta" >> $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1323,8 +1323,8 @@ test_stage_commit() {
 	local first_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1350,8 +1350,8 @@ test_stage_commit() {
 
 	(cd $testroot/wt && got commit -m "staged changes" \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1364,8 +1364,8 @@ test_stage_commit() {
 	echo "Created commit $head_commit" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1407,8 +1407,8 @@ test_stage_commit() {
 	echo '+new file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1422,8 +1422,8 @@ test_stage_commit() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1438,8 +1438,8 @@ test_stage_patch() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1452,8 +1452,8 @@ test_stage_patch() {
 	printf "n\nn\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1495,8 +1495,8 @@ M  numbers (change 3 of 3)
 stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1504,8 +1504,8 @@ EOF
 
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1515,8 +1515,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1564,8 +1564,8 @@ M  numbers (change 3 of 3)
 stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1574,8 +1574,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "MM numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1604,16 +1604,16 @@ EOF
 	echo " 9" >> $testroot/stdout.expected
 	echo " 10" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got unstage >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1621,8 +1621,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1670,8 +1670,8 @@ M  numbers (change 3 of 3)
 stage this change? [y/n/q] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1680,8 +1680,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "MM numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1707,8 +1707,8 @@ EOF
 	echo "-16" >> $testroot/stdout.expected
 	echo "+c" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1723,8 +1723,8 @@ test_stage_patch_twice() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1775,8 +1775,8 @@ M  numbers (change 3 of 3)
 stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1785,8 +1785,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "MM numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1821,8 +1821,8 @@ M  numbers (change 2 of 2)
 stage this change? [y/n/q] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1831,8 +1831,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "MM numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1869,8 +1869,8 @@ EOF
 +c
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1896,8 +1896,8 @@ EOF
  5
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1908,8 +1908,8 @@ test_stage_patch_added() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1924,8 +1924,8 @@ test_stage_patch_added() {
 	echo "A  epsilon/new" > $testroot/stdout.expected
 	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1934,8 +1934,8 @@ test_stage_patch_added() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo " A epsilon/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1954,8 +1954,8 @@ test_stage_patch_added() {
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
 	echo "+new" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1966,8 +1966,8 @@ test_stage_patch_added_twice() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1982,8 +1982,8 @@ test_stage_patch_added_twice() {
 	echo "A  epsilon/new" > $testroot/stdout.expected
 	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1992,8 +1992,8 @@ test_stage_patch_added_twice() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo " A epsilon/new" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2001,8 +2001,8 @@ test_stage_patch_added_twice() {
 
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		epsilon/new > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2010,8 +2010,8 @@ test_stage_patch_added_twice() {
 
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -2019,8 +2019,8 @@ test_stage_patch_added_twice() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -2031,8 +2031,8 @@ test_stage_patch_removed() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2048,8 +2048,8 @@ test_stage_patch_removed() {
 	echo "D  beta" > $testroot/stdout.expected
 	echo "stage this deletion? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2058,8 +2058,8 @@ test_stage_patch_removed() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo " D beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2078,8 +2078,8 @@ test_stage_patch_removed() {
 	echo "@@ -1 +0,0 @@" >> $testroot/stdout.expected
 	echo "-beta" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -2090,8 +2090,8 @@ test_stage_patch_removed_twice() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2107,8 +2107,8 @@ test_stage_patch_removed_twice() {
 	echo "D  beta" > $testroot/stdout.expected
 	echo "stage this deletion? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2117,8 +2117,8 @@ test_stage_patch_removed_twice() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo " D beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2126,8 +2126,8 @@ test_stage_patch_removed_twice() {
 
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p beta \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2135,8 +2135,8 @@ test_stage_patch_removed_twice() {
 
 	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -2144,8 +2144,8 @@ test_stage_patch_removed_twice() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -2161,8 +2161,8 @@ test_stage_patch_quit() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2177,8 +2177,8 @@ test_stage_patch_quit() {
 	printf "y\nq\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2212,8 +2212,8 @@ D  zzz
 stage this deletion? [y/n] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2223,8 +2223,8 @@ EOF
 	echo "MM numbers" > $testroot/stdout.expected
 	echo "D  zzz" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2251,8 +2251,8 @@ EOF
 	echo " 4" >> $testroot/stdout.expected
 	echo " 5" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -2269,8 +2269,8 @@ test_stage_patch_incomplete_script() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2283,8 +2283,8 @@ test_stage_patch_incomplete_script() {
 	printf "y\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2317,16 +2317,16 @@ EOF
 	echo -n "stage this change? [y/n/q] " >> $testroot/stdout.expected
 	echo "got: invalid patch choice" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2335,8 +2335,8 @@ EOF
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2345,8 +2345,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -2366,8 +2366,8 @@ test_stage_symlink() {
 	local head_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2384,8 +2384,8 @@ test_stage_symlink() {
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
 	(cd $testroot/wt && got stage > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got stage succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2394,8 +2394,8 @@ test_stage_symlink() {
 	echo "symbolic link points outside of paths under version control" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -2413,8 +2413,8 @@ test_stage_symlink() {
  A zeta.link
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2503,8 +2503,8 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2512,8 +2512,8 @@ EOF
 
 	(cd $testroot/wt && got commit -m "staged symlink" \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2529,16 +2529,16 @@ EOF
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got tree -r $testroot/repo -c $commit_id > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got tree command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2557,8 +2557,8 @@ passwd.link@ -> /etc/passwd
 zeta.link@ -> gamma/delta
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -2572,8 +2572,8 @@ EOF
 	echo 'this is regular file alpha.link' > $testroot/content.expected
 	cp $testroot/wt/alpha.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2593,8 +2593,8 @@ EOF
 	echo -n ".got/bar" > $testroot/content.expected
 	cp $testroot/wt/dotgotbar.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2608,8 +2608,8 @@ EOF
 	echo "this is regular file foo" > $testroot/content.expected
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2624,8 +2624,8 @@ EOF
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "gamma" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2639,8 +2639,8 @@ EOF
 	echo -n "/etc/passwd" > $testroot/content.expected
 	cp $testroot/wt/passwd.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2655,8 +2655,8 @@ EOF
 	readlink $testroot/wt/zeta.link > $testroot/stdout
 	echo "gamma/delta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2678,8 +2678,8 @@ test_stage_patch_symlink() {
 	local head_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2737,8 +2737,8 @@ A  zeta.link
 stage this addition? [y/n] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2805,8 +2805,8 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2814,8 +2814,8 @@ EOF
 
 	(cd $testroot/wt && got commit -m "staged symlink" \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2829,16 +2829,16 @@ EOF
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	echo "Created commit $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got tree -r $testroot/repo -c $commit_id > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got tree command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2856,8 +2856,8 @@ passwd.link@ -> /etc/passwd
 zeta.link@ -> gamma/delta
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		return 1
 	fi
@@ -2871,8 +2871,8 @@ EOF
 	echo 'this is regular file alpha.link' > $testroot/content.expected
 	cp $testroot/wt/alpha.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2886,8 +2886,8 @@ EOF
 	readlink $testroot/wt/dotgotbar.link > $testroot/stdout
 	echo ".got/bar" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2901,8 +2901,8 @@ EOF
 	echo "this is regular file foo" > $testroot/content.expected
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2917,8 +2917,8 @@ EOF
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "gamma" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -2932,8 +2932,8 @@ EOF
 	echo -n "/etc/passwd" > $testroot/content.expected
 	cp $testroot/wt/passwd.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -2948,8 +2948,8 @@ EOF
 	readlink $testroot/wt/zeta.link > $testroot/stdout
 	echo "gamma/delta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1

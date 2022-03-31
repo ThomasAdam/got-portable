@@ -20,8 +20,8 @@ test_backout_basic() {
 	local testroot=`test_init backout_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -49,8 +49,8 @@ test_backout_basic() {
 	echo "D  new" >> $testroot/stdout.expected
 	echo "Backed out commit $bad_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -59,8 +59,8 @@ test_backout_basic() {
 	echo "alpha" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -83,8 +83,8 @@ test_backout_basic() {
 	echo 'D  new' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -94,8 +94,8 @@ test_backout_edits_for_file_since_deleted() {
 	local testroot=`test_init backout_edits_for_file_since_deleted`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -121,8 +121,8 @@ test_backout_edits_for_file_since_deleted() {
 		>> $testroot/stdout.expected
 	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -137,8 +137,8 @@ test_backout_edits_for_file_since_deleted() {
 	echo -n '' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -149,8 +149,8 @@ test_backout_next_commit() {
 	local commit0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -175,8 +175,8 @@ test_backout_next_commit() {
 		>> $testroot/stdout.expected
 	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -191,8 +191,8 @@ test_backout_next_commit() {
 	echo "zeta" > $testroot/content.expected
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -201,8 +201,8 @@ test_backout_next_commit() {
 	echo -n '' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
