@@ -20,8 +20,8 @@ test_rm_basic() {
 	local testroot=`test_init rm_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -31,8 +31,8 @@ test_rm_basic() {
 	(cd $testroot/wt && got rm alpha beta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -41,8 +41,8 @@ test_rm_basic() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -63,8 +63,8 @@ test_rm_with_local_mods() {
 	local testroot=`test_init rm_with_local_mods`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -75,8 +75,8 @@ test_rm_with_local_mods() {
 	(cd $testroot/wt && got rm beta 2>$testroot/stderr)
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -86,8 +86,8 @@ test_rm_with_local_mods() {
 	(cd $testroot/wt && got rm -f beta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
@@ -104,8 +104,8 @@ test_double_rm() {
 	local testroot=`test_init double_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -116,8 +116,8 @@ test_double_rm() {
 		echo -n > $testroot/stderr.expected
 		(cd $testroot/wt && got rm $fflag beta > $testroot/stdout \
 			2> $testroot/stderr)
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			echo "got rm command failed unexpectedly" >&2
 			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
@@ -125,8 +125,8 @@ test_double_rm() {
 		fi
 		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -139,8 +139,8 @@ test_rm_and_add_elsewhere() {
 	local testroot=`test_init rm_and_add_elsewhere`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -152,16 +152,16 @@ test_rm_and_add_elsewhere() {
 	echo '!  alpha' > $testroot/stdout.expected
 	echo '?  epsilon/alpha' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rm alpha > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got rm command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
@@ -170,8 +170,8 @@ test_rm_and_add_elsewhere() {
 
 	echo -n '' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -180,16 +180,16 @@ test_rm_and_add_elsewhere() {
 	echo "got: alpha: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rm -f alpha > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rm command failed unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
@@ -198,16 +198,16 @@ test_rm_and_add_elsewhere() {
 
 	echo 'D  alpha' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -216,8 +216,8 @@ test_rm_and_add_elsewhere() {
 	# While here, test behaviour of rm on files in unversioned status.
 	(cd $testroot/wt && got rm epsilon/alpha > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got rm command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
@@ -226,8 +226,8 @@ test_rm_and_add_elsewhere() {
 
 	echo -n '' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -236,8 +236,8 @@ test_rm_and_add_elsewhere() {
 	echo "got: epsilon/alpha: file has unexpected status" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -246,8 +246,8 @@ test_rm_and_add_elsewhere() {
 	# And test the same case with -f.
 	(cd $testroot/wt && got rm -f epsilon/alpha > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got rm command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
@@ -256,8 +256,8 @@ test_rm_and_add_elsewhere() {
 
 	echo -n '' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -266,8 +266,8 @@ test_rm_and_add_elsewhere() {
 	echo "got: epsilon/alpha: file has unexpected status" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -277,8 +277,8 @@ test_rm_and_add_elsewhere() {
 	(cd $testroot/wt && got add epsilon/alpha > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -289,8 +289,8 @@ test_rm_and_add_elsewhere() {
 	echo 'D  alpha' > $testroot/stdout.expected
 	echo 'A  epsilon/alpha' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -300,19 +300,19 @@ test_rm_directory() {
 	local testroot=`test_init rm_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rm . > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
+	ret=$?
 	echo "got: removing directories requires -R option" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -320,8 +320,8 @@ test_rm_directory() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -335,8 +335,8 @@ test_rm_directory() {
 	echo 'D  gamma/delta' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -347,8 +347,8 @@ test_rm_directory() {
 	echo -n '' > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -359,8 +359,8 @@ test_rm_directory() {
 	echo -n '' > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -373,19 +373,19 @@ test_rm_directory_keep_files() {
 	local testroot=`test_init rm_directory_keep_files`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rm . > $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
+	ret=$?
 	echo "got: removing directories requires -R option" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -393,8 +393,8 @@ test_rm_directory_keep_files() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -408,8 +408,8 @@ test_rm_directory_keep_files() {
 	echo 'D  gamma/delta' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -423,8 +423,8 @@ test_rm_directory_keep_files() {
 	echo 'D  gamma/delta' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -439,8 +439,8 @@ test_rm_directory_keep_files() {
 	echo '?  gamma/delta' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -453,8 +453,8 @@ test_rm_subtree() {
 	local testroot=`test_init rm_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -500,8 +500,8 @@ test_rm_subtree() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -519,8 +519,8 @@ test_rm_symlink() {
 	git_commit $testroot/repo -m "add symlinks"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -534,8 +534,8 @@ test_rm_symlink() {
 		epsilon/beta.link nonexistent.link > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -545,8 +545,8 @@ test_rm_status_code() {
 	local testroot=`test_init rm_status_code`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -557,8 +557,8 @@ test_rm_status_code() {
 	(cd $testroot/wt && got rm -s Mx beta 2>$testroot/stderr)
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -570,8 +570,8 @@ test_rm_status_code() {
 	(cd $testroot/wt && got rm -R -s '!' . >$testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
@@ -590,8 +590,8 @@ test_rm_status_code() {
 	(cd $testroot/wt && got rm -R -s 'M!' . >$testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -607,8 +607,8 @@ test_rm_status_code() {
 	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -621,8 +621,8 @@ test_rm_nonexistent_directory() {
 	local testroot=`test_init rm_nonexistent_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -631,8 +631,8 @@ test_rm_nonexistent_directory() {
 
 	(cd $testroot/wt && got rm epsilon > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got rm command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
@@ -641,8 +641,8 @@ test_rm_nonexistent_directory() {
 
 	echo -n '' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -651,8 +651,8 @@ test_rm_nonexistent_directory() {
 	echo "got: epsilon: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -660,8 +660,8 @@ test_rm_nonexistent_directory() {
 
 	(cd $testroot/wt && got rm -f epsilon > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rm command failed unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
@@ -670,8 +670,8 @@ test_rm_nonexistent_directory() {
 
 	echo -n '' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -679,8 +679,8 @@ test_rm_nonexistent_directory() {
 
 	echo -n '' > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1

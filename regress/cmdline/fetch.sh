@@ -22,8 +22,8 @@ test_fetch_basic() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -34,7 +34,7 @@ test_fetch_basic() {
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -42,8 +42,8 @@ test_fetch_basic() {
 
 	got fetch -q -r $testroot/repo-clone > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -52,35 +52,35 @@ test_fetch_basic() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo-clone
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/log-repo $testroot/log-repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "log -p output of cloned repository differs" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -90,15 +90,15 @@ test_fetch_basic() {
 	echo "refs/heads/master: $commit_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -112,8 +112,8 @@ test_fetch_basic() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -129,8 +129,8 @@ test_fetch_list() {
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -138,8 +138,8 @@ test_fetch_list() {
 
 	(cd $testroot/repo-clone && got fetch -q -l \
 		> $testroot/stdout 2>$testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -148,8 +148,8 @@ test_fetch_list() {
 	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -161,8 +161,8 @@ test_fetch_branch() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -184,8 +184,8 @@ test_fetch_branch() {
 	local commit_id3=`git_show_head $testroot/repo`
 
 	got fetch -q -r $testroot/repo-clone -b foo > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -194,8 +194,8 @@ test_fetch_branch() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -216,16 +216,16 @@ test_fetch_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -q -r $testroot/repo-clone -b master > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -234,8 +234,8 @@ test_fetch_branch() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -255,8 +255,8 @@ test_fetch_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -268,8 +268,8 @@ test_fetch_all() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -292,16 +292,16 @@ test_fetch_all() {
 	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -q -a -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -321,8 +321,8 @@ test_fetch_all() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -338,8 +338,8 @@ test_fetch_empty_packfile() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -360,16 +360,16 @@ test_fetch_empty_packfile() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -q -a -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -389,8 +389,8 @@ test_fetch_empty_packfile() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -409,8 +409,8 @@ test_fetch_delete_branch() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -a -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -431,8 +431,8 @@ test_fetch_delete_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -441,8 +441,8 @@ test_fetch_delete_branch() {
 	got branch -r $testroot/repo -d foo >/dev/null
 
 	got fetch -q -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -462,16 +462,16 @@ test_fetch_delete_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -d -q -r $testroot/repo-clone > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -480,8 +480,8 @@ test_fetch_delete_branch() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -501,8 +501,8 @@ test_fetch_delete_branch() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -521,8 +521,8 @@ test_fetch_delete_branch_mirror() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -a -m -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -537,8 +537,8 @@ test_fetch_delete_branch_mirror() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -547,8 +547,8 @@ test_fetch_delete_branch_mirror() {
 	got branch -r $testroot/repo -d foo >/dev/null
 
 	got fetch -q -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -563,16 +563,16 @@ test_fetch_delete_branch_mirror() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -d -q -r $testroot/repo-clone > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -581,8 +581,8 @@ test_fetch_delete_branch_mirror() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -597,8 +597,8 @@ test_fetch_delete_branch_mirror() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -618,8 +618,8 @@ test_fetch_update_tag() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got clone -a -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -649,16 +649,16 @@ test_fetch_update_tag() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -a -q -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -678,8 +678,8 @@ test_fetch_update_tag() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -687,8 +687,8 @@ test_fetch_update_tag() {
 
 	got fetch -r $testroot/repo-clone 2> $testroot/stderr | \
 		tail -n 1 > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -698,8 +698,8 @@ test_fetch_update_tag() {
 		> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -719,16 +719,16 @@ test_fetch_update_tag() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -q -t -r $testroot/repo-clone > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -737,8 +737,8 @@ test_fetch_update_tag() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -758,8 +758,8 @@ test_fetch_update_tag() {
 	echo "refs/tags/1.0: $tag_id2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -771,8 +771,8 @@ test_fetch_reference() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -796,8 +796,8 @@ test_fetch_reference() {
 
 	got fetch -q -r $testroot/repo-clone -R refs/remotes/origin/main \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -806,8 +806,8 @@ test_fetch_reference() {
 	echo -n > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -817,16 +817,16 @@ test_fetch_reference() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got fetch -q -r $testroot/repo-clone -R refs/hoo
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -845,8 +845,8 @@ test_fetch_reference() {
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -859,8 +859,8 @@ test_fetch_replace_symref() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -m -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -876,8 +876,8 @@ test_fetch_replace_symref() {
 	echo "refs/hoo/boo/zoo: refs/heads/master" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -885,8 +885,8 @@ test_fetch_replace_symref() {
 
 	got fetch -r $testroot/repo-clone -R refs/hoo \
 		2> $testroot/stderr | grep ^Replacing > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -896,8 +896,8 @@ test_fetch_replace_symref() {
 		> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -910,8 +910,8 @@ test_fetch_replace_symref() {
 	echo "refs/hoo/boo/zoo: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -924,8 +924,8 @@ test_fetch_update_headref() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -941,8 +941,8 @@ test_fetch_update_headref() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -957,8 +957,8 @@ test_fetch_update_headref() {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -976,8 +976,8 @@ test_fetch_update_headref() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -998,8 +998,8 @@ test_fetch_update_headref() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1011,8 +1011,8 @@ test_fetch_headref_deleted_locally() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1028,8 +1028,8 @@ test_fetch_headref_deleted_locally() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1038,8 +1038,8 @@ test_fetch_headref_deleted_locally() {
 	got ref -r $testroot/repo-clone -d refs/remotes/origin/HEAD > /dev/null
 
 	got fetch -q -r $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1055,8 +1055,8 @@ test_fetch_headref_deleted_locally() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1072,8 +1072,8 @@ test_fetch_gotconfig_remote_repo() {
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1096,8 +1096,8 @@ EOF
 		> $testroot/stderr.expected
 	(cd $testroot/repo-clone && got fetch -q nonexistent \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
@@ -1106,8 +1106,8 @@ EOF
 
 	(cd $testroot/repo-clone && got fetch -q -l foobar \
 		> $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1116,8 +1116,8 @@ EOF
 	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1133,8 +1133,8 @@ remote "barbaz" {
 }
 EOF
 	(cd $testroot/wt && got fetch -q -l barbaz > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1143,8 +1143,8 @@ EOF
 	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1179,8 +1179,8 @@ EOF
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1192,15 +1192,15 @@ test_fetch_delete_remote_refs() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got clone -q $testurl/repo $testroot/repo-clone
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got clone command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1214,8 +1214,8 @@ test_fetch_delete_remote_refs() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1223,8 +1223,8 @@ test_fetch_delete_remote_refs() {
 
 	got fetch -q -r $testroot/repo-clone -X > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1232,8 +1232,8 @@ test_fetch_delete_remote_refs() {
 
 	echo "got: -X option requires a remote name" > $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1241,8 +1241,8 @@ test_fetch_delete_remote_refs() {
 
 	got fetch -q -r $testroot/repo-clone -X origin > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1254,15 +1254,15 @@ test_fetch_delete_remote_refs() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
-	if [ "$ret" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1272,8 +1272,8 @@ test_fetch_delete_remote_refs() {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

@@ -39,8 +39,8 @@ test_histedit_no_op() {
 		> $testroot/diff.expected
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -73,8 +73,8 @@ test_histedit_no_op() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -83,8 +83,8 @@ test_histedit_no_op() {
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -99,8 +99,8 @@ test_histedit_no_op() {
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -110,8 +110,8 @@ test_histedit_no_op() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -122,8 +122,8 @@ test_histedit_no_op() {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -133,8 +133,8 @@ test_histedit_no_op() {
 		> $testroot/diff
 	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/diff.expected $testroot/diff
 		test_done "$testroot" "$ret"
 		return 1
@@ -144,8 +144,8 @@ test_histedit_no_op() {
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -191,8 +191,8 @@ history forked at $fork_commit
 EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -205,15 +205,15 @@ EOF
 	echo "$old_commit2" >> $testroot/stdout.expected
 	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -222,8 +222,8 @@ EOF
 	(cd $testroot/repo && got histedit -l > $testroot/stdout)
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -249,8 +249,8 @@ test_histedit_swap() {
 		> $testroot/diff.expected
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -282,8 +282,8 @@ test_histedit_swap() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -292,8 +292,8 @@ test_histedit_swap() {
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -308,8 +308,8 @@ test_histedit_swap() {
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -319,8 +319,8 @@ test_histedit_swap() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -331,8 +331,8 @@ test_histedit_swap() {
 	echo "commit $new_commit2" >> $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -342,8 +342,8 @@ test_histedit_swap() {
 		> $testroot/diff
 	sed -i -e "s/$old_commit2/$new_commit1/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
@@ -368,8 +368,8 @@ test_histedit_drop() {
 		> $testroot/diff.expected
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -396,8 +396,8 @@ test_histedit_drop() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -407,8 +407,8 @@ test_histedit_drop() {
 		echo "$f" > $testroot/content.expected
 		cat $testroot/wt/$f > $testroot/content
 		cmp -s $testroot/content.expected $testroot/content
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/content.expected $testroot/content
 			test_done "$testroot" "$ret"
 			return 1
@@ -425,8 +425,8 @@ test_histedit_drop() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -436,8 +436,8 @@ test_histedit_drop() {
 	echo "commit $new_commit2 (master)" > $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -448,8 +448,8 @@ test_histedit_drop() {
 	sed -i -e "s/$old_commit1/$orig_commit/" $testroot/diff.expected
 	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
@@ -476,8 +476,8 @@ test_histedit_fold() {
 	local old_commit3=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -515,8 +515,8 @@ test_histedit_fold() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -525,8 +525,8 @@ test_histedit_fold() {
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -541,8 +541,8 @@ test_histedit_fold() {
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -552,8 +552,8 @@ test_histedit_fold() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -563,8 +563,8 @@ test_histedit_fold() {
 	echo "commit $new_commit2 (master)" > $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -587,8 +587,8 @@ test_histedit_edit() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -609,8 +609,8 @@ test_histedit_edit() {
 	echo "Stopping histedit for amending commit $old_commit1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -622,8 +622,8 @@ test_histedit_edit() {
 	(cd $testroot/wt && got stage alpha > /dev/null)
 	(cd $testroot/wt && got histedit -c > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -633,8 +633,8 @@ test_histedit_edit() {
 	echo "these changes must be committed or unstaged first" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -659,8 +659,8 @@ test_histedit_edit() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -669,8 +669,8 @@ test_histedit_edit() {
 	echo "edited modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -685,8 +685,8 @@ test_histedit_edit() {
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -696,8 +696,8 @@ test_histedit_edit() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -708,8 +708,8 @@ test_histedit_edit() {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -732,8 +732,8 @@ test_histedit_fold_last_commit() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -745,8 +745,8 @@ test_histedit_fold_last_commit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -756,8 +756,8 @@ test_histedit_fold_last_commit() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -780,8 +780,8 @@ test_histedit_missing_commit() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -792,8 +792,8 @@ test_histedit_missing_commit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -803,8 +803,8 @@ test_histedit_missing_commit() {
 		> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -827,8 +827,8 @@ test_histedit_abort() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -852,8 +852,8 @@ test_histedit_abort() {
 	echo "Stopping histedit for amending commit $old_commit1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -875,8 +875,8 @@ test_histedit_abort() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -886,8 +886,8 @@ test_histedit_abort() {
 		echo "$f" > $testroot/content.expected
 		cat $testroot/wt/$f > $testroot/content
 		cmp -s $testroot/content.expected $testroot/content
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/content.expected $testroot/content
 			test_done "$testroot" "$ret"
 			return 1
@@ -897,8 +897,8 @@ test_histedit_abort() {
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -909,8 +909,8 @@ test_histedit_abort() {
 	echo "?  epsilon/new" > $testroot/stdout.expected
 	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -921,8 +921,8 @@ test_histedit_abort() {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -938,8 +938,8 @@ test_histedit_path_prefix_drop() {
 
 	got checkout -c $orig_commit -p gamma $testroot/repo \
 		$testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -949,8 +949,8 @@ test_histedit_path_prefix_drop() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -962,8 +962,8 @@ test_histedit_path_prefix_drop() {
 		>> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -972,8 +972,8 @@ test_histedit_path_prefix_drop() {
 	rm -rf $testroot/wt
 	got checkout -c $orig_commit -p epsilon $testroot/repo \
 		$testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -989,8 +989,8 @@ test_histedit_path_prefix_drop() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -999,8 +999,8 @@ test_histedit_path_prefix_drop() {
 	echo "zeta" > $testroot/content.expected
 	cat $testroot/wt/zeta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1011,8 +1011,8 @@ test_histedit_path_prefix_drop() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1021,8 +1021,8 @@ test_histedit_path_prefix_drop() {
 	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
 	echo "commit $orig_commit (master)" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1041,8 +1041,8 @@ test_histedit_path_prefix_edit() {
 
 	got checkout -c $orig_commit -p gamma $testroot/repo \
 		$testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1053,8 +1053,8 @@ test_histedit_path_prefix_edit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1066,8 +1066,8 @@ test_histedit_path_prefix_edit() {
 		>> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1076,8 +1076,8 @@ test_histedit_path_prefix_edit() {
 	rm -rf $testroot/wt
 	got checkout -c $orig_commit -p epsilon $testroot/repo \
 		$testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1090,8 +1090,8 @@ test_histedit_path_prefix_edit() {
 	echo "Stopping histedit for amending commit $old_commit1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1100,8 +1100,8 @@ test_histedit_path_prefix_edit() {
 	echo "modified zeta" > $testroot/content.expected
 	cat $testroot/wt/zeta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1111,8 +1111,8 @@ test_histedit_path_prefix_edit() {
 
 	echo "M  zeta"> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1130,8 +1130,8 @@ test_histedit_path_prefix_edit() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1141,8 +1141,8 @@ test_histedit_path_prefix_edit() {
 	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1152,8 +1152,8 @@ test_histedit_path_prefix_edit() {
 		> $testroot/diff
 	sed -i -e "s/$old_commit1/$new_commit1/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
@@ -1164,8 +1164,8 @@ test_histedit_outside_refs_heads() {
 	local commit1=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -1175,8 +1175,8 @@ test_histedit_outside_refs_heads() {
 
 	(cd $testroot/wt && got commit -m 'change alpha' \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1184,16 +1184,16 @@ test_histedit_outside_refs_heads() {
 	local commit2=`git_show_head $testroot/repo`
 
 	got ref -r $testroot/repo -c master refs/remotes/origin/master
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update -b origin/master -c $commit1 >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -1208,8 +1208,8 @@ test_histedit_outside_refs_heads() {
 	echo '"refs/heads/" reference namespace' \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -1232,8 +1232,8 @@ test_histedit_fold_last_commit_swap() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1246,8 +1246,8 @@ test_histedit_fold_last_commit_swap() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "histedit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1273,8 +1273,8 @@ test_histedit_fold_last_commit_swap() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1299,8 +1299,8 @@ test_histedit_split_commit() {
 	local short_old_commit2=`trim_obj_id 28 $old_commit2`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1311,8 +1311,8 @@ test_histedit_split_commit() {
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "histedit failed unexpectedly:" >&2
 		cat $testroot/stderr >&2
 		test_done "$testroot" "$ret"
@@ -1326,32 +1326,32 @@ test_histedit_split_commit() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got ci -m "commitA" alpha >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got ci -m "commitB" beta >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got ci -m "commitC" epsilon/new >/dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1359,8 +1359,8 @@ test_histedit_split_commit() {
 
 	(cd $testroot/wt && got histedit -c \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "histedit failed unexpectedly:" >&2
 		cat $testroot/stderr >&2
 		test_done "$testroot" "$ret"
@@ -1378,8 +1378,8 @@ test_histedit_split_commit() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1403,8 +1403,8 @@ test_histedit_duplicate_commit_in_script() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1416,8 +1416,8 @@ test_histedit_duplicate_commit_in_script() {
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly:" >&2
 		cat $testroot/stdout >&2
 		test_done "$testroot" "$ret"
@@ -1429,8 +1429,8 @@ test_histedit_duplicate_commit_in_script() {
 	echo "in histedit script" >> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -1458,8 +1458,8 @@ test_histedit_fold_add_delete() {
 	local old_commit3=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1492,8 +1492,8 @@ test_histedit_fold_add_delete() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1509,8 +1509,8 @@ test_histedit_fold_add_delete() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1519,8 +1519,8 @@ test_histedit_fold_add_delete() {
 	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
 	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1529,8 +1529,8 @@ test_histedit_fold_add_delete() {
 	got tree -r $testroot/repo epsilon > $testroot/stdout
 	echo "zeta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1557,8 +1557,8 @@ test_histedit_fold_only() {
 	local old_commit3=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1597,8 +1597,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1607,8 +1607,8 @@ EOF
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1623,8 +1623,8 @@ EOF
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1634,8 +1634,8 @@ EOF
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1645,8 +1645,8 @@ EOF
 	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1673,8 +1673,8 @@ test_histedit_fold_only_empty_logmsg() {
 	local old_commit3=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1715,8 +1715,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1725,8 +1725,8 @@ EOF
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1741,8 +1741,8 @@ EOF
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1752,8 +1752,8 @@ EOF
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1763,8 +1763,8 @@ EOF
 	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1787,8 +1787,8 @@ test_histedit_edit_only() {
 	local old_commit2=`git_show_head $testroot/repo`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1804,8 +1804,8 @@ test_histedit_edit_only() {
 	echo "Stopping histedit for amending commit $old_commit1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1833,8 +1833,8 @@ EOF
 	echo "Stopping histedit for amending commit $old_commit2" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1861,8 +1861,8 @@ EOF
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1871,8 +1871,8 @@ EOF
 	echo "edited modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1887,8 +1887,8 @@ EOF
 	echo "new file on master" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1898,8 +1898,8 @@ EOF
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1910,8 +1910,8 @@ EOF
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1934,7 +1934,7 @@ EOF
 
 	(cd $testroot/wt/ && got commit -m 'modified alpha on master' \
 		alpha > /dev/null)
-	ret="$?"
+	ret=$?
 	if [ "$?" != 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1945,7 +1945,7 @@ EOF
 	echo "pick $top_commit" > "$testroot/histedit-script"
 
 	(cd $testroot/wt/ && got update -c $orig_commit > /dev/null)
-	ret="$?"
+	ret=$?
 	if [ "$?" != 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1954,7 +1954,7 @@ EOF
 
 	(cd $testroot/wt && got histedit -F "$testroot/histedit-script" \
 		> /dev/null)
-	ret="$?"
+	ret=$?
 	if [ "$?" != 0 ]; then
 		echo "got histedit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1963,8 +1963,8 @@ EOF
 
 	cp $testroot/wt/alpha $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1

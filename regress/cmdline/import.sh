@@ -27,8 +27,8 @@ test_import_basic() {
 
 	got import -m 'init' -r $testroot/repo $testroot/tree \
 		> $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -42,8 +42,8 @@ test_import_basic() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -93,8 +93,8 @@ test_import_basic() {
 	echo "" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -109,15 +109,15 @@ test_import_basic() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -131,8 +131,8 @@ test_import_basic() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -146,8 +146,8 @@ test_import_requires_new_branch() {
 
 	got import -b master -m 'init' -r $testroot/repo $testroot/tree \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "import command should have failed but did not"
 		test_done "$testroot" "1"
 		return 1
@@ -156,8 +156,8 @@ test_import_requires_new_branch() {
 	echo "got: import target branch already exists" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -165,7 +165,7 @@ test_import_requires_new_branch() {
 
 	got import -b newbranch -m 'init' -r $testroot/repo $testroot/tree  \
 		> $testroot/stdout
-	ret="$?"
+	ret=$?
 	test_done "$testroot" "$ret"
 
 }
@@ -181,8 +181,8 @@ test_import_ignores() {
 
 	got import -I alpha -I '*lta*' -I '*silon' \
 		-m 'init' -r $testroot/repo $testroot/tree > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -193,8 +193,8 @@ test_import_ignores() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -211,8 +211,8 @@ test_import_empty_dir() {
 	echo "alpha" > $testroot/tree/notempty/alpha
 
 	got import -m 'init' -r $testroot/repo $testroot/tree > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -223,8 +223,8 @@ test_import_empty_dir() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -236,8 +236,8 @@ test_import_empty_dir() {
 
 	got tree -r $testroot/repo -R > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -255,8 +255,8 @@ test_import_symlink() {
 
 	got import -m 'init' -r $testroot/repo $testroot/tree \
 		> $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -268,8 +268,8 @@ test_import_symlink() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -286,8 +286,8 @@ test_import_symlink() {
 	echo "$id_alpha_link alpha.link@ -> alpha" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

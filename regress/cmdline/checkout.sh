@@ -29,15 +29,15 @@ test_checkout_basic() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -51,8 +51,8 @@ test_checkout_basic() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -73,15 +73,15 @@ test_checkout_dir_exists() {
 	mkdir $testroot/wt
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -95,8 +95,8 @@ test_checkout_dir_exists() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -119,8 +119,8 @@ test_checkout_dir_not_empty() {
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "checkout succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -129,8 +129,8 @@ test_checkout_dir_not_empty() {
 	echo "got: $testroot/wt: directory exists and is not empty" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -138,8 +138,8 @@ test_checkout_dir_not_empty() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -161,23 +161,23 @@ test_checkout_sets_xbit() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	ls -l $testroot/wt/xfile | grep -q '^-rwx'
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "file is not executable" >&2
 		ls -l $testroot/wt/xfile >&2
 	fi
@@ -194,16 +194,16 @@ test_checkout_commit_from_wrong_branch() {
 	local head_rev=`git_show_head $testroot/repo`
 	got checkout -b master -c $head_rev $testroot/repo $testroot/wt \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	echo -n "" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -218,8 +218,8 @@ test_checkout_commit_from_wrong_branch() {
 	echo "'got branch -c $head_rev BRANCH_NAME'" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -244,15 +244,15 @@ test_checkout_tag() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -c $tag $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -266,8 +266,8 @@ test_checkout_tag() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -292,15 +292,15 @@ test_checkout_ignores_submodules() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -314,8 +314,8 @@ test_checkout_ignores_submodules() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -338,15 +338,15 @@ test_checkout_read_only() {
 
 	got checkout $testroot/repo $testroot/wt \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -362,8 +362,8 @@ test_checkout_read_only() {
 	echo "writable and running 'got update' will prevent this" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -377,8 +377,8 @@ test_checkout_read_only() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	chmod -R u+w $testroot/repo # make repo cleanup work
@@ -394,8 +394,8 @@ test_checkout_into_nonempty_dir() {
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
 		2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "checkout succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -403,8 +403,8 @@ test_checkout_into_nonempty_dir() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -413,8 +413,8 @@ test_checkout_into_nonempty_dir() {
 	echo "got: $testroot/wt: directory exists and is not empty" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -429,15 +429,15 @@ test_checkout_into_nonempty_dir() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -452,15 +452,15 @@ test_checkout_into_nonempty_dir() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -474,8 +474,8 @@ test_checkout_into_nonempty_dir() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -492,15 +492,15 @@ test_checkout_into_nonempty_dir() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -514,8 +514,8 @@ test_checkout_into_nonempty_dir() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -525,8 +525,8 @@ test_checkout_into_nonempty_dir() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -547,8 +547,8 @@ test_checkout_symlink() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -570,8 +570,8 @@ test_checkout_symlink() {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -586,8 +586,8 @@ test_checkout_symlink() {
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -602,8 +602,8 @@ test_checkout_symlink() {
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "epsilon" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -620,8 +620,8 @@ test_checkout_symlink() {
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -636,8 +636,8 @@ test_checkout_symlink() {
 	readlink $testroot/wt/passwd2.link > $testroot/stdout
 	echo "passwd.link" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -646,8 +646,8 @@ test_checkout_symlink() {
 	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
 	echo "../beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -656,8 +656,8 @@ test_checkout_symlink() {
 	readlink $testroot/wt/nonexistent.link > $testroot/stdout
 	echo "nonexistent" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -674,8 +674,8 @@ test_checkout_symlink() {
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -694,8 +694,8 @@ test_checkout_symlink_relative_wtpath() {
 	git_commit $testroot/repo -m "add symlinks"
 
 	(cd $testroot && got checkout $testroot/repo wt > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -709,8 +709,8 @@ test_checkout_symlink_relative_wtpath() {
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -725,8 +725,8 @@ test_checkout_symlink_relative_wtpath() {
 	readlink $testroot/wt/epsilon.link > $testroot/stdout
 	echo "epsilon" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -743,8 +743,8 @@ test_checkout_symlink_relative_wtpath() {
 	cp $testroot/wt/passwd.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -753,8 +753,8 @@ test_checkout_symlink_relative_wtpath() {
 	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
 	echo "../beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -763,8 +763,8 @@ test_checkout_symlink_relative_wtpath() {
 	readlink $testroot/wt/nonexistent.link > $testroot/stdout
 	echo "nonexistent" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -781,8 +781,8 @@ test_checkout_symlink_relative_wtpath() {
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -801,16 +801,16 @@ test_checkout_repo_with_unknown_extension() {
 	got checkout $testroot/repo $testroot/wt \
 		> $testroot/stdout 2> $testroot/stderr
 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got checkout command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -824,15 +824,15 @@ test_checkout_quiet() {
 	printf "\nNow shut up and hack\n" >> $testroot/stdout.expected
 
 	got checkout -q $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -846,8 +846,8 @@ test_checkout_quiet() {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"

@@ -24,8 +24,8 @@ test_tag_create() {
 
 	# Create a tag based on repository's HEAD reference
 	got tag -m 'test' -r $testroot/repo -c HEAD $tag > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -35,8 +35,8 @@ test_tag_create() {
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 	echo "Created tag $tag_id" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -44,8 +44,8 @@ test_tag_create() {
 
 	# Ensure that Git recognizes the tag Got has created
 	(cd $testroot/repo && git checkout -q $tag)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -53,8 +53,8 @@ test_tag_create() {
 
 	# Ensure Got recognizes the new tag
 	got checkout -c $tag $testroot/repo $testroot/wt >/dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -62,8 +62,8 @@ test_tag_create() {
 
 	# Create a tag based on implied worktree HEAD ref
 	(cd $testroot/wt && got tag -m 'test' $tag2 > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -72,16 +72,16 @@ test_tag_create() {
 		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
 	echo "Created tag $tag_id2" > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && git checkout -q $tag2)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -91,8 +91,8 @@ test_tag_create() {
 	local tree_id=`git_show_tree $testroot/repo`
 	(cd $testroot/wt && got tag -m 'test' -c $tree_id foobar \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "git tag command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
@@ -101,8 +101,8 @@ test_tag_create() {
 	echo "got: commit $tree_id: object not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -117,8 +117,8 @@ test_tag_create() {
 	echo "refs/tags/$tag: $tag_id" >> $testroot/stdout.expected
 	echo "refs/tags/$tag2: $tag_id2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -165,8 +165,8 @@ test_tag_list() {
 	echo " test" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -212,8 +212,8 @@ test_tag_list_lightweight() {
 	echo " adding the test tree" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

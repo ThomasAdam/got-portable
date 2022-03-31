@@ -38,15 +38,15 @@ test_integrate_basic() {
 	local master_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rebase newbranch > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rebase failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -57,8 +57,8 @@ test_integrate_basic() {
 	local new_commit2=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got update -b master > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -73,8 +73,8 @@ test_integrate_basic() {
 	echo "Integrated refs/heads/newbranch into refs/heads/master" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -83,8 +83,8 @@ test_integrate_basic() {
 	echo "modified delta on branch" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -93,8 +93,8 @@ test_integrate_basic() {
 	echo "modified alpha on branch" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -109,8 +109,8 @@ test_integrate_basic() {
 	echo "new file on branch" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -120,8 +120,8 @@ test_integrate_basic() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -133,8 +133,8 @@ test_integrate_basic() {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $master_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -143,8 +143,8 @@ test_integrate_basic() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 	echo "Already up-to-date" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -177,16 +177,16 @@ test_integrate_requires_rebase_first() {
 	local new_commit2=`git_show_head $testroot/repo`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got integrate newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got integrate succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -194,8 +194,8 @@ test_integrate_requires_rebase_first() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -204,8 +204,8 @@ test_integrate_requires_rebase_first() {
 	echo "got: specified branch must be rebased first" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -216,8 +216,8 @@ test_integrate_requires_rebase_first() {
 	echo "commit $master_commit (master)" > $testroot/stdout.expected
 	echo "commit $init_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -230,16 +230,16 @@ test_integrate_requires_rebase_first() {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $init_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/repo && got branch -l > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rebase failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -248,8 +248,8 @@ test_integrate_requires_rebase_first() {
 	echo "  master: $master_commit" > $testroot/stdout.expected
 	echo "  newbranch: $new_commit2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -277,15 +277,15 @@ test_integrate_path_prefix() {
 	local master_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rebase newbranch > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rebase failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -298,8 +298,8 @@ test_integrate_path_prefix() {
 	rm -r $testroot/wt
 	got checkout -b master -p epsilon $testroot/repo $testroot/wt \
 		> /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -311,8 +311,8 @@ test_integrate_path_prefix() {
 	echo "Integrated refs/heads/newbranch into refs/heads/master" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -340,15 +340,15 @@ test_integrate_backwards_in_time() {
 	local master_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got rebase newbranch > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got rebase failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -360,8 +360,8 @@ test_integrate_backwards_in_time() {
 
 	# attempt to integrate master into newbranch (wrong way around)
 	(cd $testroot/wt && got update -b newbranch > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly"
 		test_done "$testroot" "$ret"
 	 return 1
@@ -369,8 +369,8 @@ test_integrate_backwards_in_time() {
 
 	(cd $testroot/wt && got integrate master \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got integrate succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -378,8 +378,8 @@ test_integrate_backwards_in_time() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -388,8 +388,8 @@ test_integrate_backwards_in_time() {
 	echo "got: specified branch must be rebased first" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -399,8 +399,8 @@ test_integrate_replace_symlink_with_file() {
 	local testroot=`test_init integrate_replace_symlink_with_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -426,8 +426,8 @@ test_integrate_replace_symlink_with_file() {
 		>> $testroot/stdout.expected
 	echo "into refs/heads/master" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -443,8 +443,8 @@ test_integrate_replace_symlink_with_file() {
 	cat $testroot/wt/alpha.link > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
@@ -454,8 +454,8 @@ test_integrate_replace_file_with_symlink() {
 	local testroot=`test_init integrate_replace_file_with_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -476,8 +476,8 @@ test_integrate_replace_file_with_symlink() {
 		>> $testroot/stdout.expected
 	echo "into refs/heads/master" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -492,8 +492,8 @@ test_integrate_replace_file_with_symlink() {
 	readlink $testroot/wt/alpha > $testroot/stdout
 	echo "beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

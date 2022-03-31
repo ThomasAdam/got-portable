@@ -45,8 +45,8 @@ test_merge_basic() {
 	local branch_commit5=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -55,8 +55,8 @@ test_merge_basic() {
 	# need a divergant commit on the main branch for 'got merge' 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -69,8 +69,8 @@ test_merge_basic() {
 		>> $testroot/stderr.expected
 	echo "'got integrate' instead" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -85,8 +85,8 @@ test_merge_basic() {
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -95,16 +95,16 @@ test_merge_basic() {
 		> $testroot/stderr.expected
 	echo "to merge a branch" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -112,16 +112,16 @@ test_merge_basic() {
 
 	# must not use a mixed-commit work tree with 'got merge' 
 	(cd $testroot/wt && got update -c $commit0 alpha > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -131,16 +131,16 @@ test_merge_basic() {
 	echo "the entire work tree must be updated first" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -149,31 +149,31 @@ test_merge_basic() {
 	# must not have staged files with 'got merge' 
 	echo "modified file alpha"  > $testroot/wt/alpha
 	(cd $testroot/wt && got stage alpha > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got stage failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	(cd $testroot/wt && got unstage alpha > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got unstage failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -182,8 +182,8 @@ test_merge_basic() {
 	# must not have local changes with 'got merge' 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -193,24 +193,24 @@ test_merge_basic() {
 	echo "these changes must be committed or reverted first" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got revert alpha > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got merge newbranch > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -229,8 +229,8 @@ test_merge_basic() {
 	echo $merge_commit >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -239,8 +239,8 @@ test_merge_basic() {
 	echo "modified delta on branch" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -249,8 +249,8 @@ test_merge_basic() {
 	echo "modified alpha on branch" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -265,8 +265,8 @@ test_merge_basic() {
 	echo "new file on branch" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -281,8 +281,8 @@ test_merge_basic() {
 	readlink $testroot/wt/symlink > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -292,8 +292,8 @@ test_merge_basic() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -304,8 +304,8 @@ test_merge_basic() {
 	echo "commit $master_commit" >> $testroot/stdout.expected
 	echo "commit $commit0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -318,8 +318,8 @@ test_merge_basic() {
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -337,16 +337,16 @@ test_merge_basic() {
 	echo "parent 1: $master_commit" > $testroot/stdout.expected
 	echo "parent 2: $branch_commit5" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	got tree -r $testroot/repo -c $merge_commit -R > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got tree failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -364,8 +364,8 @@ gamma/delta
 symlink@ -> alpha
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -393,8 +393,8 @@ test_merge_continue() {
 	local branch_commit3=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -408,8 +408,8 @@ test_merge_continue() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -417,8 +417,8 @@ test_merge_continue() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -430,8 +430,8 @@ test_merge_continue() {
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -440,8 +440,8 @@ test_merge_continue() {
 	echo "got: conflicts must be resolved before merging can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -454,8 +454,8 @@ test_merge_continue() {
 	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "M  gamma/delta" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -472,8 +472,8 @@ test_merge_continue() {
 		>> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -483,8 +483,8 @@ test_merge_continue() {
 	echo "modified alpha by both branches" > $testroot/wt/alpha
 
 	(cd $testroot/wt && got merge -c > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -501,8 +501,8 @@ test_merge_continue() {
 	echo $merge_commit >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -511,8 +511,8 @@ test_merge_continue() {
 	echo "modified delta on branch" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -521,8 +521,8 @@ test_merge_continue() {
 	echo "modified alpha by both branches" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -537,8 +537,8 @@ test_merge_continue() {
 	echo "new file on branch" > $testroot/content.expected
 	cat $testroot/wt/epsilon/new > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -548,8 +548,8 @@ test_merge_continue() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -560,8 +560,8 @@ test_merge_continue() {
 	echo "commit $master_commit" >> $testroot/stdout.expected
 	echo "commit $commit0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -571,8 +571,8 @@ test_merge_continue() {
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -583,8 +583,8 @@ test_merge_continue() {
 	echo "parent 1: $master_commit" > $testroot/stdout.expected
 	echo "parent 2: $branch_commit3" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -615,8 +615,8 @@ test_merge_abort() {
 	local branch_commit4=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -633,8 +633,8 @@ test_merge_abort() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -642,8 +642,8 @@ test_merge_abort() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -656,8 +656,8 @@ test_merge_abort() {
 	echo "A  symlink" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -666,8 +666,8 @@ test_merge_abort() {
 	echo "got: conflicts must be resolved before merging can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -682,16 +682,16 @@ test_merge_abort() {
 	echo "A  symlink" >> $testroot/stdout.expected
 	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got merge -a > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -706,8 +706,8 @@ test_merge_abort() {
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -716,8 +716,8 @@ test_merge_abort() {
 	echo "delta" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -726,8 +726,8 @@ test_merge_abort() {
 	echo "modified alpha on master" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -736,8 +736,8 @@ test_merge_abort() {
 	echo "beta" > $testroot/content.expected
 	cat $testroot/wt/beta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -759,8 +759,8 @@ test_merge_abort() {
 
 	echo "?  unversioned-file" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -770,8 +770,8 @@ test_merge_abort() {
 	echo "commit $master_commit (master)" > $testroot/stdout.expected
 	echo "commit $commit0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -781,8 +781,8 @@ test_merge_abort() {
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -799,8 +799,8 @@ test_merge_in_progress() {
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -814,8 +814,8 @@ test_merge_in_progress() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -823,8 +823,8 @@ test_merge_in_progress() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -833,8 +833,8 @@ test_merge_in_progress() {
 	echo "C  alpha" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -843,8 +843,8 @@ test_merge_in_progress() {
 	echo "got: conflicts must be resolved before merging can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -854,8 +854,8 @@ test_merge_in_progress() {
 
 	echo "C  alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -868,8 +868,8 @@ test_merge_in_progress() {
 
 		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -880,8 +880,8 @@ test_merge_in_progress() {
 		echo "work tree and must be continued or aborted first" \
 			>> $testroot/stderr.expected
 		cmp -s $testroot/stderr.expected $testroot/stderr
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
 			return 1
@@ -903,8 +903,8 @@ test_merge_path_prefix() {
 
 	got checkout -p epsilon -b master $testroot/repo $testroot/wt \
 		> /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -918,8 +918,8 @@ test_merge_path_prefix() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -927,8 +927,8 @@ test_merge_path_prefix() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -938,8 +938,8 @@ test_merge_path_prefix() {
 		> $testroot/stderr.expected
 	echo "of this work tree's path prefix" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -957,8 +957,8 @@ test_merge_missing_file() {
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -972,8 +972,8 @@ test_merge_missing_file() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -981,8 +981,8 @@ test_merge_missing_file() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -994,8 +994,8 @@ test_merge_missing_file() {
 		>> $testroot/stdout.expected
 	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1008,8 +1008,8 @@ test_merge_missing_file() {
 	echo "required before the merge operation is continued" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1019,8 +1019,8 @@ test_merge_missing_file() {
 
 	echo "M  gamma/delta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1040,8 +1040,8 @@ test_merge_no_op() {
 	local branch_commitk=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1055,8 +1055,8 @@ test_merge_no_op() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1064,8 +1064,8 @@ test_merge_no_op() {
 
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1074,8 +1074,8 @@ test_merge_no_op() {
 	echo "C  alpha" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1084,8 +1084,8 @@ test_merge_no_op() {
 	echo "got: conflicts must be resolved before merging can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1095,8 +1095,8 @@ test_merge_no_op() {
 
 	echo "C  alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1104,8 +1104,8 @@ test_merge_no_op() {
 
 	# resolve the conflict by reverting all changes; now it is no-op merge
 	(cd $testroot/wt && got revert alpha > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got revert failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1113,8 +1113,8 @@ test_merge_no_op() {
 
 	(cd $testroot/wt && got merge -c > $testroot/stdout \
 		2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1124,8 +1124,8 @@ test_merge_no_op() {
 		> $testroot/stderr.expected
 	echo "no changes to commit" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -1135,8 +1135,8 @@ test_merge_no_op() {
 
 	echo -n "" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1159,16 +1159,16 @@ test_merge_imported_branch() {
 		$testroot/tree > /dev/null
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	(cd $testroot/wt && got merge files > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1182,8 +1182,8 @@ A  there/should
 Merged refs/heads/files into refs/heads/master: $merge_commit0
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1191,16 +1191,16 @@ EOF
 
 	# try to merge again while no new changes are available
 	(cd $testroot/wt && got merge files > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	echo "Already up-to-date" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1216,8 +1216,8 @@ EOF
 	git_commit $testroot/repo -m "lots of changes"
 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1225,8 +1225,8 @@ EOF
 
 	# we should now be able to merge more changes from files branch
 	(cd $testroot/wt && got merge files > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1240,8 +1240,8 @@ Merged refs/heads/files into refs/heads/master: $merge_commit1
 EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -1258,8 +1258,8 @@ test_merge_interrupt() {
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1273,8 +1273,8 @@ test_merge_interrupt() {
 
 	# need an up-to-date work tree for 'got merge' 
 	(cd $testroot/wt && got update > /dev/null)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1282,8 +1282,8 @@ test_merge_interrupt() {
 
 	(cd $testroot/wt && got merge -n newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1293,8 +1293,8 @@ test_merge_interrupt() {
 	echo "Merge of refs/heads/newbranch interrupted on request" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1304,8 +1304,8 @@ test_merge_interrupt() {
 
 	echo "M  alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1314,8 +1314,8 @@ test_merge_interrupt() {
 	echo "modified alpha on branch" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
@@ -1326,8 +1326,8 @@ test_merge_interrupt() {
 
 	# continue the merge
 	(cd $testroot/wt && got merge -c > $testroot/stdout)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1341,8 +1341,8 @@ test_merge_interrupt() {
 	echo $merge_commit >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1352,8 +1352,8 @@ test_merge_interrupt() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1364,8 +1364,8 @@ test_merge_interrupt() {
 	echo "commit $master_commit" >> $testroot/stdout.expected
 	echo "commit $commit0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1375,8 +1375,8 @@ test_merge_interrupt() {
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -1387,8 +1387,8 @@ test_merge_interrupt() {
 	echo "parent 1: $master_commit" > $testroot/stdout.expected
 	echo "parent 2: $branch_commit0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"

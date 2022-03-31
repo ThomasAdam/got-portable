@@ -26,8 +26,8 @@ test_log_in_repo() {
 		(cd $testroot/repo && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -38,8 +38,8 @@ test_log_in_repo() {
 		(cd $testroot/repo/epsilon && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -59,8 +59,8 @@ test_log_in_bare_repo() {
 		(cd $testroot/repo/.git && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -81,8 +81,8 @@ test_log_in_worktree() {
 	local head_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -93,8 +93,8 @@ test_log_in_worktree() {
 		(cd $testroot/wt && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -105,8 +105,8 @@ test_log_in_worktree() {
 		(cd $testroot/wt/epsilon && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -117,8 +117,8 @@ test_log_in_worktree() {
 		(cd $testroot/wt/epsilon && got log d/$p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -141,8 +141,8 @@ test_log_in_worktree_with_path_prefix() {
 	local delta_rev=`git_show_head $testroot/repo`
 
 	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -153,8 +153,8 @@ test_log_in_worktree_with_path_prefix() {
 
 	(cd $testroot/wt && got log | grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -167,8 +167,8 @@ test_log_in_worktree_with_path_prefix() {
 		(cd $testroot/wt && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -185,8 +185,8 @@ test_log_tag() {
 	local tag2="2.0.0"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -197,8 +197,8 @@ test_log_tag() {
 	(cd $testroot/wt && got log -l1 -c $tag | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -212,8 +212,8 @@ test_log_tag() {
 	(cd $testroot/wt && got log -l1 -c $tag2 | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -224,8 +224,8 @@ test_log_limit() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -247,8 +247,8 @@ test_log_limit() {
 	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
 	(cd $testroot/wt && got log -l1 | grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -260,8 +260,8 @@ test_log_limit() {
 	(cd $testroot/wt && env GOT_LOG_DEFAULT_LIMIT=2 got log | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -275,8 +275,8 @@ test_log_limit() {
 	echo "commit $commit_id1" >> $testroot/stdout.expected
 	echo "commit $commit_id0" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -290,8 +290,8 @@ test_log_limit() {
 	(cd $testroot/wt && env GOT_LOG_DEFAULT_LIMIT=1 got log -l0 | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "0"
@@ -302,8 +302,8 @@ test_log_patch_added_file() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -316,16 +316,16 @@ test_log_patch_added_file() {
 	echo "commit $commit_id1 (master)" > $testroot/stdout.expected
 	# This used to fail with 'got: no such entry found in tree'
 	(cd $testroot/wt && got log -l1 -p new > $testroot/stdout.patch)
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	grep ^commit $testroot/stdout.patch > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -339,8 +339,8 @@ test_log_nonexistent_path() {
 
 	(cd $testroot/repo && got log this/does/not/exist \
 		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -348,8 +348,8 @@ test_log_nonexistent_path() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -358,8 +358,8 @@ test_log_nonexistent_path() {
 	echo "got: this/does/not/exist: no such entry found in tree" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
@@ -370,8 +370,8 @@ test_log_end_at_commit() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -394,8 +394,8 @@ test_log_end_at_commit() {
 	(cd $testroot/wt && got log -x $commit_id3 | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -408,8 +408,8 @@ test_log_end_at_commit() {
 	(cd $testroot/wt && got log -c $commit_id3 -x $commit_id1 | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -426,8 +426,8 @@ test_log_end_at_commit() {
 	(cd $testroot/wt && got log -x foo | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -438,8 +438,8 @@ test_log_end_at_commit() {
 	(cd $testroot/repo && got log -c foo -x foo | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -454,8 +454,8 @@ test_log_end_at_commit() {
 	(cd $testroot/repo && got log -x foo | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -464,8 +464,8 @@ test_log_end_at_commit() {
 	# got will refuse -x with a non-existent commit
 	(cd $testroot/wt && got log -x nonexistent \
 		> $testroot/stdout 2> $testroot/stderr) 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -474,15 +474,15 @@ test_log_end_at_commit() {
 	echo "got: reference nonexistent not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -493,8 +493,8 @@ test_log_end_at_commit() {
 	local empty_sha1=da39a3ee5e6b4b0d3255bfef95601890afd80709 
 	(cd $testroot/wt && got log -x $empty_sha1 \
 		> $testroot/stdout 2> $testroot/stderr) 
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -503,15 +503,15 @@ test_log_end_at_commit() {
 	echo "got: commit $empty_sha1: object not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -525,8 +525,8 @@ test_log_reverse_display() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -551,8 +551,8 @@ test_log_reverse_display() {
 	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
 	(cd $testroot/wt && got log -R | grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -563,8 +563,8 @@ test_log_reverse_display() {
 	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
 	(cd $testroot/wt && got log -R -l2 | grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -577,8 +577,8 @@ test_log_reverse_display() {
 	(cd $testroot/wt && got log -R -c $commit_id3 -x $commit_id1 | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -590,8 +590,8 @@ test_log_reverse_display() {
 	(cd $testroot/wt && got log -R -s 'commit[12]' | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -613,8 +613,8 @@ test_log_reverse_display() {
 	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
 	echo " A  new" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -635,8 +635,8 @@ test_log_in_worktree_different_repo() {
 	make_test_tree $testroot/tree
 	got import -mm -b foo -r $testroot/other-repo $testroot/tree >/dev/null
 	got checkout -b foo $testroot/other-repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -650,8 +650,8 @@ test_log_in_worktree_different_repo() {
 		(cd $testroot/wt && got log -r $testroot/repo $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -662,8 +662,8 @@ test_log_in_worktree_different_repo() {
 		(cd $testroot/wt/epsilon && got log -r $testroot/repo $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -674,8 +674,8 @@ test_log_in_worktree_different_repo() {
 		(cd $testroot/wt/epsilon && got log -r $testroot/repo epsilon/d/$p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
+		ret=$?
+		if [ $ret -ne 0 ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
 			test_done "$testroot" "$ret"
 			return 1
@@ -690,8 +690,8 @@ test_log_changed_paths() {
 	local commit_id0=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -722,8 +722,8 @@ test_log_changed_paths() {
 	echo " A  gamma/delta" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
@@ -742,8 +742,8 @@ test_log_submodule() {
 
 	got log -r $testroot/repo -l1 repo2 | grep ^commit > $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -754,8 +754,8 @@ test_log_submodule() {
 	got log -r $testroot/repo -l1 -P repo2 | grep '^ [MDmA]' \
 		> $testroot/stdout
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
@@ -763,8 +763,8 @@ test_log_submodule() {
 
 	got log -p -r $testroot/repo -l1 repo2 \
 		> $testroot/stdout 2> $testroot/stderr
-	ret="$?"
-	if [ "$ret" = "0" ]; then
+	ret=$?
+	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -774,8 +774,8 @@ test_log_submodule() {
 	echo "got: object $submodule_id not found" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
@@ -791,8 +791,8 @@ test_log_submodule() {
 
 	# log -P does not show the changed submodule path
 	got log -P -r $testroot/repo -l1 repo2 > $testroot/stdout.full
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		echo "log command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -801,8 +801,8 @@ test_log_submodule() {
 
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
+	ret=$?
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
