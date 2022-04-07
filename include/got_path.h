@@ -41,6 +41,12 @@ const struct got_error *got_canonpath(const char *, char *, size_t);
 const struct got_error *got_path_skip_common_ancestor(char **, const char *,
     const char *);
 
+/*
+ * Remove leading components from path.  It's an error to strip more
+ * component than present.  The result is allocated dynamically.
+ */
+const struct got_error *got_path_strip(char **, const char *, int);
+
 /* Determine whether a path points to the root directory "/" . */
 int got_path_is_root_dir(const char *);
 

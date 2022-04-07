@@ -1211,6 +1211,68 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_strip() {
+	local testroot=`test_init patch_strip`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- foo/bar/alpha.orig
++++ foo/bar/alpha
+@@ -1 +1 @@
+-alpha
++ALPHA
+EOF
+
+	(cd $testroot/wt && got patch -p2 patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo "M  alpha" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert alpha) > /dev/null 2>&1
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch -p3 patch) \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "stripped more components than available!"
+		test_done $testroot 1
+		return 1
+	fi
+
+	cat <<EOF > $testroot/stderr.expected
+got: can't strip 1 path-components from foo/bar/alpha: bad path
+EOF
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done $testroot 0
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1231,3 +1293,4 @@ run_test test_patch_create_dirs
 run_test test_patch_with_offset
 run_test test_patch_prefer_new_path
 run_test test_patch_no_newline
+run_test test_patch_strip

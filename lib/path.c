@@ -118,6 +118,28 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 	return NULL;
 }
 
+const struct got_error *
+got_path_strip(char **out, const char *path, int n)
+{
+	const char *p, *c;
+
+	p = path;
+	*out = NULL;
+
+	while (n > 0 && (c = strchr(path, '/')) != NULL) {
+		path = c + 1;
+		n--;
+	}
+
+	if (n > 0)
+		return got_error_fmt(GOT_ERR_BAD_PATH,
+		    "can't strip %d path-components from %s", n, p);
+
+	if ((*out = strdup(path)) == NULL)
+		return got_error_from_errno("strdup");
+	return NULL;
+}
+
 int
 got_path_is_root_dir(const char *path)
 {
