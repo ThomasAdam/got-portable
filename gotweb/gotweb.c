@@ -3563,7 +3563,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 
 			/*
 			 * check for one more commit before breaking,
-			 * so we know whether to navicate through gw_briefs
+			 * so we know whether to navigate through gw_briefs
 			 * gw_commits and gw_summary
 			 */
 			if (chk_next && (gw_trans->action == GW_BRIEFS ||
