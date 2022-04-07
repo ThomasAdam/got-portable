@@ -144,7 +144,7 @@ pushline(struct got_patch_hunk *h, const char *line)
 }
 
 static const struct got_error *
-recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p)
+recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -173,14 +173,30 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p)
 		goto done;
 	}
 	memcpy(&patch, imsg.data, sizeof(patch));
-	if (*patch.old != '\0' && (p->old = strdup(patch.old)) == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
+
+	/* automatically set strip=1 for git-style diffs */
+	if (strip == -1 && patch.git &&
+	    (*patch.old == '\0' || !strncmp(patch.old, "a/", 2)) &&
+	    (*patch.new == '\0' || !strncmp(patch.new, "b/", 2)))
+		strip = 1;
+
+	/* prefer the new name if not /dev/null for not git-style diffs */
+	if (!patch.git && *patch.new != '\0' && *patch.old != '\0') {
+		err = got_path_strip(&p->old, patch.new, strip);
+		if (err)
+			goto done;
+	} else if (*patch.old != '\0') {
+		err = got_path_strip(&p->old, patch.old, strip);
+		if (err)
+			goto done;
 	}
-	if (*patch.new != '\0' && (p->new = strdup(patch.new)) == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
+
+	if (*patch.new != '\0') {
+		err = got_path_strip(&p->new, patch.new, strip);
+		if (err)
+			goto done;
 	}
+
 	if (p->old == NULL && p->new == NULL) {
 		err = got_error(GOT_ERR_PATCH_MALFORMED);
 		goto done;
@@ -650,7 +666,7 @@ done:
 
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    int nop, got_patch_progress_cb progress_cb, void *progress_arg,
+    int nop, int strip, got_patch_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
@@ -706,7 +722,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		pa.progress_arg = progress_arg;
 		pa.head = &p.head;
 
-		err = recv_patch(ibuf, &done, &p);
+		err = recv_patch(ibuf, &done, &p, strip);
 		if (err || done)
 			break;
 

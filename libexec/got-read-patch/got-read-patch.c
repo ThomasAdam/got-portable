@@ -66,18 +66,13 @@ send_patch(const char *oldname, const char *newname, int git)
 
 	memset(&p, 0, sizeof(p));
 
-	/*
-	 * Prefer the new name if it's not /dev/null and it's not
-	 * a git-style diff.
-	 */
-	if (!git && newname != NULL && oldname != NULL)
-		strlcpy(p.old, newname, sizeof(p.old));
-	else if (oldname != NULL)
+	if (oldname != NULL)
 		strlcpy(p.old, oldname, sizeof(p.old));
 
 	if (newname != NULL)
 		strlcpy(p.new, newname, sizeof(p.new));
 
+	p.git = git;
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1,
 	    &p, sizeof(p)) == -1)
 		return got_error_from_errno("imsg_compose GOT_IMSG_PATCH");
@@ -97,10 +92,9 @@ send_patch_done(void)
 
 /* based on fetchname from usr.bin/patch/util.c */
 static const struct got_error *
-filename(const char *at, char **name, int strip)
+filename(const char *at, char **name)
 {
-	char	*fullname, *t;
-	int	 l, tab;
+	char	*tmp, *t;
 
 	*name = NULL;
 	if (*at == '\0')
@@ -113,24 +107,16 @@ filename(const char *at, char **name, int strip)
 	if (!strncmp(at, _PATH_DEVNULL, sizeof(_PATH_DEVNULL) - 1))
 		return NULL;
 
-	t = strdup(at);
-	if (t == NULL)
+	tmp = strdup(at);
+	if (tmp == NULL)
 		return got_error_from_errno("strdup");
-	*name = fullname = t;
-	tab = strchr(t, '\t') != NULL;
+	if ((t = strchr(tmp, '\t')) != NULL)
+		*t = '\0';
+	if ((t = strchr(tmp, '\n')) != NULL)
+		*t = '\0';
 
-	/* strip off path components and NUL-terminate */
-	for (l = strip;
-	    *t != '\0' && ((tab && *t != '\t') || !isspace((unsigned char)*t));
-	    ++t) {
-		if (t[0] == '/' && t[1] != '/' && t[1] != '\0')
-			if (--l >= 0)
-				*name = t + 1;
-	}
-	*t = '\0';
-
-	*name = strdup(*name);
-	free(fullname);
+	*name = strdup(tmp);
+	free(tmp);
 	if (*name == NULL)
 		return got_error_from_errno("strdup");
 	return NULL;
@@ -152,18 +138,12 @@ find_patch(FILE *fp)
 		 * we don't have to follow POSIX.
 		 */
 
-		if (git && !strncmp(line, "--- a/", 6)) {
+		if (!strncmp(line, "--- ", 4)) {
 			free(old);
-			err = filename(line+6, &old, 0);
-		} else if (!strncmp(line, "--- ", 4)) {
-			free(old);
-			err = filename(line+4, &old, 0);
-		} else if (git && !strncmp(line, "+++ b/", 6)) {
-			free(new);
-			err = filename(line+6, &new, 0);
+			err = filename(line+4, &old);
 		} else if (!strncmp(line, "+++ ", 4)) {
 			free(new);
-			err = filename(line+4, &new, 0);
+			err = filename(line+4, &new);
 		} else if (!strncmp(line, "diff --git a/", 13))
 			git = 1;
 

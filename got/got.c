@@ -7222,14 +7222,21 @@ cmd_patch(int argc, char *argv[])
 	const struct got_error *error = NULL, *close_error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
+	const char *errstr;
 	char *cwd = NULL;
-	int ch, nop = 0;
+	int ch, nop = 0, strip = -1;
 	int patchfd;
 
-	while ((ch = getopt(argc, argv, "n")) != -1) {
+	while ((ch = getopt(argc, argv, "np:")) != -1) {
 		switch (ch) {
 		case 'n':
 			nop = 1;
+			break;
+		case 'p':
+			strip = strtonum(optarg, 0, INT_MAX, &errstr);
+			if (errstr != NULL)
+				errx(1, "pathname strip count is %s: %s",
+				     errstr, optarg);
 			break;
 		default:
 			usage_patch();
@@ -7278,8 +7285,8 @@ cmd_patch(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_patch(patchfd, worktree, repo, nop, &patch_progress,
-	    NULL, check_cancelled, NULL);
+	error = got_patch(patchfd, worktree, repo, nop, strip,
+	    &patch_progress, NULL, check_cancelled, NULL);
 
 done:
 	if (repo) {

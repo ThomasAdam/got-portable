@@ -31,5 +31,5 @@ typedef const struct got_error *(*got_patch_progress_cb)(void *,
  * The patch file descriptor *must* be seekable.
  */
 const struct got_error *
-got_patch(int, struct got_worktree *, struct got_repository *, int,
+got_patch(int, struct got_worktree *, struct got_repository *, int, int,
     got_patch_progress_cb, void *, got_cancel_cb, void *);

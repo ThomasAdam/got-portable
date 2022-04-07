@@ -525,6 +525,7 @@ struct got_imsg_remotes {
  * Structure for GOT_IMSG_PATCH data.
  */
 struct got_imsg_patch {
+	int	git;
 	char	old[PATH_MAX];
 	char	new[PATH_MAX];
 };
