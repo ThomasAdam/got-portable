@@ -126,16 +126,16 @@ got_path_strip(char **out, const char *path, int n)
 	p = path;
 	*out = NULL;
 
-	while (n > 0 && (c = strchr(path, '/')) != NULL) {
-		path = c + 1;
+	while (n > 0 && (c = strchr(p, '/')) != NULL) {
+		p = c + 1;
 		n--;
 	}
 
 	if (n > 0)
 		return got_error_fmt(GOT_ERR_BAD_PATH,
-		    "can't strip %d path-components from %s", n, p);
+		    "can't strip %d path-components from %s", n, path);
 
-	if ((*out = strdup(path)) == NULL)
+	if ((*out = strdup(p)) == NULL)
 		return got_error_from_errno("strdup");
 	return NULL;
 }
