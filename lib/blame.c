@@ -199,7 +199,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
     void *arg)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object *commit = NULL;
+	struct got_commit_object *commit = NULL, *pcommit = NULL;
 	struct got_object_qid *pid = NULL;
 	struct got_object_id *pblob_id = NULL;
 	struct got_blob_object *pblob = NULL;
@@ -215,7 +215,11 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		return NULL;
 	}
 
-	err = got_object_id_by_path(&pblob_id, repo, pid->id, path);
+	err = got_object_open_as_commit(&pcommit, repo, pid->id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&pblob_id, repo, pcommit, path);
 	if (err) {
 		if (err->code == GOT_ERR_NO_TREE_ENTRY)
 			err = NULL;
@@ -266,6 +270,8 @@ done:
 		diff_result_free(diff_result);
 	if (commit)
 		got_object_commit_close(commit);
+	if (pcommit)
+		got_object_commit_close(pcommit);
 	free(pblob_id);
 	if (pblob)
 		got_object_blob_close(pblob);
@@ -497,6 +503,7 @@ blame_open(struct got_blame **blamep, const char *path,
     void *arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct got_commit_object *start_commit = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
@@ -506,7 +513,11 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	*blamep = NULL;
 
-	err = got_object_id_by_path(&obj_id, repo, start_commit_id, path);
+	err = got_object_open_as_commit(&start_commit, repo, start_commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&obj_id, repo, start_commit, path);
 	if (err)
 		goto done;
 
@@ -620,6 +631,8 @@ done:
 	free(obj_id);
 	if (blob)
 		got_object_blob_close(blob);
+	if (start_commit)
+		got_object_commit_close(start_commit);
 	if (err) {
 		if (blame)
 			blame_close(blame);

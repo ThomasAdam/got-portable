@@ -106,7 +106,7 @@ const struct got_error *got_object_tree_find_path(struct got_object_id **id,
  * The caller should dispose of it with free(3).
  */
 const struct got_error *got_object_id_by_path(struct got_object_id **,
-    struct got_repository *, struct got_object_id *, const char *);
+    struct got_repository *, struct got_commit_object *, const char *);
 
 /*
  * Obtain the type of an object.
@@ -241,7 +241,7 @@ int got_object_tree_entry_is_symlink(struct got_tree_entry *);
  * target path. The caller must dispose of it with free(3). 
  */
 const struct got_error *got_object_resolve_symlinks(char **, const char *,
-    struct got_object_id *, struct got_repository *);
+    struct got_commit_object *, struct got_repository *);
 
 /*
  * Compare two trees and indicate whether the entry at the specified path

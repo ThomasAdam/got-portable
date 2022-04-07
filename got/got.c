@@ -3609,7 +3609,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 
 	if (path && path[0] != '\0') {
 		int obj_type;
-		err = got_object_id_by_path(&obj_id2, repo, id, path);
+		err = got_object_id_by_path(&obj_id2, repo, commit, path);
 		if (err)
 			goto done;
 		err = got_object_id_str(&id_str2, obj_id2);
@@ -3619,7 +3619,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		}
 		if (pcommit) {
 			err = got_object_id_by_path(&obj_id1, repo,
-			    qid->id, path);
+			    pcommit, path);
 			if (err) {
 				if (err->code != GOT_ERR_NO_TREE_ENTRY) {
 					free(obj_id2);
@@ -4984,6 +4984,7 @@ cmd_blame(int argc, char *argv[])
 	char *link_target = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
@@ -5111,12 +5112,16 @@ cmd_blame(int argc, char *argv[])
 		worktree = NULL;
 	}
 
-	error = got_object_resolve_symlinks(&link_target, in_repo_path,
-	    commit_id, repo);
+	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, repo, commit_id,
+	error = got_object_resolve_symlinks(&link_target, in_repo_path,
+	    commit, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&obj_id, repo, commit,
 	    link_target ? link_target : in_repo_path);
 	if (error)
 		goto done;
@@ -5171,6 +5176,8 @@ done:
 	free(cwd);
 	free(commit_id);
 	free(obj_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (blob)
 		got_object_blob_close(blob);
 	if (worktree)
@@ -5246,7 +5253,7 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 }
 
 static const struct got_error *
-print_tree(const char *path, struct got_object_id *commit_id,
+print_tree(const char *path, struct got_commit_object *commit,
     int show_ids, int recurse, const char *root_path,
     struct got_repository *repo)
 {
@@ -5255,7 +5262,7 @@ print_tree(const char *path, struct got_object_id *commit_id,
 	struct got_tree_object *tree = NULL;
 	int nentries, i;
 
-	err = got_object_id_by_path(&tree_id, repo, commit_id, path);
+	err = got_object_id_by_path(&tree_id, repo, commit, path);
 	if (err)
 		goto done;
 
@@ -5297,7 +5304,7 @@ print_tree(const char *path, struct got_object_id *commit_id,
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
-			err = print_tree(child_path, commit_id, show_ids, 1,
+			err = print_tree(child_path, commit, show_ids, 1,
 			    root_path, repo);
 			free(child_path);
 			if (err)
@@ -5320,6 +5327,7 @@ cmd_tree(int argc, char *argv[])
 	const char *path, *refname = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	char *commit_id_str = NULL;
 	int show_ids = 0, recurse = 0;
 	int ch;
@@ -5459,13 +5467,19 @@ cmd_tree(int argc, char *argv[])
 		worktree = NULL;
 	}
 
-	error = print_tree(in_repo_path, commit_id, show_ids, recurse,
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+
+	error = print_tree(in_repo_path, commit, show_ids, recurse,
 	    in_repo_path, repo);
 done:
 	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -11837,6 +11851,7 @@ cmd_cat(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL, *label = NULL;
 	const char *commit_id_str = NULL;
 	struct got_object_id *id = NULL, *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	int ch, obj_type, i, force_path = 0;
 	struct got_reflist_head refs;
 
@@ -11921,9 +11936,13 @@ cmd_cat(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+
 	for (i = 0; i < argc; i++) {
 		if (force_path) {
-			error = got_object_id_by_path(&id, repo, commit_id,
+			error = got_object_id_by_path(&id, repo, commit,
 			    argv[i]);
 			if (error)
 				break;
@@ -11936,7 +11955,7 @@ cmd_cat(int argc, char *argv[])
 				    error->code != GOT_ERR_NOT_REF)
 					break;
 				error = got_object_id_by_path(&id, repo,
-				    commit_id, argv[i]);
+				    commit, argv[i]);
 				if (error)
 					break;
 			}
@@ -11974,6 +11993,8 @@ done:
 	free(label);
 	free(id);
 	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {

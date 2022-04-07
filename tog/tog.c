@@ -1920,7 +1920,7 @@ tree_view_visit_subtree(struct tog_tree_view_state *s,
 
 static const struct got_error *
 tree_view_walk_path(struct tog_tree_view_state *s,
-    struct got_object_id *commit_id, const char *path)
+    struct got_commit_object *commit, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree = NULL;
@@ -1969,7 +1969,7 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 			break;
 		}
 
-		err = got_object_id_by_path(&tree_id, s->repo, commit_id,
+		err = got_object_id_by_path(&tree_id, s->repo, commit,
 		    subpath);
 		if (err)
 			break;
@@ -2018,7 +2018,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	if (got_path_is_root_dir(path))
 		return NULL;
 
-	return tree_view_walk_path(s, entry->id, path);
+	return tree_view_walk_path(s, entry->commit, path);
 }
 
 static const struct got_error *
@@ -4339,15 +4339,20 @@ run_blame(struct tog_view *view)
 	struct tog_blame_view_state *s = &view->state.blame;
 	struct tog_blame *blame = &s->blame;
 	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	int obj_type;
 
-	err = got_object_id_by_path(&obj_id, s->repo, s->blamed_commit->id,
-	    s->path);
+	err = got_object_open_as_commit(&commit, s->repo,
+	    s->blamed_commit->id);
 	if (err)
 		return err;
+
+	err = got_object_id_by_path(&obj_id, s->repo, commit, s->path);
+	if (err)
+		goto done;
 
 	err = got_object_get_type(&obj_type, s->repo, obj_id);
 	if (err)
@@ -4415,6 +4420,8 @@ run_blame(struct tog_view *view)
 	s->matched_line = 0;
 
 done:
+	if (commit)
+		got_object_commit_close(commit);
 	if (blob)
 		got_object_blob_close(blob);
 	free(obj_id);
@@ -4656,7 +4663,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (id == NULL)
 			break;
 		if (ch == 'p') {
-			struct got_commit_object *commit;
+			struct got_commit_object *commit, *pcommit;
 			struct got_object_qid *pid;
 			struct got_object_id *blob_id = NULL;
 			int obj_type;
@@ -4671,8 +4678,13 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				break;
 			}
 			/* Check if path history ends here. */
+			err = got_object_open_as_commit(&pcommit,
+			    s->repo, pid->id);
+			if (err)
+				break;
 			err = got_object_id_by_path(&blob_id, s->repo,
-			    pid->id, s->path);
+			    pcommit, s->path);
+			got_object_commit_close(pcommit);
 			if (err) {
 				if (err->code == GOT_ERR_NO_TREE_ENTRY)
 					err = NULL;
@@ -4817,6 +4829,7 @@ cmd_blame(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *link_target = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	char *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view;
@@ -4902,8 +4915,12 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+
 	error = got_object_resolve_symlinks(&link_target, in_repo_path,
-	    commit_id, repo);
+	    commit, repo);
 	if (error)
 		goto done;
 
@@ -4923,6 +4940,8 @@ done:
 	free(link_target);
 	free(cwd);
 	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -5669,6 +5688,7 @@ cmd_tree(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	const char *commit_id_arg = NULL;
 	char *label = NULL;
 	struct got_reference *ref = NULL;
@@ -5755,6 +5775,10 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	}
 
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+
 	view = view_open(0, 0, 0, 0, TOG_VIEW_TREE);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
@@ -5764,7 +5788,7 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 	if (!got_path_is_root_dir(in_repo_path)) {
-		error = tree_view_walk_path(&view->state.tree, commit_id,
+		error = tree_view_walk_path(&view->state.tree, commit,
 		    in_repo_path);
 		if (error)
 			goto done;
@@ -6569,6 +6593,7 @@ tog_log_with_path(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *commit_id = NULL, *id = NULL;
+	struct got_commit_object *commit = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *commit_id_str = NULL, **cmd_argv = NULL;
 
@@ -6612,7 +6637,11 @@ tog_log_with_path(int argc, char *argv[])
 		worktree = NULL;
 	}
 
-	error = got_object_id_by_path(&id, repo, commit_id, in_repo_path);
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&id, repo, commit, in_repo_path);
 	if (error) {
 		if (error->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
@@ -6641,6 +6670,8 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (commit)
+		got_object_commit_close(commit);
 	if (worktree)
 		got_worktree_close(worktree);
 	free(id);

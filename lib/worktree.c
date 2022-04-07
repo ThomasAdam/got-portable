@@ -2456,7 +2456,8 @@ done:
 static const struct got_error *
 find_tree_entry_for_checkout(int *entry_type, char **tree_relpath,
     struct got_object_id **tree_id, const char *wt_relpath,
-    struct got_worktree *worktree, struct got_repository *repo)
+    struct got_commit_object *base_commit, struct got_worktree *worktree,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id = NULL;
@@ -2475,8 +2476,8 @@ find_tree_entry_for_checkout(int *entry_type, char **tree_relpath,
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		err = got_object_id_by_path(tree_id, repo,
-		    worktree->base_commit_id, worktree->path_prefix);
+		err = got_object_id_by_path(tree_id, repo, base_commit,
+		    worktree->path_prefix);
 		if (err)
 			goto done;
 		return NULL;
@@ -2490,8 +2491,7 @@ find_tree_entry_for_checkout(int *entry_type, char **tree_relpath,
 		goto done;
 	}
 
-	err = got_object_id_by_path(&id, repo, worktree->base_commit_id,
-	    in_repo_path);
+	err = got_object_id_by_path(&id, repo, base_commit, in_repo_path);
 	if (err)
 		goto done;
 
@@ -2529,7 +2529,7 @@ find_tree_entry_for_checkout(int *entry_type, char **tree_relpath,
 			}
 		}
 		err = got_object_id_by_path(tree_id, repo,
-		    worktree->base_commit_id, in_repo_path);
+		    base_commit, in_repo_path);
 	} else {
 		/* Check out all files within a subdirectory. */
 		*tree_id = got_object_id_dup(id);
@@ -2641,6 +2641,11 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		return err;
 
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+
 	/* Map all specified paths to in-repository trees. */
 	TAILQ_FOREACH(pe, paths, entry) {
 		tpd = malloc(sizeof(*tpd));
@@ -2650,7 +2655,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		}
 
 		err = find_tree_entry_for_checkout(&tpd->entry_type,
-		    &tpd->relpath, &tpd->tree_id, pe->path, worktree, repo);
+		    &tpd->relpath, &tpd->tree_id, pe->path, commit,
+		    worktree, repo);
 		if (err) {
 			free(tpd);
 			goto done;
@@ -3092,12 +3098,16 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	const struct got_error *err = NULL, *sync_err;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 	struct check_merge_conflicts_arg cmc_arg;
 	struct merge_file_cb_arg arg;
 	char *label_orig = NULL;
 
 	if (commit_id1) {
-		err = got_object_id_by_path(&tree_id1, repo, commit_id1,
+		err = got_object_open_as_commit(&commit1, repo, commit_id1);
+		if (err)
+			goto done;
+		err = got_object_id_by_path(&tree_id1, repo, commit1,
 		    worktree->path_prefix);
 		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
@@ -3122,7 +3132,11 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		free(id_str);
 	}
 
-	err = got_object_id_by_path(&tree_id2, repo, commit_id2,
+	err = got_object_open_as_commit(&commit2, repo, commit_id2);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id2, repo, commit2,
 	    worktree->path_prefix);
 	if (err)
 		goto done;
@@ -3153,6 +3167,10 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	if (commit1)
+		got_object_commit_close(commit1);
+	if (commit2)
+		got_object_commit_close(commit2);
 	if (tree1)
 		got_object_tree_close(tree1);
 	if (tree2)
@@ -4541,6 +4559,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	const struct got_error *err = NULL;
 	char *parent_path = NULL;
 	struct got_fileindex_entry *ie;
+	struct got_commit_object *base_commit = NULL;
 	struct got_tree_object *tree = NULL;
 	struct got_object_id *tree_id = NULL;
 	const struct got_tree_entry *te = NULL;
@@ -4594,8 +4613,12 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		}
 	}
 
-	err = got_object_id_by_path(&tree_id, a->repo,
-	    a->worktree->base_commit_id, tree_path);
+	err = got_object_open_as_commit(&base_commit, a->repo,
+	    a->worktree->base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id, a->repo, base_commit, tree_path);
 	if (err) {
 		if (!(err->code == GOT_ERR_NO_TREE_ENTRY &&
 		    (status == GOT_STATUS_ADD ||
@@ -4753,6 +4776,8 @@ done:
 	if (tree)
 		got_object_tree_close(tree);
 	free(tree_id);
+	if (base_commit)
+		got_object_commit_close(base_commit);
 	return err;
 }
 
@@ -5510,6 +5535,7 @@ check_out_of_date(const char *in_repo_path, unsigned char status,
     int ood_errcode)
 {
 	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 
 	if (status != GOT_STATUS_ADD && staged_status != GOT_STATUS_ADD) {
@@ -5520,8 +5546,10 @@ check_out_of_date(const char *in_repo_path, unsigned char status,
 		 * Ensure file content which local changes were based
 		 * on matches file content in the branch head.
 		 */
-		err = got_object_id_by_path(&id, repo, head_commit_id,
-		    in_repo_path);
+		err = got_object_open_as_commit(&commit, repo, head_commit_id);
+		if (err)
+			goto done;
+		err = got_object_id_by_path(&id, repo, commit, in_repo_path);
 		if (err) {
 			if (err->code == GOT_ERR_NO_TREE_ENTRY)
 				err = got_error(ood_errcode);
@@ -5530,14 +5558,18 @@ check_out_of_date(const char *in_repo_path, unsigned char status,
 			err = got_error(ood_errcode);
 	} else {
 		/* Require that added files don't exist in the branch head. */
-		err = got_object_id_by_path(&id, repo, head_commit_id,
-		    in_repo_path);
+		err = got_object_open_as_commit(&commit, repo, head_commit_id);
+		if (err)
+			goto done;
+		err = got_object_id_by_path(&id, repo, commit, in_repo_path);
 		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
 		err = id ? got_error(ood_errcode) : NULL;
 	}
 done:
 	free(id);
+	if (commit)
+		got_object_commit_close(commit);
 	return err;
 }
 
@@ -6689,6 +6721,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	char *fileindex_path = NULL;
 	struct revert_file_args rfa;
 	struct got_object_id *tree_id = NULL;
@@ -6696,6 +6729,11 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
 
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(new_base_branch), 0);
@@ -6719,8 +6757,8 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id, repo,
-	    worktree->base_commit_id, worktree->path_prefix);
+	err = got_object_id_by_path(&tree_id, repo, commit,
+	    worktree->path_prefix);
 	if (err)
 		goto done;
 
@@ -6755,6 +6793,8 @@ done:
 	got_ref_close(resolved);
 	free(tree_id);
 	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
@@ -7053,12 +7093,18 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	char *fileindex_path = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_object_id *tree_id = NULL;
 	struct revert_file_args rfa;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
 
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(branch), 0);
@@ -7073,7 +7119,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id, repo, base_commit_id,
+	err = got_object_id_by_path(&tree_id, repo, commit,
 	    worktree->path_prefix);
 	if (err)
 		goto done;
@@ -7266,6 +7312,7 @@ got_worktree_integrate_continue(struct got_worktree *worktree,
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	char *fileindex_path = NULL;
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
+	struct got_commit_object *commit =  NULL;
 
 	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
@@ -7275,7 +7322,11 @@ got_worktree_integrate_continue(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id, repo, commit_id,
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id, repo, commit,
 	    worktree->path_prefix);
 	if (err)
 		goto done;
@@ -7317,6 +7368,8 @@ done:
 	got_fileindex_free(fileindex);
 	free(fileindex_path);
 	free(tree_id);
+	if (commit)
+		got_object_commit_close(commit);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -7777,12 +7830,18 @@ got_worktree_merge_abort(struct got_worktree *worktree,
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	char *fileindex_path = NULL;
 	struct revert_file_args rfa;
 	struct got_object_id *tree_id = NULL;
 
-	err = got_object_id_by_path(&tree_id, repo,
-	    worktree->base_commit_id, worktree->path_prefix);
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id, repo, commit,
+	    worktree->path_prefix);
 	if (err)
 		goto done;
 
@@ -7816,6 +7875,8 @@ sync:
 done:
 	free(tree_id);
 	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);

@@ -1996,17 +1996,12 @@ done:
 }
 const struct got_error *
 got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
-    struct got_object_id *commit_id, const char *path)
+    struct got_commit_object *commit, const char *path)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 
 	*id = NULL;
-
-	err = got_object_open_as_commit(&commit, repo, commit_id);
-	if (err)
-		goto done;
 
 	/* Handle opening of root of commit's tree. */
 	if (got_path_is_root_dir(path)) {
@@ -2020,8 +2015,6 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 		err = got_object_tree_find_path(id, NULL, repo, tree, path);
 	}
 done:
-	if (commit)
-		got_object_commit_close(commit);
 	if (tree)
 		got_object_tree_close(tree);
 	return err;
@@ -2185,7 +2178,7 @@ got_object_tree_entry_is_symlink(struct got_tree_entry *te)
 
 static const struct got_error *
 resolve_symlink(char **link_target, const char *path,
-    struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_commit_object *commit, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char buf[PATH_MAX];
@@ -2207,7 +2200,7 @@ resolve_symlink(char **link_target, const char *path,
 	if (err)
 		return err;
 
-	err = got_object_id_by_path(&tree_obj_id, repo, commit_id,
+	err = got_object_id_by_path(&tree_obj_id, repo, commit,
 	    parent_path);
 	if (err) {
 		if (err->code == GOT_ERR_NO_TREE_ENTRY) {
@@ -2263,7 +2256,7 @@ done:
 
 const struct got_error *
 got_object_resolve_symlinks(char **link_target, const char *path,
-    struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_commit_object *commit, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *next_target = NULL;
@@ -2273,7 +2266,7 @@ got_object_resolve_symlinks(char **link_target, const char *path,
 
 	do {
 		err = resolve_symlink(&next_target,
-		    *link_target ? *link_target : path, commit_id, repo);
+		    *link_target ? *link_target : path, commit, repo);
 		if (err)
 			break;
 		if (next_target) {
