@@ -112,7 +112,7 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 	pid = STAILQ_FIRST(&commit->parent_ids);
 	if (pid == NULL) {
 		struct got_object_id *obj_id;
-		err = got_object_id_by_path(&obj_id, repo, commit_id, path);
+		err = got_object_id_by_path(&obj_id, repo, commit, path);
 		if (err) {
 			if (err->code == GOT_ERR_NO_TREE_ENTRY)
 				err = NULL;
@@ -293,20 +293,30 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		struct got_object_id *merged_id, *prev_id = NULL;
 		int branches_differ = 0;
 
-		err = got_object_id_by_path(&merged_id, repo, commit_id,
+		err = got_object_id_by_path(&merged_id, repo, commit,
 		    graph->path);
 		if (err)
 			return err;
 
 		STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
-			struct got_object_id *id;
+			struct got_object_id *id = NULL;
+			struct got_commit_object *pcommit = NULL;
 
 			if (got_object_idset_contains(graph->open_branches,
 			    qid->id))
 				continue;
 
-			err = got_object_id_by_path(&id, repo, qid->id,
+			err = got_object_open_as_commit(&pcommit, repo,
+			    qid->id);
+			if (err) {
+				free(merged_id);
+				free(prev_id);
+				return err;
+			}
+			err = got_object_id_by_path(&id, repo, pcommit,
 			    graph->path);
+			got_object_commit_close(pcommit);
+			pcommit = NULL;
 			if (err) {
 				if (err->code == GOT_ERR_NO_TREE_ENTRY) {
 					branches_differ = 1;

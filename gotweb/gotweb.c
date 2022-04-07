@@ -4044,6 +4044,7 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	const struct got_error *error = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
@@ -4069,7 +4070,11 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit_id,
+	error = got_object_open_as_commit(&commit, gw_trans->repo, commit_id);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit,
 	    in_repo_path);
 	if (error)
 		goto done;
@@ -4142,6 +4147,8 @@ done:
 	}
 	if (blob)
 		got_object_blob_close(blob);
+	if (commit)
+		got_object_commit_close(commit);
 	return error;
 }
 
@@ -4151,6 +4158,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans, struct gw_header *header)
 	const struct got_error *error = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	int obj_type, set_mime = 0;
@@ -4175,7 +4183,11 @@ gw_output_blob_buf(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit_id,
+	error = got_object_open_as_commit(&commit, gw_trans->repo, commit_id);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit,
 	    in_repo_path);
 	if (error)
 		goto done;
@@ -4232,6 +4244,8 @@ done:
 	free(path);
 	if (blob)
 		got_object_blob_close(blob);
+	if (commit)
+		got_object_commit_close(commit);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -4243,6 +4257,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans, struct gw_header *header)
 	const struct got_error *error = NULL;
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
 	struct got_tree_object *tree = NULL;
+	struct got_commit_object *commit = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	char *id_str = NULL;
 	char *build_folder = NULL;
@@ -4294,7 +4309,11 @@ gw_output_repo_tree(struct gw_trans *gw_trans, struct gw_header *header)
 			goto done;
 	}
 
-	error = got_object_id_by_path(&tree_id, gw_trans->repo, commit_id,
+	error = got_object_open_as_commit(&commit, gw_trans->repo, commit_id);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&tree_id, gw_trans->repo, commit,
 	    path);
 	if (error)
 		goto done;
@@ -4466,6 +4485,8 @@ gw_output_repo_tree(struct gw_trans *gw_trans, struct gw_header *header)
 done:
 	if (tree)
 		got_object_tree_close(tree);
+	if (commit)
+		got_object_commit_close(commit);
 	free(id_str);
 	free(href_blob);
 	free(href_blame);
