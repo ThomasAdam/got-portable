@@ -1404,34 +1404,21 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 		err = got_object_get_type(&obj_type, repo, id);
 		if (err)
 			return err;
-		if (obj_type != GOT_OBJ_TYPE_COMMIT)
-			continue;
-		err = load_commit(0, idset, id, repo, loose_obj_only,
-		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
-		    cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-	}
-
-	for (i = 0; i < ntheirs; i++) {
-		struct got_object_id *id = theirs[i];
-		struct got_pack_meta *m;
-		if (id == NULL)
-			continue;
-		m = got_object_idset_get(idset, id);
-		if (m == NULL) {
-			err = got_object_get_type(&obj_type, repo, id);
+		if (obj_type == GOT_OBJ_TYPE_COMMIT) {
+			err = load_commit(0, idset, id, repo,
+			    loose_obj_only, ncolored, nfound, ntrees,
+			    progress_cb, progress_arg, rl,
+			    cancel_cb, cancel_arg);
 			if (err)
 				goto done;
-		} else
-			obj_type = m->obj_type;
-		if (obj_type != GOT_OBJ_TYPE_TAG)
-			continue;
-		err = load_tag(0, idset, id, repo, loose_obj_only,
-		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
-		    cancel_cb, cancel_arg);
-		if (err)
-			goto done;
+		} else if (obj_type == GOT_OBJ_TYPE_TAG) {
+			err = load_tag(0, idset, id, repo,
+			    loose_obj_only, ncolored, nfound, ntrees,
+			    progress_cb, progress_arg, rl,
+			    cancel_cb, cancel_arg);
+			if (err)
+				goto done;
+		}
 	}
 
 	for (i = 0; i < nobj; i++) {
