@@ -4876,14 +4876,14 @@ struct blame_cb_args {
 };
 
 static const struct got_error *
-blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
+blame_cb(void *arg, int nlines, int lineno,
+    struct got_commit_object *commit, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct blame_cb_args *a = arg;
 	struct blame_line *bline;
 	char *line = NULL;
 	size_t linesize = 0;
-	struct got_commit_object *commit = NULL;
 	off_t offset;
 	struct tm tm;
 	time_t committer_time;
@@ -4905,10 +4905,6 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	err = got_object_id_str(&bline->id_str, id);
 	if (err)
 		return err;
-
-	err = got_object_open_as_commit(&commit, a->repo, id);
-	if (err)
-		goto done;
 
 	bline->committer = strdup(got_object_commit_get_committer(commit));
 	if (bline->committer == NULL) {
@@ -4968,8 +4964,6 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		bline = &a->lines[a->lineno_cur - 1];
 	}
 done:
-	if (commit)
-		got_object_commit_close(commit);
 	free(line);
 	return err;
 }

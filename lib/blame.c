@@ -88,9 +88,9 @@ struct got_blame {
 };
 
 static const struct got_error *
-annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg)
+annotate_line(struct got_blame *blame, int lineno,
+    struct got_commit_object *commit, struct got_object_id *id,
+    got_blame_cb cb, void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_blame_line *line;
@@ -106,15 +106,14 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	line->annotated = 1;
 	blame->nannotated++;
 	if (cb)
-		err = cb(arg, blame->nlines, lineno + 1, id);
+		err = cb(arg, blame->nlines, lineno + 1, commit, id);
 	return err;
 }
 
 static const struct got_error *
 blame_changes(struct got_blame *blame, struct diff_result *diff_result,
-    struct got_object_id *commit_id,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg)
+    struct got_commit_object *commit, struct got_object_id *commit_id,
+    got_blame_cb cb, void *arg)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -152,7 +151,8 @@ blame_changes(struct got_blame *blame, struct diff_result *diff_result,
 
 		for (j = 0; j < right_count; j++) {
 			int ln = blame->linemap2[idx2++];
-			err = annotate_line(blame, ln, commit_id, cb, arg);
+			err = annotate_line(blame, ln, commit, commit_id,
+			    cb, arg);
 			if (err)
 				return err;
 			if (blame->nlines == blame->nannotated)
@@ -195,8 +195,7 @@ blame_prepare_file(FILE *f, unsigned char **p, off_t *size,
 static const struct got_error *
 blame_commit(struct got_blame *blame, struct got_object_id *id,
     const char *path, struct got_repository *repo,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg)
+    got_blame_cb cb, void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL, *pcommit = NULL;
@@ -260,11 +259,11 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 				goto done;
 			}
 		}
-		err = blame_changes(blame, diff_result, id, cb, arg);
+		err = blame_changes(blame, diff_result, commit, id, cb, arg);
 		if (err)
 			goto done;
 	} else if (cb)
-		err = cb(arg, blame->nlines, -1, id);
+		err = cb(arg, blame->nlines, -1, commit, id);
 done:
 	if (diff_result)
 		diff_result_free(diff_result);
@@ -499,11 +498,10 @@ close_file2_and_reuse_file1(struct got_blame *blame)
 static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
     struct got_object_id *start_commit_id, struct got_repository *repo,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg, got_cancel_cb cancel_cb, void *cancel_arg)
+    got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object *start_commit = NULL;
+	struct got_commit_object *start_commit = NULL, *last_commit = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
@@ -618,8 +616,12 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	if (id && blame->nannotated < blame->nlines) {
 		/* Annotate remaining non-annotated lines with last commit. */
+		err = got_object_open_as_commit(&last_commit, repo, id);
+		if (err)
+			goto done;
 		for (lineno = 0; lineno < blame->nlines; lineno++) {
-			err = annotate_line(blame, lineno, id, cb, arg);
+			err = annotate_line(blame, lineno, last_commit, id,
+			    cb, arg);
 			if (err)
 				goto done;
 		}
@@ -633,6 +635,8 @@ done:
 		got_object_blob_close(blob);
 	if (start_commit)
 		got_object_commit_close(start_commit);
+	if (last_commit)
+		got_object_commit_close(last_commit);
 	if (err) {
 		if (blame)
 			blame_close(blame);
@@ -644,9 +648,8 @@ done:
 
 const struct got_error *
 got_blame(const char *path, struct got_object_id *commit_id,
-    struct got_repository *repo,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg, got_cancel_cb cancel_cb, void* cancel_arg)
+    struct got_repository *repo, got_blame_cb cb, void *arg,
+    got_cancel_cb cancel_cb, void* cancel_arg)
 {
 	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
