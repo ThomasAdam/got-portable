@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+typedef const struct got_error *(*got_blame_cb)(void *, int, int,
+    struct got_commit_object *, struct got_object_id *);
+
 /*
  * Blame the blob at the specified path in the specified commit and invoke
  * a callback whenever an annotation has been computed for a line.
@@ -33,5 +36,4 @@
  */
 const struct got_error *got_blame(const char *,
     struct got_object_id *, struct got_repository *,
-    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *, got_cancel_cb, void *);
+    got_blame_cb, void *, got_cancel_cb, void *);

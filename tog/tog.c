@@ -4162,7 +4162,8 @@ draw_blame(struct tog_view *view)
 }
 
 static const struct got_error *
-blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
+blame_cb(void *arg, int nlines, int lineno,
+    struct got_commit_object *commit, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct tog_blame_cb_args *a = arg;
