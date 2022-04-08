@@ -9454,10 +9454,6 @@ cmd_rebase(int argc, char *argv[])
 			print_update_progress_stats(&upa);
 			goto done;
 		}
-		error = got_worktree_rebase_prepare(&new_base_branch,
-		    &tmp_branch, &fileindex, worktree, branch, repo);
-		if (error)
-			goto done;
 	}
 
 	commit_id = branch_head_commit_id;
@@ -9468,16 +9464,6 @@ cmd_rebase(int argc, char *argv[])
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	pid = STAILQ_FIRST(parent_ids);
 	if (pid == NULL) {
-		if (!continue_rebase) {
-			error = got_worktree_rebase_abort(worktree, fileindex,
-			    repo, new_base_branch, abort_progress, &upa);
-			if (error)
-				goto done;
-			printf("Rebase of %s aborted\n",
-			    got_ref_get_name(branch));
-			print_merge_progress_stats(&upa);
-
-		}
 		error = got_error(GOT_ERR_EMPTY_REBASE);
 		goto done;
 	}
@@ -9488,6 +9474,13 @@ cmd_rebase(int argc, char *argv[])
 	commit = NULL;
 	if (error)
 		goto done;
+
+	if (!continue_rebase) {
+		error = got_worktree_rebase_prepare(&new_base_branch,
+		    &tmp_branch, &fileindex, worktree, branch, repo);
+		if (error)
+			goto done;
+	}
 
 	if (STAILQ_EMPTY(&commits)) {
 		if (continue_rebase) {
