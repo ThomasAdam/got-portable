@@ -788,6 +788,59 @@ test_rebase_path_prefix() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# rebase should succeed when using a complete work tree
+	got checkout $testroot/repo $testroot/wt2 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt2 && got rebase newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "G  gamma/delta" > $testroot/stdout.expected
+	echo -n "$short_orig_commit2 -> $short_new_commit2" \
+		>> $testroot/stdout.expected
+	echo ": committing to delta on newbranch" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/newbranch" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# the first work tree should remain usable
+	(cd $testroot/wt && got update -b master \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo 'Already up-to-date' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -878,8 +931,7 @@ test_rebase_no_commits_to_rebase() {
 		return 1
 	fi
 
-	echo "Rebase of refs/heads/newbranch aborted" \
-		> $testroot/stdout.expected
+	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
