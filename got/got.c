@@ -11879,28 +11879,29 @@ cmd_cat(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
-	error = got_worktree_open(&worktree, cwd);
-	if (error && error->code != GOT_ERR_NOT_WORKTREE)
-		goto done;
-	if (worktree) {
-		if (repo_path == NULL) {
+
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		if (worktree) {
 			repo_path = strdup(
 			    got_worktree_get_repo_path(worktree));
 			if (repo_path == NULL) {
 				error = got_error_from_errno("strdup");
 				goto done;
 			}
-		}
 
-		/* Release work tree lock. */
-		got_worktree_close(worktree);
-		worktree = NULL;
+			/* Release work tree lock. */
+			got_worktree_close(worktree);
+			worktree = NULL;
+		}
 	}
 
 	if (repo_path == NULL) {
-		repo_path = getcwd(NULL, 0);
+		repo_path = strdup(cwd);
 		if (repo_path == NULL)
-			return got_error_from_errno("getcwd");
+			return got_error_from_errno("strdup");
 	}
 
 	error = got_repo_open(&repo, repo_path, NULL);
