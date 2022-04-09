@@ -6414,7 +6414,7 @@ done:
 #endif
 
 static const struct got_error *
-list_tags(struct got_repository *repo, struct got_worktree *worktree)
+list_tags(struct got_repository *repo)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
@@ -6799,13 +6799,18 @@ cmd_tag(int argc, char *argv[])
 	}
 
 	if (do_list) {
+		if (worktree) {
+			/* Release work tree lock. */
+			got_worktree_close(worktree);
+			worktree = NULL;
+		}
 		error = got_repo_open(&repo, repo_path, NULL);
 		if (error != NULL)
 			goto done;
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
-		error = list_tags(repo, worktree);
+		error = list_tags(repo);
 	} else {
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)
