@@ -1217,6 +1217,37 @@ append_id(struct got_object_id *id, void *data, void *arg)
 }
 
 static const struct got_error *
+queue_commit_or_tag_id(struct got_object_id *id, int color,
+    struct got_object_id_queue *ids, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_tag_object *tag = NULL;
+	int obj_type;
+
+	err = got_object_get_type(&obj_type, repo, id);
+	if (err)
+		return err;
+
+	if (obj_type == GOT_OBJ_TYPE_TAG) {
+		err = got_object_open_as_tag(&tag, repo, id);
+		if (err)
+			return err;
+		obj_type = got_object_tag_get_object_type(tag);
+		id = got_object_tag_get_object_id(tag);
+	}
+
+	if (obj_type == GOT_OBJ_TYPE_COMMIT) {
+		err = queue_commit_id(ids, id, color, repo);
+		if (err)
+			goto done;
+	}
+done:
+	if (tag)
+		got_object_tag_close(tag);
+	return err;
+}
+
+static const struct got_error *
 findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
     struct got_object_id **head, int nhead,
     struct got_object_id **tail, int ntail,
@@ -1228,7 +1259,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 	struct got_object_id_queue ids;
 	struct got_object_idset *keep, *drop;
 	struct got_object_qid *qid;
-	int i, ncolor, nkeep, obj_type;
+	int i, ncolor, nkeep;
 
 	STAILQ_INIT(&ids);
 	*res = NULL;
@@ -1249,25 +1280,16 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 		struct got_object_id *id = head[i];
 		if (id == NULL)
 			continue;
-		err = got_object_get_type(&obj_type, repo, id);
-		if (err)
-			return err;
-		if (obj_type != GOT_OBJ_TYPE_COMMIT)
-			continue;
-		err = queue_commit_id(&ids, id, COLOR_KEEP, repo);
+		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
 		if (err)
 			goto done;
 	}		
+
 	for (i = 0; i < ntail; i++) {
 		struct got_object_id *id = tail[i];
 		if (id == NULL)
 			continue;
-		err = got_object_get_type(&obj_type, repo, id);
-		if (err)
-			return err;
-		if (obj_type != GOT_OBJ_TYPE_COMMIT)
-			continue;
-		err = queue_commit_id(&ids, id, COLOR_DROP, repo);
+		err = queue_commit_or_tag_id(id, COLOR_DROP, &ids, repo);
 		if (err)
 			goto done;
 	}
