@@ -1266,9 +1266,20 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 
 	for (i = 0; i < nhead; i++) {
 		struct got_object_id *id = head[i];
+		int j, color = COLOR_KEEP;
+
 		if (id == NULL)
 			continue;
-		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
+
+		for (j = 0; j < ntail; j++) {
+			if (tail[j] != NULL &&
+			    got_object_id_cmp(id, tail[j]) == 0) {
+				color = COLOR_DROP;
+				break;
+			}
+		}
+
+		err = queue_commit_or_tag_id(id, color, &ids, repo);
 		if (err)
 			goto done;
 	}		
