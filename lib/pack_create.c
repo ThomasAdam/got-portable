@@ -1295,6 +1295,13 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 
 	while (!STAILQ_EMPTY(&ids)) {
 		int qcolor;
+
+		if (cancel_cb) {
+			err = cancel_cb(cancel_arg);
+			if (err)
+				goto done;
+		}
+
 		qid = STAILQ_FIRST(&ids);
 		qcolor = *((int *)qid->data);
 
