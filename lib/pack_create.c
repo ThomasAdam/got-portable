@@ -1333,38 +1333,27 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 				goto done;
 		} else if (ncolor == COLOR_BLANK) {
 			struct got_commit_object *commit;
-			struct got_object_id *id;
 			const struct got_object_id_queue *parents;
 			struct got_object_qid *pid;
 
-			id = got_object_id_dup(qid->id);
-			if (id == NULL) {
-				err = got_error_from_errno("got_object_id_dup");
-				goto done;
-			}
 			if (qcolor == COLOR_KEEP)
-				err = got_object_idset_add(keep, id, NULL);
+				err = got_object_idset_add(keep, qid->id, NULL);
 			else
-				err = got_object_idset_add(drop, id, NULL);
-			if (err) {
-				free(id);
+				err = got_object_idset_add(drop, qid->id, NULL);
+			if (err)
 				goto done;
-			}
 
-			err = got_object_open_as_commit(&commit, repo, id);
-			if (err) {
-				free(id);
+			err = got_object_open_as_commit(&commit, repo, qid->id);
+			if (err)
 				goto done;
-			}
+
 			parents = got_object_commit_get_parent_ids(commit);
 			if (parents) {
 				STAILQ_FOREACH(pid, parents, entry) {
 					err = queue_commit_id(&ids, pid->id,
 					    qcolor, repo);
-					if (err) {
-						free(id);
+					if (err)
 						goto done;
-					}
 				}
 			}
 			got_object_commit_close(commit);
