@@ -6591,14 +6591,14 @@ done:
 }
 
 static const struct got_error *
-add_tag(struct got_repository *repo, struct got_worktree *worktree,
+add_tag(struct got_repository *repo, const char *tagger,
     const char *tag_name, const char *commit_arg, const char *tagmsg_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
 	char *label = NULL, *commit_id_str = NULL;
 	struct got_reference *ref = NULL;
-	char *refname = NULL, *tagmsg = NULL, *tagger = NULL;
+	char *refname = NULL, *tagmsg = NULL;
 	char *tagmsg_path = NULL, *tag_id_str = NULL;
 	int preserve_tagmsg = 0;
 	struct got_reflist_head refs;
@@ -6612,10 +6612,6 @@ add_tag(struct got_repository *repo, struct got_worktree *worktree,
 	 */
 	if (tag_name[0] == '-')
 		return got_error_path(tag_name, GOT_ERR_REF_NAME_MINUS);
-
-	err = get_author(&tagger, repo, worktree);
-	if (err)
-		return err;
 
 	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (err)
@@ -6703,7 +6699,6 @@ done:
 	free(refname);
 	free(tagmsg);
 	free(tagmsg_path);
-	free(tagger);
 	got_ref_list_free(&refs);
 	return err;
 }
@@ -6715,7 +6710,7 @@ cmd_tag(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
-	char *gitconfig_path = NULL;
+	char *gitconfig_path = NULL, *tagger = NULL;
 	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0;
 
@@ -6819,6 +6814,15 @@ cmd_tag(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 
+		error = get_author(&tagger, repo, worktree);
+		if (error)
+			goto done;
+		if (worktree) {
+			/* Release work tree lock. */
+			got_worktree_close(worktree);
+			worktree = NULL;
+		}
+
 		if (tagmsg) {
 			error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 			if (error)
@@ -6843,7 +6847,7 @@ cmd_tag(int argc, char *argv[])
 				goto done;
 		}
 
-		error = add_tag(repo, worktree, tag_name,
+		error = add_tag(repo, tagger, tag_name,
 		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg);
 	}
 done:
@@ -6858,6 +6862,7 @@ done:
 	free(repo_path);
 	free(gitconfig_path);
 	free(commit_id_str);
+	free(tagger);
 	return error;
 }
 
