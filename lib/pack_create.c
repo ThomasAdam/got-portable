@@ -1236,6 +1236,97 @@ done:
 }
 
 static const struct got_error *
+color_commits(int *ncolored, struct got_object_id_queue *ids,
+    struct got_object_idset *keep, struct got_object_idset *drop,
+    struct got_repository *repo,
+    got_pack_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_object_qid *qid;
+
+	while (!STAILQ_EMPTY(ids)) {
+		int qcolor, ncolor;
+
+		if (cancel_cb) {
+			err = cancel_cb(cancel_arg);
+			if (err)
+				break;
+		}
+
+		qid = STAILQ_FIRST(ids);
+		qcolor = *((int *)qid->data);
+
+		if (got_object_idset_contains(drop, qid->id))
+			ncolor = COLOR_DROP;
+		else if (got_object_idset_contains(keep, qid->id))
+			ncolor = COLOR_KEEP;
+		else
+			ncolor = COLOR_BLANK;
+
+		(*ncolored)++;
+		err = report_progress(progress_cb, progress_arg, rl,
+		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
+		if (err)
+			break;
+
+		if (ncolor == COLOR_DROP || (ncolor == COLOR_KEEP &&
+		    qcolor == COLOR_KEEP)) {
+			STAILQ_REMOVE_HEAD(ids, entry);
+			got_object_qid_free(qid);
+			continue;
+		}
+
+		if (ncolor == COLOR_KEEP && qcolor == COLOR_DROP) {
+			err = drop_commit(keep, drop, qid->id, repo,
+			    cancel_cb, cancel_arg);
+			if (err)
+				break;
+		} else if (ncolor == COLOR_BLANK) {
+			struct got_commit_object *commit;
+			const struct got_object_id_queue *parents;
+			struct got_object_qid *pid;
+
+			if (qcolor == COLOR_KEEP)
+				err = got_object_idset_add(keep, qid->id, NULL);
+			else
+				err = got_object_idset_add(drop, qid->id, NULL);
+			if (err)
+				break;
+
+			err = got_object_open_as_commit(&commit, repo, qid->id);
+			if (err)
+				break;
+
+			parents = got_object_commit_get_parent_ids(commit);
+			if (parents) {
+				STAILQ_FOREACH(pid, parents, entry) {
+					err = queue_commit_id(ids, pid->id,
+					    qcolor, repo);
+					if (err)
+						break;
+				}
+			}
+			got_object_commit_close(commit);
+			commit = NULL;
+		} else {
+			/* should not happen */
+			err = got_error_fmt(GOT_ERR_NOT_IMPL,
+			    "%s ncolor=%d qcolor=%d", __func__, ncolor, qcolor);
+			break;
+		}
+
+		STAILQ_REMOVE_HEAD(ids, entry);
+		got_object_qid_free(qid);
+	}
+
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
+static const struct got_error *
 findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
     struct got_object_id **head, int nhead,
     struct got_object_id **tail, int ntail,
@@ -1246,8 +1337,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 	const struct got_error *err = NULL;
 	struct got_object_id_queue ids;
 	struct got_object_idset *keep, *drop;
-	struct got_object_qid *qid;
-	int i, ncolor, nkeep;
+	int i, nkeep;
 
 	STAILQ_INIT(&ids);
 	*res = NULL;
@@ -1293,80 +1383,10 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 			goto done;
 	}
 
-	while (!STAILQ_EMPTY(&ids)) {
-		int qcolor;
-
-		if (cancel_cb) {
-			err = cancel_cb(cancel_arg);
-			if (err)
-				goto done;
-		}
-
-		qid = STAILQ_FIRST(&ids);
-		qcolor = *((int *)qid->data);
-
-		if (got_object_idset_contains(drop, qid->id))
-			ncolor = COLOR_DROP;
-		else if (got_object_idset_contains(keep, qid->id))
-			ncolor = COLOR_KEEP;
-		else
-			ncolor = COLOR_BLANK;
-
-		(*ncolored)++;
-		err = report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
-		if (err)
-			goto done;
-
-		if (ncolor == COLOR_DROP || (ncolor == COLOR_KEEP &&
-		    qcolor == COLOR_KEEP)) {
-			STAILQ_REMOVE_HEAD(&ids, entry);
-			got_object_qid_free(qid);
-			continue;
-		}
-
-		if (ncolor == COLOR_KEEP && qcolor == COLOR_DROP) {
-			err = drop_commit(keep, drop, qid->id, repo,
-			    cancel_cb, cancel_arg);
-			if (err)
-				goto done;
-		} else if (ncolor == COLOR_BLANK) {
-			struct got_commit_object *commit;
-			const struct got_object_id_queue *parents;
-			struct got_object_qid *pid;
-
-			if (qcolor == COLOR_KEEP)
-				err = got_object_idset_add(keep, qid->id, NULL);
-			else
-				err = got_object_idset_add(drop, qid->id, NULL);
-			if (err)
-				goto done;
-
-			err = got_object_open_as_commit(&commit, repo, qid->id);
-			if (err)
-				goto done;
-
-			parents = got_object_commit_get_parent_ids(commit);
-			if (parents) {
-				STAILQ_FOREACH(pid, parents, entry) {
-					err = queue_commit_id(&ids, pid->id,
-					    qcolor, repo);
-					if (err)
-						goto done;
-				}
-			}
-			got_object_commit_close(commit);
-			commit = NULL;
-		} else {
-			/* should not happen */
-			err = got_error_fmt(GOT_ERR_NOT_IMPL,
-			    "%s ncolor=%d qcolor=%d", __func__, ncolor, qcolor);
-			goto done;
-		}
-
-		STAILQ_REMOVE_HEAD(&ids, entry);
-		got_object_qid_free(qid);
-	}
+	err = color_commits(ncolored, &ids, keep, drop, repo,
+	    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
+	if (err)
+		goto done;
 
 	nkeep = got_object_idset_num_elements(keep);
 	if (nkeep > 0) {
