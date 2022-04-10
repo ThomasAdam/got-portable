@@ -838,16 +838,6 @@ search_packidx(int *found, struct got_object_id *id,
 	return err;
 }
 
-static const int obj_types[] = {
-	GOT_OBJ_TYPE_ANY,
-	GOT_OBJ_TYPE_COMMIT,
-	GOT_OBJ_TYPE_TREE,
-	GOT_OBJ_TYPE_BLOB,
-	GOT_OBJ_TYPE_TAG,
-	GOT_OBJ_TYPE_OFFSET_DELTA,
-	GOT_OBJ_TYPE_REF_DELTA
-};
-
 static const struct got_error *
 add_object(int want_meta, struct got_object_idset *idset,
     struct got_object_id *id, const char *path, int obj_type,
@@ -1165,8 +1155,7 @@ drop_commit(struct got_object_idset *keep, struct got_object_idset *drop,
 			continue;
 		}
 
-		err = got_object_idset_add(drop, qid->id,
-		    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
+		err = got_object_idset_add(drop, qid->id, NULL);
 		if (err) {
 			got_object_qid_free(qid);
 			break;
@@ -1335,11 +1324,9 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 				goto done;
 			}
 			if (qcolor == COLOR_KEEP)
-				err = got_object_idset_add(keep, id,
-				    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
+				err = got_object_idset_add(keep, id, NULL);
 			else
-				err = got_object_idset_add(drop, id,
-				    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
+				err = got_object_idset_add(drop, id, NULL);
 			if (err) {
 				free(id);
 				goto done;
