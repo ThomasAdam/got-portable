@@ -613,7 +613,7 @@ cmd_pack(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
-	int ch, i, loose_obj_only = 1;
+	int ch, i, loose_obj_only = 1, verbosity = 0;
 	struct got_object_id *pack_hash = NULL;
 	char *id_str = NULL;
 	struct got_pack_progress_arg ppa;
@@ -628,7 +628,7 @@ cmd_pack(int argc, char *argv[])
 	TAILQ_INIT(&exclude_refs);
 	TAILQ_INIT(&include_refs);
 
-	while ((ch = getopt(argc, argv, "ar:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "ar:x:q")) != -1) {
 		switch (ch) {
 		case 'a':
 			loose_obj_only = 0;
@@ -646,6 +646,9 @@ cmd_pack(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			break;
+		case 'q':
+			verbosity = -1;
 			break;
 		default:
 			usage_pack();
@@ -712,6 +715,7 @@ cmd_pack(int argc, char *argv[])
 	ppa.last_scaled_size[0] = '\0';
 	ppa.last_p_indexed = -1;
 	ppa.last_p_resolved = -1;
+	ppa.verbosity = verbosity;
 
 	error = got_repo_pack_objects(&packfile, &pack_hash,
 	    &include_refs, &exclude_refs, repo, loose_obj_only,
@@ -725,13 +729,15 @@ cmd_pack(int argc, char *argv[])
 	error = got_object_id_str(&id_str, pack_hash);
 	if (error)
 		goto done;
-	printf("\nWrote %s.pack\n", id_str);
+	if (verbosity >= 0)
+		printf("\nWrote %s.pack\n", id_str);
 
 	error = got_repo_index_pack(packfile, pack_hash, repo,
 	    pack_index_progress, &ppa, check_cancelled, NULL);
 	if (error)
 		goto done;
-	printf("\nIndexed %s.pack\n", id_str);
+	if (verbosity >= 0)
+		printf("\nIndexed %s.pack\n", id_str);
 done:
 	if (repo)
 		got_repo_close(repo);
