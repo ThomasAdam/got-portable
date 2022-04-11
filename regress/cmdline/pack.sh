@@ -409,8 +409,7 @@ test_pack_ambiguous_arg() {
 	(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
 	local commit1=`git_show_branch_head $testroot/repo mybranch`
 
-	gotadmin pack -r $testroot/repo -x master master \
-		> /dev/null 2> $testroot/stderr
+	gotadmin pack -q -r $testroot/repo -x master master 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
@@ -467,7 +466,7 @@ test_pack_loose_only() {
 	# pack objects belonging to the 'master' branch; its objects
 	# should then be excluded while packing 'mybranch' since they
 	# are already packed
-	gotadmin pack -r $testroot/repo master > /dev/null
+	gotadmin pack -q -r $testroot/repo master
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2
@@ -574,7 +573,7 @@ test_pack_all_objects() {
 	(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
 
 	# pack objects belonging to the 'master' branch
-	gotadmin pack -r $testroot/repo master > /dev/null
+	gotadmin pack -q -r $testroot/repo master
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "gotadmin pack failed unexpectedly" >&2

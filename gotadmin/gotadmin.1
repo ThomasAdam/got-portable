@@ -72,7 +72,7 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm pack Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Op Ar reference ...
+.It Cm pack Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Oo Fl q Oc Op Ar reference ...
 Generate a new pack file and a corresponding pack file index.
 By default, add any loose objects which are reachable via any references
 to the generated pack file.
@@ -122,6 +122,8 @@ option may be specified multiple times to build a list of references to exclude.
 Exclusion takes precedence over inclusion.
 If a reference appears in both the included and excluded lists, it will
 be excluded.
+.It Fl q
+Suppress progress reporting output.
 .El
 .Tg ix
 .It Cm indexpack Ar packfile-path
