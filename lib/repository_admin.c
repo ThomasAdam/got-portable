@@ -70,6 +70,11 @@ get_reflist_object_ids(struct got_object_id ***ids, int *nobjects,
 	*ids = NULL;
 	*nobjects = 0;
 
+	err = got_reflist_sort(refs,
+	    got_ref_cmp_by_commit_timestamp_descending, repo);
+	if (err)
+		return err;
+
 	*ids = reallocarray(NULL, alloc_chunksz, sizeof(struct got_object_id *));
 	if (*ids == NULL)
 		return got_error_from_errno("reallocarray");
