@@ -2993,7 +2993,6 @@ cmd_checkout(int argc, char *argv[])
 		error = check_linear_ancestry(commit_id,
 		    got_worktree_get_base_commit_id(worktree), 0, repo);
 		if (error != NULL) {
-			free(commit_id);
 			if (error->code == GOT_ERR_ANCESTRY) {
 				error = checkout_ancestry_error(
 				    head_ref, commit_id_str);
