@@ -102,7 +102,11 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 	memcpy(&new->id, id, sizeof(new->id));
 	new->data = data;
 
-	RB_INSERT(got_object_idset_tree, &set->entries, new);
+	if (RB_INSERT(got_object_idset_tree, &set->entries, new) != NULL) {
+		free(new);
+		return got_error(GOT_ERR_OBJ_EXISTS);
+	}
+
 	set->totelem++;
 	return NULL;
 }

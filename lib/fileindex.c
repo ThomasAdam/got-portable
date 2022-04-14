@@ -265,7 +265,9 @@ add_entry(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 	if (fileindex->nentries >= GOT_FILEIDX_MAX_ENTRIES)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	RB_INSERT(got_fileindex_tree, &fileindex->entries, ie);
+	if (RB_INSERT(got_fileindex_tree, &fileindex->entries, ie) != NULL)
+		return got_error_path(ie->path, GOT_ERR_FILEIDX_DUP_ENTRY);
+
 	fileindex->nentries++;
 	return NULL;
 }
