@@ -222,6 +222,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_NO_PATCH, "no patch found" },
 	{ GOT_ERR_HUNK_FAILED, "hunk failed to apply" },
 	{ GOT_ERR_PATCH_FAILED, "patch failed to apply" },
+	{ GOT_ERR_FILEIDX_DUP_ENTRY, "duplicate file index entry" },
 };
 
 static struct got_custom_error {
