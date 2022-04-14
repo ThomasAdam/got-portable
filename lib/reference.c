@@ -1569,8 +1569,10 @@ add_object_id_map_entry(struct got_object_idset *idset,
 
 		TAILQ_INIT(&ent->refs);
 		err = got_object_idset_add(idset, id, ent);
-		if (err)
+		if (err) {
+			free(ent);
 			return err;
+		}
 	}
 
 	err = got_reflist_entry_dup(&new, re);

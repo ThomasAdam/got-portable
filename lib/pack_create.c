@@ -867,11 +867,19 @@ add_object(int want_meta, struct got_object_idset *idset,
 		(*nfound)++;
 		err = report_progress(progress_cb, progress_arg, rl,
 		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
-		if (err)
+		if (err) {
+			clear_meta(m);
+			free(m);
 			return err;
+		}
 	}
 
-	return got_object_idset_add(idset, id, m);
+	err = got_object_idset_add(idset, id, m);
+	if (err) {
+		clear_meta(m);
+		free(m);
+	}
+	return err;
 }
 
 static const struct got_error *
