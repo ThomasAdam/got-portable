@@ -60,6 +60,10 @@
 #define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
 #endif
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 struct got_pack_meta {
 	struct got_object_id id;
 	char	*path;
@@ -1107,12 +1111,25 @@ enum findtwixt_color {
 	COLOR_KEEP = 0,
 	COLOR_DROP,
 	COLOR_BLANK,
+	COLOR_SKIP,
 };
+
 static const int findtwixt_colors[] = {
 	COLOR_KEEP,
 	COLOR_DROP,
-	COLOR_BLANK
+	COLOR_BLANK,
+	COLOR_SKIP,
 };
+
+static const struct got_error *
+paint_commit(struct got_object_qid *qid, int color)
+{
+	if (color < 0 || color >= nitems(findtwixt_colors))
+		return got_error(GOT_ERR_RANGE);
+
+	qid->data = (void *)&findtwixt_colors[color];
+	return NULL;
+}
 
 static const struct got_error *
 queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
@@ -1126,77 +1143,14 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 		return err;
 
 	STAILQ_INSERT_TAIL(ids, qid, entry);
-	qid->data = (void *)&findtwixt_colors[color];
-	return NULL;
-}
-
-static const struct got_error *
-drop_commit(struct got_object_idset *keep, struct got_object_idset *drop,
-    struct got_object_id *id, struct got_repository *repo,
-    got_cancel_cb cancel_cb, void *cancel_arg)
-{
-	const struct got_error *err = NULL;
-	struct got_commit_object *commit;
-	const struct got_object_id_queue *parents;
-	struct got_object_id_queue ids;
-	struct got_object_qid *qid;
-
-	STAILQ_INIT(&ids);
-
-	err = got_object_qid_alloc(&qid, id);
-	if (err)
-		return err;
-	STAILQ_INSERT_HEAD(&ids, qid, entry);
-
-	while (!STAILQ_EMPTY(&ids)) {
-		if (cancel_cb) {
-			err = (*cancel_cb)(cancel_arg);
-			if (err)
-				break;
-		}
-
-		qid = STAILQ_FIRST(&ids);
-		STAILQ_REMOVE_HEAD(&ids, entry);
-
-		if (got_object_idset_contains(drop, qid->id)) {
-			got_object_qid_free(qid);
-			continue;
-		}
-
-		err = got_object_idset_add(drop, qid->id, NULL);
-		if (err) {
-			got_object_qid_free(qid);
-			break;
-		}
-
-		if (!got_object_idset_contains(keep, qid->id)) {
-			got_object_qid_free(qid);
-			continue;
-		}
-
-		err = got_object_open_as_commit(&commit, repo, qid->id);
-		got_object_qid_free(qid);
-		if (err)
-			break;
-
-		parents = got_object_commit_get_parent_ids(commit);
-		if (parents) {
-			err = got_object_id_queue_copy(parents, &ids);
-			if (err) {
-				got_object_commit_close(commit);
-				break;
-			}
-		}
-		got_object_commit_close(commit);
-	}
-
-	got_object_id_queue_free(&ids);
-	return err;
+	return paint_commit(qid, color);
 }
 
 struct append_id_arg {
 	struct got_object_id **array;
 	int idx;
+	struct got_object_idset *drop;
+	struct got_object_idset *skip;
 };
 
 static const struct got_error *
@@ -1204,11 +1158,14 @@ append_id(struct got_object_id *id, void *data, void *arg)
 {
 	struct append_id_arg *a = arg;
 
-	a->array[a->idx] = got_object_id_dup(id);
+	if (got_object_idset_contains(a->skip, id) ||
+	    got_object_idset_contains(a->drop, id))
+		return NULL;
+
+	a->array[++a->idx] = got_object_id_dup(id);
 	if (a->array[a->idx] == NULL)
 		return got_error_from_errno("got_object_id_dup");
 
-	a->idx++;
 	return NULL;
 }
 
@@ -1244,18 +1201,20 @@ done:
 }
 
 static const struct got_error *
-color_commits(int *ncolored, struct got_object_id_queue *ids,
+paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
     struct got_object_idset *keep, struct got_object_idset *drop,
-    struct got_repository *repo,
+    struct got_object_idset *skip, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
+	const struct got_object_id_queue *parents;
 	struct got_object_qid *qid;
+	int nqueued = nids, nskip = 0;
 
-	while (!STAILQ_EMPTY(ids)) {
-		int qcolor, ncolor;
+	while (!STAILQ_EMPTY(ids) && nskip != nqueued) {
+		int color;
 
 		if (cancel_cb) {
 			err = cancel_cb(cancel_arg);
@@ -1264,71 +1223,94 @@ color_commits(int *ncolored, struct got_object_id_queue *ids,
 		}
 
 		qid = STAILQ_FIRST(ids);
-		qcolor = *((int *)qid->data);
+		STAILQ_REMOVE_HEAD(ids, entry);
+		nqueued--;
+		color = *((int *)qid->data);
+		if (color == COLOR_SKIP)
+			nskip--;
 
-		if (got_object_idset_contains(drop, qid->id))
-			ncolor = COLOR_DROP;
-		else if (got_object_idset_contains(keep, qid->id))
-			ncolor = COLOR_KEEP;
-		else
-			ncolor = COLOR_BLANK;
+		if (got_object_idset_contains(skip, qid->id)) {
+			got_object_qid_free(qid);
+			continue;
+		}
 
-		(*ncolored)++;
+		switch (color) {
+		case COLOR_KEEP:
+			if (got_object_idset_contains(keep, qid->id)) {
+				got_object_qid_free(qid);
+				continue;
+			}
+			if (got_object_idset_contains(drop, qid->id)) {
+				err = paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+				nskip++;
+			} else
+				(*ncolored)++;
+			err = got_object_idset_add(keep, qid->id, NULL);
+			if (err)
+				goto done;
+			break;
+		case COLOR_DROP:
+			if (got_object_idset_contains(drop, qid->id)) {
+				got_object_qid_free(qid);
+				continue;
+			}
+			if (got_object_idset_contains(keep, qid->id)) {
+				err = paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+				nskip++;
+			} else
+				(*ncolored)++;
+			err = got_object_idset_add(drop, qid->id, NULL);
+			if (err)
+				goto done;
+			break;
+		case COLOR_SKIP:
+			if (!got_object_idset_contains(skip, qid->id)) {
+				err = got_object_idset_add(skip, qid->id, NULL);
+				if (err)
+					goto done;
+			}
+			break;
+		default:
+			/* should not happen */
+			err = got_error_fmt(GOT_ERR_NOT_IMPL,
+			    "%s invalid commit color %d", __func__, color);
+			goto done;
+		}
+
 		err = report_progress(progress_cb, progress_arg, rl,
 		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
 		if (err)
 			break;
 
-		if (ncolor == COLOR_DROP || (ncolor == COLOR_KEEP &&
-		    qcolor == COLOR_KEEP)) {
-			STAILQ_REMOVE_HEAD(ids, entry);
-			got_object_qid_free(qid);
-			continue;
-		}
 
-		if (ncolor == COLOR_KEEP && qcolor == COLOR_DROP) {
-			err = drop_commit(keep, drop, qid->id, repo,
-			    cancel_cb, cancel_arg);
-			if (err)
-				break;
-		} else if (ncolor == COLOR_BLANK) {
-			struct got_commit_object *commit;
-			const struct got_object_id_queue *parents;
-			struct got_object_qid *pid;
-
-			if (qcolor == COLOR_KEEP)
-				err = got_object_idset_add(keep, qid->id, NULL);
-			else
-				err = got_object_idset_add(drop, qid->id, NULL);
-			if (err)
-				break;
-
-			err = got_object_open_as_commit(&commit, repo, qid->id);
-			if (err)
-				break;
-
-			parents = got_object_commit_get_parent_ids(commit);
-			if (parents) {
-				STAILQ_FOREACH(pid, parents, entry) {
-					err = queue_commit_id(ids, pid->id,
-					    qcolor, repo);
-					if (err)
-						break;
-				}
-			}
-			got_object_commit_close(commit);
-			commit = NULL;
-		} else {
-			/* should not happen */
-			err = got_error_fmt(GOT_ERR_NOT_IMPL,
-			    "%s ncolor=%d qcolor=%d", __func__, ncolor, qcolor);
+		err = got_object_open_as_commit(&commit, repo, qid->id);
+		if (err)
 			break;
+
+		parents = got_object_commit_get_parent_ids(commit);
+		if (parents) {
+			struct got_object_qid *pid;
+			color = *((int *)qid->data);
+			STAILQ_FOREACH(pid, parents, entry) {
+				err = queue_commit_id(ids, pid->id, color,
+				    repo);
+				if (err)
+					break;
+				nqueued++;
+				if (color == COLOR_SKIP)
+					nskip++;
+			}
 		}
 
-		STAILQ_REMOVE_HEAD(ids, entry);
+		got_object_commit_close(commit);
+		commit = NULL;
 		got_object_qid_free(qid);
 	}
-
+done:
 	if (commit)
 		got_object_commit_close(commit);
 	return err;
@@ -1344,7 +1326,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id_queue ids;
-	struct got_object_idset *keep, *drop;
+	struct got_object_idset *keep, *drop, *skip = NULL;
 	int i, nkeep;
 
 	STAILQ_INIT(&ids);
@@ -1358,6 +1340,12 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 
 	drop = got_object_idset_alloc();
 	if (drop == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	skip = got_object_idset_alloc();
+	if (skip == NULL) {
 		err = got_error_from_errno("got_object_idset_alloc");
 		goto done;
 	}
@@ -1380,8 +1368,9 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 			goto done;
 	}
 
-	err = color_commits(ncolored, &ids, keep, drop, repo,
-	    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
+	err = paint_commits(ncolored, &ids, nhead + ntail,
+	    keep, drop, skip, repo, progress_cb, progress_arg, rl,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -1393,18 +1382,22 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 			err = got_error_from_errno("calloc");
 			goto done;
 		}
-		arg.idx = 0;
+		arg.idx = -1;
+		arg.skip = skip;
+		arg.drop = drop;
 		err = got_object_idset_for_each(keep, append_id, &arg);
 		if (err) {
 			free(arg.array);
 			goto done;
 		}
 		*res = arg.array;
-		*nres = nkeep;
+		*nres = arg.idx + 1;
 	}
 done:
 	got_object_idset_free(keep);
 	got_object_idset_free(drop);
+	if (skip)
+		got_object_idset_free(skip);
 	got_object_id_queue_free(&ids);
 	return err;
 }
