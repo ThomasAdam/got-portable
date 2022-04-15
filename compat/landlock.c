@@ -15,7 +15,6 @@
  */
 
 #include <linux/landlock.h>
-#include <linux/prctl.h>
 
 #include <sys/prctl.h>
 #include <sys/syscall.h>
