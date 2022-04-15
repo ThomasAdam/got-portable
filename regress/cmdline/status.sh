@@ -330,10 +330,7 @@ test_status_shows_no_mods_after_complete_merge() {
 	local testroot=`test_init status_shows_no_mods_after_complete_merge 1`
 
 	# make this file larger than the usual blob buffer size of 8192
-	echo -n > $testroot/repo/numbers
-	for i in `jot 16384`; do
-		echo "$i" >> $testroot/repo/numbers
-	done
+	jot 16384 > $testroot/repo/numbers
 
 	(cd $testroot/repo && git add numbers)
 	git_commit $testroot/repo -m "added numbers file"
