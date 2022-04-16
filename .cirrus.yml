@@ -4,6 +4,13 @@ got_linux_task:
   before_build_script: .github/ci/before-install.sh
   build:script: .github/ci/build.sh
 
+got_alpine_linux_task:
+  container:
+    image: alpine:latest
+  script:
+    - apk add build-base bison automake make autoconf libbsd-dev util-linux-dev libressl-dev zlib-dev ncurses-dev
+    - .github/ci/build.sh
+
 got_freebsd_task:
   freebsd_instance:
     image_family: freebsd-13-0
