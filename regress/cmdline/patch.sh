@@ -571,7 +571,7 @@ EOF
 		test_done $testroot 1
 		return 1
 	fi
-	
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1076,7 +1076,7 @@ EOF
 		return 1
 	fi
 
-	echo 'M  alpha' > $testroot/stdout.expected	
+	echo 'M  alpha' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
