@@ -1776,25 +1776,24 @@ done:
 }
 
 static const struct got_error *
-remove_unused_object(struct got_object_idset_element *entry, void *arg)
+remove_unused_object(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_object_idset *idset = arg;
 
-	if (got_object_idset_get_element_data(entry) == NULL)
-		got_object_idset_remove_element(idset, entry);
+	if (data == NULL)
+		got_object_idset_remove(NULL, idset, id);
 
 	return NULL;
 }
 
 static const struct got_error *
-remove_reused_object(struct got_object_idset_element *entry, void *arg)
+remove_reused_object(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_object_idset *idset = arg;
-	struct got_pack_meta *m;
+	struct got_pack_meta *m = data;
 
-	m = got_object_idset_get_element_data(entry);
 	if (m->have_reused_delta)
-		got_object_idset_remove_element(idset, entry);
+		got_object_idset_remove(NULL, idset, id);
 
 	return NULL;
 }
@@ -1839,8 +1838,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	if (err)
 		return err;
 
-	err = got_object_idset_for_each_element(idset,
-	    remove_unused_object, idset);
+	err = got_object_idset_for_each(idset, remove_unused_object, idset);
 	if (err)
 		goto done;
 
@@ -1876,7 +1874,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	if (err)
 		goto done;
 	if (reuse.nmeta > 0) {
-		err = got_object_idset_for_each_element(idset,
+		err = got_object_idset_for_each(idset,
 		    remove_reused_object, idset);
 		if (err)
 			goto done;
