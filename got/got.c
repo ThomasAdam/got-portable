@@ -7292,7 +7292,7 @@ cmd_patch(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	    got_worktree_get_root_path(worktree));
 	if (error != NULL)
 		goto done;
 
