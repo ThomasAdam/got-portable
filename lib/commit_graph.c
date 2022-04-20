@@ -126,7 +126,7 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 	if (err)
 		return err;
 
-	err = got_object_open_as_commit(&pcommit, repo, pid->id);
+	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
 	if (err)
 		goto done;
 
@@ -215,9 +215,9 @@ packed_first_parent_traversal(int *ncommits_traversed,
 	STAILQ_FOREACH(qid, &traversed_commits, entry) {
 		struct got_commit_graph_node *node;
 
-		if (got_object_idset_contains(graph->open_branches, qid->id))
+		if (got_object_idset_contains(graph->open_branches, &qid->id))
 			continue;
-		if (got_object_idset_contains(graph->node_ids, qid->id))
+		if (got_object_idset_contains(graph->node_ids, &qid->id))
 			continue;
 
 		(*ncommits_traversed)++;
@@ -225,11 +225,11 @@ packed_first_parent_traversal(int *ncommits_traversed,
 		/* ... except the last commit is the new branch tip. */
 		if (STAILQ_NEXT(qid, entry) == NULL) {
 			err = got_object_idset_add(graph->open_branches,
-			    qid->id, NULL);
+			    &qid->id, NULL);
 			break;
 		}
 
-		err = add_node(&node, graph, qid->id, repo);
+		err = add_node(&node, graph, &qid->id, repo);
 		if (err)
 			break;
 	}
@@ -263,7 +263,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
 		qid = STAILQ_FIRST(&commit->parent_ids);
 		if (qid == NULL ||
-		    got_object_idset_contains(graph->open_branches, qid->id))
+		    got_object_idset_contains(graph->open_branches, &qid->id))
 			return NULL;
 		/*
 		 * The root directory always changes by definition, and when
@@ -277,12 +277,12 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		    (commit->flags & GOT_COMMIT_FLAG_PACKED)) {
 			int ncommits = 0;
 			err = packed_first_parent_traversal(&ncommits,
-			    graph, qid->id, repo);
+			    graph, &qid->id, repo);
 			if (err || ncommits > 0)
 				return err;
 		}
 		return got_object_idset_add(graph->open_branches,
-		    qid->id, NULL);
+		    &qid->id, NULL);
 	}
 
 	/*
@@ -303,11 +303,11 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 			struct got_commit_object *pcommit = NULL;
 
 			if (got_object_idset_contains(graph->open_branches,
-			    qid->id))
+			    &qid->id))
 				continue;
 
 			err = got_object_open_as_commit(&pcommit, repo,
-			    qid->id);
+			    &qid->id);
 			if (err) {
 				free(merged_id);
 				free(prev_id);
@@ -341,7 +341,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 			 */
 			if (got_object_id_cmp(merged_id, id) == 0) {
 				err = got_object_idset_add(graph->open_branches,
-				    qid->id, NULL);
+				    &qid->id, NULL);
 				free(merged_id);
 				free(id);
 				return err;
@@ -362,22 +362,23 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 			if (qid == NULL)
 				return NULL;
 			if (got_object_idset_contains(graph->open_branches,
-			    qid->id))
+			    &qid->id))
 				return NULL;
 			if (got_object_idset_contains(graph->node_ids,
-			    qid->id))
+			    &qid->id))
 				return NULL; /* parent already traversed */
 			return got_object_idset_add(graph->open_branches,
-			    qid->id, NULL);
+			    &qid->id, NULL);
 		}
 	}
 
 	STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
-		if (got_object_idset_contains(graph->open_branches, qid->id))
+		if (got_object_idset_contains(graph->open_branches, &qid->id))
 			continue;
-		if (got_object_idset_contains(graph->node_ids, qid->id))
+		if (got_object_idset_contains(graph->node_ids, &qid->id))
 			continue; /* parent already traversed */
-		err = got_object_idset_add(graph->open_branches, qid->id, NULL);
+		err = got_object_idset_add(graph->open_branches, &qid->id,
+		    NULL);
 		if (err)
 			return err;
 	}

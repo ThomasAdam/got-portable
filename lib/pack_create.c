@@ -985,12 +985,12 @@ load_tree(int want_meta, struct got_object_idset *idset,
 		qid = STAILQ_FIRST(&tree_ids);
 		STAILQ_REMOVE_HEAD(&tree_ids, entry);
 
-		if (got_object_idset_contains(idset, qid->id)) {
+		if (got_object_idset_contains(idset, &qid->id)) {
 			got_object_qid_free(qid);
 			continue;
 		}
 
-		err = add_object(want_meta, idset, qid->id, dpath,
+		err = add_object(want_meta, idset, &qid->id, dpath,
 		    GOT_OBJ_TYPE_TREE, mtime, loose_obj_only, repo,
 		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl);
 		if (err) {
@@ -998,7 +998,7 @@ load_tree(int want_meta, struct got_object_idset *idset,
 			break;
 		}
 
-		err = load_tree_entries(&tree_ids, want_meta, idset, qid->id,
+		err = load_tree_entries(&tree_ids, want_meta, idset, &qid->id,
 		    dpath, mtime, repo, loose_obj_only, ncolored, nfound,
 		    ntrees, progress_cb, progress_arg, rl,
 		    cancel_cb, cancel_arg);
@@ -1230,47 +1230,48 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		if (color == COLOR_SKIP)
 			nskip--;
 
-		if (got_object_idset_contains(skip, qid->id)) {
+		if (got_object_idset_contains(skip, &qid->id)) {
 			got_object_qid_free(qid);
 			continue;
 		}
 
 		switch (color) {
 		case COLOR_KEEP:
-			if (got_object_idset_contains(keep, qid->id)) {
+			if (got_object_idset_contains(keep, &qid->id)) {
 				got_object_qid_free(qid);
 				continue;
 			}
-			if (got_object_idset_contains(drop, qid->id)) {
+			if (got_object_idset_contains(drop, &qid->id)) {
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
 				nskip++;
 			} else
 				(*ncolored)++;
-			err = got_object_idset_add(keep, qid->id, NULL);
+			err = got_object_idset_add(keep, &qid->id, NULL);
 			if (err)
 				goto done;
 			break;
 		case COLOR_DROP:
-			if (got_object_idset_contains(drop, qid->id)) {
+			if (got_object_idset_contains(drop, &qid->id)) {
 				got_object_qid_free(qid);
 				continue;
 			}
-			if (got_object_idset_contains(keep, qid->id)) {
+			if (got_object_idset_contains(keep, &qid->id)) {
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
 				nskip++;
 			} else
 				(*ncolored)++;
-			err = got_object_idset_add(drop, qid->id, NULL);
+			err = got_object_idset_add(drop, &qid->id, NULL);
 			if (err)
 				goto done;
 			break;
 		case COLOR_SKIP:
-			if (!got_object_idset_contains(skip, qid->id)) {
-				err = got_object_idset_add(skip, qid->id, NULL);
+			if (!got_object_idset_contains(skip, &qid->id)) {
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
 				if (err)
 					goto done;
 			}
@@ -1288,7 +1289,7 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 			break;
 
 
-		err = got_object_open_as_commit(&commit, repo, qid->id);
+		err = got_object_open_as_commit(&commit, repo, &qid->id);
 		if (err)
 			break;
 
@@ -1297,7 +1298,7 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 			struct got_object_qid *pid;
 			color = *((int *)qid->data);
 			STAILQ_FOREACH(pid, parents, entry) {
-				err = queue_commit_id(ids, pid->id, color,
+				err = queue_commit_id(ids, &pid->id, color,
 				    repo);
 				if (err)
 					break;

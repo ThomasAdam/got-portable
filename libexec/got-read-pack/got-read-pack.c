@@ -683,11 +683,11 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		if (pid == NULL)
 			break;
 
-		idx = got_packidx_get_object_idx(packidx, pid->id);
+		idx = got_packidx_get_object_idx(packidx, &pid->id);
 		if (idx == -1)
 			break;
 
-		err = open_commit(&pcommit, pack, packidx, idx, pid->id,
+		err = open_commit(&pcommit, pack, packidx, idx, &pid->id,
 		    objcache);
 		if (err) {
 			if (err->code != GOT_ERR_NO_OBJ)
@@ -745,7 +745,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		}
 
 		if (!changed) {
-			memcpy(id.sha1, pid->id->sha1, SHA1_DIGEST_LENGTH);
+			memcpy(id.sha1, pid->id.sha1, SHA1_DIGEST_LENGTH);
 			got_object_commit_close(commit);
 			commit = pcommit;
 			pcommit = NULL;

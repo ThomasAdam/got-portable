@@ -24,6 +24,7 @@
 #include <curses.h>
 #include <panel.h>
 #include <locale.h>
+#include <sha1.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -1880,7 +1881,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 		return got_error_from_errno("view_open");
 
 	parent_id = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
-	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
+	err = open_diff_view(diff_view, parent_id ? &parent_id->id : NULL,
 	    commit_id, NULL, NULL, 3, 0, 0, log_view, repo);
 	if (err == NULL)
 		*new_view = diff_view;
@@ -3118,7 +3119,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 		err = got_object_open_as_commit(&pcommit, repo,
-		    qid->id);
+		    &qid->id);
 		if (err)
 			return err;
 
@@ -3261,7 +3262,7 @@ write_commit_info(off_t **line_offsets, size_t *nlines,
 		int pn = 1;
 		parent_ids = got_object_commit_get_parent_ids(commit);
 		STAILQ_FOREACH(qid, parent_ids, entry) {
-			err = got_object_id_str(&id_str, qid->id);
+			err = got_object_id_str(&id_str, &qid->id);
 			if (err)
 				goto done;
 			n = fprintf(outfile, "parent %d: %s\n", pn++, id_str);
@@ -3390,7 +3391,7 @@ create_diff(struct tog_diff_view_state *s)
 		} else {
 			parent_ids = got_object_commit_get_parent_ids(commit2);
 			STAILQ_FOREACH(pid, parent_ids, entry) {
-				if (got_object_id_cmp(s->id1, pid->id) == 0) {
+				if (got_object_id_cmp(s->id1, &pid->id) == 0) {
 					err = write_commit_info(
 					    &s->line_offsets, &s->nlines,
 					    s->id2, refs, s->repo, s->f);
@@ -3699,7 +3700,7 @@ set_selected_commit(struct tog_diff_view_state *s,
 	parent_ids = got_object_commit_get_parent_ids(selected_commit);
 	free(s->id1);
 	pid = STAILQ_FIRST(parent_ids);
-	s->id1 = pid ? got_object_id_dup(pid->id) : NULL;
+	s->id1 = pid ? got_object_id_dup(&pid->id) : NULL;
 	got_object_commit_close(selected_commit);
 	return NULL;
 }
@@ -4014,7 +4015,7 @@ draw_blame(struct tog_view *view)
 	char *id_str;
 	struct tog_color *tc;
 
-	err = got_object_id_str(&id_str, s->blamed_commit->id);
+	err = got_object_id_str(&id_str, &s->blamed_commit->id);
 	if (err)
 		return err;
 
@@ -4337,7 +4338,7 @@ run_blame(struct tog_view *view)
 	int obj_type;
 
 	err = got_object_open_as_commit(&commit, s->repo,
-	    s->blamed_commit->id);
+	    &s->blamed_commit->id);
 	if (err)
 		return err;
 
@@ -4388,7 +4389,7 @@ run_blame(struct tog_view *view)
 	blame->cb_args.view = view;
 	blame->cb_args.lines = blame->lines;
 	blame->cb_args.nlines = blame->nlines;
-	blame->cb_args.commit_id = got_object_id_dup(s->blamed_commit->id);
+	blame->cb_args.commit_id = got_object_id_dup(&s->blamed_commit->id);
 	if (blame->cb_args.commit_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
@@ -4670,7 +4671,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			}
 			/* Check if path history ends here. */
 			err = got_object_open_as_commit(&pcommit,
-			    s->repo, pid->id);
+			    s->repo, &pid->id);
 			if (err)
 				break;
 			err = got_object_id_by_path(&blob_id, s->repo,
@@ -4691,11 +4692,11 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				break;
 			}
 			err = got_object_qid_alloc(&s->blamed_commit,
-			    pid->id);
+			    &pid->id);
 			got_object_commit_close(commit);
 		} else {
 			if (got_object_id_cmp(id,
-			    s->blamed_commit->id) == 0)
+			    &s->blamed_commit->id) == 0)
 				break;
 			err = got_object_qid_alloc(&s->blamed_commit,
 			    id);
@@ -4717,7 +4718,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'B': {
 		struct got_object_qid *first;
 		first = STAILQ_FIRST(&s->blamed_commits);
-		if (!got_object_id_cmp(first->id, s->commit_id))
+		if (!got_object_id_cmp(&first->id, s->commit_id))
 			break;
 		s->done = 1;
 		thread_err = stop_blame(&s->blame);
@@ -4755,7 +4756,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			err = got_error_from_errno("view_open");
 			break;
 		}
-		err = open_diff_view(diff_view, pid ? pid->id : NULL,
+		err = open_diff_view(diff_view, pid ? &pid->id : NULL,
 		    id, NULL, NULL, 3, 0, 0, NULL, s->repo);
 		got_object_commit_close(commit);
 		if (err) {

@@ -123,7 +123,7 @@ idset_resize(struct got_object_idset *set, size_t nbuckets)
 			uint64_t idx;
 			qid = STAILQ_FIRST(&set->ids[i]);
 			STAILQ_REMOVE(&set->ids[i], qid, got_object_qid, entry);
-			idx = idset_hash(set, qid->id) % nbuckets;
+			idx = idset_hash(set, &qid->id) % nbuckets;
 			STAILQ_INSERT_HEAD(&ids[idx], qid, entry);
 		}
 	}
@@ -170,7 +170,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 	err = got_object_qid_alloc_partial(&qid);
 	if (err)
 		return err;
-	memcpy(qid->id, id, sizeof(*qid->id));
+	memcpy(&qid->id, id, sizeof(qid->id));
 	qid->data = data;
 
 	idx = idset_hash(set, id) % set->nbuckets;
@@ -192,7 +192,7 @@ find_element(struct got_object_idset *set, struct got_object_id *id)
 	struct got_object_qid *qid;
 
 	STAILQ_FOREACH(qid, head, entry) {
-		if (got_object_id_cmp(qid->id, id) == 0)
+		if (got_object_id_cmp(&qid->id, id) == 0)
 			return qid;
 	}
 
@@ -232,7 +232,7 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 		idx = idset_hash(set, id) % set->nbuckets;
 		head = &set->ids[idx];
 		STAILQ_FOREACH(qid, head, entry) {
-			if (got_object_id_cmp(qid->id, id) == 0)
+			if (got_object_id_cmp(&qid->id, id) == 0)
 				break;
 		}
 		if (qid == NULL)
@@ -270,7 +270,7 @@ got_object_idset_for_each(struct got_object_idset *set,
 	for (i = 0; i < set->nbuckets; i++) {
 		head = &set->ids[i];
 		STAILQ_FOREACH_SAFE(qid, head, entry, tmp) {
-			err = (*cb)(qid->id, qid->data, arg);
+			err = (*cb)(&qid->id, qid->data, arg);
 			if (err)
 				goto done;
 		}

@@ -869,24 +869,24 @@ load_tree(struct got_object_idset *loose_ids,
 		qid = STAILQ_FIRST(&tree_ids);
 		STAILQ_REMOVE_HEAD(&tree_ids, entry);
 
-		if (got_object_idset_contains(traversed_ids, qid->id)) {
+		if (got_object_idset_contains(traversed_ids, &qid->id)) {
 			got_object_qid_free(qid);
 			continue;
 		}
 
-		err = got_object_idset_add(traversed_ids, qid->id, NULL);
+		err = got_object_idset_add(traversed_ids, &qid->id, NULL);
 		if (err) {
 			got_object_qid_free(qid);
 			break;
 		}
 
 		/* This tree is referenced. */
-		err = preserve_loose_object(loose_ids, qid->id, repo, npacked);
+		err = preserve_loose_object(loose_ids, &qid->id, repo, npacked);
 		if (err)
 			break;
 
 		err = load_tree_entries(&tree_ids, loose_ids, traversed_ids,
-		    qid->id, dpath, repo, npacked, cancel_cb, cancel_arg);
+		    &qid->id, dpath, repo, npacked, cancel_cb, cancel_arg);
 		got_object_qid_free(qid);
 		if (err)
 			break;
@@ -929,32 +929,33 @@ load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
 		qid = STAILQ_FIRST(&ids);
 		STAILQ_REMOVE_HEAD(&ids, entry);
 
-		if (got_object_idset_contains(traversed_ids, qid->id)) {
+		if (got_object_idset_contains(traversed_ids, &qid->id)) {
 			got_object_qid_free(qid);
 			qid = NULL;
 			continue;
 		}
 
-		err = got_object_idset_add(traversed_ids, qid->id, NULL);
+		err = got_object_idset_add(traversed_ids, &qid->id, NULL);
 		if (err)
 			break;
 
 		/* This commit or tag is referenced. */
-		err = preserve_loose_object(loose_ids, qid->id, repo, npacked);
+		err = preserve_loose_object(loose_ids, &qid->id, repo, npacked);
 		if (err)
 			break;
 
-		err = got_object_get_type(&obj_type, repo, qid->id);
+		err = got_object_get_type(&obj_type, repo, &qid->id);
 		if (err)
 			break;
 		switch (obj_type) {
 		case GOT_OBJ_TYPE_COMMIT:
-			err = got_object_open_as_commit(&commit, repo, qid->id);
+			err = got_object_open_as_commit(&commit, repo,
+			    &qid->id);
 			if (err)
 				goto done;
 			break;
 		case GOT_OBJ_TYPE_TAG:
-			err = got_object_open_as_tag(&tag, repo, qid->id);
+			err = got_object_open_as_tag(&tag, repo, &qid->id);
 			if (err)
 				goto done;
 			break;
@@ -987,7 +988,7 @@ load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
 				 * and the object it points to on disk.
 				 */
 				err = got_object_idset_remove(NULL, loose_ids,
-				    qid->id);
+				    &qid->id);
 				if (err && err->code != GOT_ERR_NO_OBJ)
 					goto done;
 				err = got_object_idset_remove(NULL, loose_ids,

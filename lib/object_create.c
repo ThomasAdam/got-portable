@@ -507,7 +507,7 @@ got_object_commit_create(struct got_object_id **id,
 		STAILQ_FOREACH(qid, parent_ids, entry) {
 			char *parent_str = NULL;
 
-			err = got_object_id_str(&id_str, qid->id);
+			err = got_object_id_str(&id_str, &qid->id);
 			if (err)
 				goto done;
 			if (asprintf(&parent_str, "%s%s\n",

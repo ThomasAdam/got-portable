@@ -78,21 +78,11 @@ got_object_id_cmp(const struct got_object_id *id1,
 const struct got_error *
 got_object_qid_alloc_partial(struct got_object_qid **qid)
 {
-	const struct got_error *err = NULL;
-
 	*qid = malloc(sizeof(**qid));
 	if (*qid == NULL)
 		return got_error_from_errno("malloc");
 
-	(*qid)->id = malloc(sizeof(*((*qid)->id)));
-	if ((*qid)->id == NULL) {
-		err = got_error_from_errno("malloc");
-		got_object_qid_free(*qid);
-		*qid = NULL;
-		return err;
-	}
 	(*qid)->data = NULL;
-
 	return NULL;
 }
 
@@ -164,7 +154,6 @@ got_object_raw_close(struct got_raw_object *obj)
 void
 got_object_qid_free(struct got_object_qid *qid)
 {
-	free(qid->id);
 	free(qid);
 }
 
@@ -314,7 +303,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	if (err)
 		return err;
 
-	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
+	if (!got_parse_sha1_digest(qid->id.sha1, id_str)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		got_object_qid_free(qid);
 		return err;
