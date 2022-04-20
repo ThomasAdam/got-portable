@@ -214,7 +214,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		return NULL;
 	}
 
-	err = got_object_open_as_commit(&pcommit, repo, pid->id);
+	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
 	if (err)
 		goto done;
 

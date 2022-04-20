@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <ctype.h>
+#include <sha1.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -3552,7 +3553,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 		err = got_object_open_as_commit(&pcommit, repo,
-		    qid->id);
+		    &qid->id);
 		if (err)
 			return err;
 
@@ -3601,7 +3602,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
 		err = got_object_open_as_commit(&pcommit, repo,
-		    qid->id);
+		    &qid->id);
 		if (err)
 			return err;
 	}
@@ -3860,7 +3861,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		int n = 1;
 		parent_ids = got_object_commit_get_parent_ids(commit);
 		STAILQ_FOREACH(qid, parent_ids, entry) {
-			err = got_object_id_str(&id_str, qid->id);
+			err = got_object_id_str(&id_str, &qid->id);
 			if (err)
 				goto done;
 			printf("parent %d: %s\n", n++, id_str);
@@ -4006,7 +4007,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	}
 	if (reverse_display_order) {
 		STAILQ_FOREACH(qid, &reversed_commits, entry) {
-			err = got_object_open_as_commit(&commit, repo, qid->id);
+			err = got_object_open_as_commit(&commit, repo,
+			    &qid->id);
 			if (err)
 				break;
 			if (show_changed_paths) {
@@ -4015,7 +4017,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				if (err)
 					break;
 			}
-			err = print_commit(commit, qid->id, repo, path,
+			err = print_commit(commit, &qid->id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
 			    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
@@ -4708,7 +4710,7 @@ cmd_diff(int argc, char *argv[])
 			struct got_object_qid *pid;
 			pids = got_object_commit_get_parent_ids(commit);
 			pid = STAILQ_FIRST(pids);
-			ids[0] = got_object_id_dup(pid->id);
+			ids[0] = got_object_id_dup(&pid->id);
 			if (ids[0] == NULL) {
 				error = got_error_from_errno(
 				    "got_object_id_dup");
@@ -8530,7 +8532,7 @@ cmd_cherrypick(int argc, char *argv[])
 		goto done;
 	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	memset(&upa, 0, sizeof(upa));
-	error = got_worktree_merge_files(worktree, pid ? pid->id : NULL,
+	error = got_worktree_merge_files(worktree, pid ? &pid->id : NULL,
 	    commit_id, repo, update_progress, &upa, check_cancelled,
 	    NULL);
 	if (error != NULL)
@@ -8632,7 +8634,7 @@ cmd_backout(int argc, char *argv[])
 	}
 
 	memset(&upa, 0, sizeof(upa));
-	error = got_worktree_merge_files(worktree, commit_id, pid->id,
+	error = got_worktree_merge_files(worktree, commit_id, &pid->id,
 	    repo, update_progress, &upa, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
@@ -9476,7 +9478,7 @@ cmd_rebase(int argc, char *argv[])
 		error = got_error(GOT_ERR_EMPTY_REBASE);
 		goto done;
 	}
-	error = collect_commits(&commits, commit_id, pid->id,
+	error = collect_commits(&commits, commit_id, &pid->id,
 	    yca_id, got_worktree_get_path_prefix(worktree),
 	    GOT_ERR_REBASE_PATH, repo);
 	got_object_commit_close(commit);
@@ -9521,8 +9523,8 @@ cmd_rebase(int argc, char *argv[])
 	pid = NULL;
 	STAILQ_FOREACH(qid, &commits, entry) {
 
-		commit_id = qid->id;
-		parent_id = pid ? pid->id : yca_id;
+		commit_id = &qid->id;
+		parent_id = pid ? &pid->id : yca_id;
 		pid = qid;
 
 		memset(&upa, 0, sizeof(upa));
@@ -9536,7 +9538,7 @@ cmd_rebase(int argc, char *argv[])
 		if (upa.conflicts > 0 || upa.missing > 0 ||
 		    upa.not_deleted > 0 || upa.unversioned > 0) {
 			if (upa.conflicts > 0) {
-				error = show_rebase_merge_conflict(qid->id,
+				error = show_rebase_merge_conflict(&qid->id,
 				    repo);
 				if (error)
 					goto done;
@@ -9689,7 +9691,7 @@ histedit_write_commit_list(struct got_object_id_queue *commits,
 			histedit_cmd = "edit";
 		else if (fold_only && STAILQ_NEXT(qid, entry) != NULL)
 			histedit_cmd = "fold";
-		err = histedit_write_commit(qid->id, histedit_cmd, f, repo);
+		err = histedit_write_commit(&qid->id, histedit_cmd, f, repo);
 		if (err)
 			break;
 		if (edit_logmsg_only) {
@@ -9715,7 +9717,7 @@ write_cmd_list(FILE *f, const char *branch_name,
 	struct got_object_qid *qid;
 
 	qid = STAILQ_FIRST(commits);
-	err = got_object_id_str(&id_str, qid->id);
+	err = got_object_id_str(&id_str, &qid->id);
 	if (err)
 		return err;
 
@@ -10036,11 +10038,11 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 
 	STAILQ_FOREACH(qid, commits, entry) {
 		TAILQ_FOREACH(hle, histedit_cmds, entry) {
-			if (got_object_id_cmp(qid->id, hle->commit_id) == 0)
+			if (got_object_id_cmp(&qid->id, hle->commit_id) == 0)
 				break;
 		}
 		if (hle == NULL) {
-			err = got_object_id_str(&id_str, qid->id);
+			err = got_object_id_str(&id_str, &qid->id);
 			if (err)
 				return err;
 			snprintf(msg, sizeof(msg),
@@ -10709,7 +10711,7 @@ cmd_histedit(int argc, char *argv[])
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
 		}
-		error = collect_commits(&commits, head_commit_id, pid->id,
+		error = collect_commits(&commits, head_commit_id, &pid->id,
 		    base_commit_id, got_worktree_get_path_prefix(worktree),
 		    GOT_ERR_HISTEDIT_PATH, repo);
 		got_object_commit_close(commit);
@@ -10750,7 +10752,7 @@ cmd_histedit(int argc, char *argv[])
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
 		}
-		error = collect_commits(&commits, head_commit_id, pid->id,
+		error = collect_commits(&commits, head_commit_id, &pid->id,
 		    got_worktree_get_base_commit_id(worktree),
 		    got_worktree_get_path_prefix(worktree),
 		    GOT_ERR_HISTEDIT_PATH, repo);
@@ -10880,7 +10882,7 @@ cmd_histedit(int argc, char *argv[])
 		pid = STAILQ_FIRST(parent_ids);
 
 		error = got_worktree_histedit_merge_files(&merged_paths,
-		    worktree, fileindex, pid->id, hle->commit_id, repo,
+		    worktree, fileindex, &pid->id, hle->commit_id, repo,
 		    update_progress, &upa, check_cancelled, NULL);
 		if (error)
 			goto done;
@@ -11750,7 +11752,7 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	    got_object_commit_get_nparents(commit));
 	STAILQ_FOREACH(pid, parent_ids, entry) {
 		char *pid_str;
-		err = got_object_id_str(&pid_str, pid->id);
+		err = got_object_id_str(&pid_str, &pid->id);
 		if (err)
 			goto done;
 		fprintf(outfile, "%s%s\n", GOT_COMMIT_LABEL_PARENT, pid_str);

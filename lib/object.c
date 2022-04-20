@@ -928,20 +928,11 @@ got_object_commit_open(struct got_commit_object **commit,
 const struct got_error *
 got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 {
-	const struct got_error *err = NULL;
-
 	*qid = calloc(1, sizeof(**qid));
 	if (*qid == NULL)
 		return got_error_from_errno("calloc");
 
-	(*qid)->id = got_object_id_dup(id);
-	if ((*qid)->id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		got_object_qid_free(*qid);
-		*qid = NULL;
-		return err;
-	}
-
+	memcpy(&(*qid)->id, id, sizeof((*qid)->id));
 	return NULL;
 }
 
@@ -958,7 +949,7 @@ got_object_id_queue_copy(const struct got_object_id_queue *src,
 		 * Deep-copy the object ID only. Let the caller deal
 		 * with setting up the new->data pointer if needed.
 		 */
-		err = got_object_qid_alloc(&new, qid->id); 
+		err = got_object_qid_alloc(&new, &qid->id); 
 		if (err) {
 			got_object_id_queue_free(dest);
 			return err;

@@ -697,7 +697,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		err = got_object_qid_alloc_partial(&qid);
 		if (err)
 			break;
-		memcpy(qid->id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		memcpy(qid->id.sha1, oid->sha1, SHA1_DIGEST_LENGTH);
 		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = &packidx->hdr.sorted_ids[++i];

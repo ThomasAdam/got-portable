@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_object_id;
+struct got_object_id {
+	u_int8_t sha1[SHA1_DIGEST_LENGTH];
+};
 
 struct got_blob_object;
 struct got_tree_object;
@@ -24,7 +26,7 @@ struct got_commit_object;
 
 struct got_object_qid {
 	STAILQ_ENTRY(got_object_qid) entry;
-	struct got_object_id *id;
+	struct got_object_id id;
 	void *data; /* managed by API user */
 };
 

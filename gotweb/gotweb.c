@@ -23,6 +23,7 @@
 #include <err.h>
 #include <errno.h>
 #include <regex.h>
+#include <sha1.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -3702,7 +3703,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 		parent_id = STAILQ_FIRST(
 		    got_object_commit_get_parent_ids(commit));
 		if (parent_id != NULL) {
-			id2 = got_object_id_dup(parent_id->id);
+			id2 = got_object_id_dup(&parent_id->id);
 			free (parent_id);
 			error = got_object_id_str(&header->parent_id, id2);
 			if (error)

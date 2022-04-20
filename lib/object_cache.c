@@ -120,7 +120,7 @@ get_size_commit(struct got_commit_object *commit)
 	size += strlen(commit->logmsg);
 
 	STAILQ_FOREACH(qid, &commit->parent_ids, entry)
-		size += sizeof(*qid) + sizeof(*qid->id);
+		size += sizeof(*qid) + sizeof(qid->id);
 
 	return size;
 }

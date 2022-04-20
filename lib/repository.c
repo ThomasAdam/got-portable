@@ -1475,20 +1475,21 @@ match_packed_object(struct got_object_id **unique_id,
 			if (obj_type != GOT_OBJ_TYPE_ANY) {
 				int matched_type;
 				err = got_object_get_type(&matched_type, repo,
-				    qid->id);
+				    &qid->id);
 				if (err)
 					goto done;
 				if (matched_type != obj_type)
 					continue;
 			}
 			if (*unique_id == NULL) {
-				*unique_id = got_object_id_dup(qid->id);
+				*unique_id = got_object_id_dup(&qid->id);
 				if (*unique_id == NULL) {
 					err = got_error_from_errno("malloc");
 					goto done;
 				}
 			} else {
-				if (got_object_id_cmp(*unique_id, qid->id) == 0)
+				if (got_object_id_cmp(*unique_id,
+				    &qid->id) == 0)
 					continue; /* packed multiple times */
 				err = got_error(GOT_ERR_AMBIGUOUS_ID);
 				goto done;

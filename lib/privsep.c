@@ -1307,7 +1307,7 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	memcpy(buf + len, commit->committer, committer_len);
 	len += committer_len;
 	STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
-		memcpy(buf + len, qid->id, SHA1_DIGEST_LENGTH);
+		memcpy(buf + len, &qid->id, SHA1_DIGEST_LENGTH);
 		len += SHA1_DIGEST_LENGTH;
 	}
 
@@ -1443,8 +1443,8 @@ get_commit_from_imsg(struct got_commit_object **commit,
 		err = got_object_qid_alloc_partial(&qid);
 		if (err)
 			break;
-		memcpy(qid->id, imsg->data + len +
-		    i * SHA1_DIGEST_LENGTH, sizeof(*qid->id));
+		memcpy(&qid->id, imsg->data + len +
+		    i * SHA1_DIGEST_LENGTH, sizeof(qid->id));
 		STAILQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
 		(*commit)->nparents++;
 	}
@@ -2687,13 +2687,13 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 				err = got_object_qid_alloc_partial(&qid);
 				if (err)
 					break;
-				memcpy(qid->id->sha1, sha1, SHA1_DIGEST_LENGTH);
+				memcpy(qid->id.sha1, sha1, SHA1_DIGEST_LENGTH);
 				STAILQ_INSERT_TAIL(commit_ids, qid, entry);
 
 				/* The last commit may contain a change. */
 				if (i == icommits->ncommits - 1) {
 					*changed_commit_id =
-					    got_object_id_dup(qid->id);
+					    got_object_id_dup(&qid->id);
 					if (*changed_commit_id == NULL) {
 						err = got_error_from_errno(
 						    "got_object_id_dup");
