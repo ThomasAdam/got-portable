@@ -22,7 +22,6 @@
 #include <limits.h>
 #include <time.h>
 #include <errno.h>
-#include <siphash.h>
 
 #include "got_compat.h"
 
