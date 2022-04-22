@@ -46,6 +46,10 @@ if HAVE_LINUX_LANDLOCK
 libopenbsd_compat_a_SOURCES += landlock.c
 endif
 
+if !HAVE_SIPHASH
+libopenbsd_compat_a_SOURCES += siphash.c siphash.h
+endif
+
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \

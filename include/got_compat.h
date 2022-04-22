@@ -139,6 +139,12 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include "compat/imsg.h"
 #endif
 
+#ifdef HAVE_SIPHASH
+#include <siphash.h>
+#else
+#include "compat/siphash.h"
+#endif
+
 /* Include Apple-specific headers.  Mostly for crypto.*/
 #if defined(__APPLE__)
 #define COMMON_DIGEST_FOR_OPENSSL

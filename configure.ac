@@ -121,6 +121,10 @@ AC_CHECK_FUNCS([ \
 	wcwidth \
 ])
 
+# Siphash support.
+AC_CHECK_FUNCS([SipHash])
+AM_CONDITIONAL([HAVE_SIPHASH], [test "x$ac_cv_func_SipHash" = xyes])
+
 # Check for functions with a compatibility implementation.
 AC_REPLACE_FUNCS([ \
 	asprintf \
