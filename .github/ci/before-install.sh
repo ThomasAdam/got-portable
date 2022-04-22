@@ -9,6 +9,7 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				build-essential \
 				libmd-dev \
 				libssl-dev \
+				libbsd-dev \
 				uuid-dev \
 				zlib1g-dev
 fi
