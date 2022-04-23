@@ -7153,7 +7153,7 @@ done:
 __dead static void
 usage_patch(void)
 {
-	fprintf(stderr, "usage: %s patch [-n] [patchfile]\n",
+	fprintf(stderr, "usage: %s patch [-n] [-p strip-count] [patchfile]\n",
 	    getprogname());
 	exit(1);
 }
