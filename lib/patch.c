@@ -685,10 +685,39 @@ done:
 	return err;
 }
 
+static void
+reverse_patch(struct got_patch *p)
+{
+	struct got_patch_hunk *h;
+	size_t i;
+	long tmp;
+
+	STAILQ_FOREACH(h, &p->head, entries) {
+		tmp = h->old_from;
+		h->old_from = h->new_from;
+		h->new_from = tmp;
+
+		tmp = h->old_lines;
+		h->old_lines = h->new_lines;
+		h->new_lines = tmp;
+
+		tmp = h->old_nonl;
+		h->old_nonl = h->new_nonl;
+		h->new_nonl = tmp;
+
+		for (i = 0; i < h->len; ++i) {
+			if (*h->lines[i] == '+')
+				*h->lines[i] = '-';
+			else if (*h->lines[i] == '-')
+				*h->lines[i] = '+';
+		}
+	}
+}
+
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    int nop, int strip, got_patch_progress_cb progress_cb, void *progress_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    int nop, int strip, int reverse, got_patch_progress_cb progress_cb,
+    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex *fileindex = NULL;
@@ -746,6 +775,9 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		err = recv_patch(ibuf, &done, &p, strip);
 		if (err || done)
 			break;
+
+		if (reverse)
+			reverse_patch(&p);
 
 		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
 		    &newpath, worktree, repo, fileindex);

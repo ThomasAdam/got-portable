@@ -1399,6 +1399,50 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_reverse() {
+	local testroot=`test_init patch_reverse`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-ALPHA
+\ No newline at end of file
++alpha
+EOF
+
+	(cd $testroot/wt && got patch -R patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo "M  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo -n ALPHA > $testroot/wt/alpha.expected
+	cmp -s $testroot/wt/alpha.expected $testroot/wt/alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1423,3 +1467,4 @@ run_test test_patch_strip
 run_test test_patch_relative_paths
 run_test test_patch_with_path_prefix
 run_test test_patch_relpath_with_path_prefix
+run_test test_patch_reverse
