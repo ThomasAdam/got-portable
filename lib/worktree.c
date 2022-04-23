@@ -8795,7 +8795,8 @@ patch_check_path(const char *p, char **path, unsigned char *status,
 	ie = got_fileindex_entry_get(fileindex, *path, strlen(*path));
 	if (ie) {
 		*staged_status = get_staged_status(ie);
-		err = get_file_status(status, &sb, ie, *path, -1, NULL, repo);
+		err = get_file_status(status, &sb, ie, ondisk_path, -1, NULL,
+		    repo);
 		if (err)
 			goto done;
 	} else {
