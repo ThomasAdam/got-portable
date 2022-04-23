@@ -373,7 +373,7 @@ __dead static void
 usage_pack(void)
 {
 	fprintf(stderr, "usage: %s pack [-a] [-r repository-path] "
-	    "[-x reference] [reference ...]\n",
+	    "[-x reference] [-q] [reference ...]\n",
 	    getprogname());
 	exit(1);
 }
