@@ -565,13 +565,14 @@ patch_add(void *arg, unsigned char status, const char *path)
 
 static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    const char *oldpath, const char *newpath, struct got_patch *p,
-    int nop, struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
+    const char *old, const char *new, struct got_patch *p, int nop,
+    struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_head oldpaths, newpaths;
 	struct got_pathlist_entry *pe;
 	int file_renamed = 0;
+	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
@@ -579,12 +580,24 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	TAILQ_INIT(&oldpaths);
 	TAILQ_INIT(&newpaths);
 
-	err = got_pathlist_insert(&pe, &oldpaths, oldpath, NULL);
+	err = got_pathlist_insert(&pe, &oldpaths, old, NULL);
 	if (err)
 		goto done;
-	err = got_pathlist_insert(&pe, &newpaths, newpath, NULL);
+	err = got_pathlist_insert(&pe, &newpaths, new, NULL);
 	if (err)
 		goto done;
+
+	if (asprintf(&oldpath, "%s/%s", got_worktree_get_root_path(worktree),
+	    old) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (asprintf(&newpath, "%s/%s", got_worktree_get_root_path(worktree),
+	    new) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	file_renamed = strcmp(oldpath, newpath);
 
@@ -650,8 +663,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		if (err)
 			unlink(newpath);
 	} else
-		err = report_progress(pa, oldpath, newpath, GOT_STATUS_MODIFY,
-		    NULL);
+		err = report_progress(pa, old, new, GOT_STATUS_MODIFY, NULL);
 
 done:
 	got_pathlist_free(&oldpaths);
@@ -661,6 +673,8 @@ done:
 	if (tmppath != NULL)
 		unlink(tmppath);
 	free(tmppath);
+	free(oldpath);
+	free(newpath);
 	return err;
 }
 
