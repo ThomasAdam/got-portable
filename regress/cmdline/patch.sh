@@ -1273,6 +1273,46 @@ EOF
 	test_done $testroot 0
 }
 
+test_patch_relative_paths() {
+	local testroot=`test_init patch_orig`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/gamma/patch
+--- delta
++++ delta
+@@ -1 +1 @@
+-delta
++DELTA
+--- /dev/null
++++ eta
+@@ -0,0 +1 @@
++eta
+EOF
+
+	(cd $testroot/wt/gamma && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  gamma/delta' > $testroot/stdout.expected
+	echo 'A  gamma/eta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1294,3 +1334,4 @@ run_test test_patch_with_offset
 run_test test_patch_prefer_new_path
 run_test test_patch_no_newline
 run_test test_patch_strip
+run_test test_patch_relative_paths
