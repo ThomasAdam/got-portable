@@ -612,7 +612,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 	if (fchmod(fileno(tmp), mode) == -1) {
-		err = got_error_from_errno2("chmod", newpath);
+		err = got_error_from_errno2("chmod", tmppath);
 		goto done;
 	}
 
