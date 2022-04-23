@@ -287,7 +287,7 @@ send_line(const char *line)
 }
 
 static const struct got_error *
-peek_special_line(FILE *fp, int send)
+peek_special_line(FILE *fp)
 {
 	const struct got_error *err;
 	int ch;
@@ -298,7 +298,7 @@ peek_special_line(FILE *fp, int send)
 		return NULL;
 	}
 
-	if (ch == '\\' && send) {
+	if (ch == '\\') {
 		err = send_line("\\");
 		if (err)
 			return err;
@@ -395,7 +395,7 @@ parse_hunk(FILE *fp, int *ok)
 
 		if ((ch == '-' && leftold == 0) ||
 		    (ch == '+' && leftnew == 0)) {
-			err = peek_special_line(fp, ch == '+');
+			err = peek_special_line(fp);
 			if (err)
 				goto done;
 		}
