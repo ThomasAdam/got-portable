@@ -1313,6 +1313,92 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_with_path_prefix() {
+	local testroot=`test_init patch_with_path_prefix`
+
+	got checkout -p gamma $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+--- delta
++++ delta
+@@ -1 +1 @@
+-delta
++DELTA
+--- /dev/null
++++ eta
+@@ -0,0 +1 @@
++eta
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  delta' > $testroot/stdout.expected
+	echo 'A  eta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
+test_patch_relpath_with_path_prefix() {
+	local testroot=`test_init patch_relpaths_with_path_prefix`
+
+	got checkout -p gamma $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/epsilon/zeta/
+
+	cat <<EOF > $testroot/wt/patch
+--- /dev/null
++++ zeta/theta
+@@ -0,0 +1 @@
++theta
+EOF
+
+	(cd $testroot/wt/epsilon/zeta && got patch -p1 $testroot/wt/patch) \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'A  epsilon/zeta/theta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'theta' > $testroot/theta.expected
+	cmp -s $testroot/wt/epsilon/zeta/theta $testroot/theta.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/epsilon/zeta/theta $testroot/theta.expected
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1335,3 +1421,5 @@ run_test test_patch_prefer_new_path
 run_test test_patch_no_newline
 run_test test_patch_strip
 run_test test_patch_relative_paths
+run_test test_patch_with_path_prefix
+run_test test_patch_relpath_with_path_prefix
