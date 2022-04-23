@@ -55,7 +55,8 @@ struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
 	const struct got_error *err;
 	long	offset;
-	int	nonl;
+	int	old_nonl;
+	int	new_nonl;
 	long	old_from;
 	long	old_lines;
 	long	new_from;
@@ -152,6 +153,7 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 	struct got_imsg_patch patch;
 	struct got_patch_hunk *h = NULL;
 	size_t datalen;
+	int lastmode = -1;
 
 	memset(p, 0, sizeof(*p));
 	STAILQ_INIT(&p->head);
@@ -215,10 +217,11 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 		case GOT_IMSG_PATCH_DONE:
 			goto done;
 		case GOT_IMSG_PATCH_HUNK:
-			if (h != NULL && h->nonl) {
+			if (h != NULL && (h->old_nonl || h->new_nonl)) {
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 				goto done;
 			}
+			lastmode = -1;
 			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 			if (datalen != sizeof(hdr)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -252,14 +255,20 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				goto done;
 			}
-			if (h->nonl)
-				err = got_error(GOT_ERR_PATCH_MALFORMED);
-			if (*t == '\\')
-				h->nonl = 1;
-			else
+
+			if (*t != '\\')
 				err = pushline(h, t);
+			else if (lastmode == '-')
+				h->old_nonl = 1;
+			else if (lastmode == '+')
+				h->new_nonl = 1;
+			else
+				err = got_error(GOT_ERR_PATCH_MALFORMED);
+
 			if (err)
 				goto done;
+
+			lastmode = *t;
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -399,7 +408,7 @@ done:
 static const struct got_error *
 apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 {
-	size_t i = 0;
+	size_t i, new = 0;
 
 	for (i = 0; i < h->len; ++i) {
 		switch (*h->lines[i]) {
@@ -411,9 +420,10 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
 			(*lineno)++;
 			break;
 		case '+':
+			new++;
 			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
 				return got_error_from_errno("fprintf");
-			if (i != h->len - 1 || !h->nonl) {
+			if (new != h->new_lines || !h->new_nonl) {
 				if (fprintf(tmp, "\n") < 0)
 					return got_error_from_errno(
 					    "fprintf");
