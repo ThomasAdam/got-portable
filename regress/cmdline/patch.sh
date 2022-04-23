@@ -592,7 +592,7 @@ EOF
 }
 
 test_patch_equals_for_context() {
-	local testroot=`test_init patch_prepend_line`
+	local testroot=`test_init patch_equals_for_context`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1274,7 +1274,7 @@ EOF
 }
 
 test_patch_relative_paths() {
-	local testroot=`test_init patch_orig`
+	local testroot=`test_init patch_relative_paths`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
