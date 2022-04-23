@@ -7153,8 +7153,8 @@ done:
 __dead static void
 usage_patch(void)
 {
-	fprintf(stderr, "usage: %s patch [-n] [-p strip-count] [patchfile]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s patch [-n] [-p strip-count] "
+	    "[-R] [patchfile]\n", getprogname());
 	exit(1);
 }
 
@@ -7243,10 +7243,10 @@ cmd_patch(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	const char *errstr;
 	char *cwd = NULL;
-	int ch, nop = 0, strip = -1;
+	int ch, nop = 0, strip = -1, reverse = 0;
 	int patchfd;
 
-	while ((ch = getopt(argc, argv, "np:")) != -1) {
+	while ((ch = getopt(argc, argv, "np:R")) != -1) {
 		switch (ch) {
 		case 'n':
 			nop = 1;
@@ -7256,6 +7256,9 @@ cmd_patch(int argc, char *argv[])
 			if (errstr != NULL)
 				errx(1, "pathname strip count is %s: %s",
 				     errstr, optarg);
+			break;
+		case 'R':
+			reverse = 1;
 			break;
 		default:
 			usage_patch();
@@ -7304,7 +7307,7 @@ cmd_patch(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_patch(patchfd, worktree, repo, nop, strip,
+	error = got_patch(patchfd, worktree, repo, nop, strip, reverse,
 	    &patch_progress, NULL, check_cancelled, NULL);
 
 done:
