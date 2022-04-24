@@ -6,6 +6,14 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.69 (2022-04-24)
+
+* portable: added Apline Linux to the core set of OSes when checking CI/CD -
+  this therefore implies -portable can build on muscl as well as glibc.
+* portable: fixed compilation of -portable on Alpine Linux with respect to
+  Landlock by using the correct header file.
+* portable: added SipHash as a -portable implementation.
+
 # got-portable 0.68.1 (2022-03-22)
 
 * portable: fix up a bad merge whereby a code block that should have been
