@@ -1,3 +1,25 @@
+* got 0.69; 2022-04-24
+- plug a memory leak in got_fetch_pack() (patch by Mikhail)
+- plug a memory leak in list_refs() (op)
+- link libexec helpers against _p libraries when building with 'make PROFILE=1'
+- regress: use test(1) -eq and -ne to compare integers, reduce quoting (naddy)
+- got patch: add -p option to strip path components (op)
+- stop relying on commit cache for good performance of got_object_id_by_path()
+- leave work tree in usable state after 'got rebase' fails path-prefix checks
+- make gotadmin pack -x option work with tag arguments
+- make 'got cat' not search for a work tree if the -r option is used
+- make 'got tag' unlock work tree earlier to allow other parallel commands
+- add a -q (quiet) option to 'gotadmin pack'
+- sort references by date for packing to process newer commits first
+- fix double-free in an error case of cmd_checkout()
+- make sure callers of got_object_idset_add() free data (tb)
+- speed up initial stage of packing by adding a "skip" commit color
+- regress: redirect jot(1) output instead of looping over it (op)
+- reimplement object-ID set data structure on top of a hash table
+- inline struct got_object_id in struct got_object_qid for speed
+- got patch: resolve paths from the current working directory (op)
+- got patch: add -R option to reverse a patch (op)
+
 * got 0.68; 2022-03-22
 - explicitly include <endian.h> for be32toh() (naddy)
 - apply time-based rate-limiting to send-/fetch-/index-pack progress output
