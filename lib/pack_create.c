@@ -161,8 +161,10 @@ delta_order_cmp(const void *pa, const void *pb)
 	cmp = strcmp(a->path, b->path);
 	if (cmp != 0)
 		return cmp;
-	if (a->mtime != b->mtime)
-		return a->mtime - b->mtime;
+	if (a->mtime < b->mtime)
+		return -1;
+	if (a->mtime > b->mtime)
+		return 1;
 	return got_object_id_cmp(&a->id, &b->id);
 }
 
@@ -1513,13 +1515,21 @@ write_order_cmp(const void *pa, const void *pb)
 	b = *(struct got_pack_meta **)pb;
 	ahd = (a->head == NULL) ? a : a->head;
 	bhd = (b->head == NULL) ? b : b->head;
-	if (ahd->mtime != bhd->mtime)
-		return bhd->mtime - ahd->mtime;
-	if (ahd != bhd)
-		return (uintptr_t)bhd - (uintptr_t)ahd;
+	if (bhd->mtime < ahd->mtime)
+		return -1;
+	if (bhd->mtime > ahd->mtime)
+		return 1;
+	if (bhd < ahd)
+		return -1;
+	if (bhd > ahd)
+		return 1;
 	if (a->nchain != b->nchain)
 		return a->nchain - b->nchain;
-	return a->mtime - b->mtime;
+	if (a->mtime < b->mtime)
+		return -1;
+	if (a->mtime > b->mtime)
+		return 1;
+	return got_object_id_cmp(&a->id, &b->id);
 }
 
 static int
