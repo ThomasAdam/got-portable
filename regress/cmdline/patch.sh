@@ -647,14 +647,22 @@ test_patch_rename() {
 	fi
 
 	cat <<EOF > $testroot/wt/patch
+diff --git a/beta b/iota
+similarity index 100%
+rename from beta
+rename to iota
 diff --git a/alpha b/eta
 --- a/alpha
 +++ b/eta
-@@ -0,0 +0,0 @@
+@@ -1 +1 @@
+-alpha
++eta
 EOF
 
-	echo 'D  alpha' > $testroot/stdout.expected
-	echo 'A  eta'  >> $testroot/stdout.expected
+	echo 'D  beta'   > $testroot/stdout.expected
+	echo 'A  iota'  >> $testroot/stdout.expected
+	echo 'D  alpha' >> $testroot/stdout.expected
+	echo 'A  eta'   >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
@@ -671,18 +679,27 @@ EOF
 		return 1
 	fi
 
-	if [ -f $testroot/wt/alpha ]; then
-		echo "alpha was not removed" >&2
+	if [ -f $testroot/wt/alpha -o -f $testroot/wt/beta ]; then
+		echo "alpha or beta were not removed" >&2
 		test_done $testroot 1
 		return 1
 	fi
-	if [ ! -f $testroot/wt/eta ]; then
-		echo "eta was not created" >&2
+	if [ ! -f $testroot/wt/iota -o ! -f $testroot/wt/eta ]; then
+		echo "iota or eta were not created" >&2
 		test_done $testroot 1
 		return 1
 	fi
 
-	echo alpha > $testroot/wt/eta.expected
+	echo beta > $testroot/wt/iota.expected
+	cmp -s $testroot/wt/iota.expected $testroot/wt/iota
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/iota.expected $testroot/wt/iota
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo eta > $testroot/wt/eta.expected
 	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -691,57 +708,6 @@ EOF
 		return 1
 	fi
 
-	# revert the changes and try again with a rename + edit
-	(cd $testroot/wt && got revert alpha eta) > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-	rm $testroot/wt/eta
-
-	cat <<EOF > $testroot/wt/patch
-diff --git a/alpha b/eta
---- a/alpha
-+++ b/eta
-@@ -1 +1,2 @@
- alpha
-+but now is eta
-EOF
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	if [ -f $testroot/wt/alpha ]; then
-		echo "alpha was not removed" >&2
-		test_done $testroot 1
-		return 1
-	fi
-	if [ ! -f $testroot/wt/eta ]; then
-		echo "eta was not created" >&2
-		test_done $testroot 1
-		return 1
-	fi
-
-	echo alpha > $testroot/wt/eta.expected
-	echo 'but now is eta' >> $testroot/wt/eta.expected
-	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/wt/eta.expected $testroot/wt/eta
-	fi
 	test_done $testroot $ret
 }
 

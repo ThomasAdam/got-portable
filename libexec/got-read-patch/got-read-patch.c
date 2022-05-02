@@ -122,14 +122,14 @@ filename(const char *at, char **name)
 }
 
 static const struct got_error *
-find_patch(FILE *fp)
+find_patch(int *empty, FILE *fp)
 {
 	const struct got_error *err = NULL;
 	char	*old = NULL, *new = NULL;
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
-	int	 create, git = 0;
+	int	 create, rename = 0, git = 0;
 
 	while ((linelen = getline(&line, &linesize, fp)) != -1) {
 		/*
@@ -140,14 +140,33 @@ find_patch(FILE *fp)
 		if (!strncmp(line, "--- ", 4)) {
 			free(old);
 			err = filename(line+4, &old);
+		} else if (rename && !strncmp(line, "rename from ", 12)) {
+			free(old);
+			err = filename(line+12, &old);
 		} else if (!strncmp(line, "+++ ", 4)) {
 			free(new);
 			err = filename(line+4, &new);
-		} else if (!strncmp(line, "diff --git a/", 13))
+		} else if (rename && !strncmp(line, "rename to ", 10)) {
+			free(new);
+			err = filename(line + 10, &new);
+		} else if (git && !strncmp(line, "similarity index 100%", 21))
+			rename = 1;
+		else if (!strncmp(line, "diff --git a/", 13))
 			git = 1;
 
 		if (err)
 			break;
+
+		/*
+		 * Git-style diffs with "similarity index 100%" don't
+		 * have any hunks and ends with the "rename to foobar"
+		 * line.
+		 */
+		if (rename && old != NULL && new != NULL) {
+			*empty = 1;
+			err = send_patch(old, new, git);
+			break;
+		}
 
 		if (!strncmp(line, "@@ -", 4)) {
 			create = !strncmp(line+4, "0,0", 3);
@@ -411,7 +430,7 @@ read_patch(struct imsgbuf *ibuf, int fd)
 {
 	const struct got_error *err = NULL;
 	FILE *fp;
-	int ok, patch_found = 0;
+	int patch_found = 0;
 
 	if ((fp = fdopen(fd, "r")) == NULL) {
 		err = got_error_from_errno("fdopen");
@@ -420,16 +439,19 @@ read_patch(struct imsgbuf *ibuf, int fd)
 	}
 
 	while (!feof(fp)) {
-		err = find_patch(fp);
+		int empty = 0, ok = 1;
+
+		err = find_patch(&empty, fp);
 		if (err)
 			goto done;
 
 		patch_found = 1;
 		for (;;) {
-			err = parse_hunk(fp, &ok);
+			if (!empty)
+				err = parse_hunk(fp, &ok);
 			if (err)
 				goto done;
-			if (!ok) {
+			if (!ok || empty) {
 				err = send_patch_done();
 				if (err)
 					goto done;
