@@ -122,7 +122,7 @@ filename(const char *at, char **name)
 }
 
 static const struct got_error *
-find_patch(int *empty, FILE *fp)
+find_patch(int *done, FILE *fp)
 {
 	const struct got_error *err = NULL;
 	char	*old = NULL, *new = NULL;
@@ -163,7 +163,7 @@ find_patch(int *empty, FILE *fp)
 		 * line.
 		 */
 		if (rename && old != NULL && new != NULL) {
-			*empty = 1;
+			*done = 1;
 			err = send_patch(old, new, git);
 			break;
 		}
