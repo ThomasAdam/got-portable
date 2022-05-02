@@ -219,13 +219,12 @@ strtolnum(char **str, long *n)
 }
 
 static const struct got_error *
-parse_hdr(char *s, int *ok, struct got_imsg_patch_hunk *hdr)
+parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 {
 	static const struct got_error *err = NULL;
 
-	*ok = 1;
 	if (strncmp(s, "@@ -", 4)) {
-		*ok = 0;
+		*done = 1;
 		return NULL;
 	}
 
@@ -333,7 +332,7 @@ peek_special_line(FILE *fp)
 }
 
 static const struct got_error *
-parse_hunk(FILE *fp, int *ok)
+parse_hunk(FILE *fp, int *done)
 {
 	static const struct got_error *err = NULL;
 	struct got_imsg_patch_hunk hdr;
@@ -344,14 +343,14 @@ parse_hunk(FILE *fp, int *ok)
 
 	linelen = getline(&line, &linesize, fp);
 	if (linelen == -1) {
-		*ok = 0;
+		*done = 1;
 		goto done;
 	}
 
-	err = parse_hdr(line, ok, &hdr);
+	err = parse_hdr(line, done, &hdr);
 	if (err)
 		goto done;
-	if (!*ok) {
+	if (*done) {
 		if (fseek(fp, linelen * -1, SEEK_CUR) == -1)
 			err = got_error_from_errno("fseek");
 		goto done;
@@ -370,7 +369,7 @@ parse_hunk(FILE *fp, int *ok)
 
 			/* trailing newlines may be chopped */
 			if (leftold < 3 && leftnew < 3) {
-				*ok = 0;
+				*done = 1;
 				break;
 			}
 
@@ -440,25 +439,23 @@ read_patch(struct imsgbuf *ibuf, int fd)
 	}
 
 	while (!feof(fp)) {
-		int empty = 0, ok = 1;
+		int done = 0;
 
-		err = find_patch(&empty, fp);
+		err = find_patch(&done, fp);
 		if (err)
 			goto done;
 
 		patch_found = 1;
-		for (;;) {
-			if (!empty)
-				err = parse_hunk(fp, &ok);
+
+		while (!done) {
+			err = parse_hunk(fp, &done);
 			if (err)
 				goto done;
-			if (!ok || empty) {
-				err = send_patch_done();
-				if (err)
-					goto done;
-				break;
-			}
 		}
+
+		err = send_patch_done();
+		if (err)
+			goto done;
 	}
 
 done:
