@@ -52,6 +52,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_repository.h"
 #include "got_lib_ratelimit.h"
+#include "got_lib_inflate.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -75,9 +76,10 @@ struct got_pack_meta {
 	/* The best delta we picked */
 	struct got_pack_meta *head;
 	struct got_pack_meta *prev;
-	unsigned char *delta_buf; /* if not encoded in delta cache file */
-	off_t	delta_offset;	/* offset in delta cache file */
+	unsigned char *delta_buf; /* if encoded in memory (compressed) */
+	off_t	delta_offset;	/* offset in delta cache file (compressed) */
 	off_t	delta_len;	/* encoded delta length */
+	off_t	delta_compressed_len; /* encoded+compressed delta length */
 	int	nchain;
 
 	int	have_reused_delta;
@@ -209,13 +211,15 @@ encode_delta_in_mem(struct got_pack_meta *m, struct got_raw_object *o,
 	const struct got_error *err;
 	unsigned char buf[16], *bp;
 	int i, j;
-	size_t len = 0;
+	size_t len = 0, compressed_len;
+	off_t bufsize = delta_size;
 	off_t n;
 	struct got_delta_instruction *d;
+	uint8_t *delta_buf;
 
-	m->delta_buf = malloc(delta_size);
-	if (m->delta_buf == NULL)
-		return got_error_from_errno("calloc");
+	delta_buf = malloc(bufsize);
+	if (delta_buf == NULL)
+		return got_error_from_errno("malloc");
 
 	/* base object size */
 	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
@@ -225,9 +229,9 @@ encode_delta_in_mem(struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	err = append(&m->delta_buf, &len, &delta_size, buf, i);
+	err = append(&delta_buf, &len, &bufsize, buf, i);
 	if (err)
-		return err;
+		goto done;
 
 	/* target object size */
 	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
@@ -237,9 +241,9 @@ encode_delta_in_mem(struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	err = append(&m->delta_buf, &len, &delta_size, buf, i);
+	err = append(&delta_buf, &len, &bufsize, buf, i);
 	if (err)
-		return err;
+		goto done;
 
 	for (j = 0; j < ndeltas; j++) {
 		d = &deltas[j];
@@ -265,51 +269,63 @@ encode_delta_in_mem(struct got_pack_meta *m, struct got_raw_object *o,
 					n >>= 8;
 				}
 			}
-			err = append(&m->delta_buf, &len, &delta_size,
+			err = append(&delta_buf, &len, &bufsize,
 			    buf, bp - buf);
 			if (err)
-				return err;
+				goto done;
 		} else if (o->f == NULL) {
 			n = 0;
 			while (n != d->len) {
 				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				err = append(&m->delta_buf, &len, &delta_size,
+				err = append(&delta_buf, &len, &bufsize,
 				    buf, 1);
 				if (err)
-					return err;
-				err = append(&m->delta_buf, &len, &delta_size,
+					goto done;
+				err = append(&delta_buf, &len, &bufsize,
 				    o->data + o->hdrlen + d->offset + n,
 				    buf[0]);
 				if (err)
-					return err;
+					goto done;
 				n += buf[0];
 			}
 		} else {
 			char content[128];
 			size_t r;
-			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1)
-				return got_error_from_errno("fseeko");
+			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
+			}
 			n = 0;
 			while (n != d->len) {
 				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				err = append(&m->delta_buf, &len, &delta_size,
+				err = append(&delta_buf, &len, &bufsize,
 				    buf, 1);
 				if (err)
-					return err;
+					goto done;
 				r = fread(content, 1, buf[0], o->f);
-				if (r != buf[0])
-					return got_ferror(o->f, GOT_ERR_IO);
-				err = append(&m->delta_buf, &len, &delta_size,
+				if (r != buf[0]) {
+					err = got_ferror(o->f, GOT_ERR_IO);
+					goto done;
+				}
+				err = append(&delta_buf, &len, &bufsize,
 				    content, buf[0]);
 				if (err)
-					return err;
+					goto done;
 				n += buf[0];
 			}
 		}
 	}
 
+	err = got_deflate_to_mem_mmap(&m->delta_buf, &compressed_len,
+	    NULL, NULL, delta_buf, 0, len);
+	if (err)
+		goto done;
+
 	m->delta_len = len;
-	return NULL;
+	m->delta_compressed_len = compressed_len;
+done:
+	free(delta_buf);
+	return err;
 }
 
 static const struct got_error *
@@ -317,11 +333,17 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
     struct got_delta_instruction *deltas, int ndeltas,
     off_t base_size, FILE *f)
 {
+	const struct got_error *err;
 	unsigned char buf[16], *bp;
 	int i, j;
 	off_t n;
-	size_t w;
+	struct got_deflate_buf zb;
 	struct got_delta_instruction *d;
+	off_t delta_len = 0, compressed_len = 0;
+
+	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+	if (err)
+		return err;
 
 	/* base object size */
 	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
@@ -331,9 +353,12 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	w = fwrite(buf, 1, i, f);
-	if (w != i)
-		return got_ferror(f, GOT_ERR_IO);
+
+	err = got_deflate_append_to_file_mmap(&zb, &compressed_len,
+	    buf, 0, i, f, NULL);
+	if (err)
+		goto done;
+	delta_len += i;
 
 	/* target object size */
 	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
@@ -343,9 +368,12 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	w = fwrite(buf, 1, i, f);
-	if (w != i)
-		return got_ferror(f, GOT_ERR_IO);
+
+	err = got_deflate_append_to_file_mmap(&zb, &compressed_len,
+	    buf, 0, i, f, NULL);
+	if (err)
+		goto done;
+	delta_len += i;
 
 	for (j = 0; j < ndeltas; j++) {
 		d = &deltas[j];
@@ -361,7 +389,6 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 				if (n == 0)
 					break;
 			}
-
 			n = d->len;
 			if (n != GOT_DELTA_COPY_DEFAULT_LEN) {
 				/* DELTA_COPY_LEN1 ... DELTA_COPY_LEN3 */
@@ -371,46 +398,75 @@ encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
 					n >>= 8;
 				}
 			}
-			w = fwrite(buf, 1, bp - buf, f);
-			if (w != bp - buf)
-				return got_ferror(f, GOT_ERR_IO);
+			err = got_deflate_append_to_file_mmap(&zb,
+			    &compressed_len, buf, 0, bp - buf, f, NULL);
+			if (err)
+				goto done;
+			delta_len += (bp - buf);
 		} else if (o->f == NULL) {
 			n = 0;
 			while (n != d->len) {
 				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				w = fwrite(buf, 1, 1, f);
-				if (w != 1)
-					return got_ferror(f, GOT_ERR_IO);
-				w = fwrite(o->data + o->hdrlen + d->offset + n,
-				    1, buf[0], f);
-				if (w != buf[0])
-					return got_ferror(f, GOT_ERR_IO);
+				err = got_deflate_append_to_file_mmap(&zb,
+				    &compressed_len, buf, 0, 1, f, NULL);
+				if (err)
+					goto done;
+				delta_len++;
+				err = got_deflate_append_to_file_mmap(&zb,
+				    &compressed_len,
+				    o->data + o->hdrlen + d->offset + n, 0,
+				    buf[0], f, NULL);
+				if (err)
+					goto done;
+				delta_len += buf[0];
 				n += buf[0];
 			}
 		} else {
 			char content[128];
 			size_t r;
-			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1)
-				return got_error_from_errno("fseeko");
+			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
+			}
 			n = 0;
 			while (n != d->len) {
 				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				w = fwrite(buf, 1, 1, f);
-				if (w != 1)
-					return got_ferror(f, GOT_ERR_IO);
+				err = got_deflate_append_to_file_mmap(&zb,
+				    &compressed_len, buf, 0, 1, f, NULL);
+				if (err)
+					goto done;
+				delta_len++;
 				r = fread(content, 1, buf[0], o->f);
-				if (r != buf[0])
-					return got_ferror(o->f, GOT_ERR_IO);
-				w = fwrite(content, 1, buf[0], f);
-				if (w != buf[0])
-					return got_ferror(f, GOT_ERR_IO);
+				if (r != buf[0]) {
+					err = got_ferror(o->f, GOT_ERR_IO);
+					goto done;
+				}
+				err = got_deflate_append_to_file_mmap(&zb,
+				    &compressed_len, content, 0, buf[0], f,
+				    NULL);
+				if (err)
+					goto done;
+				delta_len += buf[0];
 				n += buf[0];
 			}
 		}
 	}
 
-	m->delta_len = ftello(f) - m->delta_offset;
-	return NULL;
+	err = got_deflate_flush(&zb, f, NULL, &compressed_len);
+	if (err)
+		goto done;
+
+	/* sanity check */
+	if (compressed_len != ftello(f) - m->delta_offset) {
+		err = got_error(GOT_ERR_COMPRESSION);
+		goto done;
+	}
+
+	m->delta_len = delta_len;
+	m->delta_compressed_len = compressed_len;
+done:
+	got_deflate_end(&zb);
+	return err;
 }
 
 static const struct got_error *
@@ -459,15 +515,16 @@ reuse_delta(int idx, struct got_pack_meta *m, struct got_pack_metavec *v,
 	const struct got_error *err = NULL;
 	struct got_pack_meta *base = NULL;
 	struct got_object_id *base_obj_id = NULL;
-	off_t delta_len = 0, delta_offset = 0, delta_cache_offset = 0;
+	off_t delta_len = 0, delta_compressed_len = 0;
+	off_t delta_offset = 0, delta_cache_offset = 0;
 	uint64_t base_size, result_size;
 
 	if (m->have_reused_delta)
 		return NULL;
 
 	err = got_object_read_raw_delta(&base_size, &result_size, &delta_len,
-	    &delta_offset, &delta_cache_offset, &base_obj_id, delta_cache_fd,
-	    packidx, idx, &m->id, repo);
+	    &delta_compressed_len, &delta_offset, &delta_cache_offset,
+	    &base_obj_id, delta_cache_fd, packidx, idx, &m->id, repo);
 	if (err)
 		return err;
 
@@ -479,6 +536,7 @@ reuse_delta(int idx, struct got_pack_meta *m, struct got_pack_metavec *v,
 		goto done;
 
 	m->delta_len = delta_len;
+	m->delta_compressed_len = delta_compressed_len;
 	m->delta_offset = delta_cache_offset;
 	m->prev = base;
 	m->size = result_size;
@@ -789,15 +847,6 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int ncolored,
 				    best_ndeltas, best_size, m->prev->size);
 			} else {
 				m->delta_offset = ftello(delta_cache);
-				/*
-				 * TODO:
-				 * Storing compressed delta data in the delta
-				 * cache file would probably be more efficient
-				 * than writing uncompressed delta data here
-				 * and compressing it while writing the pack
-				 * file. This would also allow for reusing
-				 * deltas in their compressed form.
-				 */
 				err = encode_delta(m, raw, best_deltas,
 				    best_ndeltas, m->prev->size, delta_cache);
 			}
@@ -1487,7 +1536,7 @@ done:
 }
 
 const struct got_error *
-hwrite(FILE *f, void *buf, int len, SHA1_CTX *ctx)
+hwrite(FILE *f, void *buf, off_t len, SHA1_CTX *ctx)
 {
 	size_t n;
 
@@ -1495,6 +1544,28 @@ hwrite(FILE *f, void *buf, int len, SHA1_CTX *ctx)
 	n = fwrite(buf, 1, len, f);
 	if (n != len)
 		return got_ferror(f, GOT_ERR_IO);
+	return NULL;
+}
+
+const struct got_error *
+hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
+{
+	unsigned char buf[65536];
+	off_t remain = len;
+	size_t n;
+
+	while (remain > 0) {
+		size_t copylen = MIN(sizeof(buf), remain);
+		n = fread(buf, 1, copylen, fsrc);
+		if (n != copylen)
+			return got_ferror(fsrc, GOT_ERR_IO);
+		SHA1Update(ctx, buf, copylen);
+		n = fwrite(buf, 1, copylen, fdst);
+		if (n != copylen)
+			return got_ferror(fdst, GOT_ERR_IO);
+		remain -= copylen;
+	}
+
 	return NULL;
 }
 
@@ -1677,11 +1748,11 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		err = deltahdr(packfile_size, ctx, packfile, m);
 		if (err)
 			goto done;
-		err = got_deflate_to_file_mmap(&outlen,
-		    m->delta_buf, 0, m->delta_len, packfile, &csum);
+		err = hwrite(packfile, m->delta_buf,
+		    m->delta_compressed_len, ctx);
 		if (err)
 			goto done;
-		*packfile_size += outlen;
+		*packfile_size += m->delta_compressed_len;
 		free(m->delta_buf);
 		m->delta_buf = NULL;
 	} else {
@@ -1693,11 +1764,11 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		err = deltahdr(packfile_size, ctx, packfile, m);
 		if (err)
 			goto done;
-		err = got_deflate_to_file(&outlen, delta_cache,
-		    m->delta_len, packfile, &csum);
+		err = hcopy(delta_cache, packfile,
+		    m->delta_compressed_len, ctx);
 		if (err)
 			goto done;
-		*packfile_size += outlen;
+		*packfile_size += m->delta_compressed_len;
 	}
 done:
 	if (raw)
@@ -1921,12 +1992,12 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
-		if (fseeko(delta_cache, 0L, SEEK_SET) == -1) {
-			err = got_error_from_errno("fseeko");
-			goto done;
-		}
 	}
 
+	if (fflush(delta_cache) == EOF) {
+		err = got_error_from_errno("fflush");
+		goto done;
+	}
 	err = genpack(packsha1, packfile, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, progress_cb, progress_arg, &rl,

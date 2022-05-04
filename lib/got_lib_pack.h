@@ -212,7 +212,7 @@ const struct got_error *got_packfile_extract_object(struct got_pack *,
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
     struct got_object *, struct got_pack *);
 const struct got_error *got_packfile_extract_raw_delta(uint8_t **, size_t *,
-    off_t *, off_t *, struct got_object_id *, uint64_t *, uint64_t *,
+    size_t *, off_t *, off_t *, struct got_object_id *, uint64_t *, uint64_t *,
     struct got_pack *, struct got_packidx *, int);
 struct got_pack *got_repo_get_cached_pack(struct got_repository *,
     const char *);

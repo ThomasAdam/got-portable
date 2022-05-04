@@ -39,8 +39,17 @@ const struct got_error *got_deflate_init(struct got_deflate_buf *, uint8_t *,
     size_t);
 const struct got_error *got_deflate_read(struct got_deflate_buf *, FILE *,
     off_t, size_t *, off_t *);
+const struct got_error *got_deflate_read_mmap(struct got_deflate_buf *,
+    uint8_t *, size_t, size_t, size_t *, size_t *);
 void got_deflate_end(struct got_deflate_buf *);
 const struct got_error *got_deflate_to_file(off_t *, FILE *, off_t, FILE *,
     struct got_deflate_checksum *);
 const struct got_error *got_deflate_to_file_mmap(off_t *, uint8_t *,
     size_t, size_t, FILE *, struct got_deflate_checksum *);
+const struct got_error *got_deflate_flush(struct got_deflate_buf *, FILE *,
+    struct got_deflate_checksum *, off_t *);
+const struct got_error *got_deflate_append_to_file_mmap(
+    struct got_deflate_buf *, off_t *, uint8_t *, size_t, size_t, FILE *,
+    struct got_deflate_checksum *);
+const struct got_error *got_deflate_to_mem_mmap(uint8_t **, size_t *, size_t *,
+    struct got_deflate_checksum *, uint8_t *, size_t, size_t);

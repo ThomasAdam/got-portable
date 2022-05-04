@@ -2753,8 +2753,8 @@ got_privsep_send_raw_delta_outfd(struct imsgbuf *ibuf, int fd)
 
 const struct got_error *
 got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
-    uint64_t result_size,  off_t delta_size, off_t delta_offset,
-    off_t delta_out_offset, struct got_object_id *base_id)
+    uint64_t result_size,  off_t delta_size, off_t delta_compressed_size,
+    off_t delta_offset, off_t delta_out_offset, struct got_object_id *base_id)
 {
 	struct got_imsg_raw_delta idelta;
 	int ret;
@@ -2762,6 +2762,7 @@ got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
 	idelta.base_size = base_size;
 	idelta.result_size = result_size;
 	idelta.delta_size = delta_size;
+	idelta.delta_compressed_size = delta_compressed_size;
 	idelta.delta_offset = delta_offset;
 	idelta.delta_out_offset = delta_out_offset;
 	memcpy(idelta.base_id, base_id->sha1, SHA1_DIGEST_LENGTH);
@@ -2776,8 +2777,8 @@ got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
 
 const struct got_error *
 got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
-    off_t *delta_size, off_t *delta_offset, off_t *delta_out_offset,
-    struct got_object_id **base_id, struct imsgbuf *ibuf)
+    off_t *delta_size, off_t *delta_compressed_size, off_t *delta_offset,
+    off_t *delta_out_offset, struct got_object_id **base_id, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -2787,6 +2788,7 @@ got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	*base_size = 0;
 	*result_size = 0;
 	*delta_size = 0;
+	*delta_compressed_size = 0;
 	*delta_offset = 0;
 	*delta_out_offset = 0;
 	*base_id = NULL;
@@ -2807,6 +2809,7 @@ got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
 		*base_size = delta->base_size;
 		*result_size = delta->result_size;
 		*delta_size = delta->delta_size;
+		*delta_compressed_size = delta->delta_compressed_size;
 		*delta_offset = delta->delta_offset;
 		*delta_out_offset = delta->delta_out_offset;
 		*base_id = calloc(1, sizeof(**base_id));
