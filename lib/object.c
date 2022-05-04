@@ -386,8 +386,8 @@ got_object_open_from_packfile(struct got_object **obj, struct got_object_id *id,
 
 const struct got_error *
 got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
-    off_t *delta_size, off_t *delta_offset, off_t *delta_out_offset,
-    struct got_object_id **base_id, int delta_cache_fd,
+    off_t *delta_size, off_t *delta_compressed_size, off_t *delta_offset,
+    off_t *delta_out_offset, struct got_object_id **base_id, int delta_cache_fd,
     struct got_packidx *packidx, int obj_idx, struct got_object_id *id,
     struct got_repository *repo)
 {
@@ -398,6 +398,7 @@ got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	*base_size = 0;
 	*result_size = 0;
 	*delta_size = 0;
+	*delta_compressed_size = 0;
 	*delta_offset = 0;
 	*delta_out_offset = 0;
 
@@ -437,7 +438,8 @@ got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
 		return err;
 
 	return got_privsep_recv_raw_delta(base_size, result_size, delta_size,
-	    delta_offset, delta_out_offset, base_id, pack->privsep_child->ibuf);
+	    delta_compressed_size, delta_offset, delta_out_offset, base_id,
+	    pack->privsep_child->ibuf);
 }
 
 static const struct got_error *

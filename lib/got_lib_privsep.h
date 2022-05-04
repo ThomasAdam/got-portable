@@ -284,6 +284,7 @@ struct got_imsg_raw_delta {
 	uint64_t base_size;
 	uint64_t result_size;
 	off_t delta_size;
+	off_t delta_compressed_size;
 	off_t delta_offset;
 	off_t delta_out_offset;
 
@@ -662,8 +663,9 @@ const struct got_error *got_privsep_send_raw_delta_req(struct imsgbuf *, int,
     struct got_object_id *);
 const struct got_error *got_privsep_send_raw_delta_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_raw_delta(struct imsgbuf *, uint64_t,
-    uint64_t,  off_t, off_t, off_t, struct got_object_id *);
+    uint64_t,  off_t, off_t, off_t, off_t, struct got_object_id *);
 const struct got_error *got_privsep_recv_raw_delta(uint64_t *, uint64_t *,
-    off_t *, off_t *, off_t *, struct got_object_id **, struct imsgbuf *);
+    off_t *, off_t *, off_t *, off_t *, struct got_object_id **,
+    struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);

@@ -134,9 +134,9 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, off_t len,
 	return NULL;
 }
 
-const struct got_error *
-got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
-    size_t len, size_t *outlenp, size_t *consumed)
+static const struct got_error *
+deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
+    size_t len, size_t *outlenp, size_t *consumed, int flush_on_eof)
 {
 	z_stream *z = &zb->z;
 	size_t last_total_out = z->total_out;
@@ -157,7 +157,8 @@ got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
 				z->avail_in = len - *consumed;
 			if (z->avail_in == 0) {
 				/* EOF */
-				ret = deflate(z, Z_FINISH);
+				if (flush_on_eof)
+					ret = deflate(z, Z_FINISH);
 				break;
 			}
 		}
@@ -174,6 +175,51 @@ got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
 	}
 
 	*outlenp = z->total_out - last_total_out;
+	return NULL;
+}
+
+const struct got_error *
+got_deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
+    size_t len, size_t *outlenp, size_t *consumed)
+{
+	return deflate_read_mmap(zb, map, offset, len, outlenp, consumed, 1);
+}
+
+const struct got_error *
+got_deflate_flush(struct got_deflate_buf *zb, FILE *outfile,
+    struct got_deflate_checksum *csum, off_t *outlenp)
+{
+	int ret;
+	size_t n;
+	z_stream *z = &zb->z;
+
+	if (z->avail_in != 0)
+		return got_error_msg(GOT_ERR_COMPRESSION,
+		    "cannot flush zb with pending input data");
+
+	do {
+		size_t avail, last_total_out = zb->z.total_out;
+
+		z->next_out = zb->outbuf;
+		z->avail_out = zb->outlen;
+
+		ret = deflate(z, Z_FINISH);
+		if (ret != Z_STREAM_END && ret != Z_OK)
+			return got_error(GOT_ERR_COMPRESSION);
+
+		avail = z->total_out - last_total_out;
+		if (avail > 0) {
+			n = fwrite(zb->outbuf, avail, 1, outfile);
+			if (n != 1)
+				return got_ferror(outfile, GOT_ERR_IO);
+			if (csum)
+				csum_output(csum, zb->outbuf, avail);
+			if (outlenp)
+				*outlenp += avail;
+		}
+	} while (ret != Z_STREAM_END);
+
+	zb->flags &= ~GOT_DEFLATE_F_HAVE_MORE;
 	return NULL;
 }
 
@@ -257,6 +303,100 @@ got_deflate_to_file_mmap(off_t *outlen, uint8_t *map, size_t offset,
 		}
 	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
 
+done:
+	got_deflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_deflate_append_to_file_mmap(struct got_deflate_buf *zb, off_t *outlen,
+    uint8_t *map, size_t offset, size_t len, FILE *outfile,
+    struct got_deflate_checksum *csum)
+{
+	const struct got_error *err;
+	size_t avail, consumed;
+
+	do {
+		err = deflate_read_mmap(zb, map, offset, len, &avail,
+		    &consumed, 0);
+		if (err)
+			break;
+		offset += consumed;
+		len -= consumed;
+		if (avail > 0) {
+			size_t n;
+			n = fwrite(zb->outbuf, avail, 1, outfile);
+			if (n != 1) {
+				err = got_ferror(outfile, GOT_ERR_IO);
+				break;
+			}
+			if (csum)
+				csum_output(csum, zb->outbuf, avail);
+			if (outlen)
+				*outlen += avail;
+		}
+	} while ((zb->flags & GOT_DEFLATE_F_HAVE_MORE) && len > 0);
+
+	return err;
+}
+
+const struct got_error *
+got_deflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen,
+    size_t *consumed_total, struct got_deflate_checksum *csum, uint8_t *map,
+    size_t offset, size_t len)
+{
+	const struct got_error *err;
+	size_t avail, consumed;
+	struct got_deflate_buf zb;
+	void *newbuf;
+	size_t nbuf = 1;
+
+	if (outbuf) {
+		*outbuf = malloc(GOT_DEFLATE_BUFSIZE);
+		if (*outbuf == NULL)
+			return got_error_from_errno("malloc");
+		err = got_deflate_init(&zb, *outbuf, GOT_DEFLATE_BUFSIZE);
+		if (err) {
+			free(*outbuf);
+			*outbuf = NULL;
+			return err;
+		}
+	} else {
+		err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+		if (err)
+			return err;
+	}
+
+	*outlen = 0;
+	if (consumed_total)
+		*consumed_total = 0;
+	do {
+		err = got_deflate_read_mmap(&zb, map, offset, len, &avail,
+		    &consumed);
+		if (err)
+			goto done;
+		offset += consumed;
+		if (consumed_total)
+			*consumed_total += consumed;
+		len -= consumed;
+		if (avail > 0 && csum)
+			csum_output(csum, zb.outbuf, avail);
+		*outlen += avail;
+		if ((zb.flags & GOT_DEFLATE_F_HAVE_MORE) && outbuf != NULL) {
+			newbuf = reallocarray(*outbuf, ++nbuf,
+			    GOT_DEFLATE_BUFSIZE);
+			if (newbuf == NULL) {
+				err = got_error_from_errno("reallocarray");
+				free(*outbuf);
+				*outbuf = NULL;
+				*outlen = 0;
+				goto done;
+			}
+			*outbuf = newbuf;
+			zb.outbuf = newbuf + *outlen;
+			zb.outlen = (nbuf * GOT_DEFLATE_BUFSIZE) - *outlen;
+		}
+	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
 done:
 	got_deflate_end(&zb);
 	return err;

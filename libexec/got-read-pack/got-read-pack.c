@@ -868,7 +868,7 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_raw_delta_request req;
-	size_t datalen, delta_size;
+	size_t datalen, delta_size, delta_compressed_size;
 	off_t delta_offset;
 	uint8_t *delta_buf = NULL;
 	struct got_object_id id, base_id;
@@ -885,8 +885,8 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	imsg->fd = -1;
 
 	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
-	    &delta_offset, &base_offset, &base_id, &base_size, &result_size,
-	    pack, packidx, req.idx);
+	    &delta_compressed_size, &delta_offset, &base_offset, &base_id,
+	    &base_size, &result_size, pack, packidx, req.idx);
 	if (err)
 		goto done;
 
@@ -901,8 +901,8 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	}
 
 	delta_out_offset = ftello(delta_outfile);
-	w = fwrite(delta_buf, 1, delta_size, delta_outfile);
-	if (w != delta_size) {
+	w = fwrite(delta_buf, 1, delta_compressed_size, delta_outfile);
+	if (w != delta_compressed_size) {
 		err = got_ferror(delta_outfile, GOT_ERR_IO);
 		goto done;
 	}
@@ -912,7 +912,8 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	}
 
 	err = got_privsep_send_raw_delta(ibuf, base_size, result_size,
-	    delta_size, delta_offset, delta_out_offset, &base_id);
+	    delta_size, delta_compressed_size, delta_offset, delta_out_offset,
+	    &base_id);
 done:
 	free(delta_buf);
 	return err;
