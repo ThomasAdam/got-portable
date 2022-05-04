@@ -1869,22 +1869,13 @@ remove_unused_object(struct got_object_id *id, void *data, void *arg)
 }
 
 static const struct got_error *
-remove_reused_object(struct got_object_id *id, void *data, void *arg)
-{
-	struct got_object_idset *idset = arg;
-	struct got_pack_meta *m = data;
-
-	if (m->have_reused_delta)
-		got_object_idset_remove(NULL, idset, id);
-
-	return NULL;
-}
-
-static const struct got_error *
 add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_pack_meta *m = data;
 	struct got_pack_metavec *v = arg;
+
+	if (m->have_reused_delta)
+		return NULL;
 
 	return add_meta(m, v);
 }
@@ -1904,6 +1895,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	struct got_ratelimit rl;
 	struct got_pack_metavec deltify, reuse;
 	int ncolored = 0, nfound = 0, ntrees = 0;
+	size_t ndeltify;
 
 	memset(&deltify, 0, sizeof(deltify));
 	memset(&reuse, 0, sizeof(reuse));
@@ -1955,12 +1947,6 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
-	if (reuse.nmeta > 0) {
-		err = got_object_idset_for_each(idset,
-		    remove_reused_object, idset);
-		if (err)
-			goto done;
-	}
 
 	delta_cache = fdopen(delta_cache_fd, "a+");
 	if (delta_cache == NULL) {
@@ -1974,23 +1960,27 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		goto done;
 	}
 
-	deltify.meta = calloc(got_object_idset_num_elements(idset),
-	    sizeof(struct got_pack_meta *));
-	if (deltify.meta == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
-	deltify.metasz = got_object_idset_num_elements(idset);
+	ndeltify = got_object_idset_num_elements(idset) - reuse.nmeta;
+	if (ndeltify > 0) {
+		deltify.meta = calloc(ndeltify, sizeof(struct got_pack_meta *));
+		if (deltify.meta == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+		deltify.metasz = ndeltify;
 
-	err = got_object_idset_for_each(idset, add_meta_idset_cb, &deltify);
-	if (err)
-		goto done;
-	if (deltify.nmeta > 0) {
-		err = pick_deltas(deltify.meta, deltify.nmeta, ncolored,
-		    nfound, ntrees, nours, reuse.nmeta, delta_cache, repo,
-		    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+		err = got_object_idset_for_each(idset, add_meta_idset_cb,
+		    &deltify);
 		if (err)
 			goto done;
+		if (deltify.nmeta > 0) {
+			err = pick_deltas(deltify.meta, deltify.nmeta,
+			    ncolored, nfound, ntrees, nours, reuse.nmeta,
+			    delta_cache, repo, progress_cb, progress_arg, &rl,
+			    cancel_cb, cancel_arg);
+			if (err)
+				goto done;
+		}
 	}
 
 	if (fflush(delta_cache) == EOF) {
