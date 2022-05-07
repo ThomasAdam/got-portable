@@ -506,50 +506,6 @@ add_meta(struct got_pack_meta *m, struct got_pack_metavec *v)
 }
 
 static const struct got_error *
-reuse_delta(int idx, struct got_pack_meta *m, struct got_pack_metavec *v,
-    struct got_object_idset *idset, struct got_pack *pack,
-    struct got_packidx *packidx, int delta_cache_fd,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pack_meta *base = NULL;
-	struct got_object_id *base_obj_id = NULL;
-	off_t delta_len = 0, delta_compressed_len = 0;
-	off_t delta_offset = 0, delta_cache_offset = 0;
-	uint64_t base_size, result_size;
-
-	if (m->have_reused_delta)
-		return NULL;
-
-	err = got_object_read_raw_delta(&base_size, &result_size, &delta_len,
-	    &delta_compressed_len, &delta_offset, &delta_cache_offset,
-	    &base_obj_id, delta_cache_fd, packidx, idx, &m->id, repo);
-	if (err)
-		return err;
-
-	if (delta_offset + delta_len < delta_offset)
-		return got_error(GOT_ERR_BAD_PACKFILE);
-
-	base = got_object_idset_get(idset, base_obj_id);
-	if (base == NULL)
-		goto done;
-
-	m->delta_len = delta_len;
-	m->delta_compressed_len = delta_compressed_len;
-	m->delta_offset = delta_cache_offset;
-	m->prev = base;
-	m->size = result_size;
-	m->have_reused_delta = 1;
-	m->reused_delta_offset = delta_offset;
-	m->base_obj_id = base_obj_id;
-	base_obj_id = NULL;
-	err = add_meta(m, v);
-done:
-	free(base_obj_id);
-	return err;
-}
-
-static const struct got_error *
 find_pack_for_reuse(struct got_packidx **best_packidx,
     struct got_repository *repo)
 {
@@ -584,72 +540,61 @@ find_pack_for_reuse(struct got_packidx **best_packidx,
 	return err;
 }
 
-struct search_deltas_arg {
-	struct got_packidx *packidx;
-	struct got_pack *pack;
-	struct got_object_idset *idset;
-	struct got_pack_metavec *v;
-	int delta_cache_fd;
-	struct got_repository *repo;
-	got_pack_progress_cb progress_cb;
-	void *progress_arg;
-	struct got_ratelimit *rl;
-	got_cancel_cb cancel_cb;
-	void *cancel_arg;
-	int ncolored;
-	int nfound;
-	int ntrees;
-	int ncommits;
+struct send_id_arg {
+	struct imsgbuf *ibuf;
+	struct got_object_id *ids[GOT_IMSG_OBJ_ID_LIST_MAX_NIDS];
+	size_t nids;
 };
 
 static const struct got_error *
-search_delta_for_object(struct got_object_id *id, void *data, void *arg)
+send_id(struct got_object_id *id, void *data, void *arg)
 {
-	const struct got_error *err;
-	struct got_pack_meta *m = data;
-	struct search_deltas_arg *a = arg;
-	int obj_idx;
-	struct got_object *obj = NULL;
+	const struct got_error *err = NULL;
+	struct send_id_arg *a = arg;
 
-	if (a->cancel_cb) {
-		err = (*a->cancel_cb)(a->cancel_arg);
+	a->ids[a->nids++] = id;
+
+	if (a->nids >= GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+		err = got_privsep_send_object_idlist(a->ibuf, a->ids, a->nids);
 		if (err)
 			return err;
+		a->nids = 0;
 	}
 
-	if (!got_repo_check_packidx_bloom_filter(a->repo,
-	    a->packidx->path_packidx, id))
-		return NULL;
+	return NULL;
+}
 
-	obj_idx = got_packidx_get_object_idx(a->packidx, id);
-	if (obj_idx == -1)
-		return NULL;
+static const struct got_error *
+recv_reused_delta(struct got_imsg_reused_delta *delta,
+    struct got_object_idset *idset, struct got_pack_metavec *v)
+{
+	struct got_pack_meta *m, *base;
 
-	/* TODO:
-	 * Opening and closing an object just to check its flags
-	 * is a bit expensive. We could have an imsg which requests
-	 * plain type/size information for an object without doing
-	 * work such as traversing the object's entire delta chain
-	 * to find the base object type, and other such info which
-	 * we don't really need here.
-	 */
-	err = got_object_open_from_packfile(&obj, &m->id, a->pack,
-	    a->packidx, obj_idx, a->repo);
-	if (err)
-		return err;
+	if (delta->delta_offset + delta->delta_size < delta->delta_offset ||
+	    delta->delta_offset +
+	    delta->delta_compressed_size < delta->delta_offset)
+		return got_error(GOT_ERR_BAD_PACKFILE);
 
-	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
-		reuse_delta(obj_idx, m, a->v, a->idset, a->pack, a->packidx,
-		    a->delta_cache_fd, a->repo);
-		if (err)
-			goto done;
-		err = report_progress(a->progress_cb, a->progress_arg, a->rl,
-		    a->ncolored, a->nfound, a->ntrees, 0L, a->ncommits,
-		    got_object_idset_num_elements(a->idset), a->v->nmeta, 0);
-	}
-done:
-	got_object_close(obj);
-	return err;
+	m = got_object_idset_get(idset, &delta->id);
+	if (m == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	base = got_object_idset_get(idset, &delta->base_id);
+	if (base == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	m->delta_len = delta->delta_size;
+	m->delta_compressed_len = delta->delta_compressed_size;
+	m->delta_offset = delta->delta_out_offset;
+	m->prev = base;
+	m->size = delta->result_size;
+	m->have_reused_delta = 1;
+	m->reused_delta_offset = delta->delta_offset;
+	m->base_obj_id = got_object_id_dup(&delta->base_id);
+	if (m->base_obj_id == NULL)
+		return got_error_from_errno("got_object_id_dup");
+
+	return add_meta(m, v);
 }
 
 static const struct got_error *
@@ -660,10 +605,11 @@ search_deltas(struct got_pack_metavec *v, struct got_object_idset *idset,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	char *path_packfile = NULL;
 	struct got_packidx *packidx;
 	struct got_pack *pack;
-	struct search_deltas_arg sda;
+	struct send_id_arg sia;
+	struct got_imsg_reused_delta deltas[GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS];
+	size_t ndeltas, i;
 
 	err = find_pack_for_reuse(&packidx, repo);
 	if (err)
@@ -672,36 +618,54 @@ search_deltas(struct got_pack_metavec *v, struct got_object_idset *idset,
 	if (packidx == NULL)
 		return NULL;
 
-	err = got_packidx_get_packfile_path(&path_packfile,
-	    packidx->path_packidx);
+	err = got_object_prepare_delta_reuse(&pack, packidx,
+	    delta_cache_fd, repo);
 	if (err)
 		return err;
 
-	pack = got_repo_get_cached_pack(repo, path_packfile);
-	if (pack == NULL) {
-		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+	memset(&sia, 0, sizeof(sia));
+	sia.ibuf = pack->privsep_child->ibuf;
+	err = got_object_idset_for_each(idset, send_id, &sia);
+	if (err)
+		return err;
+	if (sia.nids > 0) {
+		err = got_privsep_send_object_idlist(pack->privsep_child->ibuf,
+		    sia.ids, sia.nids);
 		if (err)
-			goto done;
+			return err;
 	}
+	err = got_privsep_send_object_idlist_done(pack->privsep_child->ibuf);
+	if (err)
+		return err;
 
-	sda.packidx = packidx;
-	sda.pack = pack;
-	sda.idset = idset;
-	sda.v = v;
-	sda.delta_cache_fd = delta_cache_fd;
-	sda.repo = repo;
-	sda.progress_cb = progress_cb;
-	sda.progress_arg = progress_arg;
-	sda.rl = rl;
-	sda.cancel_cb = cancel_cb;
-	sda.cancel_arg = cancel_arg;
-	sda.ncolored = ncolored;
-	sda.nfound = nfound;
-	sda.ntrees = ntrees;
-	sda.ncommits = ncommits;
-	err = got_object_idset_for_each(idset, search_delta_for_object, &sda);
+	for (;;) {
+		int done = 0;
+
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
+		err = got_privsep_recv_reused_deltas(&done, deltas, &ndeltas,
+		    pack->privsep_child->ibuf);
+		if (err || done)
+			break;
+
+		for (i = 0; i < ndeltas; i++) {
+			struct got_imsg_reused_delta *delta = &deltas[i];
+			err = recv_reused_delta(delta, idset, v);
+			if (err)
+				goto done;
+		}
+
+		err = report_progress(progress_cb, progress_arg, rl,
+		    ncolored, nfound, ntrees, 0L, ncommits,
+		    got_object_idset_num_elements(idset), v->nmeta, 0);
+		if (err)
+			break;
+	}
 done:
-	free(path_packfile);
 	return err;
 }
 

@@ -106,6 +106,8 @@ const struct got_error *got_object_open_from_packfile(struct got_object **,
 const struct got_error *got_object_read_raw_delta(uint64_t *, uint64_t *,
     off_t *, off_t *, off_t *, off_t *, struct got_object_id **, int,
     struct got_packidx *, int, struct got_object_id *, struct got_repository *);
+const struct got_error *got_object_prepare_delta_reuse(struct got_pack **,
+    struct got_packidx *, int, struct got_repository *);
 const struct got_error *got_object_read_header_privsep(struct got_object **,
     struct got_object_id *, struct got_repository *, int);
 const struct got_error *got_object_open(struct got_object **,

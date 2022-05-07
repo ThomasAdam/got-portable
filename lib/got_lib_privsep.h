@@ -183,6 +183,15 @@ enum got_imsg_type {
 	GOT_IMSG_RAW_DELTA_REQUEST,
 	GOT_IMSG_RAW_DELTA,
 
+	/* Re-use deltas found in a pack file. */
+	GOT_IMSG_DELTA_REUSE_REQUEST,
+	GOT_IMSG_REUSED_DELTAS,
+	GOT_IMSG_DELTA_REUSE_DONE,
+
+	/* Transfer a list of object IDs. */
+	GOT_IMSG_OBJ_ID_LIST,
+	GOT_IMSG_OBJ_ID_LIST_DONE,
+
 	/* Messages related to patch files. */
 	GOT_IMSG_PATCH_FILE,
 	GOT_IMSG_PATCH_HUNK,
@@ -292,6 +301,35 @@ struct got_imsg_raw_delta {
 	 * Delta data has been written at delta_out_offset to the file
 	 * descriptor passed via the GOT_IMSG_RAW_DELTA_OUTFD imsg.
 	 */
+};
+
+/* Structures for GOT_IMSG_REUSED_DELTAS. */
+struct got_imsg_reused_delta {
+	struct got_object_id id;
+	struct got_object_id base_id;
+	uint64_t base_size;
+	uint64_t result_size;
+	off_t delta_size;
+	off_t delta_compressed_size;
+	off_t delta_offset;
+	off_t delta_out_offset;
+
+	/*
+	 * Delta data has been written at delta_out_offset to the file
+	 * descriptor passed via the GOT_IMSG_RAW_DELTA_OUTFD imsg.
+	 */
+};
+struct got_imsg_reused_deltas {
+	size_t ndeltas;
+
+	/*
+	 * Followed by ndeltas * struct got_imsg_reused_delta.
+	 */
+
+#define GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS \
+	((MAX_IMSGSIZE - IMSG_HEADER_SIZE - \
+	sizeof(struct got_imsg_reused_deltas)) \
+	/ sizeof(struct got_imsg_reused_delta))
 };
 
 /* Structure for GOT_IMSG_TAG data. */
@@ -478,6 +516,24 @@ struct got_imsg_delta {
 struct got_imsg_raw_delta_request {
 	uint8_t id[SHA1_DIGEST_LENGTH];
 	int idx;
+};
+
+/*
+ * Structure for GOT_IMSG_OBJ_ID_LIST data.
+ * Multiple such messages may be sent back-to-back, where each message
+ * contains a chunk of IDs. The entire list must be terminated with a
+ * GOT_IMSG_OBJ_ID_LIST_DONE message.
+ */
+struct got_imsg_object_idlist {
+	size_t nids;
+
+	/*
+	 * Followed by nids * struct got_object_id.
+	 */
+
+#define GOT_IMSG_OBJ_ID_LIST_MAX_NIDS \
+	((MAX_IMSGSIZE - IMSG_HEADER_SIZE - \
+	sizeof(struct got_imsg_object_idlist)) / sizeof(struct got_object_id))
 };
 
 /* Structure for GOT_IMSG_COMMIT_TRAVERSAL_REQUEST  */
@@ -667,5 +723,18 @@ const struct got_error *got_privsep_send_raw_delta(struct imsgbuf *, uint64_t,
 const struct got_error *got_privsep_recv_raw_delta(uint64_t *, uint64_t *,
     off_t *, off_t *, off_t *, off_t *, struct got_object_id **,
     struct imsgbuf *);
+
+const struct got_error *got_privsep_send_object_idlist(struct imsgbuf *,
+    struct got_object_id **, size_t);
+const struct got_error *got_privsep_send_object_idlist_done(struct imsgbuf *);
+const struct got_error *got_privsep_recv_object_idlist(int *,
+    struct got_object_id **, size_t *, struct imsgbuf *);
+
+const struct got_error *got_privsep_send_delta_reuse_req(struct imsgbuf *);
+const struct got_error *got_privsep_send_reused_deltas(struct imsgbuf *,
+    struct got_imsg_reused_delta *, size_t);
+const struct got_error *got_privsep_send_reused_deltas_done(struct imsgbuf *);
+const struct got_error *got_privsep_recv_reused_deltas(int *, 
+    struct got_imsg_reused_delta *, size_t *, struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);

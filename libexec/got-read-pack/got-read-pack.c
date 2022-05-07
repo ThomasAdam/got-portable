@@ -39,6 +39,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_object_parse.h"
+#include "got_lib_object_idset.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
@@ -919,6 +920,158 @@ done:
 	return err;
 }
 
+struct search_deltas_arg {
+	struct imsgbuf *ibuf;
+	struct got_packidx *packidx;
+	struct got_pack *pack;
+	struct got_object_idset *idset;
+	FILE *delta_outfile;
+	struct got_imsg_reused_delta deltas[GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS];
+	size_t ndeltas;
+};
+
+static const struct got_error *
+search_delta_for_object(struct got_object_id *id, void *data, void *arg)
+{
+	const struct got_error *err;
+	struct search_deltas_arg *a = arg;
+	int obj_idx;
+	uint8_t *delta_buf = NULL;
+	uint64_t base_size, result_size;
+	size_t delta_size, delta_compressed_size;
+	off_t delta_offset, base_offset;
+	struct got_object_id base_id;
+
+	if (sigint_received)
+		return got_error(GOT_ERR_CANCELLED);
+
+	obj_idx = got_packidx_get_object_idx(a->packidx, id);
+	if (obj_idx == -1)
+		return NULL; /* object not present in our pack file */
+
+	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
+	    &delta_compressed_size, &delta_offset, &base_offset, &base_id,
+	    &base_size, &result_size, a->pack, a->packidx, obj_idx);
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_TYPE)
+			return NULL; /* object not stored as a delta */
+		return err;
+	}
+
+	/*
+	 * If this is an offset delta we must determine the base
+	 * object ID ourselves.
+	 */
+	if (base_offset != 0) {
+		err = get_base_object_id(&base_id, a->packidx, base_offset);
+		if (err)
+			goto done;
+	}
+
+	if (got_object_idset_contains(a->idset, &base_id)) {
+		struct got_imsg_reused_delta *delta;
+		off_t delta_out_offset = ftello(a->delta_outfile);
+		size_t w;
+
+		w = fwrite(delta_buf, 1, delta_compressed_size,
+		    a->delta_outfile);
+		if (w != delta_compressed_size) {
+			err = got_ferror(a->delta_outfile, GOT_ERR_IO);
+			goto done;
+		}
+
+		delta = &a->deltas[a->ndeltas++];
+		memcpy(&delta->id, id, sizeof(delta->id));
+		memcpy(&delta->base_id, &base_id, sizeof(delta->base_id));
+		delta->base_size = base_size;
+		delta->result_size = result_size;
+		delta->delta_size = delta_size;
+		delta->delta_compressed_size = delta_compressed_size;
+		delta->delta_offset = delta_offset;
+		delta->delta_out_offset = delta_out_offset;
+
+		if (a->ndeltas >= GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS) {
+			err = got_privsep_send_reused_deltas(a->ibuf,
+			    a->deltas, a->ndeltas);
+			if (err)
+				goto done;
+			a->ndeltas = 0;
+		}
+	}
+done:
+	free(delta_buf);
+	return err;
+}
+
+static const struct got_error *
+recv_object_ids(struct got_object_idset *idset, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	int done = 0;
+	struct got_object_id *ids;
+	size_t nids, i;
+
+	for (;;) {
+		err = got_privsep_recv_object_idlist(&done, &ids, &nids, ibuf);
+		if (err || done)
+			break;
+		for (i = 0; i < nids; i++) {
+			err = got_object_idset_add(idset, &ids[i], NULL);
+			if (err) {
+				free(ids);
+				return err;
+			}
+		}
+		free(ids);
+	}
+
+	return err;
+}
+
+static const struct got_error *
+delta_reuse_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    FILE *delta_outfile, struct got_pack *pack, struct got_packidx *packidx)
+{
+	const struct got_error *err = NULL;
+	struct got_object_idset *idset;
+	struct search_deltas_arg sda;
+
+	idset = got_object_idset_alloc();
+	if (idset == NULL)
+		return got_error_from_errno("got_object_idset_alloc");
+
+	err = recv_object_ids(idset, ibuf);
+	if (err)
+		return err;
+
+	memset(&sda, 0, sizeof(sda));
+	sda.ibuf = ibuf;
+	sda.idset = idset;
+	sda.pack = pack;
+	sda.packidx = packidx;
+	sda.delta_outfile = delta_outfile;
+	err = got_object_idset_for_each(idset, search_delta_for_object, &sda);
+	if (err)
+		goto done;
+
+	if (sda.ndeltas > 0) {
+		err = got_privsep_send_reused_deltas(ibuf, sda.deltas,
+		    sda.ndeltas);
+		if (err)
+			goto done;
+	}
+
+	if (fflush(delta_outfile) == -1) {
+		err = got_error_from_errno("fflush");
+		goto done;
+	}
+
+	err = got_privsep_send_reused_deltas_done(ibuf);
+done:
+	got_object_idset_free(idset);
+	return err;
+}
+
 static const struct got_error *
 receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 {
@@ -1172,6 +1325,14 @@ main(int argc, char *argv[])
 			}
 			err = raw_delta_request(&imsg, &ibuf, delta_outfile,
 			    pack, packidx);
+			break;
+		case GOT_IMSG_DELTA_REUSE_REQUEST:
+			if (delta_outfile == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			}
+			err = delta_reuse_request(&imsg, &ibuf,
+			    delta_outfile, pack, packidx);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,
