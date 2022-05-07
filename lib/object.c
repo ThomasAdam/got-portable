@@ -444,6 +444,55 @@ got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	    pack->privsep_child->ibuf);
 }
 
+/*
+ * XXX This function does not really belong in object.c. It is only here
+ * because it needs start_pack_privsep_child(); relevant code should
+ * probably be moved to pack.c/pack_create.c.
+ */
+const struct got_error *
+got_object_prepare_delta_reuse(struct got_pack **pack,
+    struct got_packidx *packidx, int delta_outfd, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path_packfile = NULL;
+
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
+	if (err)
+		return err;
+
+	*pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (*pack == NULL) {
+		err = got_repo_cache_pack(pack, repo, path_packfile, packidx);
+		if (err)
+			goto done;
+	}
+	if ((*pack)->privsep_child == NULL) {
+		err = start_pack_privsep_child(*pack, packidx);
+		if (err)
+			goto done;
+	}
+
+	if (!(*pack)->child_has_delta_outfd) {
+		int outfd_child;
+		outfd_child = dup(delta_outfd);
+		if (outfd_child == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
+		err = got_privsep_send_raw_delta_outfd(
+		    (*pack)->privsep_child->ibuf, outfd_child);
+		if (err)
+			goto done;
+		(*pack)->child_has_delta_outfd = 1;
+	}
+
+	err = got_privsep_send_delta_reuse_req((*pack)->privsep_child->ibuf);
+done:
+	free(path_packfile);
+	return err;
+}
+
 static const struct got_error *
 request_object(struct got_object **obj, struct got_object_id *id,
     struct got_repository *repo, int fd)

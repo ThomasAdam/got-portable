@@ -2834,6 +2834,214 @@ got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
 }
 
 const struct got_error *
+got_privsep_send_object_idlist(struct imsgbuf *ibuf,
+    struct got_object_id **ids, size_t nids)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_object_idlist idlist;
+	struct ibuf *wbuf;
+	size_t i;
+
+	if (nids > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_OBJ_ID_LIST, 0, 0,
+	    sizeof(idlist) + nids * sizeof(**ids));
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create OBJ_ID_LIST");
+		return err;
+	}
+
+	idlist.nids = nids;
+	if (imsg_add(wbuf, &idlist, sizeof(idlist)) == -1) {
+		err = got_error_from_errno("imsg_add OBJ_ID_LIST");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	for (i = 0; i < nids; i++) {
+		struct got_object_id *id = ids[i];
+		if (imsg_add(wbuf, id, sizeof(*id)) == -1) {
+			err = got_error_from_errno("imsg_add OBJ_ID_LIST");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+	
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_object_idlist_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_OBJ_ID_LIST_DONE, 0, 0, -1, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose OBJ_ID_LIST_DONE");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_object_idlist(int *done, struct got_object_id **ids,
+    size_t *nids, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_object_idlist *idlist;
+	size_t datalen;
+
+	*ids = NULL;
+	*done = 0;
+	*nids = 0;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_OBJ_ID_LIST:
+		if (datalen < sizeof(*idlist)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		idlist = imsg.data;
+		if (idlist->nids > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		*nids = idlist->nids;
+		*ids = calloc(*nids, sizeof(**ids));
+		if (*ids == NULL) {
+			err = got_error_from_errno("calloc");
+			break;
+		}
+		memcpy(*ids, (uint8_t *)imsg.data + sizeof(idlist),
+		    *nids * sizeof(**ids));
+		break;
+	case GOT_IMSG_OBJ_ID_LIST_DONE:
+		*done = 1;
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_delta_reuse_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_DELTA_REUSE_REQUEST, 0, 0, -1, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose DELTA_REUSE_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_reused_deltas(struct imsgbuf *ibuf,
+    struct got_imsg_reused_delta *deltas, size_t ndeltas)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	struct got_imsg_reused_deltas ideltas;
+	size_t i;
+
+	if (ndeltas > GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_REUSED_DELTAS, 0, 0,
+	    sizeof(ideltas) + ndeltas * sizeof(*deltas));
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create REUSED_DELTAS");
+		return err;
+	}
+
+	ideltas.ndeltas = ndeltas;
+	if (imsg_add(wbuf, &ideltas, sizeof(ideltas)) == -1) {
+		err = got_error_from_errno("imsg_add REUSED_DELTAS");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	for (i = 0; i < ndeltas; i++) {
+		struct got_imsg_reused_delta *delta = &deltas[i];
+		if (imsg_add(wbuf, delta, sizeof(*delta)) == -1) {
+			err = got_error_from_errno("imsg_add REUSED_DELTAS");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+	
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_reused_deltas_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_DELTA_REUSE_DONE, 0, 0, -1, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose DELTA_REUSE_DONE");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_reused_deltas(int *done, struct got_imsg_reused_delta *deltas,
+    size_t *ndeltas, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_reused_deltas *ideltas;
+	size_t datalen;
+
+	*done = 0;
+	*ndeltas = 0;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_REUSED_DELTAS:
+		if (datalen < sizeof(*ideltas)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		ideltas = imsg.data;
+		if (ideltas->ndeltas > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		*ndeltas = ideltas->ndeltas;
+		memcpy(deltas, (uint8_t *)imsg.data + sizeof(ideltas),
+		    *ndeltas * sizeof(*deltas));
+		break;
+	case GOT_IMSG_DELTA_REUSE_DONE:
+		*done = 1;
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}
+
+const struct got_error *
 got_privsep_unveil_exec_helpers(void)
 {
 	const char *helpers[] = {
