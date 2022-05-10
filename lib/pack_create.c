@@ -19,7 +19,9 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1553,6 +1555,23 @@ hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
 	return NULL;
 }
 
+const struct got_error *
+hcopy_mmap(uint8_t *src, off_t src_offset, size_t src_size,
+    FILE *fdst, off_t len, SHA1_CTX *ctx)
+{
+	size_t n;
+
+	if (src_offset + len > src_size)
+		return got_error(GOT_ERR_RANGE);
+
+	SHA1Update(ctx, src + src_offset, len);
+	n = fwrite(src + src_offset, 1, len, fdst);
+	if (n != len)
+		return got_ferror(fdst, GOT_ERR_IO);
+
+	return NULL;
+}
+
 static void
 putbe32(char *b, uint32_t n)
 {
@@ -1682,8 +1701,9 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
 
 static const struct got_error *
 write_packed_object(off_t *packfile_size, FILE *packfile,
-    FILE *delta_cache, struct got_pack_meta *m, int *outfd,
-    SHA1_CTX *ctx, struct got_repository *repo)
+    FILE *delta_cache, uint8_t *delta_cache_map, size_t delta_cache_size,
+    struct got_pack_meta *m, int *outfd, SHA1_CTX *ctx,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_deflate_checksum csum;
@@ -1739,6 +1759,16 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		*packfile_size += m->delta_compressed_len;
 		free(m->delta_buf);
 		m->delta_buf = NULL;
+	} else if (delta_cache_map) {
+		err = deltahdr(packfile_size, ctx, packfile, m);
+		if (err)
+			goto done;
+		err = hcopy_mmap(delta_cache_map, m->delta_offset,
+		    delta_cache_size, packfile, m->delta_compressed_len,
+		    ctx);
+		if (err)
+			goto done;
+		*packfile_size += m->delta_compressed_len;
 	} else {
 		if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
 		    == -1) {
@@ -1778,12 +1808,37 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	size_t n;
 	off_t packfile_size = 0;
 	int outfd = -1;
+	int delta_cache_fd = -1;
+	uint8_t *delta_cache_map = NULL;
+	size_t delta_cache_size = 0;
 
 	SHA1Init(&ctx);
 
+#ifndef GOT_PACK_NO_MMAP
+	delta_cache_fd = dup(fileno(delta_cache));
+	if (delta_cache_fd != -1) {
+		struct stat sb;
+		if (fstat(delta_cache_fd, &sb) == -1) {
+			err = got_error_from_errno("fstat");
+			goto done;
+		}
+		if (sb.st_size > 0 && sb.st_size <= SIZE_MAX) {
+			delta_cache_map = mmap(NULL, sb.st_size,
+			    PROT_READ, MAP_PRIVATE, delta_cache_fd, 0);
+			if (delta_cache_map == MAP_FAILED) {
+				if (errno != ENOMEM) {
+					err = got_error_from_errno("mmap");
+					goto done;
+				}
+				delta_cache_map = NULL; /* fallback on stdio */
+			} else
+				delta_cache_size = (size_t)sb.st_size;
+		}
+	}
+#endif
 	err = hwrite(packfile, "PACK", 4, &ctx);
 	if (err)
-		return err;
+		goto done;
 	putbe32(buf, GOT_PACKFILE_VERSION);
 	err = hwrite(packfile, buf, 4, &ctx);
 	if (err)
@@ -1803,7 +1858,8 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			goto done;
 		m = deltify[i];
 		err = write_packed_object(&packfile_size, packfile,
-		    delta_cache, m, &outfd, &ctx, repo);
+		    delta_cache, delta_cache_map, delta_cache_size,
+		    m, &outfd, &ctx, repo);
 		if (err)
 			goto done;
 	}
@@ -1818,7 +1874,8 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 			goto done;
 		m = reuse[i];
 		err = write_packed_object(&packfile_size, packfile,
-		    delta_cache, m, &outfd, &ctx, repo);
+		    delta_cache, delta_cache_map, delta_cache_size,
+		    m, &outfd, &ctx, repo);
 		if (err)
 			goto done;
 	}
@@ -1838,6 +1895,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	}
 done:
 	if (outfd != -1 && close(outfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (delta_cache_map && munmap(delta_cache_map, delta_cache_size) == -1)
+		err = got_error_from_errno("munmap");
+	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err;
 }
