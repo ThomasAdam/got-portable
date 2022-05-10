@@ -1455,7 +1455,7 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 
 	err = findtwixt(&ids, &nobj, ncolored, ours, nours, theirs, ntheirs,
 	    repo, progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
-	if (err || nobj == 0)
+	if (err)
 		goto done;
 
 	for (i = 0; i < ntheirs; i++) {
