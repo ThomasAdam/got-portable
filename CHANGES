@@ -1,3 +1,13 @@
+* got 0.70; 2022-05-10
+- avoid subtraction of values larger than int in qsort(3) comparison callbacks
+- make 'got patch' handle git-style rename diffs
+- store deltas in compressed form while packing, both in memory and cache file
+- avoid O(N) loops over object ID lists while packing
+- run the search for deltas to reuse in got-read-pack directly, for speed
+- hook send.sh cmdline tests into 'make regress', this was overlooked earlier
+- fix regression from 0.69 where packing tags fails if zero commits are packed
+- map delta cache file into memory if possible while writing a pack file
+
 * got 0.69; 2022-04-24
 - plug a memory leak in got_fetch_pack() (patch by Mikhail)
 - plug a memory leak in list_refs() (op)
