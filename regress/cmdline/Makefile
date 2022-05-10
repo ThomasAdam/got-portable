@@ -1,6 +1,6 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	ref commit revert cherrypick backout rebase import histedit \
-	integrate merge stage unstage cat clone fetch tree patch pack \
+	integrate merge stage unstage cat clone fetch send tree patch pack \
 	cleanup
 NOOBJ=Yes
 
