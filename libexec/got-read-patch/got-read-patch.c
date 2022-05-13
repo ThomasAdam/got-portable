@@ -267,7 +267,8 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 	if (hdr->oldfrom >= LONG_MAX - hdr->oldlines ||
 	    hdr->newfrom >= LONG_MAX - hdr->newlines ||
 	    /* not so sure about this one */
-	    hdr->oldlines >= LONG_MAX - hdr->newlines - 1)
+	    hdr->oldlines >= LONG_MAX - hdr->newlines - 1 ||
+	    (hdr->oldlines == 0 && hdr->newlines == 0))
 		return got_error(GOT_ERR_PATCH_MALFORMED);
 
 	if (hdr->oldlines == 0) {
