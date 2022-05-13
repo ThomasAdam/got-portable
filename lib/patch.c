@@ -212,9 +212,12 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_PATCH_DONE:
+			if (h != NULL && h->len == 0)
+				err = got_error(GOT_ERR_PATCH_MALFORMED);
 			goto done;
 		case GOT_IMSG_PATCH_HUNK:
-			if (h != NULL && (h->old_nonl || h->new_nonl)) {
+			if (h != NULL &&
+			    (h->len == 0 || h->old_nonl || h->new_nonl)) {
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 				goto done;
 			}
@@ -467,9 +470,6 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 
 	copypos = 0;
 	STAILQ_FOREACH(h, &p->head, entries) {
-		if (h->lines == NULL)
-			break;
-
 	tryagain:
 		err = locate_hunk(orig, h, &pos, &lineno);
 		if (err != NULL && err->code == GOT_ERR_HUNK_FAILED)

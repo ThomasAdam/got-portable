@@ -537,6 +537,40 @@ EOF
 		return 1
 	fi
 
+	# empty hunk
+	cat <<EOF > $testroot/wt/patch
+diff --git a/alpha b/iota
+--- a/alpha
++++ b/iota
+@@ -0,0 +0,0 @@
+EOF
+
+	(cd $testroot/wt && got patch patch) \
+		 > $testroot/stdout \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got managed to apply an invalid patch"
+		test_done $testroot 1
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done $testroot $ret
+		return 1
+	fi
+
 	test_done $testroot $ret
 }
 
