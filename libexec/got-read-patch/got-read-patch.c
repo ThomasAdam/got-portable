@@ -181,8 +181,8 @@ find_patch(int *done, FILE *fp)
 				break;
 
 			/* rewind to previous line */
-			if (fseek(fp, linelen * -1, SEEK_CUR) == -1)
-				err = got_error_from_errno("fseek");
+			if (fseeko(fp, -linelen, SEEK_CUR) == -1)
+				err = got_error_from_errno("fseeko");
 			break;
 		}
 	}
@@ -352,8 +352,8 @@ parse_hunk(FILE *fp, int *done)
 	if (err)
 		goto done;
 	if (*done) {
-		if (fseek(fp, linelen * -1, SEEK_CUR) == -1)
-			err = got_error_from_errno("fseek");
+		if (fseeko(fp, -linelen, SEEK_CUR) == -1)
+			err = got_error_from_errno("fseeko");
 		goto done;
 	}
 
