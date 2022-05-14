@@ -293,8 +293,8 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 	char buf[BUFSIZ];
 	size_t len, r, w;
 
-	if (fseek(orig, copypos, SEEK_SET) == -1)
-		return got_error_from_errno("fseek");
+	if (fseeko(orig, copypos, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
 
 	while (pos == -1 || copypos < pos) {
 		len = sizeof(buf);
@@ -359,8 +359,8 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 	if (err == NULL) {
 		*pos = match;
 		*lineno = match_lineno;
-		if (fseek(orig, match, SEEK_SET) == -1)
-			err = got_error_from_errno("fseek");
+		if (fseeko(orig, match, SEEK_SET) == -1)
+			err = got_error_from_errno("fseeko");
 	}
 
 	free(line);
@@ -488,8 +488,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 			 * try to apply the hunk again starting the search
 			 * after the previous partial match.
 			 */
-			if (fseek(orig, pos, SEEK_SET) == -1) {
-				err = got_error_from_errno("fseek");
+			if (fseeko(orig, pos, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
 				goto done;
 			}
 			linelen = getline(&line, &linesize, orig);
