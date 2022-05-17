@@ -549,7 +549,8 @@ got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
  * Prepare for applying a patch.
  */
 const struct got_error *
-got_worktree_patch_prepare(struct got_fileindex **, struct got_worktree *);
+got_worktree_patch_prepare(struct got_fileindex **, char **,
+    struct got_worktree *);
 
 /*
  * Lookup paths for the "old" and "new" file before patching and check their
@@ -559,6 +560,16 @@ const struct got_error *
 got_worktree_patch_check_path(const char *, const char *, char **, char **,
     struct got_worktree *, struct got_repository *, struct got_fileindex *);
 
+const struct got_error *
+got_worktree_patch_schedule_add(const char *, struct got_repository *,
+    struct got_worktree *, struct got_fileindex *, got_worktree_checkout_cb,
+    void *);
+
+const struct got_error *
+got_worktree_patch_schedule_rm(const char *, struct got_repository *,
+    struct got_worktree *, struct got_fileindex *, got_worktree_delete_cb,
+    void *);
+
 /* Complete the patch operation. */
 const struct got_error *
-got_worktree_patch_complete(struct got_fileindex *);
+got_worktree_patch_complete(struct got_fileindex *, char *);

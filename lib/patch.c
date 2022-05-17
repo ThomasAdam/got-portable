@@ -572,27 +572,16 @@ patch_add(void *arg, unsigned char status, const char *path)
 
 static const struct got_error *
 apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    const char *old, const char *new, struct got_patch *p, int nop,
-    struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_fileindex *fileindex, const char *old, const char *new,
+    struct got_patch *p, int nop, struct patch_args *pa,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_pathlist_head oldpaths, newpaths;
-	struct got_pathlist_entry *pe;
 	int file_renamed = 0;
 	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
-
-	TAILQ_INIT(&oldpaths);
-	TAILQ_INIT(&newpaths);
-
-	err = got_pathlist_insert(&pe, &oldpaths, old, NULL);
-	if (err)
-		goto done;
-	err = got_pathlist_insert(&pe, &newpaths, new, NULL);
-	if (err)
-		goto done;
 
 	if (asprintf(&oldpath, "%s/%s", got_worktree_get_root_path(worktree),
 	    old) == -1) {
@@ -626,8 +615,8 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 
 	if (p->old != NULL && p->new == NULL) {
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, patch_delete, pa, repo, 0, 0);
+		err = got_worktree_patch_schedule_rm(old, repo, worktree,
+		    fileindex, patch_delete, pa);
 		goto done;
 	}
 
@@ -657,24 +646,23 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 	if (file_renamed) {
-		err = got_worktree_schedule_delete(worktree, &oldpaths,
-		    0, NULL, patch_delete, pa, repo, 0, 0);
+		err = got_worktree_patch_schedule_rm(old, repo, worktree,
+		    fileindex, patch_delete, pa);
 		if (err == NULL)
-			err = got_worktree_schedule_add(worktree, &newpaths,
-			    patch_add, pa, repo, 1);
+			err = got_worktree_patch_schedule_add(new, repo,
+			    worktree, fileindex, patch_add,
+			    pa);
 		if (err)
 			unlink(newpath);
 	} else if (p->old == NULL) {
-		err = got_worktree_schedule_add(worktree, &newpaths,
-		    patch_add, pa, repo, 1);
+		err = got_worktree_patch_schedule_add(new, repo, worktree,
+		    fileindex, patch_add, pa);
 		if (err)
 			unlink(newpath);
 	} else
 		err = report_progress(pa, old, new, GOT_STATUS_MODIFY, NULL);
 
 done:
-	got_pathlist_free(&oldpaths);
-	got_pathlist_free(&newpaths);
 	free(parent);
 	free(template);
 	if (tmppath != NULL)
@@ -719,8 +707,9 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
     int nop, int strip, int reverse, got_patch_progress_cb progress_cb,
     void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *complete_err;
 	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
 	char *oldpath, *newpath;
 	struct imsgbuf *ibuf;
 	int imsg_fds[2] = {-1, -1};
@@ -760,7 +749,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	err = got_worktree_patch_prepare(&fileindex, worktree);
+	err = got_worktree_patch_prepare(&fileindex, &fileindex_path,
+	    worktree);
 	if (err)
 		goto done;
 
@@ -782,8 +772,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
 		    &newpath, worktree, repo, fileindex);
 		if (err == NULL)
-			err = apply_patch(worktree, repo, oldpath, newpath,
-			    &p, nop, &pa, cancel_cb, cancel_arg);
+			err = apply_patch(worktree, repo, fileindex, oldpath,
+			    newpath, &p, nop, &pa, cancel_cb, cancel_arg);
 		if (err != NULL) {
 			failed = 1;
 			/* recoverable errors */
@@ -805,8 +795,9 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 done:
-	if (fileindex)
-		got_worktree_patch_complete(fileindex);
+	complete_err = got_worktree_patch_complete(fileindex, fileindex_path);
+	if (complete_err && err == NULL)
+		err = complete_err;
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (ibuf != NULL)

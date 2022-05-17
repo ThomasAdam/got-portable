@@ -8855,14 +8855,9 @@ patch_can_edit(const char *path, unsigned char status,
 
 const struct got_error *
 got_worktree_patch_prepare(struct got_fileindex **fileindex,
-    struct got_worktree *worktree)
+    char **fileindex_path, struct got_worktree *worktree)
 {
-	const struct got_error *err;
-	char *fileindex_path = NULL;
-
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
-	free(fileindex_path);
-	return err;
+	return open_fileindex(fileindex, fileindex_path, worktree);
 }
 
 const struct got_error *
@@ -8913,8 +8908,56 @@ done:
 }
 
 const struct got_error *
-got_worktree_patch_complete(struct got_fileindex *fileindex)
+got_worktree_patch_schedule_add(const char *path, struct got_repository *repo,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
-	got_fileindex_free(fileindex);
-	return NULL;
+	struct schedule_addition_args saa;
+
+	memset(&saa, 0, sizeof(saa));
+	saa.worktree = worktree;
+	saa.fileindex = fileindex;
+	saa.progress_cb = progress_cb;
+	saa.progress_arg = progress_arg;
+	saa.repo = repo;
+
+	return worktree_status(worktree, path, fileindex, repo,
+	    schedule_addition, &saa, NULL, NULL, 1, 0);
+}
+
+const struct got_error *
+got_worktree_patch_schedule_rm(const char *path, struct got_repository *repo,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    got_worktree_delete_cb progress_cb, void *progress_arg)
+{
+	struct schedule_deletion_args sda;
+
+	memset(&sda, 0, sizeof(sda));
+	sda.worktree = worktree;
+	sda.fileindex = fileindex;
+	sda.progress_cb = progress_cb;
+	sda.progress_arg = progress_arg;
+	sda.repo = repo;
+	sda.delete_local_mods = 0;
+	sda.keep_on_disk = 0;
+	sda.ignore_missing_paths = 0;
+	sda.status_codes = NULL;
+
+	return worktree_status(worktree, path, fileindex, repo,
+	    schedule_for_deletion, &sda, NULL, NULL, 1, 1);
+}
+
+const struct got_error *
+got_worktree_patch_complete(struct got_fileindex *fileindex,
+    char *fileindex_path)
+{
+	const struct got_error *err = NULL;
+
+	if (fileindex) {
+		err = sync_fileindex(fileindex, fileindex_path);
+		got_fileindex_free(fileindex);
+	}
+
+	free(fileindex_path);
+	return err;
 }
