@@ -710,7 +710,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
     int nop, int strip, int reverse, got_patch_progress_cb progress_cb,
     void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL, *complete_err;
+	const struct got_error *err = NULL, *complete_err = NULL;
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	char *oldpath, *newpath;
@@ -798,9 +798,12 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 done:
-	complete_err = got_worktree_patch_complete(fileindex, fileindex_path);
+	if (fileindex != NULL)
+		complete_err = got_worktree_patch_complete(fileindex,
+		    fileindex_path);
 	if (complete_err && err == NULL)
 		err = complete_err;
+	free(fileindex_path);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (ibuf != NULL)
