@@ -572,4 +572,4 @@ got_worktree_patch_schedule_rm(const char *, struct got_repository *,
 
 /* Complete the patch operation. */
 const struct got_error *
-got_worktree_patch_complete(struct got_fileindex *, char *);
+got_worktree_patch_complete(struct got_fileindex *, const char *);

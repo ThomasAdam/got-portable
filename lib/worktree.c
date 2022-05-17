@@ -8949,15 +8949,12 @@ got_worktree_patch_schedule_rm(const char *path, struct got_repository *repo,
 
 const struct got_error *
 got_worktree_patch_complete(struct got_fileindex *fileindex,
-    char *fileindex_path)
+    const char *fileindex_path)
 {
 	const struct got_error *err = NULL;
 
-	if (fileindex) {
-		err = sync_fileindex(fileindex, fileindex_path);
-		got_fileindex_free(fileindex);
-	}
+	err = sync_fileindex(fileindex, fileindex_path);
+	got_fileindex_free(fileindex);
 
-	free(fileindex_path);
 	return err;
 }
