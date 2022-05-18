@@ -1617,6 +1617,10 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 				break;
 			}
 			itree = imsg.data;
+			if (itree->nentries < 0) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
 			*tree = malloc(sizeof(**tree));
 			if (*tree == NULL) {
 				err = got_error_from_errno("malloc");
