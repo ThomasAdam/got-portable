@@ -1630,6 +1630,8 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 			    sizeof(struct got_tree_entry));
 			if ((*tree)->entries == NULL) {
 				err = got_error_from_errno("malloc");
+				free(*tree);
+				*tree = NULL;
 				break;
 			}
 			(*tree)->nentries = itree->nentries;
