@@ -1660,6 +1660,10 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 				err = got_error(GOT_ERR_NO_SPACE);
 				break;
 			}
+			if (nentries >= (*tree)->nentries) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
 			te = &(*tree)->entries[nentries];
 			memcpy(te->name, imsg.data + sizeof(*ite), datalen);
 			te->name[datalen] = '\0';
