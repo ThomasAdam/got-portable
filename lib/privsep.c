@@ -1566,7 +1566,7 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 	int nentries = 0;
 
 	*tree = NULL;
-get_more:
+
 	err = read_imsg(ibuf);
 	if (err)
 		goto done;
@@ -1580,9 +1580,18 @@ get_more:
 
 		n = imsg_get(ibuf, &imsg);
 		if (n == 0) {
-			if (*tree && (*tree)->nentries != nentries)
-				goto get_more;
-			break;
+			if ((*tree)) {
+				if (nentries < (*tree)->nentries) {
+					err = read_imsg(ibuf);
+					if (err)
+						break;
+					continue;
+				} else
+					break;
+			} else {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
 		}
 
 		if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen) {
