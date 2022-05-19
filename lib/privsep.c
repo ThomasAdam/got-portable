@@ -93,15 +93,9 @@ read_imsg(struct imsgbuf *ibuf)
 	const struct got_error *err;
 	size_t n;
 
-	/*
-	 * There is no imsg API function to tell us whether the
-	 * read buffer still contains pending data :-(
-	 */
-	if (ibuf->r.wpos < IMSG_HEADER_SIZE) {
-		err = poll_fd(ibuf->fd, POLLIN, INFTIM);
-		if (err)
-			return err;
-	}
+	err = poll_fd(ibuf->fd, POLLIN, INFTIM);
+	if (err)
+		return err;
 
 	n = imsg_read(ibuf);
 	if (n == -1) {
