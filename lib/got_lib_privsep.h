@@ -106,7 +106,7 @@ enum got_imsg_type {
 	GOT_IMSG_COMMIT_LOGMSG,
 	GOT_IMSG_TREE_REQUEST,
 	GOT_IMSG_TREE,
-	GOT_IMSG_TREE_ENTRY,
+	GOT_IMSG_TREE_ENTRIES,
 	GOT_IMSG_BLOB_REQUEST,
 	GOT_IMSG_BLOB_OUTFD,
 	GOT_IMSG_BLOB,
@@ -246,17 +246,23 @@ struct got_imsg_commit_object {
 	 */
 } __attribute__((__packed__));
 
-
-/* Structure for GOT_IMSG_TREE_ENTRY. */
 struct got_imsg_tree_entry {
 	char id[SHA1_DIGEST_LENGTH];
 	mode_t mode;
-	/* Followed by entry's name in remaining data of imsg buffer. */
+	size_t namelen;
+	/* Followed by namelen bytes of entry's name, not NUL-terminated. */
 } __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_TREE_ENTRIES. */
+struct got_imsg_tree_entries {
+	size_t nentries; /* Number of tree entries contained in this message. */
+
+	/* Followed by nentries * struct got_imsg_tree_entry */
+};
 
 /* Structure for GOT_IMSG_TREE_OBJECT_REPLY data. */
 struct got_imsg_tree_object {
-	int nentries; /* This many TREE_ENTRY messages follow. */
+	int nentries; /* This many tree entries follow. */
 };
 
 /* Structure for GOT_IMSG_BLOB. */
