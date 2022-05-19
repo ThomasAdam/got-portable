@@ -131,31 +131,19 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 			return got_error_from_errno(
 			    "imsg_create GITCONFIG_REMOTE");
 
-		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1)
+			return got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
 
-		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1)
+			return got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, remotes[i].fetch_url, iremote.fetch_url_len) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, remotes[i].fetch_url, iremote.fetch_url_len) == -1)
+			return got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, remotes[i].send_url, iremote.send_url_len) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, remotes[i].send_url, iremote.send_url_len) == -1)
+			return got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);

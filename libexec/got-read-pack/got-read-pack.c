@@ -551,7 +551,6 @@ static const struct got_error *
 send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
     struct imsgbuf *ibuf)
 {
-	const struct got_error *err;
 	struct ibuf *wbuf;
 	size_t i;
 
@@ -561,18 +560,14 @@ send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TRAVERSED_COMMITS");
 
-	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1) {
-		err = got_error_from_errno("imsg_add TRAVERSED_COMMITS");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1)
+		return got_error_from_errno("imsg_add TRAVERSED_COMMITS");
+
 	for (i = 0; i < ncommits; i++) {
 		struct got_object_id *id = &commit_ids[i];
 		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-			err = got_error_from_errno(
+			return got_error_from_errno(
 			    "imsg_add TRAVERSED_COMMITS");
-			ibuf_free(wbuf);
-			return err;
 		}
 	}
 

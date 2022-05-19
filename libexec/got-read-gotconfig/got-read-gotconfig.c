@@ -310,26 +310,22 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GOTCONFIG_REMOTE");
-			ibuf_free(wbuf);
 			break;
 		}
 
 		if (imsg_add(wbuf, repo->name, iremote.name_len) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GOTCONFIG_REMOTE");
-			ibuf_free(wbuf);
 			break;
 		}
 		if (imsg_add(wbuf, fetch_url, iremote.fetch_url_len) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GOTCONFIG_REMOTE");
-			ibuf_free(wbuf);
 			break;
 		}
 		if (imsg_add(wbuf, send_url, iremote.send_url_len) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GOTCONFIG_REMOTE");
-			ibuf_free(wbuf);
 			break;
 		}
 

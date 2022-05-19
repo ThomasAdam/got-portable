@@ -216,7 +216,6 @@ fetch_error(const char *buf, size_t len)
 static const struct got_error *
 send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, nsymrefs = 0;
 	struct got_pathlist_entry *pe;
@@ -237,11 +236,8 @@ send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 		return got_error_from_errno("imsg_create FETCH_SYMREFS");
 
 	/* Keep in sync with struct got_imsg_fetch_symrefs definition! */
-	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1)
+		return got_error_from_errno("imsg_add FETCH_SYMREFS");
 
 	TAILQ_FOREACH(pe, symrefs, entry) {
 		const char *name = pe->path;
@@ -250,26 +246,14 @@ send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 		size_t target_len = strlen(target);
 
 		/* Keep in sync with struct got_imsg_fetch_symref definition! */
-		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &target_len, sizeof(target_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, target, target_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
+			return got_error_from_errno("imsg_add FETCH_SYMREFS");
+		if (imsg_add(wbuf, &target_len, sizeof(target_len)) == -1)
+			return got_error_from_errno("imsg_add FETCH_SYMREFS");
+		if (imsg_add(wbuf, name, name_len) == -1)
+			return got_error_from_errno("imsg_add FETCH_SYMREFS");
+		if (imsg_add(wbuf, target, target_len) == -1)
+			return got_error_from_errno("imsg_add FETCH_SYMREFS");
 	}
 
 	wbuf->fd = -1;
@@ -281,7 +265,6 @@ static const struct got_error *
 send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
     const char *refname)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, reflen = strlen(refname);
 
@@ -294,16 +277,10 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 		return got_error_from_errno("imsg_create FETCH_REF");
 
 	/* Keep in sync with struct got_imsg_fetch_ref definition! */
-	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, refname, reflen) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_add FETCH_REF");
+	if (imsg_add(wbuf, refname, reflen) == -1)
+		return got_error_from_errno("imsg_add FETCH_REF");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
