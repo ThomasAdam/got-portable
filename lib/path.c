@@ -225,16 +225,10 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
     struct got_pathlist_head *pathlist, const char *path, void *data)
 {
 	struct got_pathlist_entry *new, *pe;
+	size_t path_len = strlen(path);
 
 	if (inserted)
 		*inserted = NULL;
-
-	new = malloc(sizeof(*new));
-	if (new == NULL)
-		return got_error_from_errno("malloc");
-	new->path = path;
-	new->path_len = strlen(path);
-	new->data = data;
 
 	/*
 	 * Many callers will provide paths in a somewhat sorted order while
@@ -245,21 +239,24 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	 */
 	pe = TAILQ_LAST(pathlist, got_pathlist_head);
 	while (pe) {
-		int cmp = got_path_cmp(pe->path, new->path,
-		    pe->path_len, new->path_len);
-		if (cmp == 0) {
-			free(new); /* duplicate */
-			return NULL;
-		} else if (cmp < 0) {
-			TAILQ_INSERT_AFTER(pathlist, pe, new, entry);
-			if (inserted)
-				*inserted = new;
-			return NULL;
-		}
+		int cmp = got_path_cmp(pe->path, path, pe->path_len, path_len);
+		if (cmp == 0)
+			return NULL;  /* duplicate */
+		else if (cmp < 0)
+			break;
 		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
 	}
 
-	TAILQ_INSERT_HEAD(pathlist, new, entry);
+	new = malloc(sizeof(*new));
+	if (new == NULL)
+		return got_error_from_errno("malloc");
+	new->path = path;
+	new->path_len = path_len;
+	new->data = data;
+	if (pe)
+		TAILQ_INSERT_AFTER(pathlist, pe, new, entry);
+	else
+		TAILQ_INSERT_HEAD(pathlist, new, entry);
 	if (inserted)
 		*inserted = new;
 	return NULL;
