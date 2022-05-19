@@ -1945,7 +1945,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	    ntheirs, ours, nours, repo, loose_obj_only,
 	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 	if (err)
-		return err;
+		goto done;
 
 	if (progress_cb) {
 		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
