@@ -49,7 +49,7 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
-read_tree_object(struct got_pathlist_head *entries, int *nentries,
+read_tree_object(struct got_parsed_tree_entry **entries, int *nentries,
     uint8_t **p, FILE *f, struct got_object_id *expected_id)
 {
 	const struct got_error *err = NULL;
@@ -125,12 +125,10 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg imsg;
 		FILE *f = NULL;
-		struct got_pathlist_head entries;
+		struct got_parsed_tree_entry *entries = NULL;
 		int nentries = 0;
 		uint8_t *buf = NULL;
 		struct got_object_id expected_id;
-
-		TAILQ_INIT(&entries);
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -176,9 +174,9 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
-		err = got_privsep_send_tree(&ibuf, &entries, nentries);
+		err = got_privsep_send_tree(&ibuf, entries, nentries);
 done:
-		got_object_parsed_tree_entries_free(&entries);
+		free(entries);
 		free(buf);
 		if (f) {
 			if (fclose(f) == EOF && err == NULL)

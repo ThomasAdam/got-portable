@@ -1489,14 +1489,13 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
-    int nentries)
+got_privsep_send_tree(struct imsgbuf *ibuf,
+    struct got_parsed_tree_entry *entries, int nentries)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_tree_object itree;
-	struct got_pathlist_entry *pe;
 	size_t totlen;
-	int nimsg; /* number of imsg queued in ibuf */
+	int i, nimsg; /* number of imsg queued in ibuf */
 
 	itree.nentries = nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
@@ -1505,12 +1504,10 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
 
 	totlen = sizeof(itree);
 	nimsg = 1;
-	TAILQ_FOREACH(pe, entries, entry) {
-		const char *name = pe->path;
-		struct got_parsed_tree_entry *pte = pe->data;
+	for (i = 0; i < nentries; i++) {
+		struct got_parsed_tree_entry *pte = &entries[i];
 		struct ibuf *wbuf;
-		size_t namelen = strlen(name);
-		size_t len = sizeof(struct got_imsg_tree_entry) + namelen;
+		size_t len = sizeof(struct got_imsg_tree_entry) + pte->namelen;
 
 		if (len > MAX_IMSGSIZE)
 			return got_error(GOT_ERR_NO_SPACE);
@@ -1539,7 +1536,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
 			return err;
 		}
 
-		if (imsg_add(wbuf, name, namelen) == -1) {
+		if (imsg_add(wbuf, pte->name, pte->namelen) == -1) {
 			err = got_error_from_errno("imsg_add TREE_ENTRY");
 			ibuf_free(wbuf);
 			return err;

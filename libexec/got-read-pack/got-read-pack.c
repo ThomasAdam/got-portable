@@ -176,7 +176,7 @@ done:
 }
 
 static const struct got_error *
-open_tree(uint8_t **buf, struct got_pathlist_head *entries, int *nentries,
+open_tree(uint8_t **buf, struct got_parsed_tree_entry **entries, int *nentries,
     struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
     struct got_object_id *id, struct got_object_cache *objcache)
 {
@@ -219,13 +219,11 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
-	struct got_pathlist_head entries;
+	struct got_parsed_tree_entry *entries = NULL;
 	int nentries = 0;
 	uint8_t *buf = NULL;
 	struct got_object_id id;
 	size_t datalen;
-
-	TAILQ_INIT(&entries);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(iobj))
@@ -238,8 +236,8 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (err)
 		return err;
 
-	err = got_privsep_send_tree(ibuf, &entries, nentries);
-	got_object_parsed_tree_entries_free(&entries);
+	err = got_privsep_send_tree(ibuf, entries, nentries);
+	free(entries);
 	free(buf);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
@@ -426,28 +424,30 @@ done:
 }
 
 static struct got_parsed_tree_entry *
-find_entry_by_name(struct got_pathlist_head *entries, int nentries,
+find_entry_by_name(struct got_parsed_tree_entry *entries, int nentries,
     const char *name, size_t len)
 {
-	struct got_pathlist_entry *pe;
+	struct got_parsed_tree_entry *pte;
+	int cmp, i;
 
 	/* Note that tree entries are sorted in strncmp() order. */
-	TAILQ_FOREACH(pe, entries, entry) {
-		int cmp = strncmp(pe->path, name, len);
+	for (i = 0; i < nentries; i++) {
+		pte = &entries[i];
+		cmp = strncmp(pte->name, name, len);
 		if (cmp < 0)
 			continue;
 		if (cmp > 0)
 			break;
-		if (pe->path[len] == '\0')
-			return (struct got_parsed_tree_entry *)pe->data;
+		if (pte->name[len] == '\0')
+			return pte;
 	}
 	return NULL;
 }
 
 static const struct got_error *
 tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
-    struct got_pathlist_head *entries1, int *nentries1,
-    struct got_pathlist_head *entries2, int *nentries2,
+    struct got_parsed_tree_entry **entries1, int *nentries1,
+    struct got_parsed_tree_entry **entries2, int *nentries2,
     const char *path, struct got_pack *pack, struct got_packidx *packidx,
     struct imsgbuf *ibuf, struct got_object_cache *objcache)
 {
@@ -475,13 +475,13 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 				continue;
 		}
 
-		pte1 = find_entry_by_name(entries1, *nentries1, seg, seglen);
+		pte1 = find_entry_by_name(*entries1, *nentries1, seg, seglen);
 		if (pte1 == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			break;
 		}
 
-		pte2 = find_entry_by_name(entries2, *nentries2, seg, seglen);
+		pte2 = find_entry_by_name(*entries2, *nentries2, seg, seglen);
 		if (pte2 == NULL) {
 			*changed = 1;
 			break;
@@ -515,7 +515,7 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 				err = got_error_no_obj(&id1);
 				break;
 			}
-			got_object_parsed_tree_entries_free(entries1);
+			free(*entries1);
 			*nentries1 = 0;
 			free(*buf1);
 			*buf1 = NULL;
@@ -531,7 +531,7 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 				err = got_error_no_obj(&id2);
 				break;
 			}
-			got_object_parsed_tree_entries_free(entries2);
+			free(*entries2);
 			*nentries2 = 0;
 			free(*buf2);
 			*buf2 = NULL;
@@ -601,7 +601,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	struct got_imsg_packed_object iobj;
 	struct got_object_qid *pid;
 	struct got_commit_object *commit = NULL, *pcommit = NULL;
-	struct got_pathlist_head entries, pentries;
+	struct got_parsed_tree_entry *entries = NULL, *pentries = NULL;
 	int nentries = 0, pnentries = 0;
 	struct got_object_id id;
 	size_t datalen, path_len;
@@ -609,9 +609,6 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	const int min_alloc = 64;
 	int changed = 0, ncommits = 0, nallocated = 0;
 	struct got_object_id *commit_ids = NULL;
-
-	TAILQ_INIT(&entries);
-	TAILQ_INIT(&pentries);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen < sizeof(iobj))
@@ -730,10 +727,12 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			    &entries, &nentries, &pentries, &pnentries, path,
 			    pack, packidx, ibuf, objcache);
 
-			got_object_parsed_tree_entries_free(&entries);
+			free(entries);
+			entries = NULL;
 			nentries = 0;
 			free(buf);
-			got_object_parsed_tree_entries_free(&pentries);
+			free(pentries);
+			pentries = NULL;
 			pnentries = 0;
 			free(pbuf);
 			if (err) {
@@ -770,10 +769,8 @@ done:
 		got_object_commit_close(commit);
 	if (pcommit)
 		got_object_commit_close(pcommit);
-	if (nentries != 0)
-		got_object_parsed_tree_entries_free(&entries);
-	if (pnentries != 0)
-		got_object_parsed_tree_entries_free(&pentries);
+	free(entries);
+	free(pentries);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;

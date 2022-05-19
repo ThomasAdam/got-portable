@@ -662,8 +662,9 @@ const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
+struct got_parsed_tree_entry;
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
-    struct got_pathlist_head *, int);
+    struct got_parsed_tree_entry *, int);
 const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t, size_t,
     const uint8_t *);
 const struct got_error *got_privsep_recv_blob(uint8_t **, size_t *, size_t *,
