@@ -192,7 +192,6 @@ static const struct got_error *
 send_their_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
     const char *refname)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, reflen = strlen(refname);
 
@@ -205,21 +204,12 @@ send_their_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 		return got_error_from_errno("imsg_create SEND_REMOTE_REF");
 
 	/* Keep in sync with struct got_imsg_send_remote_ref definition! */
-	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REMOTE_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &reflen, sizeof(reflen)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REMOTE_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, refname, reflen) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REMOTE_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_add SEND_REMOTE_REF");
+	if (imsg_add(wbuf, &reflen, sizeof(reflen)) == -1)
+		return got_error_from_errno("imsg_add SEND_REMOTE_REF");
+	if (imsg_add(wbuf, refname, reflen) == -1)
+		return got_error_from_errno("imsg_add SEND_REMOTE_REF");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
@@ -230,7 +220,6 @@ static const struct got_error *
 send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
     struct got_pathlist_head *refs, struct got_pathlist_head *delete_refs)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, reflen = strlen(refname);
 	struct got_pathlist_entry *pe;
@@ -273,21 +262,12 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 		return got_error_from_errno("imsg_create SEND_REF_STATUS");
 
 	/* Keep in sync with struct got_imsg_send_ref_status definition! */
-	if (imsg_add(wbuf, &success, sizeof(success)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF_STATUS");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &reflen, sizeof(reflen)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF_STATUS");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, refname, reflen) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF_STATUS");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &success, sizeof(success)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF_STATUS");
+	if (imsg_add(wbuf, &reflen, sizeof(reflen)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF_STATUS");
+	if (imsg_add(wbuf, refname, reflen) == -1)
+		return got_error_from_errno("imsg_add SEND_REF_STATUS");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);

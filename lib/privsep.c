@@ -308,18 +308,12 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 		return err;
 	}
 
-	if (imsg_add(wbuf, &iobj, sizeof(iobj)) == -1) {
-		err = got_error_from_errno("imsg_add RAW_OBJECT");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &iobj, sizeof(iobj)) == -1)
+		return got_error_from_errno("imsg_add RAW_OBJECT");
 
 	if (data && size + hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
-		if (imsg_add(wbuf, data, size + hdrlen) == -1) {
-			err = got_error_from_errno("imsg_add RAW_OBJECT");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, data, size + hdrlen) == -1)
+			return got_error_from_errno("imsg_add RAW_OBJECT");
 	}
 
 	wbuf->fd = -1;
@@ -415,7 +409,6 @@ const struct got_error *
 got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len;
 
@@ -428,18 +421,12 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TREE_REQUEST");
 
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add TREE_REQUEST");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_add TREE_REQUEST");
 
 	if (pack_idx != -1) { /* tree is packed */
-		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1) {
-			err = got_error_from_errno("imsg_add TREE_REQUEST");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1)
+			return got_error_from_errno("imsg_add TREE_REQUEST");
 	}
 
 	wbuf->fd = fd;
@@ -610,21 +597,12 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return got_error_from_errno("imsg_create FETCH_HAVE_REF");
 
 		/* Keep in sync with struct got_imsg_fetch_have_ref! */
-		if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1)
+			return got_error_from_errno("imsg_add FETCH_HAVE_REF");
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
+			return got_error_from_errno("imsg_add FETCH_HAVE_REF");
+		if (imsg_add(wbuf, name, name_len) == -1)
+			return got_error_from_errno("imsg_add FETCH_HAVE_REF");
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
@@ -645,18 +623,12 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			    "imsg_create FETCH_WANTED_BRANCH");
 
 		/* Keep in sync with struct got_imsg_fetch_wanted_branch! */
-		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
+			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_BRANCH");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, name, name_len) == -1)
+			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_BRANCH");
-			ibuf_free(wbuf);
-			return err;
-		}
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
@@ -677,18 +649,12 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			    "imsg_create FETCH_WANTED_REF");
 
 		/* Keep in sync with struct got_imsg_fetch_wanted_ref! */
-		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
+			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_REF");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno(
+		if (imsg_add(wbuf, name, name_len) == -1)
+			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_REF");
-			ibuf_free(wbuf);
-			return err;
-		}
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
@@ -867,7 +833,6 @@ static const struct got_error *
 send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
     int delete, struct imsgbuf *ibuf)
 {
-	const struct got_error *err = NULL;
 	size_t len;
 	struct ibuf *wbuf;
 
@@ -877,26 +842,14 @@ send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
 		return got_error_from_errno("imsg_create SEND_REF");
 
 	/* Keep in sync with struct got_imsg_send_ref! */
-	if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &delete, sizeof(delete)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, name, name_len) == -1) {
-		err = got_error_from_errno("imsg_add SEND_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF");
+	if (imsg_add(wbuf, &delete, sizeof(delete)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF");
+	if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF");
+	if (imsg_add(wbuf, name, name_len) == -1)
+		return got_error_from_errno("imsg_add SEND_REF");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
@@ -1492,7 +1445,6 @@ static const struct got_error *
 send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
     int idx0, int idxN, size_t len)
 {
-	static const struct got_error *err;
 	struct ibuf *wbuf;
 	struct got_imsg_tree_entries ientries;
 	int i;
@@ -1502,38 +1454,23 @@ send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
 		return got_error_from_errno("imsg_create TREE_ENTRY");
 
 	ientries.nentries = idxN - idx0 + 1;
-	if (imsg_add(wbuf, &ientries, sizeof(ientries)) == -1) {
-		err = got_error_from_errno("imsg_add TREE_ENTRY");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &ientries, sizeof(ientries)) == -1)
+		return got_error_from_errno("imsg_add TREE_ENTRY");
 
 	for (i = idx0; i <= idxN; i++) {
 		struct got_parsed_tree_entry *pte = &entries[i];
 
 		/* Keep in sync with struct got_imsg_tree_object definition! */
-		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &pte->namelen, sizeof(pte->namelen)) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
+		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
+		if (imsg_add(wbuf, &pte->namelen, sizeof(pte->namelen)) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
 		
 		/* Remaining bytes are the entry's name. */
-		if (imsg_add(wbuf, pte->name, pte->namelen) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, pte->name, pte->namelen) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
 	}
 
 	wbuf->fd = -1;
@@ -2692,7 +2629,6 @@ const struct got_error *
 got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
     struct got_object_id *id, int idx, const char *path)
 {
-	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t path_len = strlen(path) + 1;
 
@@ -2701,21 +2637,15 @@ got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
 	if (wbuf == NULL)
 		return got_error_from_errno(
 		    "imsg_create COMMIT_TRAVERSAL_REQUEST");
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &idx, sizeof(idx)) == -1) {
-		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, path, path_len) == -1) {
-		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_add "
+		    "COMMIT_TRAVERSAL_REQUEST");
+	if (imsg_add(wbuf, &idx, sizeof(idx)) == -1)
+		return got_error_from_errno("imsg_add "
+		    "COMMIT_TRAVERSAL_REQUEST");
+	if (imsg_add(wbuf, path, path_len) == -1)
+		return got_error_from_errno("imsg_add "
+		    "COMMIT_TRAVERSAL_REQUEST");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
@@ -2923,19 +2853,13 @@ got_privsep_send_object_idlist(struct imsgbuf *ibuf,
 	}
 
 	idlist.nids = nids;
-	if (imsg_add(wbuf, &idlist, sizeof(idlist)) == -1) {
-		err = got_error_from_errno("imsg_add OBJ_ID_LIST");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &idlist, sizeof(idlist)) == -1)
+		return got_error_from_errno("imsg_add OBJ_ID_LIST");
 
 	for (i = 0; i < nids; i++) {
 		struct got_object_id *id = ids[i];
-		if (imsg_add(wbuf, id, sizeof(*id)) == -1) {
-			err = got_error_from_errno("imsg_add OBJ_ID_LIST");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, id, sizeof(*id)) == -1)
+			return got_error_from_errno("imsg_add OBJ_ID_LIST");
 	}
 	
 	wbuf->fd = -1;
@@ -3035,19 +2959,13 @@ got_privsep_send_reused_deltas(struct imsgbuf *ibuf,
 	}
 
 	ideltas.ndeltas = ndeltas;
-	if (imsg_add(wbuf, &ideltas, sizeof(ideltas)) == -1) {
-		err = got_error_from_errno("imsg_add REUSED_DELTAS");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, &ideltas, sizeof(ideltas)) == -1)
+		return got_error_from_errno("imsg_add REUSED_DELTAS");
 
 	for (i = 0; i < ndeltas; i++) {
 		struct got_imsg_reused_delta *delta = &deltas[i];
-		if (imsg_add(wbuf, delta, sizeof(*delta)) == -1) {
-			err = got_error_from_errno("imsg_add REUSED_DELTAS");
-			ibuf_free(wbuf);
-			return err;
-		}
+		if (imsg_add(wbuf, delta, sizeof(*delta)) == -1)
+			return got_error_from_errno("imsg_add REUSED_DELTAS");
 	}
 	
 	wbuf->fd = -1;
