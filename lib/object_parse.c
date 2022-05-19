@@ -669,89 +669,87 @@ got_object_tree_close(struct got_tree_object *tree)
 }
 
 static const struct got_error *
-parse_tree_entry(struct got_parsed_tree_entry **pte, const char **name,
-    size_t *elen, char *buf,
+parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen, char *buf,
     size_t maxlen)
 {
 	char *p, *space;
-	const struct got_error *err = NULL;
 
-	*name = NULL;
 	*elen = 0;
 
-	*pte = malloc(sizeof(**pte));
-	if (*pte == NULL)
-		return got_error_from_errno("malloc");
-
 	*elen = strnlen(buf, maxlen) + 1;
-	if (*elen > maxlen) {
-		free(*pte);
-		*pte = NULL;
+	if (*elen > maxlen)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
-	}
 
 	space = memchr(buf, ' ', *elen);
-	if (space == NULL || space <= buf) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		free(*pte);
-		*pte = NULL;
-		return err;
-	}
-	(*pte)->mode = 0;
+	if (space == NULL || space <= buf)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
+	pte->mode = 0;
 	p = buf;
 	while (p < space) {
-		if (*p < '0' && *p > '7') {
-			err = got_error(GOT_ERR_BAD_OBJ_DATA);
-			goto done;
-		}
-		(*pte)->mode <<= 3;
-		(*pte)->mode |= *p - '0';
+		if (*p < '0' && *p > '7')
+			return got_error(GOT_ERR_BAD_OBJ_DATA);
+		pte->mode <<= 3;
+		pte->mode |= *p - '0';
 		p++;
 	}
 
-	if (*elen > maxlen || maxlen - *elen < SHA1_DIGEST_LENGTH) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-	*name = space + 1;
+	if (*elen > maxlen || maxlen - *elen < SHA1_DIGEST_LENGTH)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
+	pte->name = space + 1;
+	pte->namelen = strlen(pte->name);
 	buf += *elen;
-	(*pte)->id = buf;
+	pte->id = buf;
 	*elen += SHA1_DIGEST_LENGTH;
-done:
-	if (err) {
-		free(*pte);
-		*pte = NULL;
-	}
-	return err;
+	return NULL;
+}
+
+static int
+pte_cmp(const void *pa, const void *pb)
+{
+	const struct got_parsed_tree_entry *a = pa, *b = pb;
+
+	return got_path_cmp(a->name, b->name, a->namelen, b->namelen);
 }
 
 const struct got_error *
-got_object_parse_tree(struct got_pathlist_head *entries, int *nentries,
+got_object_parse_tree(struct got_parsed_tree_entry **entries, int *nentries,
     uint8_t *buf, size_t len)
 {
 	const struct got_error *err = NULL;
-	size_t remain = len;
+	size_t remain = len, totalloc;
+	const size_t nalloc = 16;
+	struct got_parsed_tree_entry *pte;
+	int i;
 
 	*nentries = 0;
 	if (remain == 0)
 		return NULL; /* tree is empty */
 
+	*entries = calloc(nalloc, sizeof(**entries));
+	if (*entries == NULL)
+		return got_error_from_errno("calloc");
+	totalloc = nalloc;
+
 	while (remain > 0) {
-		struct got_parsed_tree_entry *pte;
-		struct got_pathlist_entry *new = NULL;
-		const char *name;
 		size_t elen;
 
-		err = parse_tree_entry(&pte, &name, &elen, buf, remain);
-		if (err)
-			goto done;
-		err = got_pathlist_insert(&new, entries, name, pte);
-		if (err)
-			goto done;
-		if (new == NULL) {
-			err = got_error(GOT_ERR_TREE_DUP_ENTRY);
-			goto done;
+		if (*nentries >= totalloc) {
+			pte = recallocarray(*entries, totalloc,
+			    totalloc + nalloc, sizeof(**entries));
+			if (pte == NULL) {
+				err = got_error_from_errno("recallocarray");
+				goto done;
+			}
+			*entries = pte;
+			totalloc += nalloc;
 		}
+
+		pte = &(*entries)[*nentries];
+		err = parse_tree_entry(pte, &elen, buf, remain);
+		if (err)
+			goto done;
 		buf += elen;
 		remain -= elen;
 		(*nentries)++;
@@ -761,24 +759,27 @@ got_object_parse_tree(struct got_pathlist_head *entries, int *nentries,
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
+
+	if (*nentries > 1) {
+		mergesort(*entries, *nentries, sizeof(**entries), pte_cmp);
+
+		for (i = 0; i < *nentries - 1; i++) {
+			struct got_parsed_tree_entry *prev = &(*entries)[i];
+			pte = &(*entries)[i + 1];
+			if (got_path_cmp(prev->name, pte->name,
+			    prev->namelen, pte->namelen) == 0) {
+				err = got_error(GOT_ERR_TREE_DUP_ENTRY);
+				break;
+			}
+		}
+	}
 done:
 	if (err) {
-		got_object_parsed_tree_entries_free(entries);
+		free(*entries);
+		*entries = NULL;
 		*nentries = 0;
 	}
 	return err;
-}
-
-void
-got_object_parsed_tree_entries_free(struct got_pathlist_head *entries)
-{
-	struct got_pathlist_entry *pe;
-
-	TAILQ_FOREACH(pe, entries, entry) {
-		struct got_parsed_tree_entry *pte = pe->data;
-		free(pte);
-	}
-	got_pathlist_free(entries);
 }
 
 void
