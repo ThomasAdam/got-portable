@@ -56,6 +56,8 @@
 #include "got_lib_ratelimit.h"
 #include "got_lib_inflate.h"
 
+#include "murmurhash2.h"
+
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
@@ -70,7 +72,7 @@
 
 struct got_pack_meta {
 	struct got_object_id id;
-	char	*path;
+	uint32_t path_hash;
 	int	obj_type;
 	off_t	size;
 	time_t	mtime;
@@ -105,7 +107,6 @@ static const struct got_error *
 alloc_meta(struct got_pack_meta **new, struct got_object_id *id,
     const char *path, int obj_type, time_t mtime)
 {
-	const struct got_error *err = NULL;
 	struct got_pack_meta *m;
 
 	*new = NULL;
@@ -116,13 +117,7 @@ alloc_meta(struct got_pack_meta **new, struct got_object_id *id,
 
 	memcpy(&m->id, id, sizeof(m->id));
 
-	m->path = strdup(path);
-	if (m->path == NULL) {
-		err = got_error_from_errno("strdup");
-		free(m);
-		return err;
-	}
-
+	m->path_hash = murmurhash2(path, strlen(path), 0xd70af26a);
 	m->obj_type = obj_type;
 	m->mtime = mtime;
 	*new = m;
@@ -134,8 +129,7 @@ clear_meta(struct got_pack_meta *meta)
 {
 	if (meta == NULL)
 		return;
-	free(meta->path);
-	meta->path = NULL;
+	meta->path_hash = 0;
 	free(meta->delta_buf);
 	meta->delta_buf = NULL;
 	free(meta->base_obj_id);
@@ -156,16 +150,16 @@ static int
 delta_order_cmp(const void *pa, const void *pb)
 {
 	struct got_pack_meta *a, *b;
-	int cmp;
 
 	a = *(struct got_pack_meta **)pa;
 	b = *(struct got_pack_meta **)pb;
 
 	if (a->obj_type != b->obj_type)
 		return a->obj_type - b->obj_type;
-	cmp = strcmp(a->path, b->path);
-	if (cmp != 0)
-		return cmp;
+	if (a->path_hash < b->path_hash)
+		return -1;
+	if (a->path_hash > b->path_hash)
+		return 1;
 	if (a->mtime < b->mtime)
 		return -1;
 	if (a->mtime > b->mtime)
