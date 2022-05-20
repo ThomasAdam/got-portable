@@ -52,6 +52,7 @@ struct bloom
   int bits;
   int bytes;
   int hashes;
+  uint32_t seed;
 
   // Fields below are private to the implementation. These may go away or
   // change incompatibly at any moment. Client code MUST NOT access or rely

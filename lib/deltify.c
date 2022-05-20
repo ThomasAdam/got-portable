@@ -88,9 +88,9 @@ static const uint32_t geartab[256] = {
 };
 
 static uint32_t
-hashblk(const unsigned char *p, off_t n)
+hashblk(const unsigned char *p, off_t n, uint32_t seed)
 {
-	return murmurhash2(p, n, 0x1d7c5ac3);
+	return murmurhash2(p, n, seed);
 }
 
 static const struct got_error *
@@ -237,7 +237,8 @@ addblk_mem(struct got_delta_table *dt, uint8_t *data, off_t file_offset0,
 
 static const struct got_error *
 lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
-    unsigned char *p, off_t len, FILE *basefile, off_t basefile_offset0)
+    unsigned char *p, off_t len, uint32_t seed, FILE *basefile,
+    off_t basefile_offset0)
 {
 	int i;
 	uint32_t h;
@@ -246,7 +247,7 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 
 	*block = NULL;
 
-	h = hashblk(p, len);
+	h = hashblk(p, len, seed);
 	for (i = h % dt->nalloc; dt->blocks[i].len != 0;
 	     i = (i + 1) % dt->nalloc) {
 		if (dt->blocks[i].hash != h ||
@@ -268,7 +269,8 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 
 static const struct got_error *
 lookupblk_mem(struct got_delta_block **block, struct got_delta_table *dt,
-    unsigned char *p, off_t len, uint8_t *basedata, off_t basefile_offset0)
+    unsigned char *p, off_t len, uint32_t seed, uint8_t *basedata,
+    off_t basefile_offset0)
 {
 	int i;
 	uint32_t h;
@@ -276,7 +278,7 @@ lookupblk_mem(struct got_delta_block **block, struct got_delta_table *dt,
 
 	*block = NULL;
 
-	h = hashblk(p, len);
+	h = hashblk(p, len, seed);
 	for (i = h % dt->nalloc; dt->blocks[i].len != 0;
 	     i = (i + 1) % dt->nalloc) {
 		if (dt->blocks[i].hash != h ||
@@ -350,7 +352,7 @@ nextblk_mem(off_t *blocklen, uint8_t *data, off_t fileoffset, off_t filesize)
 
 const struct got_error *
 got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
-    off_t filesize)
+    off_t filesize, uint32_t seed)
 {
 	const struct got_error *err = NULL;
 	uint32_t h;
@@ -379,7 +381,7 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 			goto done;
 		if (blocklen == 0)
 			break;
-		h = hashblk(buf, blocklen);
+		h = hashblk(buf, blocklen, seed);
 		err = addblk(*dt, f, offset0, blocklen,
 		    fileoffset - offset0, h);
 		if (err)
@@ -400,7 +402,7 @@ done:
 
 const struct got_error *
 got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
-    off_t fileoffset, off_t filesize)
+    off_t fileoffset, off_t filesize, uint32_t seed)
 {
 	const struct got_error *err = NULL;
 	uint32_t h;
@@ -425,7 +427,7 @@ got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
 			goto done;
 		if (blocklen == 0)
 			break;
-		h = hashblk(data + fileoffset, blocklen);
+		h = hashblk(data + fileoffset, blocklen, seed);
 		err = addblk_mem(*dt, data, offset0, blocklen,
 		    fileoffset - offset0, h);
 		if (err)
@@ -621,7 +623,7 @@ stretchblk_mem_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
 
 const struct got_error *
 got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
-    FILE *f, off_t fileoffset, off_t filesize,
+    FILE *f, off_t fileoffset, off_t filesize, uint32_t seed,
     struct got_delta_table *dt, FILE *basefile,
     off_t basefile_offset0, off_t basefile_size)
 {
@@ -663,7 +665,7 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			}
 			break;
 		}
-		err = lookupblk(&block, dt, buf, blocklen, basefile,
+		err = lookupblk(&block, dt, buf, blocklen, seed, basefile,
 		    basefile_offset0);
 		if (err)
 			break;
@@ -708,7 +710,7 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 
 const struct got_error *
 got_deltify_file_mem(struct got_delta_instruction **deltas, int *ndeltas,
-    FILE *f, off_t fileoffset, off_t filesize,
+    FILE *f, off_t fileoffset, off_t filesize, uint32_t seed,
     struct got_delta_table *dt, uint8_t *basedata,
     off_t basefile_offset0, off_t basefile_size)
 {
@@ -750,7 +752,7 @@ got_deltify_file_mem(struct got_delta_instruction **deltas, int *ndeltas,
 			}
 			break;
 		}
-		err = lookupblk_mem(&block, dt, buf, blocklen, basedata,
+		err = lookupblk_mem(&block, dt, buf, blocklen, seed, basedata,
 		    basefile_offset0);
 		if (err)
 			break;
@@ -795,7 +797,7 @@ got_deltify_file_mem(struct got_delta_instruction **deltas, int *ndeltas,
 
 const struct got_error *
 got_deltify_mem_file(struct got_delta_instruction **deltas, int *ndeltas,
-    uint8_t *data, off_t fileoffset, off_t filesize,
+    uint8_t *data, off_t fileoffset, off_t filesize, uint32_t seed,
     struct got_delta_table *dt, FILE *basefile,
     off_t basefile_offset0, off_t basefile_size)
 {
@@ -828,7 +830,7 @@ got_deltify_mem_file(struct got_delta_instruction **deltas, int *ndeltas,
 			}
 			break;
 		}
-		err = lookupblk(&block, dt, data + fileoffset, blocklen,
+		err = lookupblk(&block, dt, data + fileoffset, blocklen, seed,
 		    basefile, basefile_offset0);
 		if (err)
 			break;
@@ -870,7 +872,7 @@ got_deltify_mem_file(struct got_delta_instruction **deltas, int *ndeltas,
 
 const struct got_error *
 got_deltify_mem_mem(struct got_delta_instruction **deltas, int *ndeltas,
-    uint8_t *data, off_t fileoffset, off_t filesize,
+    uint8_t *data, off_t fileoffset, off_t filesize, uint32_t seed,
     struct got_delta_table *dt, uint8_t *basedata,
     off_t basefile_offset0, off_t basefile_size)
 {
@@ -904,7 +906,7 @@ got_deltify_mem_mem(struct got_delta_instruction **deltas, int *ndeltas,
 			break;
 		}
 		err = lookupblk_mem(&block, dt, data + fileoffset, blocklen,
-		    basedata, basefile_offset0);
+		    seed, basedata, basefile_offset0);
 		if (err)
 			break;
 		if (block != NULL) {
