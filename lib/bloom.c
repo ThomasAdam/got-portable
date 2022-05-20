@@ -77,7 +77,7 @@ static int bloom_check_add(struct bloom * bloom,
   }
 
   int hits = 0;
-  register unsigned int a = murmurhash2(buffer, len, 0x9747b28c);
+  register unsigned int a = murmurhash2(buffer, len, bloom->seed);
   register unsigned int b = murmurhash2(buffer, len, a);
   register unsigned int x;
   register unsigned int i;
@@ -110,6 +110,8 @@ int bloom_init_size(struct bloom * bloom, int entries, double error,
 int bloom_init(struct bloom * bloom, int entries, double error)
 {
   bloom->ready = 0;
+
+  bloom->seed = arc4random();
 
   if (entries < 1000 || error == 0) {
     return 1;

@@ -40,6 +40,9 @@ deltify_abc_axc(void)
 	struct got_delta_instruction *deltas;
 	int ndeltas;
 	int have_nblocks = 0;
+	uint32_t seed;
+
+	seed = arc4random();
 
 	base_file = got_opentemp();
 	if (base_file == NULL)
@@ -69,7 +72,8 @@ deltify_abc_axc(void)
 	rewind(base_file);
 	rewind(derived_file);
 
-	err = got_deltify_init(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK);
+	err = got_deltify_init(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK,
+	    seed);
 	if (err)
 		goto done;
 
@@ -83,7 +87,7 @@ deltify_abc_axc(void)
 	}
 
 	err = got_deltify(&deltas, &ndeltas, derived_file, 0,
-	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_file, 0,
+	    3 * GOT_DELTIFY_MAXCHUNK, seed, dt, base_file, 0,
 	    3 * GOT_DELTIFY_MAXCHUNK);
 	if (err)
 		goto done;
@@ -131,6 +135,9 @@ deltify_abc_axc_file_mem(void)
 	struct got_delta_instruction *deltas;
 	int ndeltas;
 	int have_nblocks = 0;
+	uint32_t seed;
+
+	seed = arc4random();
 
 	derived_file = got_opentemp();
 	if (derived_file == NULL)
@@ -155,7 +162,8 @@ deltify_abc_axc_file_mem(void)
 
 	rewind(derived_file);
 
-	err = got_deltify_init_mem(&dt, base_data, 0, 3 * GOT_DELTIFY_MAXCHUNK);
+	err = got_deltify_init_mem(&dt, base_data, 0, 3 * GOT_DELTIFY_MAXCHUNK,
+	    seed);
 	if (err)
 		goto done;
 
@@ -169,7 +177,7 @@ deltify_abc_axc_file_mem(void)
 	}
 
 	err = got_deltify_file_mem(&deltas, &ndeltas, derived_file, 0,
-	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_data, 0,
+	    3 * GOT_DELTIFY_MAXCHUNK, seed, dt, base_data, 0,
 	    3 * GOT_DELTIFY_MAXCHUNK);
 	if (err)
 		goto done;
@@ -216,6 +224,9 @@ deltify_abc_axc_mem_file(void)
 	struct got_delta_instruction *deltas;
 	int ndeltas;
 	int have_nblocks = 0;
+	uint32_t seed;
+
+	seed = arc4random();
 
 	base_file = got_opentemp();
 	if (base_file == NULL)
@@ -240,7 +251,8 @@ deltify_abc_axc_mem_file(void)
 
 	rewind(base_file);
 
-	err = got_deltify_init(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK);
+	err = got_deltify_init(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK,
+	    seed);
 	if (err)
 		goto done;
 
@@ -254,7 +266,7 @@ deltify_abc_axc_mem_file(void)
 	}
 
 	err = got_deltify_mem_file(&deltas, &ndeltas, derived_file, 0,
-	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_file, 0,
+	    3 * GOT_DELTIFY_MAXCHUNK, seed, dt, base_file, 0,
 	    3 * GOT_DELTIFY_MAXCHUNK);
 	if (err)
 		goto done;
@@ -302,6 +314,9 @@ deltify_abc_axc_mem_mem(void)
 	struct got_delta_instruction *deltas;
 	int ndeltas;
 	int have_nblocks = 0;
+	uint32_t seed;
+
+	seed = arc4random();
 
 	result_file = got_opentemp();
 	if (result_file == NULL)
@@ -320,7 +335,8 @@ deltify_abc_axc_mem_mem(void)
 		derived_file[2 * GOT_DELTIFY_MAXCHUNK + i] = 'c';
 	}
 
-	err = got_deltify_init_mem(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK);
+	err = got_deltify_init_mem(&dt, base_file, 0, 3 * GOT_DELTIFY_MAXCHUNK,
+	    seed);
 	if (err)
 		goto done;
 
@@ -334,7 +350,7 @@ deltify_abc_axc_mem_mem(void)
 	}
 
 	err = got_deltify_mem_mem(&deltas, &ndeltas, derived_file, 0,
-	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_file, 0,
+	    3 * GOT_DELTIFY_MAXCHUNK, seed, dt, base_file, 0,
 	    3 * GOT_DELTIFY_MAXCHUNK);
 	if (err)
 		goto done;
