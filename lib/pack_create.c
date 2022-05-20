@@ -954,6 +954,8 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 			err = got_object_qid_alloc(&qid, id);
 			if (err)
 				break;
+			qid->data = p;
+			p = NULL;
 			STAILQ_INSERT_TAIL(ids, qid, entry);
 		} else if (S_ISREG(mode) || S_ISLNK(mode)) {
 			err = add_object(want_meta,
@@ -963,9 +965,12 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 			    progress_cb, progress_arg, rl);
 			if (err)
 				break;
+			free(p);
+			p = NULL;
+		} else {
+			free(p);
+			p = NULL;
 		}
-		free(p);
-		p = NULL;
 	}
 
 	got_object_tree_close(tree);
@@ -993,11 +998,18 @@ load_tree(int want_meta, struct got_object_idset *idset,
 	err = got_object_qid_alloc(&qid, tree_id);
 	if (err)
 		return err;
+	qid->data = strdup(dpath);
+	if (qid->data == NULL) {
+		err = got_error_from_errno("strdup");
+		got_object_qid_free(qid);
+		return err;
+	}
 
 	STAILQ_INIT(&tree_ids);
 	STAILQ_INSERT_TAIL(&tree_ids, qid, entry);
 
 	while (!STAILQ_EMPTY(&tree_ids)) {
+		const char *path;
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
@@ -1006,32 +1018,38 @@ load_tree(int want_meta, struct got_object_idset *idset,
 
 		qid = STAILQ_FIRST(&tree_ids);
 		STAILQ_REMOVE_HEAD(&tree_ids, entry);
+		path = qid->data;
 
 		if (got_object_idset_contains(idset, &qid->id) ||
 		    got_object_idset_contains(idset_exclude, &qid->id)) {
+			free(qid->data);
 			got_object_qid_free(qid);
 			continue;
 		}
 
 		err = add_object(want_meta, want_meta ? idset : idset_exclude,
-		    &qid->id, dpath, GOT_OBJ_TYPE_TREE,
+		    &qid->id, path, GOT_OBJ_TYPE_TREE,
 		    mtime, loose_obj_only, repo,
 		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl);
 		if (err) {
+			free(qid->data);
 			got_object_qid_free(qid);
 			break;
 		}
 
 		err = load_tree_entries(&tree_ids, want_meta, idset,
 		    idset_exclude, &qid->id,
-		    dpath, mtime, repo, loose_obj_only, ncolored, nfound,
+		    path, mtime, repo, loose_obj_only, ncolored, nfound,
 		    ntrees, progress_cb, progress_arg, rl,
 		    cancel_cb, cancel_arg);
+		free(qid->data);
 		got_object_qid_free(qid);
 		if (err)
 			break;
 	}
 
+	STAILQ_FOREACH(qid, &tree_ids, entry)
+		free(qid->data);
 	got_object_id_queue_free(&tree_ids);
 	return err;
 }
