@@ -86,7 +86,6 @@ struct got_pack_meta {
 	off_t	delta_compressed_len; /* encoded+compressed delta length */
 	int	nchain;
 
-	int	have_reused_delta;
 	off_t   reused_delta_offset; /* offset of delta in reused pack file */
 	struct got_object_id *base_obj_id;
 
@@ -134,6 +133,7 @@ clear_meta(struct got_pack_meta *meta)
 	meta->delta_buf = NULL;
 	free(meta->base_obj_id);
 	meta->base_obj_id = NULL;
+	meta->reused_delta_offset = 0;
 }
 
 static void
@@ -585,7 +585,6 @@ recv_reused_delta(struct got_imsg_reused_delta *delta,
 	m->delta_offset = delta->delta_out_offset;
 	m->prev = base;
 	m->size = delta->result_size;
-	m->have_reused_delta = 1;
 	m->reused_delta_offset = delta->delta_offset;
 	m->base_obj_id = got_object_id_dup(&delta->base_id);
 	if (m->base_obj_id == NULL)
@@ -1922,7 +1921,7 @@ add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
 	struct got_pack_meta *m = data;
 	struct got_pack_metavec *v = arg;
 
-	if (m->have_reused_delta)
+	if (m->reused_delta_offset != 0)
 		return NULL;
 
 	return add_meta(m, v);
