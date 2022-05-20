@@ -681,7 +681,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int ncolored,
 	off_t size, best_size;
 	const int max_base_candidates = 3;
 	size_t delta_memsize = 0;
-	const size_t max_delta_memsize = 25 * GOT_DELTA_RESULT_SIZE_CACHED_MAX;
+	const size_t max_delta_memsize = 4 * GOT_DELTA_RESULT_SIZE_CACHED_MAX;
 	int outfd = -1;
 
 	qsort(meta, nmeta, sizeof(struct got_pack_meta *), delta_order_cmp);
