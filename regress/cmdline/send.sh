@@ -845,10 +845,16 @@ remote "origin" {
 EOF
 	got branch -r $testroot/repo foo
 
-	# modify alpha on branch foo
+	# modify beta on branch foo
 	got checkout -b foo $testroot/repo $testroot/wt > /dev/null
 	echo boo >> $testroot/wt/beta
 	(cd $testroot/wt && got commit -m 'changed beta on branch foo' \
+		> /dev/null)
+	echo buu >> $testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'changed beta again on branch foo' \
+		> /dev/null)
+	echo baa >> $testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'changed beta again on branch foo' \
 		> /dev/null)
 	local commit_id2=`git_show_branch_head $testroot/repo foo`
 

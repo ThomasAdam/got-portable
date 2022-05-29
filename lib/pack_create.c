@@ -1292,7 +1292,6 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
-				nskip++;
 			} else
 				(*ncolored)++;
 			err = got_object_idset_add(keep, &qid->id, NULL);
@@ -1308,7 +1307,6 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
-				nskip++;
 			} else
 				(*ncolored)++;
 			err = got_object_idset_add(drop, &qid->id, NULL);
