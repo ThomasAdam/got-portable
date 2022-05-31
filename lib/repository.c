@@ -791,9 +791,8 @@ got_repo_close(struct got_repository *repo)
 	}
 
 	for (i = 0; i < repo->pack_cache_size; i++) {
-		if (repo->packs[i].path_packfile == NULL)
-			break;
-		got_pack_close(&repo->packs[i]);
+		if (repo->packs[i].path_packfile)
+			got_pack_close(&repo->packs[i]);
 		if (repo->packs[i].basefd != -1) {
 			if (close(repo->packs[i].basefd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
