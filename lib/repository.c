@@ -44,6 +44,7 @@
 #include "got_path.h"
 #include "got_cancel.h"
 #include "got_object.h"
+#include "got_opentemp.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
@@ -694,6 +695,19 @@ got_repo_open(struct got_repository **repop, const char *path,
 	repo->pack_cache_size = GOT_PACK_CACHE_SIZE;
 	if (repo->pack_cache_size > rl.rlim_cur / 8)
 		repo->pack_cache_size = rl.rlim_cur / 8;
+	for (i = 0; i < nitems(repo->packs); i++) {
+		if (i < repo->pack_cache_size) {
+			repo->packs[i].basefd = got_opentempfd();
+			if (repo->packs[i].basefd == -1)
+				return got_error_from_errno("got_opentempfd");
+			repo->packs[i].accumfd = got_opentempfd();
+			if (repo->packs[i].accumfd == -1)
+				return got_error_from_errno("got_opentempfd");
+		} else {
+			repo->packs[i].basefd = -1;
+			repo->packs[i].accumfd = -1;
+		}
+	}
 
 	repo_path = realpath(path, NULL);
 	if (repo_path == NULL) {
@@ -780,6 +794,16 @@ got_repo_close(struct got_repository *repo)
 		if (repo->packs[i].path_packfile == NULL)
 			break;
 		got_pack_close(&repo->packs[i]);
+		if (repo->packs[i].basefd != -1) {
+			if (close(repo->packs[i].basefd) == -1 && err == NULL)
+				err = got_error_from_errno("close");
+			repo->packs[i].basefd = -1;
+		}
+		if (repo->packs[i].accumfd != -1) {
+			if (close(repo->packs[i].accumfd) == -1 && err == NULL)
+				err = got_error_from_errno("close");
+			repo->packs[i].accumfd = -1;
+		}
 	}
 
 	free(repo->path);
@@ -1321,6 +1345,10 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 		err = got_pack_close(&repo->packs[i - 1]);
 		if (err)
 			return err;
+		if (ftruncate(repo->packs[i - 1].basefd, 0L) == -1)
+			return got_error_from_errno("ftruncate");
+		if (ftruncate(repo->packs[i - 1].accumfd, 0L) == -1)
+			return got_error_from_errno("ftruncate");
 		memmove(&repo->packs[1], &repo->packs[0],
 		    sizeof(repo->packs) - sizeof(repo->packs[0]));
 		i = 0;

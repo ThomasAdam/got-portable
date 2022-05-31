@@ -294,7 +294,7 @@ cmd_info(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
@@ -306,7 +306,12 @@ cmd_info(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
-
+#ifndef PROFILE
+	/* Remove "cpath" promise. */
+	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
 	if (error)
 		goto done;
@@ -962,14 +967,19 @@ cmd_listpack(int argc, char *argv[])
 		return got_error_from_errno2("realpath", argv[0]);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
 	error = got_repo_open(&repo, packfile_path, NULL);
 	if (error)
 		goto done;
-
+#ifndef PROFILE
+	/* Remove "cpath" promise. */
+	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
 	if (error)
 		goto done;

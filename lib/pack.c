@@ -747,6 +747,11 @@ got_pack_close(struct got_pack *pack)
 		pack->delta_cache = NULL;
 	}
 
+	/*
+	 * Leave accumfd and basefd alone. They are managed by the
+	 * repository layer and can be reused.
+	 */
+
 	return err;
 }
 
