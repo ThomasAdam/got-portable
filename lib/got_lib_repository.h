@@ -28,7 +28,7 @@
 #define GOT_OBJECTS_PACK_DIR	"objects/pack"
 #define GOT_PACKED_REFS_FILE	"packed-refs"
 
-#define GOT_PACK_CACHE_SIZE	64
+#define GOT_PACK_CACHE_SIZE	32
 
 struct got_packidx_bloom_filter {
 	RB_ENTRY(got_packidx_bloom_filter) entry;
