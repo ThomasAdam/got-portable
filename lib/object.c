@@ -172,7 +172,7 @@ static const struct got_error *
 pack_child_send_tempfiles(struct imsgbuf *ibuf, struct got_pack *pack)
 {
 	const struct got_error *err;
-	int basefd, accumfd;
+	int basefd = -1, accumfd = -1;
 
 	/* 
 	 * For performance reasons, the child will keep reusing the
@@ -183,23 +183,29 @@ pack_child_send_tempfiles(struct imsgbuf *ibuf, struct got_pack *pack)
 	if (pack->child_has_tempfiles)
 		return NULL;
 
-	basefd = got_opentempfd();
+	basefd = dup(pack->basefd);
 	if (basefd == -1)
-		return got_error_from_errno("got_opentempfd");
+		return got_error_from_errno("dup");
+
+	accumfd = dup(pack->accumfd);
+	if (accumfd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
 
 	err = got_privsep_send_tmpfd(ibuf, basefd);
 	if (err)
-		return err;
-
-	accumfd = got_opentempfd();
-	if (accumfd == -1)
-		return got_error_from_errno("got_opentempfd");
+		goto done;
 
 	err = got_privsep_send_tmpfd(ibuf, accumfd);
-	if (err)
-		return err;
-
-	pack->child_has_tempfiles = 1;
+done:
+	if (err) {
+		if (basefd != -1)
+			close(basefd);
+		if (accumfd != -1)
+			close(accumfd);
+	} else
+		pack->child_has_tempfiles = 1;
 	return NULL;
 }
 

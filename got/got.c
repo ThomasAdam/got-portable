@@ -5845,15 +5845,9 @@ cmd_ref(int argc, char *argv[])
 		got_path_strip_trailing_slashes(refname);
 
 #ifndef PROFILE
-	if (do_list) {
-		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
-		    NULL) == -1)
-			err(1, "pledge");
-	} else {
-		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-		    "sendfd unveil", NULL) == -1)
-			err(1, "pledge");
-	}
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -5886,6 +5880,15 @@ cmd_ref(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
+
+#ifndef PROFILE
+	if (do_list) {
+		/* Remove "cpath" promise. */
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+	}
+#endif
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
@@ -6213,15 +6216,9 @@ cmd_branch(int argc, char *argv[])
 		usage_branch();
 
 #ifndef PROFILE
-	if (do_list || do_show) {
-		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
-		    NULL) == -1)
-			err(1, "pledge");
-	} else {
-		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-		    "sendfd unveil", NULL) == -1)
-			err(1, "pledge");
-	}
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -6254,6 +6251,15 @@ cmd_branch(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
+
+#ifndef PROFILE
+	if (do_list || do_show) {
+		/* Remove "cpath" promise. */
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+	}
+#endif
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
@@ -6756,15 +6762,9 @@ cmd_tag(int argc, char *argv[])
 	tag_name = argv[0];
 
 #ifndef PROFILE
-	if (do_list) {
-		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
-		    NULL) == -1)
-			err(1, "pledge");
-	} else {
-		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-		    "sendfd unveil", NULL) == -1)
-			err(1, "pledge");
-	}
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -6803,6 +6803,12 @@ cmd_tag(int argc, char *argv[])
 		error = got_repo_open(&repo, repo_path, NULL);
 		if (error != NULL)
 			goto done;
+#ifndef PROFILE
+		/* Remove "cpath" promise. */
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+#endif
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
@@ -12109,7 +12115,7 @@ cmd_info(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
@@ -12126,6 +12132,12 @@ cmd_info(int argc, char *argv[])
 		goto done;
 	}
 
+#ifndef PROFILE
+	/* Remove "cpath" promise. */
+	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
