@@ -1459,8 +1459,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	uint8_t *base_buf = NULL, *accum_buf = NULL, *delta_buf;
-	size_t base_bufsz = 0, accum_size = 0, delta_len;
-	uint64_t max_size;
+	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0, delta_len;
+	uint64_t max_size = 0;
 	int n = 0;
 
 	*outbuf = NULL;
@@ -1469,15 +1469,9 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	if (STAILQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
-	err = got_pack_get_delta_chain_max_size(&max_size, deltas, pack);
-	if (err)
-		return err;
-	accum_buf = malloc(max_size);
-	if (accum_buf == NULL)
-		return got_error_from_errno("malloc");
-
 	/* Deltas are ordered in ascending order. */
 	STAILQ_FOREACH(delta, &deltas->entries, entry) {
+		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
 			size_t delta_data_offset;
@@ -1496,6 +1490,10 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				err = got_error(GOT_ERR_PACK_OFFSET);
 				goto done;
 			}
+
+			if (delta->size > max_size)
+				max_size = delta->size;
+
 			if (pack->map) {
 				size_t mapoff = (size_t)delta_data_offset;
 				err = got_inflate_to_mem_mmap(&base_buf,
@@ -1534,6 +1532,36 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				goto done;
 			}
 		}
+
+		err = got_delta_get_sizes(&base_size, &result_size,
+		    delta_buf, delta_len);
+		if (err)
+			goto done;
+		if (base_size > max_size)
+			max_size = base_size;
+		if (result_size > max_size)
+			max_size = result_size;
+
+		if (max_size > base_bufsz) {
+			uint8_t *p = realloc(base_buf, max_size);
+			if (p == NULL) {
+				err = got_error_from_errno("realloc");
+				goto done;
+			}
+			base_buf = p;
+			base_bufsz = max_size;
+		}
+
+		if (max_size > accum_bufsz) {
+			uint8_t *p = realloc(accum_buf, max_size);
+			if (p == NULL) {
+				err = got_error_from_errno("realloc");
+				goto done;
+			}
+			accum_buf = p;
+			accum_bufsz = max_size;
+		}
+
 		err = got_delta_apply_in_mem(base_buf, base_bufsz,
 		    delta_buf, delta_len, accum_buf,
 		    &accum_size, max_size);
@@ -1546,24 +1574,11 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 		if (n < deltas->nentries) {
 			/* Accumulated delta becomes the new base. */
 			uint8_t *tmp = accum_buf;
-			/*
-			 * Base buffer switches roles with accumulation buffer.
-			 * Ensure it can hold the largest result in the delta
-			 * chain. Initial allocation might have been smaller.
-			 */
-			if (base_bufsz < max_size) {
-				uint8_t *p;
-				p = reallocarray(base_buf, 1, max_size);
-				if (p == NULL) {
-					err = got_error_from_errno(
-					    "reallocarray");
-					goto done;
-				}
-				base_buf = p;
-				base_bufsz = max_size;
-			}
+			size_t tmp_size = accum_bufsz;
 			accum_buf = base_buf;
+			accum_bufsz = base_bufsz;
 			base_buf = tmp;
+			base_bufsz = tmp_size;
 		}
 	}
 
