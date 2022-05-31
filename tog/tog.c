@@ -595,6 +595,8 @@ static const struct got_error *search_next_ref_view(struct tog_view *);
 static volatile sig_atomic_t tog_sigwinch_received;
 static volatile sig_atomic_t tog_sigpipe_received;
 static volatile sig_atomic_t tog_sigcont_received;
+static volatile sig_atomic_t tog_sigint_received;
+static volatile sig_atomic_t tog_sigterm_received;
 
 static void
 tog_sigwinch(int signo)
@@ -613,6 +615,26 @@ tog_sigcont(int signo)
 {
 	tog_sigcont_received = 1;
 }
+
+static void
+tog_sigint(int signo)
+{
+	tog_sigint_received = 1;
+}
+
+static void
+tog_sigterm(int signo)
+{
+	tog_sigterm_received = 1;
+}
+
+static int
+tog_fatal_signal_received()
+{
+	return (tog_sigpipe_received ||
+	    tog_sigint_received || tog_sigint_received);
+}
+
 
 static const struct got_error *
 view_close(struct tog_view *view)
@@ -1040,7 +1062,7 @@ view_loop(struct tog_view *view)
 		return err;
 	update_panels();
 	doupdate();
-	while (!TAILQ_EMPTY(&views) && !done && !tog_sigpipe_received) {
+	while (!TAILQ_EMPTY(&views) && !done && !tog_fatal_signal_received()) {
 		/* Refresh fast during initialization, then become slower. */
 		if (fast_refresh && fast_refresh-- == 0)
 			halfdelay(10); /* switch to once per second */
@@ -2021,10 +2043,14 @@ block_signals_used_by_main_thread(void)
 	if (sigemptyset(&sigset) == -1)
 		return got_error_from_errno("sigemptyset");
 
-	/* tog handles SIGWINCH and SIGCONT */
+	/* tog handles SIGWINCH, SIGCONT, SIGINT, SIGTERM */
 	if (sigaddset(&sigset, SIGWINCH) == -1)
 		return got_error_from_errno("sigaddset");
 	if (sigaddset(&sigset, SIGCONT) == -1)
+		return got_error_from_errno("sigaddset");
+	if (sigaddset(&sigset, SIGINT) == -1)
+		return got_error_from_errno("sigaddset");
+	if (sigaddset(&sigset, SIGTERM) == -1)
 		return got_error_from_errno("sigaddset");
 
 	/* ncurses handles SIGTSTP */
@@ -2050,7 +2076,7 @@ log_thread(void *arg)
 	if (err)
 		return (void *)err;
 
-	while (!done && !err && !tog_sigpipe_received) {
+	while (!done && !err && !tog_fatal_signal_received()) {
 		err = queue_commits(a);
 		if (err) {
 			if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -2694,6 +2720,17 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 static void
 init_curses(void)
 {
+	/*
+	 * Override default signal handlers before starting ncurses.
+	 * This should prevent ncurses from installing its own
+	 * broken cleanup() signal handler.
+	 */
+	signal(SIGWINCH, tog_sigwinch);
+	signal(SIGPIPE, tog_sigpipe);
+	signal(SIGCONT, tog_sigcont);
+	signal(SIGINT, tog_sigint);
+	signal(SIGTERM, tog_sigterm);
+
 	initscr();
 	cbreak();
 	halfdelay(1); /* Do fast refresh while initial view is loading. */
@@ -2706,9 +2743,6 @@ init_curses(void)
 		start_color();
 		use_default_colors();
 	}
-	signal(SIGWINCH, tog_sigwinch);
-	signal(SIGPIPE, tog_sigpipe);
-	signal(SIGCONT, tog_sigcont);
 }
 
 static const struct got_error *
