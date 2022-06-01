@@ -2749,8 +2749,9 @@ struct merge_file_cb_arg {
 
 static const struct got_error *
 merge_file_cb(void *arg, struct got_blob_object *blob1,
-    struct got_blob_object *blob2, struct got_object_id *id1,
-    struct got_object_id *id2, const char *path1, const char *path2,
+    struct got_blob_object *blob2, FILE *f1, FILE *f2,
+    struct got_object_id *id1, struct got_object_id *id2,
+    const char *path1, const char *path2,
     mode_t mode1, mode_t mode2, struct got_repository *repo)
 {
 	static const struct got_error *err = NULL;
@@ -3056,8 +3057,9 @@ struct check_merge_conflicts_arg {
 
 static const struct got_error *
 check_merge_conflicts(void *arg, struct got_blob_object *blob1,
-    struct got_blob_object *blob2, struct got_object_id *id1,
-    struct got_object_id *id2, const char *path1, const char *path2,
+    struct got_blob_object *blob2, FILE *f1, FILE *f2,
+    struct got_object_id *id1, struct got_object_id *id2,
+    const char *path1, const char *path2,
     mode_t mode1, mode_t mode2, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -3105,6 +3107,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct check_merge_conflicts_arg cmc_arg;
 	struct merge_file_cb_arg arg;
 	char *label_orig = NULL;
+	FILE *f1 = NULL, *f2 = NULL;
 
 	if (commit_id1) {
 		err = got_object_open_as_commit(&commit1, repo, commit_id1);
@@ -3133,6 +3136,12 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			goto done;
 		}
 		free(id_str);
+
+		f1 = got_opentemp();
+		if (f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
 	}
 
 	err = got_object_open_as_commit(&commit2, repo, commit_id2);
@@ -3148,10 +3157,16 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		goto done;
 
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
 	cmc_arg.worktree = worktree;
 	cmc_arg.fileindex = fileindex;
 	cmc_arg.repo = repo;
-	err = got_diff_tree(tree1, tree2, "", "", repo,
+	err = got_diff_tree(tree1, tree2, f1, f2, "", "", repo,
 	    check_merge_conflicts, &cmc_arg, 0);
 	if (err)
 		goto done;
@@ -3165,7 +3180,8 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	arg.label_orig = label_orig;
 	arg.commit_id2 = commit_id2;
 	arg.allow_bad_symlinks = 1; /* preserve bad symlinks across merges */
-	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg, 1);
+	err = got_diff_tree(tree1, tree2, f1, f2, "", "", repo,
+	    merge_file_cb, &arg, 1);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
@@ -3178,6 +3194,10 @@ done:
 		got_object_tree_close(tree1);
 	if (tree2)
 		got_object_tree_close(tree2);
+	if (f1 && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(label_orig);
 	return err;
 }

@@ -308,7 +308,7 @@ get_color_value(const char *envvar)
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	const char *label1, *label2;
-	FILE *f;
+	FILE *f, *f1, *f2;
 	int first_displayed_line;
 	int last_displayed_line;
 	int eof;
@@ -3178,7 +3178,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, "", "", repo,
+	err = got_diff_tree(tree1, tree2, NULL, NULL, "", "", repo,
 	    got_diff_tree_collect_changed_paths, paths, 0);
 done:
 	if (tree1)
@@ -3398,12 +3398,13 @@ create_diff(struct tog_diff_view_state *s)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, s->label1, s->label2, s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
+		    s->f1, s->f2, s->id1, s->id2, s->label1, s->label2,
+		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
+		    s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, NULL, "", "", s->diff_context,
+		    s->f1, s->f2, s->id1, s->id2, NULL, "", "", s->diff_context,
 		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
@@ -3438,8 +3439,8 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, NULL, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, s->repo, s->f);
+		    s->f1, s->f2, s->id1, s->id2, NULL, s->diff_context,
+		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	}
 	default:
@@ -3536,6 +3537,32 @@ search_next_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
+close_diff_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_diff_view_state *s = &view->state.diff;
+
+	free(s->id1);
+	s->id1 = NULL;
+	free(s->id2);
+	s->id2 = NULL;
+	if (s->f && fclose(s->f) == EOF)
+		err = got_error_from_errno("fclose");
+	s->f = NULL;
+	if (s->f1 && fclose(s->f1) == EOF)
+		err = got_error_from_errno("fclose");
+	s->f1 = NULL;
+	if (s->f2 && fclose(s->f2) == EOF)
+		err = got_error_from_errno("fclose");
+	s->f2 = NULL;
+	free_colors(&s->colors);
+	free(s->line_offsets);
+	s->line_offsets = NULL;
+	s->nlines = 0;
+	return err;
+}
+
+static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
@@ -3543,6 +3570,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 {
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
+
+	memset(s, 0, sizeof(*s));
 
 	if (id1 != NULL && id2 != NULL) {
 	    int type1, type2;
@@ -3569,16 +3598,26 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		s->id1 = got_object_id_dup(id1);
 		if (s->id1 == NULL)
 			return got_error_from_errno("got_object_id_dup");
+		s->f1 = got_opentemp();
+		if (s->f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
 	} else
 		s->id1 = NULL;
 
 	s->id2 = got_object_id_dup(id2);
 	if (s->id2 == NULL) {
-		free(s->id1);
-		s->id1 = NULL;
-		return got_error_from_errno("got_object_id_dup");
+		err = got_error_from_errno("got_object_id_dup");
+		goto done;
 	}
-	s->f = NULL;
+
+	s->f2 = got_opentemp();
+	if (s->f2 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
 	s->diff_context = diff_context;
@@ -3593,89 +3632,52 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		    "^-", TOG_COLOR_DIFF_MINUS,
 		    get_color_value("TOG_COLOR_DIFF_MINUS"));
 		if (err)
-			return err;
+			goto done;
 		err = add_color(&s->colors, "^\\+",
 		    TOG_COLOR_DIFF_PLUS,
 		    get_color_value("TOG_COLOR_DIFF_PLUS"));
-		if (err) {
-			free_colors(&s->colors);
-			return err;
-		}
+		if (err)
+			goto done;
 		err = add_color(&s->colors,
 		    "^@@", TOG_COLOR_DIFF_CHUNK_HEADER,
 		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
-		if (err) {
-			free_colors(&s->colors);
-			return err;
-		}
+		if (err)
+			goto done;
 
 		err = add_color(&s->colors,
 		    "^(commit [0-9a-f]|parent [0-9]|(blob|file) [-+] |"
 		    "[MDmA]  [^ ])", TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
-		if (err) {
-			free_colors(&s->colors);
-			return err;
-		}
+		if (err)
+			goto done;
 
 		err = add_color(&s->colors,
 		    "^(from|via): ", TOG_COLOR_AUTHOR,
 		    get_color_value("TOG_COLOR_AUTHOR"));
-		if (err) {
-			free_colors(&s->colors);
-			return err;
-		}
+		if (err)
+			goto done;
 
 		err = add_color(&s->colors,
 		    "^date: ", TOG_COLOR_DATE,
 		    get_color_value("TOG_COLOR_DATE"));
-		if (err) {
-			free_colors(&s->colors);
-			return err;
-		}
+		if (err)
+			goto done;
 	}
 
 	if (log_view && view_is_splitscreen(view))
 		show_log_view(log_view); /* draw vborder */
 	diff_view_indicate_progress(view);
 
-	s->line_offsets = NULL;
-	s->nlines = 0;
 	err = create_diff(s);
-	if (err) {
-		free(s->id1);
-		s->id1 = NULL;
-		free(s->id2);
-		s->id2 = NULL;
-		free_colors(&s->colors);
-		return err;
-	}
 
 	view->show = show_diff_view;
 	view->input = input_diff_view;
 	view->close = close_diff_view;
 	view->search_start = search_start_diff_view;
 	view->search_next = search_next_diff_view;
-
-	return NULL;
-}
-
-static const struct got_error *
-close_diff_view(struct tog_view *view)
-{
-	const struct got_error *err = NULL;
-	struct tog_diff_view_state *s = &view->state.diff;
-
-	free(s->id1);
-	s->id1 = NULL;
-	free(s->id2);
-	s->id2 = NULL;
-	if (s->f && fclose(s->f) == EOF)
-		err = got_error_from_errno("fclose");
-	free_colors(&s->colors);
-	free(s->line_offsets);
-	s->line_offsets = NULL;
-	s->nlines = 0;
+done:
+	if (err)
+		close_diff_view(view);
 	return err;
 }
 
