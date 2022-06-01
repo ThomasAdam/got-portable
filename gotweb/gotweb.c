@@ -2850,7 +2850,7 @@ static const struct got_error *
 gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error;
-	FILE *f = NULL;
+	FILE *f = NULL, *f1 = NULL, *f2 = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *label1 = NULL, *label2 = NULL, *line = NULL;
 	int obj_type;
@@ -2861,6 +2861,18 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	f = got_opentemp();
 	if (f == NULL)
 		return NULL;
+
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
 
 	if (header->parent_id != NULL &&
 	    strncmp(header->parent_id, "/dev/null", 9) != 0) {
@@ -2882,16 +2894,16 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(NULL, NULL, id1, id2,
-		    NULL, NULL, 3, 0, 0, gw_trans->repo, f);
+		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
+		    id1, id2, NULL, NULL, 3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(NULL, NULL, id1, id2,
-		    NULL, "", "", 3, 0, 0, gw_trans->repo, f);
+		error = got_diff_objects_as_trees(NULL, NULL, f1, f2,
+		    id1, id2, NULL, "", "", 3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = got_diff_objects_as_commits(NULL, NULL, id1, id2,
-		    NULL, 3, 0, 0, gw_trans->repo, f);
+		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
+		    id1, id2, NULL, 3, 0, 0, gw_trans->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -2920,6 +2932,10 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		error = got_error_from_errno("getline");
 done:
 	if (f && fclose(f) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+	if (f1 && fclose(f1) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	free(line);
 	free(label1);
