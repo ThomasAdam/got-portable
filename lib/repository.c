@@ -1346,6 +1346,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	}
 
 	if (i == repo->pack_cache_size) {
+		struct got_pack tmp;
 		err = got_pack_close(&repo->packs[i - 1]);
 		if (err)
 			return err;
@@ -1353,8 +1354,10 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return got_error_from_errno("ftruncate");
 		if (ftruncate(repo->packs[i - 1].accumfd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
-		memmove(&repo->packs[1], &repo->packs[0],
-		    sizeof(repo->packs) - sizeof(repo->packs[0]));
+		memcpy(&tmp, &repo->packs[i - 1], sizeof(tmp)); 
+		memcpy(&repo->packs[i - 1], &repo->packs[0],
+		    sizeof(repo->packs[i - 1]));
+		memcpy(&repo->packs[0], &tmp, sizeof(repo->packs[0]));
 		i = 0;
 	}
 
