@@ -173,7 +173,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	
@@ -235,7 +235,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo "got: origin: remote repository not found" \
@@ -361,7 +361,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo -n "got: changes on refs/heads/branch1 will be sent to server" \
@@ -411,7 +411,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo -n "got-send-pack: refs/heads/branchX does not exist in remote " \
@@ -432,7 +432,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo -n "got-send-pack: refs/heads/refs/tags/1.0 does not exist " \
@@ -716,7 +716,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 
@@ -736,7 +736,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 
@@ -1093,7 +1093,7 @@ test_send_all_branches() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo "got: -a and -b options are mutually exclusive" \
