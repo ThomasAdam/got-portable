@@ -793,7 +793,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "edited a missing file" >&2
-		test_done $testroot $ret
+		test_done $testroot 1
 		return 1
 	fi
 

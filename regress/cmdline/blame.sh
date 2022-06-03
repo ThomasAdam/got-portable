@@ -846,7 +846,7 @@ test_blame_symlink() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 
@@ -865,7 +865,7 @@ test_blame_symlink() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "blame command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

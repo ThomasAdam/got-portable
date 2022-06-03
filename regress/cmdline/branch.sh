@@ -286,7 +286,7 @@ test_branch_delete() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got branch succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 
@@ -434,7 +434,7 @@ test_branch_delete_packed() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got update succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

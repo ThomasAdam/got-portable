@@ -372,7 +372,7 @@ test_integrate_backwards_in_time() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got integrate succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

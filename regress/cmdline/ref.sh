@@ -237,7 +237,7 @@ test_ref_delete() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got ref succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

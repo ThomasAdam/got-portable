@@ -2387,7 +2387,7 @@ test_stage_symlink() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got stage succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 	echo -n "got: $testroot/wt/dotgotbar.link: " > $testroot/stderr.expected

@@ -590,7 +590,7 @@ EOF
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: $testroot/wt/dotgotfoo.link: symbolic link points " \
