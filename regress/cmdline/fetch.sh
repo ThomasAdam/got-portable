@@ -34,6 +34,7 @@ test_fetch_basic() {
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -60,12 +61,14 @@ test_fetch_basic() {
 	fi
 
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo-clone
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got log command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -80,6 +83,7 @@ test_fetch_basic() {
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -98,6 +102,7 @@ test_fetch_basic() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1200,6 +1205,7 @@ test_fetch_delete_remote_refs() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1262,6 +1268,7 @@ test_fetch_delete_remote_refs() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"

@@ -65,6 +65,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -86,6 +87,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -267,6 +269,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -287,6 +290,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -343,6 +347,7 @@ EOF
 	got branch -r $testroot/repo-clone branch2
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -447,8 +452,9 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -468,6 +474,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -534,6 +541,7 @@ test_send_clone_and_send() {
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -552,6 +560,7 @@ test_send_clone_and_send() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -631,6 +640,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -653,6 +663,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -890,6 +901,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -915,6 +927,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -992,6 +1005,7 @@ test_send_new_branch() {
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1011,6 +1025,7 @@ test_send_new_branch() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1077,6 +1092,7 @@ test_send_all_branches() {
 	local commit_id4=`git_show_branch_head $testroot/repo-clone bar`
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1125,6 +1141,7 @@ test_send_all_branches() {
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1145,6 +1162,7 @@ test_send_all_branches() {
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1226,6 +1244,7 @@ EOF
 	got ref -r $testroot/repo2 -s refs/heads/master HEAD
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1246,6 +1265,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo2 > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1321,6 +1341,7 @@ remote "origin" {
 }
 EOF
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1348,6 +1369,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1378,8 +1400,9 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1429,6 +1452,7 @@ remote "origin" {
 }
 EOF
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
@@ -1461,6 +1485,7 @@ EOF
 	fi
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got ref command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"

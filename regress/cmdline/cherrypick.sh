@@ -910,6 +910,7 @@ test_cherrypick_symlink_conflicts() {
 	echo "M  new.link" >> $testroot/stdout.expected
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
+	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
