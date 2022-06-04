@@ -196,7 +196,7 @@ got_delta_cache_add(struct got_delta_cache *cache,
 	struct got_delta_cache_head *head;
 	uint64_t idx;
 
-	if (delta_len > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+	if (delta_len > GOT_DELTA_CACHE_MAX_DELTA_SIZE) {
 		cache->cache_toolarge++;
 		return got_error(GOT_ERR_NO_SPACE);
 	}
