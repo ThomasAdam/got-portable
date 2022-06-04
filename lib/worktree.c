@@ -8088,6 +8088,17 @@ stage_path(void *arg, unsigned char status,
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, blob_id,
 		    new_staged_blob_id, NULL, dirfd, de_name);
+		if (err)
+			break;
+		/*
+		 * When staging the reverse of the staged diff,
+		 * implicitly unstage the file.
+		 */
+		if (memcmp(ie->staged_blob_sha1, ie->blob_sha1,
+		    sizeof(ie->blob_sha1)) == 0) {
+			got_fileindex_entry_stage_set(ie,
+			    GOT_FILEIDX_STAGE_NONE);
+		}
 		break;
 	case GOT_STATUS_DELETE:
 		if (staged_status == GOT_STATUS_DELETE)
