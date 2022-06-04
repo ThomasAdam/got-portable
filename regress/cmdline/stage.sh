@@ -2151,6 +2151,59 @@ test_stage_patch_removed_twice() {
 	test_done "$testroot" "$ret"
 }
 
+test_stage_patch_reversed() {
+	local testroot=`test_init stage_patch_reversed`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'ALPHA' > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'alpha' > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s /dev/null $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u /dev/null $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_stage_patch_quit() {
 	local testroot=`test_init stage_patch_quit`
 
@@ -2984,6 +3037,7 @@ run_test test_stage_patch_added
 run_test test_stage_patch_added_twice
 run_test test_stage_patch_removed
 run_test test_stage_patch_removed_twice
+run_test test_stage_patch_reversed
 run_test test_stage_patch_quit
 run_test test_stage_patch_incomplete_script
 run_test test_stage_symlink
