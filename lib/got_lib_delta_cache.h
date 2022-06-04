@@ -16,7 +16,7 @@
 
 struct got_delta_cache;
 
-struct got_delta_cache *got_delta_cache_alloc(int, size_t);
+const struct got_error *got_delta_cache_alloc(struct got_delta_cache **);
 void got_delta_cache_free(struct got_delta_cache *);
 
 const struct got_error *got_delta_cache_add(struct got_delta_cache *, off_t,
