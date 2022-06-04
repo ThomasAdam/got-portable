@@ -21,6 +21,8 @@
 #include <zlib.h>
 #include <limits.h>
 #include <time.h>
+#include <errno.h>
+#include <siphash.h>
 
 #include "got_compat.h"
 
@@ -36,79 +38,151 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-struct got_delta_cache_element {
-	TAILQ_ENTRY(got_delta_cache_element) entry;
-	off_t delta_data_offset;
-	uint8_t *delta_data;
-	size_t delta_len;
+#define GOT_DELTA_CACHE_MIN_BUCKETS	64
+#define GOT_DELTA_CACHE_MAX_BUCKETS	16384
+#define GOT_DELTA_CACHE_MAX_CHAIN	2
+#define GOT_DELTA_CACHE_MAX_DELTA_SIZE	2048
+
+struct got_cached_delta {
+	off_t offset;
+	uint8_t *data;
+	size_t len;
 };
 
-TAILQ_HEAD(got_delta_cache_head, got_delta_cache_element);
+struct got_delta_cache_head {
+	struct got_cached_delta entries[GOT_DELTA_CACHE_MAX_CHAIN];
+	unsigned int nchain;
+};
 
 struct got_delta_cache {
-	struct got_delta_cache_head entries;
-	int nelem;
-	int maxelem;
-	size_t maxelemsize;
+	struct got_delta_cache_head *buckets;
+	unsigned int nbuckets;
+	unsigned int totelem;
 	int cache_search;
 	int cache_hit;
 	int cache_miss;
 	int cache_evict;
 	int cache_toolarge;
+	unsigned int flags;
+#define GOT_DELTA_CACHE_F_NOMEM	0x01
+	SIPHASH_KEY key;
 };
 
-struct got_delta_cache *
-got_delta_cache_alloc(int maxelem, size_t maxelemsize)
+const struct got_error *
+got_delta_cache_alloc(struct got_delta_cache **new)
 {
+	const struct got_error *err;
 	struct got_delta_cache *cache;
+
+	*new = NULL;
 
 	cache = calloc(1, sizeof(*cache));
 	if (cache == NULL)
-		return NULL;
+		return got_error_from_errno("calloc");
+	
+	cache->buckets = calloc(GOT_DELTA_CACHE_MIN_BUCKETS,
+	    sizeof(cache->buckets[0]));
+	if (cache->buckets == NULL) {
+		err = got_error_from_errno("calloc");
+		free(cache);
+		return err;
+	}
+	cache->nbuckets = GOT_DELTA_CACHE_MIN_BUCKETS;
 
-	TAILQ_INIT(&cache->entries);
-	cache->maxelem = maxelem;
-	cache->maxelemsize = maxelemsize;
-	return cache;
+	arc4random_buf(&cache->key, sizeof(cache->key));
+	*new = cache;
+	return NULL;
 }
 
 void
 got_delta_cache_free(struct got_delta_cache *cache)
 {
-	struct got_delta_cache_element *entry;
+	struct got_cached_delta *delta;
+	unsigned int i;
 
 #ifdef GOT_OBJ_CACHE_DEBUG
-	fprintf(stderr, "%s: delta cache: %d elements, %d searches, %d hits, "
-	    "%d missed, %d evicted, %d too large\n", getprogname(), cache->nelem,
-	    cache->cache_search, cache->cache_hit, cache->cache_miss,
-	    cache->cache_evict, cache->cache_toolarge);
+	fprintf(stderr, "%s: delta cache: %u elements, %d searches, %d hits, "
+	    "%d missed, %d evicted, %d too large\n", getprogname(),
+	    cache->totelem, cache->cache_search, cache->cache_hit,
+	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge);
 #endif
-	while (!TAILQ_EMPTY(&cache->entries)) {
-		entry = TAILQ_FIRST(&cache->entries);
-		TAILQ_REMOVE(&cache->entries, entry, entry);
-		free(entry->delta_data);
-		free(entry);
+	for (i = 0; i < cache->nbuckets; i++) {
+		struct got_delta_cache_head *head;
+		int j;
+		head = &cache->buckets[i];
+		for (j = 0; j < head->nchain; j++) {
+			delta = &head->entries[j];
+			free(delta->data);
+		}
 	}
+	free(cache->buckets);
 	free(cache);
 }
 
-#ifndef GOT_NO_OBJ_CACHE
-static void
-remove_least_used_element(struct got_delta_cache *cache)
+static uint64_t
+delta_cache_hash(struct got_delta_cache *cache, off_t delta_offset)
 {
-	struct got_delta_cache_element *entry;
-
-	if (cache->nelem == 0)
-		return;
-
-	entry = TAILQ_LAST(&cache->entries, got_delta_cache_head);
-	TAILQ_REMOVE(&cache->entries, entry, entry);
-	free(entry->delta_data);
-	free(entry);
-	cache->nelem--;
-	cache->cache_evict++;
+	return SipHash24(&cache->key, &delta_offset, sizeof(delta_offset));
 }
-#endif
+
+static const struct got_error *
+delta_cache_resize(struct got_delta_cache *cache, unsigned int nbuckets)
+{
+	struct got_delta_cache_head *buckets;
+	size_t i;
+
+	buckets = calloc(nbuckets, sizeof(buckets[0]));
+	if (buckets == NULL) {
+		if (errno != ENOMEM)
+			return got_error_from_errno("calloc");
+		/* Proceed with our current amount of hash buckets. */
+		cache->flags |= GOT_DELTA_CACHE_F_NOMEM;
+		return NULL;
+	}
+
+	arc4random_buf(&cache->key, sizeof(cache->key));
+
+	for (i = 0; i < cache->nbuckets; i++) {
+		unsigned int j;
+		for (j = 0; j < cache->buckets[i].nchain; j++) {
+			struct got_delta_cache_head *head;
+			struct got_cached_delta *delta;
+			uint64_t idx;
+			delta = &cache->buckets[i].entries[j];
+			idx = delta_cache_hash(cache, delta->offset) % nbuckets;
+			head = &buckets[idx];
+			if (head->nchain < nitems(head->entries)) {
+				struct got_cached_delta *new_delta;
+				new_delta = &head->entries[head->nchain];
+				memcpy(new_delta, delta, sizeof(*new_delta));
+				head->nchain++;
+			} else
+				free(delta->data);
+		}
+	}
+
+	free(cache->buckets);
+	cache->buckets = buckets;
+	cache->nbuckets = nbuckets;
+	return NULL;
+}
+
+static const struct got_error *
+delta_cache_grow(struct got_delta_cache *cache)
+{
+	unsigned int nbuckets;
+
+	if ((cache->flags & GOT_DELTA_CACHE_F_NOMEM) ||
+	    cache->nbuckets == GOT_DELTA_CACHE_MAX_BUCKETS)
+		return NULL;
+
+	if (cache->nbuckets >= GOT_DELTA_CACHE_MAX_BUCKETS / 2)
+		nbuckets = GOT_DELTA_CACHE_MAX_BUCKETS;
+	else
+		nbuckets = cache->nbuckets * 2;
+
+	return delta_cache_resize(cache, nbuckets);
+}
 
 const struct got_error *
 got_delta_cache_add(struct got_delta_cache *cache,
@@ -117,26 +191,38 @@ got_delta_cache_add(struct got_delta_cache *cache,
 #ifdef GOT_NO_OBJ_CACHE
 	return got_error(GOT_ERR_NO_SPACE);
 #else
-	struct got_delta_cache_element *entry;
+	const struct got_error *err = NULL;
+	struct got_cached_delta *delta;
+	struct got_delta_cache_head *head;
+	uint64_t idx;
 
-	if (delta_len > cache->maxelemsize) {
+	if (delta_len > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 		cache->cache_toolarge++;
 		return got_error(GOT_ERR_NO_SPACE);
 	}
 
-	if (cache->nelem >= cache->maxelem)
-		remove_least_used_element(cache);
+	if (cache->nbuckets * 3 < cache->totelem * 4) {
+		err = delta_cache_grow(cache);
+		if (err)
+			return err;
+	}
 
-	entry = calloc(1, sizeof(*entry));
-	if (entry == NULL)
-		return got_error_from_errno("calloc");
+	idx = delta_cache_hash(cache, delta_data_offset) % cache->nbuckets;
+	head = &cache->buckets[idx];
+	if (head->nchain >= nitems(head->entries)) {
+		delta = &head->entries[head->nchain - 1];
+		free(delta->data);
+		memset(delta, 0, sizeof(*delta));
+		head->nchain--;
+	}
 
-	entry->delta_data_offset = delta_data_offset;
-	entry->delta_data = delta_data;
-	entry->delta_len = delta_len;
+	delta = &head->entries[head->nchain];
+	delta->offset = delta_data_offset;
+	delta->data = delta_data;
+	delta->len = delta_len;
+	head->nchain++;
+	cache->totelem++;
 
-	TAILQ_INSERT_HEAD(&cache->entries, entry, entry);
-	cache->nelem++;
 	return NULL;
 #endif
 }
@@ -145,21 +231,33 @@ void
 got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
     struct got_delta_cache *cache, off_t delta_data_offset)
 {
-	struct got_delta_cache_element *entry;
+	uint64_t idx;
+	struct got_delta_cache_head *head;
+	struct got_cached_delta *delta;
+	int i;
+
+	idx = delta_cache_hash(cache, delta_data_offset) % cache->nbuckets;
+	head = &cache->buckets[idx];
 
 	cache->cache_search++;
 	*delta_data = NULL;
 	*delta_len = 0;
-	TAILQ_FOREACH(entry, &cache->entries, entry) {
-		if (entry->delta_data_offset != delta_data_offset)
+	for (i = 0; i < head->nchain; i++) {
+		delta = &head->entries[i];
+		if (delta->offset != delta_data_offset)
 			continue;
 		cache->cache_hit++;
-		if (entry != TAILQ_FIRST(&cache->entries)) {
-			TAILQ_REMOVE(&cache->entries, entry, entry);
-			TAILQ_INSERT_HEAD(&cache->entries, entry, entry);
+		if (i > 0) {
+			struct got_cached_delta tmp;
+			memcpy(&tmp, &head->entries[0], sizeof(tmp));
+			memcpy(&head->entries[0], &head->entries[i],
+			    sizeof(head->entries[0]));
+			memcpy(&head->entries[i], &tmp,
+			    sizeof(head->entries[i]));
+			delta = &head->entries[0];
 		}
-		*delta_data = entry->delta_data;
-		*delta_len = entry->delta_len;
+		*delta_data = delta->data;
+		*delta_len = delta->len;
 		return;
 	}
 

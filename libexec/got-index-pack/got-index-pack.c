@@ -1007,12 +1007,9 @@ main(int argc, char **argv)
 
 	memset(&pack, 0, sizeof(pack));
 	pack.fd = -1;
-	pack.delta_cache = got_delta_cache_alloc(500,
-	    GOT_DELTA_RESULT_SIZE_CACHED_MAX);
-	if (pack.delta_cache == NULL) {
-		err = got_error_from_errno("got_delta_cache_alloc");
+	err = got_delta_cache_alloc(&pack.delta_cache);
+	if (err)
 		goto done;
-	}
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 #ifndef PROFILE

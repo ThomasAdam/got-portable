@@ -1184,12 +1184,9 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 		goto done;
 	}
 
-	pack->delta_cache = got_delta_cache_alloc(100,
-	    GOT_DELTA_RESULT_SIZE_CACHED_MAX);
-	if (pack->delta_cache == NULL) {
-		err = got_error_from_errno("got_delta_cache_alloc");
+	err = got_delta_cache_alloc(&pack->delta_cache);
+	if (err)
 		goto done;
-	}
 
 #ifndef GOT_PACK_NO_MMAP
 	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
