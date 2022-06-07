@@ -133,3 +133,14 @@ const struct got_error *got_object_tree_entry_dup(struct got_tree_entry **,
 const struct got_error *got_traverse_packed_commits(
     struct got_object_id_queue *, struct got_object_id *, const char *,
     struct got_repository *);
+
+typedef const struct got_error *(*got_object_enumerate_commit_cb)(void *,
+    time_t, struct got_object_id *, struct got_repository *);
+typedef const struct got_error *(*got_object_enumerate_tree_cb)(void *,
+    struct got_tree_object *, time_t, struct got_object_id *, const char *,
+    struct got_repository *);
+
+const struct got_error *got_object_enumerate(got_object_enumerate_commit_cb,
+    got_object_enumerate_tree_cb, void *, struct got_object_id **, int,
+    struct got_object_id **, int, struct got_packidx *,
+    struct got_repository *);
