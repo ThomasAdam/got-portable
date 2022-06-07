@@ -1355,6 +1355,9 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 				free(buf);
 				goto done;
 			}
+			idx = got_packidx_get_object_idx(packidx, &tag->id);
+			if (idx == -1)
+				break;
 			err = open_commit(&commit, pack, packidx, idx,
 			    &tag->id, objcache);
 			got_object_tag_close(tag);
