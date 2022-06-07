@@ -2770,21 +2770,12 @@ got_privsep_send_enumerated_tree(size_t *totlen, struct imsgbuf *ibuf,
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create ENUMERATED_TREE");
 
-	if (imsg_add(wbuf, tree_id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add ENUMERATED_TREE");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, &nentries, sizeof(nentries)) == -1) {
-		err = got_error_from_errno("imsg_add ENUMERATED_TREE");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, path, path_len) == -1) {
-		err = got_error_from_errno("imsg_add ENUMERATED_TREE");
-		ibuf_free(wbuf);
-		return err;
-	}
+	if (imsg_add(wbuf, tree_id->sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_add ENUMERATED_TREE");
+	if (imsg_add(wbuf, &nentries, sizeof(nentries)) == -1)
+		return got_error_from_errno("imsg_add ENUMERATED_TREE");
+	if (imsg_add(wbuf, path, path_len) == -1)
+		return got_error_from_errno("imsg_add ENUMERATED_TREE");
 
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
