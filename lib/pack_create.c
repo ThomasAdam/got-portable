@@ -1520,13 +1520,21 @@ load_packed_tree_ids(void *arg, struct got_tree_object *tree, time_t mtime,
 	if (tree == NULL) {
 		free(a->id);
 		a->id = got_object_id_dup(id);
-		if (a->id == NULL)
-			return got_error_from_errno("got_object_id_dup");
+		if (a->id == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			free(a->dpath);
+			a->dpath = NULL;
+			return err;
+		}
 
 		free(a->dpath);
 		a->dpath = strdup(dpath);
-		if (a->dpath == NULL)
-			return got_error_from_errno("strdup");
+		if (a->dpath == NULL) {
+			err = got_error_from_errno("strdup");
+			free(a->id);
+			a->id = NULL;
+			return err;
+		}
 
 		a->mtime = mtime;
 		return NULL;
