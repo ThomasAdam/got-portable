@@ -145,6 +145,11 @@ enum got_imsg_type {
 	GOT_IMSG_COMMIT_TRAVERSAL_REQUEST,
 	GOT_IMSG_TRAVERSED_COMMITS,
 	GOT_IMSG_COMMIT_TRAVERSAL_DONE,
+	GOT_IMSG_OBJECT_ENUMERATION_REQUEST,
+	GOT_IMSG_ENUMERATED_COMMIT,
+	GOT_IMSG_ENUMERATED_TREE,
+	GOT_IMSG_TREE_ENUMERATION_DONE,
+	GOT_IMSG_OBJECT_ENUMERATION_DONE,
 
 	/* Message sending file descriptor to a temporary file. */
 	GOT_IMSG_TMPFD,
@@ -556,6 +561,22 @@ struct got_imsg_traversed_commits {
 	/* Followed by ncommit IDs of SHA1_DIGEST_LENGTH each */
 } __attribute__((__packed__));
 
+/* Structure for GOT_IMSG_ENUMERATED_COMMIT  */
+struct got_imsg_enumerated_commit {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	time_t mtime;
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_ENUMERATED_TREE */
+struct got_imsg_enumerated_tree {
+	uint8_t id[SHA1_DIGEST_LENGTH]; /* tree ID */
+	int nentries;			/* number of tree entries */
+
+	/* Followed by tree's path in remaining data of imsg buffer. */
+
+	/* Followed by nentries * GOT_IMSG_TREE_ENTRY messages. */
+} __attribute__((__packed__));
+
 /*
  * Structure for GOT_IMSG_GOTCONFIG_REMOTE and
  * GOT_IMSG_GOTCONFIG_REMOTE data.
@@ -721,6 +742,18 @@ const struct got_error *got_privsep_send_commit_traversal_request(
 const struct got_error *got_privsep_recv_traversed_commits(
     struct got_commit_object **, struct got_object_id **,
     struct got_object_id_queue *, struct imsgbuf *);
+const struct got_error *got_privsep_send_enumerated_tree(size_t *,
+    struct imsgbuf *, struct got_object_id *, const char *,
+    struct got_parsed_tree_entry *, int);
+const struct got_error *got_privsep_send_object_enumeration_request(
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_object_enumeration_done(
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_enumerated_commit(struct imsgbuf *,
+    struct got_object_id *, time_t);
+const struct got_error *got_privsep_recv_enumerated_objects(struct imsgbuf *,
+    got_object_enumerate_commit_cb, got_object_enumerate_tree_cb, void *,
+    struct got_repository *);
 
 const struct got_error *got_privsep_send_raw_delta_req(struct imsgbuf *, int,
     struct got_object_id *);
