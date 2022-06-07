@@ -1572,8 +1572,7 @@ recv_tree_entries(void *data, size_t datalen, struct got_tree_object *tree,
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
-		if (te_offset + sizeof(ite) + ite.namelen >
-		    datalen) {
+		if (te_offset + sizeof(ite) + ite.namelen > datalen) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
