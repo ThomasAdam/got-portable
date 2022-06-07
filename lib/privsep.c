@@ -1442,8 +1442,8 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 }
 
 static const struct got_error *
-send_tree_entries_batch(struct imsgbuf *ibuf,
-    struct got_parsed_tree_entry *entries, int idx0, int idxN, size_t len)
+send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
+    int idx0, int idxN, size_t len)
 {
 	struct ibuf *wbuf;
 	struct got_imsg_tree_entries ientries;
@@ -1478,14 +1478,21 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 	return NULL;
 }
 
-static const struct got_error *
-send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
-    int nentries)
+const struct got_error *
+got_privsep_send_tree(struct imsgbuf *ibuf,
+    struct got_parsed_tree_entry *entries, int nentries)
 {
 	const struct got_error *err = NULL;
+	struct got_imsg_tree_object itree;
+	size_t entries_len;
 	int i, j;
-	size_t entries_len = sizeof(struct got_imsg_tree_entries);
 
+	itree.nentries = nentries;
+	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
+	    == -1)
+		return got_error_from_errno("imsg_compose TREE");
+
+	entries_len = sizeof(struct got_imsg_tree_entries);
 	i = 0;
 	for (j = 0; j < nentries; j++) {
 		struct got_parsed_tree_entry *pte = &entries[j];
@@ -1493,7 +1500,7 @@ send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
 
 		if (j > 0 &&
 		    entries_len + len > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
-			err = send_tree_entries_batch(ibuf, entries,
+			err = send_tree_entries(ibuf, entries,
 			    i, j - 1, entries_len);
 			if (err)
 				return err;
@@ -1505,95 +1512,12 @@ send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
 	}
 
 	if (j > 0) {
-		err = send_tree_entries_batch(ibuf, entries, i, j - 1,
-		    entries_len);
+		err = send_tree_entries(ibuf, entries, i, j - 1, entries_len);
 		if (err)
 			return err;
 	}
 
-	return NULL;
-}
-
-const struct got_error *
-got_privsep_send_tree(struct imsgbuf *ibuf,
-    struct got_parsed_tree_entry *entries, int nentries)
-{
-	const struct got_error *err = NULL;
-	struct got_imsg_tree_object itree;
-
-	itree.nentries = nentries;
-	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
-	    == -1)
-		return got_error_from_errno("imsg_compose TREE");
-
-	err = send_tree_entries(ibuf, entries, nentries);
-	if (err)
-		return err;
-
 	return flush_imsg(ibuf);
-}
-
-
-static const struct got_error *
-recv_tree_entries(void *data, size_t datalen, struct got_tree_object *tree,
-    int *nentries)
-{
-	const struct got_error *err = NULL;
-	struct got_imsg_tree_entries *ientries;
-	struct got_tree_entry *te;
-	size_t te_offset;
-	size_t i;
-
-	if (datalen <= sizeof(*ientries) ||
-	    datalen > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	ientries = (struct got_imsg_tree_entries *)data;
-	if (ientries->nentries > INT_MAX) {
-		return got_error_msg(GOT_ERR_NO_SPACE,
-		    "too many tree entries");
-	}
-
-	te_offset = sizeof(*ientries);
-	for (i = 0; i < ientries->nentries; i++) {
-		struct got_imsg_tree_entry ite;
-		const char *te_name;
-		uint8_t *buf = (uint8_t *)data + te_offset;
-
-		if (te_offset >= datalen) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-
-		/* Might not be aligned, size is ~32 bytes. */
-		memcpy(&ite, buf, sizeof(ite));
-
-		if (ite.namelen >= sizeof(te->name)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		if (te_offset + sizeof(ite) + ite.namelen > datalen) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-
-		if (*nentries >= tree->nentries) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		te = &tree->entries[*nentries];
-		te_name = buf + sizeof(ite);
-		memcpy(te->name, te_name, ite.namelen);
-		te->name[ite.namelen] = '\0';
-		memcpy(te->id.sha1, ite.id, SHA1_DIGEST_LENGTH);
-		te->mode = ite.mode;
-		te->idx = *nentries;
-		(*nentries)++;
-
-		te_offset += sizeof(ite) + ite.namelen;
-	}
-
-	return err;
 }
 
 const struct got_error *
@@ -1604,6 +1528,7 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 	    MIN(sizeof(struct got_imsg_error),
 	    sizeof(struct got_imsg_tree_object));
 	struct got_imsg_tree_object *itree;
+	size_t i;
 	int nentries = 0;
 
 	*tree = NULL;
@@ -1616,6 +1541,9 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 		struct imsg imsg;
 		size_t n;
 		size_t datalen;
+		struct got_imsg_tree_entries *ientries;
+		struct got_tree_entry *te = NULL;
+		size_t te_offset;
 
 		n = imsg_get(ibuf, &imsg);
 		if (n == 0) {
@@ -1682,8 +1610,56 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			err = recv_tree_entries(imsg.data, datalen,
-			    *tree, &nentries);
+			if (datalen <= sizeof(*ientries) ||
+			    datalen > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+
+			ientries = imsg.data;
+			if (ientries->nentries > INT_MAX) {
+				err = got_error_msg(GOT_ERR_NO_SPACE,
+				    "too many tree entries");
+				break;
+			}
+			te_offset = sizeof(*ientries);
+			for (i = 0; i < ientries->nentries; i++) {
+				struct got_imsg_tree_entry ite;
+				const char *te_name;
+				uint8_t *buf = imsg.data + te_offset;
+
+				if (te_offset >= datalen) {
+					err = got_error(GOT_ERR_PRIVSEP_LEN);
+					break;
+				}
+
+				/* Might not be aligned, size is ~32 bytes. */
+				memcpy(&ite, buf, sizeof(ite));
+
+				if (ite.namelen >= sizeof(te->name)) {
+					err = got_error(GOT_ERR_PRIVSEP_LEN);
+					break;
+				}
+				if (te_offset + sizeof(ite) + ite.namelen >
+				    datalen) {
+					err = got_error(GOT_ERR_PRIVSEP_LEN);
+					break;
+				}
+				if (nentries >= (*tree)->nentries) {
+					err = got_error(GOT_ERR_PRIVSEP_LEN);
+					break;
+				}
+				te = &(*tree)->entries[nentries];
+				te_name = buf + sizeof(ite);
+				memcpy(te->name, te_name, ite.namelen);
+				te->name[ite.namelen] = '\0';
+				memcpy(te->id.sha1, ite.id, SHA1_DIGEST_LENGTH);
+				te->mode = ite.mode;
+				te->idx = nentries;
+				nentries++;
+
+				te_offset += sizeof(ite) + ite.namelen;
+			}
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -2754,269 +2730,6 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 }
 
 const struct got_error *
-got_privsep_send_enumerated_tree(size_t *totlen, struct imsgbuf *ibuf,
-    struct got_object_id *tree_id, const char *path,
-    struct got_parsed_tree_entry *entries, int nentries)
-{
-	const struct got_error *err = NULL;
-	struct ibuf *wbuf;
-	size_t path_len = strlen(path);
-	size_t msglen;
-
-	msglen = sizeof(struct got_imsg_enumerated_tree) + path_len;
-	wbuf = imsg_create(ibuf, GOT_IMSG_ENUMERATED_TREE, 0, 0, msglen);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create ENUMERATED_TREE");
-
-	if (imsg_add(wbuf, tree_id->sha1, SHA1_DIGEST_LENGTH) == -1)
-		return got_error_from_errno("imsg_add ENUMERATED_TREE");
-	if (imsg_add(wbuf, &nentries, sizeof(nentries)) == -1)
-		return got_error_from_errno("imsg_add ENUMERATED_TREE");
-	if (imsg_add(wbuf, path, path_len) == -1)
-		return got_error_from_errno("imsg_add ENUMERATED_TREE");
-
-	wbuf->fd = -1;
-	imsg_close(ibuf, wbuf);
-
-	if (entries) {
-		err = send_tree_entries(ibuf, entries, nentries);
-		if (err)
-			return err;
-	}
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_object_enumeration_request(struct imsgbuf *ibuf)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_ENUMERATION_REQUEST,
-	    0, 0, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose "
-		    "OBJECT_ENUMERATION_REQUEST");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_object_enumeration_done(struct imsgbuf *ibuf)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_ENUMERATION_DONE,
-	    0, 0, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose "
-		    "OBJECT_ENUMERATION_DONE");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_enumerated_commit(struct imsgbuf *ibuf,
-    struct got_object_id *id, time_t mtime)
-{
-	struct ibuf *wbuf;
-
-	wbuf = imsg_create(ibuf, GOT_IMSG_ENUMERATED_COMMIT, 0, 0,
-	    sizeof(struct got_imsg_enumerated_commit) + SHA1_DIGEST_LENGTH);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create ENUMERATED_COMMIT");
-
-	/* Keep in sync with struct got_imsg_enumerated_commit! */
-	if (imsg_add(wbuf, id, SHA1_DIGEST_LENGTH) == -1)
-		return got_error_from_errno("imsg_add ENUMERATED_COMMIT");
-	if (imsg_add(wbuf, &mtime, sizeof(mtime)) == -1)
-		return got_error_from_errno("imsg_add ENUMERATED_COMMIT");
-
-	wbuf->fd = -1;
-	imsg_close(ibuf, wbuf);
-	/* Don't flush yet, tree entries or ENUMERATION_DONE will follow. */
-	return NULL;
-}
-
-const struct got_error *
-got_privsep_recv_enumerated_objects(struct imsgbuf *ibuf,
-    got_object_enumerate_commit_cb cb_commit,
-    got_object_enumerate_tree_cb cb_tree, void *cb_arg,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct imsg imsg;
-	struct got_imsg_enumerated_commit *icommit = NULL;
-	struct got_object_id commit_id;
-	int have_commit = 0;
-	time_t mtime = 0;
-	struct got_tree_object tree;
-	struct got_imsg_enumerated_tree *itree;
-	struct got_object_id tree_id;
-	char *path = NULL, *canon_path = NULL;
-	size_t datalen, path_len;
-	int nentries = -1;
-	int done = 0;
-
-	memset(&tree, 0, sizeof(tree));
-
-	while (!done) {
-		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-		if (err)
-			break;
-
-		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-		switch (imsg.hdr.type) {
-		case GOT_IMSG_ENUMERATED_COMMIT: 
-			if (have_commit && nentries != -1) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			if (datalen != sizeof(*icommit)) {
-				err = got_error(GOT_ERR_PRIVSEP_LEN);
-				break;
-			}
-			icommit = (struct got_imsg_enumerated_commit *)imsg.data;
-			memcpy(commit_id.sha1, icommit->id, SHA1_DIGEST_LENGTH);
-			mtime = icommit->mtime;
-			err = cb_commit(cb_arg, mtime, &commit_id, repo);
-			if (err)
-				break;
-			have_commit = 1;
-			break;
-		case GOT_IMSG_ENUMERATED_TREE:
-			/* Should be preceeded by GOT_IMSG_ENUMERATED_COMMIT. */
-			if (!have_commit) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			if (datalen < sizeof(*itree)) {
-				err = got_error(GOT_ERR_PRIVSEP_LEN);
-				break;
-			}
-			itree = imsg.data;
-			path_len = datalen - sizeof(*itree);
-			if (path_len == 0) {
-				err = got_error(GOT_ERR_PRIVSEP_LEN);
-				break;
-			}
-			memcpy(tree_id.sha1, itree->id, sizeof(tree_id.sha1));
-			free(path);
-			path = malloc(path_len + 1);
-			if (path == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			free(canon_path);
-			canon_path = malloc(path_len + 1);
-			if (canon_path == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			memcpy(path, (uint8_t *)imsg.data + sizeof(*itree),
-			    path_len);
-			path[path_len] = '\0';
-			if (!got_path_is_absolute(path)) {
-				err = got_error(GOT_ERR_BAD_PATH);
-				break;
-			}
-			if (got_path_is_root_dir(path)) {
-				/* XXX check what got_canonpath() does wrong */
-				canon_path[0] = '/';
-				canon_path[1] = '\0';
-			} else {
-				err = got_canonpath(path, canon_path,
-				    path_len + 1);
-				if (err)
-					break;
-			}
-			if (strcmp(path, canon_path) != 0) {
-				err = got_error(GOT_ERR_BAD_PATH);
-				break;
-			}
-			if (nentries != -1) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			if (itree->nentries < -1) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			if (itree->nentries == -1) {
-				/* Tree was not found in pack file. */
-				err = cb_tree(cb_arg, NULL, mtime, &tree_id,
-				    path, repo);
-				break;
-			}
-			if (itree->nentries > INT_MAX) {
-				err = got_error(GOT_ERR_PRIVSEP_LEN);
-				break;
-			}
-			tree.entries = calloc(itree->nentries,
-			    sizeof(struct got_tree_entry));
-			if (tree.entries == NULL) {
-				err = got_error_from_errno("calloc");
-				break;
-			}
-			if (itree->nentries == 0) {
-				err = cb_tree(cb_arg, &tree, mtime, &tree_id,
-				    path, repo);
-				if (err)
-					break;
-
-				/* Prepare for next tree. */
-				free(tree.entries);
-				memset(&tree, 0, sizeof(tree));
-				nentries = -1;
-			} else {
-				tree.nentries = itree->nentries;
-				nentries = 0;
-			}
-			break;
-		case GOT_IMSG_TREE_ENTRIES:
-			/* Should be preceeded by GOT_IMSG_ENUMERATED_TREE. */
-			if (nentries <= -1) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			err = recv_tree_entries(imsg.data, datalen,
-			    &tree, &nentries);
-			if (err)
-				break;
-			if (tree.nentries == nentries) {
-				err = cb_tree(cb_arg, &tree, mtime, &tree_id,
-				    path, repo);
-				if (err)
-					break;
-
-				/* Prepare for next tree. */
-				free(tree.entries);
-				memset(&tree, 0, sizeof(tree));
-				nentries = -1;
-			}
-			break;
-		case GOT_IMSG_TREE_ENUMERATION_DONE:
-			/* All trees have been found and traversed. */
-			if (path == NULL || nentries != -1) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			have_commit = 0;
-			break;
-		case GOT_IMSG_OBJECT_ENUMERATION_DONE:
-			done = 1;
-			break;
-		default:
-			err = got_error(GOT_ERR_PRIVSEP_MSG);
-			break;
-		}
-
-		imsg_free(&imsg);
-		if (err)
-			break;
-	}
-
-	free(path);
-	free(canon_path);
-	free(tree.entries);
-	return err;
-}
-
-const struct got_error *
 got_privsep_send_raw_delta_req(struct imsgbuf *ibuf, int idx,
     struct got_object_id *id)
 {
@@ -3120,8 +2833,9 @@ got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	return err;
 }
 
-static const struct got_error *
-send_idlist(struct imsgbuf *ibuf, struct got_object_id **ids, size_t nids)
+const struct got_error *
+got_privsep_send_object_idlist(struct imsgbuf *ibuf,
+    struct got_object_id **ids, size_t nids)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_object_idlist idlist;
@@ -3152,34 +2866,6 @@ send_idlist(struct imsgbuf *ibuf, struct got_object_id **ids, size_t nids)
 	imsg_close(ibuf, wbuf);
 
 	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_object_idlist(struct imsgbuf *ibuf,
-    struct got_object_id **ids, size_t nids)
-{
-	const struct got_error *err = NULL;
-	struct got_object_id *idlist[GOT_IMSG_OBJ_ID_LIST_MAX_NIDS];
-	int i, j = 0;
-
-	for (i = 0; i < nids; i++) { 
-		j = i % nitems(idlist);
-		idlist[j] = ids[i];
-		if (j >= nitems(idlist) - 1) {
-			err = send_idlist(ibuf, idlist, j + 1);
-			if (err)
-				return err;
-			j = 0;
-		}
-	}
-
-	if (j > 0) {
-		err = send_idlist(ibuf, idlist, j + 1);
-		if (err)
-			return err;
-	}
-
-	return NULL;
 }
 
 const struct got_error *

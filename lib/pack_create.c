@@ -903,15 +903,20 @@ add_object(int want_meta, struct got_object_idset *idset,
 static const struct got_error *
 load_tree_entries(struct got_object_id_queue *ids, int want_meta,
     struct got_object_idset *idset, struct got_object_idset *idset_exclude,
-    struct got_tree_object *tree,
+    struct got_object_id *tree_id,
     const char *dpath, time_t mtime, uint32_t seed, struct got_repository *repo,
     int loose_obj_only, int *ncolored, int *nfound, int *ntrees,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
+	struct got_tree_object *tree;
 	char *p = NULL;
 	int i;
+
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		return err;
 
 	(*ntrees)++;
 	err = report_progress(progress_cb, progress_arg, rl,
@@ -934,16 +939,8 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 		    got_object_idset_contains(idset, id) ||
 		    got_object_idset_contains(idset_exclude, id))
 			continue;
-
-		/*
-		 * If got-read-pack is crawling trees for us then
-		 * we are only here to collect blob IDs.
-		 */
-		if (ids == NULL && S_ISDIR(mode))
-			continue;
-
-		if (asprintf(&p, "%s%s%s", dpath,
-		    got_path_is_root_dir(dpath) ? "" : "/",
+		
+		if (asprintf(&p, "%s%s%s", dpath, dpath[0] != '\0' ? "/" : "",
 		    got_tree_entry_get_name(e)) == -1) {
 			err = got_error_from_errno("asprintf");
 			break;
@@ -973,6 +970,7 @@ load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 		}
 	}
 
+	got_object_tree_close(tree);
 	free(p);
 	return err;
 }
@@ -989,7 +987,6 @@ load_tree(int want_meta, struct got_object_idset *idset,
 	const struct got_error *err = NULL;
 	struct got_object_id_queue tree_ids;
 	struct got_object_qid *qid;
-	struct got_tree_object *tree = NULL;
 
 	if (got_object_idset_contains(idset, tree_id) ||
 	    got_object_idset_contains(idset_exclude, tree_id))
@@ -1037,32 +1034,20 @@ load_tree(int want_meta, struct got_object_idset *idset,
 			break;
 		}
 
-		err = got_object_open_as_tree(&tree, repo, &qid->id);
-		if (err) {
-			free(qid->data);
-			got_object_qid_free(qid);
-			break;
-		}
-
 		err = load_tree_entries(&tree_ids, want_meta, idset,
-		    idset_exclude, tree, path, mtime, seed, repo,
-		    loose_obj_only, ncolored, nfound, ntrees,
-		    progress_cb, progress_arg, rl,
+		    idset_exclude, &qid->id,
+		    path, mtime, seed, repo, loose_obj_only, ncolored, nfound,
+		    ntrees, progress_cb, progress_arg, rl,
 		    cancel_cb, cancel_arg);
 		free(qid->data);
 		got_object_qid_free(qid);
 		if (err)
 			break;
-
-		got_object_tree_close(tree);
-		tree = NULL;
 	}
 
 	STAILQ_FOREACH(qid, &tree_ids, entry)
 		free(qid->data);
 	got_object_id_queue_free(&tree_ids);
-	if (tree)
-		got_object_tree_close(tree);
 	return err;
 }
 
@@ -1464,206 +1449,6 @@ done:
 	return err;
 }
 
-struct load_packed_obj_arg {
-	/* output parameters: */
-	struct got_object_id *id;
-	char *dpath;
-	time_t mtime;
-
-	/* input parameters: */
-	uint32_t seed;
-	int want_meta;
-	struct got_object_idset *idset;
-	struct got_object_idset *idset_exclude;
-	int loose_obj_only;
-	int *ncolored;
-	int *nfound;
-	int *ntrees;
-	got_pack_progress_cb progress_cb;
-	void *progress_arg;
-	struct got_ratelimit *rl;
-	got_cancel_cb cancel_cb;
-	void *cancel_arg;
-};
-
-static const struct got_error *
-load_packed_commit_id(void *arg, time_t mtime, struct got_object_id *id,
-    struct got_repository *repo)
-{
-	struct load_packed_obj_arg *a = arg;
-
-	if (got_object_idset_contains(a->idset, id) ||
-	    got_object_idset_contains(a->idset_exclude, id))
-		return NULL;
-
-	return add_object(a->want_meta,
-	    a->want_meta ? a->idset : a->idset_exclude,
-	    id, "", GOT_OBJ_TYPE_COMMIT, mtime, a->seed, a->loose_obj_only,
-	    repo, a->ncolored, a->nfound, a->ntrees,
-	    a->progress_cb, a->progress_arg, a->rl);
-}
-
-static const struct got_error *
-load_packed_tree_ids(void *arg, struct got_tree_object *tree, time_t mtime,
-    struct got_object_id *id, const char *dpath, struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct load_packed_obj_arg *a = arg;
-	const char *relpath;
-
-	/*
-	 * When we receive a tree's ID and path but not the tree itself,
-	 * this tree object was not found in the pack file. This is the
-	 * last time we are being called for this optimized traversal.
-	 * Return from here and switch to loading objects the slow way.
-	 */
-	if (tree == NULL) {
-		free(a->id);
-		a->id = got_object_id_dup(id);
-		if (a->id == NULL) {
-			err = got_error_from_errno("got_object_id_dup");
-			free(a->dpath);
-			a->dpath = NULL;
-			return err;
-		}
-
-		free(a->dpath);
-		a->dpath = strdup(dpath);
-		if (a->dpath == NULL) {
-			err = got_error_from_errno("strdup");
-			free(a->id);
-			a->id = NULL;
-			return err;
-		}
-
-		a->mtime = mtime;
-		return NULL;
-	}
-
-	if (got_object_idset_contains(a->idset, id) ||
-	    got_object_idset_contains(a->idset_exclude, id))
-		return NULL;
-
-	relpath = dpath;
-	while (relpath[0] == '/')
-		relpath++;
-
-	err = add_object(a->want_meta,
-	    a->want_meta ? a->idset : a->idset_exclude,
-	    id, relpath, GOT_OBJ_TYPE_TREE, mtime, a->seed,
-	    a->loose_obj_only, repo, a->ncolored, a->nfound, a->ntrees,
-	    a->progress_cb, a->progress_arg, a->rl);
-	if (err)
-		return err;
-
-	return load_tree_entries(NULL, a->want_meta, a->idset,
-	    a->idset_exclude, tree, dpath, mtime, a->seed, repo,
-	    a->loose_obj_only, a->ncolored, a->nfound, a->ntrees,
-	    a->progress_cb, a->progress_arg, a->rl,
-	    a->cancel_cb, a->cancel_arg);
-}
-
-static const struct got_error *
-load_packed_object_ids(struct got_object_id **ours, int nours,
-    struct got_object_id **theirs, int ntheirs,
-    int want_meta, uint32_t seed, struct got_object_idset *idset,
-    struct got_object_idset *idset_exclude, int loose_obj_only,
-    struct got_repository *repo, struct got_packidx *packidx,
-    int *ncolored, int *nfound, int *ntrees,
-    got_pack_progress_cb progress_cb, void *progress_arg,
-    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
-{
-	const struct got_error *err = NULL;
-	struct load_packed_obj_arg lpa;
-
-	memset(&lpa, 0, sizeof(lpa));
-	lpa.seed = seed;
-	lpa.want_meta = want_meta;
-	lpa.idset = idset;
-	lpa.idset_exclude = idset_exclude;
-	lpa.loose_obj_only = loose_obj_only;
-	lpa.ncolored = ncolored;
-	lpa.nfound = nfound;
-	lpa.ntrees = ntrees;
-	lpa.progress_cb = progress_cb;
-	lpa.progress_arg = progress_arg;
-	lpa.rl = rl;
-	lpa.cancel_cb = cancel_cb;
-	lpa.cancel_arg = cancel_arg;
-
-	/* Attempt to load objects via got-read-pack, as far as possible. */
-	err = got_object_enumerate(load_packed_commit_id,
-	   load_packed_tree_ids, &lpa, ours, nours, theirs, ntheirs,
-	   packidx, repo);
-	if (err)
-		return err;
-
-	if (lpa.id == NULL)
-		return NULL;
-
-	/*
-	 * An incomplete tree hierarchy was present in the pack file
-	 * and caused loading to be aborted midway through a commit.
-	 * Continue loading trees the slow way.
-	 */
-	err = load_tree(want_meta, idset, idset_exclude,
-	    lpa.id, lpa.dpath, lpa.mtime, seed, repo, loose_obj_only,
-	    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
-	    cancel_cb, cancel_arg);
-	free(lpa.id);
-	free(lpa.dpath);
-	return err;
-}
-
-static const struct got_error *
-find_pack_for_enumeration(struct got_packidx **best_packidx,
-    struct got_object_id **ids, int nids, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pathlist_entry *pe;
-	const char *best_packidx_path = NULL;
-	int nobj_max = 0;
-	int ncommits_max = 0;
-
-	*best_packidx = NULL;
-
-	/*
-	 * Find the largest pack which contains at least some of the
-	 * commits and tags we are interested in.
-	 */
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
-		const char *path_packidx = pe->path;
-		struct got_packidx *packidx;
-		int nobj, i, idx, ncommits = 0;
-
-		err = got_repo_get_packidx(&packidx, path_packidx, repo);
-		if (err)
-			break;
-
-		nobj = be32toh(packidx->hdr.fanout_table[0xff]);
-		if (nobj <= nobj_max)
-			continue;
-
-		for (i = 0; i < nids; i++) {
-			idx = got_packidx_get_object_idx(packidx, ids[i]);
-			if (idx != -1)
-				ncommits++;
-		}
-		if (ncommits > ncommits_max) {
-			best_packidx_path = path_packidx;
-			nobj_max = nobj;
-			ncommits_max = ncommits;
-		}
-	}
-
-	if (best_packidx_path) {
-		err = got_repo_get_packidx(best_packidx, best_packidx_path,
-		    repo);
-	}
-
-	return err;
-}
-
 static const struct got_error *
 load_object_ids(int *ncolored, int *nfound, int *ntrees,
     struct got_object_idset *idset, struct got_object_id **theirs, int ntheirs,
@@ -1674,7 +1459,6 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
-	struct got_packidx *packidx = NULL;
 	int i, nobj = 0, obj_type;
 	struct got_object_idset *idset_exclude;
 
@@ -1690,18 +1474,6 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 	    repo, progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
-
-	err = find_pack_for_enumeration(&packidx, theirs, ntheirs, repo);
-	if (err)
-		goto done;
-	if (packidx) {
-		err = load_packed_object_ids(theirs, ntheirs, NULL, 0, 0,
-		    seed, idset, idset_exclude, loose_obj_only, repo, packidx,
-		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
-		    cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-	}
 
 	for (i = 0; i < ntheirs; i++) {
 		struct got_object_id *id = theirs[i];
@@ -1725,18 +1497,6 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 			if (err)
 				goto done;
 		}
-	}
-
-	err = find_pack_for_enumeration(&packidx, ids, nobj, repo);
-	if (err)
-		goto done;
-	if (packidx) {
-		err = load_packed_object_ids(ids, nobj, theirs, ntheirs, 1,
-		    seed, idset, idset_exclude, loose_obj_only, repo, packidx,
-		    ncolored, nfound, ntrees,
-		    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
-		if (err)
-			goto done;
 	}
 
 	for (i = 0; i < nobj; i++) {
