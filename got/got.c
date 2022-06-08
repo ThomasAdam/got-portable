@@ -3476,7 +3476,7 @@ done:
 static const struct got_error *
 diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
     const char *path, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo)
+    int force_text_diff, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -3506,7 +3506,7 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 	while (path[0] == '/')
 		path++;
 	err = got_diff_blob(NULL, NULL, blob1, blob2, f1, f2, path, path,
-	    diff_context, ignore_whitespace, force_text_diff, stdout);
+	    diff_context, ignore_whitespace, force_text_diff, outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -3521,7 +3521,7 @@ done:
 static const struct got_error *
 diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
     const char *path, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo)
+    int force_text_diff, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -3552,7 +3552,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
-	arg.outfile = stdout;
+	arg.outfile = outfile;
 	arg.line_offsets = NULL;
 	arg.nlines = 0;
 	while (path[0] == '/')
@@ -3622,7 +3622,8 @@ done:
 
 static const struct got_error *
 print_patch(struct got_commit_object *commit, struct got_object_id *id,
-    const char *path, int diff_context, struct got_repository *repo)
+    const char *path, int diff_context, struct got_repository *repo,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *pcommit = NULL;
@@ -3669,15 +3670,16 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 			free(obj_id2);
 			goto done;
 		}
-		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+		fprintf(outfile,
+		    "diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
 		switch (obj_type) {
 		case GOT_OBJ_TYPE_BLOB:
 			err = diff_blobs(obj_id1, obj_id2, path, diff_context,
-			    0, 0, repo);
+			    0, 0, repo, outfile);
 			break;
 		case GOT_OBJ_TYPE_TREE:
 			err = diff_trees(obj_id1, obj_id2, path, diff_context,
-			    0, 0, repo);
+			    0, 0, repo, outfile);
 			break;
 		default:
 			err = got_error(GOT_ERR_OBJ_TYPE);
@@ -3696,10 +3698,10 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 			if (err)
 				goto done;
 		}
-		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null",
-		    id_str2);
+		fprintf(outfile,
+		    "diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
 		err = diff_trees(obj_id1, obj_id2, "", diff_context, 0, 0,
-		    repo);
+		    repo, outfile);
 	}
 done:
 	free(id_str1);
@@ -3768,6 +3770,46 @@ match_changed_paths(int *have_match, struct got_pathlist_head *changed_paths,
 			break;
 		}
 	}
+}
+
+static const struct got_error *
+match_patch(int *have_match, struct got_commit_object *commit,
+    struct got_object_id *id, const char *path, int diff_context,
+    struct got_repository *repo, regex_t *regex)
+{
+	const struct got_error *err = NULL;
+	FILE *f;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
+	regmatch_t regmatch;
+
+	*have_match = 0;
+
+	f = got_opentemp();
+	if (f == NULL)
+		return got_error_from_errno("got_opentemp");
+
+	err = print_patch(commit, id, path, diff_context, repo, f);
+	if (err)
+		goto done;
+
+	if (fseeko(f, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
+
+	while ((linelen = getline(&line, &linesize, f)) != -1) {
+		if (regexec(regex, line, 1, &regmatch, 0) == 0) {
+			*have_match = 1;
+			break;
+		}
+	}
+done:
+	free(line);
+	if (fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	return err;
 }
 
 #define GOT_COMMIT_SEP_STR "-----------------------------------------------\n"
@@ -3955,7 +3997,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		printf("\n");
 	}
 	if (show_patch) {
-		err = print_patch(commit, id, path, diff_context, repo);
+		err = print_patch(commit, id, path, diff_context, repo, stdout);
 		if (err == 0)
 			printf("\n");
 	}
@@ -4034,6 +4076,12 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			if (have_match == 0 && show_changed_paths)
 				match_changed_paths(&have_match,
 				    &changed_paths, &regex);
+			if (have_match == 0 && show_patch) {
+				err = match_patch(&have_match, commit, id,
+				    path, diff_context, repo, &regex);
+				if (err)
+					break;
+			}
 			if (have_match == 0) {
 				got_object_commit_close(commit);
 				TAILQ_FOREACH(pe, &changed_paths, entry) {
