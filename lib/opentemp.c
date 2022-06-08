@@ -113,3 +113,15 @@ got_opentemp_named_fd(char **path, int *outfd, const char *basepath)
 	*outfd = fd;
 	return err;
 }
+
+const struct got_error *
+got_opentemp_truncate(FILE *f)
+{
+	if (fpurge(f) == EOF)
+		return got_error_from_errno("fpurge");
+	if (ftruncate(fileno(f), 0L) == -1)
+		return got_error_from_errno("ftruncate");
+	if (fseeko(f, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+	return NULL;
+}

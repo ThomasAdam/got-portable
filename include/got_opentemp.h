@@ -37,3 +37,6 @@ const struct got_error *got_opentemp_named(char **, FILE **, const char *);
 
 /* Like got_opentemp_named() but returns a file descriptor instead of a FILE. */
 const struct got_error *got_opentemp_named_fd(char **, int *, const char *);
+
+/* Truncate a file. This is useful for re-using open temporary files. */
+const struct got_error *got_opentemp_truncate(FILE *);

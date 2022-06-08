@@ -31,6 +31,7 @@
 #include "got_path.h"
 #include "got_cancel.h"
 #include "got_worktree.h"
+#include "got_opentemp.h"
 
 #include "got_lib_diff.h"
 #include "got_lib_delta.h"
@@ -48,18 +49,6 @@ add_line_offset(off_t **line_offsets, size_t *nlines, off_t off)
 	*line_offsets = p;
 	(*line_offsets)[*nlines] = off;
 	(*nlines)++;
-	return NULL;
-}
-
-static const struct got_error *
-reset_file(FILE *f)
-{
-	if (fpurge(f) == EOF)
-		return got_error_from_errno("fpurge");
-	if (ftruncate(fileno(f), 0L) == -1)
-		return got_error_from_errno("ftruncate");
-	if (fseeko(f, 0L, SEEK_SET) == -1)
-		return got_error_from_errno("fseeko");
 	return NULL;
 }
 
@@ -91,12 +80,12 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 		*resultp = NULL;
 
 	if (f1) {
-		err = reset_file(f1);
+		err = got_opentemp_truncate(f1);
 		if (err)
 			goto done;
 	}
 	if (f2) {
-		err = reset_file(f2);
+		err = got_opentemp_truncate(f2);
 		if (err)
 			goto done;
 	}

@@ -3776,10 +3776,9 @@ match_changed_paths(int *have_match, struct got_pathlist_head *changed_paths,
 static const struct got_error *
 match_patch(int *have_match, struct got_commit_object *commit,
     struct got_object_id *id, const char *path, int diff_context,
-    struct got_repository *repo, regex_t *regex)
+    struct got_repository *repo, regex_t *regex, FILE *f)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
@@ -3787,9 +3786,9 @@ match_patch(int *have_match, struct got_commit_object *commit,
 
 	*have_match = 0;
 
-	f = got_opentemp();
-	if (f == NULL)
-		return got_error_from_errno("got_opentemp");
+	err = got_opentemp_truncate(f);
+	if (err)
+		return err;
 
 	err = print_patch(commit, id, path, diff_context, repo, f);
 	if (err)
@@ -3808,8 +3807,6 @@ match_patch(int *have_match, struct got_commit_object *commit,
 	}
 done:
 	free(line);
-	if (fclose(f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -4016,7 +4013,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_changed_paths,
     int show_patch, const char *search_pattern, int diff_context, int limit,
     int log_branches, int reverse_display_order,
-    struct got_reflist_object_id_map *refs_idmap, int one_line)
+    struct got_reflist_object_id_map *refs_idmap, int one_line,
+    FILE *tmpfile)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -4079,7 +4077,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				    &changed_paths, &regex);
 			if (have_match == 0 && show_patch) {
 				err = match_patch(&have_match, commit, id,
-				    path, diff_context, repo, &regex);
+				    path, diff_context, repo, &regex,
+				    tmpfile);
 				if (err)
 					break;
 			}
@@ -4207,6 +4206,7 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 	struct got_reflist_head refs;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
+	FILE *tmpfile = NULL;
 
 	TAILQ_INIT(&refs);
 
@@ -4398,9 +4398,18 @@ cmd_log(int argc, char *argv[])
 		worktree = NULL;
 	}
 
+	if (search_pattern && show_patch) {
+		tmpfile = got_opentemp();
+		if (tmpfile == NULL) {
+			error = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+	}
+
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_patch, search_pattern, diff_context,
-	    limit, log_branches, reverse_display_order, refs_idmap, one_line);
+	    limit, log_branches, reverse_display_order, refs_idmap, one_line,
+	    tmpfile);
 done:
 	free(path);
 	free(repo_path);
@@ -4414,6 +4423,8 @@ done:
 	}
 	if (refs_idmap)
 		got_reflist_object_id_map_free(refs_idmap);
+	if (tmpfile && fclose(tmpfile) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	got_ref_list_free(&refs);
 	return error;
 }
