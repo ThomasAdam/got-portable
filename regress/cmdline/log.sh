@@ -297,6 +297,40 @@ test_log_limit() {
 	test_done "$testroot" "0"
 }
 
+test_log_oneline() {
+	local testroot=`test_init log_oneline`
+	local commit_id0=`git_show_head $testroot/repo`
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "test oneline
+no" > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	echo "modified beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "  test oneline
+no" > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	printf "%.7s test oneline\n" $commit_id2 > $testroot/stdout.expected
+	printf "%.7s test oneline\n" $commit_id1 >> $testroot/stdout.expected
+
+	(cd $testroot/repo && got log -s | head -n 2 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "0"
+}
+
 test_log_patch_added_file() {
 	local testroot=`test_init log_patch_added_file`
 	local commit_id0=`git_show_head $testroot/repo`
@@ -587,7 +621,7 @@ test_log_reverse_display() {
 	# commit matching with -s applies before -R
 	echo "commit $commit_id1" > $testroot/stdout.expected
 	echo "commit $commit_id2" >> $testroot/stdout.expected
-	(cd $testroot/wt && got log -R -s 'commit[12]' | \
+	(cd $testroot/wt && got log -R -S 'commit[12]' | \
 		grep ^commit > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -815,6 +849,7 @@ run_test test_log_in_worktree
 run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
+run_test test_log_oneline
 run_test test_log_patch_added_file
 run_test test_log_nonexistent_path
 run_test test_log_end_at_commit

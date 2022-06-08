@@ -756,7 +756,7 @@ does not support negated ignore patterns prefixed with
 and gives no special significance to the location of path component separators,
 .Dq / ,
 in a pattern.
-.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl P Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl R Oc Oo Fl x Ar commit Oc Op Ar path
+.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl P Oc Oo Fl s Oc Oo Fl S Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl R Oc Oo Fl x Ar commit Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -802,6 +802,9 @@ Display the patch of modifications made in each commit.
 If a
 .Ar path
 is specified, only show the patch of modifications at or within this path.
+Cannot be used with the
+.Fl s
+option.
 .It Fl P
 Display the list of file paths changed in each commit, using the following
 status codes:
@@ -811,7 +814,20 @@ status codes:
 .It A Ta new file was added
 .It m Ta modified file modes (executable bit only)
 .El
-.It Fl s Ar search-pattern
+Cannot be used with the
+.Fl s
+option.
+.It Fl s
+Display a short one-line summary of each commit, instead of the default
+history format.
+The one-line format prints the beginning of the SHA1 hash of each commit,
+followed by a space and the first line of the log message.
+Cannot be used together with the
+.Fl p
+or
+.Fl P
+option.
+.It Fl S Ar search-pattern
 If specified, show only commits with a log message matched by the extended
 regular expression
 .Ar search-pattern .
