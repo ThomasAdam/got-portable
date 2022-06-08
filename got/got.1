@@ -832,12 +832,12 @@ option.
 If specified, show only commits with a log message matched by the extended
 regular expression
 .Ar search-pattern .
-When used together with
-.Fl p ,
-then the lines in committed patches can be matched.
-When used together with
-.Fl P ,
-then the file paths changed by a commit can be matched as well.
+Lines in committed patches will be matched if
+.Fl p
+is specified.
+File paths changed by a commit will be matched if
+.Fl P
+is specified.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Fl r Ar repository-path
