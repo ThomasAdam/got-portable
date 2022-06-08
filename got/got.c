@@ -3840,6 +3840,39 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 }
 
 static const struct got_error *
+print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	char *id_str, *s, *nl, *logmsg0;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		goto done;
+
+	s = logmsg0;
+	while (isspace((unsigned char)s[0]))
+		s++;
+
+	nl = strchr(s, '\n');
+	if (nl) {
+		*nl = '\0';
+	}
+
+	printf("%.7s %s\n", id_str, s);
+
+	if (fflush(stdout) != 0 && err == NULL)
+		err = got_error_from_errno("fflush");
+done:
+	free(id_str);
+	free(logmsg0);
+	return err;
+}
+
+static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, const char *path,
     struct got_pathlist_head *changed_paths, int show_patch,
@@ -3940,7 +3973,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_changed_paths,
     int show_patch, const char *search_pattern, int diff_context, int limit,
     int log_branches, int reverse_display_order,
-    struct got_reflist_object_id_map *refs_idmap)
+    struct got_reflist_object_id_map *refs_idmap, int one_line)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -4019,9 +4052,12 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			STAILQ_INSERT_HEAD(&reversed_commits, qid, entry);
 			got_object_commit_close(commit);
 		} else {
-			err = print_commit(commit, id, repo, path,
-			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs_idmap, NULL);
+			if (one_line)
+				err = print_commit_oneline(commit, id);
+			else
+				err = print_commit(commit, id, repo, path,
+				    show_changed_paths ? &changed_paths : NULL,
+				    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -4048,9 +4084,12 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				if (err)
 					break;
 			}
-			err = print_commit(commit, &qid->id, repo, path,
-			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs_idmap, NULL);
+			if (one_line)
+				err = print_commit_oneline(commit, &qid->id);
+			else
+				err = print_commit(commit, &qid->id, repo, path,
+				    show_changed_paths ? &changed_paths : NULL,
+				    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -4081,9 +4120,9 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] "
-	    "[-p] [-P] [-x commit] [-s search-pattern] [-r repository-path] "
-	    "[-R] [path]\n", getprogname());
+	fprintf(stderr, "usage: %s log [-b] [-p] [-P] [-s] [-c commit] "
+	    "[-C number] [ -l N ] [-x commit] [-S search-pattern] "
+	    "[-r repository-path] [-R] [path]\n", getprogname());
 	exit(1);
 }
 
@@ -4115,7 +4154,7 @@ cmd_log(int argc, char *argv[])
 	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
 	int show_changed_paths = 0, show_patch = 0, limit = 0, log_branches = 0;
-	int reverse_display_order = 0;
+	int reverse_display_order = 0, one_line = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
@@ -4131,7 +4170,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bpPc:C:l:r:Rs:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "bpPc:C:l:r:RsS:x:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -4169,6 +4208,9 @@ cmd_log(int argc, char *argv[])
 			reverse_display_order = 1;
 			break;
 		case 's':
+			one_line = 1;
+			break;
+		case 'S':
 			search_pattern = optarg;
 			break;
 		case 'x':
@@ -4187,6 +4229,9 @@ cmd_log(int argc, char *argv[])
 		diff_context = 3;
 	else if (!show_patch)
 		errx(1, "-C requires -p");
+
+	if (one_line && (show_patch || show_changed_paths))
+		errx(1, "cannot use -s with -p or -P");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -4306,7 +4351,7 @@ cmd_log(int argc, char *argv[])
 
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_patch, search_pattern, diff_context,
-	    limit, log_branches, reverse_display_order, refs_idmap);
+	    limit, log_branches, reverse_display_order, refs_idmap, one_line);
 done:
 	free(path);
 	free(repo_path);
