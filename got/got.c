@@ -7481,6 +7481,7 @@ static const struct got_error *
 show_change(unsigned char status, const char *path, FILE *patch_file, int n,
     int nchanges, const char *action)
 {
+	const struct got_error *err;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
@@ -7498,8 +7499,12 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 		printf(GOT_COMMIT_SEP_STR);
 		while ((linelen = getline(&line, &linesize, patch_file)) != -1)
 			printf("%s", line);
-		if (ferror(patch_file))
-			return got_error_from_errno("getline");
+		if (linelen == -1 && ferror(patch_file)) {
+			err = got_error_from_errno("getline");
+			free(line);
+			return err;
+		}
+		free(line);
 		printf(GOT_COMMIT_SEP_STR);
 		printf("M  %s (change %d of %d)\n%s this change? [y/n/q] ",
 		    path, n, nchanges, action);
