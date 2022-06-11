@@ -2490,6 +2490,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case CTRL('u'):
+	case 'u':
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
@@ -2538,7 +2540,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	}
 	case KEY_NPAGE:
-	case CTRL('f'): {
+	case CTRL('f'):
+	case CTRL('d'):
+	case 'd': {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
 		if (first == NULL)
@@ -3796,6 +3800,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case CTRL('u'):
+	case 'u':
 		if (s->first_displayed_line == 1)
 			break;
 		i = 0;
@@ -3812,6 +3818,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case ' ':
+	case CTRL('d'):
+	case 'd':
 		if (s->eof)
 			break;
 		i = 0;
@@ -4671,6 +4679,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case CTRL('u'):
+	case 'u':
 		if (s->first_displayed_line == 1) {
 			s->selected_line = 1;
 			break;
@@ -4825,6 +4835,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case ' ':
+	case CTRL('d'):
+	case 'd':
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
 		    view->nlines - 2)) {
@@ -5609,6 +5621,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case CTRL('u'):
+	case 'u':
 		if (s->tree == s->root) {
 			if (got_object_tree_get_first_entry(s->tree) ==
 			    s->first_displayed_entry)
@@ -5634,6 +5648,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case CTRL('d'):
+	case 'd':
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
@@ -6422,6 +6438,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case CTRL('u'):
+	case 'u':
 		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
 			s->selected = 0;
 		ref_scroll_up(s, MAX(0, view->nlines - 1));
@@ -6440,6 +6458,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case CTRL('d'):
+	case 'd':
 		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
