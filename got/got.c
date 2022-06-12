@@ -3730,7 +3730,7 @@ get_datestr(time_t *time, char *datebuf)
 }
 
 static const struct got_error *
-match_logmsg(int *have_match, struct got_object_id *id,
+match_commit(int *have_match, struct got_object_id *id,
     struct got_commit_object *commit, regex_t *regex)
 {
 	const struct got_error *err = NULL;
@@ -3747,7 +3747,12 @@ match_logmsg(int *have_match, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	if (regexec(regex, logmsg, 1, &regmatch, 0) == 0)
+	if (regexec(regex, got_object_commit_get_author(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, got_object_commit_get_committer(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, id_str, 1, &regmatch, 0) == 0 ||
+	    regexec(regex, logmsg, 1, &regmatch, 0) == 0)
 		*have_match = 1;
 done:
 	free(id_str);
@@ -4066,7 +4071,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		}
 
 		if (search_pattern) {
-			err = match_logmsg(&have_match, id, commit, &regex);
+			err = match_commit(&have_match, id, commit, &regex);
 			if (err) {
 				got_object_commit_close(commit);
 				break;
