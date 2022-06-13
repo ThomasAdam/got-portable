@@ -311,14 +311,18 @@ test_log_oneline() {
 	(cd $testroot/wt && got commit -m "test oneline
 no" > /dev/null)
 	local commit_id1=`git_show_head $testroot/repo`
+	local author_time1=`git_show_author_time $testroot/repo`
 
 	echo "modified beta" > $testroot/wt/beta
 	(cd $testroot/wt && got commit -m "  test oneline
 no" > /dev/null)
 	local commit_id2=`git_show_head $testroot/repo`
+	local author_time2=`git_show_author_time $testroot/repo`
 
-	printf "%.7s test oneline\n" $commit_id2 > $testroot/stdout.expected
-	printf "%.7s test oneline\n" $commit_id1 >> $testroot/stdout.expected
+	d=`date -u -r $author_time1 +"%G-%m-%d"`
+	printf "$d %-7s test oneline\n" master > $testroot/stdout.expected
+	d=`date -u -r $author_time2 +"%G-%m-%d"`
+	printf "$d %.7s test oneline\n" $commit_id1 >> $testroot/stdout.expected
 
 	(cd $testroot/repo && got log -s | head -n 2 > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
