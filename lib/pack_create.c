@@ -1656,7 +1656,7 @@ find_pack_for_enumeration(struct got_packidx **best_packidx,
 		}
 	}
 
-	if (best_packidx_path) {
+	if (best_packidx_path && err == NULL) {
 		err = got_repo_get_packidx(best_packidx, best_packidx_path,
 		    repo);
 	}
