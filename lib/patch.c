@@ -118,6 +118,9 @@ patch_free(struct got_patch *p)
 
 	free(p->new);
 	free(p->old);
+
+	memset(p, 0, sizeof(*p));
+	STAILQ_INIT(&p->head);
 }
 
 static const struct got_error *
@@ -216,8 +219,10 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 		char *t;
 
 		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-		if (err)
+		if (err) {
+			patch_free(p);
 			return err;
+		}
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_PATCH_DONE:
@@ -288,6 +293,9 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 	}
 
 done:
+	if (err)
+		patch_free(p);
+
 	imsg_free(&imsg);
 	return err;
 }
