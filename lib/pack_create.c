@@ -21,7 +21,6 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 
-#include <endian.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
