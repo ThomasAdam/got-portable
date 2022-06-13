@@ -3894,6 +3894,9 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 	char *ref_str = NULL, *id_str = NULL, *logmsg0 = NULL;
 	char *comma, *s, *nl;
 	struct got_reflist_head *refs;
+	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
+	struct tm tm;
+	time_t committer_time;
 
 	refs = got_reflist_object_id_map_lookup(refs_idmap, id);
 	if (refs) {
@@ -3912,6 +3915,12 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 			return err;
 	}
 
+	committer_time = got_object_commit_get_committer_time(commit);
+	if (gmtime_r(&committer_time, &tm) == NULL)
+		return got_error_from_errno("gmtime_r");
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0)
+		return got_error(GOT_ERR_NO_SPACE);
+
 	err = got_object_commit_get_logmsg(&logmsg0, commit);
 	if (err)
 		goto done;
@@ -3926,9 +3935,9 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 	}
 
 	if (ref_str)
-		printf("%-7s %s\n", ref_str, s);
+		printf("%s%-7s %s\n", datebuf, ref_str, s);
 	else
-		printf("%.7s %s\n", id_str, s);
+		printf("%s%.7s %s\n", datebuf, id_str, s);
 
 	if (fflush(stdout) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
