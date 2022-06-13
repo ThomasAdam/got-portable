@@ -2450,7 +2450,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_view *diff_view = NULL, *tree_view = NULL;
 	struct tog_view *ref_view = NULL;
 	struct commit_queue_entry *entry;
-	int begin_x = 0, n;
+	int begin_x = 0, n, nscroll = view->nlines - 1;
 
 	if (s->thread_args.load_all) {
 		if (ch == KEY_BACKSPACE)
@@ -2488,16 +2488,17 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
 		select_commit(s);
 		break;
+	case CTRL('u'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
-	case CTRL('u'):
-	case 'u':
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
-			s->selected = 0;
+			s->selected = MAX(0, s->selected - nscroll - 1);
 		else
-			log_scroll_up(s, view->nlines - 1);
+			log_scroll_up(s, nscroll);
 		select_commit(s);
 		break;
 	case 'j':
@@ -2539,23 +2540,24 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		select_commit(s);
 		break;
 	}
-	case KEY_NPAGE:
-	case CTRL('f'):
 	case CTRL('d'):
-	case 'd': {
+		nscroll /= 2;
+		/* FALL THROUGH */
+	case KEY_NPAGE:
+	case CTRL('f'): {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
 		if (first == NULL)
 			break;
-		err = log_scroll_down(view, view->nlines - 1);
+		err = log_scroll_down(view, nscroll);
 		if (err)
 			break;
 		if (first == s->first_displayed_entry &&
 		    s->selected < MIN(view->nlines - 2,
 		    s->commits.ncommits - 1)) {
 			/* can't scroll further down */
-			s->selected = MIN(view->nlines - 2,
-			    s->commits.ncommits - 1);
+			s->selected += MIN(s->last_displayed_entry->idx -
+			    s->selected_entry->idx, nscroll + 1);
 		}
 		select_commit(s);
 		break;
@@ -3764,7 +3766,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	int i;
+	int i, nscroll = view->nlines - 1;
 
 	switch (ch) {
 	case 'a':
@@ -3798,15 +3800,15 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->first_displayed_line > 1)
 			s->first_displayed_line--;
 		break;
+	case CTRL('u'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
-	case CTRL('u'):
-	case 'u':
 		if (s->first_displayed_line == 1)
 			break;
 		i = 0;
-		while (i++ < view->nlines - 1 &&
-		    s->first_displayed_line > 1)
+		while (i++ < nscroll && s->first_displayed_line > 1)
 			s->first_displayed_line--;
 		break;
 	case 'j':
@@ -3815,15 +3817,16 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (!s->eof)
 			s->first_displayed_line++;
 		break;
+	case CTRL('d'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case ' ':
-	case CTRL('d'):
-	case 'd':
 		if (s->eof)
 			break;
 		i = 0;
-		while (!s->eof && i++ < view->nlines - 1) {
+		while (!s->eof && i++ < nscroll) {
 			linelen = getline(&line, &linesize, s->f);
 			s->first_displayed_line++;
 			if (linelen == -1) {
@@ -4646,7 +4649,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	const struct got_error *err = NULL, *thread_err = NULL;
 	struct tog_view *diff_view;
 	struct tog_blame_view_state *s = &view->state.blame;
-	int begin_x = 0;
+	int begin_x = 0, nscroll = view->nlines - 2;
 
 	switch (ch) {
 	case 'q':
@@ -4677,17 +4680,17 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    s->first_displayed_line > 1)
 			s->first_displayed_line--;
 		break;
+	case CTRL('u'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
-	case CTRL('u'):
-	case 'u':
 		if (s->first_displayed_line == 1) {
-			s->selected_line = 1;
+			s->selected_line = MAX(1, s->selected_line - nscroll);
 			break;
 		}
-		if (s->first_displayed_line > view->nlines - 2)
-			s->first_displayed_line -=
-			    (view->nlines - 2);
+		if (s->first_displayed_line > nscroll)
+			s->first_displayed_line -= nscroll;
 		else
 			s->first_displayed_line = 1;
 		break;
@@ -4832,11 +4835,12 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		break;
 	}
+	case CTRL('d'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case ' ':
-	case CTRL('d'):
-	case 'd':
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
 		    view->nlines - 2)) {
@@ -4844,18 +4848,15 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line < view->nlines - 2) {
-			s->selected_line = MIN(s->blame.nlines,
-			    view->nlines - 2);
-			break;
+			s->selected_line +=
+			    MIN(nscroll, s->last_displayed_line -
+			    s->first_displayed_line - s->selected_line + 1);
 		}
-		if (s->last_displayed_line + view->nlines - 2
-		    <= s->blame.nlines)
-			s->first_displayed_line +=
-			    view->nlines - 2;
+		if (s->last_displayed_line + nscroll <= s->blame.nlines)
+			s->first_displayed_line += nscroll;
 		else
 			s->first_displayed_line =
-			    s->blame.nlines -
-			    (view->nlines - 3);
+			    s->blame.nlines - (view->nlines - 3);
 		break;
 	case KEY_RESIZE:
 		if (s->selected_line > view->nlines - 2) {
@@ -5537,7 +5538,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct tog_view *log_view, *ref_view;
 	struct got_tree_entry *te;
-	int begin_x = 0, n;
+	int begin_x = 0, n, nscroll = view->nlines - 3;
 
 	switch (ch) {
 	case 'i':
@@ -5619,19 +5620,20 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		tree_scroll_up(s, 1);
 		break;
+	case CTRL('u'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
-	case CTRL('u'):
-	case 'u':
 		if (s->tree == s->root) {
 			if (got_object_tree_get_first_entry(s->tree) ==
 			    s->first_displayed_entry)
-				s->selected = 0;
+				s->selected -= MIN(s->selected, nscroll);
 		} else {
 			if (s->first_displayed_entry == NULL)
-				s->selected = 0;
+				s->selected -= MIN(s->selected, nscroll);
 		}
-		tree_scroll_up(s, MAX(0, view->nlines - 3));
+		tree_scroll_up(s, MAX(0, nscroll));
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -5646,18 +5648,20 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		tree_scroll_down(s, 1);
 		break;
+	case CTRL('d'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
-	case CTRL('d'):
-	case 'd':
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
-				s->selected = s->ndisplayed - 1;
+				s->selected += MIN(nscroll,
+				    s->ndisplayed - s->selected - 1);
 			break;
 		}
-		tree_scroll_down(s, view->nlines - 3);
+		tree_scroll_down(s, nscroll);
 		break;
 	case KEY_ENTER:
 	case '\r':
@@ -6349,7 +6353,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_view *log_view, *tree_view;
 	struct tog_reflist_entry *re;
-	int begin_x = 0, n;
+	int begin_x = 0, n, nscroll = view->nlines - 1;
 
 	switch (ch) {
 	case 'i':
@@ -6436,13 +6440,14 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		ref_scroll_up(s, 1);
 		break;
+	case CTRL('u'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
-	case CTRL('u'):
-	case 'u':
 		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
-			s->selected = 0;
-		ref_scroll_up(s, MAX(0, view->nlines - 1));
+			s->selected -= MIN(nscroll, s->selected);
+		ref_scroll_up(s, MAX(0, nscroll));
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -6456,17 +6461,19 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		ref_scroll_down(s, 1);
 		break;
+	case CTRL('d'):
+		nscroll /= 2;
+		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
-	case CTRL('d'):
-	case 'd':
 		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
-				s->selected = s->ndisplayed - 1;
+				s->selected += MIN(nscroll,
+				    s->ndisplayed - s->selected - 1);
 			break;
 		}
-		ref_scroll_down(s, view->nlines - 1);
+		ref_scroll_down(s, nscroll);
 		break;
 	case CTRL('l'):
 		tog_free_refs();
