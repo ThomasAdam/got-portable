@@ -3819,7 +3819,8 @@ done:
 
 static const struct got_error*
 build_refs_str(char **refs_str, struct got_reflist_head *refs,
-    struct got_object_id *id, struct got_repository *repo)
+    struct got_object_id *id, struct got_repository *repo,
+    int local_only)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_entry *re;
@@ -3843,6 +3844,8 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0) {
+			if (local_only)
+				continue;
 			name += 8;
 			s = strstr(name, "/" GOT_REF_HEAD);
 			if (s != NULL && s[strlen(s)] == '\0')
@@ -3885,14 +3888,30 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 }
 
 static const struct got_error *
-print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id)
+print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo, struct got_reflist_object_id_map *refs_idmap)
 {
 	const struct got_error *err = NULL;
-	char *id_str, *s, *nl, *logmsg0;
+	char *ref_str = NULL, *id_str = NULL, *logmsg0 = NULL;
+	char *comma, *s, *nl;
+	struct got_reflist_head *refs;
 
-	err = got_object_id_str(&id_str, id);
-	if (err)
-		return err;
+	refs = got_reflist_object_id_map_lookup(refs_idmap, id);
+	if (refs) {
+		err = build_refs_str(&ref_str, refs, id, repo, 1);
+		if (err)
+			goto done;
+
+		/* Display the first matching ref only. */
+		if (ref_str && (comma = strchr(ref_str, ',')) != NULL)
+			*comma = '\0';
+	}
+
+	if (ref_str == NULL) {
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			return err;
+	}
 
 	err = got_object_commit_get_logmsg(&logmsg0, commit);
 	if (err)
@@ -3907,12 +3926,16 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id)
 		*nl = '\0';
 	}
 
-	printf("%.7s %s\n", id_str, s);
+	if (ref_str)
+		printf("%-7s %s\n", ref_str, s);
+	else
+		printf("%.7s %s\n", id_str, s);
 
 	if (fflush(stdout) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
 done:
 	free(id_str);
+	free(ref_str);
 	free(logmsg0);
 	return err;
 }
@@ -3939,7 +3962,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		struct got_reflist_head *refs;
 		refs = got_reflist_object_id_map_lookup(refs_idmap, id);
 		if (refs) {
-			err = build_refs_str(&refs_str, refs, id, repo);
+			err = build_refs_str(&refs_str, refs, id, repo, 0);
 			if (err)
 				goto done;
 		}
@@ -4106,7 +4129,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			got_object_commit_close(commit);
 		} else {
 			if (one_line)
-				err = print_commit_oneline(commit, id);
+				err = print_commit_oneline(commit, id,
+				    repo, refs_idmap);
 			else
 				err = print_commit(commit, id, repo, path,
 				    show_changed_paths ? &changed_paths : NULL,
@@ -4138,7 +4162,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 					break;
 			}
 			if (one_line)
-				err = print_commit_oneline(commit, &qid->id);
+				err = print_commit_oneline(commit, &qid->id,
+				    repo, refs_idmap);
 			else
 				err = print_commit(commit, &qid->id, repo, path,
 				    show_changed_paths ? &changed_paths : NULL,
@@ -9227,7 +9252,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 
 	refs = got_reflist_object_id_map_lookup(refs_idmap, new_commit_id);
 	if (refs) {
-		err = build_refs_str(&refs_str, refs, new_commit_id, repo);
+		err = build_refs_str(&refs_str, refs, new_commit_id, repo, 0);
 		if (err)
 			goto done;
 	}
@@ -9267,7 +9292,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 
 		refs = got_reflist_object_id_map_lookup(refs_idmap, yca_id);
 		if (refs) {
-			err = build_refs_str(&refs_str, refs, yca_id, repo);
+			err = build_refs_str(&refs_str, refs, yca_id, repo, 0);
 			if (err)
 				goto done;
 		}
