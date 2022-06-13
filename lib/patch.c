@@ -173,6 +173,12 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 	}
 	memcpy(&patch, imsg.data, sizeof(patch));
 
+	if (patch.old[sizeof(patch.old)-1] != '\0' ||
+	    patch.new[sizeof(patch.new)-1] != '\0') {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
 	/* automatically set strip=1 for git-style diffs */
 	if (strip == -1 && patch.git &&
 	    (*patch.old == '\0' || !strncmp(patch.old, "a/", 2)) &&
