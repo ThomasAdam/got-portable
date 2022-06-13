@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/time.h>
@@ -586,7 +587,6 @@ send_commit_traversal_done(struct imsgbuf *ibuf)
 	return got_privsep_flush_imsg(ibuf);
 }
 
-
 static const struct got_error *
 commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_pack *pack, struct got_packidx *packidx,
@@ -1021,6 +1021,31 @@ recv_object_ids(struct got_object_idset *idset, struct imsgbuf *ibuf)
 }
 
 static const struct got_error *
+recv_object_id_queue(struct got_object_id_queue *queue, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	int done = 0;
+	struct got_object_qid *qid;
+	struct got_object_id *ids;
+	size_t nids, i;
+
+	for (;;) {
+		err = got_privsep_recv_object_idlist(&done, &ids, &nids, ibuf);
+		if (err || done)
+			break;
+		for (i = 0; i < nids; i++) {
+			err = got_object_qid_alloc_partial(&qid);
+			if (err)
+				return err;
+			memcpy(&qid->id, &ids[i], sizeof(qid->id));
+			STAILQ_INSERT_TAIL(queue, qid, entry);
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
 delta_reuse_request(struct imsg *imsg, struct imsgbuf *ibuf,
     FILE *delta_outfile, struct got_pack *pack, struct got_packidx *packidx)
 {
@@ -1127,6 +1152,375 @@ done:
 	} else
 		*packidx = p;
 	imsg_free(&imsg);
+	return err;
+}
+
+static const struct got_error *
+send_tree_enumeration_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_TREE_ENUMERATION_DONE, 0, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose TREE_ENUMERATION_DONE");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+struct enumerated_tree {
+	struct got_object_id id;
+	char *path;
+	uint8_t *buf;
+	struct got_parsed_tree_entry *entries;
+	int nentries;
+};
+
+static const struct got_error *
+enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
+    struct got_object_id *tree_id,
+    const char *path, struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache, struct got_object_idset *idset,
+    struct enumerated_tree **trees, size_t *nalloc, size_t *ntrees)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id_queue ids;
+	struct got_object_qid *qid;
+	uint8_t *buf = NULL;
+	struct got_parsed_tree_entry *entries = NULL;
+	int nentries = 0, i;
+	struct enumerated_tree *tree;
+
+	*ntrees = 0;
+	*have_all_entries = 1;
+	STAILQ_INIT(&ids);
+
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
+		return err;
+	memcpy(&qid->id.sha1, tree_id, SHA1_DIGEST_LENGTH);
+	qid->data = strdup(path);
+	if (qid->data == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	STAILQ_INSERT_TAIL(&ids, qid, entry);
+	qid = NULL;
+
+	/* Traverse the tree hierarchy, gather tree object IDs and paths. */
+	do {
+		const char *path;
+		int idx, i;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			goto done;
+		}
+
+		qid = STAILQ_FIRST(&ids);
+		STAILQ_REMOVE_HEAD(&ids, entry);
+		path = qid->data;
+
+		idx = got_packidx_get_object_idx(packidx, &qid->id);
+		if (idx == -1) {
+			*have_all_entries = 0;
+			break;
+		}
+
+		err = open_tree(&buf, &entries, &nentries,
+		    pack, packidx, idx, &qid->id, objcache);
+		if (err) {
+			if (err->code != GOT_ERR_NO_OBJ)
+				goto done;
+		}
+
+		err = got_object_idset_add(idset, &qid->id, NULL);
+		if (err)
+			goto done;
+
+		for (i = 0; i < nentries; i++) {
+			struct got_object_qid *eqid = NULL;
+			struct got_parsed_tree_entry *pte = &entries[i];
+			char *p;
+
+			if (!S_ISDIR(pte->mode))
+				continue;
+
+			err = got_object_qid_alloc_partial(&eqid);
+			if (err)
+				goto done;
+			memcpy(eqid->id.sha1, pte->id, sizeof(eqid->id.sha1));
+
+			if (got_object_idset_contains(idset, &eqid->id)) {
+				got_object_qid_free(eqid);
+				continue;
+			}
+
+			if (asprintf(&p, "%s%s%s", path,
+			    got_path_is_root_dir(path) ? "" : "/",
+			    pte->name) == -1) {
+				err = got_error_from_errno("asprintf");
+				got_object_qid_free(eqid);
+				goto done;
+			}
+			eqid->data = p;
+			STAILQ_INSERT_TAIL(&ids, eqid, entry);
+		}
+
+		if (*ntrees >= *nalloc) {
+			struct enumerated_tree *new;
+			new = recallocarray(*trees, *nalloc, *nalloc + 16,
+			    sizeof(*new));
+			if (new == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+			*trees = new;
+			*nalloc += 16;
+		}
+		tree = &(*trees)[*ntrees];
+		(*ntrees)++;
+		memcpy(&tree->id, &qid->id, sizeof(tree->id));
+		tree->path = qid->data;
+		tree->buf = buf;
+		buf = NULL;
+		tree->entries = entries;
+		entries = NULL;
+		tree->nentries = nentries;
+
+		got_object_qid_free(qid);
+		qid = NULL;
+	} while (!STAILQ_EMPTY(&ids));
+
+	if (*have_all_entries) {
+		int i;
+		/*
+		 * We have managed to traverse all entries in the hierarchy.
+		 * Tell the main process what we have found.
+		 */
+		for (i = 0; i < *ntrees; i++) {
+			tree = &(*trees)[i];
+			err = got_privsep_send_enumerated_tree(totlen,
+			    ibuf, &tree->id, tree->path, tree->entries,
+			    tree->nentries);
+			if (err)
+				goto done;
+			free(tree->buf);
+			tree->buf = NULL;
+			free(tree->path);
+			tree->path = NULL;
+			free(tree->entries);
+			tree->entries = NULL;
+		}
+		*ntrees = 0; /* don't loop again below to free memory */
+
+		err = send_tree_enumeration_done(ibuf);
+	} else {
+		/*
+		 * We can only load fully packed tree hierarchies on
+		 * behalf of the main process, otherwise the main process
+		 * gets a wrong idea about which tree objects have
+		 * already been traversed.
+		 * Indicate a missing entry for the root of this tree.
+		 * The main process should continue by loading this
+		 * entire tree the slow way.
+		 */
+		err = got_privsep_send_enumerated_tree(totlen, ibuf,
+		    tree_id, "/", NULL, -1);
+		if (err)
+			goto done;
+	}
+done:
+	free(buf);
+	free(entries);
+	for (i = 0; i < *ntrees; i++) {
+		tree = &(*trees)[i];
+		free(tree->buf);
+		tree->buf = NULL;
+		free(tree->path);
+		tree->path = NULL;
+		free(tree->entries);
+		tree->entries = NULL;
+	}
+	if (qid)
+		free(qid->data);
+	got_object_qid_free(qid);
+	got_object_id_queue_free(&ids);
+	if (err) {
+		if (err->code == GOT_ERR_PRIVSEP_PIPE)
+			err = NULL;
+		else
+			got_privsep_send_error(ibuf, err);
+	}
+
+	return err;
+}
+
+static const struct got_error *
+enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id_queue commit_ids;
+	const struct got_object_id_queue *parents = NULL;
+	struct got_object_qid *qid = NULL;
+	struct got_object *obj = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id *tree_id = NULL;
+	size_t totlen = 0;
+	struct got_object_idset *idset;
+	int i, idx, have_all_entries = 1;
+	struct enumerated_tree *trees = NULL;
+	size_t ntrees = 0, nalloc = 16;
+
+	STAILQ_INIT(&commit_ids);
+
+	trees = calloc(1, nalloc);
+	if (trees == NULL)
+		return got_error_from_errno("calloc");
+
+	idset = got_object_idset_alloc();
+	if (idset == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	err = recv_object_id_queue(&commit_ids, ibuf);
+	if (err)
+		goto done;
+
+	err = recv_object_ids(idset, ibuf);
+	if (err)
+		goto done;
+
+	while (!STAILQ_EMPTY(&commit_ids)) {
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			goto done;
+		}
+
+		qid = STAILQ_FIRST(&commit_ids);
+		STAILQ_REMOVE_HEAD(&commit_ids, entry);
+
+		if (got_object_idset_contains(idset, &qid->id)) {
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
+
+		idx = got_packidx_get_object_idx(packidx, &qid->id);
+		if (idx == -1)
+			break;
+
+		err = open_object(&obj, pack, packidx, idx, &qid->id,
+		    objcache);
+		if (err)
+			goto done;
+		if (obj->type == GOT_OBJ_TYPE_TAG) {
+			struct got_tag_object *tag;
+			uint8_t *buf;
+			size_t len;
+			err = got_packfile_extract_object_to_mem(&buf,
+			    &len, obj, pack);
+			if (err)
+				goto done;
+			obj->size = len;
+			err = got_object_parse_tag(&tag, buf, len);
+			if (err) {
+				free(buf);
+				goto done;
+			}
+			idx = got_packidx_get_object_idx(packidx, &tag->id);
+			if (idx == -1)
+				break;
+			err = open_commit(&commit, pack, packidx, idx,
+			    &tag->id, objcache);
+			got_object_tag_close(tag);
+			free(buf);
+			if (err)
+				goto done;
+		} else if (obj->type == GOT_OBJ_TYPE_COMMIT) {
+			err = open_commit(&commit, pack, packidx, idx,
+			    &qid->id, objcache);
+			if (err)
+				goto done;
+		} else {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+		got_object_close(obj);
+		obj = NULL;
+
+		err = got_privsep_send_enumerated_commit(ibuf, &qid->id,
+		    got_object_commit_get_committer_time(commit));
+		if (err)
+			goto done;
+
+		tree_id = got_object_commit_get_tree_id(commit);
+		idx = got_packidx_get_object_idx(packidx, tree_id);
+		if (idx == -1) {
+			err = got_privsep_send_enumerated_tree(&totlen, ibuf,
+			    tree_id, "/", NULL, -1);
+			if (err)
+				goto done;
+			break;
+		}
+
+		if (got_object_idset_contains(idset, tree_id)) {
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
+
+		err = enumerate_tree(&have_all_entries, ibuf, &totlen, tree_id, "/",
+		    pack, packidx, objcache, idset, &trees, &nalloc, &ntrees);
+		if (err)
+			goto done;
+
+		if (!have_all_entries)
+			break;
+
+		got_object_qid_free(qid);
+		qid = NULL;
+
+		parents = got_object_commit_get_parent_ids(commit);
+		if (parents) {
+			struct got_object_qid *pid;
+			STAILQ_FOREACH(pid, parents, entry) {
+				if (got_object_idset_contains(idset, &pid->id))
+					continue;
+				err = got_object_qid_alloc_partial(&qid);
+				if (err)
+					goto done;
+				memcpy(&qid->id, &pid->id, sizeof(qid->id));
+				STAILQ_INSERT_TAIL(&commit_ids, qid, entry);
+				qid = NULL;
+			}
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+	}
+
+	if (have_all_entries) {
+		err = got_privsep_send_object_enumeration_done(ibuf);
+		if (err)
+			goto done;
+	}
+done:
+	if (obj)
+		got_object_close(obj);
+	if (commit)
+		got_object_commit_close(commit);
+	got_object_qid_free(qid);
+	got_object_id_queue_free(&commit_ids);
+	if (idset)
+		got_object_idset_free(idset);
+	for (i = 0; i < ntrees; i++) {
+		struct enumerated_tree *tree = &trees[i];
+		free(tree->buf);
+		free(tree->path);
+		free(tree->entries);
+	}
+	free(trees);
 	return err;
 }
 
@@ -1345,6 +1739,10 @@ main(int argc, char *argv[])
 			break;
 		case GOT_IMSG_COMMIT_TRAVERSAL_REQUEST:
 			err = commit_traversal_request(&imsg, &ibuf, pack,
+			    packidx, &objcache);
+			break;
+		case GOT_IMSG_OBJECT_ENUMERATION_REQUEST:
+			err = enumeration_request(&imsg, &ibuf, pack,
 			    packidx, &objcache);
 			break;
 		default:

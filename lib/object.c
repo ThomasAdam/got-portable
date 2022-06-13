@@ -58,6 +58,10 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 struct got_object_id *
 got_object_get_id(struct got_object *obj)
 {
@@ -2392,5 +2396,62 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 done:
 	free(path_packfile);
 	free(changed_commit_id);
+	return err;
+}
+
+const struct got_error *
+got_object_enumerate(got_object_enumerate_commit_cb cb_commit,
+    got_object_enumerate_tree_cb cb_tree, void *cb_arg,
+    struct got_object_id **ours, int nours,
+    struct got_object_id **theirs, int ntheirs,
+    struct got_packidx *packidx, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack *pack;
+	char *path_packfile = NULL;
+
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
+	if (err)
+		return err;
+
+	pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+		if (err)
+			goto done;
+	}
+
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			goto done;
+	}
+
+	err = got_privsep_send_object_enumeration_request(
+	    pack->privsep_child->ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_object_idlist(pack->privsep_child->ibuf,
+	    ours, nours);
+	if (err)
+		goto done;
+	err = got_privsep_send_object_idlist_done(pack->privsep_child->ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_object_idlist(pack->privsep_child->ibuf,
+	    theirs, ntheirs);
+	if (err)
+		goto done;
+	err = got_privsep_send_object_idlist_done(pack->privsep_child->ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_enumerated_objects(pack->privsep_child->ibuf,
+	    cb_commit, cb_tree, cb_arg, repo);
+done:
+	free(path_packfile);
 	return err;
 }
