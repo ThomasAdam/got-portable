@@ -243,6 +243,10 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 				err = got_error_from_errno("calloc");
 				goto done;
 			}
+			if (h->old_from < 0 || h->new_from < 0) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				goto done;
+			}
 			h->old_from = hdr.oldfrom;
 			h->old_lines = hdr.oldlines;
 			h->new_from = hdr.newfrom;
