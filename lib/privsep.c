@@ -3124,7 +3124,7 @@ got_privsep_send_object_idlist(struct imsgbuf *ibuf,
 	for (i = 0; i < nids; i++) {
 		idlist[i % nitems(idlist)] = ids[i];
 		queued++;
-		if (queued >= nitems(idlist) - 1) {
+		if (queued >= nitems(idlist)) {
 			err = send_idlist(ibuf, idlist, queued);
 			if (err)
 				return err;
