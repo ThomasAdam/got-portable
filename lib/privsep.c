@@ -3170,7 +3170,7 @@ got_privsep_recv_object_idlist(int *done, struct got_object_id **ids,
 			err = got_error_from_errno("calloc");
 			break;
 		}
-		memcpy(*ids, (uint8_t *)imsg.data + sizeof(idlist),
+		memcpy(*ids, (uint8_t *)imsg.data + sizeof(*idlist),
 		    *nids * sizeof(**ids));
 		break;
 	case GOT_IMSG_OBJ_ID_LIST_DONE:
@@ -3272,7 +3272,7 @@ got_privsep_recv_reused_deltas(int *done, struct got_imsg_reused_delta *deltas,
 			break;
 		}
 		*ndeltas = ideltas->ndeltas;
-		memcpy(deltas, (uint8_t *)imsg.data + sizeof(ideltas),
+		memcpy(deltas, (uint8_t *)imsg.data + sizeof(*ideltas),
 		    *ndeltas * sizeof(*deltas));
 		break;
 	case GOT_IMSG_DELTA_REUSE_DONE:
