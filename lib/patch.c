@@ -221,6 +221,7 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 			return err;
 		}
 
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_PATCH_DONE:
 			if (h != NULL && h->len == 0)
@@ -233,7 +234,6 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 				goto done;
 			}
 			lastmode = -1;
-			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 			if (datalen != sizeof(hdr)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				goto done;
@@ -258,7 +258,6 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				goto done;
 			}
-			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 			t = imsg.data;
 			/* at least one char */
 			if (datalen < 2 || t[datalen-1] != '\0') {
