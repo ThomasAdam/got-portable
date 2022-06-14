@@ -1438,7 +1438,7 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 			return got_error_from_errno("imsg_add TREE_ENTRY");
 		if (imsg_add(wbuf, &pte->namelen, sizeof(pte->namelen)) == -1)
 			return got_error_from_errno("imsg_add TREE_ENTRY");
-		
+
 		/* Remaining bytes are the entry's name. */
 		if (imsg_add(wbuf, pte->name, pte->namelen) == -1)
 			return got_error_from_errno("imsg_add TREE_ENTRY");
@@ -2801,7 +2801,7 @@ got_privsep_recv_enumerated_objects(struct imsgbuf *ibuf,
 
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 		switch (imsg.hdr.type) {
-		case GOT_IMSG_ENUMERATED_COMMIT: 
+		case GOT_IMSG_ENUMERATED_COMMIT:
 			if (have_commit && nentries != -1) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
@@ -3088,7 +3088,7 @@ send_idlist(struct imsgbuf *ibuf, struct got_object_id **ids, size_t nids)
 		if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 			return got_error_from_errno("imsg_add OBJ_ID_LIST");
 	}
-	
+
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
@@ -3103,7 +3103,7 @@ got_privsep_send_object_idlist(struct imsgbuf *ibuf,
 	struct got_object_id *idlist[GOT_IMSG_OBJ_ID_LIST_MAX_NIDS];
 	int i, j = 0;
 
-	for (i = 0; i < nids; i++) { 
+	for (i = 0; i < nids; i++) {
 		j = i % nitems(idlist);
 		idlist[j] = ids[i];
 		if (j >= nitems(idlist) - 1) {
@@ -3223,7 +3223,7 @@ got_privsep_send_reused_deltas(struct imsgbuf *ibuf,
 		if (imsg_add(wbuf, delta, sizeof(*delta)) == -1)
 			return got_error_from_errno("imsg_add REUSED_DELTAS");
 	}
-	
+
 	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
