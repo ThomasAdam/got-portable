@@ -355,7 +355,8 @@ got_privsep_recv_raw_obj(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 			break;
 		}
 
-		if (*size + *hdrlen > GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
+		if (*size < 0 ||
+		    *size + *hdrlen > GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
@@ -1100,6 +1101,11 @@ got_privsep_recv_index_progress(int *done, int *nobj_total,
 			break;
 		}
 		iprogress = (struct got_imsg_index_pack_progress *)imsg.data;
+		if (iprogress->nobj_total < 0 || iprogress->nobj_indexed < 0 ||
+		    iprogress->nobj_loose < 0 || iprogress->nobj_resolved < 0) {
+			err = got_error(GOT_ERR_RANGE);
+			break;
+		}
 		*nobj_total = iprogress->nobj_total;
 		*nobj_indexed = iprogress->nobj_indexed;
 		*nobj_loose = iprogress->nobj_loose;
@@ -1131,6 +1137,9 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
 	if (datalen != sizeof(*iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	iobj = imsg->data;
+
+	if (iobj->pack_offset < 0)
+		return got_error(GOT_ERR_PACK_OFFSET);
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
@@ -1738,7 +1747,8 @@ got_privsep_recv_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 			break;
 		}
 
-		if (*size > GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
+		if (*size > GOT_PRIVSEP_INLINE_BLOB_DATA_MAX ||
+		    *size > datalen + sizeof(*iblob)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
@@ -2418,6 +2428,10 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 			break;
 		}
 		memcpy(&iremotes, imsg.data, sizeof(iremotes));
+		if (iremotes.nremotes < 0) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
 		if (iremotes.nremotes == 0) {
 			imsg_free(&imsg);
 			return NULL;
@@ -3145,7 +3159,8 @@ got_privsep_recv_object_idlist(int *done, struct got_object_id **ids,
 			break;
 		}
 		idlist = imsg.data;
-		if (idlist->nids > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+		if (idlist->nids > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS ||
+		    idlist->nids * sizeof(**ids) > datalen - sizeof(*idlist)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
@@ -3250,7 +3265,9 @@ got_privsep_recv_reused_deltas(int *done, struct got_imsg_reused_delta *deltas,
 			break;
 		}
 		ideltas = imsg.data;
-		if (ideltas->ndeltas > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+		if (ideltas->ndeltas > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS ||
+		    ideltas->ndeltas * sizeof(*deltas) >
+		    datalen - sizeof(*ideltas)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
