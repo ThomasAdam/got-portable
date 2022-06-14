@@ -2751,6 +2751,17 @@ got_privsep_send_object_enumeration_done(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_object_enumeration_incomplete(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_ENUMERATION_INCOMPLETE,
+	    0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "OBJECT_ENUMERATION_INCOMPLETE");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_enumerated_commit(struct imsgbuf *ibuf,
     struct got_object_id *id, time_t mtime)
 {
@@ -2774,7 +2785,8 @@ got_privsep_send_enumerated_commit(struct imsgbuf *ibuf,
 }
 
 const struct got_error *
-got_privsep_recv_enumerated_objects(struct imsgbuf *ibuf,
+got_privsep_recv_enumerated_objects(int *found_all_objects,
+    struct imsgbuf *ibuf,
     got_object_enumerate_commit_cb cb_commit,
     got_object_enumerate_tree_cb cb_tree, void *cb_arg,
     struct got_repository *repo)
@@ -2793,6 +2805,7 @@ got_privsep_recv_enumerated_objects(struct imsgbuf *ibuf,
 	int nentries = -1;
 	int done = 0;
 
+	*found_all_objects = 0;
 	memset(&tree, 0, sizeof(tree));
 
 	while (!done) {
@@ -2940,6 +2953,10 @@ got_privsep_recv_enumerated_objects(struct imsgbuf *ibuf,
 			have_commit = 0;
 			break;
 		case GOT_IMSG_OBJECT_ENUMERATION_DONE:
+			*found_all_objects = 1;
+			done = 1;
+			break;
+		case GOT_IMSG_OBJECT_ENUMERATION_INCOMPLETE:
 			done = 1;
 			break;
 		default:

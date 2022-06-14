@@ -1564,7 +1564,8 @@ load_packed_tree_ids(void *arg, struct got_tree_object *tree, time_t mtime,
 }
 
 static const struct got_error *
-load_packed_object_ids(struct got_object_id **ours, int nours,
+load_packed_object_ids(int *found_all_objects,
+    struct got_object_id **ours, int nours,
     struct got_object_id **theirs, int ntheirs,
     int want_meta, uint32_t seed, struct got_object_idset *idset,
     struct got_object_idset *idset_exclude, int loose_obj_only,
@@ -1592,7 +1593,7 @@ load_packed_object_ids(struct got_object_id **ours, int nours,
 	lpa.cancel_arg = cancel_arg;
 
 	/* Attempt to load objects via got-read-pack, as far as possible. */
-	err = got_object_enumerate(load_packed_commit_id,
+	err = got_object_enumerate(found_all_objects, load_packed_commit_id,
 	   load_packed_tree_ids, &lpa, ours, nours, theirs, ntheirs,
 	   packidx, repo);
 	if (err)
@@ -1603,7 +1604,7 @@ load_packed_object_ids(struct got_object_id **ours, int nours,
 
 	/*
 	 * An incomplete tree hierarchy was present in the pack file
-	 * and caused loading to be aborted midway through a commit.
+	 * and caused loading to be aborted.
 	 * Continue loading trees the slow way.
 	 */
 	err = load_tree(want_meta, idset, idset_exclude,
@@ -1675,7 +1676,7 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 	const struct got_error *err = NULL;
 	struct got_object_id **ids = NULL;
 	struct got_packidx *packidx = NULL;
-	int i, nobj = 0, obj_type;
+	int i, nobj = 0, obj_type, found_all_objects = 0;
 	struct got_object_idset *idset_exclude;
 
 	idset_exclude = got_object_idset_alloc();
@@ -1695,10 +1696,10 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 	if (err)
 		goto done;
 	if (packidx) {
-		err = load_packed_object_ids(theirs, ntheirs, NULL, 0, 0,
-		    seed, idset, idset_exclude, loose_obj_only, repo, packidx,
-		    ncolored, nfound, ntrees, progress_cb, progress_arg, rl,
-		    cancel_cb, cancel_arg);
+		err = load_packed_object_ids(&found_all_objects,
+		    theirs, ntheirs, NULL, 0, 0, seed, idset, idset_exclude,
+		    loose_obj_only, repo, packidx, ncolored, nfound, ntrees,
+		    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1711,12 +1712,15 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 		if (err)
 			return err;
 		if (obj_type == GOT_OBJ_TYPE_COMMIT) {
-			err = load_commit(0, idset, idset_exclude, id, repo,
-			    seed, loose_obj_only, ncolored, nfound, ntrees,
-			    progress_cb, progress_arg, rl,
-			    cancel_cb, cancel_arg);
-			if (err)
-				goto done;
+			if (!found_all_objects) {
+				err = load_commit(0, idset, idset_exclude,
+				    id, repo, seed, loose_obj_only,
+				    ncolored, nfound, ntrees,
+				    progress_cb, progress_arg, rl,
+				    cancel_cb, cancel_arg);
+				if (err)
+					goto done;
+			}
 		} else if (obj_type == GOT_OBJ_TYPE_TAG) {
 			err = load_tag(0, idset, idset_exclude, id, repo,
 			    seed, loose_obj_only, ncolored, nfound, ntrees,
@@ -1727,24 +1731,28 @@ load_object_ids(int *ncolored, int *nfound, int *ntrees,
 		}
 	}
 
+	found_all_objects = 0;
 	err = find_pack_for_enumeration(&packidx, ids, nobj, repo);
 	if (err)
 		goto done;
 	if (packidx) {
-		err = load_packed_object_ids(ids, nobj, theirs, ntheirs, 1,
-		    seed, idset, idset_exclude, loose_obj_only, repo, packidx,
-		    ncolored, nfound, ntrees,
+		err = load_packed_object_ids(&found_all_objects, ids,
+		    nobj, theirs, ntheirs, 1, seed, idset, idset_exclude,
+		    loose_obj_only, repo, packidx, ncolored, nfound, ntrees,
 		    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
 
-	for (i = 0; i < nobj; i++) {
-		err = load_commit(1, idset, idset_exclude, ids[i], repo,
-		    seed, loose_obj_only, ncolored, nfound, ntrees,
-		    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
-		if (err)
-			goto done;
+	if (!found_all_objects) {
+		for (i = 0; i < nobj; i++) {
+			err = load_commit(1, idset, idset_exclude, ids[i],
+			    repo, seed, loose_obj_only, ncolored, nfound,
+			    ntrees, progress_cb, progress_arg, rl,
+			    cancel_cb, cancel_arg);
+			if (err)
+				goto done;
+		}
 	}
 
 	for (i = 0; i < nours; i++) {

@@ -150,6 +150,7 @@ enum got_imsg_type {
 	GOT_IMSG_ENUMERATED_TREE,
 	GOT_IMSG_TREE_ENUMERATION_DONE,
 	GOT_IMSG_OBJECT_ENUMERATION_DONE,
+	GOT_IMSG_OBJECT_ENUMERATION_INCOMPLETE,
 
 	/* Message sending file descriptor to a temporary file. */
 	GOT_IMSG_TMPFD,
@@ -749,11 +750,13 @@ const struct got_error *got_privsep_send_object_enumeration_request(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_object_enumeration_done(
     struct imsgbuf *);
+const struct got_error *got_privsep_send_object_enumeration_incomplete(
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_enumerated_commit(struct imsgbuf *,
     struct got_object_id *, time_t);
-const struct got_error *got_privsep_recv_enumerated_objects(struct imsgbuf *,
-    got_object_enumerate_commit_cb, got_object_enumerate_tree_cb, void *,
-    struct got_repository *);
+const struct got_error *got_privsep_recv_enumerated_objects(int *,
+    struct imsgbuf *, got_object_enumerate_commit_cb,
+    got_object_enumerate_tree_cb, void *, struct got_repository *);
 
 const struct got_error *got_privsep_send_raw_delta_req(struct imsgbuf *, int,
     struct got_object_id *);
