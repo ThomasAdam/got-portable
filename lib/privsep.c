@@ -2108,11 +2108,10 @@ got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	const size_t min_datalen = 0;
 
 	*str = NULL;
 
-	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
@@ -2354,11 +2353,10 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	const size_t min_datalen = 0;
 
 	*str = NULL;
 
-	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
