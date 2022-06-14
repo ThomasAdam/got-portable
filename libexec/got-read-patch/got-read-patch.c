@@ -197,7 +197,7 @@ find_patch(int *done, FILE *fp)
 }
 
 static const struct got_error *
-strtolnum(char **str, long *n)
+strtolnum(char **str, int *n)
 {
 	char		*p, c;
 	const char	*errstr;
@@ -208,7 +208,7 @@ strtolnum(char **str, long *n)
 	c = *p;
 	*p = '\0';
 
-	*n = strtonum(*str, 0, LONG_MAX, &errstr);
+	*n = strtonum(*str, 0, INT_MAX, &errstr);
 	if (errstr != NULL)
 		return got_error(GOT_ERR_PATCH_MALFORMED);
 
@@ -263,10 +263,10 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 	if (*s != '@')
 		return got_error(GOT_ERR_PATCH_MALFORMED);
 
-	if (hdr->oldfrom >= LONG_MAX - hdr->oldlines ||
-	    hdr->newfrom >= LONG_MAX - hdr->newlines ||
+	if (hdr->oldfrom >= INT_MAX - hdr->oldlines ||
+	    hdr->newfrom >= INT_MAX - hdr->newlines ||
 	    /* not so sure about this one */
-	    hdr->oldlines >= LONG_MAX - hdr->newlines - 1 ||
+	    hdr->oldlines >= INT_MAX - hdr->newlines - 1 ||
 	    (hdr->oldlines == 0 && hdr->newlines == 0))
 		return got_error(GOT_ERR_PATCH_MALFORMED);
 
@@ -339,7 +339,7 @@ parse_hunk(FILE *fp, int *done)
 	char	*line = NULL, ch;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
-	long	 leftold, leftnew;
+	int	 leftold, leftnew;
 
 	linelen = getline(&line, &linesize, fp);
 	if (linelen == -1) {
