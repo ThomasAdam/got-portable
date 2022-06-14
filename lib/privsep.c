@@ -1301,40 +1301,18 @@ get_commit_from_imsg(struct got_commit_object **commit,
 	(*commit)->committer_time = icommit->committer_time;
 	(*commit)->committer_gmtoff = icommit->committer_gmtoff;
 
-	if (icommit->author_len == 0) {
-		(*commit)->author = strdup("");
-		if ((*commit)->author == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else {
-		(*commit)->author = malloc(icommit->author_len + 1);
-		if ((*commit)->author == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-		memcpy((*commit)->author, imsg->data + len,
-		    icommit->author_len);
-		(*commit)->author[icommit->author_len] = '\0';
+	(*commit)->author = strndup(imsg->data + len, icommit->author_len);
+	if ((*commit)->author == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
 	}
 	len += icommit->author_len;
 
-	if (icommit->committer_len == 0) {
-		(*commit)->committer = strdup("");
-		if ((*commit)->committer == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else {
-		(*commit)->committer =
-		    malloc(icommit->committer_len + 1);
-		if ((*commit)->committer == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-		memcpy((*commit)->committer, imsg->data + len,
-		    icommit->committer_len);
-		(*commit)->committer[icommit->committer_len] = '\0';
+	(*commit)->committer = strndup(imsg->data + len,
+	    icommit->committer_len);
+	if ((*commit)->committer == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
 	}
 	len += icommit->committer_len;
 
@@ -1901,21 +1879,10 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 
 		memcpy((*tag)->id.sha1, itag->id, SHA1_DIGEST_LENGTH);
 
-		if (itag->tag_len == 0) {
-			(*tag)->tag = strdup("");
-			if ((*tag)->tag == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		} else {
-			(*tag)->tag = malloc(itag->tag_len + 1);
-			if ((*tag)->tag == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			memcpy((*tag)->tag, imsg.data + len,
-			    itag->tag_len);
-			(*tag)->tag[itag->tag_len] = '\0';
+		(*tag)->tag = strndup(imsg.data + len, itag->tag_len);
+		if ((*tag)->tag == NULL) {
+			err = got_error_from_errno("strndup");
+			break;
 		}
 		len += itag->tag_len;
 
@@ -1923,21 +1890,10 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 		(*tag)->tagger_time = itag->tagger_time;
 		(*tag)->tagger_gmtoff = itag->tagger_gmtoff;
 
-		if (itag->tagger_len == 0) {
-			(*tag)->tagger = strdup("");
-			if ((*tag)->tagger == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		} else {
-			(*tag)->tagger = malloc(itag->tagger_len + 1);
-			if ((*tag)->tagger == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			memcpy((*tag)->tagger, imsg.data + len,
-			    itag->tagger_len);
-			(*tag)->tagger[itag->tagger_len] = '\0';
+		(*tag)->tagger = strndup(imsg.data + len, itag->tagger_len);
+		if ((*tag)->tagger == NULL) {
+			err = got_error_from_errno("strndup");
+			break;
 		}
 		len += itag->tagger_len;
 
