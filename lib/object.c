@@ -2400,7 +2400,8 @@ done:
 }
 
 const struct got_error *
-got_object_enumerate(got_object_enumerate_commit_cb cb_commit,
+got_object_enumerate(int *found_all_objects,
+    got_object_enumerate_commit_cb cb_commit,
     got_object_enumerate_tree_cb cb_tree, void *cb_arg,
     struct got_object_id **ours, int nours,
     struct got_object_id **theirs, int ntheirs,
@@ -2449,8 +2450,8 @@ got_object_enumerate(got_object_enumerate_commit_cb cb_commit,
 	if (err)
 		goto done;
 
-	err = got_privsep_recv_enumerated_objects(pack->privsep_child->ibuf,
-	    cb_commit, cb_tree, cb_arg, repo);
+	err = got_privsep_recv_enumerated_objects(found_all_objects,
+	    pack->privsep_child->ibuf, cb_commit, cb_tree, cb_arg, repo);
 done:
 	free(path_packfile);
 	return err;

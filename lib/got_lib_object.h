@@ -140,7 +140,7 @@ typedef const struct got_error *(*got_object_enumerate_tree_cb)(void *,
     struct got_tree_object *, time_t, struct got_object_id *, const char *,
     struct got_repository *);
 
-const struct got_error *got_object_enumerate(got_object_enumerate_commit_cb,
-    got_object_enumerate_tree_cb, void *, struct got_object_id **, int,
-    struct got_object_id **, int, struct got_packidx *,
-    struct got_repository *);
+const struct got_error *got_object_enumerate(int *,
+    got_object_enumerate_commit_cb, got_object_enumerate_tree_cb, void *,
+    struct got_object_id **, int, struct got_object_id **, int,
+    struct got_packidx *, struct got_repository *);

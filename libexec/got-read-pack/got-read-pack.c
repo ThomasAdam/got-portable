@@ -1407,8 +1407,10 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		}
 
 		idx = got_packidx_get_object_idx(packidx, &qid->id);
-		if (idx == -1)
+		if (idx == -1) {
+			have_all_entries = 0;
 			break;
+		}
 
 		err = open_object(&obj, pack, packidx, idx, &qid->id,
 		    objcache);
@@ -1429,8 +1431,10 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 				goto done;
 			}
 			idx = got_packidx_get_object_idx(packidx, &tag->id);
-			if (idx == -1)
+			if (idx == -1) {
+				have_all_entries = 0;
 				break;
+			}
 			err = open_commit(&commit, pack, packidx, idx,
 			    &tag->id, objcache);
 			got_object_tag_close(tag);
@@ -1457,6 +1461,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		tree_id = got_object_commit_get_tree_id(commit);
 		idx = got_packidx_get_object_idx(packidx, tree_id);
 		if (idx == -1) {
+			have_all_entries = 0;
 			err = got_privsep_send_enumerated_tree(&totlen, ibuf,
 			    tree_id, "/", NULL, -1);
 			if (err)
@@ -1502,6 +1507,10 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 
 	if (have_all_entries) {
 		err = got_privsep_send_object_enumeration_done(ibuf);
+		if (err)
+			goto done;
+	} else {
+		err = got_privsep_send_object_enumeration_incomplete(ibuf);
 		if (err)
 			goto done;
 	}
