@@ -1387,6 +1387,11 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (err)
 		goto done;
 
+	if (STAILQ_EMPTY(&commit_ids)) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
 	err = recv_object_ids(idset, ibuf);
 	if (err)
 		goto done;
