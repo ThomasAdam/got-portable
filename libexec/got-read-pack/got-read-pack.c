@@ -1373,7 +1373,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 
 	STAILQ_INIT(&commit_ids);
 
-	trees = calloc(1, nalloc);
+	trees = calloc(nalloc, sizeof(*trees));
 	if (trees == NULL)
 		return got_error_from_errno("calloc");
 
