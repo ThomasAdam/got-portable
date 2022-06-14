@@ -3119,21 +3119,21 @@ got_privsep_send_object_idlist(struct imsgbuf *ibuf,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *idlist[GOT_IMSG_OBJ_ID_LIST_MAX_NIDS];
-	int i, j = 0;
+	int i, queued = 0;
 
 	for (i = 0; i < nids; i++) {
-		j = i % nitems(idlist);
-		idlist[j] = ids[i];
-		if (j >= nitems(idlist) - 1) {
-			err = send_idlist(ibuf, idlist, j + 1);
+		idlist[i % nitems(idlist)] = ids[i];
+		queued++;
+		if (queued >= nitems(idlist) - 1) {
+			err = send_idlist(ibuf, idlist, queued);
 			if (err)
 				return err;
-			j = 0;
+			queued = 0;
 		}
 	}
 
-	if (j > 0) {
-		err = send_idlist(ibuf, idlist, j + 1);
+	if (queued > 0) {
+		err = send_idlist(ibuf, idlist, queued);
 		if (err)
 			return err;
 	}
