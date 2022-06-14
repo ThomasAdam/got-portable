@@ -239,12 +239,12 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 				goto done;
 			}
 			memcpy(&hdr, imsg.data, sizeof(hdr));
-			if ((h = calloc(1, sizeof(*h))) == NULL) {
-				err = got_error_from_errno("calloc");
+			if (hdr.oldfrom < 0 || hdr.newfrom < 0) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				goto done;
 			}
-			if (h->old_from < 0 || h->new_from < 0) {
-				err = got_error(GOT_ERR_PRIVSEP_LEN);
+			if ((h = calloc(1, sizeof(*h))) == NULL) {
+				err = got_error_from_errno("calloc");
 				goto done;
 			}
 			h->old_from = hdr.oldfrom;
