@@ -618,10 +618,10 @@ struct got_imsg_patch {
  * Structure for GOT_IMSG_PATCH_HUNK data.
  */
 struct got_imsg_patch_hunk {
-	long	oldfrom;
-	long	oldlines;
-	long	newfrom;
-	long	newlines;
+	int	oldfrom;
+	int	oldlines;
+	int	newfrom;
+	int	newlines;
 };
 
 struct got_remote_repo;

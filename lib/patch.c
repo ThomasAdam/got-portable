@@ -54,13 +54,13 @@
 struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
 	const struct got_error *err;
-	long	offset;
+	int	offset;
 	int	old_nonl;
 	int	new_nonl;
-	long	old_from;
-	long	old_lines;
-	long	new_from;
-	long	new_lines;
+	int	old_from;
+	int	old_lines;
+	int	new_from;
+	int	new_lines;
 	size_t	len;
 	size_t	cap;
 	char	**lines;
@@ -337,7 +337,7 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 }
 
 static const struct got_error *
-locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
+locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -345,7 +345,7 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, long *lineno)
 	size_t linesize = 0;
 	ssize_t linelen;
 	off_t match = -1;
-	long match_lineno = -1;
+	int match_lineno = -1;
 
 	for (;;) {
 		linelen = getline(&line, &linesize, orig);
@@ -426,7 +426,7 @@ done:
 }
 
 static const struct got_error *
-apply_hunk(FILE *tmp, struct got_patch_hunk *h, long *lineno)
+apply_hunk(FILE *tmp, struct got_patch_hunk *h, int *lineno)
 {
 	size_t i, new = 0;
 
@@ -461,7 +461,7 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
 	struct stat sb;
-	long lineno = 0;
+	int lineno = 0;
 	FILE *orig;
 	off_t copypos, pos;
 	char *line = NULL;
@@ -698,7 +698,7 @@ reverse_patch(struct got_patch *p)
 {
 	struct got_patch_hunk *h;
 	size_t i;
-	long tmp;
+	int tmp;
 
 	STAILQ_FOREACH(h, &p->head, entries) {
 		tmp = h->old_from;
