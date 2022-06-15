@@ -715,6 +715,7 @@ cmd_import(int argc, char *argv[])
 	struct got_pathlist_head ignores;
 	struct got_pathlist_entry *pe;
 	int preserve_logmsg = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&ignores);
 
@@ -773,7 +774,10 @@ cmd_import(int argc, char *argv[])
 	error = get_gitconfig_path(&gitconfig_path);
 	if (error)
 		goto done;
-	error = got_repo_open(&repo, repo_path, gitconfig_path);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, repo_path, gitconfig_path, pack_fds);
 	if (error)
 		goto done;
 
@@ -900,6 +904,12 @@ cmd_import(int argc, char *argv[])
 	printf("Created branch %s with commit %s\n",
 	    got_ref_get_name(branch_ref), id_str);
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	if (preserve_logmsg) {
 		fprintf(stderr, "%s: log message preserved in %s\n",
 		    getprogname(), logmsg_path);
@@ -1484,6 +1494,7 @@ cmd_clone(int argc, char *argv[])
 	char *git_url = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int list_refs_only = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1628,7 +1639,10 @@ cmd_clone(int argc, char *argv[])
 		error = got_repo_init(repo_path);
 		if (error)
 			goto done;
-		error = got_repo_open(&repo, repo_path, NULL);
+		error = got_repo_pack_fds_open(&pack_fds);
+		if (error != NULL)
+			goto done;
+		error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 		if (error)
 			goto done;
 	}
@@ -1806,6 +1820,12 @@ cmd_clone(int argc, char *argv[])
 		printf("Created %s repository '%s'\n",
 		    mirror_references ? "mirrored" : "cloned", repo_path);
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	if (fetchpid > 0) {
 		if (kill(fetchpid, SIGTERM) == -1)
 			error = got_error_from_errno("kill");
@@ -2212,6 +2232,7 @@ cmd_fetch(int argc, char *argv[])
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -2311,6 +2332,10 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -2333,7 +2358,7 @@ cmd_fetch(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -2621,6 +2646,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
 		free(pe->data);
@@ -2848,6 +2879,7 @@ cmd_checkout(int argc, char *argv[])
 	int ch, same_path_prefix, allow_nonempty = 0, verbosity = 0;
 	struct got_pathlist_head paths;
 	struct got_checkout_progress_arg cpa;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -2936,7 +2968,11 @@ cmd_checkout(int argc, char *argv[])
 	got_path_strip_trailing_slashes(repo_path);
 	got_path_strip_trailing_slashes(worktree_path);
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -3052,6 +3088,12 @@ cmd_checkout(int argc, char *argv[])
 	if (cpa.had_base_commit_ref_error)
 		show_worktree_base_ref_warning();
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	if (head_ref)
 		got_ref_close(head_ref);
 	if (ref)
@@ -3281,8 +3323,13 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 	const struct got_error *err;
 	struct got_repository *repo;
 	static char msg[512];
+	int *pack_fds = NULL;
 
-	err = got_repo_open(&repo, path, NULL);
+	err = got_repo_pack_fds_open(&pack_fds);
+	if (err)
+		return err;
+
+	err = got_repo_open(&repo, path, NULL, pack_fds);
 	if (err)
 		return orig_err;
 
@@ -3293,6 +3340,12 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 	    "The got(1) manual page contains more information.", cmdname);
 	err = got_error_msg(GOT_ERR_NOT_WORKTREE, msg);
 	got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (err == NULL)
+			err = pack_err;
+	}
 	return err;
 }
 
@@ -3311,6 +3364,7 @@ cmd_update(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	int ch, verbosity = 0;
 	struct got_update_progress_arg upa;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -3346,6 +3400,11 @@ cmd_update(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, worktree_path);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -3359,7 +3418,7 @@ cmd_update(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -3463,8 +3522,15 @@ cmd_update(int argc, char *argv[])
 		    got_worktree_get_head_ref_name(worktree), commit_id_str);
 	} else
 		printf("Already up-to-date\n");
+
 	print_update_progress_stats(&upa);
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(worktree_path);
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -4250,6 +4316,7 @@ cmd_log(int argc, char *argv[])
 	struct got_reflist_head refs;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
 	FILE *tmpfile = NULL;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
 
@@ -4331,6 +4398,10 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -4363,7 +4434,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -4463,6 +4534,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	if (refs_idmap)
 		got_reflist_object_id_map_free(refs_idmap);
@@ -4726,6 +4803,7 @@ cmd_diff(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	FILE *f1 = NULL, *f2 = NULL;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&paths);
@@ -4785,6 +4863,10 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -4807,7 +4889,7 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	free(repo_path);
 	if (error != NULL)
 		goto done;
@@ -5062,6 +5144,12 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -5208,6 +5296,7 @@ cmd_blame(int argc, char *argv[])
 	struct blame_cb_args bca;
 	int ch, obj_type, i;
 	off_t filesize;
+	int *pack_fds = NULL;
 
 	memset(&bca, 0, sizeof(bca));
 
@@ -5248,6 +5337,11 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -5271,7 +5365,7 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -5404,6 +5498,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	if (bca.lines) {
 		for (i = 0; i < bca.nlines; i++) {
@@ -5549,6 +5649,7 @@ cmd_tree(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int show_ids = 0, recurse = 0;
 	int ch;
+	int *pack_fds = NULL;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -5595,6 +5696,11 @@ cmd_tree(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -5617,7 +5723,7 @@ cmd_tree(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -5705,6 +5811,12 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	return error;
 }
 
@@ -5771,6 +5883,7 @@ cmd_status(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	int ch, i, no_ignores = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -5830,6 +5943,10 @@ cmd_status(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -5838,7 +5955,7 @@ cmd_status(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -5854,6 +5971,13 @@ cmd_status(int argc, char *argv[])
 	error = got_worktree_status(worktree, &paths, repo, no_ignores,
 	    print_status, &st, check_cancelled, NULL);
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
+
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -5995,6 +6119,7 @@ cmd_ref(int argc, char *argv[])
 	int ch, do_list = 0, do_delete = 0, sort_by_time = 0;
 	const char *obj_arg = NULL, *symref_target= NULL;
 	char *refname = NULL;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:dr:ls:t")) != -1) {
 		switch (ch) {
@@ -6078,6 +6203,10 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -6100,7 +6229,7 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -6138,6 +6267,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(cwd);
 	free(repo_path);
 	return error;
@@ -6385,6 +6520,7 @@ cmd_branch(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -6449,6 +6585,10 @@ cmd_branch(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -6471,7 +6611,7 @@ cmd_branch(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -6566,6 +6706,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(cwd);
 	free(repo_path);
 	free(commit_id);
@@ -6943,6 +7089,7 @@ cmd_tag(int argc, char *argv[])
 	char *gitconfig_path = NULL, *tagger = NULL;
 	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:m:r:l")) != -1) {
 		switch (ch) {
@@ -6995,6 +7142,10 @@ cmd_tag(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -7023,9 +7174,10 @@ cmd_tag(int argc, char *argv[])
 			got_worktree_close(worktree);
 			worktree = NULL;
 		}
-		error = got_repo_open(&repo, repo_path, NULL);
+		error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 		if (error != NULL)
 			goto done;
+
 #ifndef PROFILE
 		/* Remove "cpath" promise. */
 		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
@@ -7040,7 +7192,8 @@ cmd_tag(int argc, char *argv[])
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)
 			goto done;
-		error = got_repo_open(&repo, repo_path, gitconfig_path);
+		error = got_repo_open(&repo, repo_path, gitconfig_path,
+		    pack_fds);
 		if (error != NULL)
 			goto done;
 
@@ -7088,6 +7241,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(cwd);
 	free(repo_path);
 	free(gitconfig_path);
@@ -7123,6 +7282,7 @@ cmd_add(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	int ch, can_recurse = 0, no_ignores = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -7157,6 +7317,10 @@ cmd_add(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -7165,7 +7329,7 @@ cmd_add(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -7217,6 +7381,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -7258,6 +7428,7 @@ cmd_remove(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0, i;
 	int ignore_missing_paths = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -7311,6 +7482,11 @@ cmd_remove(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -7319,7 +7495,7 @@ cmd_remove(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -7372,6 +7548,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -7474,6 +7656,7 @@ cmd_patch(int argc, char *argv[])
 	char *cwd = NULL;
 	int ch, nop = 0, strip = -1, reverse = 0;
 	int patchfd;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "np:R")) != -1) {
 		switch (ch) {
@@ -7516,12 +7699,16 @@ cmd_patch(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error != NULL)
 		goto done;
 
 	const char *repo_path = got_worktree_get_repo_path(worktree);
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -7549,6 +7736,12 @@ done:
 		close_error = got_worktree_close(worktree);
 		if (error == NULL)
 			error = close_error;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	free(cwd);
 	return error;
@@ -7704,6 +7897,7 @@ cmd_revert(int argc, char *argv[])
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -7742,6 +7936,11 @@ cmd_revert(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -7750,7 +7949,7 @@ cmd_revert(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -7815,6 +8014,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(path);
 	free(cwd);
 	return error;
@@ -7988,6 +8193,7 @@ cmd_commit(int argc, char *argv[])
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
 	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
 	struct got_pathlist_head paths;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
@@ -8032,6 +8238,11 @@ cmd_commit(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -8056,7 +8267,7 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    gitconfig_path);
+	    gitconfig_path, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -8131,6 +8342,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(cwd);
 	free(id_str);
 	free(gitconfig_path);
@@ -8367,6 +8584,7 @@ cmd_send(int argc, char *argv[])
 	int verbosity = 0, overwrite_refs = 0;
 	int send_all_branches = 0, send_all_tags = 0;
 	struct got_reference *ref = NULL;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&branches);
 	TAILQ_INIT(&tags);
@@ -8446,6 +8664,10 @@ cmd_send(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -8468,7 +8690,7 @@ cmd_send(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -8674,6 +8896,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	if (ref)
 		got_ref_close(ref);
 	got_pathlist_free(&branches);
@@ -8713,6 +8941,7 @@ cmd_cherrypick(int argc, char *argv[])
 	struct got_object_qid *pid;
 	int ch;
 	struct got_update_progress_arg upa;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -8738,6 +8967,11 @@ cmd_cherrypick(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -8747,7 +8981,7 @@ cmd_cherrypick(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -8789,6 +9023,13 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
+
 	return error;
 }
 
@@ -8811,6 +9052,7 @@ cmd_backout(int argc, char *argv[])
 	struct got_object_qid *pid;
 	int ch;
 	struct got_update_progress_arg upa;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -8836,6 +9078,11 @@ cmd_backout(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -8844,7 +9091,7 @@ cmd_backout(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -8889,6 +9136,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	return error;
 }
@@ -9474,6 +9727,7 @@ cmd_rebase(int argc, char *argv[])
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid, *pid;
 	struct got_update_progress_arg upa;
+	int *pack_fds = NULL;
 
 	STAILQ_INIT(&commits);
 	TAILQ_INIT(&merged_paths);
@@ -9540,6 +9794,11 @@ cmd_rebase(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (list_backups || delete_backups) {
@@ -9554,7 +9813,8 @@ cmd_rebase(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo,
-	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL);
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL,
+	    pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -9838,6 +10098,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	return error;
 }
@@ -10693,6 +10959,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_object_qid *pid;
 	struct got_histedit_list histedit_cmds;
 	struct got_histedit_list_entry *hle;
+	int *pack_fds = NULL;
 
 	STAILQ_INIT(&commits);
 	TAILQ_INIT(&histedit_cmds);
@@ -10814,6 +11081,11 @@ cmd_histedit(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (list_backups || delete_backups) {
@@ -10830,7 +11102,7 @@ cmd_histedit(int argc, char *argv[])
 	if (list_backups || delete_backups) {
 		error = got_repo_open(&repo,
 		    worktree ? got_worktree_get_repo_path(worktree) : cwd,
-		    NULL);
+		    NULL, pack_fds);
 		if (error != NULL)
 			goto done;
 		error = apply_unveil(got_repo_get_path(repo), 0,
@@ -10844,7 +11116,7 @@ cmd_histedit(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11214,6 +11486,12 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	return error;
 }
 
@@ -11237,6 +11515,7 @@ cmd_integrate(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL, *base_commit_id = NULL;
 	int ch;
 	struct got_update_progress_arg upa;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -11263,6 +11542,10 @@ cmd_integrate(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -11276,7 +11559,7 @@ cmd_integrate(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11356,6 +11639,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(cwd);
 	free(base_commit_id);
 	free(commit_id);
@@ -11388,6 +11677,7 @@ cmd_merge(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	struct got_object_id *merge_commit_id = NULL;
 	char *branch_name = NULL;
+	int *pack_fds = NULL;
 
 	memset(&upa, 0, sizeof(upa));
 
@@ -11431,6 +11721,10 @@ cmd_merge(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -11440,7 +11734,8 @@ cmd_merge(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo,
-	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL);
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL,
+	    pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11626,6 +11921,12 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	return error;
 }
 
@@ -11678,6 +11979,7 @@ cmd_stage(int argc, char *argv[])
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -11720,6 +12022,10 @@ cmd_stage(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -11728,7 +12034,7 @@ cmd_stage(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11775,6 +12081,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -11806,6 +12118,7 @@ cmd_unstage(int argc, char *argv[])
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -11840,6 +12153,10 @@ cmd_unstage(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -11848,7 +12165,7 @@ cmd_unstage(int argc, char *argv[])
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11888,6 +12205,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
@@ -12090,6 +12413,7 @@ cmd_cat(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	int ch, obj_type, i, force_path = 0;
 	struct got_reflist_head refs;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
 
@@ -12129,6 +12453,10 @@ cmd_cat(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -12153,7 +12481,7 @@ cmd_cat(int argc, char *argv[])
 			return got_error_from_errno("strdup");
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	free(repo_path);
 	if (error != NULL)
 		goto done;
@@ -12239,6 +12567,13 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
+
 	got_ref_list_free(&refs);
 	return error;
 }
@@ -12329,6 +12664,7 @@ cmd_info(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	char *uuidstr = NULL;
 	int ch, show_files = 0;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -12353,6 +12689,10 @@ cmd_info(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
 
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
@@ -12421,6 +12761,12 @@ cmd_info(int argc, char *argv[])
 		}
 	}
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);

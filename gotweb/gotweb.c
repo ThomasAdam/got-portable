@@ -568,7 +568,7 @@ gw_index(struct gw_trans *gw_trans)
 	enum kcgi_err kerr = KCGI_OK;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		return error;
@@ -972,7 +972,7 @@ gw_commits(struct gw_trans *gw_trans)
 		return got_error_from_errno("malloc");
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		goto done;
@@ -1199,7 +1199,7 @@ gw_briefs(struct gw_trans *gw_trans)
 		return got_error_from_errno("malloc");
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		goto done;
@@ -1459,7 +1459,8 @@ gw_summary(struct gw_trans *gw_trans)
 	enum kcgi_err kerr = KCGI_OK;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
+	    NULL) == -1)
 		return got_error_from_errno("pledge");
 #endif
 	error = gw_apply_unveil(gw_trans->gw_dir->path);
@@ -1622,7 +1623,8 @@ gw_tree(struct gw_trans *gw_trans)
 	enum kcgi_err kerr = KCGI_OK;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
+	    NULL) == -1)
 		return got_error_from_errno("pledge");
 #endif
 	if ((header = gw_init_header()) == NULL)
@@ -1697,7 +1699,8 @@ gw_tags(struct gw_trans *gw_trans)
 	enum kcgi_err kerr = KCGI_OK;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
+	    NULL) == -1)
 		return got_error_from_errno("pledge");
 #endif
 	if ((header = gw_init_header()) == NULL)
@@ -1813,7 +1816,7 @@ gw_tag(struct gw_trans *gw_trans)
 	enum kcgi_err kerr = KCGI_OK;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
 #endif
 	if ((header = gw_init_header()) == NULL)
@@ -2784,6 +2787,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	time_t committer_time = 0, cmp_time = 0;
+	int *pack_fds = NULL;
 
 	*repo_age = NULL;
 	TAILQ_INIT(&refs);
@@ -2794,7 +2798,10 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	if (gw_trans->repo)
 		repo = gw_trans->repo;
 	else {
-		error = got_repo_open(&repo, dir, NULL);
+		error = got_repo_pack_fds_open(&pack_fds);
+		if (error != NULL)
+			goto done;
+		error = got_repo_open(&repo, dir, NULL, pack_fds);
 		if (error)
 			return error;
 	}
@@ -2843,6 +2850,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	return error;
 }
@@ -2955,15 +2968,20 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 	const struct got_error *error = NULL, *close_err;
 	struct got_repository *repo;
 	const char *gitconfig_owner;
+	int *pack_fds = NULL;
 
 	*owner = NULL;
 
 	if (gw_trans->gw_conf->got_show_repo_owner == 0)
 		return NULL;
 
-	error = got_repo_open(&repo, dir, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		return error;
+	error = got_repo_open(&repo, dir, NULL, pack_fds);
 	if (error)
 		return error;
+
 	gitconfig_owner = got_repo_get_gitconfig_owner(repo);
 	if (gitconfig_owner) {
 		*owner = strdup(gitconfig_owner);
@@ -2973,6 +2991,12 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 	close_err = got_repo_close(repo);
 	if (error == NULL)
 		error = close_err;
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	return error;
 }
 
@@ -3772,8 +3796,13 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	char *in_repo_path = NULL;
 	struct got_object_id *id = NULL;
 	struct got_reference *ref;
+	int *pack_fds = NULL;
 
-	error = got_repo_open(&gw_trans->repo, gw_trans->repo_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&gw_trans->repo, gw_trans->repo_path, NULL,
+	    pack_fds);
 	if (error)
 		return error;
 
@@ -3855,7 +3884,12 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 
 	error = gw_get_commits(gw_trans, header, limit, id);
 done:
-	got_ref_list_free(&header->refs);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(id);
 	free(in_repo_path);
 	return error;
@@ -4847,17 +4881,17 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (gw_trans->action == GW_BLOB)
-		error = gw_blob(gw_trans);
-	else
-		error = gw_display_index(gw_trans);
-done:
 	if (gw_trans->repo) {
 		const struct got_error *close_err;
 		close_err = got_repo_close(gw_trans->repo);
 		if (error == NULL)
 			error = close_err;
 	}
+	if (gw_trans->action == GW_BLOB)
+		error = gw_blob(gw_trans);
+	else
+		error = gw_display_index(gw_trans);
+done:
 	if (error) {
 		gw_trans->error = error;
 		gw_trans->action = GW_ERR;

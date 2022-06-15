@@ -410,6 +410,7 @@ struct tog_blame {
 	struct tog_blame_thread_args thread_args;
 	struct tog_blame_cb_args cb_args;
 	const char *path;
+	int *pack_fds;
 };
 
 struct tog_blame_view_state {
@@ -1125,7 +1126,7 @@ view_loop(struct tog_view *view)
 			}
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
 			view = new_view;
-		} 
+		}
 		if (view) {
 			if (view_is_parent_view(view)) {
 				if (view->child && view->child->focussed)
@@ -2317,6 +2318,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	struct got_repository *thread_repo = NULL;
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
+	int *pack_fds = NULL;
 
 	if (in_repo_path != s->in_repo_path) {
 		free(s->in_repo_path);
@@ -2370,7 +2372,11 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->search_start = search_start_log_view;
 	view->search_next = search_next_log_view;
 
-	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
+	err = got_repo_pack_fds_open(&pack_fds);
+	if (err)
+		goto done;
+	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL,
+	    pack_fds);
 	if (err)
 		goto done;
 	err = got_commit_graph_open(&thread_graph, s->in_repo_path,
@@ -2407,6 +2413,12 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.search_next_done = &view->search_next_done;
 	s->thread_args.regex = &view->regex;
 done:
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (err == NULL)
+			err = pack_err;
+	}
 	if (err)
 		close_log_view(view);
 	return err;
@@ -2442,6 +2454,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_view *ref_view = NULL;
 	struct commit_queue_entry *entry;
 	int begin_x = 0, n, nscroll = view->nlines - 1;
+	int *pack_fds = NULL;
 
 	if (s->thread_args.load_all) {
 		if (ch == KEY_BACKSPACE)
@@ -2642,8 +2655,14 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else /* 'B' */
 			s->log_branches = !s->log_branches;
 
+		err = got_repo_pack_fds_open(&pack_fds);
+		if (err)
+			return err;
 		err = got_repo_open(&s->thread_args.repo,
-		    got_repo_get_path(s->repo), NULL);
+		    got_repo_get_path(s->repo), NULL, pack_fds);
+		if (err)
+			return err;
+		err = got_repo_pack_fds_close(pack_fds);
 		if (err)
 			return err;
 		tog_free_refs();
@@ -2799,6 +2818,7 @@ cmd_log(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch, log_branches = 0;
 	struct tog_view *view;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "bc:r:")) != -1) {
 		switch (ch) {
@@ -2826,6 +2846,10 @@ cmd_log(int argc, char *argv[])
 	if (argc > 1)
 		usage_log();
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -2844,7 +2868,7 @@ cmd_log(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -2916,6 +2940,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	tog_free_refs();
 	return error;
 }
@@ -3926,6 +3956,7 @@ cmd_diff(int argc, char *argv[])
 	int ch, force_text_diff = 0;
 	const char *errstr;
 	struct tog_view *view;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "aC:r:w")) != -1) {
 		switch (ch) {
@@ -3966,6 +3997,10 @@ cmd_diff(int argc, char *argv[])
 	} else
 		usage_diff();
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error)
+		goto done;
+
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -3984,7 +4019,7 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -4030,6 +4065,12 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	tog_free_refs();
 	return error;
 }
@@ -4349,7 +4390,12 @@ stop_blame(struct tog_blame *blame)
 	}
 	free(blame->cb_args.commit_id);
 	blame->cb_args.commit_id = NULL;
-
+	if (blame->pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(blame->pack_fds);
+		if (err == NULL)
+			err = pack_err;
+	}
 	return err;
 }
 
@@ -4387,6 +4433,7 @@ run_blame(struct tog_view *view)
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	int obj_type;
+	int *pack_fds = NULL;
 
 	err = got_object_open_as_commit(&commit, s->repo,
 	    &s->blamed_commit->id);
@@ -4433,10 +4480,15 @@ run_blame(struct tog_view *view)
 		goto done;
 	}
 
-	err = got_repo_open(&thread_repo, got_repo_get_path(s->repo), NULL);
+	err = got_repo_pack_fds_open(&pack_fds);
+	if (err)
+		goto done;
+	err = got_repo_open(&thread_repo, got_repo_get_path(s->repo), NULL,
+	    pack_fds);
 	if (err)
 		goto done;
 
+	blame->pack_fds = pack_fds;
 	blame->cb_args.view = view;
 	blame->cb_args.lines = blame->lines;
 	blame->cb_args.nlines = blame->nlines;
@@ -4536,7 +4588,6 @@ close_blame_view(struct tog_view *view)
 
 	free(s->path);
 	free_colors(&s->colors);
-
 	return err;
 }
 
@@ -4880,6 +4931,7 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
@@ -4904,6 +4956,10 @@ cmd_blame(int argc, char *argv[])
 	if (argc != 1)
 		usage_blame();
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -4922,7 +4978,7 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -4995,6 +5051,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	tog_free_refs();
 	return error;
@@ -5751,6 +5813,7 @@ cmd_tree(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch;
 	struct tog_view *view;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
@@ -5775,6 +5838,10 @@ cmd_tree(int argc, char *argv[])
 	if (argc > 1)
 		usage_tree();
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -5793,7 +5860,7 @@ cmd_tree(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -5867,6 +5934,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	tog_free_refs();
 	return error;
@@ -6513,6 +6586,7 @@ cmd_ref(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	int ch;
 	struct tog_view *view;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
@@ -6534,6 +6608,10 @@ cmd_ref(int argc, char *argv[])
 	if (argc > 1)
 		usage_ref();
 
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -6552,7 +6630,7 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -6589,6 +6667,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (close_err)
 			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
 	}
 	tog_free_refs();
 	return error;
@@ -6661,10 +6745,15 @@ tog_log_with_path(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *commit_id_str = NULL, **cmd_argv = NULL;
+	int *pack_fds = NULL;
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
 		return got_error_from_errno("getcwd");
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
 
 	error = got_worktree_open(&worktree, cwd);
 	if (error && error->code != GOT_ERR_NOT_WORKTREE)
@@ -6679,7 +6768,7 @@ tog_log_with_path(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -6739,6 +6828,12 @@ done:
 		got_object_commit_close(commit);
 	if (worktree)
 		got_worktree_close(worktree);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(id);
 	free(commit_id_str);
 	free(commit_id);
