@@ -4402,6 +4402,7 @@ stop_blame(struct tog_blame *blame)
 		    got_repo_pack_fds_close(blame->pack_fds);
 		if (err == NULL)
 			err = pack_err;
+		blame->pack_fds = NULL;
 	}
 	return err;
 }
