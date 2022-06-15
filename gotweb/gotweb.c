@@ -75,6 +75,7 @@ struct gw_trans {
 	unsigned int		 page;
 	unsigned int		 repos_total;
 	enum kmime		 mime;
+	int			*pack_fds;
 };
 
 struct gw_header {
@@ -451,7 +452,6 @@ gw_blob(struct gw_trans *gw_trans)
 
 	error = gw_output_blob_buf(gw_trans, header);
 done:
-
 	if (error) {
 		gw_trans->mime = KMIME_TEXT_PLAIN;
 		err = gw_display_index(gw_trans);
@@ -2786,7 +2786,6 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	time_t committer_time = 0, cmp_time = 0;
-	int *pack_fds = NULL;
 
 	*repo_age = NULL;
 	TAILQ_INIT(&refs);
@@ -2797,10 +2796,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	if (gw_trans->repo)
 		repo = gw_trans->repo;
 	else {
-		error = got_repo_pack_fds_open(&pack_fds);
-		if (error != NULL)
-			goto done;
-		error = got_repo_open(&repo, dir, NULL, pack_fds);
+		error = got_repo_open(&repo, dir, NULL, gw_trans->pack_fds);
 		if (error)
 			return error;
 	}
@@ -2849,12 +2845,6 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
-	}
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
 	}
 	return error;
 }
@@ -2967,17 +2957,13 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 	const struct got_error *error = NULL, *close_err;
 	struct got_repository *repo;
 	const char *gitconfig_owner;
-	int *pack_fds = NULL;
 
 	*owner = NULL;
 
 	if (gw_trans->gw_conf->got_show_repo_owner == 0)
 		return NULL;
 
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		return error;
-	error = got_repo_open(&repo, dir, NULL, pack_fds);
+	error = got_repo_open(&repo, dir, NULL, gw_trans->pack_fds);
 	if (error)
 		return error;
 
@@ -2990,12 +2976,6 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 	close_err = got_repo_close(repo);
 	if (error == NULL)
 		error = close_err;
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
 	return error;
 }
 
@@ -3795,13 +3775,9 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	char *in_repo_path = NULL;
 	struct got_object_id *id = NULL;
 	struct got_reference *ref;
-	int *pack_fds = NULL;
 
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
 	error = got_repo_open(&gw_trans->repo, gw_trans->repo_path, NULL,
-	    pack_fds);
+	    gw_trans->pack_fds);
 	if (error)
 		return error;
 
@@ -3883,12 +3859,6 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 
 	error = gw_get_commits(gw_trans, header, limit, id);
 done:
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
 	free(id);
 	free(in_repo_path);
 	return error;
@@ -4872,6 +4842,10 @@ main(int argc, char *argv[])
 	gw_trans->gw_tmpl->arg = gw_trans;
 	gw_trans->gw_tmpl->cb = gw_template;
 
+	error = got_repo_pack_fds_open(&gw_trans->pack_fds);
+	if (error != NULL)
+		goto done;
+
 	error = parse_gotweb_config(&gw_trans->gw_conf, GOTWEB_CONF);
 	if (error)
 		goto done;
@@ -4909,6 +4883,12 @@ done:
 	}
 
 cleanup:
+	if (gw_trans->pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(gw_trans->pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(gw_trans->gw_conf->got_repos_path);
 	free(gw_trans->gw_conf->got_www_path);
 	free(gw_trans->gw_conf->got_site_name);
