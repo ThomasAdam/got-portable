@@ -379,6 +379,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 
 	free(repo_path);
@@ -766,6 +767,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	got_pathlist_free(&exclude_args);
 	got_ref_list_free(&exclude_refs);
@@ -859,6 +861,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	free(id_str);
 	free(pack_hash);
@@ -1049,6 +1052,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	free(id_str);
 	free(pack_hash);
@@ -1275,6 +1279,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	free(repo_path);
 	return error;
