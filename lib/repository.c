@@ -279,7 +279,6 @@ got_repo_pack_fds_close(int *pack_fds)
 		}
 	}
 	free(pack_fds);
-	pack_fds = NULL;
 	return err;
 }
 
