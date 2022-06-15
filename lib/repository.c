@@ -255,11 +255,9 @@ got_repo_pack_fds_open(int **pack_fds)
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
 		pack_fds_tmp[i] = got_opentempfd();
 		if (pack_fds_tmp[i] == -1) {
-			err = got_repo_pack_fds_close(pack_fds_tmp);
-			if (err)
-				return err;
-			else
-				return got_error_from_errno("got_opentempfd");
+			err = got_error_from_errno("got_opentempfd");
+			got_repo_pack_fds_close(pack_fds_tmp);
+			return err;
 		}
 	}
 	memcpy(*pack_fds, pack_fds_tmp, sizeof(pack_fds_tmp));
