@@ -62,6 +62,8 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+#define GOT_PACK_NUM_TEMPFILES		GOT_PACK_CACHE_SIZE * 2
+
 RB_PROTOTYPE(got_packidx_bloom_filter_tree, got_packidx_bloom_filter, entry,
     got_packidx_bloom_filter_cmp);
 
@@ -238,6 +240,49 @@ done:
 	free(path_head);
 	return ret;
 
+}
+
+const struct got_error *
+got_repo_pack_fds_open(int **pack_fds)
+{
+	const struct got_error *err = NULL;
+	int i, pack_fds_tmp[GOT_PACK_NUM_TEMPFILES];
+
+	*pack_fds = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(**pack_fds));
+	if (*pack_fds == NULL)
+		return got_error_from_errno("calloc");
+
+	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
+		pack_fds_tmp[i] = got_opentempfd();
+		if (pack_fds_tmp[i] == -1) {
+			err = got_repo_pack_fds_close(pack_fds_tmp);
+			if (err)
+				return err;
+			else
+				return got_error_from_errno("got_opentempfd");
+		}
+	}
+	memcpy(*pack_fds, pack_fds_tmp, sizeof(pack_fds_tmp));
+	return err;
+}
+
+const struct got_error *
+got_repo_pack_fds_close(int *pack_fds)
+{
+	const struct got_error *err = NULL;
+	int i;
+
+	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
+		if (pack_fds[i] == -1)
+			continue;
+		if (close(pack_fds[i]) == -1) {
+			err = got_error_from_errno("close");
+			break;
+		}
+	}
+	free(pack_fds);
+	pack_fds = NULL;
+	return err;
 }
 
 const struct got_error *
@@ -645,12 +690,12 @@ static const char *const repo_extensions[] = {
 
 const struct got_error *
 got_repo_open(struct got_repository **repop, const char *path,
-    const char *global_gitconfig_path)
+    const char *global_gitconfig_path, int *pack_fds)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
 	char *repo_path = NULL;
-	size_t i;
+	size_t i, j = 0;
 	struct rlimit rl;
 
 	*repop = NULL;
@@ -697,12 +742,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 		repo->pack_cache_size = rl.rlim_cur / 8;
 	for (i = 0; i < nitems(repo->packs); i++) {
 		if (i < repo->pack_cache_size) {
-			repo->packs[i].basefd = got_opentempfd();
-			if (repo->packs[i].basefd == -1)
-				return got_error_from_errno("got_opentempfd");
-			repo->packs[i].accumfd = got_opentempfd();
-			if (repo->packs[i].accumfd == -1)
-				return got_error_from_errno("got_opentempfd");
+			repo->packs[i].basefd = pack_fds[j++];
+			repo->packs[i].accumfd = pack_fds[j++];
 		} else {
 			repo->packs[i].basefd = -1;
 			repo->packs[i].accumfd = -1;
@@ -790,20 +831,10 @@ got_repo_close(struct got_repository *repo)
 		free(bf);
 	}
 
-	for (i = 0; i < repo->pack_cache_size; i++) {
+	for (i = 0; i < repo->pack_cache_size; i++)
 		if (repo->packs[i].path_packfile)
-			got_pack_close(&repo->packs[i]);
-		if (repo->packs[i].basefd != -1) {
-			if (close(repo->packs[i].basefd) == -1 && err == NULL)
-				err = got_error_from_errno("close");
-			repo->packs[i].basefd = -1;
-		}
-		if (repo->packs[i].accumfd != -1) {
-			if (close(repo->packs[i].accumfd) == -1 && err == NULL)
-				err = got_error_from_errno("close");
-			repo->packs[i].accumfd = -1;
-		}
-	}
+			if (repo->packs[i].path_packfile)
+				got_pack_close(&repo->packs[i]);
 
 	free(repo->path);
 	free(repo->path_git_dir);

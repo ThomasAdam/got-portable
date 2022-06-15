@@ -274,6 +274,7 @@ cmd_info(int argc, char *argv[])
 	int ch, npackfiles, npackedobj, nobj;
 	off_t packsize, loose_size;
 	char scaled[FMT_SCALED_STRSIZE];
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
@@ -303,7 +304,10 @@ cmd_info(int argc, char *argv[])
 		if (error)
 			goto done;
 	}
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 #ifndef PROFILE
@@ -370,6 +374,13 @@ cmd_info(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
+
 	free(repo_path);
 	return error;
 }
@@ -628,6 +639,7 @@ cmd_pack(int argc, char *argv[])
 	struct got_reflist_head exclude_refs;
 	struct got_reflist_head include_refs;
 	struct got_reflist_entry *re, *new;
+	int *pack_fds = NULL;
 
 	TAILQ_INIT(&exclude_args);
 	TAILQ_INIT(&exclude_refs);
@@ -674,7 +686,10 @@ cmd_pack(int argc, char *argv[])
 		if (error)
 			goto done;
 	}
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -746,6 +761,12 @@ cmd_pack(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	got_pathlist_free(&exclude_args);
 	got_ref_list_free(&exclude_refs);
 	got_ref_list_free(&include_refs);
@@ -774,6 +795,7 @@ cmd_indexpack(int argc, char *argv[])
 	char *id_str = NULL;
 	struct got_pack_progress_arg ppa;
 	FILE *packfile = NULL;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -799,7 +821,10 @@ cmd_indexpack(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	error = got_repo_open(&repo, packfile_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, packfile_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -829,6 +854,12 @@ cmd_indexpack(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(id_str);
 	free(pack_hash);
 	return error;
@@ -861,7 +892,7 @@ list_pack_cb(void *arg, struct got_object_id *id, int type, off_t offset,
 	char *id_str, *delta_str = NULL, *base_id_str = NULL;
 	const char *type_str;
 
-	err = got_object_id_str(&id_str, id);	
+	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
@@ -942,6 +973,7 @@ cmd_listpack(int argc, char *argv[])
 	struct gotadmin_list_pack_cb_args lpa;
 	FILE *packfile = NULL;
 	int show_stats = 0, human_readable = 0;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "hs")) != -1) {
 		switch (ch) {
@@ -971,7 +1003,10 @@ cmd_listpack(int argc, char *argv[])
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
-	error = got_repo_open(&repo, packfile_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, packfile_path, NULL, pack_fds);
 	if (error)
 		goto done;
 #ifndef PROFILE
@@ -1009,6 +1044,12 @@ cmd_listpack(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(id_str);
 	free(pack_hash);
 	free(packfile_path);
@@ -1119,6 +1160,7 @@ cmd_cleanup(int argc, char *argv[])
 	char scaled_diff[FMT_SCALED_STRSIZE];
 	char **extensions;
 	int nextensions, i;
+	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "apr:nq")) != -1) {
 		switch (ch) {
@@ -1160,7 +1202,10 @@ cmd_cleanup(int argc, char *argv[])
 		if (error)
 			goto done;
 	}
-	error = got_repo_open(&repo, repo_path, NULL);
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
 	if (error)
 		goto done;
 
@@ -1225,6 +1270,12 @@ cmd_cleanup(int argc, char *argv[])
 done:
 	if (repo)
 		got_repo_close(repo);
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	free(repo_path);
 	return error;
 }

@@ -20,7 +20,7 @@ struct got_tag_object;
 
 /* Open and close repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *,
-    const char *);
+    const char *, int *);
 const struct got_error *got_repo_close(struct got_repository*);
 
 /* Obtain the on-disk path to the repository. */
@@ -177,3 +177,9 @@ const struct got_error *got_repo_get_loose_object_info(int *nobjects,
 /* Obtain the number and size of packed objects in the repository. */
 const struct got_error *got_repo_get_packfile_info(int *npackfiles,
     int *nobjects, off_t *total_packsize, struct got_repository *);
+
+/* Create an array of file descriptors to hand over to got_repo_open for pack */
+const struct got_error *got_repo_pack_fds_open(int **);
+
+/* Close the array of file descriptors handed over to got_repo_open for pack */
+const struct got_error *got_repo_pack_fds_close(int *);
