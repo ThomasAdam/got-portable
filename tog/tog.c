@@ -2943,6 +2943,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	tog_free_refs();
 	return error;
@@ -4068,6 +4069,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	tog_free_refs();
 	return error;
@@ -5056,6 +5058,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	tog_free_refs();
 	return error;
@@ -5939,6 +5942,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	tog_free_refs();
 	return error;
@@ -6672,6 +6676,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	tog_free_refs();
 	return error;
@@ -6832,6 +6837,7 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		pack_fds = NULL;
 	}
 	free(id);
 	free(commit_id_str);
