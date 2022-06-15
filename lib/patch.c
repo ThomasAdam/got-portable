@@ -596,7 +596,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	int file_renamed = 0;
 	char *oldpath = NULL, *newpath = NULL;
-	char *tmppath = NULL, *template = NULL, *parent = NULL;;
+	char *tmppath = NULL, *template = NULL, *parent = NULL;
 	FILE *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
