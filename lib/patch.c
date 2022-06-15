@@ -684,6 +684,8 @@ done:
 	free(template);
 	if (tmppath != NULL)
 		unlink(tmppath);
+	if (tmp != NULL)
+		fclose(tmp);
 	free(tmppath);
 	free(oldpath);
 	free(newpath);
