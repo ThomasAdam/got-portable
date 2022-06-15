@@ -909,7 +909,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (preserve_logmsg) {
 		fprintf(stderr, "%s: log message preserved in %s\n",
@@ -1826,7 +1825,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (fetchpid > 0) {
 		if (kill(fetchpid, SIGTERM) == -1)
@@ -2653,7 +2651,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
@@ -3096,7 +3093,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (head_ref)
 		got_ref_close(head_ref);
@@ -3349,7 +3345,6 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 		    got_repo_pack_fds_close(pack_fds);
 		if (err == NULL)
 			err = pack_err;
-		pack_fds = NULL;
 	}
 	return err;
 }
@@ -3535,7 +3530,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(worktree_path);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -4546,7 +4540,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (refs_idmap)
 		got_reflist_object_id_map_free(refs_idmap);
@@ -5156,7 +5149,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -5512,7 +5504,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (bca.lines) {
 		for (i = 0; i < bca.nlines; i++) {
@@ -5825,7 +5816,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	return error;
 }
@@ -5986,7 +5976,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -6283,7 +6272,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	free(repo_path);
@@ -6723,7 +6711,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	free(repo_path);
@@ -7259,7 +7246,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	free(repo_path);
@@ -7400,7 +7386,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -7568,7 +7553,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -7758,7 +7742,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	return error;
@@ -8036,7 +8019,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(path);
 	free(cwd);
@@ -8365,7 +8347,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	free(id_str);
@@ -8920,7 +8901,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	if (ref)
 		got_ref_close(ref);
@@ -9048,7 +9028,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 
 	return error;
@@ -9163,7 +9142,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	return error;
 }
@@ -10126,7 +10104,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	return error;
 }
@@ -11514,7 +11491,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	return error;
 }
@@ -11668,7 +11644,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	free(cwd);
 	free(base_commit_id);
@@ -11951,7 +11926,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	return error;
 }
@@ -12112,7 +12086,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -12237,7 +12210,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -12600,7 +12572,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 
 	got_ref_list_free(&refs);
@@ -12795,7 +12766,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-		pack_fds = NULL;
 	}
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
