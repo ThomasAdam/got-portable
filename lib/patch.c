@@ -546,8 +546,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		err = copy(tmp, orig, copypos, -1);
 
 done:
-	if (orig != NULL)
-		fclose(orig);
+	if (orig != NULL && fclose(orig) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -687,8 +687,8 @@ done:
 	free(template);
 	if (tmppath != NULL)
 		unlink(tmppath);
-	if (tmp != NULL)
-		fclose(tmp);
+	if (tmp != NULL && fclose(tmp) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(tmppath);
 	free(oldpath);
 	free(newpath);
