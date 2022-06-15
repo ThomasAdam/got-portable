@@ -2489,6 +2489,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		select_commit(s);
 		break;
 	case CTRL('u'):
+	case 'u':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_PPAGE:
@@ -2541,6 +2542,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	}
 	case CTRL('d'):
+	case 'd':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
@@ -3801,6 +3803,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->first_displayed_line--;
 		break;
 	case CTRL('u'):
+	case 'u':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_PPAGE:
@@ -3818,6 +3821,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->first_displayed_line++;
 		break;
 	case CTRL('d'):
+	case 'd':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
@@ -4681,6 +4685,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->first_displayed_line--;
 		break;
 	case CTRL('u'):
+	case 'u':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_PPAGE:
@@ -4836,6 +4841,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	}
 	case CTRL('d'):
+	case 'd':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
@@ -5621,6 +5627,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		tree_scroll_up(s, 1);
 		break;
 	case CTRL('u'):
+	case 'u':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_PPAGE:
@@ -5649,6 +5656,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		tree_scroll_down(s, 1);
 		break;
 	case CTRL('d'):
+	case 'd':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
@@ -6441,6 +6449,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		ref_scroll_up(s, 1);
 		break;
 	case CTRL('u'):
+	case 'u':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_PPAGE:
@@ -6462,6 +6471,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		ref_scroll_down(s, 1);
 		break;
 	case CTRL('d'):
+	case 'd':
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
