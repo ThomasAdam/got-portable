@@ -4889,6 +4889,7 @@ cleanup:
 		    got_repo_pack_fds_close(gw_trans->pack_fds);
 		if (error == NULL)
 			error = pack_err;
+		gw_trans->pack_fds = NULL;
 	}
 	free(gw_trans->gw_conf->got_repos_path);
 	free(gw_trans->gw_conf->got_www_path);
