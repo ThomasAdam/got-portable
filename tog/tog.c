@@ -345,6 +345,7 @@ struct tog_log_thread_args {
 	const char *in_repo_path;
 	struct got_object_id *start_id;
 	struct got_repository *repo;
+	int *pack_fds;
 	int log_complete;
 	sig_atomic_t *quit;
 	struct commit_queue_entry **first_displayed_entry;
@@ -2171,6 +2172,14 @@ stop_log_thread(struct tog_log_view_state *s)
 		s->thread_args.repo = NULL;
 	}
 
+	if (s->thread_args.pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(s->thread_args.pack_fds);
+		if (err == NULL)
+			err = pack_err;
+		s->thread_args.pack_fds = NULL;
+	}
+
 	if (s->thread_args.graph) {
 		got_commit_graph_close(s->thread_args.graph);
 		s->thread_args.graph = NULL;
@@ -2327,7 +2336,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	struct got_repository *thread_repo = NULL;
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
-	int *pack_fds = NULL;
 
 	if (in_repo_path != s->in_repo_path) {
 		free(s->in_repo_path);
@@ -2381,11 +2389,13 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->search_start = search_start_log_view;
 	view->search_next = search_next_log_view;
 
-	err = got_repo_pack_fds_open(&pack_fds);
-	if (err)
-		goto done;
+	if (s->thread_args.pack_fds == NULL) {
+		err = got_repo_pack_fds_open(&s->thread_args.pack_fds);
+		if (err)
+			goto done;
+	}
 	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL,
-	    pack_fds);
+	    s->thread_args.pack_fds);
 	if (err)
 		goto done;
 	err = got_commit_graph_open(&thread_graph, s->in_repo_path,
@@ -2422,12 +2432,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.search_next_done = &view->search_next_done;
 	s->thread_args.regex = &view->regex;
 done:
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (err == NULL)
-			err = pack_err;
-	}
 	if (err)
 		close_log_view(view);
 	return err;
@@ -2463,7 +2467,6 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_view *ref_view = NULL;
 	struct commit_queue_entry *entry;
 	int begin_x = 0, n, nscroll = view->nlines - 1;
-	int *pack_fds = NULL;
 
 	if (s->thread_args.load_all) {
 		if (ch == KEY_BACKSPACE)
@@ -2664,14 +2667,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else /* 'B' */
 			s->log_branches = !s->log_branches;
 
-		err = got_repo_pack_fds_open(&pack_fds);
-		if (err)
-			return err;
 		err = got_repo_open(&s->thread_args.repo,
-		    got_repo_get_path(s->repo), NULL, pack_fds);
-		if (err)
-			return err;
-		err = got_repo_pack_fds_close(pack_fds);
+		    got_repo_get_path(s->repo), NULL,
+		    s->thread_args.pack_fds);
 		if (err)
 			return err;
 		tog_free_refs();
