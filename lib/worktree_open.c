@@ -113,6 +113,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	int version, fd = -1;
 	const char *errstr;
 	struct got_repository *repo = NULL;
+	int *pack_fds = NULL;
 	uint32_t uuid_status;
 
 	*worktree = NULL;
@@ -187,12 +188,11 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	err = got_repo_pack_fds_open(&(*worktree)->pack_fds);
+	err = got_repo_pack_fds_open(&pack_fds);
 	if (err)
 		goto done;
 
-	err = got_repo_open(&repo, (*worktree)->repo_path, NULL,
-	    (*worktree)->pack_fds);
+	err = got_repo_open(&repo, (*worktree)->repo_path, NULL, pack_fds);
 	if (err)
 		goto done;
 
@@ -227,6 +227,12 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (err == NULL)
 			err = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (err == NULL)
+			err = pack_err;
 	}
 	free(path_got);
 	free(path_lock);
@@ -298,12 +304,6 @@ got_worktree_close(struct got_worktree *worktree)
 	if (close(worktree->root_fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close",
 		    got_worktree_get_root_path(worktree));
-	if (worktree->pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(worktree->pack_fds);
-		if (err == NULL)
-			err = pack_err;
-	}
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit_id);
