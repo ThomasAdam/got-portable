@@ -507,6 +507,7 @@ struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
+	int maxx, x; /* max column and current start column */
 	int lines, cols; /* copies of LINES and COLS */
 	int focussed; /* Only set on one parent or child view at a time. */
 	int dying;
@@ -1230,21 +1231,62 @@ done:
 	return err;
 }
 
+static const struct got_error *
+expand_tab(char **ptr, const char *src)
+{
+	char	*dst;
+	size_t	 len, n, idx = 0, sz = 0;
+
+	*ptr = NULL;
+	n = len = strlen(src);
+	dst = malloc((n + 1) * sizeof(char));
+	if (dst == NULL)
+		return got_error_from_errno("malloc");
+
+	while (idx < len && src[idx]) {
+		const char c = src[idx];
+
+		if (c == '\t') {
+			size_t nb = TABSIZE - sz % TABSIZE;
+			n += nb;
+			dst = reallocarray(dst, n, sizeof(char));
+			if (dst == NULL)
+				return got_error_from_errno("reallocarray");
+			memcpy(dst + sz, "        ", nb);
+			sz += nb;
+		} else
+			dst[sz++] = src[idx];
+		++idx;
+	}
+
+	dst[sz] = '\0';
+	*ptr = dst;
+	return NULL;
+}
+
 /* Format a line for display, ensuring that it won't overflow a width limit. */
 static const struct got_error *
 format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
-    int col_tab_align)
+    int col_tab_align, int expand)
 {
 	const struct got_error *err = NULL;
 	int cols = 0;
 	wchar_t *wline = NULL;
+	char *exstr = NULL;
 	size_t wlen;
 	int i;
 
 	*wlinep = NULL;
 	*widthp = 0;
 
-	err = mbs2ws(&wline, &wlen, line);
+	if (expand) {
+		err = expand_tab(&exstr, line);
+		if (err)
+			return err;
+	}
+
+	err = mbs2ws(&wline, &wlen, expand ? exstr : line);
+	free(exstr);
 	if (err)
 		return err;
 
@@ -1377,7 +1419,8 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 	if (smallerthan && smallerthan[1] != '\0')
 		author = smallerthan + 1;
 	author[strcspn(author, "@>")] = '\0';
-	return format_line(wauthor, author_width, author, limit, col_tab_align);
+	return format_line(wauthor, author_width, author, limit, col_tab_align,
+	    0);
 }
 
 static const struct got_error *
@@ -1474,12 +1517,15 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	newline = strchr(logmsg, '\n');
 	if (newline)
 		*newline = '\0';
-	limit = avail - col;
-	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, col);
+	limit = view->x + avail - col;
+	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, col, 1);
 	if (err)
 		goto done;
-	waddwstr(view->window, wlogmsg);
-	col += logmsg_width;
+	if (view->x < logmsg_width - 1)
+		waddwstr(view->window, wlogmsg + view->x);
+	else
+		logmsg_width = 0;
+	col += MAX(logmsg_width - view->x, 0);
 	while (col < avail) {
 		waddch(view->window, ' ');
 		col++;
@@ -1716,7 +1762,7 @@ draw_commits(struct tog_view *view)
 		header = NULL;
 		goto done;
 	}
-	err = format_line(&wline, &width, header, view->ncols, 0);
+	err = format_line(&wline, &width, header, view->ncols, 0, 0);
 	if (err)
 		goto done;
 
@@ -1745,8 +1791,9 @@ draw_commits(struct tog_view *view)
 	/* Grow author column size if necessary. */
 	entry = s->first_displayed_entry;
 	ncommits = 0;
+	view->maxx = 0;
 	while (entry) {
-		char *author;
+		char *author, *eol, *msg, *msg0;
 		wchar_t *wauthor;
 		int width;
 		if (ncommits >= limit - 1)
@@ -1762,6 +1809,17 @@ draw_commits(struct tog_view *view)
 			author_cols = width;
 		free(wauthor);
 		free(author);
+		err = got_object_commit_get_logmsg(&msg0, entry->commit);
+		if (err)
+			goto done;
+		msg = msg0;
+		while (*msg == '\n')
+			++msg;
+		if ((eol = strchr(msg, '\n')))
+			view->maxx = MAX(view->maxx, eol - msg);
+		else
+			view->maxx = MAX(view->maxx, strlen(msg));
+		free(msg0);
 		ncommits++;
 		entry = TAILQ_NEXT(entry, entry);
 	}
@@ -2485,6 +2543,21 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'q':
 		s->quit = 1;
 		break;
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 2, 0);
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 2 < view->maxx)
+			view->x += 2;  /* move two columns right */
+		break;
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);  /* move two columns back */
+		break;
 	case 'k':
 	case KEY_UP:
 	case '<':
@@ -2988,62 +3061,55 @@ match_color(struct tog_colors *colors, const char *line)
 
 static const struct got_error *
 add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
-    WINDOW *window, regmatch_t *regmatch)
+    WINDOW *window, int skip, regmatch_t *regmatch)
 {
 	const struct got_error *err = NULL;
 	wchar_t *wline;
-	int width;
-	char *s;
+	int rme, rms, n, width;
 
 	*wtotal = 0;
+	rms = regmatch->rm_so;
+	rme = regmatch->rm_eo;
 
-	s = strndup(line, regmatch->rm_so);
-	if (s == NULL)
-		return got_error_from_errno("strndup");
-
-	err = format_line(&wline, &width, s, wlimit, col_tab_align);
-	if (err) {
-		free(s);
+	err = format_line(&wline, &width, line, wlimit + skip,
+	    col_tab_align, 1);
+	if (err)
 		return err;
+
+	/* draw up to matched token if we haven't scrolled past it */
+	n = MAX(rms - skip, 0);
+	if (n) {
+		waddnwstr(window, wline + skip, n);
+		wlimit -= n;
+		*wtotal += n;
 	}
-	waddwstr(window, wline);
-	free(wline);
-	free(s);
-	wlimit -= width;
-	*wtotal += width;
 
 	if (wlimit > 0) {
-		s = strndup(line + regmatch->rm_so,
-		    regmatch->rm_eo - regmatch->rm_so);
-		if (s == NULL) {
-			err = got_error_from_errno("strndup");
-			free(s);
-			return err;
+		int len = rme - rms;
+		n = 0;
+		if (skip > rms) {
+			n = skip - rms;
+			len = MAX(len - n, 0);
 		}
-		err = format_line(&wline, &width, s, wlimit, col_tab_align);
-		if (err) {
-			free(s);
-			return err;
+		/* draw (visible part of) matched token (if scrolled into it) */
+		if (len) {
+			wattron(window, A_STANDOUT);
+			waddnwstr(window, wline + rms + n, len);
+			wattroff(window, A_STANDOUT);
+			wlimit -= len;
+			*wtotal += len;
 		}
-		wattr_on(window, A_STANDOUT, NULL);
-		waddwstr(window, wline);
-		wattr_off(window, A_STANDOUT, NULL);
-		free(wline);
-		free(s);
-		wlimit -= width;
-		*wtotal += width;
 	}
 
-	if (wlimit > 0 && strlen(line) > regmatch->rm_eo) {
-		err = format_line(&wline, &width,
-		    line + regmatch->rm_eo, wlimit, col_tab_align);
-		if (err)
-			return err;
-		waddwstr(window, wline);
-		free(wline);
-		*wtotal += width;
+	if (wlimit > 0 && skip < width) {  /* draw rest of line */
+		n = 0;
+		if (skip > rme)
+			n = MIN(skip - rme, width - rme);
+		waddnwstr(window, wline + rme + n, wlimit);
 	}
 
+	*wtotal = width;
+	free(wline);
 	return NULL;
 }
 
@@ -3075,7 +3141,7 @@ draw_file(struct tog_view *view, const char *header)
 		    s->first_displayed_line - 1 + s->selected_line, nlines,
 		    header) == -1)
 			return got_error_from_errno("asprintf");
-		err = format_line(&wline, &width, line, view->ncols, 0);
+		err = format_line(&wline, &width, line, view->ncols, 0, 0);
 		free(line);
 		if (err)
 			return err;
@@ -3096,6 +3162,7 @@ draw_file(struct tog_view *view, const char *header)
 	}
 
 	s->eof = 0;
+	view->maxx = 0;
 	line = NULL;
 	while (max_lines > 0 && nprinted < max_lines) {
 		linelen = getline(&line, &linesize, s->f);
@@ -3108,6 +3175,8 @@ draw_file(struct tog_view *view, const char *header)
 			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
+		view->maxx = MAX(view->maxx, linelen);
+
 		tc = match_color(&s->colors, line);
 		if (tc)
 			wattr_on(view->window,
@@ -3115,25 +3184,27 @@ draw_file(struct tog_view *view, const char *header)
 		if (s->first_displayed_line + nprinted == s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
 			err = add_matched_line(&width, line, view->ncols, 0,
-			    view->window, regmatch);
+			    view->window, view->x, regmatch);
 			if (err) {
 				free(line);
 				return err;
 			}
 		} else {
-			err = format_line(&wline, &width, line, view->ncols, 0);
+			err = format_line(&wline, &width, line,
+			    view->x + view->ncols, 0, view->x ? 1 : 0);
 			if (err) {
 				free(line);
 				return err;
 			}
-			waddwstr(view->window, wline);
+			if (view->x < width - 1)
+				waddwstr(view->window, wline + view->x);
 			free(wline);
 			wline = NULL;
 		}
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (width <= view->ncols - 1)
+		if (width - view->x <= view->ncols - 1)
 			waddch(view->window, '\n');
 		nprinted++;
 	}
@@ -3152,7 +3223,8 @@ draw_file(struct tog_view *view, const char *header)
 			nprinted++;
 		}
 
-		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols, 0);
+		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols,
+		    0, 0);
 		if (err) {
 			return err;
 		}
@@ -3521,8 +3593,9 @@ static const struct got_error *
 search_next_diff_view(struct tog_view *view)
 {
 	struct tog_diff_view_state *s = &view->state.diff;
+	const struct got_error *err = NULL;
 	int lineno;
-	char *line = NULL;
+	char *exstr = NULL, *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
 
@@ -3560,25 +3633,31 @@ search_next_diff_view(struct tog_view *view)
 			return got_error_from_errno("fseeko");
 		}
 		linelen = getline(&line, &linesize, s->f);
+		err = expand_tab(&exstr, line);
+		if (err)
+			break;
 		if (linelen != -1 &&
-		    match_line(line, &view->regex, 1, &view->regmatch)) {
+		    match_line(exstr, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			break;
 		}
+		free(exstr);
+		exstr = NULL;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
 	free(line);
+	free(exstr);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
 		s->selected_line = 1;
 	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -3799,6 +3878,21 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int i, nscroll = view->nlines - 1;
 
 	switch (ch) {
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 3, 0);
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 3 < view->maxx)
+			view->x += 2;  /* move two columns right */
+		break;
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);  /* move two columns back */
+		break;
 	case 'a':
 	case 'w':
 		if (ch == 'a')
@@ -3913,6 +4007,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
 		s->matched_line = 0;
+		view->x = 0;
 
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
@@ -3938,6 +4033,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
 		s->matched_line = 0;
+		view->x = 0;
 
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
@@ -4127,7 +4223,7 @@ draw_blame(struct tog_view *view)
 		return err;
 	}
 
-	err = format_line(&wline, &width, line, view->ncols, 0);
+	err = format_line(&wline, &width, line, view->ncols, 0, 0);
 	free(line);
 	line = NULL;
 	if (err)
@@ -4156,7 +4252,7 @@ draw_blame(struct tog_view *view)
 		return got_error_from_errno("asprintf");
 	}
 	free(id_str);
-	err = format_line(&wline, &width, line, view->ncols, 0);
+	err = format_line(&wline, &width, line, view->ncols, 0, 0);
 	free(line);
 	line = NULL;
 	if (err)
@@ -4168,6 +4264,7 @@ draw_blame(struct tog_view *view)
 		waddch(view->window, '\n');
 
 	s->eof = 0;
+	view->maxx = 0;
 	while (nprinted < view->nlines - 2) {
 		linelen = getline(&line, &linesize, blame->f);
 		if (linelen == -1) {
@@ -4180,6 +4277,8 @@ draw_blame(struct tog_view *view)
 		}
 		if (++lineno < s->first_displayed_line)
 			continue;
+
+		view->maxx = MAX(view->maxx, linelen);
 
 		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandout(view->window);
@@ -4233,7 +4332,7 @@ draw_blame(struct tog_view *view)
 		    s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
 			err = add_matched_line(&width, line, view->ncols - 9, 9,
-			    view->window, regmatch);
+			    view->window, view->x, regmatch);
 			if (err) {
 				free(line);
 				return err;
@@ -4241,11 +4340,15 @@ draw_blame(struct tog_view *view)
 			width += 9;
 		} else {
 			err = format_line(&wline, &width, line,
-			    view->ncols - 9, 9);
-			waddwstr(view->window, wline);
+			    view->x + view->ncols - 9, 9, 1);
+			if (!err && view->x < width - 1) {
+				waddwstr(view->window, wline + view->x);
+				width += 9;
+			}
 			free(wline);
 			wline = NULL;
-			width += 9;
+			if (err)
+				return err;
 		}
 
 		if (width <= view->ncols - 1)
@@ -4612,8 +4715,9 @@ static const struct got_error *
 search_next_blame_view(struct tog_view *view)
 {
 	struct tog_blame_view_state *s = &view->state.blame;
+	const struct got_error *err = NULL;
 	int lineno;
-	char *line = NULL;
+	char *exstr = NULL, *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
 
@@ -4651,25 +4755,31 @@ search_next_blame_view(struct tog_view *view)
 			return got_error_from_errno("fseeko");
 		}
 		linelen = getline(&line, &linesize, s->blame.f);
+		err = expand_tab(&exstr, line);
+		if (err)
+			break;
 		if (linelen != -1 &&
-		    match_line(line, &view->regex, 1, &view->regmatch)) {
+		    match_line(exstr, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			break;
 		}
+		free(exstr);
+		exstr = NULL;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
 	free(line);
+	free(exstr);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
 		s->selected_line = 1;
 	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -4706,6 +4816,21 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int begin_x = 0, nscroll = view->nlines - 2;
 
 	switch (ch) {
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 3, 0);
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 3 < view->maxx)
+			view->x += 2;  /* move two columns right */
+		break;
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);  /* move two columns back */
+		break;
 	case 'q':
 		s->done = 1;
 		break;
@@ -5088,7 +5213,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	if (limit == 0)
 		return NULL;
 
-	err = format_line(&wline, &width, s->tree_label, view->ncols, 0);
+	err = format_line(&wline, &width, s->tree_label, view->ncols, 0, 0);
 	if (err)
 		return err;
 	if (view_needs_focus_indication(view))
@@ -5109,7 +5234,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	err = format_line(&wline, &width, parent_path, view->ncols, 0);
+	err = format_line(&wline, &width, parent_path, view->ncols, 0, 0);
 	if (err)
 		return err;
 	waddwstr(view->window, wline);
@@ -5189,7 +5314,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		}
 		free(id_str);
 		free(link_target);
-		err = format_line(&wline, &width, line, view->ncols, 0);
+		err = format_line(&wline, &width, line, view->ncols, 0, 0);
 		if (err) {
 			free(line);
 			break;
@@ -6300,7 +6425,7 @@ show_ref_view(struct tog_view *view)
 	    s->nrefs) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = format_line(&wline, &width, line, view->ncols, 0);
+	err = format_line(&wline, &width, line, view->ncols, 0, 0);
 	if (err) {
 		free(line);
 		return err;
@@ -6354,7 +6479,7 @@ show_ref_view(struct tog_view *view)
 				return got_error_from_errno("strdup");
 		}
 
-		err = format_line(&wline, &width, line, view->ncols, 0);
+		err = format_line(&wline, &width, line, view->ncols, 0, 0);
 		if (err) {
 			free(line);
 			return err;
