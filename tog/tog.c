@@ -1809,8 +1809,8 @@ draw_commits(struct tog_view *view)
 	}
 
 	if (s->in_repo_path && strcmp(s->in_repo_path, "/") != 0) {
-		if (asprintf(&header, "commit %s %s%s",
-		    id_str ? id_str : "........................................",
+		if (asprintf(&header, "commit %s %s%s", id_str ? id_str :
+		    "........................................",
 		    s->in_repo_path, ncommits_str) == -1) {
 			err = got_error_from_errno("asprintf");
 			header = NULL;
@@ -4267,7 +4267,8 @@ __dead static void
 usage_blame(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s blame [-c commit] [-r repository-path] path\n",
+	fprintf(stderr,
+	    "usage: %s blame [-c commit] [-r repository-path] path\n",
 	    getprogname());
 	exit(1);
 }
@@ -4375,7 +4376,8 @@ draw_blame(struct tog_view *view)
 				waddstr(view->window, "        ");
 			} else if (blame_line->annotated) {
 				char *id_str;
-				err = got_object_id_str(&id_str, blame_line->id);
+				err = got_object_id_str(&id_str,
+				    blame_line->id);
 				if (err) {
 					free(line);
 					return err;
@@ -6029,7 +6031,8 @@ __dead static void
 usage_tree(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path] [path]\n",
+	fprintf(stderr,
+	    "usage: %s tree [-c commit] [-r repository-path] [path]\n",
 	    getprogname());
 	exit(1);
 }
