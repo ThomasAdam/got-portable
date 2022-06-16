@@ -3242,7 +3242,7 @@ draw_file(struct tog_view *view, const char *header)
 				free(line);
 				return err;
 			}
-			if (view->x < width - 1)
+			if (view->x < width)
 				waddwstr(view->window, wline + view->x);
 			free(wline);
 			wline = NULL;
