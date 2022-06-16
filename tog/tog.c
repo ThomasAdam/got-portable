@@ -470,7 +470,7 @@ struct tog_ref_view_state {
 	struct tog_reflist_entry *first_displayed_entry;
 	struct tog_reflist_entry *last_displayed_entry;
 	struct tog_reflist_entry *selected_entry;
-	int nrefs, ndisplayed, selected, show_ids, sort_by_date;
+	int nrefs, ndisplayed, selected, show_date, show_ids, sort_by_date;
 	struct got_repository *repo;
 	struct tog_reflist_entry *matched_entry;
 	struct tog_colors colors;
@@ -6438,10 +6438,45 @@ show_ref_view(struct tog_view *view)
 	n = 0;
 	while (re && limit > 0) {
 		char *line = NULL;
+		char ymd[13];  /* YYYY-MM-DD + "  " + NUL */
 
+		if (s->show_date) {
+			struct got_commit_object *ci;
+			struct got_tag_object *tag;
+			struct got_object_id *id;
+			struct tm tm;
+			time_t t;
+
+			err = got_ref_resolve(&id, s->repo, re->ref);
+			if (err)
+				return err;
+			err = got_object_open_as_tag(&tag, s->repo, id);
+			if (err) {
+				if (err->code != GOT_ERR_OBJ_TYPE) {
+					free(id);
+					return err;
+				}
+				err = got_object_open_as_commit(&ci, s->repo,
+				    id);
+				if (err) {
+					free(id);
+					return err;
+				}
+				t = got_object_commit_get_committer_time(ci);
+				got_object_commit_close(ci);
+			} else {
+				t = got_object_tag_get_tagger_time(tag);
+				got_object_tag_close(tag);
+			}
+			free(id);
+			if (gmtime_r(&t, &tm) == NULL)
+				return got_error_from_errno("gmtime_r");
+			if (strftime(ymd, sizeof(ymd), "%G-%m-%d  ", &tm) == 0)
+				return got_error(GOT_ERR_NO_SPACE);
+		}
 		if (got_ref_is_symbolic(re->ref)) {
-			if (asprintf(&line, "%s -> %s",
-			    got_ref_get_name(re->ref),
+			if (asprintf(&line, "%s%s -> %s", s->show_date ?
+			    ymd : "", got_ref_get_name(re->ref),
 			    got_ref_get_symref_target(re->ref)) == -1)
 				return got_error_from_errno("asprintf");
 		} else if (s->show_ids) {
@@ -6455,7 +6490,7 @@ show_ref_view(struct tog_view *view)
 				free(id);
 				return err;
 			}
-			if (asprintf(&line, "%s: %s",
+			if (asprintf(&line, "%s%s: %s", s->show_date ? ymd : "",
 			    got_ref_get_name(re->ref), id_str) == -1) {
 				err = got_error_from_errno("asprintf");
 				free(id);
@@ -6464,11 +6499,9 @@ show_ref_view(struct tog_view *view)
 			}
 			free(id);
 			free(id_str);
-		} else {
-			line = strdup(got_ref_get_name(re->ref));
-			if (line == NULL)
-				return got_error_from_errno("strdup");
-		}
+		} else if (asprintf(&line, "%s%s", s->show_date ? ymd : "",
+		    got_ref_get_name(re->ref)) == -1)
+			return got_error_from_errno("asprintf");
 
 		err = format_line(&wline, &width, line, view->ncols, 0, 0);
 		if (err) {
@@ -6554,6 +6587,9 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	switch (ch) {
 	case 'i':
 		s->show_ids = !s->show_ids;
+		break;
+	case 'm':
+		s->show_date = !s->show_date;
 		break;
 	case 'o':
 		s->sort_by_date = !s->sort_by_date;
