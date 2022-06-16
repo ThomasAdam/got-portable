@@ -4284,7 +4284,7 @@ draw_blame(struct tog_view *view)
 	struct tog_blame *blame = &s->blame;
 	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
-	int lineno = 0, nprinted = 0, i;
+	int lineno = 0, nprinted = 0;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
@@ -4363,8 +4363,6 @@ draw_blame(struct tog_view *view)
 		if (++lineno < s->first_displayed_line)
 			continue;
 
-		view->maxx = MAX(view->maxx, linelen);
-
 		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandout(view->window);
 
@@ -4422,19 +4420,32 @@ draw_blame(struct tog_view *view)
 				free(line);
 				return err;
 			}
+			view->maxx = MAX(view->maxx, width);
 			width += 9;
 		} else {
-			err = format_line(&wline, &width, NULL, line, 0,
-			    view->x + view->ncols - 9, 9, 1);
+			int skip;
+
+			/* Set view->maxx based on full line length. */
+			err = format_line(&wline, &width, NULL, line,
+			    0, INT_MAX, 9, 1);
 			if (err) {
 				free(line);
 				return err;
 			}
-			if (view->x < width) {
-				waddwstr(view->window, wline + view->x);
-				for (i = 0; i < view->x; i++)
-					width -= wcwidth(wline[i]);
+			view->maxx = MAX(view->maxx, width);
+
+			/*
+			 * Get a new version of the line for display.
+			 * This will be scrolled and/or trimmed in length.
+			 */
+			free(wline);
+			err = format_line(&wline, &width, &skip, line,
+			    view->x, view->ncols - 9, 9, 1);
+			if (err) {
+				free(line);
+				return err;
 			}
+			waddwstr(view->window, &wline[skip]);
 			width += 9;
 			free(wline);
 			wline = NULL;
