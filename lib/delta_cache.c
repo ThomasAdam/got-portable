@@ -79,7 +79,7 @@ got_delta_cache_alloc(struct got_delta_cache **new)
 	cache = calloc(1, sizeof(*cache));
 	if (cache == NULL)
 		return got_error_from_errno("calloc");
-	
+
 	cache->buckets = calloc(GOT_DELTA_CACHE_MIN_BUCKETS,
 	    sizeof(cache->buckets[0]));
 	if (cache->buckets == NULL) {
@@ -125,6 +125,7 @@ delta_cache_hash(struct got_delta_cache *cache, off_t delta_offset)
 	return SipHash24(&cache->key, &delta_offset, sizeof(delta_offset));
 }
 
+#ifndef GOT_NO_OBJ_CACHE
 static const struct got_error *
 delta_cache_resize(struct got_delta_cache *cache, unsigned int nbuckets)
 {
@@ -183,6 +184,7 @@ delta_cache_grow(struct got_delta_cache *cache)
 
 	return delta_cache_resize(cache, nbuckets);
 }
+#endif
 
 const struct got_error *
 got_delta_cache_add(struct got_delta_cache *cache,
