@@ -1264,17 +1264,68 @@ expand_tab(char **ptr, const char *src)
 	return NULL;
 }
 
-/* Format a line for display, ensuring that it won't overflow a width limit. */
+/* 
+ * Skip leading nscroll columns of a wide character string.
+ * Returns the index to the first character of the scrolled string.
+ */
 static const struct got_error *
-format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
-    int col_tab_align, int expand)
+scroll_wline(int *scrollx , wchar_t *wline, int nscroll,
+    int col_tab_align)
+{
+	int cols = 0;
+	size_t wlen = wcslen(wline);
+	int i = 0;
+
+	*scrollx = 0;
+
+	while (i < wlen && cols < nscroll) {
+		int width = wcwidth(wline[i]);
+
+		if (width == 0) {
+			i++;
+			continue;
+		}
+
+		if (width == 1 || width == 2) {
+			if (cols + width > nscroll)
+				break;
+			cols += width;
+			i++;
+		} else if (width == -1) {
+			if (wline[i] == L'\t') {
+				width = TABSIZE -
+				    ((cols + col_tab_align) % TABSIZE);
+			} else {
+				width = 1;
+				wline[i] = L'.';
+			}
+			if (cols + width > nscroll)
+				break;
+			cols += width;
+			i++;
+		} else
+			return got_error_from_errno("wcwidth");
+	}
+
+	*scrollx = i;
+	return NULL;
+}
+
+/*
+ * Format a line for display, ensuring that it won't overflow a width limit.
+ * With scrolling, the width returned refers to the scrolled version of the
+ * line, which starts at (*wlinep)[*scrollxp]. The caller must free *wlinep.
+ */
+static const struct got_error *
+format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
+    const char *line, int nscroll, int wlimit, int col_tab_align, int expand)
 {
 	const struct got_error *err = NULL;
 	int cols = 0;
 	wchar_t *wline = NULL;
 	char *exstr = NULL;
 	size_t wlen;
-	int i;
+	int i, scrollx = 0;
 
 	*wlinep = NULL;
 	*widthp = 0;
@@ -1290,6 +1341,10 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
 	if (err)
 		return err;
 
+	err = scroll_wline(&scrollx, wline, nscroll, col_tab_align);
+	if (err)
+		goto done;
+
 	if (wlen > 0 && wline[wlen - 1] == L'\n') {
 		wline[wlen - 1] = L'\0';
 		wlen--;
@@ -1299,7 +1354,7 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
 		wlen--;
 	}
 
-	i = 0;
+	i = scrollx;
 	while (i < wlen) {
 		int width = wcwidth(wline[i]);
 
@@ -1333,57 +1388,14 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
 	wline[i] = L'\0';
 	if (widthp)
 		*widthp = cols;
+	if (scrollxp)
+		*scrollxp = scrollx;
 done:
 	if (err)
 		free(wline);
 	else
 		*wlinep = wline;
 	return err;
-}
-
-/* Skip the leading nscroll columns of a wide character string. */
-const struct got_error *
-scroll_wline(wchar_t **wlinep, wchar_t *wline, int nscroll,
-    int col_tab_align)
-{
-	int cols = 0;
-	size_t wlen = wcslen(wline);
-	int i = 0, j = 0;
-
-	*wlinep = wline;
-
-	while (i < wlen && cols < nscroll) {
-		int width = wcwidth(wline[i]);
-
-		if (width == 0) {
-			i++;
-			continue;
-		}
-
-		if (width == 1 || width == 2) {
-			if (cols + width > nscroll)
-				break;
-			cols += width;
-			i++;
-		} else if (width == -1) {
-			if (wline[i] == L'\t') {
-				width = TABSIZE -
-				    ((cols + col_tab_align) % TABSIZE);
-			} else {
-				width = 1;
-				wline[i] = L'.';
-			}
-			if (cols + width > nscroll)
-				break;
-			cols += width;
-			i++;
-		} else
-			return got_error_from_errno("wcwidth");
-		j++;
-	}
-
-	*wlinep = &wline[j];
-	return NULL;
 }
 
 static const struct got_error*
@@ -1464,8 +1476,8 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 	if (smallerthan && smallerthan[1] != '\0')
 		author = smallerthan + 1;
 	author[strcspn(author, "@>")] = '\0';
-	return format_line(wauthor, author_width, author, limit, col_tab_align,
-	    0);
+	return format_line(wauthor, author_width, NULL, author, 0, limit,
+	    col_tab_align, 0);
 }
 
 static const struct got_error *
@@ -1478,10 +1490,10 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author = NULL;
-	wchar_t *wlogmsg = NULL, *wauthor = NULL, *scrolled_wline;
+	wchar_t *wlogmsg = NULL, *wauthor = NULL;
 	int author_width, logmsg_width;
 	char *newline, *line = NULL;
-	int col, limit;
+	int col, limit, scrollx;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
@@ -1562,15 +1574,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	newline = strchr(logmsg, '\n');
 	if (newline)
 		*newline = '\0';
-	limit = view->x + avail - col;
-	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, col, 1);
+	limit = avail - col;
+	err = format_line(&wlogmsg, &logmsg_width, &scrollx, logmsg, view->x,
+	    limit, col, 1);
 	if (err)
 		goto done;
-	err = scroll_wline(&scrolled_wline, wlogmsg, view->x, col);
-	if (err)
-		goto done;
-	waddwstr(view->window, scrolled_wline);
-	logmsg_width = wcswidth(scrolled_wline, wcslen(scrolled_wline));
+	waddwstr(view->window, &wlogmsg[scrollx]);
 	col += MAX(logmsg_width, 0);
 	while (col < avail) {
 		waddch(view->window, ' ');
@@ -1808,7 +1817,7 @@ draw_commits(struct tog_view *view)
 		header = NULL;
 		goto done;
 	}
-	err = format_line(&wline, &width, header, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, header, 0, view->ncols, 0, 0);
 	if (err)
 		goto done;
 
@@ -1863,7 +1872,7 @@ draw_commits(struct tog_view *view)
 			++msg;
 		if ((eol = strchr(msg, '\n')))
 			*eol = '\0';
-		err = format_line(&wmsg, &width, msg, INT_MAX,
+		err = format_line(&wmsg, &width, NULL, msg, 0, INT_MAX,
 		    date_display_cols + author_cols, 0);
 		if (err)
 			goto done;
@@ -3126,7 +3135,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 	rms = regmatch->rm_so;
 	rme = regmatch->rm_eo;
 
-	err = format_line(&wline, &width, line, wlimit + skip,
+	err = format_line(&wline, &width, NULL, line, 0, wlimit + skip,
 	    col_tab_align, 1);
 	if (err)
 		return err;
@@ -3196,7 +3205,8 @@ draw_file(struct tog_view *view, const char *header)
 		    s->first_displayed_line - 1 + s->selected_line, nlines,
 		    header) == -1)
 			return got_error_from_errno("asprintf");
-		err = format_line(&wline, &width, line, view->ncols, 0, 0);
+		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
+		    0, 0);
 		free(line);
 		if (err)
 			return err;
@@ -3245,7 +3255,7 @@ draw_file(struct tog_view *view, const char *header)
 				return err;
 			}
 		} else {
-			err = format_line(&wline, &width, line,
+			err = format_line(&wline, &width, NULL, line, 0,
 			    view->x + view->ncols, 0, view->x ? 1 : 0);
 			if (err) {
 				free(line);
@@ -3278,8 +3288,8 @@ draw_file(struct tog_view *view, const char *header)
 			nprinted++;
 		}
 
-		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols,
-		    0, 0);
+		err = format_line(&wline, &width, NULL, TOG_EOF_STRING, 0,
+		    view->ncols, 0, 0);
 		if (err) {
 			return err;
 		}
@@ -4278,7 +4288,7 @@ draw_blame(struct tog_view *view)
 		return err;
 	}
 
-	err = format_line(&wline, &width, line, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, line, 0, view->ncols, 0, 0);
 	free(line);
 	line = NULL;
 	if (err)
@@ -4307,7 +4317,7 @@ draw_blame(struct tog_view *view)
 		return got_error_from_errno("asprintf");
 	}
 	free(id_str);
-	err = format_line(&wline, &width, line, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, line, 0, view->ncols, 0, 0);
 	free(line);
 	line = NULL;
 	if (err)
@@ -4394,7 +4404,7 @@ draw_blame(struct tog_view *view)
 			}
 			width += 9;
 		} else {
-			err = format_line(&wline, &width, line,
+			err = format_line(&wline, &width, NULL, line, 0,
 			    view->x + view->ncols - 9, 9, 1);
 			if (err) {
 				free(line);
@@ -5272,7 +5282,8 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	if (limit == 0)
 		return NULL;
 
-	err = format_line(&wline, &width, s->tree_label, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, s->tree_label, 0, view->ncols,
+	    0, 0);
 	if (err)
 		return err;
 	if (view_needs_focus_indication(view))
@@ -5293,7 +5304,8 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	err = format_line(&wline, &width, parent_path, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, parent_path, 0, view->ncols,
+	    0, 0);
 	if (err)
 		return err;
 	waddwstr(view->window, wline);
@@ -5373,7 +5385,8 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		}
 		free(id_str);
 		free(link_target);
-		err = format_line(&wline, &width, line, view->ncols, 0, 0);
+		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
+		    0, 0);
 		if (err) {
 			free(line);
 			break;
@@ -6484,7 +6497,7 @@ show_ref_view(struct tog_view *view)
 	    s->nrefs) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = format_line(&wline, &width, line, view->ncols, 0, 0);
+	err = format_line(&wline, &width, NULL, line, 0, view->ncols, 0, 0);
 	if (err) {
 		free(line);
 		return err;
@@ -6571,7 +6584,8 @@ show_ref_view(struct tog_view *view)
 		    got_ref_get_name(re->ref)) == -1)
 			return got_error_from_errno("asprintf");
 
-		err = format_line(&wline, &width, line, view->ncols, 0, 0);
+		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
+		    0, 0);
 		if (err) {
 			free(line);
 			return err;
