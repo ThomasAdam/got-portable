@@ -4190,7 +4190,7 @@ draw_blame(struct tog_view *view)
 	struct tog_blame *blame = &s->blame;
 	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
-	int lineno = 0, nprinted = 0;
+	int lineno = 0, nprinted = 0, i;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
@@ -4332,14 +4332,18 @@ draw_blame(struct tog_view *view)
 		} else {
 			err = format_line(&wline, &width, line,
 			    view->x + view->ncols - 9, 9, 1);
-			if (!err && view->x < width - 1) {
-				waddwstr(view->window, wline + view->x);
-				width += 9;
+			if (err) {
+				free(line);
+				return err;
 			}
+			if (view->x < width) {
+				waddwstr(view->window, wline + view->x);
+				for (i = 0; i < view->x; i++)
+					width -= wcwidth(wline[i]);
+			}
+			width += 9;
 			free(wline);
 			wline = NULL;
-			if (err)
-				return err;
 		}
 
 		if (width <= view->ncols - 1)
