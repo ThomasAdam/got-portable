@@ -3131,56 +3131,107 @@ match_color(struct tog_colors *colors, const char *line)
 
 static const struct got_error *
 add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
-    WINDOW *window, int skip, regmatch_t *regmatch)
+    WINDOW *window, int skipcol, regmatch_t *regmatch)
 {
 	const struct got_error *err = NULL;
-	wchar_t *wline;
-	int rme, rms, n, width;
+	wchar_t *wline = NULL;
+	int rme, rms, n, width, scrollx;
+	int width0 = 0, width1 = 0, width2 = 0;
+	char *seg0 = NULL, *seg1 = NULL, *seg2 = NULL;
 
 	*wtotal = 0;
+
 	rms = regmatch->rm_so;
 	rme = regmatch->rm_eo;
 
-	err = format_line(&wline, &width, NULL, line, 0, wlimit + skip,
-	    col_tab_align, 1);
-	if (err)
-		return err;
+	/* Split the line into 3 segments, according to match offsets. */
+	seg0 = strndup(line, rms);
+	if (seg0 == NULL)
+		return got_error_from_errno("strndup");
+	seg1 = strndup(line + rms, rme - rms);
+	if (seg1 == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	seg2 = strdup(line + rme);
+	if (seg1 == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
 
 	/* draw up to matched token if we haven't scrolled past it */
-	n = MAX(rms - skip, 0);
+	err = format_line(&wline, &width0, NULL, seg0, 0, wlimit,
+	    col_tab_align, 1);
+	if (err)
+		goto done;
+	n = MAX(width0 - skipcol, 0);
 	if (n) {
-		waddnwstr(window, wline + skip, n);
-		wlimit -= n;
-		*wtotal += n;
+		free(wline);
+		err = format_line(&wline, &width, &scrollx, seg0, skipcol,
+		    wlimit, col_tab_align, 1);
+		if (err)
+			goto done;
+		waddwstr(window, &wline[scrollx]);
+		wlimit -= width;
+		*wtotal += width;
 	}
 
 	if (wlimit > 0) {
-		int len = rme - rms;
-		n = 0;
-		if (skip > rms) {
-			n = skip - rms;
-			len = MAX(len - n, 0);
+		int i = 0, w = 0;
+		size_t wlen;
+
+		free(wline);
+		err = format_line(&wline, &width1, NULL, seg1, 0, wlimit,
+		    col_tab_align, 1);
+		if (err)
+			goto done;
+		wlen = wcslen(wline);
+		while (i < wlen) {
+			width = wcwidth(wline[i]);
+			if (width == -1) {
+				/* should not happen, tabs are expanded */
+				err = got_error(GOT_ERR_RANGE);
+				goto done;
+			}
+			if (width0 + w + width > skipcol)
+				break;
+			w += width; 
+			i++;
 		}
 		/* draw (visible part of) matched token (if scrolled into it) */
-		if (len) {
+		if (width1 - w > 0) {
 			wattron(window, A_STANDOUT);
-			waddnwstr(window, wline + rms + n, len);
+			waddwstr(window, &wline[i]);
 			wattroff(window, A_STANDOUT);
-			wlimit -= len;
-			*wtotal += len;
+			wlimit -= (width1 - w);
+			*wtotal += (width1 - w);
 		}
 	}
 
-	if (wlimit > 0 && skip < width) {  /* draw rest of line */
-		n = 0;
-		if (skip > rme)
-			n = MIN(skip - rme, width - rme);
-		waddnwstr(window, wline + rme + n, wlimit);
+	if (wlimit > 0) {  /* draw rest of line */
+		free(wline);
+		if (skipcol > width0 + width1) {
+			err = format_line(&wline, &width2, &scrollx, seg2,
+			    skipcol - (width0 + width1), wlimit,
+			    col_tab_align, 1);
+			if (err)
+				goto done;
+			waddwstr(window, &wline[scrollx]);
+		} else {
+			err = format_line(&wline, &width2, NULL, seg2, 0,
+			    wlimit, col_tab_align, 1);
+			if (err)
+				goto done;
+			waddwstr(window, wline);
+		}
+		*wtotal += width2;
 	}
-
-	*wtotal = width;
+done:
 	free(wline);
-	return NULL;
+	free(seg0);
+	free(seg1);
+	free(seg2);
+	return err;
 }
 
 static const struct got_error *
@@ -3246,6 +3297,17 @@ draw_file(struct tog_view *view, const char *header)
 			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
+		/* Set view->maxx based on full line length. */
+		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 0,
+		    view->x ? 1 : 0);
+		if (err) {
+			free(line);
+			return err;
+		}
+		view->maxx = MAX(view->maxx, width);
+		free(wline);
+		wline = NULL;
+
 		tc = match_color(&s->colors, line);
 		if (tc)
 			wattr_on(view->window,
@@ -3258,24 +3320,8 @@ draw_file(struct tog_view *view, const char *header)
 				free(line);
 				return err;
 			}
-			view->maxx = MAX(view->maxx, width);
 		} else {
 			int skip;
-
-			/* Set view->maxx based on full line length. */
-			err = format_line(&wline, &width, NULL, line,
-			    0, INT_MAX, 0, view->x ? 1 : 0);
-			if (err) {
-				free(line);
-				return err;
-			}
-			view->maxx = MAX(view->maxx, width);
-
-			/*
-			 * Get a new version of the line for display.
-			 * This will be scrolled and/or trimmed in length.
-			 */
-			free(wline);
 			err = format_line(&wline, &width, &skip, line,
 			    view->x, view->ncols, 0, view->x ? 1 : 0);
 			if (err) {
@@ -4364,6 +4410,16 @@ draw_blame(struct tog_view *view)
 		if (++lineno < s->first_displayed_line)
 			continue;
 
+		/* Set view->maxx based on full line length. */
+		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 9, 1);
+		if (err) {
+			free(line);
+			return err;
+		}
+		free(wline);
+		wline = NULL;
+		view->maxx = MAX(view->maxx, width);
+
 		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandout(view->window);
 
@@ -4407,12 +4463,6 @@ draw_blame(struct tog_view *view)
 
 		if (view->ncols <= 9) {
 			width = 9;
-			wline = wcsdup(L"");
-			if (wline == NULL) {
-				err = got_error_from_errno("wcsdup");
-				free(line);
-				return err;
-			}
 		} else if (s->first_displayed_line + nprinted ==
 		    s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
@@ -4422,25 +4472,9 @@ draw_blame(struct tog_view *view)
 				free(line);
 				return err;
 			}
-			view->maxx = MAX(view->maxx, width);
 			width += 9;
 		} else {
 			int skip;
-
-			/* Set view->maxx based on full line length. */
-			err = format_line(&wline, &width, NULL, line,
-			    0, INT_MAX, 9, 1);
-			if (err) {
-				free(line);
-				return err;
-			}
-			view->maxx = MAX(view->maxx, width);
-
-			/*
-			 * Get a new version of the line for display.
-			 * This will be scrolled and/or trimmed in length.
-			 */
-			free(wline);
 			err = format_line(&wline, &width, &skip, line,
 			    view->x, view->ncols - 9, 9, 1);
 			if (err) {
