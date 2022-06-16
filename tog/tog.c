@@ -3152,7 +3152,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 		goto done;
 	}
 	seg2 = strdup(exstr + rme);
-	if (seg1 == NULL) {
+	if (seg2 == NULL) {
 		err = got_error_from_errno("strndup");
 		goto done;
 	}
