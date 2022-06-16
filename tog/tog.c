@@ -3125,6 +3125,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
     WINDOW *window, int skipcol, regmatch_t *regmatch)
 {
 	const struct got_error *err = NULL;
+	char *exstr = NULL;
 	wchar_t *wline = NULL;
 	int rme, rms, n, width, scrollx;
 	int width0 = 0, width1 = 0, width2 = 0;
@@ -3135,16 +3136,22 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 	rms = regmatch->rm_so;
 	rme = regmatch->rm_eo;
 
+	err = expand_tab(&exstr, line);
+	if (err)
+		return err;
+
 	/* Split the line into 3 segments, according to match offsets. */
-	seg0 = strndup(line, rms);
-	if (seg0 == NULL)
-		return got_error_from_errno("strndup");
-	seg1 = strndup(line + rms, rme - rms);
+	seg0 = strndup(exstr, rms);
+	if (seg0 == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	seg1 = strndup(exstr + rms, rme - rms);
 	if (seg1 == NULL) {
 		err = got_error_from_errno("strndup");
 		goto done;
 	}
-	seg2 = strdup(line + rme);
+	seg2 = strdup(exstr + rme);
 	if (seg1 == NULL) {
 		err = got_error_from_errno("strndup");
 		goto done;
@@ -3219,6 +3226,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 	}
 done:
 	free(wline);
+	free(exstr);
 	free(seg0);
 	free(seg1);
 	free(seg2);
