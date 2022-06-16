@@ -3726,7 +3726,7 @@ search_next_diff_view(struct tog_view *view)
 	struct tog_diff_view_state *s = &view->state.diff;
 	const struct got_error *err = NULL;
 	int lineno;
-	char *exstr = NULL, *line = NULL;
+	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
 
@@ -3764,24 +3764,26 @@ search_next_diff_view(struct tog_view *view)
 			return got_error_from_errno("fseeko");
 		}
 		linelen = getline(&line, &linesize, s->f);
-		err = expand_tab(&exstr, line);
-		if (err)
-			break;
-		if (linelen != -1 &&
-		    match_line(exstr, &view->regex, 1, &view->regmatch)) {
-			view->search_next_done = TOG_SEARCH_HAVE_MORE;
-			s->matched_line = lineno;
-			break;
+		if (linelen != -1) {
+			char *exstr;
+			err = expand_tab(&exstr, line);
+			if (err)
+				break;
+			if (match_line(exstr, &view->regex, 1,
+			    &view->regmatch)) {
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
+				s->matched_line = lineno;
+				free(exstr);
+				break;
+			}
+			free(exstr);
 		}
-		free(exstr);
-		exstr = NULL;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
 	free(line);
-	free(exstr);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
@@ -4853,7 +4855,7 @@ search_next_blame_view(struct tog_view *view)
 	struct tog_blame_view_state *s = &view->state.blame;
 	const struct got_error *err = NULL;
 	int lineno;
-	char *exstr = NULL, *line = NULL;
+	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
 
@@ -4891,24 +4893,26 @@ search_next_blame_view(struct tog_view *view)
 			return got_error_from_errno("fseeko");
 		}
 		linelen = getline(&line, &linesize, s->blame.f);
-		err = expand_tab(&exstr, line);
-		if (err)
-			break;
-		if (linelen != -1 &&
-		    match_line(exstr, &view->regex, 1, &view->regmatch)) {
-			view->search_next_done = TOG_SEARCH_HAVE_MORE;
-			s->matched_line = lineno;
-			break;
+		if (linelen != -1) {
+			char *exstr;
+			err = expand_tab(&exstr, line);
+			if (err)
+				break;
+			if (match_line(exstr, &view->regex, 1,
+			    &view->regmatch)) {
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
+				s->matched_line = lineno;
+				free(exstr);
+				break;
+			}
+			free(exstr);
 		}
-		free(exstr);
-		exstr = NULL;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
 	free(line);
-	free(exstr);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
