@@ -3237,8 +3237,6 @@ draw_file(struct tog_view *view, const char *header)
 			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
-		view->maxx = MAX(view->maxx, linelen);
-
 		tc = match_color(&s->colors, line);
 		if (tc)
 			wattr_on(view->window,
@@ -3251,22 +3249,38 @@ draw_file(struct tog_view *view, const char *header)
 				free(line);
 				return err;
 			}
+			view->maxx = MAX(view->maxx, width);
 		} else {
-			err = format_line(&wline, &width, NULL, line, 0,
-			    view->x + view->ncols, 0, view->x ? 1 : 0);
+			int skip;
+
+			/* Set view->maxx based on full line length. */
+			err = format_line(&wline, &width, NULL, line,
+			    0, INT_MAX, 0, view->x ? 1 : 0);
 			if (err) {
 				free(line);
 				return err;
 			}
-			if (view->x < width)
-				waddwstr(view->window, wline + view->x);
+			view->maxx = MAX(view->maxx, width);
+
+			/*
+			 * Get a new version of the line for display.
+			 * This will be scrolled and/or trimmed in length.
+			 */
+			free(wline);
+			err = format_line(&wline, &width, &skip, line,
+			    view->x, view->ncols, 0, view->x ? 1 : 0);
+			if (err) {
+				free(line);
+				return err;
+			}
+			waddwstr(view->window, &wline[skip]);
 			free(wline);
 			wline = NULL;
 		}
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (width - view->x <= view->ncols - 1)
+		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		nprinted++;
 	}
