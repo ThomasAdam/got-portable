@@ -1341,6 +1341,51 @@ done:
 	return err;
 }
 
+/* Skip the leading nscroll columns of a wide character string. */
+const struct got_error *
+scroll_wline(wchar_t **wlinep, wchar_t *wline, int nscroll,
+    int col_tab_align)
+{
+	int cols = 0;
+	size_t wlen = wcslen(wline);
+	int i = 0, j = 0;
+
+	*wlinep = wline;
+
+	while (i < wlen && cols < nscroll) {
+		int width = wcwidth(wline[i]);
+
+		if (width == 0) {
+			i++;
+			continue;
+		}
+
+		if (width == 1 || width == 2) {
+			if (cols + width > nscroll)
+				break;
+			cols += width;
+			i++;
+		} else if (width == -1) {
+			if (wline[i] == L'\t') {
+				width = TABSIZE -
+				    ((cols + col_tab_align) % TABSIZE);
+			} else {
+				width = 1;
+				wline[i] = L'.';
+			}
+			if (cols + width > nscroll)
+				break;
+			cols += width;
+			i++;
+		} else
+			return got_error_from_errno("wcwidth");
+		j++;
+	}
+
+	*wlinep = &wline[j];
+	return NULL;
+}
+
 static const struct got_error*
 build_refs_str(char **refs_str, struct got_reflist_head *refs,
     struct got_object_id *id, struct got_repository *repo)
@@ -1433,7 +1478,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author = NULL;
-	wchar_t *wlogmsg = NULL, *wauthor = NULL;
+	wchar_t *wlogmsg = NULL, *wauthor = NULL, *scrolled_wline;
 	int author_width, logmsg_width;
 	char *newline, *line = NULL;
 	int col, limit;
@@ -1521,11 +1566,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, col, 1);
 	if (err)
 		goto done;
-	if (view->x < logmsg_width - 1)
-		waddwstr(view->window, wlogmsg + view->x);
-	else
-		logmsg_width = 0;
-	col += MAX(logmsg_width - view->x, 0);
+	err = scroll_wline(&scrolled_wline, wlogmsg, view->x, col);
+	if (err)
+		goto done;
+	waddwstr(view->window, scrolled_wline);
+	logmsg_width = wcswidth(scrolled_wline, wcslen(scrolled_wline));
+	col += MAX(logmsg_width, 0);
 	while (col < avail) {
 		waddch(view->window, ' ');
 		col++;
@@ -1788,13 +1834,13 @@ draw_commits(struct tog_view *view)
 	if (limit <= 1)
 		goto done;
 
-	/* Grow author column size if necessary. */
+	/* Grow author column size if necessary, and set view->maxx. */
 	entry = s->first_displayed_entry;
 	ncommits = 0;
 	view->maxx = 0;
 	while (entry) {
 		char *author, *eol, *msg, *msg0;
-		wchar_t *wauthor;
+		wchar_t *wauthor, *wmsg;
 		int width;
 		if (ncommits >= limit - 1)
 			break;
@@ -1816,10 +1862,14 @@ draw_commits(struct tog_view *view)
 		while (*msg == '\n')
 			++msg;
 		if ((eol = strchr(msg, '\n')))
-			view->maxx = MAX(view->maxx, eol - msg);
-		else
-			view->maxx = MAX(view->maxx, strlen(msg));
+			*eol = '\0';
+		err = format_line(&wmsg, &width, msg, INT_MAX,
+		    date_display_cols + author_cols, 0);
+		if (err)
+			goto done;
+		view->maxx = MAX(view->maxx, width);
 		free(msg0);
+		free(wmsg);
 		ncommits++;
 		entry = TAILQ_NEXT(entry, entry);
 	}
