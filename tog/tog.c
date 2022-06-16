@@ -1248,7 +1248,9 @@ expand_tab(char **ptr, const char *src)
 
 		if (c == '\t') {
 			size_t nb = TABSIZE - sz % TABSIZE;
-			char *p = realloc(dst, n + nb);
+			char *p;
+
+			p = realloc(dst, n + nb);
 			if (p == NULL) {
 				free(dst);
 				return got_error_from_errno("realloc");
