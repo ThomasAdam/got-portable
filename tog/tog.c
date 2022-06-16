@@ -1232,7 +1232,7 @@ expand_tab(char **ptr, const char *src)
 
 	*ptr = NULL;
 	n = len = strlen(src);
-	dst = malloc((n + 1) * sizeof(char));
+	dst = malloc(n + 1);
 	if (dst == NULL)
 		return got_error_from_errno("malloc");
 
@@ -1241,11 +1241,15 @@ expand_tab(char **ptr, const char *src)
 
 		if (c == '\t') {
 			size_t nb = TABSIZE - sz % TABSIZE;
+			char *p = realloc(dst, n + nb);
+			if (p == NULL) {
+				free(dst);
+				return got_error_from_errno("realloc");
+
+			}
+			dst = p;
 			n += nb;
-			dst = reallocarray(dst, n, sizeof(char));
-			if (dst == NULL)
-				return got_error_from_errno("reallocarray");
-			memcpy(dst + sz, "        ", nb);
+			memset(dst + sz, ' ', nb);
 			sz += nb;
 		} else
 			dst[sz++] = src[idx];
