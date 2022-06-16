@@ -2781,6 +2781,11 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else /* 'B' */
 			s->log_branches = !s->log_branches;
 
+		if (s->thread_args.pack_fds == NULL) {
+			err = got_repo_pack_fds_open(&s->thread_args.pack_fds);
+			if (err)
+				return err;
+		}
 		err = got_repo_open(&s->thread_args.repo,
 		    got_repo_get_path(s->repo), NULL,
 		    s->thread_args.pack_fds);
