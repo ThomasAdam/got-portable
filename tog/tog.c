@@ -1263,51 +1263,40 @@ expand_tab(char **ptr, const char *src)
 	return NULL;
 }
 
-/* 
- * Skip leading nscroll columns of a wide character string.
- * Returns the index to the first character of the scrolled string.
+/*
+ * Advance at most n columns from wline starting at offset off.
+ * Return the index to the first character after the span operation.
+ * Return the combined column width of all spanned wide character in
+ * *rcol.
  */
-static const struct got_error *
-scroll_wline(int *scrollx , wchar_t *wline, int nscroll,
-    int col_tab_align)
+static int
+span_wline(int *rcol, int off, wchar_t *wline, int n, int col_tab_align)
 {
-	int cols = 0;
-	size_t wlen = wcslen(wline);
-	int i = 0;
+	int width, i, cols = 0;
 
-	*scrollx = 0;
-
-	while (i < wlen && cols < nscroll) {
-		int width = wcwidth(wline[i]);
-
-		if (width == 0) {
-			i++;
-			continue;
-		}
-
-		if (width == 1 || width == 2) {
-			if (cols + width > nscroll)
-				break;
-			cols += width;
-			i++;
-		} else if (width == -1) {
-			if (wline[i] == L'\t') {
-				width = TABSIZE -
-				    ((cols + col_tab_align) % TABSIZE);
-			} else {
-				width = 1;
-				wline[i] = L'.';
-			}
-			if (cols + width > nscroll)
-				break;
-			cols += width;
-			i++;
-		} else
-			return got_error_from_errno("wcwidth");
+	if (n == 0) {
+		*rcol = cols;
+		return off;
 	}
 
-	*scrollx = i;
-	return NULL;
+	for (i = off; wline[i] != L'\0'; ++i) {
+		if (wline[i] == L'\t')
+			width = TABSIZE - ((cols + col_tab_align) % TABSIZE);
+		else
+			width = wcwidth(wline[i]);
+
+		if (width == -1) {
+			width = 1;
+			wline[i] = L'.';
+		}
+
+		if (cols + width > n)
+			break;
+		cols += width;
+	}
+
+	*rcol = cols;
+	return i;
 }
 
 /*
@@ -1320,11 +1309,11 @@ format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
     const char *line, int nscroll, int wlimit, int col_tab_align, int expand)
 {
 	const struct got_error *err = NULL;
-	int cols = 0;
+	int cols;
 	wchar_t *wline = NULL;
 	char *exstr = NULL;
 	size_t wlen;
-	int i, scrollx = 0;
+	int i, scrollx;
 
 	*wlinep = NULL;
 	*widthp = 0;
@@ -1340,9 +1329,7 @@ format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
 	if (err)
 		return err;
 
-	err = scroll_wline(&scrollx, wline, nscroll, col_tab_align);
-	if (err)
-		goto done;
+	scrollx = span_wline(&cols, 0, wline, nscroll, col_tab_align);
 
 	if (wlen > 0 && wline[wlen - 1] == L'\n') {
 		wline[wlen - 1] = L'\0';
@@ -1353,43 +1340,13 @@ format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
 		wlen--;
 	}
 
-	i = scrollx;
-	while (i < wlen) {
-		int width = wcwidth(wline[i]);
-
-		if (width == 0) {
-			i++;
-			continue;
-		}
-
-		if (width == 1 || width == 2) {
-			if (cols + width > wlimit)
-				break;
-			cols += width;
-			i++;
-		} else if (width == -1) {
-			if (wline[i] == L'\t') {
-				width = TABSIZE -
-				    ((cols + col_tab_align) % TABSIZE);
-			} else {
-				width = 1;
-				wline[i] = L'.';
-			}
-			if (cols + width > wlimit)
-				break;
-			cols += width;
-			i++;
-		} else {
-			err = got_error_from_errno("wcwidth");
-			goto done;
-		}
-	}
+	i = span_wline(&cols, scrollx, wline, wlimit, col_tab_align);
 	wline[i] = L'\0';
+
 	if (widthp)
 		*widthp = cols;
 	if (scrollxp)
 		*scrollxp = scrollx;
-done:
 	if (err)
 		free(wline);
 	else
