@@ -1,3 +1,48 @@
+* got 0.71; 2022-06-17
+- got patch: fail when reading empty hunks (op)
+- got patch: switch from fseek() to fseeko(), use unary minus (naddy)
+- got patch: avoid open/sync/close of the fileindex over and over again (op)
+- make got_privsep_recv_tree() reject trees with less than zero entries
+- plug memory leak in an error path of got_privsep_recv_tree()
+- prevent an out-of-bounds access in got_privsep_recv_tree()
+- parse tree entries into an array instead of a pathlist for speed
+- batch up tree entries in imsg instead of sending one imsg per tree entry
+- imsg_add() frees its msg argument on error; avoid double-free in error paths
+- avoid malloc/free for duplicate check in got_pathlists_insert()
+- plug a small memleak on error in got_pack_create()
+- fix paths stored in pack meta data, improving file deltification
+- store a path hash instead of a verbatim path in pack meta data
+- reduce the amount of memory used for caching deltas during deltification
+- shrink struct got_pack_meta a bit by removing the have_reused_delta flag
+- use random seeds for murmurhash2 (op)
+- fix bug in findwixt() which caused pack files with missing parent commits
+- avoid looping over deltas twice in dump_delta_chain_to_{file,mem}()
+- open tempfiles needed for delta application upfront, for future gotwebd
+- reduce GOT_PACK_CACHE_SIZE to 32 to accomodate for previous tempfile change
+- tog: override SIGTERM and SIGINT handlers to avoid ncurses cleanup() handler
+- move creation of tempfiles outside of lib/diff.c
+- tests: don't pass $ret to test_done on failure when it's known to be zero (op)
+- tests: set `ret' in a few places where it was forgotten (op)
+- convert delta cache to a hash table
+- implicitly unstage changes when staging the reverse of a staged diff (op)
+- implement object enumeration support in got-read-pack for speed
+- add one-line output mode to got log with -s flag (patch by Evan Silberman)
+- rename the former got log -s (search) flag to got log -S
+- make it possible to match committed patches with got log -p -S pattern
+- tog: add key bindings for half-page scroll (patch by Mikhail, Mark Jamsek)
+- make got log -S match author name and commit ID, like tog search does (op)
+- got patch: ensure new and old paths are NUL-terminated (op)
+- got patch: guard against invalid (negative) line offsets (op)
+- got patch: use ints for line offsets instead of longs (op)
+- remove redundant datalen checks before calling recv_imsg_error (op)
+- use strndup instead of malloc+memcpy in privsep.c (op)
+- do stricter validation of data received from libexec helpers (op)
+- move got_opentempfd() out of got_repo_open(), for future gotwebd (tracey)
+- fix D_GOTWWW default path; gotweb can now run without a config file again
+- add horizontal scrolling to tog diff, blame, and log views (Mark Jamsek)
+- show last-modified date in the "tog ref" view if 'm' is pressed (Mark Jamsek)
+- make tog horizontal scrolling work with unicode (with op@)
+
 * got 0.70; 2022-05-10
 - avoid subtraction of values larger than int in qsort(3) comparison callbacks
 - make 'got patch' handle git-style rename diffs
