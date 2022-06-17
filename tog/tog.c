@@ -3830,17 +3830,18 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		s->id1 = got_object_id_dup(id1);
 		if (s->id1 == NULL)
 			return got_error_from_errno("got_object_id_dup");
-		s->f1 = got_opentemp();
-		if (s->f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
 	} else
 		s->id1 = NULL;
 
 	s->id2 = got_object_id_dup(id2);
 	if (s->id2 == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
+		goto done;
+	}
+
+	s->f1 = got_opentemp();
+	if (s->f1 == NULL) {
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
