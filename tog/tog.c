@@ -639,7 +639,7 @@ tog_sigterm(int signo)
 }
 
 static int
-tog_fatal_signal_received()
+tog_fatal_signal_received(void)
 {
 	return (tog_sigpipe_received ||
 	    tog_sigint_received || tog_sigint_received);
