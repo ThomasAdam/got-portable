@@ -2809,6 +2809,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->thread_args.log_complete = 0;
 		s->quit = 0;
 		s->thread_args.commits_needed = view->nlines;
+		s->matched_entry = NULL;
+		s->search_entry = NULL;
 		break;
 	case 'r':
 		if (view_is_parent_view(view))
