@@ -296,6 +296,7 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 	size_t len = sizeof(iobj);
 	struct ibuf *wbuf;
 
+	memset(&iobj, 0, sizeof(iobj));
 	iobj.hdrlen = hdrlen;
 	iobj.size = size;
 
@@ -386,6 +387,7 @@ got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
 	void *data;
 	size_t len;
 
+	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* commit is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
@@ -444,6 +446,7 @@ got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
 	void *data;
 	size_t len;
 
+	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* tag is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
@@ -470,6 +473,7 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
 	void *data;
 	size_t len;
 
+	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* blob is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
@@ -1422,6 +1426,8 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 	struct got_imsg_tree_entries ientries;
 	int i;
 
+	memset(&ientries, 0, sizeof(ientries));
+
 	wbuf = imsg_create(ibuf, GOT_IMSG_TREE_ENTRIES, 0, 0, len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TREE_ENTRY");
@@ -1494,6 +1500,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf,
 	const struct got_error *err = NULL;
 	struct got_imsg_tree_object itree;
 
+	memset(&itree, 0, sizeof(itree));
 	itree.nentries = nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
 	    == -1)
@@ -1684,6 +1691,7 @@ got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen,
 {
 	struct got_imsg_blob iblob;
 
+	memset(&iblob, 0, sizeof(iblob));
 	iblob.size = size;
 	iblob.hdrlen = hdrlen;
 
@@ -1963,6 +1971,9 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 	struct got_imsg_pack ipack;
 	int fd;
 
+	memset(&ipackidx, 0, sizeof(ipackidx));
+	memset(&ipack, 0, sizeof(ipack));
+
 	ipackidx.len = packidx->len;
 	ipackidx.packfile_size = pack->filesize;
 	fd = dup(packidx->fd);
@@ -2001,6 +2012,7 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 {
 	struct got_imsg_packed_object iobj;
 
+	memset(&iobj, 0, sizeof(iobj));
 	iobj.idx = idx;
 	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
 
@@ -2018,6 +2030,7 @@ got_privsep_send_packed_raw_obj_req(struct imsgbuf *ibuf, int idx,
 {
 	struct got_imsg_packed_object iobj;
 
+	memset(&iobj, 0, sizeof(iobj));
 	iobj.idx = idx;
 	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
 
@@ -2982,6 +2995,7 @@ got_privsep_send_raw_delta_req(struct imsgbuf *ibuf, int idx,
 {
 	struct got_imsg_raw_delta_request dreq;
 
+	memset(&dreq, 0, sizeof(dreq));
 	dreq.idx = idx;
 	memcpy(dreq.id, id->sha1, SHA1_DIGEST_LENGTH);
 
@@ -3006,6 +3020,7 @@ got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
 	struct got_imsg_raw_delta idelta;
 	int ret;
 
+	memset(&idelta, 0, sizeof(idelta));
 	idelta.base_size = base_size;
 	idelta.result_size = result_size;
 	idelta.delta_size = delta_size;
@@ -3087,6 +3102,8 @@ send_idlist(struct imsgbuf *ibuf, struct got_object_id **ids, size_t nids)
 	struct got_imsg_object_idlist idlist;
 	struct ibuf *wbuf;
 	size_t i;
+
+	memset(&idlist, 0, sizeof(idlist));
 
 	if (nids > GOT_IMSG_OBJ_ID_LIST_MAX_NIDS)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -3222,6 +3239,8 @@ got_privsep_send_reused_deltas(struct imsgbuf *ibuf,
 	struct ibuf *wbuf;
 	struct got_imsg_reused_deltas ideltas;
 	size_t i;
+
+	memset(&ideltas, 0, sizeof(ideltas));
 
 	if (ndeltas > GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS)
 		return got_error(GOT_ERR_NO_SPACE);
