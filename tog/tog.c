@@ -2355,8 +2355,9 @@ search_next_log_view(struct tog_view *view)
 		int selected_idx = s->selected_entry->idx;
 
 		/*
-		 * If user has moved cursor after we hit the match, position
-		 * from where we should continue search must be changed.
+		 * If the user has moved the cursor after we hit a match,
+		 * the position from where we should continue searching
+		 * might have changed.
 		 */
 		if (view->searching == TOG_SEARCH_FORWARD) {
 			if (matched_idx > selected_idx)
