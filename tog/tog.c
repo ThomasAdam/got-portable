@@ -2358,18 +2358,19 @@ search_next_log_view(struct tog_view *view)
 		 * If user has moved cursor after we hit the match, position
 		 * from where we should continue search must be changed.
 		 */
-		if (view->searching == TOG_SEARCH_FORWARD)
+		if (view->searching == TOG_SEARCH_FORWARD) {
 			if (matched_idx > selected_idx)
 				entry = TAILQ_NEXT(s->selected_entry, entry);
 			else
 				entry = TAILQ_NEXT(s->matched_entry, entry);
-		else
+		} else {
 			if (matched_idx < selected_idx)
 				entry = TAILQ_PREV(s->selected_entry,
 						commit_queue_head, entry);
 			else
 				entry = TAILQ_PREV(s->matched_entry,
 						commit_queue_head, entry);
+		}
 	} else {
 		entry = s->selected_entry;
 	}
