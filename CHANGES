@@ -1,3 +1,10 @@
+* got 0.72; 2022-06-18
+- fix "bad offset in pack file" error due to uninitialized variable (op)
+- initialize all variables used for sending privsep messages to zero (op)
+- tog: reset search state after Ctrl-L to fix a use-after-free (op)
+- fix unexpected imsg error after incomplete enumeration in got-read-pack
+- tog: heed selection cursor position while searching (patch by Mikhail)
+
 * got 0.71; 2022-06-17
 - got patch: fail when reading empty hunks (op)
 - got patch: switch from fseek() to fseeko(), use unary minus (naddy)
