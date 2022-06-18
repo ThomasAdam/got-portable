@@ -531,6 +531,8 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 {
 	struct got_imsg_object iobj;
 
+	memset(&iobj, 0, sizeof(iobj));
+
 	memcpy(iobj.id, obj->id.sha1, sizeof(iobj.id));
 	iobj.type = obj->type;
 	iobj.flags = obj->flags;
