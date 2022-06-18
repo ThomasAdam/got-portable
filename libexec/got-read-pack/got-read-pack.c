@@ -1480,8 +1480,9 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			continue;
 		}
 
-		err = enumerate_tree(&have_all_entries, ibuf, &totlen, tree_id, "/",
-		    pack, packidx, objcache, idset, &trees, &nalloc, &ntrees);
+		err = enumerate_tree(&have_all_entries, ibuf, &totlen,
+		    tree_id, "/", pack, packidx, objcache, idset,
+		    &trees, &nalloc, &ntrees);
 		if (err)
 			goto done;
 
