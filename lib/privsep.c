@@ -2903,7 +2903,6 @@ got_privsep_recv_enumerated_objects(int *found_all_objects,
 			}
 			if (itree->nentries == -1) {
 				/* Tree was not found in pack file. */
-				done = 1;
 				err = cb_tree(cb_arg, NULL, mtime, &tree_id,
 				    path, repo);
 				break;
