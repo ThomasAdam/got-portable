@@ -452,7 +452,7 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, int *lineno)
 }
 
 static const struct got_error *
-patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
+patch_file(struct got_patch *p, FILE *orig, FILE *tmp, mode_t *mode)
 {
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
@@ -467,8 +467,6 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
 		h = STAILQ_FIRST(&p->head);
 		if (h == NULL || STAILQ_NEXT(h, entries) != NULL)
 			return got_error(GOT_ERR_PATCH_MALFORMED);
-		if (nop)
-			return NULL;
 		return apply_hunk(tmp, h, &lineno);
 	}
 
@@ -484,8 +482,7 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
 			h->err = err;
 		if (err != NULL)
 			return err;
-		if (!nop)
-			err = copy(tmp, orig, copypos, pos);
+		err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
 			return err;
 		copypos = pos;
@@ -510,8 +507,7 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
 		if (lineno + 1 != h->old_from)
 			h->offset = lineno + 1 - h->old_from;
 
-		if (!nop)
-			err = apply_hunk(tmp, h, &lineno);
+		err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
 			return err;
 
@@ -524,7 +520,7 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
 		h = STAILQ_FIRST(&p->head);
 		h->err = got_error(GOT_ERR_HUNK_FAILED);
 		err = h->err;
-	} else if (!nop && !feof(orig))
+	} else if (!feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
 	return err;
@@ -607,11 +603,10 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	if (!nop)
-		err = got_opentemp_named(&tmppath, &tmp, template);
+	err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
-	err = patch_file(p, oldfile, tmp, nop, &mode);
+	err = patch_file(p, oldfile, tmp, &mode);
 	if (err)
 		goto done;
 
