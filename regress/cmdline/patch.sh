@@ -1517,6 +1517,8 @@ test_patch_merge_conflict() {
 		return 1
 	fi
 
+	local commit_id=`git_show_head $testroot/repo`
+
 	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
 
 	(cd $testroot/wt && got diff > $testroot/old.diff \
@@ -1555,7 +1557,7 @@ test_patch_merge_conflict() {
 	5
 	<<<<<<< --- numbers
 	six
-	||||||| f00c965d8307308469e537302baa73048488f162
+	||||||| commit $commit_id
 	6
 	=======
 	3+3
