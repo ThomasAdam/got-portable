@@ -1443,6 +1443,177 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_merge_simple() {
+	local testroot=`test_init patch_merge_simple`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed 's/4/four/g' > $testroot/wt/numbers
+
+	(cd $testroot/wt && got diff > $testroot/old.diff \
+		&& got revert numbers) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
+	(cd $testroot/wt && got commit -m 'edit numbers') \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch $testroot/old.diff) \
+		2>&1 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+	test_done $testroot $ret
+}
+
+test_patch_merge_conflict() {
+	local testroot=`test_init patch_merge_conflict`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
+
+	(cd $testroot/wt && got diff > $testroot/old.diff \
+		&& got revert numbers) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed 's/6/3+3/g' > $testroot/wt/numbers
+	(cd $testroot/wt && got commit -m 'edit numbers') \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch $testroot/old.diff) \
+		>/dev/null 2>&1
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got patch merged a diff that should conflict" >&2
+		test_done $testroot 0
+		return 1
+	fi
+
+	# XXX: prefixing every line with a tab otherwise got thinks
+	# the file has conflicts in it.
+	cat <<-EOF > $testroot/wt/numbers.expected
+	1
+	2
+	3
+	4
+	5
+	<<<<<<< --- numbers
+	six
+	||||||| f00c965d8307308469e537302baa73048488f162
+	6
+	=======
+	3+3
+	>>>>>>> +++ numbers
+	7
+	8
+	9
+	10
+EOF
+
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+	test_done $testroot $ret
+}
+
+test_patch_merge_unknown_blob() {
+	local testroot=`test_init patch_merge_unknown_blob`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+I've got a
+blob - aaaabbbbccccddddeeeeffff0000111122223333
+and also a
+blob + 0000111122223333444455556666888899990000
+for this dummy diff
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++ALPHA
+will it work?
+EOF
+
+	(cd $testroot/wt/ && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_simple_add_file
 run_test test_patch_simple_rm_file
@@ -1468,3 +1639,6 @@ run_test test_patch_relative_paths
 run_test test_patch_with_path_prefix
 run_test test_patch_relpath_with_path_prefix
 run_test test_patch_reverse
+run_test test_patch_merge_simple
+run_test test_patch_merge_conflict
+run_test test_patch_merge_unknown_blob

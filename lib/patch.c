@@ -39,12 +39,15 @@
 #include "got_reference.h"
 #include "got_cancel.h"
 #include "got_worktree.h"
+#include "got_repository.h"
 #include "got_opentemp.h"
 #include "got_patch.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_diff.h"
 #include "got_lib_object.h"
 #include "got_lib_privsep.h"
+#include "got_lib_sha1.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -67,6 +70,7 @@ STAILQ_HEAD(got_patch_hunk_head, got_patch_hunk);
 struct got_patch {
 	char	*old;
 	char	*new;
+	char	 blob[41];
 	struct got_patch_hunk_head head;
 };
 
@@ -177,10 +181,13 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 	memcpy(&patch, imsg.data, sizeof(patch));
 
 	if (patch.old[sizeof(patch.old)-1] != '\0' ||
-	    patch.new[sizeof(patch.new)-1] != '\0') {
+	    patch.new[sizeof(patch.new)-1] != '\0' ||
+	    patch.blob[sizeof(patch.blob)-1] != '\0') {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
+
+	strlcpy(p->blob, patch.blob, sizeof(p->blob));
 
 	/* automatically set strip=1 for git-style diffs */
 	if (strip == -1 && patch.git &&
@@ -566,17 +573,74 @@ patch_add(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
-apply_patch(struct got_worktree *worktree, struct got_repository *repo,
-    struct got_fileindex *fileindex, const char *old, const char *new,
-    struct got_patch *p, int nop, struct patch_args *pa,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+open_blob(char **path, FILE **fp, const char *blobid,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	int file_renamed = 0;
+	struct got_blob_object *blob = NULL;
+	struct got_object_id id;
+
+	*fp = NULL;
+	*path = NULL;
+
+	if (!got_parse_sha1_digest(id.sha1, blobid))
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	err = got_object_open_as_blob(&blob, repo, &id, 8192);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named(path, fp, GOT_TMPDIR_STR "/got-patch-blob");
+	if (err)
+		goto done;
+
+	err = got_object_blob_dump_to_file(NULL, NULL, NULL, *fp, blob);
+	if (err)
+		goto done;
+
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (err) {
+		if (*fp != NULL)
+			fclose(*fp);
+		if (*path != NULL)
+			unlink(*path);
+		free(*path);
+		*fp = NULL;
+		*path = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+apply_patch(int *overlapcnt, struct got_worktree *worktree,
+    struct got_repository *repo, struct got_fileindex *fileindex,
+    const char *old, const char *new, struct got_patch *p, int nop,
+    struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	int do_merge = 0, file_renamed = 0;
+	char *oldlabel = NULL, *newlabel = NULL;
 	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;
-	FILE *oldfile = NULL, *tmp = NULL;
+	char *apath = NULL, *mergepath = NULL;
+	FILE *oldfile = NULL, *tmpfile = NULL, *afile = NULL, *mergefile = NULL;
+	int outfd;
+	const char *outpath;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
+
+	*overlapcnt = 0;
+
+	/* don't run the diff3 merge on creations/deletions */
+	if (*p->blob != '\0' && p->old != NULL && p->new != NULL) {
+		err = open_blob(&apath, &afile, p->blob, repo);
+		if (err && err->code != GOT_ERR_NOT_REF)
+			return err;
+		else if (err == NULL)
+			do_merge = 1;
+		err = NULL;
+	}
 
 	if (asprintf(&oldpath, "%s/%s", got_worktree_get_root_path(worktree),
 	    old) == -1) {
@@ -603,12 +667,47 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	err = got_opentemp_named(&tmppath, &tmp, template);
+	err = got_opentemp_named(&tmppath, &tmpfile, template);
 	if (err)
 		goto done;
-	err = patch_file(p, oldfile, tmp, &mode);
+	outpath = tmppath;
+	outfd = fileno(tmpfile);
+	err = patch_file(p, afile != NULL ? afile : oldfile, tmpfile, &mode);
 	if (err)
 		goto done;
+
+	if (do_merge) {
+		if (fseeko(afile, 0, SEEK_SET) == -1 ||
+		    fseeko(oldfile, 0, SEEK_SET) == -1 ||
+		    fseeko(tmpfile, 0, SEEK_SET) == -1) {
+			err = got_error_from_errno("fseeko");
+			goto done;
+		}
+
+		if (asprintf(&oldlabel, "--- %s", p->old) == -1) {
+			err = got_error_from_errno("asprintf");
+			oldlabel = NULL;
+			goto done;
+		}
+
+		if (asprintf(&newlabel, "+++ %s", p->new) == -1) {
+			err = got_error_from_errno("asprintf");
+			newlabel = NULL;
+			goto done;
+		}
+
+		err = got_opentemp_named(&mergepath, &mergefile, template);
+		if (err)
+			goto done;
+		outpath = mergepath;
+		outfd = fileno(mergefile);
+
+		err = got_merge_diff3(overlapcnt, outfd, tmpfile, afile,
+		    oldfile, oldlabel, p->blob, newlabel,
+		    GOT_DIFF_ALGORITHM_PATIENCE);
+		if (err)
+			goto done;
+	}
 
 	if (nop)
 		goto done;
@@ -619,14 +718,14 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
-	if (fchmod(fileno(tmp), mode) == -1) {
+	if (fchmod(outfd, mode) == -1) {
 		err = got_error_from_errno2("chmod", tmppath);
 		goto done;
 	}
 
-	if (rename(tmppath, newpath) == -1) {
+	if (rename(outpath, newpath) == -1) {
 		if (errno != ENOENT) {
-			err = got_error_from_errno3("rename", tmppath,
+			err = got_error_from_errno3("rename", outpath,
 			    newpath);
 			goto done;
 		}
@@ -637,8 +736,8 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		err = got_path_mkdir(parent);
 		if (err != NULL)
 			goto done;
-		if (rename(tmppath, newpath) == -1) {
-			err = got_error_from_errno3("rename", tmppath,
+		if (rename(outpath, newpath) == -1) {
+			err = got_error_from_errno3("rename", outpath,
 			    newpath);
 			goto done;
 		}
@@ -658,21 +757,40 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		    fileindex, patch_add, pa);
 		if (err)
 			unlink(newpath);
-	} else
+	} else if (*overlapcnt != 0)
+		err = report_progress(pa, old, new, GOT_STATUS_CONFLICT, NULL);
+	else
 		err = report_progress(pa, old, new, GOT_STATUS_MODIFY, NULL);
 
 done:
 	free(parent);
 	free(template);
+
 	if (tmppath != NULL)
 		unlink(tmppath);
-	if (tmp != NULL && fclose(tmp) == EOF && err == NULL)
+	if (tmpfile != NULL && fclose(tmpfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(tmppath);
+
 	free(oldpath);
 	if (oldfile != NULL && fclose(oldfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
+
+	if (apath != NULL)
+		unlink(apath);
+	if (afile != NULL && fclose(afile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(apath);
+
+	if (mergepath != NULL)
+		unlink(mergepath);
+	if (mergefile != NULL && fclose(mergefile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(mergepath);
+
 	free(newpath);
+	free(oldlabel);
+	free(newlabel);
 	return err;
 }
 
@@ -716,7 +834,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	char *oldpath, *newpath;
 	struct imsgbuf *ibuf;
 	int imsg_fds[2] = {-1, -1};
-	int done = 0, failed = 0;
+	int overlapcnt, done = 0, failed = 0;
 	pid_t pid;
 
 	ibuf = calloc(1, sizeof(*ibuf));
@@ -775,8 +893,9 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
 		    &newpath, worktree, repo, fileindex);
 		if (err == NULL)
-			err = apply_patch(worktree, repo, fileindex, oldpath,
-			    newpath, &p, nop, &pa, cancel_cb, cancel_arg);
+			err = apply_patch(&overlapcnt, worktree, repo,
+			    fileindex, oldpath, newpath, &p, nop, &pa,
+			    cancel_cb, cancel_arg);
 		if (err != NULL) {
 			failed = 1;
 			/* recoverable errors */
@@ -788,6 +907,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 				err = report_progress(&pa, p.old, p.new,
 				    GOT_STATUS_CANNOT_UPDATE, NULL);
 		}
+		if (overlapcnt != 0)
+			failed = 1;
 
 		free(oldpath);
 		free(newpath);

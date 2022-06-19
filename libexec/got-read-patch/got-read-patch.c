@@ -55,11 +55,12 @@
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_privsep.h"
+#include "got_lib_sha1.h"
 
 struct imsgbuf ibuf;
 
 static const struct got_error *
-send_patch(const char *oldname, const char *newname, int git)
+send_patch(const char *oldname, const char *newname, const char *blob, int git)
 {
 	struct got_imsg_patch p;
 
@@ -71,9 +72,11 @@ send_patch(const char *oldname, const char *newname, int git)
 	if (newname != NULL)
 		strlcpy(p.new, newname, sizeof(p.new));
 
+	if (blob != NULL)
+		strlcpy(p.blob, blob, sizeof(p.blob));
+
 	p.git = git;
-	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1,
-	    &p, sizeof(p)) == -1)
+	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1, &p, sizeof(p)) == -1)
 		return got_error_from_errno("imsg_compose GOT_IMSG_PATCH");
 	return NULL;
 }
@@ -122,10 +125,31 @@ filename(const char *at, char **name)
 }
 
 static const struct got_error *
+blobid(const char *line, char **blob)
+{
+	uint8_t digest[SHA1_DIGEST_LENGTH];
+	size_t len;
+
+	*blob = NULL;
+
+	len = strspn(line, "0123456789abcdefABCDEF");
+	if ((*blob = strndup(line, len)) == NULL)
+		return got_error_from_errno("strndup");
+
+	if (!got_parse_sha1_digest(digest, *blob)) {
+		/* silently ignore invalid blob ids */
+		free(*blob);
+		*blob = NULL;
+	}
+	return NULL;
+}
+
+static const struct got_error *
 find_patch(int *done, FILE *fp)
 {
 	const struct got_error *err = NULL;
 	char	*old = NULL, *new = NULL;
+	char	*blob = NULL;
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
@@ -146,13 +170,19 @@ find_patch(int *done, FILE *fp)
 		} else if (!strncmp(line, "+++ ", 4)) {
 			free(new);
 			err = filename(line+4, &new);
+		} else if (!git && !strncmp(line, "blob - ", 7)) {
+			free(blob);
+			err = blobid(line + 7, &blob);
 		} else if (rename && !strncmp(line, "rename to ", 10)) {
 			free(new);
 			err = filename(line + 10, &new);
 		} else if (git && !strncmp(line, "similarity index 100%", 21))
 			rename = 1;
-		else if (!strncmp(line, "diff --git a/", 13))
+		else if (!strncmp(line, "diff --git a/", 13)) {
 			git = 1;
+			free(blob);
+			blob = NULL;
+		}
 
 		if (err)
 			break;
@@ -164,7 +194,7 @@ find_patch(int *done, FILE *fp)
 		 */
 		if (rename && old != NULL && new != NULL) {
 			*done = 1;
-			err = send_patch(old, new, git);
+			err = send_patch(old, new, blob, git);
 			break;
 		}
 
@@ -174,7 +204,7 @@ find_patch(int *done, FILE *fp)
 			    (!create && old == NULL))
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 			else
-				err = send_patch(old, new, git);
+				err = send_patch(old, new, blob, git);
 
 			if (err)
 				break;
@@ -188,6 +218,7 @@ find_patch(int *done, FILE *fp)
 
 	free(old);
 	free(new);
+	free(blob);
 	free(line);
 	if (ferror(fp) && err == NULL)
 		err = got_error_from_errno("getline");

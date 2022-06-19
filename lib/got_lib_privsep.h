@@ -613,6 +613,7 @@ struct got_imsg_patch {
 	int	git;
 	char	old[PATH_MAX];
 	char	new[PATH_MAX];
+	char	blob[41];
 };
 
 /*
