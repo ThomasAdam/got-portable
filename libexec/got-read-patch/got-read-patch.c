@@ -61,7 +61,8 @@
 struct imsgbuf ibuf;
 
 static const struct got_error *
-send_patch(const char *oldname, const char *newname, const char *blob, int git)
+send_patch(const char *oldname, const char *newname, const char *commitid,
+    const char *blob, int git)
 {
 	struct got_imsg_patch p;
 
@@ -73,8 +74,10 @@ send_patch(const char *oldname, const char *newname, const char *blob, int git)
 	if (newname != NULL)
 		strlcpy(p.new, newname, sizeof(p.new));
 
-	if (blob != NULL)
+	if (commitid != NULL && blob != NULL) {
+		strlcpy(p.cid, commitid, sizeof(p.cid));
 		strlcpy(p.blob, blob, sizeof(p.blob));
+	}
 
 	p.git = git;
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1, &p, sizeof(p)) == -1)
@@ -150,7 +153,7 @@ find_patch(int *done, FILE *fp)
 {
 	const struct got_error *err = NULL;
 	char	*old = NULL, *new = NULL;
-	char	*blob = NULL;
+	char	*commitid = NULL, *blob = NULL;
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
@@ -181,8 +184,13 @@ find_patch(int *done, FILE *fp)
 			rename = 1;
 		else if (!strncmp(line, "diff --git a/", 13)) {
 			git = 1;
+			free(commitid);
+			commitid = NULL;
 			free(blob);
 			blob = NULL;
+		} else if (!git && !strncmp(line, "diff ", 5)) {
+			free(commitid);
+			err = blobid(line + 5, &commitid);
 		}
 
 		if (err)
@@ -195,7 +203,8 @@ find_patch(int *done, FILE *fp)
 		 */
 		if (rename && old != NULL && new != NULL) {
 			*done = 1;
-			err = send_patch(old, new, blob, git);
+			err = send_patch(old, new, commitid,
+			    blob, git);
 			break;
 		}
 
@@ -205,7 +214,8 @@ find_patch(int *done, FILE *fp)
 			    (!create && old == NULL))
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 			else
-				err = send_patch(old, new, blob, git);
+				err = send_patch(old, new, commitid,
+				    blob, git);
 
 			if (err)
 				break;
@@ -219,6 +229,7 @@ find_patch(int *done, FILE *fp)
 
 	free(old);
 	free(new);
+	free(commitid);
 	free(blob);
 	free(line);
 	if (ferror(fp) && err == NULL)

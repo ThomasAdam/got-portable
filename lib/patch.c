@@ -73,6 +73,7 @@ STAILQ_HEAD(got_patch_hunk_head, got_patch_hunk);
 struct got_patch {
 	char	*old;
 	char	*new;
+	char	 cid[41];
 	char	 blob[41];
 	struct got_patch_hunk_head head;
 };
@@ -185,12 +186,16 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 
 	if (patch.old[sizeof(patch.old)-1] != '\0' ||
 	    patch.new[sizeof(patch.new)-1] != '\0' ||
+	    patch.cid[sizeof(patch.cid)-1] != '\0' ||
 	    patch.blob[sizeof(patch.blob)-1] != '\0') {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
 
-	strlcpy(p->blob, patch.blob, sizeof(p->blob));
+	if (*patch.cid != '\0' && *patch.blob != '\0') {
+		strlcpy(p->cid, patch.cid, sizeof(p->cid));
+		strlcpy(p->blob, patch.blob, sizeof(p->blob));
+	}
 
 	/* automatically set strip=1 for git-style diffs */
 	if (strip == -1 && patch.git &&
@@ -624,7 +629,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	int do_merge = 0, file_renamed = 0;
-	char *oldlabel = NULL, *newlabel = NULL;
+	char *oldlabel = NULL, *newlabel = NULL, *anclabel = NULL;
 	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;
 	char *apath = NULL, *mergepath = NULL;
@@ -699,6 +704,12 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			goto done;
 		}
 
+		if (asprintf(&anclabel, "commit %s", p->cid) == -1) {
+			err = got_error_from_errno("asprintf");
+			anclabel = NULL;
+			goto done;
+		}
+
 		err = got_opentemp_named(&mergepath, &mergefile, template);
 		if (err)
 			goto done;
@@ -706,7 +717,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		outfd = fileno(mergefile);
 
 		err = got_merge_diff3(overlapcnt, outfd, tmpfile, afile,
-		    oldfile, oldlabel, p->blob, newlabel,
+		    oldfile, oldlabel, anclabel, newlabel,
 		    GOT_DIFF_ALGORITHM_PATIENCE);
 		if (err)
 			goto done;
@@ -794,6 +805,7 @@ done:
 	free(newpath);
 	free(oldlabel);
 	free(newlabel);
+	free(anclabel);
 	return err;
 }
 
