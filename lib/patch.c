@@ -452,14 +452,12 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, int *lineno)
 }
 
 static const struct got_error *
-patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
-    mode_t *mode)
+patch_file(struct got_patch *p, FILE *orig, FILE *tmp, int nop, mode_t *mode)
 {
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
 	struct stat sb;
 	int lineno = 0;
-	FILE *orig;
 	off_t copypos, pos;
 	char *line = NULL;
 	size_t linesize = 0;
@@ -474,15 +472,8 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		return apply_hunk(tmp, h, &lineno);
 	}
 
-	if ((orig = fopen(path, "r")) == NULL) {
-		err = got_error_from_errno2("fopen", path);
-		goto done;
-	}
-
-	if (fstat(fileno(orig), &sb) == -1) {
-		err = got_error_from_errno("fstat");
-		goto done;
-	}
+	if (fstat(fileno(orig), &sb) == -1)
+		return got_error_from_errno("fstat");
 	*mode = sb.st_mode;
 
 	copypos = 0;
@@ -492,11 +483,11 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		if (err != NULL && err->code == GOT_ERR_HUNK_FAILED)
 			h->err = err;
 		if (err != NULL)
-			goto done;
+			return err;
 		if (!nop)
 			err = copy(tmp, orig, copypos, pos);
 		if (err != NULL)
-			goto done;
+			return err;
 		copypos = pos;
 
 		err = test_hunk(orig, h);
@@ -505,20 +496,16 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 			 * try to apply the hunk again starting the search
 			 * after the previous partial match.
 			 */
-			if (fseeko(orig, pos, SEEK_SET) == -1) {
-				err = got_error_from_errno("fseeko");
-				goto done;
-			}
+			if (fseeko(orig, pos, SEEK_SET) == -1)
+				return got_error_from_errno("fseeko");
 			linelen = getline(&line, &linesize, orig);
-			if (linelen == -1) {
-				err = got_error_from_errno("getline");
-				goto done;
-			}
+			if (linelen == -1)
+				return got_error_from_errno("getline");
 			lineno++;
 			goto tryagain;
 		}
 		if (err != NULL)
-			goto done;
+			return err;
 
 		if (lineno + 1 != h->old_from)
 			h->offset = lineno + 1 - h->old_from;
@@ -526,13 +513,11 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 		if (!nop)
 			err = apply_hunk(tmp, h, &lineno);
 		if (err != NULL)
-			goto done;
+			return err;
 
 		copypos = ftello(orig);
-		if (copypos == -1) {
-			err = got_error_from_errno("ftello");
-			goto done;
-		}
+		if (copypos == -1)
+			return got_error_from_errno("ftello");
 	}
 
 	if (p->new == NULL && sb.st_size != copypos) {
@@ -542,9 +527,6 @@ patch_file(struct got_patch *p, const char *path, FILE *tmp, int nop,
 	} else if (!nop && !feof(orig))
 		err = copy(tmp, orig, copypos, -1);
 
-done:
-	if (orig != NULL && fclose(orig) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -597,7 +579,7 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 	int file_renamed = 0;
 	char *oldpath = NULL, *newpath = NULL;
 	char *tmppath = NULL, *template = NULL, *parent = NULL;
-	FILE *tmp = NULL;
+	FILE *oldfile = NULL, *tmp = NULL;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
 	if (asprintf(&oldpath, "%s/%s", got_worktree_get_root_path(worktree),
@@ -620,11 +602,16 @@ apply_patch(struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 
+	if (p->old != NULL && (oldfile = fopen(oldpath, "r")) == NULL) {
+		err = got_error_from_errno2("open", oldpath);
+		goto done;
+	}
+
 	if (!nop)
 		err = got_opentemp_named(&tmppath, &tmp, template);
 	if (err)
 		goto done;
-	err = patch_file(p, oldpath, tmp, nop, &mode);
+	err = patch_file(p, oldfile, tmp, nop, &mode);
 	if (err)
 		goto done;
 
@@ -688,6 +675,8 @@ done:
 		err = got_error_from_errno("fclose");
 	free(tmppath);
 	free(oldpath);
+	if (oldfile != NULL && fclose(oldfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(newpath);
 	return err;
 }
