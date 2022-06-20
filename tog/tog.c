@@ -965,7 +965,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	case 'Q':
 		*done = 1;
 		break;
-	case 'f':
+	case 'F':
 		if (view_is_parent_view(view)) {
 			if (view->child == NULL)
 				break;
@@ -2625,6 +2625,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case 'b':
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
@@ -2677,7 +2678,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		nscroll /= 2;
 		/* FALL THROUGH */
 	case KEY_NPAGE:
-	case CTRL('f'): {
+	case CTRL('f'):
+	case 'f': {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
 		if (first == NULL)
@@ -3187,7 +3189,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 			}
 			if (width0 + w + width > skipcol)
 				break;
-			w += width; 
+			w += width;
 			i++;
 		}
 		/* draw (visible part of) matched token (if scrolled into it) */
@@ -4057,6 +4059,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case 'b':
 		if (s->first_displayed_line == 1)
 			break;
 		i = 0;
@@ -4075,6 +4078,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case 'f':
 	case ' ':
 		if (s->eof)
 			break;
@@ -4999,6 +5003,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case 'b':
 		if (s->first_displayed_line == 1) {
 			s->selected_line = MAX(1, s->selected_line - nscroll);
 			break;
@@ -5019,7 +5024,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    s->blame.nlines)
 			s->first_displayed_line++;
 		break;
-	case 'b':
+	case 'c':
 	case 'p': {
 		struct got_object_id *id = NULL;
 		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
@@ -5087,7 +5092,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		break;
 	}
-	case 'B': {
+	case 'C': {
 		struct got_object_qid *first;
 		first = STAILQ_FIRST(&s->blamed_commits);
 		if (!got_object_id_cmp(&first->id, s->commit_id))
@@ -5157,6 +5162,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case 'f':
 	case ' ':
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
@@ -5961,6 +5967,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case 'b':
 		if (s->tree == s->root) {
 			if (got_object_tree_get_first_entry(s->tree) ==
 			    s->first_displayed_entry)
@@ -5990,6 +5997,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case 'f':
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
@@ -6838,6 +6846,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_PPAGE:
 	case CTRL('b'):
+	case 'b':
 		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
 			s->selected -= MIN(nscroll, s->selected);
 		ref_scroll_up(s, MAX(0, nscroll));
@@ -6860,6 +6869,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
+	case 'f':
 		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
