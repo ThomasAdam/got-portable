@@ -2693,7 +2693,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* FALL THROUGH */
 	case KEY_NPAGE:
 	case CTRL('f'):
-	case 'f': {
+	case 'f':
+	case ' ': {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
 		if (first == NULL)
@@ -2725,7 +2726,6 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		break;
 	case KEY_ENTER:
-	case ' ':
 	case '\r':
 		if (s->selected_entry == NULL)
 			break;
@@ -6012,6 +6012,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case 'f':
+	case ' ':
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
@@ -6884,6 +6885,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case 'f':
+	case ' ':
 		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
