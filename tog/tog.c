@@ -748,6 +748,13 @@ view_is_parent_view(struct tog_view *view)
 	return view->parent == NULL;
 }
 
+static int
+view_is_splitscreen(struct tog_view *view)
+{
+	return view->begin_x > 0;
+}
+
+
 static const struct got_error *
 view_resize(struct tog_view *view)
 {
@@ -763,7 +770,7 @@ view_resize(struct tog_view *view)
 	else
 		ncols = view->ncols + (COLS - view->cols);
 
-	if (view->child) {
+	if (view->child && view_is_splitscreen(view->child)) {
 		view->child->begin_x = view_split_begin_x(view->begin_x);
 		if (view->child->begin_x == 0) {
 			ncols = COLS;
@@ -816,12 +823,6 @@ view_set_child(struct tog_view *view, struct tog_view *child)
 	child->parent = view;
 
 	return view_resize(view);
-}
-
-static int
-view_is_splitscreen(struct tog_view *view)
-{
-	return view->begin_x > 0;
 }
 
 static void
@@ -956,6 +957,8 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			view->focussed = 0;
 			view->parent->focussed = 1;
 			view->parent->focus_child = 0;
+			if (!view_is_splitscreen(view))
+				err = view_fullscreen(view->parent);
 		}
 		break;
 	case 'q':
@@ -986,6 +989,8 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 				err = view_fullscreen(view);
 			} else {
 				err = view_splitscreen(view);
+				if (!err)
+					err = view_resize(view->parent);
 			}
 			if (err)
 				break;
