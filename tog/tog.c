@@ -1547,7 +1547,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (newline)
 		*newline = '\0';
 	limit = avail - col;
-	if (view->child && limit > 0)
+	if (view->child && view_is_splitscreen(view->child) && limit > 0)
 		limit--;	/* for the border */
 	err = format_line(&wlogmsg, &logmsg_width, &scrollx, logmsg, view->x,
 	    limit, col, 1);
