@@ -774,6 +774,8 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			unlink(newpath);
 	} else if (*overlapcnt != 0)
 		err = report_progress(pa, old, new, GOT_STATUS_CONFLICT, NULL);
+	else if (do_merge)
+		err = report_progress(pa, old, new, GOT_STATUS_MERGE, NULL);
 	else
 		err = report_progress(pa, old, new, GOT_STATUS_MODIFY, NULL);
 

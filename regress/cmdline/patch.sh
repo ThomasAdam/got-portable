@@ -1482,9 +1482,18 @@ test_patch_merge_simple() {
 	fi
 
 	(cd $testroot/wt && got patch $testroot/old.diff) \
-		2>&1 > /dev/null
+		> $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'G  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
 		test_done $testroot $ret
 		return 1
 	fi
@@ -1539,11 +1548,20 @@ test_patch_merge_conflict() {
 	fi
 
 	(cd $testroot/wt && got patch $testroot/old.diff) \
-		>/dev/null 2>&1
+		> $testroot/stdout 2>/dev/null
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got patch merged a diff that should conflict" >&2
 		test_done $testroot 0
+		return 1
+	fi
+
+	echo 'C  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
+		test_done $testroot $ret
 		return 1
 	fi
 

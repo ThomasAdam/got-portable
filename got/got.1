@@ -1333,6 +1333,8 @@ contains multiple patches, then attempt to apply each of them in sequence.
 Show the status of each affected file, using the following status codes:
 .Bl -column XYZ description
 .It M Ta file was modified
+.It G Ta file was merged using a merge-base found in the repository
+.It C Ta file was merged and conflicts occurred during merge
 .It D Ta file was deleted
 .It A Ta file was added
 .It # Ta failed to patch the file
