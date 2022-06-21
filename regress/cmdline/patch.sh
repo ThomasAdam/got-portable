@@ -1588,9 +1588,11 @@ test_patch_merge_unknown_blob() {
 
 	cat <<EOF > $testroot/wt/patch
 I've got a
+diff aaaabbbbccccddddeeeeffff0000111122223333 foo/bar
+with a
 blob - aaaabbbbccccddddeeeeffff0000111122223333
 and also a
-blob + 0000111122223333444455556666888899990000
+blob + 0000111122223333444455556666777788889999
 for this dummy diff
 --- alpha
 +++ alpha
@@ -1601,6 +1603,39 @@ will it work?
 EOF
 
 	(cd $testroot/wt/ && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# try again without a `diff' header
+
+	cat <<EOF > $testroot/wt/patch
+I've got a
+blob - aaaabbbbccccddddeeeeffff0000111122223333
+and also a
+blob + 0000111122223333444455556666777788889999
+for this dummy diff
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++ALPHA
+will it work?
+EOF
+
+	(cd $testroot/wt && got revert alpha > /dev/null && got patch patch) \
+		> $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret

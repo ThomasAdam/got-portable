@@ -643,7 +643,11 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 	/* don't run the diff3 merge on creations/deletions */
 	if (*p->blob != '\0' && p->old != NULL && p->new != NULL) {
 		err = open_blob(&apath, &afile, p->blob, repo);
-		if (err && err->code != GOT_ERR_NOT_REF)
+		/*
+		 * ignore failures to open this blob, we might have
+		 * parsed gibberish.
+		 */
+		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT))
 			return err;
 		else if (err == NULL)
 			do_merge = 1;
