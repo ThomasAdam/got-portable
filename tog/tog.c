@@ -502,6 +502,7 @@ struct tog_view {
 	int nlines, ncols, begin_y, begin_x;
 	int maxx, x; /* max column and current start column */
 	int lines, cols; /* copies of LINES and COLS */
+	int ch, count; /* current keymap and count prefix */
 	int focussed; /* Only set on one parent or child view at a time. */
 	int dying;
 	struct tog_view *parent;
@@ -667,6 +668,8 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 	if (view == NULL)
 		return NULL;
 
+	view->ch = 0;
+	view->count = 0;
 	view->type = type;
 	view->lines = LINES;
 	view->cols = COLS;
@@ -884,6 +887,38 @@ view_search_start(struct tog_view *view)
 	return NULL;
 }
 
+/*
+ * Compute view->count from numeric user input.  User has five-tenths of a
+ * second to follow each numeric keypress with another number to form count.
+ * Return first non-numeric input or ERR and assign total to view->count.
+ * XXX Should we add support for user-defined timeout?
+ */
+static int
+get_compound_key(struct tog_view *view, int c)
+{
+	int n = 0;
+
+	view->count = 0;
+	halfdelay(5);  /* block for half a second */
+
+	do {
+		/*
+		 * Don't overflow. Max valid request should be the greatest
+		 * between the longest and total lines; cap at 10 million.
+		 */
+		if (n >= 9999999)
+			n = 9999999;
+		else
+			n = n * 10 + (c - '0');
+	} while (((c = wgetch(view->window))) >= '0' && c <= '9' && c != ERR);
+
+	/* Massage excessive or inapplicable values at the input handler. */
+	view->count = n;
+
+	cbreak();  /* return to blocking */
+	return c;
+}
+
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
     struct tog_view_list_head *views)
@@ -896,8 +931,10 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 
 	/* Clear "no matches" indicator. */
 	if (view->search_next_done == TOG_SEARCH_NO_MORE ||
-	    view->search_next_done == TOG_SEARCH_HAVE_NONE)
+	    view->search_next_done == TOG_SEARCH_HAVE_NONE) {
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
+		view->count = 0;
+	}
 
 	if (view->searching && !view->search_next_done) {
 		errcode = pthread_mutex_unlock(&tog_mutex);
@@ -918,7 +955,13 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_unlock");
-	ch = wgetch(view->window);
+	/* If we have an unfinished count, don't get a new key map. */
+	ch = view->ch;
+	if ((view->count && --view->count == 0) || !view->count) {
+		ch = wgetch(view->window);
+		if (ch >= '1' && ch  <= '9')
+			view->ch = ch = get_compound_key(view, ch);
+	}
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_lock");
@@ -949,6 +992,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 
 	switch (ch) {
 	case '\t':
+		view->count = 0;
 		if (view->child) {
 			view->focussed = 0;
 			view->child->focussed = 1;
@@ -969,6 +1013,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		*done = 1;
 		break;
 	case 'F':
+		view->count = 0;
 		if (view_is_parent_view(view)) {
 			if (view->child == NULL)
 				break;
@@ -1000,6 +1045,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	case KEY_RESIZE:
 		break;
 	case '/':
+		view->count = 0;
 		if (view->search_start)
 			view_search_start(view);
 		else
@@ -2595,21 +2641,28 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '$':
 		view->x = MAX(view->maxx - view->ncols / 2, 0);
+		view->count = 0;
 		break;
 	case KEY_RIGHT:
 	case 'l':
 		if (view->x + view->ncols / 2 < view->maxx)
 			view->x += 2;  /* move two columns right */
+		else
+			view->count = 0;
 		break;
 	case KEY_LEFT:
 	case 'h':
 		view->x -= MIN(view->x, 2);  /* move two columns back */
+		if (view->x <= 0)
+			view->count = 0;
 		break;
 	case 'k':
 	case KEY_UP:
 	case '<':
 	case ',':
 	case CTRL('p'):
+		if (s->selected_entry->idx == 0)
+			view->count = 0;
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (s->selected > 0)
@@ -2623,6 +2676,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->selected = 0;
 		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
 		select_commit(s);
+		view->count = 0;
 		break;
 	case CTRL('u'):
 	case 'u':
@@ -2638,6 +2692,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		else
 			log_scroll_up(s, nscroll);
 		select_commit(s);
+		if (s->selected_entry->idx == 0)
+			view->count = 0;
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -2655,11 +2711,15 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				break;
 		}
 		select_commit(s);
+		if (s->thread_args.log_complete &&
+		    s->selected_entry->idx == s->commits.ncommits - 1)
+			view->count = 0;
 		break;
 	case 'G':
 	case KEY_END: {
 		/* We don't know yet how many commits, so we're forced to
 		 * traverse them all. */
+		view->count = 0;
 		if (!s->thread_args.log_complete) {
 			s->thread_args.load_all = 1;
 			return trigger_log_thread(view, 0);
@@ -2688,8 +2748,10 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case ' ': {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
-		if (first == NULL)
+		if (first == NULL) {
+			view->count = 0;
 			break;
+		}
 		err = log_scroll_down(view, nscroll);
 		if (err)
 			break;
@@ -2701,6 +2763,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			    s->selected_entry->idx, nscroll + 1);
 		}
 		select_commit(s);
+		if (s->thread_args.log_complete &&
+		    s->selected_entry->idx == s->commits.ncommits - 1)
+			view->count = 0;
 		break;
 	}
 	case KEY_RESIZE:
@@ -2718,6 +2783,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_ENTER:
 	case '\r':
+		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
 		if (view_is_parent_view(view))
@@ -2741,6 +2807,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			*new_view = diff_view;
 		break;
 	case 't':
+		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
 		if (view_is_parent_view(view))
@@ -2766,6 +2833,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_BACKSPACE:
 	case CTRL('l'):
 	case 'B':
+		view->count = 0;
 		if (ch == KEY_BACKSPACE &&
 		    got_path_is_root_dir(s->in_repo_path))
 			break;
@@ -2827,6 +2895,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->search_entry = NULL;
 		break;
 	case 'r':
+		view->count = 0;
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
 		ref_view = view_open(view->nlines, view->ncols,
@@ -2852,6 +2921,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			*new_view = ref_view;
 		break;
 	default:
+		view->count = 0;
 		break;
 	}
 
@@ -4017,15 +4087,20 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '$':
 		view->x = MAX(view->maxx - view->ncols / 3, 0);
+		view->count = 0;
 		break;
 	case KEY_RIGHT:
 	case 'l':
 		if (view->x + view->ncols / 3 < view->maxx)
 			view->x += 2;  /* move two columns right */
+		else
+			view->count = 0;
 		break;
 	case KEY_LEFT:
 	case 'h':
 		view->x -= MIN(view->x, 2);  /* move two columns back */
+		if (view->x <= 0)
+			view->count = 0;
 		break;
 	case 'a':
 	case 'w':
@@ -4039,13 +4114,16 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->matched_line = 0;
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
+		view->count = 0;
 		break;
 	case 'g':
 	case KEY_HOME:
 		s->first_displayed_line = 1;
+		view->count = 0;
 		break;
 	case 'G':
 	case KEY_END:
+		view->count = 0;
 		if (s->eof)
 			break;
 
@@ -4057,6 +4135,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case CTRL('p'):
 		if (s->first_displayed_line > 1)
 			s->first_displayed_line--;
+		else
+			view->count = 0;
 		break;
 	case CTRL('u'):
 	case 'u':
@@ -4065,8 +4145,10 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_PPAGE:
 	case CTRL('b'):
 	case 'b':
-		if (s->first_displayed_line == 1)
+		if (s->first_displayed_line == 1) {
+			view->count = 0;
 			break;
+		}
 		i = 0;
 		while (i++ < nscroll && s->first_displayed_line > 1)
 			s->first_displayed_line--;
@@ -4076,6 +4158,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case CTRL('n'):
 		if (!s->eof)
 			s->first_displayed_line++;
+		else
+			view->count = 0;
 		break;
 	case CTRL('d'):
 	case 'd':
@@ -4085,8 +4169,10 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case CTRL('f'):
 	case 'f':
 	case ' ':
-		if (s->eof)
+		if (s->eof) {
+			view->count = 0;
 			break;
+		}
 		i = 0;
 		while (!s->eof && i++ < nscroll) {
 			linelen = getline(&line, &linesize, s->f);
@@ -4112,7 +4198,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				s->first_displayed_line = 1;
 				s->last_displayed_line = view->nlines;
 			}
-		}
+		} else
+			view->count = 0;
 		break;
 	case ']':
 		if (s->diff_context < GOT_DIFF_MAX_CONTEXT) {
@@ -4120,15 +4207,19 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->matched_line = 0;
 			diff_view_indicate_progress(view);
 			err = create_diff(s);
-		}
+		} else
+			view->count = 0;
 		break;
 	case '<':
 	case ',':
-		if (s->log_view == NULL)
+		if (s->log_view == NULL) {
+			view->count = 0;
 			break;
+		}
 		ls = &s->log_view->state.log;
 		old_selected_entry = ls->selected_entry;
 
+		/* view->count handled in input_log_view() */
 		err = input_log_view(NULL, s->log_view, KEY_UP);
 		if (err)
 			break;
@@ -4150,11 +4241,14 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '>':
 	case '.':
-		if (s->log_view == NULL)
+		if (s->log_view == NULL) {
+			view->count = 0;
 			break;
+		}
 		ls = &s->log_view->state.log;
 		old_selected_entry = ls->selected_entry;
 
+		/* view->count handled in input_log_view() */
 		err = input_log_view(NULL, s->log_view, KEY_DOWN);
 		if (err)
 			break;
@@ -4175,6 +4269,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = create_diff(s);
 		break;
 	default:
+		view->count = 0;
 		break;
 	}
 
@@ -4964,15 +5059,20 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '$':
 		view->x = MAX(view->maxx - view->ncols / 3, 0);
+		view->count = 0;
 		break;
 	case KEY_RIGHT:
 	case 'l':
 		if (view->x + view->ncols / 3 < view->maxx)
 			view->x += 2;  /* move two columns right */
+		else
+			view->count = 0;
 		break;
 	case KEY_LEFT:
 	case 'h':
 		view->x -= MIN(view->x, 2);  /* move two columns back */
+		if (view->x <= 0)
+			view->count = 0;
 		break;
 	case 'q':
 		s->done = 1;
@@ -4981,6 +5081,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_HOME:
 		s->selected_line = 1;
 		s->first_displayed_line = 1;
+		view->count = 0;
 		break;
 	case 'G':
 	case KEY_END:
@@ -4992,6 +5093,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->first_displayed_line = s->blame.nlines -
 			    (view->nlines - 3);
 		}
+		view->count = 0;
 		break;
 	case 'k':
 	case KEY_UP:
@@ -5001,6 +5103,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		else if (s->selected_line == 1 &&
 		    s->first_displayed_line > 1)
 			s->first_displayed_line--;
+		else
+			view->count = 0;
 		break;
 	case CTRL('u'):
 	case 'u':
@@ -5010,7 +5114,10 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case CTRL('b'):
 	case 'b':
 		if (s->first_displayed_line == 1) {
+			if (view->count > 1)
+				nscroll += nscroll;
 			s->selected_line = MAX(1, s->selected_line - nscroll);
+			view->count = 0;
 			break;
 		}
 		if (s->first_displayed_line > nscroll)
@@ -5028,10 +5135,14 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		else if (s->last_displayed_line <
 		    s->blame.nlines)
 			s->first_displayed_line++;
+		else
+			view->count = 0;
 		break;
 	case 'c':
 	case 'p': {
 		struct got_object_id *id = NULL;
+
+		view->count = 0;
 		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
 		    s->first_displayed_line, s->selected_line);
 		if (id == NULL)
@@ -5099,6 +5210,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	}
 	case 'C': {
 		struct got_object_qid *first;
+
+		view->count = 0;
 		first = STAILQ_FIRST(&s->blamed_commits);
 		if (!got_object_id_cmp(&first->id, s->commit_id))
 			break;
@@ -5121,6 +5234,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		struct got_object_id *id = NULL;
 		struct got_object_qid *pid;
 		struct got_commit_object *commit = NULL;
+
+		view->count = 0;
 		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
 		    s->first_displayed_line, s->selected_line);
 		if (id == NULL)
@@ -5172,6 +5287,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
 		    view->nlines - 2)) {
+			view->count = 0;
 			break;
 		}
 		if (s->last_displayed_line >= s->blame.nlines &&
@@ -5193,6 +5309,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		break;
 	default:
+		view->count = 0;
 		break;
 	}
 	return thread_err ? thread_err : err;
@@ -5885,8 +6002,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	switch (ch) {
 	case 'i':
 		s->show_ids = !s->show_ids;
+		view->count = 0;
 		break;
 	case 'l':
+		view->count = 0;
 		if (!s->selected_entry)
 			break;
 		if (view_is_parent_view(view))
@@ -5906,6 +6025,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			*new_view = log_view;
 		break;
 	case 'r':
+		view->count = 0;
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
 		ref_view = view_open(view->nlines, view->ncols,
@@ -5933,6 +6053,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'g':
 	case KEY_HOME:
 		s->selected = 0;
+		view->count = 0;
 		if (s->tree == s->root)
 			s->first_displayed_entry =
 			    got_object_tree_get_first_entry(s->tree);
@@ -5942,6 +6063,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'G':
 	case KEY_END:
 		s->selected = 0;
+		view->count = 0;
 		te = got_object_tree_get_last_entry(s->tree);
 		for (n = 0; n < view->nlines - 3; n++) {
 			if (te == NULL) {
@@ -5965,6 +6087,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		}
 		tree_scroll_up(s, 1);
+		if (s->selected_entry == NULL ||
+		    (s->tree == s->root && s->selected_entry ==
+		     got_object_tree_get_first_entry(s->tree)))
+			view->count = 0;
 		break;
 	case CTRL('u'):
 	case 'u':
@@ -5982,6 +6108,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				s->selected -= MIN(s->selected, nscroll);
 		}
 		tree_scroll_up(s, MAX(0, nscroll));
+		if (s->selected_entry == NULL ||
+		    (s->tree == s->root && s->selected_entry ==
+		     got_object_tree_get_first_entry(s->tree)))
+			view->count = 0;
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -5991,9 +6121,11 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		}
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
-		    == NULL)
+		    == NULL) {
 			/* can't scroll any further */
+			view->count = 0;
 			break;
+		}
 		tree_scroll_down(s, 1);
 		break;
 	case CTRL('d'):
@@ -6010,6 +6142,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			if (s->selected < s->ndisplayed - 1)
 				s->selected += MIN(nscroll,
 				    s->ndisplayed - s->selected - 1);
+			else
+				view->count = 0;
 			break;
 		}
 		tree_scroll_down(s, nscroll);
@@ -6020,8 +6154,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->selected_entry == NULL || ch == KEY_BACKSPACE) {
 			struct tog_parent_tree *parent;
 			/* user selected '..' */
-			if (s->tree == s->root)
+			if (s->tree == s->root) {
+				view->count = 0;
 				break;
+			}
 			parent = TAILQ_FIRST(&s->parents);
 			TAILQ_REMOVE(&s->parents, parent,
 			    entry);
@@ -6036,6 +6172,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else if (S_ISDIR(got_tree_entry_get_mode(
 		    s->selected_entry))) {
 			struct got_tree_object *subtree;
+			view->count = 0;
 			err = got_object_open_as_tree(&subtree, s->repo,
 			    got_tree_entry_get_id(s->selected_entry));
 			if (err)
@@ -6056,6 +6193,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			    s->commit_id, s->repo);
 			if (err)
 				break;
+			view->count = 0;
 			view->focussed = 0;
 			blame_view->focussed = 1;
 			if (view_is_parent_view(view)) {
@@ -6073,8 +6211,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_RESIZE:
 		if (view->nlines >= 4 && s->selected >= view->nlines - 3)
 			s->selected = view->nlines - 4;
+		view->count = 0;
 		break;
 	default:
+		view->count = 0;
 		break;
 	}
 
@@ -6757,12 +6897,15 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	switch (ch) {
 	case 'i':
 		s->show_ids = !s->show_ids;
+		view->count = 0;
 		break;
 	case 'm':
 		s->show_date = !s->show_date;
+		view->count = 0;
 		break;
 	case 'o':
 		s->sort_by_date = !s->sort_by_date;
+		view->count = 0;
 		err = got_reflist_sort(&tog_refs, s->sort_by_date ?
 		    got_ref_cmp_by_commit_timestamp_descending :
 		    tog_ref_cmp_by_name, s->repo);
@@ -6778,6 +6921,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case KEY_ENTER:
 	case '\r':
+		view->count = 0;
 		if (!s->selected_entry)
 			break;
 		if (view_is_parent_view(view))
@@ -6798,6 +6942,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			*new_view = log_view;
 		break;
 	case 't':
+		view->count = 0;
 		if (!s->selected_entry)
 			break;
 		if (view_is_parent_view(view))
@@ -6822,11 +6967,13 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'g':
 	case KEY_HOME:
 		s->selected = 0;
+		view->count = 0;
 		s->first_displayed_entry = TAILQ_FIRST(&s->refs);
 		break;
 	case 'G':
 	case KEY_END:
 		s->selected = 0;
+		view->count = 0;
 		re = TAILQ_LAST(&s->refs, tog_reflist_head);
 		for (n = 0; n < view->nlines - 1; n++) {
 			if (re == NULL)
@@ -6845,6 +6992,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		}
 		ref_scroll_up(s, 1);
+		if (s->selected_entry == TAILQ_FIRST(&s->refs))
+			view->count = 0;
 		break;
 	case CTRL('u'):
 	case 'u':
@@ -6856,6 +7005,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
 			s->selected -= MIN(nscroll, s->selected);
 		ref_scroll_up(s, MAX(0, nscroll));
+		if (s->selected_entry == TAILQ_FIRST(&s->refs))
+			view->count = 0;
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -6864,9 +7015,11 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected++;
 			break;
 		}
-		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL)
+		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
 			/* can't scroll any further */
+			view->count = 0;
 			break;
+		}
 		ref_scroll_down(s, 1);
 		break;
 	case CTRL('d'):
@@ -6882,11 +7035,15 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			if (s->selected < s->ndisplayed - 1)
 				s->selected += MIN(nscroll,
 				    s->ndisplayed - s->selected - 1);
+			if (view->count > 1 && s->selected < s->ndisplayed - 1)
+				s->selected += s->ndisplayed - s->selected - 1;
+			view->count = 0;
 			break;
 		}
 		ref_scroll_down(s, nscroll);
 		break;
 	case CTRL('l'):
+		view->count = 0;
 		tog_free_refs();
 		err = tog_load_refs(s->repo, s->sort_by_date);
 		if (err)
@@ -6899,6 +7056,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected = view->nlines - 2;
 		break;
 	default:
+		view->count = 0;
 		break;
 	}
 
