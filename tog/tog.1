@@ -55,6 +55,15 @@ Displays references in the repository.
 .Pp
 .Nm
 provides global and command-specific key bindings and options.
+Some command-specific key bindings may be prefixed with an integer, which is
+denoted by N in the descriptions below, and is used as a modifier to the
+operation as indicated.
+When the first integer for a count modifier is entered,
+.Nm
+will wait 500 milliseconds for each successive integer or the compound sequence
+to complete.
+If this sequence should timeout or does not conclude with a valid key binding,
+the command is aborted and any preceding count is reset.
 The global key bindings are:
 .Bl -tag -width Ds
 .It Cm Q
@@ -98,30 +107,32 @@ This command is also executed if no explicit command is specified.
 .Pp
 The key bindings for
 .Cm tog log
-are as follows:
+are as follows (N denotes optional prefixed count modifier):
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, >, Full stop, Ctrl-n
-Move the selection cursor down.
+Move the selection cursor down N lines (default: 1).
 .It Cm Up-arrow, k, <, Comma, Ctrl-p
-Move the selection cursor up.
+Move the selection cursor up N lines (default: 1).
 .It Cm Right-arrow, l
-Scroll log message field to the right.
+Scroll log message field to the right N increments (default: 1).
+.br
 Log message moves left on the screen.
 .It Cm Left-arrow, h
-Scroll log message field to the left.
+Scroll log message field to the left N increments (default: 1).
+.br
 Log message moves right on the screen.
 .It Cm $
 Scroll log message field to the rightmost position.
 .It Cm 0
 Scroll log message field to the leftmost position.
 .It Cm Page-down, Space, Ctrl+f, f
-Move the selection cursor down one page.
+Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
-Move the selection cursor up one page.
+Move the selection cursor up N pages (default: 1).
 .It Cm Ctrl+d, d
-Move the selection cursor down one half page.
+Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
-Move the selection cursor up one half page.
+Move the selection cursor up N half pages (default: 1).
 .It Cm Home, g
 Move the cursor to the newest commit.
 .It Cm End, G
@@ -152,12 +163,15 @@ commit ID SHA1 hash.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
-Find the next commit which matches the current search pattern.
+Find the Nth next commit which matches the current search pattern (default: 1).
+.br
 Searching continues until either a match is found or the
 .Cm Backspace
 key is pressed.
 .It Cm N
-Find the previous commit which matches the current search pattern.
+Find the Nth previous commit which matches the current search pattern
+(default: 1).
+.br
 Searching continues until either a match is found or the
 .Cm Backspace
 key is pressed.
@@ -220,62 +234,65 @@ automatically, provided the abbreviation is unique.
 .Pp
 The key bindings for
 .Cm tog diff
-are as follows:
+are as follows (N denotes optional prefixed count modifier):
 .Bl -tag -width Ds
 .It Cm a
 Toggle treatment of file contents as ASCII text even if binary data was
 detected.
 .It Cm Down-arrow, j, Ctrl-n
-Scroll down.
+Scroll down N lines (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
-Scroll up.
+Scroll up N lines (default: 1).
 .It Cm Right-arrow, l
-Scroll view to the right.
+Scroll view to the right N increments (default: 1).
+.br
 Diff output moves left on the screen.
 .It Cm Left-arrow, h
-Scroll view to the left.
+Scroll view to the left N increments (default: 1).
+.br
 Diff output moves right on the screen.
 .It Cm $
 Scroll view to the rightmost position.
 .It Cm 0
 Scroll view left to the start of the line.
 .It Cm Page-down, Space, Ctrl+f, f
-Scroll down one page.
+Scroll down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
-Scroll up one page.
+Scroll up N pages (default: 1).
 .It Cm Ctrl+d, d
-Scroll down one half page.
+Scroll down N half pages (default: 1).
 .It Cm Ctrl+u, u
-Scroll up one half page.
+Scroll up N half pages (default: 1).
 .It Cm Home, g
 Scroll to the top of the view.
 .It Cm End, G
 Scroll to the bottom of the view.
 .It Cm \&[
-Reduce the amount of diff context lines.
+Reduce diff context by N lines (default: 1).
 .It Cm \&]
-Increase the amount of diff context lines.
+Increase diff context by N lines (default: 1).
 .It Cm <, Comma
 If the
 .Cm diff
 view was opened via the
 .Cm log
-view, move to the previous (younger) commit.
+view, move to the Nth previous (younger) commit (default: 1).
 .It Cm >, Full stop
 If the
 .Cm diff
 view was opened via the
 .Cm log
-view, move to the next (older) commit.
+view, move to the Nth next (older) commit (default: 1).
 .It Cm /
 Prompt for a search pattern and start searching for matching lines.
 The search pattern is an extended regular expression.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
-Find the next line which matches the current search pattern.
+Find the Nth next line which matches the current search pattern (default: 1).
 .It Cm N
-Find the previous line which matches the current search pattern.
+Find the Nth previous line which matches the current search pattern
+(default: 1).
 .It Cm w
 Toggle display of whitespace-only changes.
 .El
@@ -304,30 +321,32 @@ Display line-by-line history of a file at the specified path.
 .Pp
 The key bindings for
 .Cm tog blame
-are as follows:
+are as follows (N denotes optional prefixed count modifier):
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, Ctrl-n
-Move the selection cursor down.
+Move the selection cursor down N pages (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
-Move the selection cursor up.
+Move the selection cursor up N pages (default: 1).
 .It Cm Right-arrow, l
-Scroll view to the right.
+Scroll view to the right N increments (default: 1).
+.br
 File output moves left on the screen.
 .It Cm Left-arrow, h
-Scroll view to the left.
+Scroll view to the left N increments (default: 1).
+.br
 File output moves right on the screen.
 .It Cm $
 Scroll view to the rightmost position.
 .It Cm 0
 Scroll view left to the start of the line.
 .It Cm Page-down, Space, Ctrl+f, f
-Move the selection cursor down one page.
+Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
-Move the selection cursor up one page.
+Move the selection cursor up N pages (default: 1).
 .It Cm Ctrl+d, d
-Move the selection cursor down one half page.
+Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
-Move the selection cursor up one half page.
+Move the selection cursor up N half pages (default: 1).
 .It Cm Home, g
 Move the selection cursor to the first line of the file.
 .It Cm End, G
@@ -356,9 +375,10 @@ The search pattern is an extended regular expression.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
-Find the next line which matches the current search pattern.
+Find the Nth next line which matches the current search pattern (default: 1).
 .It Cm N
-Find the previous line which matches the current search pattern.
+Find the Nth previous line which matches the current search pattern
+(default: 1).
 .El
 .Pp
 The options for
@@ -397,20 +417,20 @@ Symbolic link entries are also annotated with the target path of the link.
 .Pp
 The key bindings for
 .Cm tog tree
-are as follows:
+are as follows (N denotes optional prefixed count modifier):
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, Ctrl-n
-Move the selection cursor down.
+Move the selection cursor down N lines (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
-Move the selection cursor up.
+Move the selection cursor up N lines (default: 1).
 .It Cm Page-down, Space, Ctrl+f, f
-Move the selection cursor down one page.
+Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
-Move the selection cursor up one page.
+Move the selection cursor up N pages (default: 1).
 .It Cm Ctrl+d, d
-Move the selection cursor down one half page.
+Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
-Move the selection cursor up one half page.
+Move the selection cursor up N half pages (default: 1).
 .It Cm Home, g
 Move the selection cursor to the first entry.
 .It Cm End, G
@@ -431,7 +451,7 @@ This can then be used to open a new
 .Cm tree
 view for arbitrary branches and tags.
 .It Cm Backspace
-Move back to the parent directory.
+Move back to the Nth parent directory (default: 1).
 .It Cm i
 Show object IDs for all objects displayed in the
 .Cm tree
@@ -443,9 +463,11 @@ against the tree entry's name.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
-Find the next tree entry which matches the current search pattern.
+Find the Nth next tree entry which matches the current search pattern
+(default: 1).
 .It Cm N
-Find the previous tree entry which matches the current search pattern.
+Find the Nth previous tree entry which matches the current search pattern
+(default: 1).
 .El
 .Pp
 The options for
@@ -471,20 +493,20 @@ Display references in the repository.
 .Pp
 The key bindings for
 .Cm tog ref
-are as follows:
+are as follows (N denotes optional prefixed count modifier):
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, Ctrl-n
-Move the selection cursor down.
+Move the selection cursor down N lines (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
-Move the selection cursor up.
+Move the selection cursor up N lines (default: 1).
 .It Cm Page-down, Space, Ctrl+f, f
-Move the selection cursor down one page.
+Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
-Move the selection cursor up one page.
+Move the selection cursor up N pages (default: 1).
 .It Cm Ctrl+d, d
-Move the selection cursor down one half page.
+Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
-Move the selection cursor up one half page.
+Move the selection cursor up N half pages (default: 1).
 .It Cm Home, g
 Move the selection cursor to the first reference.
 .It Cm End, G
@@ -513,9 +535,11 @@ against absolute reference names.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
-Find the next reference which matches the current search pattern.
+Find the Nth next reference which matches the current search pattern
+(default: 1).
 .It Cm N
-Find the previous reference which matches the current search pattern.
+Find the Nth previous reference which matches the current search pattern
+(default: 1).
 .It Cm Ctrl+l
 Reload the list of references displayed by the
 .Cm ref
