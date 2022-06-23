@@ -69,6 +69,12 @@
 #define unveil(s, p) (0)
 #endif
 
+#ifdef __FreeBSD__
+#include <sys/capsicum.h>
+#else
+#define cap_enter() (0)
+#endif
+
 #ifndef HAVE_LINUX_LANDLOCK_H
 #define landlock_no_fs() (0)
 #else

@@ -120,6 +120,11 @@ main(int argc, char *argv[])
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
+	if (cap_enter() == -1) {
+		err = got_error_from_errno("cap_enter");
+		got_privsep_send_error(&ibuf, err);
+		return 1;
+	}
 #endif
 
 	for (;;) {
