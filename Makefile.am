@@ -19,36 +19,36 @@ tests: $(TEST_TARGETS)
 regress-cmdline:
 	(export PLATFORM=@PLATFORM@; 				\
 	cd $(top_builddir)/regress/cmdline || exit $$?; 	\
-	./checkout.sh -r "$(GOT_TEST_ROOT)";			\
-	./update.sh -r "$(GOT_TEST_ROOT)";			\
-	./status.sh -r "$(GOT_TEST_ROOT)";			\
-	./log.sh -r "$(GOT_TEST_ROOT)";				\
-	./add.sh -r "$(GOT_TEST_ROOT)";				\
-	./rm.sh -r "$(GOT_TEST_ROOT)";				\
-	./diff.sh -r "$(GOT_TEST_ROOT)";			\
-	./blame.sh -r "$(GOT_TEST_ROOT)";			\
-	./branch.sh -r "$(GOT_TEST_ROOT)";			\
-	./tag.sh -r "$(GOT_TEST_ROOT)";				\
-	./ref.sh -r "$(GOT_TEST_ROOT)";				\
-	./commit.sh -r "$(GOT_TEST_ROOT)";			\
-	./revert.sh -r "$(GOT_TEST_ROOT)";			\
-	./cherrypick.sh -r "$(GOT_TEST_ROOT)";			\
-	./backout.sh -r "$(GOT_TEST_ROOT)";			\
-	./rebase.sh -r "$(GOT_TEST_ROOT)";			\
-	./import.sh -r "$(GOT_TEST_ROOT)";			\
-	./histedit.sh -r "$(GOT_TEST_ROOT)";			\
-	./integrate.sh -r "$(GOT_TEST_ROOT)";			\
-	./merge.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./stage.sh -r "$(GOT_TEST_ROOT)";			\
-	./unstage.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./cat.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./clone.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./fetch.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./send.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./tree.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./checkout.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./update.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./status.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./log.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./add.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./rm.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./diff.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./blame.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./branch.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./tag.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./ref.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./commit.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./revert.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./cherrypick.sh -q -r "$(GOT_TEST_ROOT)";		\
+	./backout.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./rebase.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./import.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./histedit.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./integrate.sh -q -r "$(GOT_TEST_ROOT)";		\
+	./merge.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./stage.sh -q -r "$(GOT_TEST_ROOT)";			\
+	./unstage.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./cat.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./clone.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./fetch.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./send.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./tree.sh -q -r "$(GOT_TEST_ROOT)"; 			\
 	./patch.sh -q -r "$(GOT_TEST_ROOT)" 			\
-	./pack.sh -r "$(GOT_TEST_ROOT)"; 			\
-	./cleanup.sh -r "$(GOT_TEST_ROOT)")
+	./pack.sh -q -r "$(GOT_TEST_ROOT)"; 			\
+	./cleanup.sh -q -r "$(GOT_TEST_ROOT)")
 
 regress-delta:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
