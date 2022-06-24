@@ -6,6 +6,7 @@
 #include <sys/uio.h>
 #if defined(__FreeBSD__)
 #include <sys/endian.h>
+#include <sys/capsicum.h>
 #elif defined(__APPLE__)
 #include <machine/endian.h>
 #include <libkern/OSByteOrder.h>
@@ -69,9 +70,7 @@
 #define unveil(s, p) (0)
 #endif
 
-#ifdef __FreeBSD__
-#include <sys/capsicum.h>
-#else
+#ifndef __FreeBSD__
 #define cap_enter() (0)
 #endif
 
