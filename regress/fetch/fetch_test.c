@@ -45,7 +45,7 @@
 static int verbose;
 static int quiet;
 
-void
+static void
 test_printf(char *fmt, ...)
 {
 	va_list ap;
@@ -248,7 +248,7 @@ fetch_parse_uri(void)
 	if (!quiet) printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
-void
+static void
 usage(void)
 {
 	fprintf(stderr, "usage: fetch_test [-v] [-q]\n");

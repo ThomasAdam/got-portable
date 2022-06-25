@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_lib_pkt.h"
 
 const struct got_error *
 got_pkt_readn(ssize_t *off, int fd, void *buf, size_t n)

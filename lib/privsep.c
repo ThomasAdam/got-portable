@@ -48,6 +48,8 @@
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
+#include "got_privsep.h"
+
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif

@@ -70,6 +70,7 @@ struct sym {
 };
 
 int	 symset(const char *, const char *, int);
+int	 cmdline_symset(char *);
 char	*symget(const char *);
 
 const struct got_error* gerror = NULL;

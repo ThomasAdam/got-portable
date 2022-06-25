@@ -405,7 +405,7 @@ usage_import(void)
 	exit(1);
 }
 
-int
+static int
 spawn_editor(const char *editor, const char *file)
 {
 	pid_t pid;
@@ -3118,7 +3118,7 @@ struct got_update_progress_arg {
 	int verbosity;
 };
 
-void
+static void
 print_update_progress_stats(struct got_update_progress_arg *upa)
 {
 	if (!upa->did_something)
@@ -3141,7 +3141,7 @@ print_update_progress_stats(struct got_update_progress_arg *upa)
  * if the work tree was updated. This function should be used by any operation
  * which merges changes into the work tree without updating the work tree.
  */
-void
+static void
 print_merge_progress_stats(struct got_update_progress_arg *upa)
 {
 	if (!upa->did_something)
@@ -9154,7 +9154,7 @@ usage_rebase(void)
 	exit(1);
 }
 
-void
+static void
 trim_logmsg(char *logmsg, int limit)
 {
 	char *nl;
@@ -10697,7 +10697,7 @@ done:
 	return err;
 }
 
-void
+static void
 histedit_free_list(struct got_histedit_list *histedit_cmds)
 {
 	struct got_histedit_list_entry *hle;

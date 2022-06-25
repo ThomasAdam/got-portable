@@ -43,6 +43,8 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_lockfile.h"
 
+#include "got_lib_object_create.h"
+
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif

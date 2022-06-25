@@ -224,7 +224,7 @@ free_colors(struct tog_colors *colors)
 	}
 }
 
-struct tog_color *
+static struct tog_color *
 get_color(struct tog_colors *colors, int colorpair)
 {
 	struct tog_color *tc = NULL;
@@ -1069,7 +1069,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	return err;
 }
 
-void
+static void
 view_vborder(struct tog_view *view)
 {
 	PANEL *panel;
@@ -1087,7 +1087,7 @@ view_vborder(struct tog_view *view)
 	    got_locale_is_utf8() ? ACS_VLINE : '|', view->nlines);
 }
 
-int
+static int
 view_needs_focus_indication(struct tog_view *view)
 {
 	if (view_is_parent_view(view)) {
@@ -3178,7 +3178,7 @@ match_line(const char *line, regex_t *regex, size_t nmatch,
 	return regexec(regex, line, nmatch, regmatch, 0) == 0;
 }
 
-struct tog_color *
+static struct tog_color *
 match_color(struct tog_colors *colors, const char *line)
 {
 	struct tog_color *tc = NULL;
@@ -6407,7 +6407,7 @@ ref_view_load_refs(struct tog_ref_view_state *s)
 	return NULL;
 }
 
-void
+static void
 ref_view_free_refs(struct tog_ref_view_state *s)
 {
 	struct tog_reflist_entry *re;

@@ -83,7 +83,7 @@ got_object_cache_init(struct got_object_cache *cache,
 	return NULL;
 }
 
-size_t
+static size_t
 get_size_obj(struct got_object *obj)
 {
 	size_t size = sizeof(*obj);
@@ -101,7 +101,7 @@ get_size_obj(struct got_object *obj)
 	return size;
 }
 
-size_t
+static size_t
 get_size_tree(struct got_tree_object *tree)
 {
 	size_t size = sizeof(*tree);
@@ -110,7 +110,7 @@ get_size_tree(struct got_tree_object *tree)
 	return size;
 }
 
-size_t
+static size_t
 get_size_commit(struct got_commit_object *commit)
 {
 	size_t size = sizeof(*commit);
@@ -127,7 +127,7 @@ get_size_commit(struct got_commit_object *commit)
 	return size;
 }
 
-size_t
+static size_t
 get_size_tag(struct got_tag_object *tag)
 {
 	size_t size = sizeof(*tag);
@@ -139,7 +139,7 @@ get_size_tag(struct got_tag_object *tag)
 	return size;
 }
 
-size_t
+static size_t
 get_size_raw(struct got_raw_object *raw)
 {
 	return sizeof(*raw);

@@ -1070,7 +1070,7 @@ request_tree(struct got_tree_object **tree, struct got_repository *repo,
 	return got_privsep_recv_tree(tree, ibuf);
 }
 
-const struct got_error *
+static const struct got_error *
 read_tree_privsep(struct got_tree_object **tree, int obj_fd,
     struct got_object_id *id, struct got_repository *repo)
 {
