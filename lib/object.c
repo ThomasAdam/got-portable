@@ -21,7 +21,6 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <sys/resource.h>
 #include <sys/mman.h>
 
 #include <errno.h>
@@ -246,80 +245,6 @@ request_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	return NULL;
 }
 
-static void
-set_max_datasize(void)
-{
-	struct rlimit rl;
-
-	if (getrlimit(RLIMIT_DATA, &rl) != 0)
-		return;
-
-	rl.rlim_cur = rl.rlim_max;
-	setrlimit(RLIMIT_DATA, &rl);
-}
-
-static const struct got_error *
-start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
-{
-	const struct got_error *err = NULL;
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno("calloc");
-
-	pack->privsep_child = calloc(1, sizeof(*pack->privsep_child));
-	if (pack->privsep_child == NULL) {
-		err = got_error_from_errno("calloc");
-		free(ibuf);
-		return err;
-	}
-	pack->child_has_tempfiles = 0;
-	pack->child_has_delta_outfd = 0;
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
-		err = got_error_from_errno("socketpair");
-		goto done;
-	}
-
-	pid = fork();
-	if (pid == -1) {
-		err = got_error_from_errno("fork");
-		goto done;
-	} else if (pid == 0) {
-		set_max_datasize();
-		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
-		    pack->path_packfile);
-		/* not reached */
-	}
-
-	if (close(imsg_fds[1]) == -1)
-		return got_error_from_errno("close");
-	pack->privsep_child->imsg_fd = imsg_fds[0];
-	pack->privsep_child->pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	pack->privsep_child->ibuf = ibuf;
-
-	err = got_privsep_init_pack_child(ibuf, pack, packidx);
-	if (err) {
-		const struct got_error *child_err;
-		err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
-		child_err = got_privsep_wait_for_child(
-		    pack->privsep_child->pid);
-		if (child_err && err == NULL)
-			err = child_err;
-	}
-done:
-	if (err) {
-		free(ibuf);
-		free(pack->privsep_child);
-		pack->privsep_child = NULL;
-	}
-	return err;
-}
-
 static const struct got_error *
 read_packed_object_privsep(struct got_object **obj,
     struct got_repository *repo, struct got_pack *pack,
@@ -328,7 +253,7 @@ read_packed_object_privsep(struct got_object **obj,
 	const struct got_error *err = NULL;
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			return err;
 	}
@@ -344,7 +269,7 @@ read_packed_object_raw_privsep(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	const struct got_error *err = NULL;
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			return err;
 	}
@@ -427,7 +352,7 @@ got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	}
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			return err;
 	}
@@ -452,55 +377,6 @@ got_object_read_raw_delta(uint64_t *base_size, uint64_t *result_size,
 	return got_privsep_recv_raw_delta(base_size, result_size, delta_size,
 	    delta_compressed_size, delta_offset, delta_out_offset, base_id,
 	    pack->privsep_child->ibuf);
-}
-
-/*
- * XXX This function does not really belong in object.c. It is only here
- * because it needs start_pack_privsep_child(); relevant code should
- * probably be moved to pack.c/pack_create.c.
- */
-const struct got_error *
-got_object_prepare_delta_reuse(struct got_pack **pack,
-    struct got_packidx *packidx, int delta_outfd, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	char *path_packfile = NULL;
-
-	err = got_packidx_get_packfile_path(&path_packfile,
-	    packidx->path_packidx);
-	if (err)
-		return err;
-
-	*pack = got_repo_get_cached_pack(repo, path_packfile);
-	if (*pack == NULL) {
-		err = got_repo_cache_pack(pack, repo, path_packfile, packidx);
-		if (err)
-			goto done;
-	}
-	if ((*pack)->privsep_child == NULL) {
-		err = start_pack_privsep_child(*pack, packidx);
-		if (err)
-			goto done;
-	}
-
-	if (!(*pack)->child_has_delta_outfd) {
-		int outfd_child;
-		outfd_child = dup(delta_outfd);
-		if (outfd_child == -1) {
-			err = got_error_from_errno("dup");
-			goto done;
-		}
-		err = got_privsep_send_raw_delta_outfd(
-		    (*pack)->privsep_child->ibuf, outfd_child);
-		if (err)
-			goto done;
-		(*pack)->child_has_delta_outfd = 1;
-	}
-
-	err = got_privsep_send_delta_reuse_req((*pack)->privsep_child->ibuf);
-done:
-	free(path_packfile);
-	return err;
 }
 
 static const struct got_error *
@@ -842,7 +718,7 @@ read_packed_commit_privsep(struct got_commit_object **commit,
 	if (pack->privsep_child)
 		return request_packed_commit(commit, pack, idx, id);
 
-	err = start_pack_privsep_child(pack, packidx);
+	err = got_pack_start_privsep_child(pack, packidx);
 	if (err)
 		return err;
 
@@ -1047,7 +923,7 @@ read_packed_tree_privsep(struct got_tree_object **tree,
 	if (pack->privsep_child)
 		return request_packed_tree(tree, pack, idx, id);
 
-	err = start_pack_privsep_child(pack, packidx);
+	err = got_pack_start_privsep_child(pack, packidx);
 	if (err)
 		return err;
 
@@ -1370,7 +1246,7 @@ read_packed_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 	const struct got_error *err = NULL;
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			return err;
 	}
@@ -1746,7 +1622,7 @@ read_packed_tag_privsep(struct got_tag_object **tag,
 	if (pack->privsep_child)
 		return request_packed_tag(tag, pack, idx, id);
 
-	err = start_pack_privsep_child(pack, packidx);
+	err = got_pack_start_privsep_child(pack, packidx);
 	if (err)
 		return err;
 
@@ -2370,7 +2246,7 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 	}
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			goto done;
 	}
@@ -2426,7 +2302,7 @@ got_object_enumerate(int *found_all_objects,
 	}
 
 	if (pack->privsep_child == NULL) {
-		err = start_pack_privsep_child(pack, packidx);
+		err = got_pack_start_privsep_child(pack, packidx);
 		if (err)
 			goto done;
 	}
