@@ -428,6 +428,8 @@ test_commit_path_prefix() {
 	fi
 
 	echo "diff $commit1 $commit2" > $testroot/stdout.expected
+	echo "commit - $commit1" >> $testroot/stdout.expected
+	echo "commit + $commit2" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit1 -i gamma | grep 'delta$' \
 		| cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -470,6 +472,8 @@ test_commit_path_prefix() {
 	fi
 
 	echo "diff $commit2 $commit3" > $testroot/stdout.expected
+	echo "commit - $commit2" >> $testroot/stdout.expected
+	echo "commit + $commit3" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit2 -i gamma | grep 'delta$' \
 		| cut -d' ' -f 1 | sed -e 's/$/ (mode 644)/' \

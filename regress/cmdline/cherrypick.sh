@@ -1372,7 +1372,7 @@ EOF
  
 EOF
 	(cd $testroot/wt && got diff |
-		egrep -v '^(diff|blob|file)' > $testroot/diff)
+		egrep -v '^(diff|blob|file|commit|path)' > $testroot/diff)
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then

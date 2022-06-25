@@ -336,8 +336,9 @@ EOF
 
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt (staged changes)" \
-		> $testroot/stdout.expected
+	echo "diff -s $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -371,7 +372,9 @@ EOF
 	fi
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
-	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1  | \
 		tr -d '\n' >> $testroot/stdout.expected
@@ -478,8 +481,9 @@ EOF
 
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt (staged changes)" \
-		> $testroot/stdout.expected
+	echo "diff -s $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -513,7 +517,9 @@ EOF
 	fi
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
-	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
 		tr -d '\n' >> $testroot/stdout.expected
@@ -627,7 +633,9 @@ EOF
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -718,7 +726,9 @@ test_unstage_patch_added() {
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + epsilon/new' >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
@@ -784,8 +794,9 @@ test_unstage_patch_removed() {
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt" \
-		> $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -885,7 +896,9 @@ EOF
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
 		tr -d '\n' >> $testroot/stdout.expected
@@ -909,8 +922,9 @@ EOF
 	fi
 
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
-	echo "diff $commit_id $testroot/wt (staged changes)" \
-		> $testroot/stdout.expected
+	echo "diff -s $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
+	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \

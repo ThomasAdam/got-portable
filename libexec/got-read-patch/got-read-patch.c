@@ -191,6 +191,9 @@ find_patch(int *done, FILE *fp)
 		} else if (!git && !strncmp(line, "diff ", 5)) {
 			free(commitid);
 			err = blobid(line + 5, &commitid);
+		} else if (!git && !strncmp(line, "commit - ", 9)) {
+			free(commitid);
+			err = blobid(line + 9, &commitid);
 		}
 
 		if (err)

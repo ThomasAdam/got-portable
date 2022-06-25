@@ -352,6 +352,8 @@ test_log_patch_added_file() {
 	local commit_id1=`git_show_head $testroot/repo`
 
 	echo "commit $commit_id1 (master)" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	# This used to fail with 'got: no such entry found in tree'
 	(cd $testroot/wt && got log -l1 -p new > $testroot/stdout.patch)
 	ret=$?

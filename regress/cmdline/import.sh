@@ -65,7 +65,9 @@ test_import_basic() {
 	echo " " >> $testroot/stdout.expected
 	echo " init" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
-	echo "diff /dev/null $tree_id" >> $testroot/stdout.expected
+	echo "diff /dev/null $head_commit" >> $testroot/stdout.expected
+	echo "commit - /dev/null" >> $testroot/stdout.expected
+	echo "commit + $head_commit" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
 	echo "blob + $id_alpha (mode 644)" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected

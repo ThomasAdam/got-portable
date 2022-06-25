@@ -3704,29 +3704,25 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		    &qid->id);
 		if (err)
 			return err;
+		err = got_object_id_str(&id_str1, &qid->id);
+		if (err)
+			goto done;
 	}
+
+	err = got_object_id_str(&id_str2, id);
+	if (err)
+		goto done;
 
 	if (path && path[0] != '\0') {
 		int obj_type;
 		err = got_object_id_by_path(&obj_id2, repo, commit, path);
 		if (err)
 			goto done;
-		err = got_object_id_str(&id_str2, obj_id2);
-		if (err) {
-			free(obj_id2);
-			goto done;
-		}
 		if (pcommit) {
 			err = got_object_id_by_path(&obj_id1, repo,
 			    pcommit, path);
 			if (err) {
 				if (err->code != GOT_ERR_NO_TREE_ENTRY) {
-					free(obj_id2);
-					goto done;
-				}
-			} else {
-				err = got_object_id_str(&id_str1, obj_id1);
-				if (err) {
 					free(obj_id2);
 					goto done;
 				}
@@ -3739,6 +3735,9 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		}
 		fprintf(outfile,
 		    "diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+		fprintf(outfile, "commit - %s\n",
+		    id_str1 ? id_str1 : "/dev/null");
+		fprintf(outfile, "commit + %s\n", id_str2);
 		switch (obj_type) {
 		case GOT_OBJ_TYPE_BLOB:
 			err = diff_blobs(obj_id1, obj_id2, path, diff_context,
@@ -3756,17 +3755,13 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		free(obj_id2);
 	} else {
 		obj_id2 = got_object_commit_get_tree_id(commit);
-		err = got_object_id_str(&id_str2, obj_id2);
-		if (err)
-			goto done;
-		if (pcommit) {
+		if (pcommit)
 			obj_id1 = got_object_commit_get_tree_id(pcommit);
-			err = got_object_id_str(&id_str1, obj_id1);
-			if (err)
-				goto done;
-		}
 		fprintf(outfile,
 		    "diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+		fprintf(outfile, "commit - %s\n",
+		    id_str1 ? id_str1 : "/dev/null");
+		fprintf(outfile, "commit + %s\n", id_str2);
 		err = diff_trees(obj_id1, obj_id2, "", diff_context, 0, 0,
 		    repo, outfile);
 	}
@@ -4648,7 +4643,10 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	if (!a->header_shown) {
-		printf("diff %s %s%s\n", a->id_str,
+		printf("diff %s%s\n", a->diff_staged ? "-s " : "",
+		    got_worktree_get_root_path(a->worktree));
+		printf("commit - %s\n", a->id_str);
+		printf("path + %s%s\n",
 		    got_worktree_get_root_path(a->worktree),
 		    a->diff_staged ? " (staged changes)" : "");
 		a->header_shown = 1;
