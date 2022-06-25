@@ -32,7 +32,9 @@ test_diff_basic() {
 	echo "new file" > $testroot/wt/new
 	(cd $testroot/wt && got add new >/dev/null)
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -115,7 +117,9 @@ test_diff_basic() {
 	echo "modified zeta" > $testroot/wt/epsilon/zeta
 
 	# diff several paths in a work tree
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -205,6 +209,8 @@ test_diff_basic() {
 		return 1
 	fi
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "commit + $head_rev" >> $testroot/stdout.expected
 	# diff between the branches is empty
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -222,6 +228,8 @@ test_diff_basic() {
 		return 1
 	fi
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "commit + $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -238,6 +246,8 @@ test_diff_basic() {
 		return 1
 	fi
 	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "commit + $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -254,7 +264,9 @@ test_diff_basic() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + master' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -294,7 +306,9 @@ test_diff_basic() {
 	fi
 
 	# a single argument which can be resolved to a path is not ambiguous
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -346,7 +360,9 @@ test_diff_basic() {
 		return 1
 	fi
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -419,7 +435,9 @@ test_diff_shows_conflict() {
 		return 1
 	fi
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'numbers$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -482,6 +500,8 @@ test_diff_tag() {
 	(cd $testroot/repo && git tag -m "test" $tag2)
 
 	echo "diff $commit_id0 refs/tags/$tag1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -504,6 +524,8 @@ test_diff_tag() {
 	fi
 
 	echo "diff refs/tags/$tag1 refs/tags/$tag2" > $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
+	echo "commit + $commit_id2" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id2 | grep 'new$' | \
@@ -543,6 +565,8 @@ test_diff_lightweight_tag() {
 	(cd $testroot/repo && git tag $tag2)
 
 	echo "diff $commit_id0 refs/tags/$tag1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -565,6 +589,8 @@ test_diff_lightweight_tag() {
 	fi
 
 	echo "diff refs/tags/$tag1 refs/tags/$tag2" > $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
+	echo "commit + $commit_id2" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id2 | grep 'new$' | \
@@ -599,7 +625,9 @@ test_diff_ignore_whitespace() {
 
 	(cd $testroot/wt && got diff -w > $testroot/stdout)
 
-	echo "diff $commit_id0 $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -675,7 +703,9 @@ test_diff_symlinks_in_work_tree() {
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	echo "diff $commit_id1 $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'alpha.link@ -> alpha$' | \
@@ -776,6 +806,8 @@ test_diff_symlinks_in_repo() {
 	got diff -r $testroot/repo $commit_id1 $commit_id2 > $testroot/stdout
 
 	echo "diff $commit_id1 $commit_id2" > $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
+	echo "commit + $commit_id2" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'alpha.link@ -> alpha$' | \
@@ -881,7 +913,9 @@ test_diff_binary_files() {
 	printf '\377\377\0\0\377\377\0\0' > $testroot/wt/foo
 	(cd $testroot/wt && got add foo >/dev/null)
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
 	echo "Binary files /dev/null and foo differ" \
@@ -896,7 +930,9 @@ test_diff_binary_files() {
 		return 1
 	fi
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -919,7 +955,9 @@ test_diff_binary_files() {
 
 	printf '\377\200\0\0\377\200\0\0' > $testroot/wt/foo
 
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo "diff $testroot/wt" > $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'foo$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -965,6 +1003,8 @@ test_diff_commits() {
 	new_id1=`get_blob_id $testroot/repo "" new`
 
 	echo "diff $commit_id0 refs/heads/master" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo "blob - $alpha_id0" >> $testroot/stdout.expected
 	echo "blob + $alpha_id1" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
@@ -1007,6 +1047,8 @@ test_diff_commits() {
 
 	# same diff with commit object IDs
 	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo "blob - $alpha_id0" >> $testroot/stdout.expected
 	echo "blob + $alpha_id1" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
@@ -1038,6 +1080,8 @@ test_diff_commits() {
 
 	# same diff, filtered by paths
 	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo "blob - $alpha_id0" >> $testroot/stdout.expected
 	echo "blob + $alpha_id1" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
@@ -1066,6 +1110,8 @@ test_diff_commits() {
 	fi
 
 	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
 	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
 	echo 'blob + /dev/null' >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected

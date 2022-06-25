@@ -875,8 +875,34 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
+static const struct got_error *
+show_object_id(off_t **line_offsets, size_t *nlines, const char *obj_typestr,
+    int ch, const char *id_str, FILE *outfile)
+{
+	const struct got_error *err;
+	int n;
+	off_t outoff = 0;
+
+	n = fprintf(outfile, "%s %c %s\n", obj_typestr, ch, id_str);
+	if (line_offsets != NULL && *line_offsets != NULL) {
+		if (*nlines == 0) {
+			err = add_line_offset(line_offsets, nlines, 0);
+			if (err)
+				return err;
+		} else
+			outoff = (*line_offsets)[*nlines - 1];
+
+		outoff += n;
+		err = add_line_offset(line_offsets, nlines, outoff);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
     FILE *f1, FILE *f2, struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths,
     char *label1, char *label2, int diff_context, int ignore_whitespace,
@@ -932,6 +958,61 @@ done:
 }
 
 const struct got_error *
+got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
+    FILE *f1, FILE *f2, struct got_object_id *id1, struct got_object_id *id2,
+    struct got_pathlist_head *paths,
+    char *label1, char *label2, int diff_context, int ignore_whitespace,
+    int force_text_diff, struct got_repository *repo, FILE *outfile)
+{
+	const struct got_error *err;
+	char *idstr = NULL;
+
+	if (id1 == NULL && id2 == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	if (id1) {
+		err = got_object_id_str(&idstr, id1);
+		if (err)
+			goto done;
+		err = show_object_id(line_offsets, nlines, "tree", '-',
+		    idstr, outfile);
+		if (err)
+			goto done;
+		free(idstr);
+		idstr = NULL;
+	} else {
+		err = show_object_id(line_offsets, nlines, "tree", '-',
+		    "/dev/null", outfile);
+		if (err)
+			goto done;
+	}
+
+	if (id2) {
+		err = got_object_id_str(&idstr, id2);
+		if (err)
+			goto done;
+		err = show_object_id(line_offsets, nlines, "tree", '+',
+		    idstr, outfile);
+		if (err)
+			goto done;
+		free(idstr);
+		idstr = NULL;
+	} else {
+		err = show_object_id(line_offsets, nlines, "tree", '+',
+		    "/dev/null", outfile);
+		if (err)
+			goto done;
+	}
+
+	err = diff_objects_as_trees(line_offsets, nlines, f1, f2, id1, id2,
+	    paths, label1, label2, diff_context, ignore_whitespace,
+	    force_text_diff, repo, outfile);
+done:
+	free(idstr);
+	return err;
+}
+
+const struct got_error *
 got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
     FILE *f1, FILE *f2, struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths,
@@ -940,6 +1021,7 @@ got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
 {
 	const struct got_error *err;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
+	char *idstr = NULL;
 
 	if (id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
@@ -948,13 +1030,35 @@ got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
 		err = got_object_open_as_commit(&commit1, repo, id1);
 		if (err)
 			goto done;
+		err = got_object_id_str(&idstr, id1);
+		if (err)
+			goto done;
+		err = show_object_id(line_offsets, nlines, "commit", '-',
+		    idstr, outfile);
+		if (err)
+			goto done;
+		free(idstr);
+		idstr = NULL;
+	} else {
+		err = show_object_id(line_offsets, nlines, "commit", '-',
+		    "/dev/null", outfile);
+		if (err)
+			goto done;
 	}
 
 	err = got_object_open_as_commit(&commit2, repo, id2);
 	if (err)
 		goto done;
 
-	err = got_diff_objects_as_trees(line_offsets, nlines, f1, f2,
+	err = got_object_id_str(&idstr, id2);
+	if (err)
+		goto done;
+	err = show_object_id(line_offsets, nlines, "commit", '+',
+	    idstr, outfile);
+	if (err)
+		goto done;
+
+	err = diff_objects_as_trees(line_offsets, nlines, f1, f2,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
 	    got_object_commit_get_tree_id(commit2), paths, "", "",
 	    diff_context, ignore_whitespace, force_text_diff, repo, outfile);
@@ -963,6 +1067,7 @@ done:
 		got_object_commit_close(commit1);
 	if (commit2)
 		got_object_commit_close(commit2);
+	free(idstr);
 	return err;
 }
 
