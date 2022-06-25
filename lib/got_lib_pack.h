@@ -30,6 +30,8 @@ struct got_pack {
 
 struct got_packidx;
 
+const struct got_error *got_pack_start_privsep_child(struct got_pack *,
+    struct got_packidx *);
 const struct got_error *got_pack_close(struct got_pack *);
 
 const struct got_error *got_pack_parse_offset_delta(off_t *, size_t *,

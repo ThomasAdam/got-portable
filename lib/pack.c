@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
 
 #include <fcntl.h>
 #include <errno.h>
@@ -705,6 +707,80 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 
 	if (err)
 		got_object_id_queue_free(matched_ids);
+	return err;
+}
+
+static void
+set_max_datasize(void)
+{
+	struct rlimit rl;
+
+	if (getrlimit(RLIMIT_DATA, &rl) != 0)
+		return;
+
+	rl.rlim_cur = rl.rlim_max;
+	setrlimit(RLIMIT_DATA, &rl);
+}
+
+const struct got_error *
+got_pack_start_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
+{
+	const struct got_error *err = NULL;
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno("calloc");
+
+	pack->privsep_child = calloc(1, sizeof(*pack->privsep_child));
+	if (pack->privsep_child == NULL) {
+		err = got_error_from_errno("calloc");
+		free(ibuf);
+		return err;
+	}
+	pack->child_has_tempfiles = 0;
+	pack->child_has_delta_outfd = 0;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
+		err = got_error_from_errno("socketpair");
+		goto done;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno("fork");
+		goto done;
+	} else if (pid == 0) {
+		set_max_datasize();
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
+		    pack->path_packfile);
+		/* not reached */
+	}
+
+	if (close(imsg_fds[1]) == -1)
+		return got_error_from_errno("close");
+	pack->privsep_child->imsg_fd = imsg_fds[0];
+	pack->privsep_child->pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	pack->privsep_child->ibuf = ibuf;
+
+	err = got_privsep_init_pack_child(ibuf, pack, packidx);
+	if (err) {
+		const struct got_error *child_err;
+		err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
+		child_err = got_privsep_wait_for_child(
+		    pack->privsep_child->pid);
+		if (child_err && err == NULL)
+			err = child_err;
+	}
+done:
+	if (err) {
+		free(ibuf);
+		free(pack->privsep_child);
+		pack->privsep_child = NULL;
+	}
 	return err;
 }
 
