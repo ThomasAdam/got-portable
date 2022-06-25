@@ -32,6 +32,7 @@
 #include "got_compat.h"
 
 #include "got_lib_dial.h"
+#include "got_dial.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof((_a)) / sizeof((_a)[0]))

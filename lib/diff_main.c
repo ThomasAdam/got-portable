@@ -351,7 +351,7 @@ diff_state_add_chunk(struct diff_state *state, bool solved,
 	return diff_state_add_solved_chunk(state, &chunk);
 }
 
-void
+static void
 diff_data_init_root(struct diff_data *d, FILE *f, const uint8_t *data,
     unsigned long long len, int diff_flags)
 {
@@ -502,7 +502,7 @@ diff_algo_none(const struct diff_algo_config *algo_config,
 	return DIFF_RC_OK;
 }
 
-int
+static int
 diff_run_algo(const struct diff_algo_config *algo_config,
 	      struct diff_state *state)
 {

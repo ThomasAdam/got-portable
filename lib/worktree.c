@@ -3347,7 +3347,7 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	    ie->path, &blob_id, NULL, &commit_id, -1, NULL);
 }
 
-void
+static void
 free_ignorelist(struct got_pathlist_head *ignorelist)
 {
 	struct got_pathlist_entry *pe;
@@ -3357,7 +3357,7 @@ free_ignorelist(struct got_pathlist_head *ignorelist)
 	got_pathlist_free(ignorelist);
 }
 
-void
+static void
 free_ignores(struct got_pathlist_head *ignores)
 {
 	struct got_pathlist_entry *pe;
@@ -3426,7 +3426,7 @@ done:
 	return err;
 }
 
-int
+static int
 match_ignores(struct got_pathlist_head *ignores, const char *path)
 {
 	struct got_pathlist_entry *pe;
@@ -5593,7 +5593,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 commit_worktree(struct got_object_id **new_commit_id,
     struct got_pathlist_head *commitable_paths,
     struct got_object_id *head_commit_id,
@@ -6634,7 +6634,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 create_backup_ref(const char *backup_ref_prefix, struct got_reference *branch,
     struct got_object_id *new_commit_id, struct got_repository *repo)
 {
@@ -7915,7 +7915,7 @@ struct check_stage_ok_arg {
 	int have_changes;
 };
 
-const struct got_error *
+static const struct got_error *
 check_stage_ok(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,

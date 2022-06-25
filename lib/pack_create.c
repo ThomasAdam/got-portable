@@ -1783,7 +1783,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 hwrite(FILE *f, void *buf, off_t len, SHA1_CTX *ctx)
 {
 	size_t n;
@@ -1795,7 +1795,7 @@ hwrite(FILE *f, void *buf, off_t len, SHA1_CTX *ctx)
 	return NULL;
 }
 
-const struct got_error *
+static const struct got_error *
 hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
 {
 	unsigned char buf[65536];
@@ -1817,7 +1817,7 @@ hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
 	return NULL;
 }
 
-const struct got_error *
+static const struct got_error *
 hcopy_mmap(uint8_t *src, off_t src_offset, size_t src_size,
     FILE *fdst, off_t len, SHA1_CTX *ctx)
 {

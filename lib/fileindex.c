@@ -977,7 +977,7 @@ read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 	return err;
 }
 
-void
+static void
 free_dirlist(struct got_pathlist_head *dirlist)
 {
 	struct got_pathlist_entry *dle;

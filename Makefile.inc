@@ -10,7 +10,8 @@ BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${PREFIX}/libexec
 MANDIR ?= ${PREFIX}/man/man
 .else
-CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
+CFLAGS += -Werror -Wall -Wstrict-prototypes -Wmissing-prototypes
+CFLAGS += -Wunused-variable
 PREFIX ?= ${HOME}
 BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${BINDIR}

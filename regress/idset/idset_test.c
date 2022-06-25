@@ -36,19 +36,6 @@
 static int verbose;
 static int quiet;
 
-void
-test_printf(char *fmt, ...)
-{
-	va_list ap;
-
-	if (!verbose)
-		return;
-
-	va_start(ap, fmt);
-	vprintf(fmt, ap);
-	va_end(ap);
-}
-
 static const char *id_str1 = "1111111111111111111111111111111111111111";
 static const char *id_str2 = "2222222222222222222222222222222222222222";
 static const char *id_str3 = "ffffffffffffffffffffffffffffffffffffffff";
@@ -171,7 +158,7 @@ done:
 	if (!quiet) printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
-void
+static void
 usage(void)
 {
 	fprintf(stderr, "usage: id_test [-v] [-q]\n");

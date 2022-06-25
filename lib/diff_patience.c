@@ -186,7 +186,7 @@ diff_atoms_mark_unique_in_both(struct diff_data *left, struct diff_data *right,
 
 /* Use an optimized sorting algorithm (qsort, mergesort) to find unique lines */
 
-int diff_atoms_compar(const void *_a, const void *_b)
+static int diff_atoms_compar(const void *_a, const void *_b)
 {
 	const struct diff_atom *a = *(struct diff_atom**)_a;
 	const struct diff_atom *b = *(struct diff_atom**)_b;

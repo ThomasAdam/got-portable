@@ -149,12 +149,6 @@ got_path_is_root_dir(const char *path)
 }
 
 int
-got_path_is_current_dir(const char *path)
-{
-	return (path[0] == '.' && path[1] == '\0');
-}
-
-int
 got_path_is_child(const char *child, const char *parent, size_t parent_len)
 {
 	if (parent_len == 0 || got_path_is_root_dir(parent))

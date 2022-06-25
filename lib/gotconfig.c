@@ -37,6 +37,8 @@
 #include "got_lib_privsep.h"
 #include "got_lib_gotconfig.h"
 
+#include "got_gotconfig.h"
+
 const struct got_error *
 got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 {

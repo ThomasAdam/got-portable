@@ -74,6 +74,7 @@ struct sym {
 };
 
 int	 symset(const char *, const char *, int);
+int	 cmdline_symset(char *);
 char	*symget(const char *);
 
 static int	 atoul(char *, u_long *);
