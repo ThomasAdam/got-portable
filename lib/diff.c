@@ -62,7 +62,7 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 	const struct got_error *err = NULL, *free_err;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
-	char *idstr1 = NULL, *idstr2 = NULL;
+	const char *idstr1 = NULL, *idstr2 = NULL;
 	off_t size1, size2;
 	struct got_diffreg_result *result;
 	off_t outoff = 0;
@@ -220,7 +220,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 {
 	const struct got_error *err = NULL, *free_err;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
-	char *idstr1 = NULL;
+	const char *idstr1 = NULL;
 	struct got_diffreg_result *result = NULL;
 
 	if (resultp)
@@ -904,9 +904,9 @@ show_object_id(off_t **line_offsets, size_t *nlines, const char *obj_typestr,
 static const struct got_error *
 diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
     FILE *f1, FILE *f2, struct got_object_id *id1, struct got_object_id *id2,
-    struct got_pathlist_head *paths,
-    char *label1, char *label2, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo, FILE *outfile)
+    struct got_pathlist_head *paths, const char *label1, const char *label2,
+    int diff_context, int ignore_whitespace, int force_text_diff,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -960,9 +960,9 @@ done:
 const struct got_error *
 got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
     FILE *f1, FILE *f2, struct got_object_id *id1, struct got_object_id *id2,
-    struct got_pathlist_head *paths,
-    char *label1, char *label2, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo, FILE *outfile)
+    struct got_pathlist_head *paths, const char *label1, const char *label2,
+    int diff_context, int ignore_whitespace, int force_text_diff,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	char *idstr = NULL;

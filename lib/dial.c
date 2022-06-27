@@ -67,7 +67,7 @@ got_dial_apply_unveil(const char *proto)
 }
 
 static int
-hassuffix(char *base, char *suf)
+hassuffix(const char *base, const char *suf)
 {
 	int nb, ns;
 
@@ -207,7 +207,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
-	char *argv[11];
+	const char *argv[11];
 	int i = 0, j;
 
 	*newpid = -1;
@@ -252,7 +252,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
 		if (n < 0 || n >= ssizeof(cmd))
 			err(1, "snprintf");
-		if (execv(GOT_DIAL_PATH_SSH, argv) == -1)
+		if (execv(GOT_DIAL_PATH_SSH, (char *const *)argv) == -1)
 			err(1, "execv");
 		abort(); /* not reached */
 	} else {

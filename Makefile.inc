@@ -11,7 +11,7 @@ LIBEXECDIR ?= ${PREFIX}/libexec
 MANDIR ?= ${PREFIX}/man/man
 .else
 CFLAGS += -Werror -Wall -Wstrict-prototypes -Wmissing-prototypes
-CFLAGS += -Wunused-variable
+CFLAGS += -Wwrite-strings -Wunused-variable
 PREFIX ?= ${HOME}
 BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${BINDIR}

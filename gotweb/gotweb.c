@@ -237,7 +237,7 @@ struct gw_query_action {
 	unsigned int		 func_id;
 	const char		*func_name;
 	const struct got_error	*(*func_main)(struct gw_trans *);
-	char			*template;
+	const char		*template;
 };
 
 enum gw_query_actions {
@@ -2716,11 +2716,11 @@ gw_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 {
 	struct tm tm;
 	time_t diff_time;
-	char *years = "years ago", *months = "months ago";
-	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
-	char *minutes = "minutes ago", *seconds = "seconds ago";
-	char *now = "right now";
-	char *s;
+	const char *years = "years ago", *months = "months ago";
+	const char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
+	const char *minutes = "minutes ago", *seconds = "seconds ago";
+	const char *now = "right now";
+	const char *s;
 	char datebuf[29];
 
 	*repo_age = NULL;
@@ -4763,7 +4763,7 @@ static const struct got_error *
 gw_colordiff_line(struct gw_trans *gw_trans, char *buf)
 {
 	const struct got_error *error = NULL;
-	char *color = NULL;
+	const char *color = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
 	if (strncmp(buf, "-", 1) == 0)

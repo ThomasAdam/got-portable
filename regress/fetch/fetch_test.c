@@ -46,7 +46,7 @@ static int verbose;
 static int quiet;
 
 static void
-test_printf(char *fmt, ...)
+test_printf(const char *fmt, ...)
 {
 	va_list ap;
 

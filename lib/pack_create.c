@@ -1829,7 +1829,7 @@ done:
 }
 
 static const struct got_error *
-hwrite(FILE *f, void *buf, off_t len, SHA1_CTX *ctx)
+hwrite(FILE *f, const void *buf, off_t len, SHA1_CTX *ctx)
 {
 	size_t n;
 
