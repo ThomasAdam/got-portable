@@ -130,7 +130,7 @@ filename(const char *at, char **name)
 }
 
 static const struct got_error *
-blobid(const char *line, char **blob)
+blobid(const char *line, char **blob, int git)
 {
 	uint8_t digest[SHA1_DIGEST_LENGTH];
 	size_t len;
@@ -141,7 +141,7 @@ blobid(const char *line, char **blob)
 	if ((*blob = strndup(line, len)) == NULL)
 		return got_error_from_errno("strndup");
 
-	if (!got_parse_sha1_digest(digest, *blob)) {
+	if (!git && !got_parse_sha1_digest(digest, *blob)) {
 		/* silently ignore invalid blob ids */
 		free(*blob);
 		*blob = NULL;
@@ -177,13 +177,16 @@ find_patch(int *done, FILE *fp)
 			err = filename(line+4, &new);
 		} else if (!git && !strncmp(line, "blob - ", 7)) {
 			free(blob);
-			err = blobid(line + 7, &blob);
+			err = blobid(line + 7, &blob, git);
 		} else if (rename && !strncmp(line, "rename to ", 10)) {
 			free(new);
 			err = filename(line + 10, &new);
 		} else if (git && !strncmp(line, "similarity index 100%", 21))
 			rename = 1;
-		else if (!strncmp(line, "diff --git a/", 13)) {
+		else if (git && !strncmp(line, "index ", 6)) {
+			free(blob);
+			err = blobid(line + 6, &blob, git);
+		} else if (!strncmp(line, "diff --git a/", 13)) {
 			git = 1;
 			free(commitid);
 			commitid = NULL;
@@ -191,10 +194,10 @@ find_patch(int *done, FILE *fp)
 			blob = NULL;
 		} else if (!git && !strncmp(line, "diff ", 5)) {
 			free(commitid);
-			err = blobid(line + 5, &commitid);
+			err = blobid(line + 5, &commitid, git);
 		} else if (!git && !strncmp(line, "commit - ", 9)) {
 			free(commitid);
-			err = blobid(line + 9, &commitid);
+			err = blobid(line + 9, &commitid, git);
 		}
 
 		if (err)

@@ -1507,6 +1507,62 @@ test_patch_merge_simple() {
 	test_done $testroot $ret
 }
 
+test_patch_merge_gitdiff() {
+	local testroot=`test_init patch_merge_gitdiff`
+
+	jot 10 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers && \
+		git_commit $testroot/repo -m "nums")
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed 's/4/four/g' > $testroot/repo/numbers
+	(cd $testroot/repo && git diff > $testroot/old.diff)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# restore numbers
+	jot 10 > $testroot/repo/numbers
+
+	jot 10 | sed 's/6/six/g' > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers && \
+		git_commit $testroot/repo -m "edit")
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# now work with got:
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch $testroot/old.diff) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'G  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
+	fi
+	test_done $testroot $ret
+}
+
 test_patch_merge_conflict() {
 	local testroot=`test_init patch_merge_conflict`
 
@@ -1665,6 +1721,35 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# try again with a git-style diff
+
+	cat <<EOF > $testroot/wt/patch
+diff --git a/alpha b/alpha
+index 0123456789ab..abcdef012345 100644
+--- a/alpha
++++ b/alpha
+@@ -1 +1 @@
+-alpha
++ALPHA
+EOF
+
+	(cd $testroot/wt && got revert alpha > /dev/null && got patch patch) \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done $testroot $ret
 }
@@ -1695,5 +1780,6 @@ run_test test_patch_with_path_prefix
 run_test test_patch_relpath_with_path_prefix
 run_test test_patch_reverse
 run_test test_patch_merge_simple
+run_test test_patch_merge_gitdiff
 run_test test_patch_merge_conflict
 run_test test_patch_merge_unknown_blob
