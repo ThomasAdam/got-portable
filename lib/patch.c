@@ -584,15 +584,25 @@ open_blob(char **path, FILE **fp, const char *blobid,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
-	struct got_object_id id;
+	struct got_object_id id, *idptr, *matched_id = NULL;
 
 	*fp = NULL;
 	*path = NULL;
 
-	if (!got_parse_sha1_digest(id.sha1, blobid))
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	if (strlen(blobid) != SHA1_DIGEST_STRING_LENGTH - 1) {
+		err = got_repo_match_object_id(&matched_id, NULL, blobid,
+		    GOT_OBJ_TYPE_BLOB, NULL /* do not resolve tags */,
+		    repo);
+		if (err)
+			return err;
+		idptr = matched_id;
+	} else {
+		if (!got_parse_sha1_digest(id.sha1, blobid))
+			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		idptr = &id;
+	}
 
-	err = got_object_open_as_blob(&blob, repo, &id, 8192);
+	err = got_object_open_as_blob(&blob, repo, idptr, 8192);
 	if (err)
 		goto done;
 
@@ -607,6 +617,8 @@ open_blob(char **path, FILE **fp, const char *blobid,
 done:
 	if (blob)
 		got_object_blob_close(blob);
+	if (matched_id != NULL)
+		free(matched_id);
 	if (err) {
 		if (*fp != NULL)
 			fclose(*fp);
@@ -645,7 +657,8 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		 * ignore failures to open this blob, we might have
 		 * parsed gibberish.
 		 */
-		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT))
+		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT) &&
+		    err->code != GOT_ERR_NO_OBJ)
 			return err;
 		else if (err == NULL)
 			do_merge = 1;
