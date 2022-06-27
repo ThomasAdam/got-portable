@@ -74,10 +74,11 @@ send_patch(const char *oldname, const char *newname, const char *commitid,
 	if (newname != NULL)
 		strlcpy(p.new, newname, sizeof(p.new));
 
-	if (commitid != NULL && blob != NULL) {
+	if (commitid != NULL)
 		strlcpy(p.cid, commitid, sizeof(p.cid));
+
+	if (blob != NULL)
 		strlcpy(p.blob, blob, sizeof(p.blob));
-	}
 
 	p.git = git;
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1, &p, sizeof(p)) == -1)

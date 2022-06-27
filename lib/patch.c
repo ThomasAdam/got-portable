@@ -192,10 +192,11 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 		goto done;
 	}
 
-	if (*patch.cid != '\0' && *patch.blob != '\0') {
+	if (*patch.cid != '\0')
 		strlcpy(p->cid, patch.cid, sizeof(p->cid));
+
+	if (*patch.blob != '\0')
 		strlcpy(p->blob, patch.blob, sizeof(p->blob));
-	}
 
 	/* automatically set strip=1 for git-style diffs */
 	if (strip == -1 && patch.git &&
@@ -689,6 +690,8 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		goto done;
 
 	if (do_merge) {
+		const char *type, *id;
+
 		if (fseeko(afile, 0, SEEK_SET) == -1 ||
 		    fseeko(oldfile, 0, SEEK_SET) == -1 ||
 		    fseeko(tmpfile, 0, SEEK_SET) == -1) {
@@ -708,7 +711,15 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			goto done;
 		}
 
-		if (asprintf(&anclabel, "commit %s", p->cid) == -1) {
+		if (*p->cid != '\0') {
+			type = "commit";
+			id = p->cid;
+		} else {
+			type = "blob";
+			id = p->blob;
+		}
+
+		if (asprintf(&anclabel, "%s %s", type, id) == -1) {
 			err = got_error_from_errno("asprintf");
 			anclabel = NULL;
 			goto done;
