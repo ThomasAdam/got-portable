@@ -459,10 +459,11 @@ const struct got_error *
 got_path_find_prog(char **filename, const char *prog)
 {
 	const struct got_error *err = NULL;
+	const char *path;
 	char *p;
 	int len;
 	struct stat sbuf;
-	char *path, *pathcpy;
+	char *pathcpy, *dup = NULL;
 
 	*filename = NULL;
 
@@ -481,19 +482,22 @@ got_path_find_prog(char **filename, const char *prog)
 		return NULL;
 	}
 
-	if ((path = strdup(path)) == NULL)
+	if ((dup = strdup(path)) == NULL)
 		return got_error_from_errno("strdup");
-	pathcpy = path;
+	pathcpy = dup;
 
 	while ((p = strsep(&pathcpy, ":")) != NULL) {
-		if (*p == '\0')
-			p = ".";
+		const char *d;
 
 		len = strlen(p);
 		while (len > 0 && p[len-1] == '/')
 			p[--len] = '\0';	/* strip trailing '/' */
 
-		if (asprintf(filename, "%s/%s", p, prog) == -1) {
+		d = p;
+		if (*d == '\0')
+			d = ".";
+
+		if (asprintf(filename, "%s/%s", d, prog) == -1) {
 			err = got_error_from_errno("asprintf");
 			break;
 		}
@@ -504,7 +508,7 @@ got_path_find_prog(char **filename, const char *prog)
 		*filename = NULL;
 		continue;
 	}
-	free(path);
+	free(dup);
 	return err;
 }
 

@@ -166,7 +166,7 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  */
 const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
     FILE *, FILE *, struct got_object_id *, struct got_object_id *,
-    struct got_pathlist_head *, char *, char *, int, int, int,
+    struct got_pathlist_head *, const char *, const char *, int, int, int,
     struct got_repository *, FILE *);
 
 /*

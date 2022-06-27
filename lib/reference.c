@@ -997,8 +997,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
-	char *abs_namespace = NULL;
-	char *buf = NULL, *ondisk_ref_namespace = NULL;
+	char *abs_namespace = NULL, *buf = NULL;
+	const char *ondisk_ref_namespace = NULL;
 	char *line = NULL;
 	FILE *f = NULL;
 	struct got_reference *ref;

@@ -262,7 +262,7 @@ diff_output_match_function_prototype(char *prototype, size_t prototype_size,
 	struct diff_atom *start_atom, *atom;
 	const struct diff_data *data;
 	unsigned char buf[DIFF_FUNCTION_CONTEXT_SIZE];
-	char *state = NULL;
+	const char *state = NULL;
 	int rc, i, ch;
 
 	if (result->left->atoms.len > 0 && cc->left.start > 0) {
