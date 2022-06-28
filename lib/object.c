@@ -1426,7 +1426,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 			goto done;
 		}
 
-		(*blob)->f = fdopen(outfd, "rb");
+		(*blob)->f = fdopen(dfd, "rb");
 		if ((*blob)->f == NULL) {
 			err = got_error_from_errno("fdopen");
 			close(dfd);
