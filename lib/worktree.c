@@ -1629,7 +1629,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 	const struct got_error *err = NULL;
 	struct got_object_id id;
 	size_t hdrlen;
-	int fd = -1;
+	int fd = -1, fd1 = -1;
 	FILE *f = NULL;
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
@@ -1706,7 +1706,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 	else
 		memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
 
-	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf), fd1);
 	if (err)
 		goto done;
 
@@ -1769,6 +1774,8 @@ get_file_status(unsigned char *status, struct stat *sb,
 	} else if (xbit_differs(ie, sb->st_mode))
 		*status = GOT_STATUS_MODE_CHANGE;
 done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (f != NULL && fclose(f) == EOF && err == NULL)
@@ -1802,9 +1809,10 @@ update_blob(struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
-	char *ondisk_path;
+	char *ondisk_path = NULL;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 	struct stat sb;
+	int fd1 = -1, fd2 = -1;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno("asprintf");
@@ -1886,7 +1894,12 @@ update_blob(struct got_worktree *worktree,
 		}
 	}
 
-	err = got_object_open_as_blob(&blob, repo, &te->id, 8192);
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	err = got_object_open_as_blob(&blob, repo, &te->id, 8192, fd1);
 	if (err)
 		goto done;
 
@@ -1895,9 +1908,15 @@ update_blob(struct got_worktree *worktree,
 		struct got_blob_object *blob2 = NULL;
 		char *label_orig = NULL;
 		if (got_fileindex_entry_has_blob(ie)) {
+			fd2 = got_opentempfd();
+			if (fd2 == -1) {
+				err = got_error_from_errno("got_opentempfd");
+				goto done;
+			}
 			struct got_object_id id2;
 			memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-			err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
+			err = got_object_open_as_blob(&blob2, repo, &id2, 8192,
+			    fd2);
 			if (err)
 				goto done;
 		}
@@ -1931,6 +1950,10 @@ update_blob(struct got_worktree *worktree,
 			    progress_cb, progress_arg);
 		}
 		free(label_orig);
+		if (fd2 != -1 && close(fd2) == -1 && err == NULL) {
+			err = got_error_from_errno("close");
+			goto done;
+		}
 		if (blob2)
 			got_object_blob_close(blob2);
 		if (err)
@@ -1988,6 +2011,11 @@ update_blob(struct got_worktree *worktree,
 			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_BAD_SYMLINK);
 		}
+	}
+
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL) {
+		err = got_error_from_errno("close");
+		goto done;
 	}
 	got_object_blob_close(blob);
 done:
@@ -4405,7 +4433,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	const struct got_error *err, *free_err;
 	struct got_blob_object *blob = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
-	int fd2 = -1;
+	int fd = -1, fd2 = -1;
 	char link_target[PATH_MAX];
 	ssize_t link_len = 0;
 	char *path1 = NULL, *id_str = NULL;
@@ -4483,7 +4511,13 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		rewind(f2);
 	}
 
-	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	err = got_object_open_as_blob(&blob, repo, blob_id, 8192, fd);
 	if (err)
 		goto done;
 
@@ -4547,6 +4581,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	}
 done:
 	free(id_str);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	free_err = got_diffreg_result_free(diffreg_result);
@@ -4589,6 +4625,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	char *tree_path = NULL, *te_name;
 	char *ondisk_path = NULL, *path_content = NULL;
 	struct got_blob_object *blob = NULL;
+	int fd = -1;
 
 	/* Reverting a staged deletion is a no-op. */
 	if (status == GOT_STATUS_DELETE &&
@@ -4718,7 +4755,13 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		} else
 			memcpy(id.sha1, ie->blob_sha1,
 			    SHA1_DIGEST_LENGTH);
-		err = got_object_open_as_blob(&blob, a->repo, &id, 8192);
+		fd = got_opentempfd();
+		if (fd == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+
+		err = got_object_open_as_blob(&blob, a->repo, &id, 8192, fd);
 		if (err)
 			goto done;
 
@@ -4794,6 +4837,8 @@ done:
 	free(path_content);
 	free(parent_path);
 	free(tree_path);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (tree)
@@ -8254,6 +8299,7 @@ create_unstaged_content(char **path_unstaged_content,
 	struct got_diffreg_result *diffreg_result = NULL;
 	int line_cur1 = 1, line_cur2 = 1, n = 0, nchunks_used = 0;
 	int have_content = 0, have_rejected_content = 0, i = 0, nchanges = 0;
+	int fd1 = -1, fd2 = -1;
 
 	*path_unstaged_content = NULL;
 	*path_new_staged_content = NULL;
@@ -8261,7 +8307,19 @@ create_unstaged_content(char **path_unstaged_content,
 	err = got_object_id_str(&label1, blob_id);
 	if (err)
 		return err;
-	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	err = got_object_open_as_blob(&blob, repo, blob_id, 8192, fd1);
 	if (err)
 		goto done;
 
@@ -8273,7 +8331,8 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_blob(&staged_blob, repo, staged_blob_id, 8192);
+	err = got_object_open_as_blob(&staged_blob, repo, staged_blob_id, 8192,
+	    fd2);
 	if (err)
 		goto done;
 
@@ -8309,7 +8368,7 @@ create_unstaged_content(char **path_unstaged_content,
 	}
 	/* Count the number of actual changes in the diff result. */
 	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
-		struct diff_chunk_context cc = {}; 
+		struct diff_chunk_context cc = {};
 		diff_chunk_context_load_change(&cc, &nchunks_used,
 		    diffreg_result->result, n, 0);
 		nchanges++;
@@ -8334,8 +8393,12 @@ create_unstaged_content(char **path_unstaged_content,
 		    outfile, rejectfile);
 done:
 	free(label1);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (staged_blob)
 		got_object_blob_close(staged_blob);
 	free_err = got_diffreg_result_free(diffreg_result);
@@ -8537,6 +8600,7 @@ unstage_path(void *arg, unsigned char status,
 	char *id_str = NULL, *label_orig = NULL;
 	int local_changes_subsumed;
 	struct stat sb;
+	int fd1 = -1, fd2 = -1;
 
 	if (staged_status != GOT_STATUS_ADD &&
 	    staged_status != GOT_STATUS_MODIFY &&
@@ -8561,10 +8625,21 @@ unstage_path(void *arg, unsigned char status,
 		goto done;
 	}
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	switch (staged_status) {
 	case GOT_STATUS_MODIFY:
 		err = got_object_open_as_blob(&blob_base, a->repo,
-		    blob_id, 8192);
+		    blob_id, 8192, fd1);
 		if (err)
 			break;
 		/* fall through */
@@ -8588,7 +8663,7 @@ unstage_path(void *arg, unsigned char status,
 			}
 		}
 		err = got_object_open_as_blob(&blob_staged, a->repo,
-		    staged_blob_id, 8192);
+		    staged_blob_id, 8192, fd2);
 		if (err)
 			break;
 		switch (got_fileindex_entry_staged_filetype_get(ie)) {
@@ -8659,8 +8734,12 @@ unstage_path(void *arg, unsigned char status,
 	}
 done:
 	free(ondisk_path);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob_base)
 		got_object_blob_close(blob_base);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob_staged)
 		got_object_blob_close(blob_staged);
 	free(id_str);

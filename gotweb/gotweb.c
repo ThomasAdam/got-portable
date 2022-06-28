@@ -4064,8 +4064,12 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
-	int i, obj_type;
+	int i, obj_type, fd = -1;
 	off_t filesize;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	memset(&bca, 0, sizeof(bca));
 
@@ -4109,7 +4113,8 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192);
+	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192,
+	    fd);
 	if (error)
 		goto done;
 
@@ -4150,6 +4155,8 @@ done:
 	free(obj_id);
 	free(path);
 
+	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	if (blob) {
 		free(bca.line_offsets);
 		for (i = 0; i < bca.nlines; i++) {
@@ -4177,10 +4184,14 @@ gw_output_blob_buf(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
-	int obj_type, set_mime = 0;
+	int obj_type, set_mime = 0, fd = -1;
 	size_t len, hdrlen;
 	const uint8_t *buf;
 	enum kcgi_err kerr = KCGI_OK;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
@@ -4222,7 +4233,8 @@ gw_output_blob_buf(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192);
+	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192,
+	    fd);
 	if (error)
 		goto done;
 
@@ -4258,6 +4270,8 @@ done:
 	free(commit_id);
 	free(obj_id);
 	free(path);
+	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (commit)

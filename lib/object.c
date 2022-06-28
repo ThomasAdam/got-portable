@@ -1160,19 +1160,30 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
+	int fd = -1;
 
 	*link_target = NULL;
 
 	if (!got_object_tree_entry_is_symlink(te))
 		return got_error(GOT_ERR_TREE_ENTRY_TYPE);
 
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	err = got_object_open_as_blob(&blob, repo,
-	    got_tree_entry_get_id(te), PATH_MAX);
+	    got_tree_entry_get_id(te), PATH_MAX, fd);
 	if (err)
-		return err;
+		goto done;
 
 	err = got_object_blob_read_to_str(link_target, blob);
-	got_object_blob_close(blob);
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (blob)
+		got_object_blob_close(blob);
 	if (err) {
 		free(*link_target);
 		*link_target = NULL;
@@ -1337,24 +1348,19 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 static const struct got_error *
 open_blob(struct got_blob_object **blob, struct got_repository *repo,
-    struct got_object_id *id, size_t blocksize)
+    struct got_object_id *id, size_t blocksize, int outfd)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
 	char *path_packfile = NULL;
 	uint8_t *outbuf;
-	int outfd;
 	size_t size, hdrlen;
 	struct stat sb;
 
 	*blob = calloc(1, sizeof(**blob));
 	if (*blob == NULL)
 		return got_error_from_errno("calloc");
-
-	outfd = got_opentempfd();
-	if (outfd == -1)
-		return got_error_from_errno("got_opentempfd");
 
 	(*blob)->read_buf = malloc(blocksize);
 	if ((*blob)->read_buf == NULL) {
@@ -1398,9 +1404,6 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	}
 
 	if (outbuf) {
-		if (close(outfd) == -1 && err == NULL)
-			err = got_error_from_errno("close");
-		outfd = -1;
 		(*blob)->f = fmemopen(outbuf, size, "rb");
 		if ((*blob)->f == NULL) {
 			err = got_error_from_errno("fmemopen");
@@ -1438,25 +1441,25 @@ done:
 		if (*blob) {
 			got_object_blob_close(*blob);
 			*blob = NULL;
-		} else if (outfd != -1)
-			close(outfd);
+		}
 	}
 	return err;
 }
 
 const struct got_error *
 got_object_open_as_blob(struct got_blob_object **blob,
-    struct got_repository *repo, struct got_object_id *id,
-    size_t blocksize)
+    struct got_repository *repo, struct got_object_id *id, size_t blocksize,
+    int outfd)
 {
-	return open_blob(blob, repo, id, blocksize);
+	return open_blob(blob, repo, id, blocksize, outfd);
 }
 
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
-    struct got_repository *repo, struct got_object *obj, size_t blocksize)
+    struct got_repository *repo, struct got_object *obj, size_t blocksize,
+    int outfd)
 {
-	return open_blob(blob, repo, got_object_get_id(obj), blocksize);
+	return open_blob(blob, repo, got_object_get_id(obj), blocksize, outfd);
 }
 
 const struct got_error *

@@ -3548,9 +3548,20 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
 	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
+		return got_error_from_errno("got_opentempfd");
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 
 	if (blob_id1) {
-		err = got_object_open_as_blob(&blob1, repo, blob_id1, 8192);
+		err = got_object_open_as_blob(&blob1, repo, blob_id1, 8192,
+		    fd1);
 		if (err)
 			goto done;
 		f1 = got_opentemp();
@@ -3560,7 +3571,7 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 		}
 	}
 
-	err = got_object_open_as_blob(&blob2, repo, blob_id2, 8192);
+	err = got_object_open_as_blob(&blob2, repo, blob_id2, 8192, fd2);
 	if (err)
 		goto done;
 
@@ -3575,8 +3586,12 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 	err = got_diff_blob(NULL, NULL, blob1, blob2, f1, f2, path, path,
 	    diff_context, ignore_whitespace, force_text_diff, outfile);
 done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	got_object_blob_close(blob2);
 	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -4619,7 +4634,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
-	int fd = -1;
+	int fd = -1, fd1 = -1;
 	FILE *f1 = NULL, *f2 = NULL;
 	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
@@ -4684,11 +4699,17 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		goto done;
 	}
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	if (staged_status == GOT_STATUS_ADD ||
 	    staged_status == GOT_STATUS_MODIFY) {
 		char *id_str;
 		err = got_object_open_as_blob(&blob1, a->repo, staged_blob_id,
-		    8192);
+		    8192, fd1);
 		if (err)
 			goto done;
 		err = got_object_id_str(&id_str, staged_blob_id);
@@ -4701,7 +4722,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		}
 		free(id_str);
 	} else if (status != GOT_STATUS_ADD) {
-		err = got_object_open_as_blob(&blob1, a->repo, blob_id, 8192);
+		err = got_object_open_as_blob(&blob1, a->repo, blob_id, 8192,
+		    fd1);
 		if (err)
 			goto done;
 	}
@@ -4717,7 +4739,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			fd = openat(dirfd, de_name,
 			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
-				if (!got_err_open_nofollow_on_symlink()) { 
+				if (!got_err_open_nofollow_on_symlink()) {
 					err = got_error_from_errno2("openat",
 					    abspath);
 					goto done;
@@ -4764,12 +4786,14 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		    blob1);
 		if (err)
 			goto done;
-	}	
+	}
 
 	err = got_diff_blob_file(blob1, f1, size1, label1, f2, sb.st_size,
 	    path, a->diff_context, a->ignore_whitespace, a->force_text_diff,
 	    stdout);
 done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
 	if (f1 && fclose(f1) == EOF && err == NULL)
@@ -5292,9 +5316,13 @@ cmd_blame(int argc, char *argv[])
 	struct got_blob_object *blob = NULL;
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
-	int ch, obj_type, i;
+	int ch, obj_type, i, fd = -1;
 	off_t filesize;
 	int *pack_fds = NULL;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	memset(&bca, 0, sizeof(bca));
 
@@ -5446,7 +5474,7 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	error = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd);
 	if (error)
 		goto done;
 	bca.f = got_opentemp();
@@ -5488,6 +5516,8 @@ done:
 	free(obj_id);
 	if (commit)
 		got_object_commit_close(commit);
+	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (worktree)
@@ -12229,13 +12259,22 @@ cat_blob(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob;
+	int fd = -1;
 
-	err = got_object_open_as_blob(&blob, repo, id, 8192);
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	err = got_object_open_as_blob(&blob, repo, id, 8192, fd);
 	if (err)
-		return err;
+		goto done;
 
 	err = got_object_blob_dump_to_file(NULL, NULL, NULL, outfile, blob);
-	got_object_blob_close(blob);
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (blob)
+		got_object_blob_close(blob);
 	return err;
 }
 
