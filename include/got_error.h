@@ -168,6 +168,7 @@
 #define GOT_ERR_HUNK_FAILED	150
 #define GOT_ERR_PATCH_FAILED	151
 #define GOT_ERR_FILEIDX_DUP_ENTRY 152
+#define GOT_ERR_PIN_PACK	153
 
 struct got_error {
         int code;

@@ -45,6 +45,10 @@
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 static volatile sig_atomic_t sigint_received;
 
 static void
@@ -1540,6 +1544,272 @@ done:
 	return err;
 }
 
+enum findtwixt_color {
+	COLOR_KEEP = 0,
+	COLOR_DROP,
+	COLOR_SKIP,
+	COLOR_MAX,
+};
+
+static const struct got_error *
+paint_commit(struct got_object_qid *qid, intptr_t color)
+{
+	if (color < 0 || color >= COLOR_MAX)
+		return got_error(GOT_ERR_RANGE);
+
+	qid->data = (void *)color;
+	return NULL;
+}
+
+static const struct got_error *
+queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
+    intptr_t color)
+{
+	const struct got_error *err;
+	struct got_object_qid *qid;
+
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
+		return err;
+
+	memcpy(&qid->id, id, sizeof(qid->id));
+	STAILQ_INSERT_TAIL(ids, qid, entry);
+	return paint_commit(qid, color);
+}
+
+static const struct got_error *
+paint_commits(struct got_object_id_queue *ids, int *nids,
+    struct got_object_idset *keep, struct got_object_idset *drop,
+    struct got_object_idset *skip, struct got_pack *pack,
+    struct got_packidx *packidx, struct imsgbuf *ibuf,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id_queue painted;
+	const struct got_object_id_queue *parents;
+	struct got_object_qid *qid = NULL;
+	int nqueued = *nids, nskip = 0, npainted = 0;
+
+	STAILQ_INIT(&painted);
+
+	while (!STAILQ_EMPTY(ids) && nskip != nqueued) {
+		int idx;
+		intptr_t color;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			goto done;
+		}
+
+		qid = STAILQ_FIRST(ids);
+		idx = got_packidx_get_object_idx(packidx, &qid->id);
+		if (idx == -1) {
+			qid = NULL;
+			break;
+		}
+
+		STAILQ_REMOVE_HEAD(ids, entry);
+		nqueued--;
+		color = (intptr_t)qid->data;
+		if (color == COLOR_SKIP)
+			nskip--;
+
+		if (got_object_idset_contains(skip, &qid->id)) {
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
+
+		switch (color) {
+		case COLOR_KEEP:
+			if (got_object_idset_contains(keep, &qid->id)) {
+				got_object_qid_free(qid);
+				qid = NULL;
+				continue;
+			}
+			if (got_object_idset_contains(drop, &qid->id)) {
+				err = paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+			}
+			err = got_object_idset_add(keep, &qid->id, NULL);
+			if (err)
+				goto done;
+			break;
+		case COLOR_DROP:
+			if (got_object_idset_contains(drop, &qid->id)) {
+				got_object_qid_free(qid);
+				qid = NULL;
+				continue;
+			}
+			if (got_object_idset_contains(keep, &qid->id)) {
+				err = paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+			}
+			err = got_object_idset_add(drop, &qid->id, NULL);
+			if (err)
+				goto done;
+			break;
+		case COLOR_SKIP:
+			if (!got_object_idset_contains(skip, &qid->id)) {
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+			}
+			break;
+		default:
+			/* should not happen */
+			err = got_error_fmt(GOT_ERR_NOT_IMPL,
+			    "%s invalid commit color %d", __func__, color);
+			goto done;
+		}
+
+		err = open_commit(&commit, pack, packidx, idx, &qid->id,
+		    objcache);
+		if (err)
+			goto done;
+
+		parents = got_object_commit_get_parent_ids(commit);
+		if (parents) {
+			struct got_object_qid *pid;
+			color = (intptr_t)qid->data;
+			STAILQ_FOREACH(pid, parents, entry) {
+				err = queue_commit_id(ids, &pid->id, color);
+				if (err)
+					goto done;
+				nqueued++;
+				if (color == COLOR_SKIP)
+					nskip++;
+			}
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+
+		STAILQ_INSERT_TAIL(&painted, qid, entry);
+		qid = NULL;
+		npainted++;
+
+		err = got_privsep_send_painted_commits(ibuf, &painted,
+		    &npainted, 1, 0);
+		if (err)
+			goto done;
+	}
+
+	err = got_privsep_send_painted_commits(ibuf, &painted, &npainted, 1, 1);
+	if (err)
+		goto done;
+
+	*nids = nqueued;
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	got_object_qid_free(qid);
+	return err;
+}
+
+static void
+commit_painting_free(struct got_object_idset **keep,
+    struct got_object_idset **drop,
+    struct got_object_idset **skip)
+{
+	if (*keep) {
+		got_object_idset_free(*keep);
+		*keep = NULL;
+	}
+	if (*drop) {
+		got_object_idset_free(*drop);
+		*drop = NULL;
+	}
+	if (*skip) {
+		got_object_idset_free(*skip); 
+		*skip = NULL;
+	}
+}
+
+static const struct got_error *
+commit_painting_init(struct imsgbuf *ibuf, struct got_object_idset **keep,
+    struct got_object_idset **drop, struct got_object_idset **skip)
+{
+	const struct got_error *err = NULL;
+
+	*keep = got_object_idset_alloc();
+	if (*keep == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+	*drop = got_object_idset_alloc();
+	if (*drop == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+	*skip = got_object_idset_alloc();
+	if (*skip == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	err = recv_object_ids(*keep, ibuf);
+	if (err)
+		goto done;
+	err = recv_object_ids(*drop, ibuf);
+	if (err)
+		goto done;
+	err = recv_object_ids(*skip, ibuf);
+	if (err)
+		goto done;
+
+done:
+	if (err)
+		commit_painting_free(keep, drop, skip);
+
+	return err;
+}
+
+static const struct got_error *
+commit_painting_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache, struct got_object_idset *keep,
+    struct got_object_idset *drop, struct got_object_idset *skip)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_commit_painting_request ireq;
+	struct got_object_id id;
+	size_t datalen;
+	struct got_object_id_queue ids;
+	int nids = 0;
+
+	STAILQ_INIT(&ids);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(ireq))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&ireq, imsg->data, sizeof(ireq));
+	memcpy(id.sha1, ireq.id, SHA1_DIGEST_LENGTH);
+
+	err = queue_commit_id(&ids, &id, ireq.color);
+	if (err)
+		return err;
+	nids = 1;
+
+	err = paint_commits(&ids, &nids, keep, drop, skip,
+	    pack, packidx, ibuf, objcache);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_painted_commits(ibuf, &ids, &nids, 0, 1);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_painting_commits_done(ibuf);
+done:
+	got_object_id_queue_free(&ids);
+	return err;
+}
+
 static const struct got_error *
 receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 {
@@ -1625,6 +1895,7 @@ main(int argc, char *argv[])
 	struct got_pack *pack = NULL;
 	struct got_object_cache objcache;
 	FILE *basefile = NULL, *accumfile = NULL, *delta_outfile = NULL;
+	struct got_object_idset *keep = NULL, *drop = NULL, *skip = NULL;
 
 	//static int attached;
 	//while (!attached) sleep(1);
@@ -1754,6 +2025,21 @@ main(int argc, char *argv[])
 			err = enumeration_request(&imsg, &ibuf, pack,
 			    packidx, &objcache);
 			break;
+		case GOT_IMSG_COMMIT_PAINTING_INIT:
+			commit_painting_free(&keep, &drop, &skip);
+			err = commit_painting_init(&ibuf, &keep, &drop, &skip);
+			break;
+		case GOT_IMSG_COMMIT_PAINTING_REQUEST:
+			if (keep == NULL || drop == NULL || skip == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = commit_painting_request(&imsg, &ibuf, pack,
+			    packidx, &objcache, keep, drop, skip);
+			break;
+		case GOT_IMSG_COMMIT_PAINTING_DONE:
+			commit_painting_free(&keep, &drop, &skip);
+			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
@@ -1766,6 +2052,7 @@ main(int argc, char *argv[])
 			break;
 	}
 
+	commit_painting_free(&keep, &drop, &skip);
 	if (packidx)
 		got_packidx_close(packidx);
 	if (pack)

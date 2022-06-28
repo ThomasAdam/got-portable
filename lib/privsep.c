@@ -3328,6 +3328,182 @@ got_privsep_recv_reused_deltas(int *done, struct got_imsg_reused_delta *deltas,
 }
 
 const struct got_error *
+got_privsep_init_commit_painting(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_PAINTING_INIT,
+	    0, 0, -1, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose "
+		    "COMMIT_PAINTING_INIT");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_painting_request(struct imsgbuf *ibuf, int idx,
+    struct got_object_id *id, intptr_t color)
+{
+	struct got_imsg_commit_painting_request ireq;
+
+	memset(&ireq, 0, sizeof(ireq));
+	memcpy(ireq.id, id->sha1, sizeof(ireq.id));
+	ireq.idx = idx;
+	ireq.color = color;
+
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_PAINTING_REQUEST, 0, 0, -1,
+	    &ireq, sizeof(ireq)) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "COMMIT_PAINTING_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_painted_commits(struct got_object_id_queue *ids, int *nids,
+    size_t remain, int present_in_pack, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf = NULL;
+	struct got_object_qid *qid;
+	size_t msglen;
+	int ncommits;
+	intptr_t color;
+
+	msglen = MIN(remain, MAX_IMSGSIZE - IMSG_HEADER_SIZE);
+	ncommits = (msglen - sizeof(struct got_imsg_painted_commits)) /
+	    sizeof(struct got_imsg_painted_commit);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_PAINTED_COMMITS, 0, 0, msglen);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create PAINTED_COMMITS");
+		return err;
+	}
+
+	/* Keep in sync with struct got_imsg_painted_commits! */
+	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1)
+		return got_error_from_errno("imsg_add PAINTED_COMMITS");
+	if (imsg_add(wbuf, &present_in_pack, sizeof(present_in_pack)) == -1)
+		return got_error_from_errno("imsg_add PAINTED_COMMITS");
+
+	while (ncommits > 0) {
+		qid = STAILQ_FIRST(ids);
+		STAILQ_REMOVE_HEAD(ids, entry);
+		ncommits--;
+		(*nids)--;
+		color = (intptr_t)qid->data;
+
+		/* Keep in sync with struct got_imsg_painted_commit! */
+		if (imsg_add(wbuf, qid->id.sha1, SHA1_DIGEST_LENGTH) == -1)
+			return got_error_from_errno("imsg_add PAINTED_COMMITS");
+		if (imsg_add(wbuf, &color, sizeof(color)) == -1)
+			return got_error_from_errno("imsg_add PAINTED_COMMITS");
+
+		got_object_qid_free(qid);
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_painted_commits(struct imsgbuf *ibuf,
+    struct got_object_id_queue *ids, int *nids,
+    int present_in_pack, int flush)
+{
+	const struct got_error *err;
+	size_t remain;
+
+	if (*nids <= 0)
+		return NULL;
+
+	do {
+		remain = (sizeof(struct got_imsg_painted_commits)) +
+		    *nids * sizeof(struct got_imsg_painted_commit);
+		if (flush || remain >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+			err = send_painted_commits(ids, nids, remain,
+			    present_in_pack, ibuf);
+			if (err)
+				return err;
+		}
+	} while (flush && *nids > 0);
+
+	return NULL;
+}
+
+const struct got_error *
+got_privsep_send_painting_commits_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_PAINTING_DONE,
+	    0, 0, -1, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose "
+		    "COMMIT_PAINTING_DONE");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
+    got_privsep_recv_painted_commit_cb cb, void *cb_arg, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_painted_commits icommits;
+	struct got_imsg_painted_commit icommit;
+	size_t datalen;
+	int i;
+
+	for (;;) {
+		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+		if (err)
+			return err;
+
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (imsg.hdr.type == GOT_IMSG_COMMIT_PAINTING_DONE)
+			break;
+		if (imsg.hdr.type != GOT_IMSG_PAINTED_COMMITS)
+			return got_error(GOT_ERR_PRIVSEP_MSG);
+
+		if (datalen < sizeof(icommits))
+			return got_error(GOT_ERR_PRIVSEP_LEN);
+		memcpy(&icommits, imsg.data, sizeof(icommits));
+		if (icommits.ncommits * sizeof(icommit) < icommits.ncommits ||
+		    datalen < sizeof(icommits) +
+		    icommits.ncommits * sizeof(icommit))
+			return got_error(GOT_ERR_PRIVSEP_LEN);
+
+		for (i = 0; i < icommits.ncommits; i++) {
+			memcpy(&icommit,
+			    (uint8_t *)imsg.data + sizeof(icommits) + i * sizeof(icommit),
+			    sizeof(icommit));
+
+			if (icommits.present_in_pack) {
+				struct got_object_id id;
+				memcpy(id.sha1, icommit.id, SHA1_DIGEST_LENGTH);
+				err = cb(cb_arg, &id, icommit.color);
+				if (err)
+					break;
+			} else {
+				struct got_object_qid *qid;
+				err = got_object_qid_alloc_partial(&qid);
+				if (err)
+					break;
+				memcpy(qid->id.sha1, icommit.id,
+				    SHA1_DIGEST_LENGTH);
+				qid->data = (void *)icommit.color;
+				STAILQ_INSERT_TAIL(new_ids, qid, entry);
+			}
+		}
+
+		imsg_free(&imsg);
+	}
+
+	return err;
+}
+
+const struct got_error *
 got_privsep_unveil_exec_helpers(void)
 {
 	const char *helpers[] = {

@@ -194,6 +194,12 @@ enum got_imsg_type {
 	GOT_IMSG_REUSED_DELTAS,
 	GOT_IMSG_DELTA_REUSE_DONE,
 
+	/* Commit coloring in got-read-pack. */
+	GOT_IMSG_COMMIT_PAINTING_INIT,
+	GOT_IMSG_COMMIT_PAINTING_REQUEST,
+	GOT_IMSG_PAINTED_COMMITS,
+	GOT_IMSG_COMMIT_PAINTING_DONE,
+
 	/* Transfer a list of object IDs. */
 	GOT_IMSG_OBJ_ID_LIST,
 	GOT_IMSG_OBJ_ID_LIST_DONE,
@@ -343,6 +349,27 @@ struct got_imsg_reused_deltas {
 	sizeof(struct got_imsg_reused_deltas)) \
 	/ sizeof(struct got_imsg_reused_delta))
 };
+
+/* Structure for GOT_IMSG_COMMIT_PAINTING_REQUEST. */
+struct got_imsg_commit_painting_request {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	int idx;
+	int color;
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_PAINTED_COMMITS. */
+struct got_imsg_painted_commit {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	intptr_t color;
+} __attribute__((__packed__));
+
+struct got_imsg_painted_commits {
+	int ncommits;
+	int present_in_pack;
+	/*
+	 * Followed by ncommits * struct got_imsg_painted_commit.
+	 */
+} __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_TAG data. */
 struct got_imsg_tag_object {
@@ -781,5 +808,17 @@ const struct got_error *got_privsep_send_reused_deltas(struct imsgbuf *,
 const struct got_error *got_privsep_send_reused_deltas_done(struct imsgbuf *);
 const struct got_error *got_privsep_recv_reused_deltas(int *, 
     struct got_imsg_reused_delta *, size_t *, struct imsgbuf *);
+
+const struct got_error *got_privsep_init_commit_painting(struct imsgbuf *);
+const struct got_error *got_privsep_send_painting_request(struct imsgbuf *,
+    int, struct got_object_id *, intptr_t);
+typedef const struct got_error *(*got_privsep_recv_painted_commit_cb)(void *,
+    struct got_object_id *, intptr_t);
+const struct got_error *got_privsep_send_painted_commits(struct imsgbuf *,
+    struct got_object_id_queue *, int *, int, int);
+const struct got_error *got_privsep_send_painting_commits_done(struct imsgbuf *);
+const struct got_error *got_privsep_recv_painted_commits(
+    struct got_object_id_queue *, got_privsep_recv_painted_commit_cb, void *,
+    struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);
