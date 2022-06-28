@@ -1350,7 +1350,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
-	int idx;
+	int idx, dfd = -1;
 	char *path_packfile = NULL;
 	uint8_t *outbuf;
 	size_t size, hdrlen;
@@ -1420,11 +1420,17 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 			goto done;
 		}
 
+		dfd = dup(outfd);
+		if (dfd == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
+
 		(*blob)->f = fdopen(outfd, "rb");
 		if ((*blob)->f == NULL) {
 			err = got_error_from_errno("fdopen");
-			close(outfd);
-			outfd = -1;
+			close(dfd);
+			dfd = -1;
 			goto done;
 		}
 	}
