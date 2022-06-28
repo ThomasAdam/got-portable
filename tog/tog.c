@@ -316,6 +316,7 @@ struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	const char *label1, *label2;
 	FILE *f, *f1, *f2;
+	int fd1, fd2;
 	int first_displayed_line;
 	int last_displayed_line;
 	int eof;
@@ -3513,7 +3514,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, NULL, NULL, "", "", repo,
+	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
 	    got_diff_tree_collect_changed_paths, paths, 0);
 done:
 	if (tree1)
@@ -3733,14 +3734,15 @@ create_diff(struct tog_diff_view_state *s)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
-		    s->f1, s->f2, s->id1, s->id2, s->label1, s->label2,
-		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
-		    s->repo, s->f);
+		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
+		    s->label1, s->label2, s->diff_context,
+		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
-		    s->f1, s->f2, s->id1, s->id2, NULL, "", "", s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
+		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
+		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
+		    s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -3774,8 +3776,9 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
-		    s->f1, s->f2, s->id1, s->id2, NULL, s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
+		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
+		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
+		    s->repo, s->f);
 		break;
 	}
 	default:
@@ -3893,12 +3896,18 @@ close_diff_view(struct tog_view *view)
 	if (s->f && fclose(s->f) == EOF)
 		err = got_error_from_errno("fclose");
 	s->f = NULL;
-	if (s->f1 && fclose(s->f1) == EOF)
+	if (s->f1 && fclose(s->f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	s->f1 = NULL;
-	if (s->f2 && fclose(s->f2) == EOF)
+	if (s->f2 && fclose(s->f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	s->f2 = NULL;
+	if (s->fd1 != -1 && close(s->fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	s->fd1 = -1;
+	if (s->fd2 != -1 && close(s->fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	s->fd2 = -1;
 	free_colors(&s->colors);
 	free(s->line_offsets);
 	s->line_offsets = NULL;
@@ -3916,6 +3925,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	struct tog_diff_view_state *s = &view->state.diff;
 
 	memset(s, 0, sizeof(*s));
+	s->fd1 = -1;
+	s->fd2 = -1;
 
 	if (id1 != NULL && id2 != NULL) {
 	    int type1, type2;
@@ -3960,6 +3971,18 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->f2 = got_opentemp();
 	if (s->f2 == NULL) {
 		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	s->fd1 = got_opentempfd();
+	if (s->fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	s->fd2 = got_opentempfd();
+	if (s->fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
 		goto done;
 	}
 

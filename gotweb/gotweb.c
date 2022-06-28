@@ -2854,6 +2854,7 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error;
 	FILE *f = NULL, *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *label1 = NULL, *label2 = NULL, *line = NULL;
 	int obj_type;
@@ -2874,6 +2875,18 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	f2 = got_opentemp();
 	if (f2 == NULL) {
 		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		error = got_error_from_errno("got_opentempfd");
 		goto done;
 	}
 
@@ -2898,15 +2911,17 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
-		    id1, id2, NULL, NULL, 3, 0, 0, gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, NULL, 3, 0, 0,
+		    gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2,
-		    id1, id2, NULL, "", "", 3, 0, 0, gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, "", "", 3, 0, 0,
+		    gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
-		    id1, id2, NULL, 3, 0, 0, gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, 3, 0, 0, gw_trans->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -2940,6 +2955,10 @@ done:
 		error = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	free(line);
 	free(label1);
 	free(label2);
