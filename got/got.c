@@ -5315,7 +5315,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_blob_object *blob = NULL;
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
-	int ch, obj_type, i, fd = -1;
+	int ch, obj_type, i, fd = -1, fd1 = -1;
 	off_t filesize;
 	int *pack_fds = NULL;
 
@@ -5504,8 +5504,13 @@ cmd_blame(int argc, char *argv[])
 	}
 	bca.repo = repo;
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 	error = got_blame(link_target ? link_target : in_repo_path, commit_id,
-	    repo, blame_cb, &bca, check_cancelled, NULL);
+	    repo, blame_cb, &bca, check_cancelled, NULL, fd1);
 done:
 	free(in_repo_path);
 	free(link_target);
@@ -5516,6 +5521,8 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);

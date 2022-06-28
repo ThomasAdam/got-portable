@@ -4063,7 +4063,7 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
-	int i, obj_type, fd = -1;
+	int i, obj_type, fd = -1, fd1 = -1;
 	off_t filesize;
 
 	fd = got_opentempfd();
@@ -4146,8 +4146,14 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	bca.repo = gw_trans->repo;
 	bca.gw_trans = gw_trans;
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	error = got_blame(in_repo_path, commit_id, gw_trans->repo, gw_blame_cb,
-	    &bca, NULL, NULL);
+	    &bca, NULL, NULL, fd1);
 done:
 	free(in_repo_path);
 	free(commit_id);
@@ -4156,6 +4162,9 @@ done:
 
 	if (fd != -1 && close(fd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+
 	if (blob) {
 		free(bca.line_offsets);
 		for (i = 0; i < bca.nlines; i++) {

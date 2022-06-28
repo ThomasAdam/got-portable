@@ -507,7 +507,8 @@ close_file2_and_reuse_file1(struct got_blame *blame)
 static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
     struct got_object_id *start_commit_id, struct got_repository *repo,
-    got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void *cancel_arg)
+    got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void *cancel_arg,
+    int fd)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *start_commit = NULL, *last_commit = NULL;
@@ -515,12 +516,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
 	struct got_object_id *id = NULL;
-	int lineno, fd = -1;
+	int lineno;
 	struct got_commit_graph *graph = NULL;
-
-	fd = got_opentempfd();
-	if (fd == -1)
-		return got_error_from_errno("got_opentempfd");
 
 	*blamep = NULL;
 
@@ -644,8 +641,6 @@ done:
 	if (graph)
 		got_commit_graph_close(graph);
 	free(obj_id);
-	if (fd != -1 && close(fd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (start_commit)
@@ -664,7 +659,7 @@ done:
 const struct got_error *
 got_blame(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo, got_blame_cb cb, void *arg,
-    got_cancel_cb cancel_cb, void* cancel_arg)
+    got_cancel_cb cancel_cb, void* cancel_arg, int fd)
 {
 	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
@@ -674,7 +669,7 @@ got_blame(const char *path, struct got_object_id *commit_id,
 		return got_error_from_errno2("asprintf", path);
 
 	err = blame_open(&blame, abspath, commit_id, repo, cb, arg,
-	    cancel_cb, cancel_arg);
+	    cancel_cb, cancel_arg, fd);
 	free(abspath);
 	if (blame)
 		close_err = blame_close(blame);
