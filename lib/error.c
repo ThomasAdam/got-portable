@@ -223,6 +223,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_HUNK_FAILED, "hunk failed to apply" },
 	{ GOT_ERR_PATCH_FAILED, "patch failed to apply" },
 	{ GOT_ERR_FILEIDX_DUP_ENTRY, "duplicate file index entry" },
+	{ GOT_ERR_PIN_PACK, "could not pin pack file" },
 };
 
 static struct got_custom_error {

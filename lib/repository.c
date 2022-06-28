@@ -746,6 +746,9 @@ got_repo_open(struct got_repository **repop, const char *path,
 			repo->packs[i].accumfd = -1;
 		}
 	}
+	repo->pinned_pack = -1;
+	repo->pinned_packidx = -1;
+	repo->pinned_pid = 0;
 
 	repo_path = realpath(path, NULL);
 	if (repo_path == NULL) {
@@ -1029,7 +1032,10 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 		}
 	}
 	if (i == repo->pack_cache_size) {
-		i = repo->pack_cache_size - 1;
+		do {
+			i--;
+		} while (i > 0 && repo->pinned_packidx >= 0 &&
+		    i == repo->pinned_packidx);
 		err = got_packidx_close(repo->packidx_cache[i]);
 		if (err)
 			return err;
@@ -1165,6 +1171,11 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 				    &repo->packidx_cache[0],
 				    i * sizeof(repo->packidx_cache[0]));
 				repo->packidx_cache[0] = *packidx;
+				if (repo->pinned_packidx >= 0 &&
+				    repo->pinned_packidx < i)
+					repo->pinned_packidx++;
+				else if (repo->pinned_packidx == i)
+					repo->pinned_packidx = 0;
 			}
 			return NULL;
 		}
@@ -1370,17 +1381,25 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 
 	if (i == repo->pack_cache_size) {
 		struct got_pack tmp;
-		err = got_pack_close(&repo->packs[i - 1]);
+		do {
+			i--;
+		} while (i > 0 && repo->pinned_pack >= 0 &&
+		    i == repo->pinned_pack);
+		err = got_pack_close(&repo->packs[i]);
 		if (err)
 			return err;
-		if (ftruncate(repo->packs[i - 1].basefd, 0L) == -1)
+		if (ftruncate(repo->packs[i].basefd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
-		if (ftruncate(repo->packs[i - 1].accumfd, 0L) == -1)
+		if (ftruncate(repo->packs[i].accumfd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
-		memcpy(&tmp, &repo->packs[i - 1], sizeof(tmp)); 
-		memcpy(&repo->packs[i - 1], &repo->packs[0],
-		    sizeof(repo->packs[i - 1]));
+		memcpy(&tmp, &repo->packs[i], sizeof(tmp)); 
+		memcpy(&repo->packs[i], &repo->packs[0],
+		    sizeof(repo->packs[i]));
 		memcpy(&repo->packs[0], &tmp, sizeof(repo->packs[0]));
+		if (repo->pinned_pack == 0)
+			repo->pinned_pack = i;
+		else if (repo->pinned_pack == i)
+			repo->pinned_pack = 0;
 		i = 0;
 	}
 
@@ -1441,6 +1460,51 @@ got_repo_get_cached_pack(struct got_repository *repo, const char *path_packfile)
 	}
 
 	return NULL;
+}
+
+const struct got_error *
+got_repo_pin_pack(struct got_repository *repo, struct got_packidx *packidx,
+    struct got_pack *pack)
+{
+	size_t i;
+	int pinned_pack = -1, pinned_packidx = -1;
+
+	for (i = 0; i < repo->pack_cache_size; i++) {
+		if (repo->packidx_cache[i] &&
+		    strcmp(repo->packidx_cache[i]->path_packidx,
+		    packidx->path_packidx) == 0)
+			pinned_packidx = i;
+		if (repo->packs[i].path_packfile &&
+		    strcmp(repo->packs[i].path_packfile,
+		    pack->path_packfile) == 0)
+			pinned_pack = i;
+	}
+
+	if (pinned_packidx == -1 || pinned_pack == -1)
+		return got_error(GOT_ERR_PIN_PACK);
+
+	repo->pinned_pack = pinned_pack;
+	repo->pinned_packidx = pinned_packidx;
+	repo->pinned_pid = repo->packs[pinned_pack].privsep_child->pid;
+	return NULL;
+}
+
+struct got_pack *
+got_repo_get_pinned_pack(struct got_repository *repo)
+{
+	if (repo->pinned_pack >= 0 &&
+	    repo->pinned_pack < repo->pack_cache_size)
+		return &repo->packs[repo->pinned_pack];
+
+	return NULL;
+}
+
+void
+got_repo_unpin_pack(struct got_repository *repo)
+{
+	repo->pinned_packidx = -1;
+	repo->pinned_pack = -1;
+	repo->pinned_pid = 0;
 }
 
 const struct got_error *

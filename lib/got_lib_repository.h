@@ -72,6 +72,16 @@ struct got_repository {
 	 */
 	int pack_cache_size;
 
+	/*
+	 * Index to cache entries which are pinned to avoid eviction.
+	 * This may be used to keep one got-index-pack process alive
+	 * across searches for arbitrary objects which may be stored
+	 * in other pack files.
+	 */
+	int pinned_pack;
+	pid_t pinned_pid;
+	int pinned_packidx;
+
 	/* Handles to child processes for reading loose objects. */
 	struct got_privsep_child privsep_children[5];
 #define GOT_REPO_PRIVSEP_CHILD_OBJECT	0
@@ -134,3 +144,10 @@ const struct got_error *got_repo_get_packidx(struct got_packidx **, const char *
     struct got_repository *);
 const struct got_error *got_repo_cache_pack(struct got_pack **,
     struct got_repository *, const char *, struct got_packidx *);
+struct got_pack *got_repo_get_cached_pack(struct got_repository *,
+    const char *);
+const struct got_error *got_repo_pin_pack(struct got_repository *,
+    struct got_packidx *, struct got_pack *);
+struct got_pack *got_repo_get_pinned_pack(struct got_repository *);
+void got_repo_unpin_pack(struct got_repository *);
+
