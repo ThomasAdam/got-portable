@@ -3136,6 +3136,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct merge_file_cb_arg arg;
 	char *label_orig = NULL;
 	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
 
 	if (commit_id1) {
 		err = got_object_open_as_commit(&commit1, repo, commit_id1);
@@ -3191,10 +3192,22 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		goto done;
 	}
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	cmc_arg.worktree = worktree;
 	cmc_arg.fileindex = fileindex;
 	cmc_arg.repo = repo;
-	err = got_diff_tree(tree1, tree2, f1, f2, "", "", repo,
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, "", "", repo,
 	    check_merge_conflicts, &cmc_arg, 0);
 	if (err)
 		goto done;
@@ -3208,7 +3221,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	arg.label_orig = label_orig;
 	arg.commit_id2 = commit_id2;
 	arg.allow_bad_symlinks = 1; /* preserve bad symlinks across merges */
-	err = got_diff_tree(tree1, tree2, f1, f2, "", "", repo,
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, "", "", repo,
 	    merge_file_cb, &arg, 1);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
@@ -3226,6 +3239,10 @@ done:
 		err = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	free(label_orig);
 	return err;
 }

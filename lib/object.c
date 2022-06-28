@@ -1368,6 +1368,15 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
+	if (ftruncate(outfd, 0L) == -1) {
+		err = got_error_from_errno("ftruncate");
+		goto done;
+	}
+	if (lseek(outfd, SEEK_SET, 0) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {
 		struct got_pack *pack = NULL;

@@ -102,14 +102,16 @@ const struct got_error *got_diff_blob_output_unidiff(void *,
  * Diffing of blob content can be suppressed by passing zero for the
  * 'diff_content' parameter. The callback will then only receive blob
  * object IDs and diff labels, but NULL pointers instead of blob objects.
- * If 'diff_content' is set, two open temporary files must be provided
- * for internal use; these files can be obtained from got_opentemp()
+ * If 'diff_content' is set, two open temporary FILEs and two open
+ * temporary file descriptors must be provided for internal use; these
+ * files can be obtained from got_opentemp() and got_opentempfd(),
  * and must be closed by the caller. Otherwise the files can be NULL.
  * The set of arguments relating to either tree may be NULL to indicate
  * that no content is present on its respective side of the diff.
  */
 const struct got_error *got_diff_tree(struct got_tree_object *,
-    struct got_tree_object *, FILE *, FILE *, const char *, const char *,
+    struct got_tree_object *, FILE *, FILE *, int, int,
+    const char *, const char *,
     struct got_repository *, got_diff_blob_cb cb, void *cb_arg, int);
 
 /*
@@ -137,9 +139,10 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  * Diff two objects, assuming both objects are blobs. Two const char * diff
  * header labels may be provided which will be used to identify each blob in
  * the diff output. If a label is NULL, use the blob's SHA1 checksum instead.
- * Two open temporary files must be provided for internal use; these files
- * can be obtained from got_opentemp() and must be closed by the caller.
- * The set of arguments relating to either blob may be NULL to indicate
+ * Two open temporary files and two temporary file descriptors must be
+ * provided for internal use; these files can be obtained from
+ * got_opentemp() and got_opentempfd(), and must be closed by the caller.
+ * The set of arguments relating to either blob may be NULL/-1 to indicate
  * that no content is present on its respective side of the diff.
  * The number of context lines to show in the diff must be specified as well.
  * Write unified diff text to the provided output FILE.
@@ -147,7 +150,7 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
-    FILE *, FILE *, struct got_object_id *, struct got_object_id *,
+    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
     const char *, const char *, int, int, int,
     struct got_repository *, FILE *);
 
@@ -156,8 +159,10 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  * header labels may be provided which will be used to identify each blob in
  * the trees. If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in diffs must be specified.
- * Two open temporary files must be provided for internal use; these files
- * can be obtained from got_opentemp() and must be closed by the caller.
+ * Two open temporary files and two temporary file descriptors must be
+ * provided for internal use; these files can be obtained from
+ * got_opentemp() and got_opentempfd(), and must be closed by the caller.
+ * If 'diff_content' is not set, the files may be NULL / -1.
  * The set of arguments relating to either tree may be NULL to indicate
  * that no content is present on its respective side of the diff.
  * Write unified diff text to the provided output FILE.
@@ -165,15 +170,16 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
-    FILE *, FILE *, struct got_object_id *, struct got_object_id *,
+    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
     struct got_pathlist_head *, const char *, const char *, int, int, int,
     struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
  * The number of context lines to show in diffs must be specified.
- * Two open temporary files must be provided for internal use; these files
- * can be obtained from got_opentemp() and must be closed by the caller.
+ * Two open temporary files and two temporary file descriptors must be
+ * provided for internal use; these files can be obtained from
+ * got_opentemp() and got_opentempfd(), and must be closed by the caller.
  * The set of arguments relating to either commit may be NULL to indicate
  * that no content is present on its respective side of the diff.
  * Write unified diff text to the provided output FILE.
@@ -181,7 +187,7 @@ const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
-    FILE *, FILE *, struct got_object_id *, struct got_object_id *,
+    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
     struct got_pathlist_head *, int, int, int, struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

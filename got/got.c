@@ -3609,6 +3609,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_diff_blob_output_unidiff_arg arg;
 	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
 
 	if (tree_id1) {
 		err = got_object_open_as_tree(&tree1, repo, tree_id1);
@@ -3617,6 +3618,12 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 		f1 = got_opentemp();
 		if (f1 == NULL) {
 			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+
+		fd1 = got_opentempfd();
+		if (fd1 == -1) {
+			err = got_error_from_errno("got_opentempfd");
 			goto done;
 		}
 	}
@@ -3630,7 +3637,11 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
@@ -3639,7 +3650,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.nlines = 0;
 	while (path[0] == '/')
 		path++;
-	err = got_diff_tree(tree1, tree2, f1, f2, path, path, repo,
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, path, path, repo,
 	    got_diff_blob_output_unidiff, &arg, 1);
 done:
 	if (tree1)
@@ -3650,6 +3661,10 @@ done:
 		err = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	return err;
 }
 
@@ -3691,7 +3706,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, NULL, NULL, "", "", repo,
+	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
 	    got_diff_tree_collect_changed_paths, paths, 0);
 done:
 	if (tree1)
@@ -4634,7 +4649,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
-	int fd = -1, fd1 = -1;
+	int fd = -1, fd1 = -1, fd2 = -1;
 	FILE *f1 = NULL, *f2 = NULL;
 	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
@@ -4693,7 +4708,17 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			err = got_error_from_errno("got_opentemp");
 			goto done;
 		}
-		err = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
+		fd1 = got_opentempfd();
+		if (fd1 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+		fd2 = got_opentempfd();
+		if (fd2 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+		err = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd1, fd2,
 		    blob_id, staged_blob_id, label1, label2, a->diff_context,
 		    a->ignore_whitespace, a->force_text_diff, a->repo, stdout);
 		goto done;
@@ -4794,6 +4819,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
 	if (f1 && fclose(f1) == EOF && err == NULL)
@@ -4825,6 +4852,7 @@ cmd_diff(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
@@ -5134,22 +5162,34 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	switch (type1 == GOT_OBJ_TYPE_ANY ? type2 : type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
-		    ids[0], ids[1], NULL, NULL, diff_context,
+		    fd1, fd2, ids[0], ids[1], NULL, NULL, diff_context,
 		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(NULL, NULL, f1, f2,
+		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd1, fd2,
 		    ids[0], ids[1], &paths, "", "", diff_context,
 		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", labels[0], labels[1]);
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
-		    ids[0], ids[1], &paths, diff_context, ignore_whitespace,
-		    force_text_diff, repo, stdout);
+		    fd1, fd2, ids[0], ids[1], &paths, diff_context,
+		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -5180,6 +5220,10 @@ done:
 		error = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	return error;
 }
 
@@ -9393,7 +9437,7 @@ check_path_prefix(struct got_object_id *parent_id,
 		cpp_arg.path_prefix++;
 	cpp_arg.len = strlen(cpp_arg.path_prefix);
 	cpp_arg.errcode = errcode;
-	err = got_diff_tree(tree1, tree2, NULL, NULL, "", "", repo,
+	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
 	    check_path_prefix_in_diff, &cpp_arg, 0);
 done:
 	if (tree1)
