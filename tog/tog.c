@@ -4797,13 +4797,19 @@ run_blame(struct tog_view *view)
 	struct got_blob_object *blob = NULL;
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
-	int obj_type;
+	int obj_type, fd = -1;
 	int *pack_fds = NULL;
 
 	err = got_object_open_as_commit(&commit, s->repo,
 	    &s->blamed_commit->id);
 	if (err)
 		return err;
+
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 
 	err = got_object_id_by_path(&obj_id, s->repo, commit, s->path);
 	if (err)
@@ -4818,7 +4824,7 @@ run_blame(struct tog_view *view)
 		goto done;
 	}
 
-	err = got_object_open_as_blob(&blob, s->repo, obj_id, 8192);
+	err = got_object_open_as_blob(&blob, s->repo, obj_id, 8192, fd);
 	if (err)
 		goto done;
 	blame->f = got_opentemp();
@@ -4882,6 +4888,8 @@ run_blame(struct tog_view *view)
 done:
 	if (commit)
 		got_object_commit_close(commit);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	free(obj_id);

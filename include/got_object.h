@@ -260,7 +260,7 @@ const struct got_error *got_object_tree_path_changed(int *,
  * The caller must dispose of the blob with got_object_blob_close().
  */
 const struct got_error *got_object_open_as_blob(struct got_blob_object **,
-    struct got_repository *, struct got_object_id *, size_t);
+    struct got_repository *, struct got_object_id *, size_t, int);
 
 /* Dispose of a blob object. */
 const struct got_error *got_object_blob_close(struct got_blob_object *);

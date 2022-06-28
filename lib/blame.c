@@ -203,6 +203,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	struct got_object_id *pblob_id = NULL;
 	struct got_blob_object *pblob = NULL;
 	struct diff_result *diff_result = NULL;
+	int fd = -1;
 
 	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
@@ -212,6 +213,12 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (pid == NULL) {
 		got_object_commit_close(commit);
 		return NULL;
+	}
+
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
 	}
 
 	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
@@ -225,7 +232,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		goto done;
 	}
 
-	err = got_object_open_as_blob(&pblob, repo, pblob_id, 8192);
+	err = got_object_open_as_blob(&pblob, repo, pblob_id, 8192, fd);
 	if (err)
 		goto done;
 
@@ -272,6 +279,8 @@ done:
 	if (pcommit)
 		got_object_commit_close(pcommit);
 	free(pblob_id);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (pblob)
 		got_object_blob_close(pblob);
 	return err;
@@ -506,8 +515,12 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
 	struct got_object_id *id = NULL;
-	int lineno;
+	int lineno, fd = -1;
 	struct got_commit_graph *graph = NULL;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	*blamep = NULL;
 
@@ -519,7 +532,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	err = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd);
 	if (err)
 		goto done;
 
@@ -631,6 +644,8 @@ done:
 	if (graph)
 		got_commit_graph_close(graph);
 	free(obj_id);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (start_commit)

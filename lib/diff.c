@@ -280,18 +280,27 @@ diff_added_blob(struct got_object_id *id, FILE *f, const char *label,
 	const struct got_error *err;
 	struct got_blob_object  *blob = NULL;
 	struct got_object *obj = NULL;
+	int fd = -1;
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
 
-	err = got_object_blob_open(&blob, repo, obj, 8192);
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	err = got_object_blob_open(&blob, repo, obj, 8192, fd);
 	if (err)
 		goto done;
 	err = cb(cb_arg, NULL, blob, NULL, f, NULL, id,
 	    NULL, label, 0, mode, repo);
 done:
 	got_object_close(obj);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	return err;
@@ -308,10 +317,23 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	struct got_object *obj2 = NULL;
 	struct got_blob_object *blob1 = NULL;
 	struct got_blob_object *blob2 = NULL;
+	int fd1 = -1, fd2 = -1;
 
 	err = got_object_open(&obj1, repo, id1);
 	if (err)
 		return err;
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	if (obj1->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
@@ -325,11 +347,11 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 		goto done;
 	}
 
-	err = got_object_blob_open(&blob1, repo, obj1, 8192);
+	err = got_object_blob_open(&blob1, repo, obj1, 8192, fd1);
 	if (err)
 		goto done;
 
-	err = got_object_blob_open(&blob2, repo, obj2, 8192);
+	err = got_object_blob_open(&blob2, repo, obj2, 8192, fd2);
 	if (err)
 		goto done;
 
@@ -340,8 +362,12 @@ done:
 		got_object_close(obj1);
 	if (obj2)
 		got_object_close(obj2);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob2)
 		got_object_blob_close(blob2);
 	return err;
@@ -354,18 +380,25 @@ diff_deleted_blob(struct got_object_id *id, FILE *f, const char *label,
 	const struct got_error *err;
 	struct got_blob_object  *blob = NULL;
 	struct got_object *obj = NULL;
+	int fd = -1;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
 
-	err = got_object_blob_open(&blob, repo, obj, 8192);
+	err = got_object_blob_open(&blob, repo, obj, 8192, fd);
 	if (err)
 		goto done;
 	err = cb(cb_arg, blob, NULL, f, NULL, id, NULL, label, NULL,
 	    mode, 0, repo);
 done:
 	got_object_close(obj);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	return err;
@@ -723,17 +756,27 @@ got_diff_objects_as_blobs(off_t **line_offsets, size_t *nlines,
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
+	int fd1 = -1, fd2 = -1;
 
 	if (id1 == NULL && id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
+		return got_error_from_errno("got_opentempfd");
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	if (id1) {
-		err = got_object_open_as_blob(&blob1, repo, id1, 8192);
+		err = got_object_open_as_blob(&blob1, repo, id1, 8192, fd1);
 		if (err)
 			goto done;
 	}
 	if (id2) {
-		err = got_object_open_as_blob(&blob2, repo, id2, 8192);
+		err = got_object_open_as_blob(&blob2, repo, id2, 8192, fd2);
 		if (err)
 			goto done;
 	}
@@ -741,8 +784,12 @@ got_diff_objects_as_blobs(off_t **line_offsets, size_t *nlines,
 	    label1, label2, diff_context, ignore_whitespace, force_text_diff,
 	    outfile);
 done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob2)
 		got_object_blob_close(blob2);
 	return err;
@@ -758,7 +805,16 @@ diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_tree_object *subtree1 = NULL, *subtree2 = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
+	int fd1 = -1, fd2 = -1;
 
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
+		return got_error_from_errno("got_opentempfd");
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 	TAILQ_FOREACH(pe, paths, entry) {
 		int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
 		mode_t mode1 = 0, mode2 = 0;
@@ -820,13 +876,13 @@ diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		    type2 == GOT_OBJ_TYPE_BLOB) {
 			if (id1) {
 				err = got_object_open_as_blob(&blob1, repo,
-				    id1, 8192);
+				    id1, 8192, fd1);
 				if (err)
 					goto done;
 			}
 			if (id2) {
 				err = got_object_open_as_blob(&blob2, repo,
-				    id2, 8192);
+				    id2, 8192, fd2);
 				if (err)
 					goto done;
 			}
@@ -860,6 +916,10 @@ diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			err = got_error(GOT_ERR_OBJ_TYPE);
 			goto done;
 		}
+		if (ftruncate(fd1, 0L) == -1)
+			return got_error_from_errno("ftruncate");
+		if (ftruncate(fd2, 0L) == -1)
+			return got_error_from_errno("ftruncate");
 	}
 done:
 	free(id1);
@@ -868,8 +928,12 @@ done:
 		got_object_tree_close(subtree1);
 	if (subtree2)
 		got_object_tree_close(subtree2);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob2)
 		got_object_blob_close(blob2);
 	return err;

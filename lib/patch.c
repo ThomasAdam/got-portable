@@ -585,6 +585,7 @@ open_blob(char **path, FILE **fp, const char *blobid,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_object_id id, *idptr, *matched_id = NULL;
+	int fd = -1;
 
 	*fp = NULL;
 	*path = NULL;
@@ -602,7 +603,13 @@ open_blob(char **path, FILE **fp, const char *blobid,
 		idptr = &id;
 	}
 
-	err = got_object_open_as_blob(&blob, repo, idptr, 8192);
+	fd = got_opentempfd();
+	if (fd == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	err = got_object_open_as_blob(&blob, repo, idptr, 8192, fd);
 	if (err)
 		goto done;
 
@@ -615,6 +622,8 @@ open_blob(char **path, FILE **fp, const char *blobid,
 		goto done;
 
 done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
 	if (matched_id != NULL)
