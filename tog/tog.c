@@ -4657,14 +4657,18 @@ blame_thread(void *arg)
 	const struct got_error *err, *close_err;
 	struct tog_blame_thread_args *ta = arg;
 	struct tog_blame_cb_args *a = ta->cb_args;
-	int errcode;
+	int errcode, fd = -1;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return (void *)got_error_from_errno("got_opentempfd");
 
 	err = block_signals_used_by_main_thread();
 	if (err)
 		return (void *)err;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg);
+	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg, fd);
 	if (err && err->code == GOT_ERR_CANCELLED)
 		err = NULL;
 
@@ -4682,6 +4686,9 @@ blame_thread(void *arg)
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode && err == NULL)
 		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
+
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 
 	return (void *)err;
 }
