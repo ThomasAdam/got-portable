@@ -903,12 +903,19 @@ view_search_start(struct tog_view *view)
 static int
 get_compound_key(struct tog_view *view, int c)
 {
-	int n = 0;
+	int x, n = 0;
 
 	view->count = 0;
 	halfdelay(5);  /* block for half a second */
+	wattron(view->window, A_BOLD);
+	wmove(view->window, view->nlines - 1, 0);
+	wclrtoeol(view->window);
+	waddch(view->window, ':');
 
 	do {
+		x = getcurx(view->window);
+		if (x != ERR && x < view->ncols)
+			waddch(view->window, c);
 		/*
 		 * Don't overflow. Max valid request should be the greatest
 		 * between the longest and total lines; cap at 10 million.
@@ -922,6 +929,7 @@ get_compound_key(struct tog_view *view, int c)
 	/* Massage excessive or inapplicable values at the input handler. */
 	view->count = n;
 
+	wattroff(view->window, A_BOLD);
 	cbreak();  /* return to blocking */
 	return c;
 }
