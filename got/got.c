@@ -6869,17 +6869,48 @@ done:
 #endif
 
 static const struct got_error *
-list_tags(struct got_repository *repo)
+get_tag_refname(char **refname, const char *tag_name)
+{
+	const struct got_error *err;
+
+	if (strncmp("refs/tags/", tag_name, 10) == 0) {
+		*refname = strdup(tag_name);
+		if (*refname == NULL)
+			return got_error_from_errno("strdup");
+	} else if (asprintf(refname, "refs/tags/%s", tag_name) == -1) {
+		err = got_error_from_errno("asprintf");
+		*refname = NULL;
+		return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+list_tags(struct got_repository *repo, const char *tag_name)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
+	char *wanted_refname = NULL;
 
 	TAILQ_INIT(&refs);
 
 	err = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
 	if (err)
 		return err;
+
+	if (tag_name) {
+		struct got_reference *ref;
+		err = get_tag_refname(&wanted_refname, tag_name);
+		if (err)
+			goto done;
+		/* Wanted tag reference should exist. */
+		err = got_ref_open(&ref, repo, wanted_refname, 0);
+		if (err)
+			goto done;
+		got_ref_close(ref);
+	}
 
 	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname;
@@ -6892,7 +6923,8 @@ list_tags(struct got_repository *repo)
 		struct got_commit_object *commit = NULL;
 
 		refname = got_ref_get_name(re->ref);
-		if (strncmp(refname, "refs/tags/", 10) != 0)
+		if (strncmp(refname, "refs/tags/", 10) != 0 ||
+		    (wanted_refname && strcmp(refname, wanted_refname) != 0))
 			continue;
 		refname += 10;
 		refstr = got_ref_to_str(re->ref);
@@ -6985,9 +7017,10 @@ list_tags(struct got_repository *repo)
 		} while (line);
 		free(tagmsg0);
 	}
-
+done:
 	got_ref_list_free(&refs);
-	return NULL;
+	free(wanted_refname);
+	return err;
 }
 
 static const struct got_error *
@@ -7081,17 +7114,11 @@ add_tag(struct got_repository *repo, const char *tagger,
 	if (err)
 		goto done;
 
-	if (strncmp("refs/tags/", tag_name, 10) == 0) {
-		refname = strdup(tag_name);
-		if (refname == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		tag_name += 10;
-	} else if (asprintf(&refname, "refs/tags/%s", tag_name) == -1) {
-		err = got_error_from_errno("asprintf");
+	err = get_tag_refname(&refname, tag_name);
+	if (err)
 		goto done;
-	}
+	if (strncmp("refs/tags/", tag_name, 10) == 0)
+		tag_name += 10;
 
 	err = got_ref_open(&ref, repo, refname, 0);
 	if (err == NULL) {
@@ -7166,7 +7193,7 @@ cmd_tag(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
 	char *gitconfig_path = NULL, *tagger = NULL;
-	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
+	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0;
 	int *pack_fds = NULL;
 
@@ -7203,12 +7230,13 @@ cmd_tag(int argc, char *argv[])
 			    "-c option can only be used when creating a tag");
 		if (tagmsg)
 			option_conflict('l', 'm');
-		if (argc > 0)
+		if (argc > 1)
 			usage_tag();
 	} else if (argc != 1)
 		usage_tag();
 
-	tag_name = argv[0];
+	if (argc == 1)
+		tag_name = argv[0];
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
@@ -7266,7 +7294,7 @@ cmd_tag(int argc, char *argv[])
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
-		error = list_tags(repo);
+		error = list_tags(repo, tag_name);
 	} else {
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)
