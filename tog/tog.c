@@ -782,7 +782,8 @@ view_resize(struct tog_view *view)
 		ncols = view->ncols + (COLS - view->cols);
 
 	if (view->child) {
-		view->child->begin_x = view_split_begin_x(view->begin_x);
+		if (view->child->focussed)
+			view->child->begin_x = view_split_begin_x(view->begin_x);
 		if (view->child->begin_x == 0) {
 			ncols = COLS;
 
