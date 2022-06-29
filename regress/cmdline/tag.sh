@@ -177,6 +177,44 @@ test_tag_list() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -r $testroot/repo -l $tag > $testroot/stdout
+
+	echo "-----------------------------------------------" \
+		> $testroot/stdout.expected
+	echo "tag $tag $tag_id" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d1" >> $testroot/stdout.expected
+	echo "object: commit $commit_id" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " test" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -r $testroot/repo -l $tag2 > $testroot/stdout
+
+	echo "-----------------------------------------------" \
+		> $testroot/stdout.expected
+	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d2" >> $testroot/stdout.expected
+	echo "object: commit $commit_id" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " test" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
