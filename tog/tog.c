@@ -2628,6 +2628,82 @@ show_log_view(struct tog_view *view)
 	return draw_commits(view);
 }
 
+static void
+log_move_cursor_up(struct tog_view *view, int page, int home)
+{
+	struct tog_log_view_state *s = &view->state.log;
+
+	if (s->selected_entry->idx == 0)
+		view->count = 0;
+	if (s->first_displayed_entry == NULL)
+		return;
+
+	if ((page && TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
+	    || home)
+		s->selected = home ? 0 : MAX(0, s->selected - page - 1);
+
+	if (!page && !home && s->selected > 0)
+		--s->selected;
+	else
+		log_scroll_up(s, home ? s->commits.ncommits : MAX(page, 1));
+
+	select_commit(s);
+	return;
+}
+
+static const struct got_error *
+log_move_cursor_down(struct tog_view *view, int page)
+{
+	struct tog_log_view_state	*s = &view->state.log;
+	struct commit_queue_entry	*first;
+	const struct got_error		*err = NULL;
+
+	first = s->first_displayed_entry;
+	if (first == NULL) {
+		view->count = 0;
+		return NULL;
+	}
+
+	if (s->thread_args.log_complete &&
+	    s->selected_entry->idx >= s->commits.ncommits - 1)
+		return NULL;
+
+	if (!page) {
+		int eos = view->nlines - 2;
+
+		if (s->selected < MIN(eos, s->commits.ncommits - 1))
+			++s->selected;
+		else
+			err = log_scroll_down(view, 1);
+	} else if (s->thread_args.log_complete) {
+		if (s->last_displayed_entry->idx == s->commits.ncommits - 1)
+			s->selected += MIN(s->last_displayed_entry->idx -
+			    s->selected_entry->idx, page + 1);
+		else
+			err = log_scroll_down(view, MIN(page,
+			    s->commits.ncommits - s->selected_entry->idx - 1));
+		s->selected = MIN(view->nlines - 2, s->commits.ncommits - 1);
+	} else {
+		err = log_scroll_down(view, page);
+		if (err)
+			return err;
+		if (first == s->first_displayed_entry && s->selected <
+		    MIN(view->nlines - 2, s->commits.ncommits - 1)) {
+			s->selected = MIN(s->commits.ncommits - 1, page);
+		}
+	}
+	if (err)
+		return err;
+
+	select_commit(s);
+
+	if (s->thread_args.log_complete &&
+	    s->selected_entry->idx == s->commits.ncommits - 1)
+		view->count = 0;
+
+	return NULL;
+}
+
 static const struct got_error *
 input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
@@ -2643,12 +2719,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->thread_args.load_all = 0;
 		else if (s->thread_args.log_complete) {
 			s->thread_args.load_all = 0;
-			log_scroll_down(view, s->commits.ncommits);
-			s->selected = MIN(view->nlines - 2,
-			    s->commits.ncommits - 1);
-			select_commit(s);
+			err = log_move_cursor_down(view, s->commits.ncommits);
 		}
-		return NULL;
+		return err;
 	}
 
 	switch (ch) {
@@ -2680,21 +2753,11 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case '<':
 	case ',':
 	case CTRL('p'):
-		if (s->selected_entry->idx == 0)
-			view->count = 0;
-		if (s->first_displayed_entry == NULL)
-			break;
-		if (s->selected > 0)
-			s->selected--;
-		else
-			log_scroll_up(s, 1);
-		select_commit(s);
+		log_move_cursor_up(view, 0, 0);
 		break;
 	case 'g':
 	case KEY_HOME:
-		s->selected = 0;
-		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
-		select_commit(s);
+		log_move_cursor_up(view, 0, 1);
 		view->count = 0;
 		break;
 	case CTRL('u'):
@@ -2704,35 +2767,14 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_PPAGE:
 	case CTRL('b'):
 	case 'b':
-		if (s->first_displayed_entry == NULL)
-			break;
-		if (TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
-			s->selected = MAX(0, s->selected - nscroll - 1);
-		else
-			log_scroll_up(s, nscroll);
-		select_commit(s);
-		if (s->selected_entry->idx == 0)
-			view->count = 0;
+		log_move_cursor_up(view, nscroll, 0);
 		break;
 	case 'j':
 	case KEY_DOWN:
 	case '>':
 	case '.':
 	case CTRL('n'):
-		if (s->first_displayed_entry == NULL)
-			break;
-		if (s->selected < MIN(view->nlines - 2,
-		    s->commits.ncommits - 1))
-			s->selected++;
-		else {
-			err = log_scroll_down(view, 1);
-			if (err)
-				break;
-		}
-		select_commit(s);
-		if (s->thread_args.log_complete &&
-		    s->selected_entry->idx == s->commits.ncommits - 1)
-			view->count = 0;
+		err = log_move_cursor_down(view, 0);
 		break;
 	case 'G':
 	case KEY_END: {
@@ -2764,29 +2806,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_NPAGE:
 	case CTRL('f'):
 	case 'f':
-	case ' ': {
-		struct commit_queue_entry *first;
-		first = s->first_displayed_entry;
-		if (first == NULL) {
-			view->count = 0;
-			break;
-		}
-		err = log_scroll_down(view, nscroll);
-		if (err)
-			break;
-		if (first == s->first_displayed_entry &&
-		    s->selected < MIN(view->nlines - 2,
-		    s->commits.ncommits - 1)) {
-			/* can't scroll further down */
-			s->selected += MIN(s->last_displayed_entry->idx -
-			    s->selected_entry->idx, nscroll + 1);
-		}
-		select_commit(s);
-		if (s->thread_args.log_complete &&
-		    s->selected_entry->idx == s->commits.ncommits - 1)
-			view->count = 0;
+	case ' ':
+		err = log_move_cursor_down(view, nscroll);
 		break;
-	}
 	case KEY_RESIZE:
 		if (s->selected > view->nlines - 2)
 			s->selected = view->nlines - 2;
