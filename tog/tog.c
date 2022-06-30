@@ -4907,25 +4907,45 @@ blame_thread(void *arg)
 	const struct got_error *err, *close_err;
 	struct tog_blame_thread_args *ta = arg;
 	struct tog_blame_cb_args *a = ta->cb_args;
-	int errcode, fd = -1;
+	int errcode, fd1 = -1, fd2 = -1;
+	FILE *f1 = NULL, *f2 = NULL;
 
-	fd = got_opentempfd();
-	if (fd == -1)
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
 		return (void *)got_error_from_errno("got_opentempfd");
+
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		err = (void *)got_error_from_errno("got_opentemp");
+		goto done;
+	}
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		err = (void *)got_error_from_errno("got_opentemp");
+		goto done;
+	}
 
 	err = block_signals_used_by_main_thread();
 	if (err)
-		return (void *)err;
+		goto done;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg, fd);
+	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg, fd1, fd2, f1,
+	    f2);
 	if (err && err->code == GOT_ERR_CANCELLED)
 		err = NULL;
 
 	errcode = pthread_mutex_lock(&tog_mutex);
-	if (errcode)
-		return (void *)got_error_set_errno(errcode,
-		    "pthread_mutex_lock");
+	if (errcode) {
+		err = got_error_set_errno(errcode, "pthread_mutex_lock");
+		goto done;
+	}
 
 	close_err = got_repo_close(ta->repo);
 	if (err == NULL)
@@ -4937,8 +4957,15 @@ blame_thread(void *arg)
 	if (errcode && err == NULL)
 		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
 
-	if (fd != -1 && close(fd) == -1 && err == NULL)
+done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (f1 && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 
 	return (void *)err;
 }

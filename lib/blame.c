@@ -65,6 +65,7 @@ struct got_blame {
 	 */
 	FILE *f1; /* older version from commit N-1. */
 	FILE *f2; /* newer version from commit N. */
+	int fd;
 	unsigned char *map1;
 	unsigned char *map2;
 	off_t size1;
@@ -204,7 +205,6 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	struct got_object_id *pblob_id = NULL;
 	struct got_blob_object *pblob = NULL;
 	struct diff_result *diff_result = NULL;
-	int fd = -1;
 
 	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
@@ -214,12 +214,6 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (pid == NULL) {
 		got_object_commit_close(commit);
 		return NULL;
-	}
-
-	fd = got_opentempfd();
-	if (fd == -1) {
-		err = got_error_from_errno("got_opentempfd");
-		goto done;
 	}
 
 	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
@@ -233,15 +227,9 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		goto done;
 	}
 
-	err = got_object_open_as_blob(&pblob, repo, pblob_id, 8192, fd);
+	err = got_object_open_as_blob(&pblob, repo, pblob_id, 8192, blame->fd);
 	if (err)
 		goto done;
-
-	blame->f1 = got_opentemp();
-	if (blame->f1 == NULL) {
-		err = got_error_from_errno("got_opentemp");
-		goto done;
-	}
 
 	err = blame_prepare_file(blame->f1, &blame->map1, &blame->size1,
 	    &blame->nlines1, &blame->line_offsets1, blame->data1,
@@ -280,8 +268,6 @@ done:
 	if (pcommit)
 		got_object_commit_close(pcommit);
 	free(pblob_id);
-	if (fd != -1 && close(fd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
 	if (pblob)
 		got_object_blob_close(pblob);
 	return err;
@@ -304,10 +290,6 @@ blame_close(struct got_blame *blame)
 		if (munmap(blame->map2, blame->size2) == -1 && err == NULL)
 			err = got_error_from_errno("munmap");
 	}
-	if (blame->f1 && fclose(blame->f1) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (blame->f2 && fclose(blame->f2) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	free(blame->lines);
 	free(blame->line_offsets1);
 	free(blame->line_offsets2);
@@ -466,9 +448,11 @@ blame_atomize_file(void *arg, struct diff_data *d)
 }
 
 static const struct got_error *
-close_file2_and_reuse_file1(struct got_blame *blame)
+flip_files(struct got_blame *blame)
 {
+	const struct got_error *err = NULL;
 	struct diff_data *d;
+	FILE *tmp;
 
 	free(blame->line_offsets2);
 	blame->line_offsets2 = blame->line_offsets1;
@@ -483,15 +467,16 @@ close_file2_and_reuse_file1(struct got_blame *blame)
 			return got_error_from_errno("munmap");
 		blame->map2 = blame->map1;
 		blame->map1 = NULL;
-
 	}
 	blame->size2 = blame->size1;
-	blame->size1 = 0;
 
-	if (fclose(blame->f2) == EOF)
-		return got_error_from_errno("fclose");
+	err = got_opentemp_truncate(blame->f2);
+	if (err)
+		return err; 
+	tmp = blame->f2;
 	blame->f2 = blame->f1;
-	blame->f1 = NULL;
+	blame->f1 = tmp;
+	blame->size1 = 0;
 
 	blame->nlines2 = blame->nlines1;
 	blame->nlines1 = 0;
@@ -509,7 +494,7 @@ static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
     struct got_object_id *start_commit_id, struct got_repository *repo,
     got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void *cancel_arg,
-    int fd)
+    int fd1, int fd2, FILE *f1, FILE *f2)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *start_commit = NULL, *last_commit = NULL;
@@ -530,7 +515,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd);
+	err = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd1);
 	if (err)
 		goto done;
 
@@ -551,11 +536,10 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 
-	blame->f2 = got_opentemp();
-	if (blame->f2 == NULL) {
-		err = got_error_from_errno("got_opentemp");
-		goto done;
-	}
+	blame->f1 = f1;
+	blame->f2 = f2;
+	blame->fd = fd2;
+
 	err = got_diff_get_config(&blame->cfg, GOT_DIFF_ALGORITHM_PATIENCE,
 	    blame_atomize_file, blame);
 	if (err)
@@ -619,7 +603,7 @@ blame_open(struct got_blame **blamep, const char *path,
 			if (blame->nannotated == blame->nlines)
 				break;
 
-			err = close_file2_and_reuse_file1(blame);
+			err = flip_files(blame);
 			if (err)
 				goto done;
 		}
@@ -660,7 +644,8 @@ done:
 const struct got_error *
 got_blame(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo, got_blame_cb cb, void *arg,
-    got_cancel_cb cancel_cb, void* cancel_arg, int fd)
+    got_cancel_cb cancel_cb, void* cancel_arg, int fd1, int fd2, FILE *f1,
+    FILE *f2)
 {
 	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
@@ -670,7 +655,7 @@ got_blame(const char *path, struct got_object_id *commit_id,
 		return got_error_from_errno2("asprintf", path);
 
 	err = blame_open(&blame, abspath, commit_id, repo, cb, arg,
-	    cancel_cb, cancel_arg, fd);
+	    cancel_cb, cancel_arg, fd1, fd2, f1, f2);
 	free(abspath);
 	if (blame)
 		close_err = blame_close(blame);
