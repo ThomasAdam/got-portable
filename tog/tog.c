@@ -2816,7 +2816,7 @@ log_move_cursor_down(struct tog_view *view, int page)
 			++s->selected;
 		else
 			err = log_scroll_down(view, 1);
-	} else if (s->thread_args.log_complete) {
+	} else if (s->thread_args.load_all) {
 		if (s->last_displayed_entry->idx == s->commits.ncommits - 1)
 			s->selected += MIN(s->last_displayed_entry->idx -
 			    s->selected_entry->idx, page + 1);
@@ -2899,17 +2899,23 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_view *diff_view = NULL, *tree_view = NULL;
 	struct tog_view *ref_view = NULL;
 	struct commit_queue_entry *entry;
-	int begin_x = 0, begin_y = 0, n, nscroll = view->nlines - 1;
+	int begin_x = 0, begin_y = 0, eos, n, nscroll;
 
 	if (s->thread_args.load_all) {
 		if (ch == KEY_BACKSPACE)
 			s->thread_args.load_all = 0;
 		else if (s->thread_args.log_complete) {
-			s->thread_args.load_all = 0;
 			err = log_move_cursor_down(view, s->commits.ncommits);
+			s->thread_args.load_all = 0;
 		}
 		return err;
 	}
+
+	eos = nscroll = view->nlines - 1;
+	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
+	    view_is_splitscreen(view->child))
+		--eos;  /* border */
+
 
 	switch (ch) {
 	case 'q':
@@ -2975,7 +2981,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 		s->selected = 0;
 		entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
-		for (n = 0; n < view->nlines - 1; n++) {
+		for (n = 0; n < eos; n++) {
 			if (entry == NULL)
 				break;
 			s->first_displayed_entry = entry;
