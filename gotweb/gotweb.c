@@ -4082,12 +4082,23 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
-	int i, obj_type, fd = -1, fd1 = -1;
+	int i, obj_type, fd1 = -1, fd2 = -1, fd3 = -1;
 	off_t filesize;
+	FILE *f1 = NULL, *f2 = NULL;
 
-	fd = got_opentempfd();
-	if (fd == -1)
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
 		return got_error_from_errno("got_opentempfd");
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	fd3 = got_opentempfd();
+	if (fd3 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 
 	memset(&bca, 0, sizeof(bca));
 
@@ -4132,7 +4143,7 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 	}
 
 	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192,
-	    fd);
+	    fd1);
 	if (error)
 		goto done;
 
@@ -4171,18 +4182,35 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	}
 
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
 	error = got_blame(in_repo_path, commit_id, gw_trans->repo, gw_blame_cb,
-	    &bca, NULL, NULL, fd1);
+	    &bca, NULL, NULL, fd2, fd3, f1, f2);
 done:
 	free(in_repo_path);
 	free(commit_id);
 	free(obj_id);
 	free(path);
 
-	if (fd != -1 && close(fd) == -1 && error == NULL)
-		error = got_error_from_errno("close");
 	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
 		error = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd3 != -1 && close(fd3) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (f1 && fclose(f1) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 
 	if (blob) {
 		free(bca.line_offsets);

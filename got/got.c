@@ -5359,12 +5359,13 @@ cmd_blame(int argc, char *argv[])
 	struct got_blob_object *blob = NULL;
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
-	int ch, obj_type, i, fd = -1, fd1 = -1;
+	int ch, obj_type, i, fd1 = -1, fd2 = -1, fd3 = -1;
 	off_t filesize;
 	int *pack_fds = NULL;
+	FILE *f1 = NULL, *f2 = NULL;
 
-	fd = got_opentempfd();
-	if (fd == -1)
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
 		return got_error_from_errno("got_opentempfd");
 
 	memset(&bca, 0, sizeof(bca));
@@ -5517,7 +5518,7 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd);
+	error = got_object_open_as_blob(&blob, repo, obj_id, 8192, fd1);
 	if (error)
 		goto done;
 	bca.f = got_opentemp();
@@ -5548,13 +5549,28 @@ cmd_blame(int argc, char *argv[])
 	}
 	bca.repo = repo;
 
-	fd1 = got_opentempfd();
-	if (fd1 == -1) {
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
 		error = got_error_from_errno("got_opentempfd");
 		goto done;
 	}
+	fd3 = got_opentempfd();
+	if (fd3 == -1) {
+		error = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
 	error = got_blame(link_target ? link_target : in_repo_path, commit_id,
-	    repo, blame_cb, &bca, check_cancelled, NULL, fd1);
+	    repo, blame_cb, &bca, check_cancelled, NULL, fd2, fd3, f1, f2);
 done:
 	free(in_repo_path);
 	free(link_target);
@@ -5564,10 +5580,18 @@ done:
 	free(obj_id);
 	if (commit)
 		got_object_commit_close(commit);
-	if (fd != -1 && close(fd) == -1 && error == NULL)
-		error = got_error_from_errno("close");
+
 	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
 		error = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd3 != -1 && close(fd3) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (f1 && fclose(f1) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+
 	if (blob)
 		got_object_blob_close(blob);
 	if (worktree)
