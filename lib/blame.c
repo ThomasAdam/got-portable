@@ -32,9 +32,10 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_cancel.h"
-#include "got_blame.h"
 #include "got_commit_graph.h"
 #include "got_opentemp.h"
+#include "got_diff.h"
+#include "got_blame.h"
 
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"
@@ -493,7 +494,8 @@ flip_files(struct got_blame *blame)
 static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
     struct got_object_id *start_commit_id, struct got_repository *repo,
-    got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void *cancel_arg,
+    enum got_diff_algorithm diff_algo, got_blame_cb cb, void *arg,
+    got_cancel_cb cancel_cb, void *cancel_arg,
     int fd1, int fd2, FILE *f1, FILE *f2)
 {
 	const struct got_error *err = NULL;
@@ -540,8 +542,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	blame->f2 = f2;
 	blame->fd = fd2;
 
-	err = got_diff_get_config(&blame->cfg, GOT_DIFF_ALGORITHM_PATIENCE,
-	    blame_atomize_file, blame);
+	err = got_diff_get_config(&blame->cfg, diff_algo, blame_atomize_file,
+	    blame);
 	if (err)
 		goto done;
 
@@ -643,9 +645,9 @@ done:
 
 const struct got_error *
 got_blame(const char *path, struct got_object_id *commit_id,
-    struct got_repository *repo, got_blame_cb cb, void *arg,
-    got_cancel_cb cancel_cb, void* cancel_arg, int fd1, int fd2, FILE *f1,
-    FILE *f2)
+    struct got_repository *repo, enum got_diff_algorithm diff_algo,
+    got_blame_cb cb, void *arg, got_cancel_cb cancel_cb, void* cancel_arg,
+    int fd1, int fd2, FILE *f1, FILE *f2)
 {
 	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
@@ -654,8 +656,8 @@ got_blame(const char *path, struct got_object_id *commit_id,
 	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
 		return got_error_from_errno2("asprintf", path);
 
-	err = blame_open(&blame, abspath, commit_id, repo, cb, arg,
-	    cancel_cb, cancel_arg, fd1, fd2, f1, f2);
+	err = blame_open(&blame, abspath, commit_id, repo, diff_algo,
+	    cb, arg, cancel_cb, cancel_arg, fd1, fd2, f1, f2);
 	free(abspath);
 	if (blame)
 		close_err = blame_close(blame);

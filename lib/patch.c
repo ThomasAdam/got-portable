@@ -45,6 +45,7 @@
 #include "got_repository.h"
 #include "got_opentemp.h"
 #include "got_patch.h"
+#include "got_diff.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_diff.h"

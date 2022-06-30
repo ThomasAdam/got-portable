@@ -3584,7 +3584,8 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 	while (path[0] == '/')
 		path++;
 	err = got_diff_blob(NULL, NULL, blob1, blob2, f1, f2, path, path,
-	    diff_context, ignore_whitespace, force_text_diff, outfile);
+	    GOT_DIFF_ALGORITHM_PATIENCE, diff_context, ignore_whitespace,
+	    force_text_diff, outfile);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -3645,6 +3646,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
+	arg.diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
 	arg.outfile = outfile;
 	arg.line_offsets = NULL;
 	arg.nlines = 0;
@@ -4590,6 +4592,7 @@ struct print_diff_arg {
 	const char *id_str;
 	int header_shown;
 	int diff_staged;
+	enum got_diff_algorithm diff_algo;
 	int ignore_whitespace;
 	int force_text_diff;
 	FILE *f1;
@@ -4720,8 +4723,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		}
 		err = got_diff_objects_as_blobs(NULL, NULL, a->f1, a->f2,
 		    fd1, fd2, blob_id, staged_blob_id, label1, label2,
-		    a->diff_context, a->ignore_whitespace, a->force_text_diff,
-		    a->repo, stdout);
+		    a->diff_algo, a->diff_context, a->ignore_whitespace,
+		    a->force_text_diff, a->repo, stdout);
 		goto done;
 	}
 
@@ -4812,8 +4815,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	err = got_diff_blob_file(blob1, a->f1, size1, label1, f2 ? f2 : a->f2,
-	    f2_exists, sb.st_size, path, a->diff_context, a->ignore_whitespace,
-	    a->force_text_diff, stdout);
+	    f2_exists, sb.st_size, path, GOT_DIFF_ALGORITHM_PATIENCE,
+	    a->diff_context, a->ignore_whitespace, a->force_text_diff, stdout);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -5031,6 +5034,7 @@ cmd_diff(int argc, char *argv[])
 			goto done;
 		arg.repo = repo;
 		arg.worktree = worktree;
+		arg.diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
 		arg.diff_context = diff_context;
 		arg.id_str = id_str;
 		arg.header_shown = 0;
@@ -5175,18 +5179,21 @@ cmd_diff(int argc, char *argv[])
 	switch (type1 == GOT_OBJ_TYPE_ANY ? type2 : type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
-		    fd1, fd2, ids[0], ids[1], NULL, NULL, diff_context,
+		    fd1, fd2, ids[0], ids[1], NULL, NULL,
+		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
 		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd1, fd2,
-		    ids[0], ids[1], &paths, "", "", diff_context,
+		    ids[0], ids[1], &paths, "", "",
+		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
 		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", labels[0], labels[1]);
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
-		    fd1, fd2, ids[0], ids[1], &paths, diff_context,
+		    fd1, fd2, ids[0], ids[1], &paths,
+		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
 		    ignore_whitespace, force_text_diff, repo, stdout);
 		break;
 	default:
@@ -5569,7 +5576,8 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 	error = got_blame(link_target ? link_target : in_repo_path, commit_id,
-	    repo, blame_cb, &bca, check_cancelled, NULL, fd2, fd3, f1, f2);
+	    repo, GOT_DIFF_ALGORITHM_PATIENCE, blame_cb, &bca,
+	    check_cancelled, NULL, fd2, fd3, f1, f2);
 done:
 	free(in_repo_path);
 	free(link_target);

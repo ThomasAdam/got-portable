@@ -18,11 +18,6 @@
 #include "diff_main.h"
 #include "diff_output.h"
 
-enum got_diff_algorithm {
-	GOT_DIFF_ALGORITHM_MYERS,
-	GOT_DIFF_ALGORITHM_PATIENCE,
-};
-
 enum got_diff_output_format {
 	GOT_DIFF_OUTPUT_UNIDIFF,
 	GOT_DIFF_OUTPUT_EDSCRIPT,
@@ -63,4 +58,5 @@ const struct got_error *got_merge_diff3(int *, int, FILE *, FILE *, FILE *,
     const char *, const char *, const char *, enum got_diff_algorithm);
 
 const struct got_error *got_diff_files(struct got_diffreg_result **, FILE *,
-    int, const char *, FILE *, int, const char *, int, int, int, FILE *);
+    int, const char *, FILE *, int, const char *, int, int, int, FILE *,
+    enum got_diff_algorithm);

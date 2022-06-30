@@ -2912,17 +2912,18 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
-		    fd1, fd2, id1, id2, NULL, NULL, 3, 0, 0,
-		    gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, NULL, GOT_DIFF_ALGORITHM_PATIENCE,
+		    3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2,
-		    fd1, fd2, id1, id2, NULL, "", "", 3, 0, 0,
-		    gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, "", "",
+		    GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
-		    fd1, fd2, id1, id2, NULL, 3, 0, 0, gw_trans->repo, f);
+		    fd1, fd2, id1, id2, NULL, GOT_DIFF_ALGORITHM_PATIENCE,
+		    3, 0, 0, gw_trans->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -4194,8 +4195,9 @@ gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	}
 
-	error = got_blame(in_repo_path, commit_id, gw_trans->repo, gw_blame_cb,
-	    &bca, NULL, NULL, fd2, fd3, f1, f2);
+	error = got_blame(in_repo_path, commit_id, gw_trans->repo,
+	    GOT_DIFF_ALGORITHM_PATIENCE, gw_blame_cb, &bca, NULL, NULL,
+	    fd2, fd3, f1, f2);
 done:
 	free(in_repo_path);
 	free(commit_id);
