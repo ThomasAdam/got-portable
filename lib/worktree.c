@@ -4543,8 +4543,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		goto done;
 
-	err = got_diff_files(&diffreg_result, f1, id_str, f2, path2, 3, 0, 1,
-	    NULL);
+	err = got_diff_files(&diffreg_result, f1, 1, id_str, f2, 1, path2,
+	    3, 0, 1, NULL);
 	if (err)
 		goto done;
 
@@ -8358,7 +8358,7 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
-	err = got_diff_files(&diffreg_result, f1, label1, f2,
+	err = got_diff_files(&diffreg_result, f1, 1, label1, f2, 1,
 	    path2, 3, 0, 1, NULL);
 	if (err)
 		goto done;

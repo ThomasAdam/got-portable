@@ -90,8 +90,7 @@ const struct diff_config diff_config_no_algo = {
 };
 
 const struct got_error *
-got_diffreg_close(FILE *f1, char *p1, size_t size1,
-    FILE *f2, char *p2, size_t size2)
+got_diffreg_close(char *p1, size_t size1, char *p2, size_t size2)
 {
 	const struct got_error *err = NULL;
 
@@ -99,10 +98,6 @@ got_diffreg_close(FILE *f1, char *p1, size_t size1,
 		err = got_error_from_errno("munmap");
 	if (p2 && munmap(p2, size2) == -1 && err == NULL)
 		err = got_error_from_errno("munmap");
-	if (f1 && fclose(f1) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -186,7 +181,6 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 	const struct got_error *err = NULL;
 	struct diff_config *cfg = NULL;
 	char *p1 = NULL, *p2 = NULL;
-	int f1_created = 0, f2_created = 0;
 	size_t size1, size2;
 	struct diff_data d_left, d_right;
 	struct diff_data *left, *right;
@@ -208,23 +202,6 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 	err = got_diff_get_config(&cfg, algorithm, NULL, NULL);
 	if (err)
 		goto done;
-
-	if (f1 == NULL) {
-		f1_created = 1;
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-	}
-	if (f2 == NULL) {
-		f2_created = 1;
-		f2 = got_opentemp();
-		if (f2 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-	}
 
 	err = got_diff_prepare_file(f1, &p1, &size1, left, cfg,
 	    ignore_whitespace, force_text_diff);
@@ -248,12 +225,8 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 
 	if (diffreg_result) {
 		(*diffreg_result)->result = diff_result;
-		if (f1_created)
-			(*diffreg_result)->f1 = f1;
 		(*diffreg_result)->map1 = p1;
 		(*diffreg_result)->size1 = size1;
-		if (f2_created)
-			(*diffreg_result)->f2 = f2;
 		(*diffreg_result)->map2 = p2;
 		(*diffreg_result)->size2 = size2;
 	}
@@ -264,8 +237,7 @@ done:
 		diff_data_free(right);
 	}
 	if (err) {
-		got_diffreg_close(f1_created ? f1 : NULL, p1, size1,
-		    f2_created ? f2 : NULL, p2, size2);
+		got_diffreg_close(p1, size1, p2, size2);
 		if (diffreg_result) {
 			diff_data_free(left);
 			diff_data_free(right);
@@ -352,8 +324,7 @@ got_diffreg_result_free(struct got_diffreg_result *diffreg_result)
 	diff_result_free(diffreg_result->result);
 	diff_data_free(&diffreg_result->left);
 	diff_data_free(&diffreg_result->right);
-	err = got_diffreg_close(diffreg_result->f1, diffreg_result->map1,
-	    diffreg_result->size1, diffreg_result->f2,
+	err = got_diffreg_close(diffreg_result->map1, diffreg_result->size1,
 	    diffreg_result->map2, diffreg_result->size2);
 	free(diffreg_result);
 	return err;
@@ -364,8 +335,8 @@ got_diffreg_result_free_left(struct got_diffreg_result *diffreg_result)
 {
 	diff_data_free(&diffreg_result->left);
 	memset(&diffreg_result->left, 0, sizeof(diffreg_result->left));
-	return got_diffreg_close(diffreg_result->f1, diffreg_result->map1,
-	    diffreg_result->size1, NULL, NULL, 0);
+	return got_diffreg_close(diffreg_result->map1, diffreg_result->size1,
+	    NULL, 0);
 }
 
 const struct got_error *
@@ -373,6 +344,6 @@ got_diffreg_result_free_right(struct got_diffreg_result *diffreg_result)
 {
 	diff_data_free(&diffreg_result->right);
 	memset(&diffreg_result->right, 0, sizeof(diffreg_result->right));
-	return got_diffreg_close(NULL, NULL, 0, diffreg_result->f2,
-	    diffreg_result->map2, diffreg_result->size2);
+	return got_diffreg_close(NULL, 0, diffreg_result->map2,
+	    diffreg_result->size2);
 }
