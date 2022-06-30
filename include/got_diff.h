@@ -14,6 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+enum got_diff_algorithm {
+	GOT_DIFF_ALGORITHM_MYERS,
+	GOT_DIFF_ALGORITHM_PATIENCE,
+};
+
 /*
  * Compute the differences between two blobs and write unified diff text
  * to the provided output file. Two open temporary files must be provided
@@ -31,7 +36,8 @@
  */
 const struct got_error *got_diff_blob(off_t **, size_t *,
     struct got_blob_object *, struct got_blob_object *, FILE *, FILE *,
-    const char *, const char *, int, int, int, FILE *);
+    const char *, const char *, enum got_diff_algorithm, int, int, int,
+    FILE *);
 
 /*
  * Compute the differences between a blob and a file and write unified diff
@@ -43,8 +49,8 @@ const struct got_error *got_diff_blob(off_t **, size_t *,
  * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
-    off_t, const char *, FILE *, int, size_t, const char *, int, int, int,
-    FILE *);
+    off_t, const char *, FILE *, int, size_t, const char *,
+    enum got_diff_algorithm, int, int, int, FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs
@@ -74,6 +80,7 @@ struct got_diff_blob_output_unidiff_arg {
 	int diff_context;	/* Sets the number of context lines. */
 	int ignore_whitespace;	/* Ignore whitespace differences. */
 	int force_text_diff;	/* Assume text even if binary data detected. */
+	enum got_diff_algorithm diff_algo; /* Diffing algorithm to use. */
 
 	/*
 	 * The number of lines contained in produced unidiff text output,
@@ -150,8 +157,10 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  */
 const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
     FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    const char *, const char *, int, int, int,
+    const char *, const char *, enum got_diff_algorithm, int, int, int,
     struct got_repository *, FILE *);
+
+struct got_pathlist_head;
 
 /*
  * Diff two objects, assuming both objects are trees. Two const char * diff
@@ -170,8 +179,8 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  */
 const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
     FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    struct got_pathlist_head *, const char *, const char *, int, int, int,
-    struct got_repository *, FILE *);
+    struct got_pathlist_head *, const char *, const char *,
+    enum got_diff_algorithm, int, int, int, struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
@@ -187,6 +196,7 @@ const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
  */
 const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
     FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    struct got_pathlist_head *, int, int, int, struct got_repository *, FILE *);
+    struct got_pathlist_head *, enum got_diff_algorithm, int, int, int,
+    struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

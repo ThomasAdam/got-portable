@@ -78,6 +78,7 @@
 #include "got_error.h"
 #include "got_opentemp.h"
 #include "got_object.h"
+#include "got_diff.h"
 
 #include "buf.h"
 #include "rcsutil.h"

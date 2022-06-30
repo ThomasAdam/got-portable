@@ -35,5 +35,5 @@ typedef const struct got_error *(*got_blame_cb)(void *, int, int,
  * aborted and the callback's error is returned from this function.
  */
 const struct got_error *got_blame(const char *,
-    struct got_object_id *, struct got_repository *,
+    struct got_object_id *, struct got_repository *, enum got_diff_algorithm,
     got_blame_cb, void *, got_cancel_cb, void *, int, int, FILE *, FILE *);

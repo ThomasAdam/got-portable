@@ -328,6 +328,7 @@ struct tog_diff_view_state {
 	int first_displayed_line;
 	int last_displayed_line;
 	int eof;
+	enum got_diff_algorithm diff_algo;
 	int diff_context;
 	int ignore_whitespace;
 	int force_text_diff;
@@ -3972,14 +3973,14 @@ create_diff(struct tog_diff_view_state *s)
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
-		    s->label1, s->label2, s->diff_context,
+		    s->label1, s->label2, s->diff_algo, s->diff_context,
 		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
-		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
-		    s->repo, s->f);
+		    s->diff_algo, s->diff_context, s->ignore_whitespace,
+		    s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -4014,8 +4015,8 @@ create_diff(struct tog_diff_view_state *s)
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
-		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
-		    s->repo, s->f);
+		    s->diff_algo, s->diff_context, s->ignore_whitespace,
+		    s->force_text_diff, s->repo, s->f);
 		break;
 	}
 	default:
@@ -4225,6 +4226,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
+	s->diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
@@ -4955,8 +4957,8 @@ blame_thread(void *arg)
 		goto done;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg, fd1, fd2, f1,
-	    f2);
+	    GOT_DIFF_ALGORITHM_MYERS, blame_cb, ta->cb_args,
+	    ta->cancel_cb, ta->cancel_arg, fd1, fd2, f1, f2);
 	if (err && err->code == GOT_ERR_CANCELLED)
 		err = NULL;
 
