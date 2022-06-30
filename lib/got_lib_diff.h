@@ -30,10 +30,8 @@ enum got_diff_output_format {
 
 struct got_diffreg_result {
 	struct diff_result *result;
-	FILE *f1;
 	char *map1;
 	size_t size1;
-	FILE *f2;
 	char *map2;
 	size_t size2;
 	struct diff_data left;
@@ -59,11 +57,10 @@ const struct got_error *got_diffreg_result_free_left(
     struct got_diffreg_result *);
 const struct got_error *got_diffreg_result_free_right(
     struct got_diffreg_result *);
-const struct got_error *got_diffreg_close(FILE *, char *, size_t,
-    FILE *, char *, size_t);
+const struct got_error *got_diffreg_close(char *, size_t, char *, size_t);
 
 const struct got_error *got_merge_diff3(int *, int, FILE *, FILE *, FILE *,
     const char *, const char *, const char *, enum got_diff_algorithm);
 
 const struct got_error *got_diff_files(struct got_diffreg_result **, FILE *,
-    const char *, FILE *, const char *, int, int, int, FILE *);
+    int, const char *, FILE *, int, const char *, int, int, int, FILE *);

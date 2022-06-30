@@ -3564,17 +3564,17 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 		    fd1);
 		if (err)
 			goto done;
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
 	}
 
 	err = got_object_open_as_blob(&blob2, repo, blob_id2, 8192, fd2);
 	if (err)
 		goto done;
 
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
 	f2 = got_opentemp();
 	if (f2 == NULL) {
 		err = got_error_from_errno("got_opentemp");
@@ -3615,12 +3615,6 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 		err = got_object_open_as_tree(&tree1, repo, tree_id1);
 		if (err)
 			goto done;
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-
 		fd1 = got_opentempfd();
 		if (fd1 == -1) {
 			err = got_error_from_errno("got_opentempfd");
@@ -3631,6 +3625,12 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	err = got_object_open_as_tree(&tree2, repo, tree_id2);
 	if (err)
 		goto done;
+
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
 
 	f2 = got_opentemp();
 	if (f2 == NULL) {
@@ -4592,6 +4592,8 @@ struct print_diff_arg {
 	int diff_staged;
 	int ignore_whitespace;
 	int force_text_diff;
+	FILE *f1;
+	FILE *f2;
 };
 
 /*
@@ -4650,10 +4652,11 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
 	int fd = -1, fd1 = -1, fd2 = -1;
-	FILE *f1 = NULL, *f2 = NULL;
+	FILE *f2 = NULL;
 	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
 	off_t size1 = 0;
+	int f2_exists = 1;
 
 	if (a->diff_staged) {
 		if (staged_status != GOT_STATUS_MODIFY &&
@@ -4671,6 +4674,13 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		    status != GOT_STATUS_CONFLICT)
 			return NULL;
 	}
+
+	err = got_opentemp_truncate(a->f1);
+	if (err)
+		return got_error_from_errno("got_opentemp_truncate");
+	err = got_opentemp_truncate(a->f2);
+	if (err)
+		return got_error_from_errno("got_opentemp_truncate");
 
 	if (!a->header_shown) {
 		printf("diff %s%s\n", a->diff_staged ? "-s " : "",
@@ -4698,16 +4708,6 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		default:
 			return got_error(GOT_ERR_FILE_STATUS);
 		}
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-		f2 = got_opentemp();
-		if (f2 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
 		fd1 = got_opentempfd();
 		if (fd1 == -1) {
 			err = got_error_from_errno("got_opentempfd");
@@ -4718,9 +4718,10 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			err = got_error_from_errno("got_opentempfd");
 			goto done;
 		}
-		err = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd1, fd2,
-		    blob_id, staged_blob_id, label1, label2, a->diff_context,
-		    a->ignore_whitespace, a->force_text_diff, a->repo, stdout);
+		err = got_diff_objects_as_blobs(NULL, NULL, a->f1, a->f2,
+		    fd1, fd2, blob_id, staged_blob_id, label1, label2,
+		    a->diff_context, a->ignore_whitespace, a->force_text_diff,
+		    a->repo, stdout);
 		goto done;
 	}
 
@@ -4798,24 +4799,21 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			goto done;
 		}
 		fd = -1;
-	} else
+	} else {
 		sb.st_size = 0;
+		f2_exists = 0;
+	}
 
 	if (blob1) {
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-		err = got_object_blob_dump_to_file(&size1, NULL, NULL, f1,
-		    blob1);
+		err = got_object_blob_dump_to_file(&size1, NULL, NULL,
+		    a->f1, blob1);
 		if (err)
 			goto done;
 	}
 
-	err = got_diff_blob_file(blob1, f1, size1, label1, f2, sb.st_size,
-	    path, a->diff_context, a->ignore_whitespace, a->force_text_diff,
-	    stdout);
+	err = got_diff_blob_file(blob1, a->f1, size1, label1, f2 ? f2 : a->f2,
+	    f2_exists, sb.st_size, path, a->diff_context, a->ignore_whitespace,
+	    a->force_text_diff, stdout);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -4823,12 +4821,10 @@ done:
 		err = got_error_from_errno("close");
 	if (blob1)
 		got_object_blob_close(blob1);
-	if (f1 && fclose(f1) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(abspath);
 	return err;
 }
@@ -4991,6 +4987,18 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
 	if (ncommit_args == 0 && (ids[0] == NULL || ids[1] == NULL)) {
 		struct print_diff_arg arg;
 		char *id_str;
@@ -5029,6 +5037,8 @@ cmd_diff(int argc, char *argv[])
 		arg.diff_staged = diff_staged;
 		arg.ignore_whitespace = ignore_whitespace;
 		arg.force_text_diff = force_text_diff;
+		arg.f1 = f1;
+		arg.f2 = f2;
 
 		error = got_worktree_status(worktree, &paths, repo, 0,
 		    print_diff, &arg, check_cancelled, NULL);
@@ -5148,18 +5158,6 @@ cmd_diff(int argc, char *argv[])
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
 		worktree = NULL;
-	}
-
-	f1 = got_opentemp();
-	if (f1 == NULL) {
-		error = got_error_from_errno("got_opentemp");
-		goto done;
-	}
-
-	f2 = got_opentemp();
-	if (f2 == NULL) {
-		error = got_error_from_errno("got_opentemp");
-		goto done;
 	}
 
 	fd1 = got_opentempfd();

@@ -20,11 +20,9 @@
  * for internal use; these files can be obtained from got_opentemp() and
  * must be closed by the caller.
  * If one of the blobs being diffed does not exist, all corresponding
- * blob object and temporary file arguments should be set to NULL.
+ * blob object arguments should be set to NULL.
  * Two const char * diff header labels may be provided which will be used
  * to identify each blob in the diff output.
- * The set of arguments relating to either blob may be NULL to indicate
- * that no content is present on its respective side of the diff.
  * If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in the diff must be specified as well.
  * Whitespace differences may optionally be ignored.
@@ -38,14 +36,15 @@ const struct got_error *got_diff_blob(off_t **, size_t *,
 /*
  * Compute the differences between a blob and a file and write unified diff
  * text to the provided output file. The blob object, its content, and its
- * size must be provided.The file's size must be provided, as well as a
+ * size must be provided. The file's size must be provided, as well as a
  * const char * diff header label which identifies the file.
  * An optional const char * diff header label for the blob may be provided, too.
  * The number of context lines to show in the diff must be specified as well.
  * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
-    off_t, const char *, FILE *, size_t, const char *, int, int, int, FILE *);
+    off_t, const char *, FILE *, int, size_t, const char *, int, int, int,
+    FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs
@@ -55,7 +54,7 @@ const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
  * the second blob contains content on the new side of the diff.
  * Two open temporary files must be provided for internal use; these files
  * can be obtained from got_opentemp() and must be closed by the caller.
- * The set of arguments relating to either blob may be NULL to indicate
+ * The blob object argument for either blob may be NULL to indicate
  * that no content is present on its respective side of the diff.
  * File modes from relevant tree objects which contain the blobs may
  * also be passed. These will be zero if not available.
