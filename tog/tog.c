@@ -788,6 +788,12 @@ view_is_splitscreen(struct tog_view *view)
 	return view->begin_x > 0 || view->begin_y > 0;
 }
 
+static int
+view_is_fullscreen(struct tog_view *view)
+{
+	return view->nlines == LINES && view->ncols == COLS;
+}
+
 static void
 view_border(struct tog_view *view)
 {
@@ -835,7 +841,7 @@ view_resize(struct tog_view *view)
 	if (view->child) {
 		int hs = view->child->begin_y;
 
-		if (view->child->focussed)
+		if (!view_is_fullscreen(view))
 			view->child->begin_x = view_split_begin_x(view->begin_x);
 		if (view->mode == TOG_VIEW_SPLIT_HRZN ||
 		    view->child->begin_x == 0) {
