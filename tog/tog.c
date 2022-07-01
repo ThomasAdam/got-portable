@@ -143,6 +143,7 @@ STAILQ_HEAD(tog_colors, tog_color);
 
 static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
+static enum got_diff_algorithm tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 
 static const struct got_error *
 tog_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
@@ -328,7 +329,6 @@ struct tog_diff_view_state {
 	int first_displayed_line;
 	int last_displayed_line;
 	int eof;
-	enum got_diff_algorithm diff_algo;
 	int diff_context;
 	int ignore_whitespace;
 	int force_text_diff;
@@ -551,6 +551,7 @@ struct tog_view {
 	const struct got_error *(*show)(struct tog_view *);
 	const struct got_error *(*input)(struct tog_view **,
 	    struct tog_view *, int);
+	const struct got_error *(*reset)(struct tog_view *);
 	const struct got_error *(*close)(struct tog_view *);
 
 	const struct got_error *(*search_start)(struct tog_view *);
@@ -574,6 +575,7 @@ static const struct got_error *open_diff_view(struct tog_view *,
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view *, int);
+static const struct got_error *reset_diff_view(struct tog_view *);
 static const struct got_error* close_diff_view(struct tog_view *);
 static const struct got_error *search_start_diff_view(struct tog_view *);
 static const struct got_error *search_next_diff_view(struct tog_view *);
@@ -593,6 +595,7 @@ static const struct got_error *open_blame_view(struct tog_view *, char *,
 static const struct got_error *show_blame_view(struct tog_view *);
 static const struct got_error *input_blame_view(struct tog_view **,
     struct tog_view *, int);
+static const struct got_error *reset_blame_view(struct tog_view *);
 static const struct got_error *close_blame_view(struct tog_view *);
 static const struct got_error *search_start_blame_view(struct tog_view *);
 static const struct got_error *search_next_blame_view(struct tog_view *);
@@ -657,7 +660,6 @@ tog_fatal_signal_received(void)
 	return (tog_sigpipe_received ||
 	    tog_sigint_received || tog_sigint_received);
 }
-
 
 static const struct got_error *
 view_close(struct tog_view *view)
@@ -1223,6 +1225,24 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			view->search_next(view);
 		} else
 			err = view->input(new, view, ch);
+		break;
+	case 'A':
+		if (tog_diff_algo == GOT_DIFF_ALGORITHM_MYERS)
+			tog_diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
+		else
+			tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
+		TAILQ_FOREACH(v, views, entry) {
+			if (v->reset) {
+				err = v->reset(v);
+				if (err)
+					return err;
+			}
+			if (v->child && v->child->reset) {
+				err = v->child->reset(v->child);
+				if (err)
+					return err;
+			}
+		}
 		break;
 	default:
 		err = view->input(new, view, ch);
@@ -3973,13 +3993,13 @@ create_diff(struct tog_diff_view_state *s)
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
-		    s->label1, s->label2, s->diff_algo, s->diff_context,
+		    s->label1, s->label2, tog_diff_algo, s->diff_context,
 		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
-		    s->diff_algo, s->diff_context, s->ignore_whitespace,
+		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
 		    s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
@@ -4015,7 +4035,7 @@ create_diff(struct tog_diff_view_state *s)
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
-		    s->diff_algo, s->diff_context, s->ignore_whitespace,
+		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
 		    s->force_text_diff, s->repo, s->f);
 		break;
 	}
@@ -4226,7 +4246,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
-	s->diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
@@ -4280,6 +4299,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 
 	view->show = show_diff_view;
 	view->input = input_diff_view;
+	view->reset = reset_diff_view;
 	view->close = close_diff_view;
 	view->search_start = search_start_diff_view;
 	view->search_next = search_next_diff_view;
@@ -4350,6 +4370,20 @@ set_selected_commit(struct tog_diff_view_state *s,
 }
 
 static const struct got_error *
+reset_diff_view(struct tog_view *view)
+{
+	struct tog_diff_view_state *s = &view->state.diff;
+
+	view->count = 0;
+	wclear(view->window);
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->matched_line = 0;
+	diff_view_indicate_progress(view);
+	return create_diff(s);
+}
+
+static const struct got_error *
 input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
@@ -4388,13 +4422,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->force_text_diff = !s->force_text_diff;
 		if (ch == 'w')
 			s->ignore_whitespace = !s->ignore_whitespace;
-		wclear(view->window);
-		s->first_displayed_line = 1;
-		s->last_displayed_line = view->nlines;
-		s->matched_line = 0;
-		diff_view_indicate_progress(view);
-		err = create_diff(s);
-		view->count = 0;
+		err = reset_diff_view(view);
 		break;
 	case 'g':
 	case KEY_HOME:
@@ -4957,7 +4985,7 @@ blame_thread(void *arg)
 		goto done;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    GOT_DIFF_ALGORITHM_MYERS, blame_cb, ta->cb_args,
+	    tog_diff_algo, blame_cb, ta->cb_args,
 	    ta->cancel_cb, ta->cancel_arg, fd1, fd2, f1, f2);
 	if (err && err->code == GOT_ERR_CANCELLED)
 		err = NULL;
@@ -5232,6 +5260,7 @@ open_blame_view(struct tog_view *view, char *path,
 
 	view->show = show_blame_view;
 	view->input = input_blame_view;
+	view->reset = reset_blame_view;
 	view->close = close_blame_view;
 	view->search_start = search_start_blame_view;
 	view->search_next = search_next_blame_view;
@@ -5645,6 +5674,21 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	}
 	return thread_err ? thread_err : err;
+}
+
+static const struct got_error *
+reset_blame_view(struct tog_view *view)
+{
+	const struct got_error *err;
+	struct tog_blame_view_state *s = &view->state.blame;
+
+	view->count = 0;
+	s->done = 1;
+	err = stop_blame(&s->blame);
+	s->done = 0;
+	if (err)
+		return err;
+	return run_blame(view);
 }
 
 static const struct got_error *
@@ -7846,6 +7890,7 @@ main(int argc, char *argv[])
 	    { "version", no_argument, NULL, 'V' },
 	    { NULL, 0, NULL, 0}
 	};
+	char *diff_algo_str = NULL;
 
 	setlocale(LC_CTYPE, "");
 
@@ -7897,6 +7942,14 @@ main(int argc, char *argv[])
 				break;
 			}
 		}
+	}
+
+	diff_algo_str = getenv("TOG_DIFF_ALGORITHM");
+	if (diff_algo_str) {
+		if (strcasecmp(diff_algo_str, "patience") == 0)
+			tog_diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
+		if (strcasecmp(diff_algo_str, "myers") == 0)
+			tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 	}
 
 	if (cmd == NULL) {
