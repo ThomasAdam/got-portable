@@ -1,5 +1,7 @@
 AM_CFLAGS += \
-	    @AM_CFLAGS@
+	    @AM_CFLAGS@ \
+	    -Wunused-variable \
+	    -Wwrite-strings
 # Ideally, we should be enabling further flags, but this requires upstream
 # changes.  Leaving these here for now.
 #
