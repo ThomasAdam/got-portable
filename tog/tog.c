@@ -2885,6 +2885,9 @@ view_get_split(struct tog_view *view, int *y, int *x)
 {
 	char *mode;
 
+	*x = 0;
+	*y = 0;
+
 	mode = getenv("TOG_VIEW_SPLIT_MODE");
 
 	if (!mode || mode[0] != 'h') {
