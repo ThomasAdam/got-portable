@@ -1277,6 +1277,91 @@ EOF
 	test_done $testroot 0
 }
 
+test_patch_whitespace() {
+	local testroot=`test_init patch_whitespace`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	trailing="		"
+
+	cat <<EOF > $testroot/wt/hello.c
+#include <stdio.h>
+
+int
+main(void)
+{
+	/* the trailing whitespace is on purpose */
+	printf("hello, world\n");$trailing
+	return 0;
+}
+EOF
+
+	(cd $testroot/wt && got add hello.c && got ci -m '+hello.c') \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	# test with a diff with various whitespace corruptions
+	cat <<EOF > $testroot/wt/patch
+--- hello.c
++++ hello.c
+@@ -5,5 +5,5 @@
+ {
+ /* the trailing whitespace is on purpose */
+	printf("hello, world\n");
+-    return 0;
++    return 5; /* always fails */
+ }
+EOF
+
+	(cd $testroot/wt && got patch patch) \
+		2>$testroot/stderr >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "failed to apply diff" >&2
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  hello.c' > $testroot/stdout.expected
+	echo '@@ -5,5 +5,5 @@ hunk contains mangled whitespace' \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/hello.c.expected
+#include <stdio.h>
+
+int
+main(void)
+{
+	/* the trailing whitespace is on purpose */
+	printf("hello, world\n");$trailing
+    return 5; /* always fails */
+}
+EOF
+
+	cmp -s $testroot/wt/hello.c.expected $testroot/wt/hello.c
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/hello.c.expected $testroot/wt/hello.c
+	fi
+	test_done $testroot $ret
+}
+
 test_patch_relative_paths() {
 	local testroot=`test_init patch_relative_paths`
 
@@ -1811,6 +1896,7 @@ run_test test_patch_with_offset
 run_test test_patch_prefer_new_path
 run_test test_patch_no_newline
 run_test test_patch_strip
+run_test test_patch_whitespace
 run_test test_patch_relative_paths
 run_test test_patch_with_path_prefix
 run_test test_patch_relpath_with_path_prefix

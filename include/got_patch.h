@@ -22,7 +22,7 @@
  */
 typedef const struct got_error *(*got_patch_progress_cb)(void *,
     const char *, const char *, unsigned char, const struct got_error *,
-    long, long, long, long, long, const struct got_error *);
+    long, long, long, long, long, int, const struct got_error *);
 
 /*
  * Apply the (already opened) patch to the repository and register the
