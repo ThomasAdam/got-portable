@@ -1458,6 +1458,7 @@ test_patch_merge_simple() {
 	fi
 
 	jot 10 > $testroot/wt/numbers
+	chmod +x $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		> /dev/null
 	ret=$?
@@ -1507,6 +1508,14 @@ test_patch_merge_simple() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+		test_done $testroot $ret
+		return 1
+	fi
+
+	test -x $testroot/wt/numbers
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "numbers lost the executable bit" >&2
 	fi
 	test_done $testroot $ret
 }
