@@ -62,8 +62,8 @@ EOF
 	test_done $testroot $ret
 }
 
-test_patch_simple_rm_file() {
-	local testroot=`test_init patch_simple_rm_file`
+test_patch_rm_file() {
+	local testroot=`test_init patch_rm_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1783,7 +1783,7 @@ EOF
 
 test_parseargs "$@"
 run_test test_patch_add_file
-run_test test_patch_simple_rm_file
+run_test test_patch_rm_file
 run_test test_patch_simple_edit_file
 run_test test_patch_prepend_line
 run_test test_patch_replace_line
