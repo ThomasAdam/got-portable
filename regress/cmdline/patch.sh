@@ -16,8 +16,8 @@
 
 . ./common.sh
 
-test_patch_simple_add_file() {
-	local testroot=`test_init patch_simple_add_file`
+test_patch_add_file() {
+	local testroot=`test_init patch_add_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -29,8 +29,12 @@ test_patch_simple_add_file() {
 	cat <<EOF > $testroot/wt/patch
 --- /dev/null
 +++ eta
-@@ -0,0 +1 @@
-+eta
+@@ -0,0 +5,5 @@
++1
++2
++3
++4
++5
 EOF
 
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
@@ -49,7 +53,7 @@ EOF
 		return 1
 	fi
 
-	echo eta > $testroot/wt/eta.expected
+	jot 5 > $testroot/wt/eta.expected
 	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1778,7 +1782,7 @@ EOF
 }
 
 test_parseargs "$@"
-run_test test_patch_simple_add_file
+run_test test_patch_add_file
 run_test test_patch_simple_rm_file
 run_test test_patch_simple_edit_file
 run_test test_patch_prepend_line
