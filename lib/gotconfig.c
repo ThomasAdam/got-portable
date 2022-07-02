@@ -100,6 +100,24 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	if (err)
 		goto done;
 
+	err = got_privsep_send_gotconfig_allowed_signers_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gotconfig_str(&(*conf)->allowed_signers_file,
+	    ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_gotconfig_revoked_signers_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gotconfig_str(&(*conf)->revoked_signers_file,
+	    ibuf);
+	if (err)
+		goto done;
+
 	err = got_privsep_send_gotconfig_remotes_req(ibuf);
 	if (err)
 		goto done;
@@ -156,4 +174,16 @@ got_gotconfig_get_remotes(int *nremotes, const struct got_remote_repo **remotes,
 {
 	*nremotes = conf->nremotes;
 	*remotes = conf->remotes;
+}
+
+const char *
+got_gotconfig_get_allowed_signers_file(const struct got_gotconfig *conf)
+{
+	return conf->allowed_signers_file;
+}
+
+const char *
+got_gotconfig_get_revoked_signers_file(const struct got_gotconfig *conf)
+{
+	return conf->revoked_signers_file;
 }

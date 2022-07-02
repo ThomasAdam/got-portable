@@ -57,6 +57,8 @@
 #include "got_gotconfig.h"
 #include "got_dial.h"
 #include "got_patch.h"
+#include "got_sigs.h"
+#include "got_date.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -683,6 +685,76 @@ get_author(char **author, struct got_repository *repo,
 		*author = NULL;
 	}
 	return err;
+}
+
+static const struct got_error *
+get_allowed_signers(char **allowed_signers, struct got_repository *repo,
+    struct got_worktree *worktree)
+{
+	const char *got_allowed_signers = NULL;
+	const struct got_gotconfig *worktree_conf = NULL, *repo_conf = NULL;
+
+	*allowed_signers = NULL;
+
+	if (worktree)
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+	repo_conf = got_repo_get_gotconfig(repo);
+
+	/*
+	 * Priority of potential author information sources, from most
+	 * significant to least significant:
+	 * 1) work tree's .got/got.conf file
+	 * 2) repository's got.conf file
+	 */
+
+	if (worktree_conf)
+		got_allowed_signers = got_gotconfig_get_allowed_signers_file(
+		    worktree_conf);
+	if (got_allowed_signers == NULL)
+		got_allowed_signers = got_gotconfig_get_allowed_signers_file(
+		    repo_conf);
+
+	if (got_allowed_signers) {
+		*allowed_signers = strdup(got_allowed_signers);
+		if (*allowed_signers == NULL)
+			return got_error_from_errno("strdup");
+	}
+	return NULL;
+}
+
+static const struct got_error *
+get_revoked_signers(char **revoked_signers, struct got_repository *repo,
+    struct got_worktree *worktree)
+{
+	const char *got_revoked_signers = NULL;
+	const struct got_gotconfig *worktree_conf = NULL, *repo_conf = NULL;
+
+	*revoked_signers = NULL;
+
+	if (worktree)
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+	repo_conf = got_repo_get_gotconfig(repo);
+
+	/*
+	 * Priority of potential author information sources, from most
+	 * significant to least significant:
+	 * 1) work tree's .got/got.conf file
+	 * 2) repository's got.conf file
+	 */
+
+	if (worktree_conf)
+		got_revoked_signers = got_gotconfig_get_revoked_signers_file(
+		    worktree_conf);
+	if (got_revoked_signers == NULL)
+		got_revoked_signers = got_gotconfig_get_revoked_signers_file(
+		    repo_conf);
+
+	if (got_revoked_signers) {
+		*revoked_signers = strdup(got_revoked_signers);
+		if (*revoked_signers == NULL)
+			return got_error_from_errno("strdup");
+	}
+	return NULL;
 }
 
 static const struct got_error *
@@ -6836,7 +6908,8 @@ usage_tag(void)
 {
 	fprintf(stderr,
 	    "usage: %s tag [-c commit] [-r repository] [-l] "
-	        "[-m message] name\n", getprogname());
+	        "[-m message] [-s signer_id] name\n",
+	        getprogname());
 	exit(1);
 }
 
@@ -6916,12 +6989,14 @@ get_tag_refname(char **refname, const char *tag_name)
 }
 
 static const struct got_error *
-list_tags(struct got_repository *repo, const char *tag_name)
+list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
+    const char *allowed_signers, const char *revoked_signers, int verbosity)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *wanted_refname = NULL;
+	int bad_sigs = 0;
 
 	TAILQ_INIT(&refs);
 
@@ -6945,7 +7020,8 @@ list_tags(struct got_repository *repo, const char *tag_name)
 		const char *refname;
 		char *refstr, *tagmsg0, *tagmsg, *line, *id_str, *datestr;
 		char datebuf[26];
-		const char *tagger;
+		const char *tagger, *ssh_sig = NULL;
+		char *sig_msg = NULL;
 		time_t tagger_time;
 		struct got_object_id *id;
 		struct got_tag_object *tag;
@@ -6961,8 +7037,6 @@ list_tags(struct got_repository *repo, const char *tag_name)
 			err = got_error_from_errno("got_ref_to_str");
 			break;
 		}
-		printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr);
-		free(refstr);
 
 		err = got_ref_resolve(&id, repo, re->ref);
 		if (err)
@@ -6995,6 +7069,22 @@ list_tags(struct got_repository *repo, const char *tag_name)
 			if (err)
 				break;
 		}
+
+		if (verify_tags) {
+			ssh_sig = got_sigs_get_tagmsg_ssh_signature(
+			    got_object_tag_get_message(tag));
+			if (ssh_sig && allowed_signers == NULL) {
+				err = got_error_msg(
+				    GOT_ERR_VERIFY_TAG_SIGNATURE,
+				    "SSH signature verification requires "
+				        "setting allowed_signers in "
+				        "got.conf(5)");
+				break;
+			}
+		}
+
+		printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr);
+		free(refstr);
 		printf("from: %s\n", tagger);
 		datestr = get_datestr(&tagger_time, datebuf);
 		if (datestr)
@@ -7024,6 +7114,19 @@ list_tags(struct got_repository *repo, const char *tag_name)
 			}
 		}
 		free(id_str);
+
+		if (ssh_sig) {
+			err = got_sigs_verify_tag_ssh(&sig_msg, tag, ssh_sig,
+				allowed_signers, revoked_signers, verbosity);
+			if (err && err->code == GOT_ERR_BAD_TAG_SIGNATURE)
+				bad_sigs = 1;
+			else if (err)
+				break;
+			printf("signature: %s", sig_msg);
+			free(sig_msg);
+			sig_msg = NULL;
+		}
+
 		if (commit) {
 			err = got_object_commit_get_logmsg(&tagmsg0, commit);
 			if (err)
@@ -7049,6 +7152,9 @@ list_tags(struct got_repository *repo, const char *tag_name)
 done:
 	got_ref_list_free(&refs);
 	free(wanted_refname);
+
+	if (err == NULL && bad_sigs)
+		err = got_error(GOT_ERR_BAD_TAG_SIGNATURE);
 	return err;
 }
 
@@ -7097,9 +7203,6 @@ done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *tagmsg_path);
 
-	/* Editor is done; we can now apply unveil(2) */
-	if (err == NULL)
-		err = apply_unveil(repo_path, 0, NULL);
 	if (err) {
 		free(*tagmsg);
 		*tagmsg = NULL;
@@ -7109,7 +7212,8 @@ done:
 
 static const struct got_error *
 add_tag(struct got_repository *repo, const char *tagger,
-    const char *tag_name, const char *commit_arg, const char *tagmsg_arg)
+    const char *tag_name, const char *commit_arg, const char *tagmsg_arg,
+    const char *key_file, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
@@ -7165,10 +7269,18 @@ add_tag(struct got_repository *repo, const char *tagger,
 				preserve_tagmsg = 1;
 			goto done;
 		}
+		/* Editor is done; we can now apply unveil(2) */
+		err = got_sigs_apply_unveil();
+		if (err)
+			goto done;
+		err = apply_unveil(got_repo_get_path(repo), 0, NULL);
+		if (err)
+			goto done;
 	}
 
 	err = got_object_tag_create(&tag_id, tag_name, commit_id,
-	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, repo);
+	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, key_file, repo,
+	    verbosity);
 	if (err) {
 		if (tagmsg_path)
 			preserve_tagmsg = 1;
@@ -7222,11 +7334,13 @@ cmd_tag(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
 	char *gitconfig_path = NULL, *tagger = NULL;
+	char *allowed_signers = NULL, *revoked_signers = NULL;
 	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
-	int ch, do_list = 0;
+	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
+	const char *signer_id = NULL;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "c:m:r:l")) != -1) {
+	while ((ch = getopt(argc, argv, "c:m:r:ls:Vv")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -7243,6 +7357,18 @@ cmd_tag(int argc, char *argv[])
 			break;
 		case 'l':
 			do_list = 1;
+			break;
+		case 's':
+			signer_id = optarg;
+			break;
+		case 'V':
+			verify_tags = 1;
+			break;
+		case 'v':
+			if (verbosity < 0)
+				verbosity = 0;
+			else if (verbosity < 3)
+				verbosity++;
 			break;
 		default:
 			usage_tag();
@@ -7304,26 +7430,40 @@ cmd_tag(int argc, char *argv[])
 		}
 	}
 
-	if (do_list) {
+	if (do_list || verify_tags) {
+		error = got_repo_open(&repo, repo_path, NULL, pack_fds);
+		if (error != NULL)
+			goto done;
+		error = get_allowed_signers(&allowed_signers, repo, worktree);
+		if (error)
+			goto done;
+		error = get_revoked_signers(&revoked_signers, repo, worktree);
+		if (error)
+			goto done;
 		if (worktree) {
 			/* Release work tree lock. */
 			got_worktree_close(worktree);
 			worktree = NULL;
 		}
-		error = got_repo_open(&repo, repo_path, NULL, pack_fds);
-		if (error != NULL)
-			goto done;
 
+		/*
+		 * Remove "cpath" promise unless needed for signature tmpfile
+		 * creation.
+		 */
+		if (verify_tags)
+		 	got_sigs_apply_unveil();
+		else {
 #ifndef PROFILE
-		/* Remove "cpath" promise. */
-		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
-		    NULL) == -1)
-			err(1, "pledge");
+			if (pledge("stdio rpath wpath flock proc exec sendfd "
+			    "unveil", NULL) == -1)
+				err(1, "pledge");
 #endif
+		}
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
-		error = list_tags(repo, tag_name);
+		error = list_tags(repo, tag_name, verify_tags, allowed_signers,
+		    revoked_signers, verbosity);
 	} else {
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)
@@ -7343,6 +7483,11 @@ cmd_tag(int argc, char *argv[])
 		}
 
 		if (tagmsg) {
+			if (signer_id) {
+				error = got_sigs_apply_unveil();
+				if (error)
+					goto done;
+			}
 			error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 			if (error)
 				goto done;
@@ -7367,7 +7512,8 @@ cmd_tag(int argc, char *argv[])
 		}
 
 		error = add_tag(repo, tagger, tag_name,
-		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg);
+		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg,
+		    signer_id, verbosity);
 	}
 done:
 	if (repo) {
@@ -7388,6 +7534,8 @@ done:
 	free(gitconfig_path);
 	free(commit_id_str);
 	free(tagger);
+	free(allowed_signers);
+	free(revoked_signers);
 	return error;
 }
 
@@ -12419,22 +12567,6 @@ cat_tree(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	return err;
 }
 
-static void
-format_gmtoff(char *buf, size_t sz, time_t gmtoff)
-{
-	long long h, m;
-	char sign = '+';
-
-	if (gmtoff < 0) {
-		sign = '-';
-		gmtoff = -gmtoff;
-	}
-
-	h = (long long)gmtoff / 3600;
-	m = ((long long)gmtoff - h*3600) / 60;
-	snprintf(buf, sz, "%c%02lld%02lld", sign, h, m);
-}
-
 static const struct got_error *
 cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 {
@@ -12466,14 +12598,14 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 		fprintf(outfile, "%s%s\n", GOT_COMMIT_LABEL_PARENT, pid_str);
 		free(pid_str);
 	}
-	format_gmtoff(gmtoff, sizeof(gmtoff),
+	got_date_format_gmtoff(gmtoff, sizeof(gmtoff),
 	    got_object_commit_get_author_gmtoff(commit));
 	fprintf(outfile, "%s%s %lld %s\n", GOT_COMMIT_LABEL_AUTHOR,
 	    got_object_commit_get_author(commit),
 	    (long long)got_object_commit_get_author_time(commit),
 	    gmtoff);
 
-	format_gmtoff(gmtoff, sizeof(gmtoff),
+	got_date_format_gmtoff(gmtoff, sizeof(gmtoff),
 	    got_object_commit_get_committer_gmtoff(commit));
 	fprintf(outfile, "%s%s %lld %s\n", GOT_COMMIT_LABEL_COMMITTER,
 	    got_object_commit_get_author(commit),
@@ -12532,7 +12664,7 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TAG,
 	    got_object_tag_get_name(tag));
 
-	format_gmtoff(gmtoff, sizeof(gmtoff),
+	got_date_format_gmtoff(gmtoff, sizeof(gmtoff),
 	    got_object_tag_get_tagger_gmtoff(tag));
 	fprintf(outfile, "%s%s %lld %s\n", GOT_TAG_LABEL_TAGGER,
 	    got_object_tag_get_tagger(tag),

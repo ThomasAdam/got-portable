@@ -104,7 +104,8 @@ typedef struct {
 
 %token	ERROR
 %token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES BRANCH
-%token	AUTHOR FETCH_ALL_BRANCHES REFERENCE FETCH SEND
+%token	AUTHOR ALLOWED_SIGNERS REVOKED_SIGNERS FETCH_ALL_BRANCHES REFERENCE
+%token	FETCH SEND
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean portplain
@@ -118,6 +119,7 @@ grammar		: /* empty */
 		| grammar '\n'
 		| grammar author '\n'
 		| grammar remote '\n'
+		| grammar allowed_signers '\n'
 		;
 boolean		: STRING {
 			if (strcasecmp($1, "true") == 0 ||
@@ -311,6 +313,14 @@ author		: AUTHOR STRING {
 			gotconfig.author = $2;
 		}
 		;
+allowed_signers	: ALLOWED_SIGNERS STRING {
+			gotconfig.allowed_signers_file = $2;
+		}
+		;
+revoked_signers	: REVOKED_SIGNERS STRING {
+			gotconfig.revoked_signers_file = $2;
+		}
+		;
 optnl		: '\n' optnl
 		| /* empty */
 		;
@@ -359,6 +369,7 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{"allowed_signers",	ALLOWED_SIGNERS},
 		{"author",		AUTHOR},
 		{"branch",		BRANCH},
 		{"fetch",		FETCH},
@@ -369,6 +380,7 @@ lookup(char *s)
 		{"reference",		REFERENCE},
 		{"remote",		REMOTE},
 		{"repository",		REPOSITORY},
+		{"revoked_signers",	REVOKED_SIGNERS},
 		{"send",		SEND},
 		{"server",		SERVER},
 	};
@@ -796,6 +808,8 @@ gotconfig_free(struct gotconfig *conf)
 	struct gotconfig_remote_repo *remote;
 
 	free(conf->author);
+	free(conf->allowed_signers_file);
+	free(conf->revoked_signers_file);
 	while (!TAILQ_EMPTY(&conf->remotes)) {
 		remote = TAILQ_FIRST(&conf->remotes);
 		TAILQ_REMOVE(&conf->remotes, remote, entry);

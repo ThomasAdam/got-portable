@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Josh Rickmar <jrick@zettaport.com>
  * Copyright (c) 2020, 2021 Tracey Emery <tracey@openbsd.org>
  * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
  *
@@ -66,6 +67,8 @@ struct gotconfig {
 	char	*author;
 	struct gotconfig_remote_repo_list remotes;
 	int nremotes;
+	char	*allowed_signers_file;
+	char	*revoked_signers_file;
 };
 
 /*

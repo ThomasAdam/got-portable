@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2022 Josh Rickmar <jrick@zettaport.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,16 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define GOT_GOTCONFIG_FILENAME		"got.conf"
-
-struct got_gotconfig {
-	char *author;
-	int nremotes;
-	struct got_remote_repo *remotes;
-	char *allowed_signers_file;
-	char *revoked_signers_file;
-};
-
-const struct got_error *got_gotconfig_read(struct got_gotconfig **,
-    const char *);
-void got_gotconfig_free(struct got_gotconfig *);
+void
+got_date_format_gmtoff(char *, size_t, time_t);

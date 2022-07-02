@@ -272,7 +272,168 @@ test_tag_list_lightweight() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_create_ssh_signed() {
+	local testroot=`test_init tag_create`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag=1.0.0
+	local tag2=2.0.0
+
+	ssh-keygen -q -N '' -t ed25519 -f $testroot/id_ed25519
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "ssh-keygen failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	touch $testroot/allowed_signers
+	echo "allowed_signers \"$testroot/allowed_signers\"" > \
+		$testroot/repo/.git/got.conf
+
+	# Create a signed tag based on repository's HEAD reference
+	got tag -s $testroot/id_ed25519 -m 'test' -r $testroot/repo -c HEAD \
+		$tag > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got tag command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+	echo "Created tag $tag_id" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Ensure validation fails when the key is not allowed
+	echo "signature: Could not verify signature." > \
+		$testroot/stdout.expected
+	VERIFY_STDOUT=$(got tag -r $testroot/repo -V $tag 2> $testroot/stderr)
+	ret=$?
+	echo "$VERIFY_STDOUT" | grep '^signature: ' > $testroot/stdout
+	if [ $ret -eq 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	GOOD_SIG='Good "git" signature for flan_hacker@openbsd.org with ED25519 key SHA256:'
+
+	# Validate the signature with the key allowed
+	echo -n 'flan_hacker@openbsd.org ' > $testroot/allowed_signers
+	cat $testroot/id_ed25519.pub >> $testroot/allowed_signers
+	GOT_STDOUT=$(got tag -r $testroot/repo -V $tag 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got tag command failed unexpectedly"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	if ! echo "$GOT_STDOUT" | grep -q "^signature: $GOOD_SIG"; then
+		echo "got tag command failed to validate signature"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Ensure that Git recognizes and verifies the tag Got has created
+	(cd $testroot/repo && git checkout -q $tag)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	(cd $testroot/repo && git config --local gpg.ssh.allowedSignersFile \
+		$testroot/allowed_signers)
+	GIT_STDERR=$(cd $testroot/repo && git tag -v $tag 2>&1 1>/dev/null)
+	if ! echo "$GIT_STDERR" | grep -q "^$GOOD_SIG"; then
+		echo "git tag command failed to validate signature"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Ensure Got recognizes the new tag
+	got checkout -c $tag $testroot/repo $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a tag based on implied worktree HEAD ref
+	(cd $testroot/wt && got tag -m 'test' $tag2 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_id2=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
+	echo "Created tag $tag_id2" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q $tag2)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Attempt to create a tag pointing at a non-commit
+	local tree_id=`git_show_tree $testroot/repo`
+	(cd $testroot/wt && got tag -m 'test' -c $tree_id foobar \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "git tag command succeeded unexpectedly"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: commit $tree_id: object not found" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -l > $testroot/stdout
+	echo "HEAD: $commit_id" > $testroot/stdout.expected
+	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
+	cat $testroot/wt/.got/uuid | tr -d '\n' >> $testroot/stdout.expected
+	echo ": $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/tags/$tag: $tag_id" >> $testroot/stdout.expected
+	echo "refs/tags/$tag2: $tag_id2" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight
+run_test test_tag_create_ssh_signed

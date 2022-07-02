@@ -2365,6 +2365,28 @@ got_privsep_send_gotconfig_author_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_gotconfig_allowed_signers_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GOTCONFIG_ALLOWEDSIGNERS_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_ALLOWEDSIGNERS_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gotconfig_revoked_signers_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GOTCONFIG_REVOKEDSIGNERS_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_REVOKEDSIGNERS_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_gotconfig_remotes_req(struct imsgbuf *ibuf)
 {
 	if (imsg_compose(ibuf,

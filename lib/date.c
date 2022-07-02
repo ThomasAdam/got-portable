@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2022 Josh Rickmar <jrick@zettaport.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,16 +14,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define GOT_GOTCONFIG_FILENAME		"got.conf"
+#include <stdio.h>
 
-struct got_gotconfig {
-	char *author;
-	int nremotes;
-	struct got_remote_repo *remotes;
-	char *allowed_signers_file;
-	char *revoked_signers_file;
-};
+#include "got_date.h"
 
-const struct got_error *got_gotconfig_read(struct got_gotconfig **,
-    const char *);
-void got_gotconfig_free(struct got_gotconfig *);
+void
+got_date_format_gmtoff(char *buf, size_t sz, time_t gmtoff)
+{
+	long long h, m;
+	char sign = '+';
+
+	if (gmtoff < 0) {
+		sign = '-';
+		gmtoff = -gmtoff;
+	}
+
+	h = (long long)gmtoff / 3600;
+	m = ((long long)gmtoff - h*3600) / 60;
+	snprintf(buf, sz, "%c%02lld%02lld", sign, h, m);
+}
