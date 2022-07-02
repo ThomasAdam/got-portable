@@ -7757,7 +7757,7 @@ static const struct got_error *
 patch_progress(void *arg, const char *old, const char *new,
     unsigned char status, const struct got_error *error, long old_from,
     long old_lines, long new_from, long new_lines, long offset,
-    const struct got_error *hunk_err)
+    int ws_mangled, const struct got_error *hunk_err)
 {
 	const char *path = new == NULL ? old : new;
 
@@ -7770,13 +7770,15 @@ patch_progress(void *arg, const char *old, const char *new,
 	if (error != NULL)
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 
-	if (offset != 0 || hunk_err != NULL) {
+	if (offset != 0 || hunk_err != NULL || ws_mangled) {
 		printf("@@ -%ld,%ld +%ld,%ld @@ ", old_from,
 		    old_lines, new_from, new_lines);
 		if (hunk_err != NULL)
 			printf("%s\n", hunk_err->msg);
-		else
+		else if (offset != 0)
 			printf("applied with offset %ld\n", offset);
+		else
+			printf("hunk contains mangled whitespace\n");
 	}
 
 	return NULL;

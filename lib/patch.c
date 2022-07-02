@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
@@ -55,6 +56,7 @@
 struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
 	const struct got_error *err;
+	int	ws_mangled;
 	int	offset;
 	int	old_nonl;
 	int	new_nonl;
@@ -398,6 +400,30 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 	return err;
 }
 
+static int
+linecmp(const char *a, const char *b, int *mangled)
+{
+	int c;
+
+	*mangled = 0;
+	c = strcmp(a, b);
+	if (c == 0)
+		return c;
+
+	*mangled = 1;
+	for (;;) {
+		while (isspace(*a))
+			a++;
+		while (isspace(*b))
+			b++;
+		if (*a == '\0' || *b == '\0' || *a != *b)
+			break;
+		a++, b++;
+	}
+
+	return *a - *b;
+}
+
 static const struct got_error *
 test_hunk(FILE *orig, struct got_patch_hunk *h)
 {
@@ -405,6 +431,7 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 	char *line = NULL;
 	size_t linesize = 0, i = 0;
 	ssize_t linelen;
+	int mangled;
 
 	for (i = 0; i < h->len; ++i) {
 		switch (*h->lines[i]) {
@@ -423,10 +450,12 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 			}
 			if (line[linelen - 1] == '\n')
 				line[linelen - 1] = '\0';
-			if (strcmp(h->lines[i] + 1, line)) {
+			if (linecmp(h->lines[i] + 1, line, &mangled)) {
 				err = got_error(GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
+			if (mangled)
+				h->ws_mangled = 1;
 			break;
 		}
 	}
@@ -437,32 +466,61 @@ done:
 }
 
 static const struct got_error *
-apply_hunk(FILE *tmp, struct got_patch_hunk *h, int *lineno)
+apply_hunk(FILE *orig, FILE *tmp, struct got_patch_hunk *h, int *lineno,
+    off_t from)
 {
-	size_t i, new = 0;
+	const struct got_error *err = NULL;
+	const char *t;
+	size_t linesize = 0, i, new = 0;
+	char *line = NULL;
+	char mode;
+	ssize_t linelen;
+
+	if (orig != NULL && fseeko(orig, from, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
 
 	for (i = 0; i < h->len; ++i) {
-		switch (*h->lines[i]) {
-		case ' ':
-			if (fprintf(tmp, "%s\n", h->lines[i] + 1) < 0)
-				return got_error_from_errno("fprintf");
-			/* fallthrough */
+		switch (mode = *h->lines[i]) {
 		case '-':
+		case ' ':
 			(*lineno)++;
+			if (orig != NULL) {
+				linelen = getline(&line, &linesize, orig);
+				if (linelen == -1) {
+					err = got_error_from_errno("getline");
+					goto done;
+				}
+				if (line[linelen - 1] == '\n')
+					line[linelen - 1] = '\0';
+				t = line;
+			} else
+				t = h->lines[i] + 1;
+			if (mode == '-')
+				continue;
+			if (fprintf(tmp, "%s\n", t) < 0) {
+				err = got_error_from_errno("fprintf");
+				goto done;
+			}
 			break;
 		case '+':
 			new++;
-			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0)
-				return got_error_from_errno("fprintf");
+			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0) {
+				err = got_error_from_errno("fprintf");
+				goto done;
+			}
 			if (new != h->new_lines || !h->new_nonl) {
-				if (fprintf(tmp, "\n") < 0)
-					return got_error_from_errno(
-					    "fprintf");
+				if (fprintf(tmp, "\n") < 0) {
+					err = got_error_from_errno("fprintf");
+					goto done;
+				}
 			}
 			break;
 		}
 	}
-	return NULL;
+
+done:
+	free(line);
+	return err;
 }
 
 static const struct got_error *
@@ -481,7 +539,7 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp)
 		h = STAILQ_FIRST(&p->head);
 		if (h == NULL || STAILQ_NEXT(h, entries) != NULL)
 			return got_error(GOT_ERR_PATCH_MALFORMED);
-		return apply_hunk(tmp, h, &lineno);
+		return apply_hunk(orig, tmp, h, &lineno, 0);
 	}
 
 	if (fstat(fileno(orig), &sb) == -1)
@@ -520,7 +578,7 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp)
 		if (lineno + 1 != h->old_from)
 			h->offset = lineno + 1 - h->old_from;
 
-		err = apply_hunk(tmp, h, &lineno);
+		err = apply_hunk(orig, tmp, h, &lineno, pos);
 		if (err != NULL)
 			return err;
 
@@ -547,17 +605,17 @@ report_progress(struct patch_args *pa, const char *old, const char *new,
 	struct got_patch_hunk *h;
 
 	err = pa->progress_cb(pa->progress_arg, old, new, status,
-	    orig_error, 0, 0, 0, 0, 0, NULL);
+	    orig_error, 0, 0, 0, 0, 0, 0, NULL);
 	if (err)
 		return err;
 
 	STAILQ_FOREACH(h, pa->head, entries) {
-		if (h->offset == 0 && h->err == NULL)
+		if (h->offset == 0 && !h->ws_mangled && h->err == NULL)
 			continue;
 
 		err = pa->progress_cb(pa->progress_arg, old, new, 0, NULL,
 		    h->old_from, h->old_lines, h->new_from, h->new_lines,
-		    h->offset, h->err);
+		    h->offset, h->ws_mangled, h->err);
 		if (err)
 			return err;
 	}
