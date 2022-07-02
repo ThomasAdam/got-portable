@@ -28,7 +28,10 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/sha1.c \
        $(top_srcdir)/lib/bloom.c \
        $(top_srcdir)/lib/murmurhash2.c \
-       $(top_srcdir)/lib/worktree_open.c
+       $(top_srcdir)/lib/worktree_open.c \
+       $(top_srcdir)/lib/date.c \
+       $(top_srcdir)/lib/buf.c \
+       $(top_srcdir)/lib/sigs.c
 
 gotadmin_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = gotadmin.1

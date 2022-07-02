@@ -5,6 +5,7 @@ include $(top_builddir)/Makefile.common
 got_SOURCES = got.c \
 	$(top_srcdir)/lib/blame.c \
 	$(top_srcdir)/lib/commit_graph.c \
+	$(top_srcdir)/lib/date.c \
 	$(top_srcdir)/lib/delta.c \
 	$(top_srcdir)/lib/diff.c \
 	$(top_srcdir)/lib/diffreg.c \
@@ -48,7 +49,8 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/pack_create.c \
 	$(top_srcdir)/lib/dial.c \
 	$(top_srcdir)/lib/bloom.c \
-	$(top_srcdir)/lib/murmurhash2.c
+	$(top_srcdir)/lib/murmurhash2.c \
+	$(top_srcdir)/lib/sigs.c
 
 EXTRA_DIST = $(top_srcdir)/compat/*.[ch] \
 	     $(top_srcdir)/lib/*.[ch] \

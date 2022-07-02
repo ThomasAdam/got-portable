@@ -17,7 +17,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
-#include <sys/queue.h>
 #include <sys/wait.h>
 
 #include <stdlib.h>
@@ -27,7 +26,6 @@
 #include <string.h>
 #include <err.h>
 #include <assert.h>
-#include <sha1.h>
 
 #include "got_error.h"
 #include "got_date.h"
@@ -35,7 +33,7 @@
 #include "got_opentemp.h"
 
 #include "got_sigs.h"
-
+#include "got_compat.h"
 #include "buf.h"
 
 #ifndef MIN

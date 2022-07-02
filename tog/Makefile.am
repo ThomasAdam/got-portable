@@ -44,7 +44,9 @@ tog_SOURCES = tog.c \
 	$(top_srcdir)/lib/utf8.c \
 	$(top_srcdir)/lib/dial.c \
 	$(top_srcdir)/lib/bloom.c \
-	$(top_srcdir)/lib/murmurhash2.c
+	$(top_srcdir)/lib/murmurhash2.c \
+	$(top_srcdir)/lib/date.c \
+	$(top_srcdir)/lib/sigs.c
 
 tog_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
