@@ -1585,9 +1585,10 @@ test_patch_merge_conflict() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
+	echo ALPHA > $testroot/wt/alpha
 
 	(cd $testroot/wt && got diff > $testroot/old.diff \
-		&& got revert numbers) >/dev/null
+		&& got revert alpha numbers) >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
@@ -1595,7 +1596,8 @@ test_patch_merge_conflict() {
 	fi
 
 	jot 10 | sed 's/6/3+3/g' > $testroot/wt/numbers
-	(cd $testroot/wt && got commit -m 'edit numbers') \
+	jot -c 3 a > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha and numbers') \
 		> /dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1612,7 +1614,8 @@ test_patch_merge_conflict() {
 		return 1
 	fi
 
-	echo 'C  numbers' > $testroot/stdout.expected
+	echo 'C  alpha' > $testroot/stdout.expected
+	echo 'C  numbers' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1623,6 +1626,18 @@ test_patch_merge_conflict() {
 
 	# XXX: prefixing every line with a tab otherwise got thinks
 	# the file has conflicts in it.
+	cat <<-EOF > $testroot/wt/alpha.expected
+	<<<<<<< --- alpha
+	ALPHA
+	||||||| commit $commit_id
+	alpha
+	=======
+	a
+	b
+	c
+	>>>>>>> +++ alpha
+EOF
+
 	cat <<-EOF > $testroot/wt/numbers.expected
 	1
 	2
@@ -1641,6 +1656,14 @@ test_patch_merge_conflict() {
 	9
 	10
 EOF
+
+	cmp -s $testroot/wt/alpha $testroot/wt/alpha.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/alpha $testroot/wt/alpha.expected
+		test_done $testroot $ret
+		return 1
+	fi
 
 	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
 	ret=$?

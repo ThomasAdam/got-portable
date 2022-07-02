@@ -150,16 +150,61 @@ blobid(const char *line, char **blob, int git)
 }
 
 static const struct got_error *
-find_patch(int *done, FILE *fp)
+patch_start(int *git, char **cid, FILE *fp)
 {
 	const struct got_error *err = NULL;
-	char	*old = NULL, *new = NULL;
-	char	*commitid = NULL, *blob = NULL;
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
-	int	 create, rename = 0, git = 0;
 
+	*git = 0;
+
+	while ((linelen = getline(&line, &linesize, fp)) != -1) {
+		if (!strncmp(line, "diff --git ", 11)) {
+			*git = 1;
+			free(*cid);
+			*cid = NULL;
+			break;
+		} else if (!strncmp(line, "diff ", 5)) {
+			*git = 0;
+			free(*cid);
+			*cid = NULL;
+		} else if (!strncmp(line, "commit - ", 9)) {
+			free(*cid);
+			err = blobid(line + 9, cid, *git);
+			if (err)
+				break;
+		} else if (!strncmp(line, "--- ", 4) ||
+		    !strncmp(line, "+++ ", 4) ||
+		    !strncmp(line, "blob - ", 7)) {
+			/* rewind to previous line */
+			if (fseeko(fp, -linelen, SEEK_CUR) == -1)
+				err = got_error_from_errno("fseeko");
+			break;
+		}
+	}
+
+	free(line);
+	if (ferror(fp) && err == NULL)
+		err = got_error_from_errno("getline");
+	if (feof(fp) && err == NULL)
+		err = got_error(GOT_ERR_NO_PATCH);
+	return err;
+}
+
+static const struct got_error *
+find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
+{
+	const struct got_error *err = NULL;
+	char	*old = NULL, *new = NULL;
+	char	*blob = NULL;
+	char	*line = NULL;
+	size_t	 linesize = 0;
+	ssize_t	 linelen;
+	int	 create, rename = 0;
+
+	*done = 0;
+	*next = 0;
 	while ((linelen = getline(&line, &linesize, fp)) != -1) {
 		/*
 		 * Ignore the Index name like GNU and larry' patch,
@@ -186,18 +231,12 @@ find_patch(int *done, FILE *fp)
 		else if (git && !strncmp(line, "index ", 6)) {
 			free(blob);
 			err = blobid(line + 6, &blob, git);
-		} else if (!strncmp(line, "diff --git a/", 13)) {
-			git = 1;
-			free(commitid);
-			commitid = NULL;
-			free(blob);
-			blob = NULL;
-		} else if (!git && !strncmp(line, "diff ", 5)) {
-			free(commitid);
-			err = blobid(line + 5, &commitid, git);
-		} else if (!git && !strncmp(line, "commit - ", 9)) {
-			free(commitid);
-			err = blobid(line + 9, &commitid, git);
+		} else if (!strncmp(line, "diff ", 5)) {
+			/* rewind to previous line */
+			if (fseeko(fp, -linelen, SEEK_CUR) == -1)
+				err = got_error_from_errno("fseeko");
+			*next = 1;
+			break;
 		}
 
 		if (err)
@@ -236,7 +275,6 @@ find_patch(int *done, FILE *fp)
 
 	free(old);
 	free(new);
-	free(commitid);
 	free(blob);
 	free(line);
 	if (ferror(fp) && err == NULL)
@@ -480,7 +518,8 @@ read_patch(struct imsgbuf *ibuf, int fd)
 {
 	const struct got_error *err = NULL;
 	FILE *fp;
-	int patch_found = 0;
+	int git, patch_found = 0;
+	char *cid = NULL;
 
 	if ((fp = fdopen(fd, "r")) == NULL) {
 		err = got_error_from_errno("fdopen");
@@ -488,12 +527,14 @@ read_patch(struct imsgbuf *ibuf, int fd)
 		return err;
 	}
 
-	while (!feof(fp)) {
-		int done = 0;
+	while ((err = patch_start(&git, &cid, fp)) == NULL) {
+		int done, next;
 
-		err = find_patch(&done, fp);
+		err = find_diff(&done, &next, fp, git, cid);
 		if (err)
 			goto done;
+		if (next)
+			continue;
 
 		patch_found = 1;
 
@@ -510,6 +551,7 @@ read_patch(struct imsgbuf *ibuf, int fd)
 
 done:
 	fclose(fp);
+	free(cid);
 
 	/* ignore trailing gibberish */
 	if (err != NULL && err->code == GOT_ERR_NO_PATCH && patch_found)
