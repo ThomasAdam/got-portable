@@ -466,7 +466,7 @@ apply_hunk(FILE *tmp, struct got_patch_hunk *h, int *lineno)
 }
 
 static const struct got_error *
-patch_file(struct got_patch *p, FILE *orig, FILE *tmp, mode_t *mode)
+patch_file(struct got_patch *p, FILE *orig, FILE *tmp)
 {
 	const struct got_error *err = NULL;
 	struct got_patch_hunk *h;
@@ -486,7 +486,6 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp, mode_t *mode)
 
 	if (fstat(fileno(orig), &sb) == -1)
 		return got_error_from_errno("fstat");
-	*mode = sb.st_mode;
 
 	copypos = 0;
 	STAILQ_FOREACH(h, &p->head, entries) {
@@ -648,6 +647,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
     struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct stat sb;
 	int do_merge = 0, file_renamed = 0;
 	char *oldlabel = NULL, *newlabel = NULL, *anclabel = NULL;
 	char *oldpath = NULL, *newpath = NULL;
@@ -695,9 +695,16 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		goto done;
 	}
 
-	if (p->old != NULL && (oldfile = fopen(oldpath, "r")) == NULL) {
-		err = got_error_from_errno2("open", oldpath);
-		goto done;
+	if (p->old != NULL) {
+		if ((oldfile = fopen(oldpath, "r")) == NULL) {
+			err = got_error_from_errno2("open", oldpath);
+			goto done;
+		}
+		if (fstat(fileno(oldfile), &sb) == -1) {
+			err = got_error_from_errno2("fstat", oldpath);
+			goto done;
+		}
+		mode = sb.st_mode;
 	}
 
 	err = got_opentemp_named(&tmppath, &tmpfile, template);
@@ -705,7 +712,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		goto done;
 	outpath = tmppath;
 	outfd = fileno(tmpfile);
-	err = patch_file(p, afile != NULL ? afile : oldfile, tmpfile, &mode);
+	err = patch_file(p, afile != NULL ? afile : oldfile, tmpfile);
 	if (err)
 		goto done;
 
