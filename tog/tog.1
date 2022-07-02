@@ -58,12 +58,10 @@ provides global and command-specific key bindings and options.
 Some command-specific key bindings may be prefixed with an integer, which is
 denoted by N in the descriptions below, and is used as a modifier to the
 operation as indicated.
-When the first integer for a count modifier is entered,
 .Nm
-will wait 500 milliseconds for each successive integer or the compound sequence
-to complete.
-If this sequence should timeout or does not conclude with a valid key binding,
-the command is aborted and any preceding count is reset.
+will echo digits to the screen when count modifiers are entered, and complete
+the sequence upon input of the first non-numeric character.
+Count modifiers can be aborted by entering an unmapped key.
 The global key bindings are:
 .Bl -tag -width Ds
 .It Cm Q

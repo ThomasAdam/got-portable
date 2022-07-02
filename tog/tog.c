@@ -1004,10 +1004,8 @@ view_search_start(struct tog_view *view)
 }
 
 /*
- * Compute view->count from numeric user input.  User has five-tenths of a
- * second to follow each numeric keypress with another number to form count.
- * Return first non-numeric input or ERR and assign total to view->count.
- * XXX Should we add support for user-defined timeout?
+ * Compute view->count from numeric input. Assign total to view->count and
+ * return first non-numeric key entered.
  */
 static int
 get_compound_key(struct tog_view *view, int c)
@@ -1022,8 +1020,7 @@ get_compound_key(struct tog_view *view, int c)
 		v = view->parent;
 
 	view->count = 0;
-	halfdelay(5);  /* block for half a second */
-	wattron(v->window, A_BOLD);
+	cbreak();  /* block for input */
 	wmove(v->window, v->nlines - 1, 0);
 	wclrtoeol(v->window);
 	waddch(v->window, ':');
@@ -1048,8 +1045,6 @@ get_compound_key(struct tog_view *view, int c)
 	/* Massage excessive or inapplicable values at the input handler. */
 	view->count = n;
 
-	wattroff(v->window, A_BOLD);
-	cbreak();  /* return to blocking */
 	return c;
 }
 
