@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/wait.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -35,6 +36,7 @@
 #include "got_repository.h"
 #include "got_opentemp.h"
 #include "got_path.h"
+#include "got_sigs.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_deflate.h"
@@ -44,6 +46,8 @@
 #include "got_lib_lockfile.h"
 
 #include "got_lib_object_create.h"
+
+#include "buf.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -608,19 +612,21 @@ done:
 const struct got_error *
 got_object_tag_create(struct got_object_id **id,
     const char *tag_name, struct got_object_id *object_id, const char *tagger,
-    time_t tagger_time, const char *tagmsg, struct got_repository *repo)
+    time_t tagger_time, const char *tagmsg, const char *key_file,
+    struct got_repository *repo, int verbosity)
 {
 	const struct got_error *err = NULL;
 	SHA1_CTX sha1_ctx;
 	char *header = NULL;
 	char *tag_str = NULL, *tagger_str = NULL;
 	char *id_str = NULL, *obj_str = NULL, *type_str = NULL;
-	size_t headerlen, len = 0, n;
+	size_t headerlen, len = 0, sig_len = 0, n;
 	FILE *tagfile = NULL;
 	off_t tagsize = 0;
 	char *msg0 = NULL, *msg;
 	const char *obj_type_str;
 	int obj_type;
+	BUF *buf = NULL;
 
 	*id = NULL;
 
@@ -681,9 +687,79 @@ got_object_tag_create(struct got_object_id **id,
 	while (isspace((unsigned char)msg[0]))
 		msg++;
 
-	len = strlen(obj_str) + strlen(type_str) + strlen(tag_str) +
-	    strlen(tagger_str) + 1 + strlen(msg) + 1;
+	if (key_file) {
+		FILE *out;
+		pid_t pid;
+		size_t len;
+		int in_fd, out_fd;
+		int status;
 
+		err = buf_alloc(&buf, 0);
+		if (err)
+			goto done;
+
+		/* signed message */
+		err = buf_puts(&len, buf, obj_str);
+		if (err)
+			goto done;
+		err = buf_puts(&len, buf, type_str);
+		if (err)
+			goto done;
+		err = buf_puts(&len, buf, tag_str);
+		if (err)
+			goto done;
+		err = buf_puts(&len, buf, tagger_str);
+		if (err)
+			goto done;
+		err = buf_putc(buf, '\n');
+		if (err)
+			goto done;
+		err = buf_puts(&len, buf, msg);
+		if (err)
+			goto done;
+		err = buf_putc(buf, '\n');
+		if (err)
+			goto done;
+
+		err = got_sigs_sign_tag_ssh(&pid, &in_fd, &out_fd, key_file,
+		    verbosity);
+		if (err)
+			goto done;
+		if (buf_write_fd(buf, in_fd) == -1) {
+			err = got_error_from_errno("write");
+			goto done;
+		}
+		if (close(in_fd) == -1) {
+			err = got_error_from_errno("close");
+			goto done;
+		}
+
+		if (waitpid(pid, &status, 0) == -1) {
+			err = got_error_from_errno("waitpid");
+			goto done;
+		}
+
+		out = fdopen(out_fd, "r");
+		if (out == NULL) {
+			err = got_error_from_errno("fdopen");
+			goto done;
+		}
+		buf_empty(buf);
+		err = buf_load(&buf, out);
+		if (err)
+			goto done;
+		sig_len = buf_len(buf) + 1;
+		err = buf_putc(buf, '\0');
+		if (err)
+			goto done;
+		if (close(out_fd) == -1) {
+			err = got_error_from_errno("close");
+			goto done;
+		}
+	}
+
+	len = strlen(obj_str) + strlen(type_str) + strlen(tag_str) +
+	    strlen(tagger_str) + 1 + strlen(msg) + 1 + sig_len;
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_TAG, len) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -764,6 +840,17 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += n;
 
+	if (key_file && buf_len(buf) > 0) {
+		len = buf_len(buf);
+		SHA1Update(&sha1_ctx, buf_get(buf), len);
+		n = fwrite(buf_get(buf), 1, len, tagfile);
+		if (n != len) {
+			err = got_ferror(tagfile, GOT_ERR_IO);
+			goto done;
+		}
+		tagsize += n;
+	}
+
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
 		err = got_error_from_errno("malloc");
@@ -783,6 +870,8 @@ done:
 	free(header);
 	free(obj_str);
 	free(tagger_str);
+	if (buf)
+		buf_release(buf);
 	if (tagfile && fclose(tagfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {

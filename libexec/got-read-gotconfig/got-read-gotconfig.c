@@ -548,6 +548,24 @@ main(int argc, char *argv[])
 			err = send_gotconfig_str(&ibuf,
 			    gotconfig->author ?  gotconfig->author : "");
 			break;
+		case GOT_IMSG_GOTCONFIG_ALLOWEDSIGNERS_REQUEST:
+			if (gotconfig == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = send_gotconfig_str(&ibuf,
+			    gotconfig->allowed_signers_file ?
+			        gotconfig->allowed_signers_file : "");
+			break;
+		case GOT_IMSG_GOTCONFIG_REVOKEDSIGNERS_REQUEST:
+			if (gotconfig == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = send_gotconfig_str(&ibuf,
+			    gotconfig->revoked_signers_file ?
+			        gotconfig->revoked_signers_file : "");
+			break;
 		case GOT_IMSG_GOTCONFIG_REMOTES_REQUEST:
 			if (gotconfig == NULL) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);

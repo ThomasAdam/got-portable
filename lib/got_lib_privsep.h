@@ -172,6 +172,8 @@ enum got_imsg_type {
 	/* Messages related to gotconfig files. */
 	GOT_IMSG_GOTCONFIG_PARSE_REQUEST,
 	GOT_IMSG_GOTCONFIG_AUTHOR_REQUEST,
+	GOT_IMSG_GOTCONFIG_ALLOWEDSIGNERS_REQUEST,
+	GOT_IMSG_GOTCONFIG_REVOKEDSIGNERS_REQUEST,
 	GOT_IMSG_GOTCONFIG_REMOTES_REQUEST,
 	GOT_IMSG_GOTCONFIG_INT_VAL,
 	GOT_IMSG_GOTCONFIG_STR_VAL,
@@ -760,6 +762,10 @@ const struct got_error *got_privsep_recv_gitconfig_remotes(
 const struct got_error *got_privsep_send_gotconfig_parse_req(struct imsgbuf *,
     int);
 const struct got_error *got_privsep_send_gotconfig_author_req(struct imsgbuf *);
+const struct got_error *got_privsep_send_gotconfig_allowed_signers_req(
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_gotconfig_revoked_signers_req(
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_gotconfig_remotes_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_gotconfig_str(char **,

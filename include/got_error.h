@@ -169,6 +169,8 @@
 #define GOT_ERR_PATCH_FAILED	151
 #define GOT_ERR_FILEIDX_DUP_ENTRY 152
 #define GOT_ERR_PIN_PACK	153
+#define GOT_ERR_BAD_TAG_SIGNATURE 154
+#define GOT_ERR_VERIFY_TAG_SIGNATURE 155
 
 struct got_error {
         int code;

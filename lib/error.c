@@ -217,6 +217,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_PATCH_FAILED, "patch failed to apply" },
 	{ GOT_ERR_FILEIDX_DUP_ENTRY, "duplicate file index entry" },
 	{ GOT_ERR_PIN_PACK, "could not pin pack file" },
+	{ GOT_ERR_BAD_TAG_SIGNATURE, "invalid tag signature" },
+	{ GOT_ERR_VERIFY_TAG_SIGNATURE, "cannot verify signature" },
 };
 
 static struct got_custom_error {

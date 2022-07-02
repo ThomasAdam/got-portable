@@ -351,4 +351,4 @@ const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
 /* Create a new tag object in the repository. */
 const struct got_error *got_object_tag_create(struct got_object_id **,
     const char *, struct got_object_id *, const char *,
-    time_t, const char *, struct got_repository *);
+    time_t, const char *, const char *, struct got_repository *, int verbosity);

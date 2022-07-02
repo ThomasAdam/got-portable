@@ -29,3 +29,19 @@ const char *got_gotconfig_get_author(const struct got_gotconfig *);
  */
 void got_gotconfig_get_remotes(int *, const struct got_remote_repo **,
     const struct got_gotconfig *);
+
+/*
+ * Obtain the filename of the allowed signers file.
+ * Returns NULL if no configuration file is found or no allowed signers file
+ * is configured.
+ */
+const char *
+got_gotconfig_get_allowed_signers_file(const struct got_gotconfig *);
+
+/*
+ * Obtain the filename of the revoked signers file.
+ * Returns NULL if no configuration file is found or no revoked signers file
+ * is configured.
+ */
+const char *
+got_gotconfig_get_revoked_signers_file(const struct got_gotconfig *);
