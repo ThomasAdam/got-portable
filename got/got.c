@@ -1344,7 +1344,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    remote_repo_path, branches ? "\tbranch { " : "",
 	    branches ? branches : "", branches ? "}\n" : "", 
 	    refs ? "\treference { " : "", refs ? refs : "", refs ? "}\n" : "", 
-	    mirror_references ? "\tmirror-references yes\n" : "",
+	    mirror_references ? "\tmirror_references yes\n" : "",
 	    fetch_all_branches ? "\tfetch_all_branches yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;

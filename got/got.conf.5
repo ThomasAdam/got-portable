@@ -151,7 +151,7 @@ In any case, references in the
 .Dq refs/tags/
 namespace will always be fetched and mapped directly to local references
 in the same namespace.
-.It Ic mirror-references Ar yes | no
+.It Ic mirror_references Ar yes | no
 This option controls the behaviour of
 .Cm got fetch
 when updating references.
@@ -239,7 +239,7 @@ remote "origin" {
 	repository "openbsd/src"
 	server git@github.com
 	protocol git+ssh
-	mirror-references yes
+	mirror_references yes
 }
 .Ed
 .Pp
