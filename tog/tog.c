@@ -985,12 +985,14 @@ view_search_start(struct tog_view *view)
 	mvwaddstr(v->window, v->nlines - 1, 0, "/");
 	wclrtoeol(v->window);
 
+	nodelay(view->window, FALSE);  /* block for search term input */
 	nocbreak();
 	echo();
 	ret = wgetnstr(v->window, pattern, sizeof(pattern));
 	wrefresh(v->window);
 	cbreak();
 	noecho();
+	nodelay(view->window, TRUE);
 	if (ret == ERR)
 		return NULL;
 
@@ -1084,14 +1086,21 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		return NULL;
 	}
 
-	nodelay(stdscr, FALSE);
+	nodelay(view->window, FALSE);
 	/* Allow threads to make progress while we are waiting for input. */
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_unlock");
-	/* If we have an unfinished count, don't get a new key map. */
-	ch = view->ch;
-	if ((view->count && --view->count == 0) || !view->count) {
+	/* If we have an unfinished count, let C-g or backspace abort. */
+	if (view->count && --view->count) {
+		cbreak();
+		nodelay(view->window, TRUE);
+		ch = wgetch(view->window);
+		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
+			view->count = 0;
+		else
+			ch = view->ch;
+	} else {
 		ch = wgetch(view->window);
 		if (ch >= '1' && ch  <= '9')
 			view->ch = ch = get_compound_key(view, ch);
@@ -1099,7 +1108,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_lock");
-	nodelay(stdscr, TRUE);
+	nodelay(view->window, TRUE);
 
 	if (tog_sigwinch_received || tog_sigcont_received) {
 		tog_resizeterm();
@@ -2568,7 +2577,7 @@ search_next_log_view(struct tog_view *view)
 		if (errcode)
 			return got_error_set_errno(errcode,
 			    "pthread_mutex_lock");
-		if (ch == KEY_BACKSPACE) {
+		if (ch == CTRL('g') || ch == KEY_BACKSPACE) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			return NULL;
 		}
@@ -2932,7 +2941,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int begin_x = 0, begin_y = 0, eos, n, nscroll;
 
 	if (s->thread_args.load_all) {
-		if (ch == KEY_BACKSPACE)
+		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
 			s->thread_args.load_all = 0;
 		else if (s->thread_args.log_complete) {
 			err = log_move_cursor_down(view, s->commits.ncommits);
