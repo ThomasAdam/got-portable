@@ -417,6 +417,43 @@ test_tag_create_ssh_signed() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_create_ssh_signed_missing_key() {
+	local testroot=`test_init tag_create`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag=1.0.0
+
+	# Fail to create a signed tag due to a missing SSH key
+	got tag -s $testroot/bogus -m 'test' -r $testroot/repo \
+		-c HEAD	$tag > $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got tag command succeeded unexpectedly"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got ref -r $testroot/repo -l > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	printf "Couldn't load public key $testroot/bogus: " \
+	echo "got: unable to sign tag" >> $testroot/stderr.expected
+	printf "No such file or directory\r\n" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_parseargs "$@"
 test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list

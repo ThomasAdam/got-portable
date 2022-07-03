@@ -171,6 +171,7 @@
 #define GOT_ERR_PIN_PACK	153
 #define GOT_ERR_BAD_TAG_SIGNATURE 154
 #define GOT_ERR_VERIFY_TAG_SIGNATURE 155
+#define GOT_ERR_SIGNING_TAG	156
 
 struct got_error {
         int code;

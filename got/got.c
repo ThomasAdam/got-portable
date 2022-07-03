@@ -7214,7 +7214,7 @@ done:
 static const struct got_error *
 add_tag(struct got_repository *repo, const char *tagger,
     const char *tag_name, const char *commit_arg, const char *tagmsg_arg,
-    const char *key_file, int verbosity)
+    const char *signer_id, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
@@ -7280,7 +7280,7 @@ add_tag(struct got_repository *repo, const char *tagger,
 	}
 
 	err = got_object_tag_create(&tag_id, tag_name, commit_id,
-	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, key_file, repo,
+	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, signer_id, repo,
 	    verbosity);
 	if (err) {
 		if (tagmsg_path)
