@@ -455,7 +455,6 @@ test_tag_create_ssh_signed_missing_key() {
 }
 
 test_parseargs "$@"
-test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight
