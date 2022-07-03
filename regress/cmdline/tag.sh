@@ -443,8 +443,9 @@ test_tag_create_ssh_signed_missing_key() {
 		return 1
 	fi
 	printf "Couldn't load public key $testroot/bogus: " \
-	echo "got: unable to sign tag" >> $testroot/stderr.expected
+		>> $testroot/stderr.expected
 	printf "No such file or directory\r\n" >> $testroot/stderr.expected
+	echo "got: unable to sign tag" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -459,3 +460,4 @@ run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight
 run_test test_tag_create_ssh_signed
+run_test test_tag_create_ssh_signed_missing_key
