@@ -99,10 +99,10 @@ got_sigs_sign_tag_ssh(pid_t *newpid, int *in_fd, int *out_fd,
 	argv[i++] = NULL;
 	assert(i <= nitems(argv));
 
-	if (pipe2(in_pfd, 0) == -1)
-		return got_error_from_errno("pipe2");
-	if (pipe2(out_pfd, 0) == -1)
-		return got_error_from_errno("pipe2");
+	if (pipe(in_pfd) == -1)
+		return got_error_from_errno("pipe");
+	if (pipe(out_pfd) == -1)
+		return got_error_from_errno("pipe");
 
 	pid = fork();
 	if (pid == -1) {
@@ -321,12 +321,12 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 	argv[i++] = NULL;
 	assert(i <= nitems(argv));
 
-	if (pipe2(in_pfd, 0) == -1) {
-		error = got_error_from_errno("pipe2");
+	if (pipe(in_pfd) == -1) {
+		error = got_error_from_errno("pipe");
 		goto done;
 	}
-	if (pipe2(out_pfd, 0) == -1) {
-		error = got_error_from_errno("pipe2");
+	if (pipe(out_pfd) == -1) {
+		error = got_error_from_errno("pipe");
 		goto done;
 	}
 
