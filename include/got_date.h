@@ -15,6 +15,7 @@
  */
 
 #include <sys/time.h>
+#include <sys/types.h>
 
 void
 got_date_format_gmtoff(char *, size_t, time_t);
