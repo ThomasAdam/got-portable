@@ -276,7 +276,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
-	fetch-all-branches yes
+	fetch_all_branches yes
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -422,7 +422,7 @@ remote "origin" {
 	protocol ssh
 	repository "$testroot/repo"
 	mirror-references yes
-	fetch-all-branches yes
+	fetch_all_branches yes
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected

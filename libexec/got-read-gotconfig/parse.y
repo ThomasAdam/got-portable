@@ -373,7 +373,8 @@ lookup(char *s)
 		{"author",		AUTHOR},
 		{"branch",		BRANCH},
 		{"fetch",		FETCH},
-		{"fetch-all-branches",	FETCH_ALL_BRANCHES},
+		{"fetch-all-branches",	FETCH_ALL_BRANCHES}, /* deprecated */
+		{"fetch_all_branches",	FETCH_ALL_BRANCHES},
 		{"mirror-references",	MIRROR_REFERENCES},
 		{"port",		PORT},
 		{"protocol",		PROTOCOL},

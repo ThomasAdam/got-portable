@@ -1344,7 +1344,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    branches ? branches : "", branches ? "}\n" : "", 
 	    refs ? "\treference { " : "", refs ? refs : "", refs ? "}\n" : "", 
 	    mirror_references ? "\tmirror-references yes\n" : "",
-	    fetch_all_branches ? "\tfetch-all-branches yes\n" : "") == -1) {
+	    fetch_all_branches ? "\tfetch_all_branches yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
