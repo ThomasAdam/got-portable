@@ -320,7 +320,7 @@ test_tag_create_ssh_signed() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	if ! echo "$GOT_STDOUT" | grep -q "^signature: $GOOD_SIG"; then
 		echo "got tag command failed to validate signature"
 		test_done "$testroot" "1"
