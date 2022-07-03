@@ -613,7 +613,7 @@ done:
 const struct got_error *
 got_object_tag_create(struct got_object_id **id,
     const char *tag_name, struct got_object_id *object_id, const char *tagger,
-    time_t tagger_time, const char *tagmsg, const char *key_file,
+    time_t tagger_time, const char *tagmsg, const char *signer_id,
     struct got_repository *repo, int verbosity)
 {
 	const struct got_error *err = NULL;
@@ -688,7 +688,7 @@ got_object_tag_create(struct got_object_id **id,
 	while (isspace((unsigned char)msg[0]))
 		msg++;
 
-	if (key_file) {
+	if (signer_id) {
 		FILE *out;
 		pid_t pid;
 		size_t len;
@@ -722,7 +722,7 @@ got_object_tag_create(struct got_object_id **id,
 		if (err)
 			goto done;
 
-		err = got_sigs_sign_tag_ssh(&pid, &in_fd, &out_fd, key_file,
+		err = got_sigs_sign_tag_ssh(&pid, &in_fd, &out_fd, signer_id,
 		    verbosity);
 		if (err)
 			goto done;
@@ -737,6 +737,10 @@ got_object_tag_create(struct got_object_id **id,
 
 		if (waitpid(pid, &status, 0) == -1) {
 			err = got_error_from_errno("waitpid");
+			goto done;
+		}
+		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+			err = got_error(GOT_ERR_SIGNING_TAG);
 			goto done;
 		}
 
@@ -841,7 +845,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += n;
 
-	if (key_file && buf_len(buf) > 0) {
+	if (signer_id && buf_len(buf) > 0) {
 		len = buf_len(buf);
 		SHA1Update(&sha1_ctx, buf_get(buf), len);
 		n = fwrite(buf_get(buf), 1, len, tagfile);
