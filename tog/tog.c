@@ -790,6 +790,13 @@ view_is_fullscreen(struct tog_view *view)
 	return view->nlines == LINES && view->ncols == COLS;
 }
 
+static int
+view_is_hsplit_top(struct tog_view *view)
+{
+	return view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
+	    view_is_splitscreen(view->child);
+}
+
 static void
 view_border(struct tog_view *view)
 {
@@ -965,8 +972,7 @@ view_search_start(struct tog_view *view)
 	if (view->nlines < 1)
 		return NULL;
 
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		v = view->child;
 
 	mvwaddstr(v->window, v->nlines - 1, 0, "/");
@@ -1006,8 +1012,7 @@ get_compound_key(struct tog_view *view, int c)
 	struct tog_view	*v = view;
 	int		 x, n = 0;
 
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		v = view->child;
 	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
 		v = view->parent;
@@ -1747,7 +1752,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (newline)
 		*newline = '\0';
 	limit = avail - col;
-	if (view->child && view_is_splitscreen(view->child) && limit > 0)
+	if (view->child && !view_is_hsplit_top(view) && limit > 0)
 		limit--;	/* for the border */
 	err = format_line(&wlogmsg, &logmsg_width, &scrollx, logmsg, view->x,
 	    limit, col, 1);
@@ -2328,7 +2333,7 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 }
 
 static const struct got_error *
-browse_commit_tree(struct tog_view **new_view, int begin_x,
+browse_commit_tree(struct tog_view **new_view, int begin_y, int begin_x,
     struct commit_queue_entry *entry, const char *path,
     const char *head_ref_name, struct got_repository *repo)
 {
@@ -2336,7 +2341,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
 
-	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
+	tree_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL)
 		return got_error_from_errno("view_open");
 
@@ -2825,8 +2830,7 @@ log_move_cursor_down(struct tog_view *view, int page)
 	if (!page) {
 		int eos = view->nlines - 2;
 
-		if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-		    view_is_splitscreen(view->child))
+		if (view_is_hsplit_top(view))
 			--eos;  /* border consumes the last line */
 		if (s->selected < MIN(eos, s->commits.ncommits - 1))
 			++s->selected;
@@ -2931,10 +2935,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	}
 
 	eos = nscroll = view->nlines - 1;
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		--eos;  /* border */
-
 
 	switch (ch) {
 	case 'q':
@@ -3035,7 +3037,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		break;
 	case KEY_ENTER:
-	case '\r': {
+	case '\r':
 		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
@@ -3050,7 +3052,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (err)
 			break;
 
-		if (view->mode == TOG_VIEW_SPLIT_HRZN) {  /* safe to split */
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {  /* safe to split */
 			err = view_init_hsplit(view, begin_y);
 			if (err)
 				break;
@@ -3072,20 +3075,27 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else
 			*new_view = diff_view;
 		break;
-	}
 	case 't':
 		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
 		if (view_is_parent_view(view))
-			begin_x = view_split_begin_x(view->begin_x);
-		err = browse_commit_tree(&tree_view, begin_x,
+			view_get_split(view, &begin_y, &begin_x);
+		err = browse_commit_tree(&tree_view, begin_y, begin_x,
 		    s->selected_entry, s->in_repo_path, s->head_ref_name,
 		    s->repo);
 		if (err)
 			break;
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
 		view->focussed = 0;
 		tree_view->focussed = 1;
+		tree_view->mode = view->mode;
+		tree_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
@@ -3164,9 +3174,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'r':
 		view->count = 0;
 		if (view_is_parent_view(view))
-			begin_x = view_split_begin_x(view->begin_x);
-		ref_view = view_open(view->nlines, view->ncols,
-		    view->begin_y, begin_x, TOG_VIEW_REF);
+			view_get_split(view, &begin_y, &begin_x);
+		ref_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_REF);
 		if (ref_view == NULL)
 			return got_error_from_errno("view_open");
 		err = open_ref_view(ref_view, s->repo);
@@ -3174,8 +3183,16 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			view_close(ref_view);
 			return err;
 		}
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
 		view->focussed = 0;
 		ref_view->focussed = 1;
+		ref_view->mode = view->mode;
+		ref_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
@@ -5396,8 +5413,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int eos, nscroll, begin_y = 0, begin_x = 0;
 
 	eos = nscroll = view->nlines - 2;
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		--eos;  /* border */
 
 	switch (ch) {
@@ -5604,7 +5620,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			view_close(diff_view);
 			break;
 		}
-		if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
 			err = view_init_hsplit(view, begin_y);
 			if (err)
 				break;
@@ -5838,8 +5855,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	int limit = view->nlines;
 
 	s->ndisplayed = 0;
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		--limit;  /* border */
 
 	werase(view->window);
@@ -6114,7 +6130,7 @@ done:
 }
 
 static const struct got_error *
-log_selected_tree_entry(struct tog_view **new_view, int begin_x,
+log_selected_tree_entry(struct tog_view **new_view, int begin_y, int begin_x,
     struct tog_tree_view_state *s)
 {
 	struct tog_view *log_view;
@@ -6123,7 +6139,7 @@ log_selected_tree_entry(struct tog_view **new_view, int begin_x,
 
 	*new_view = NULL;
 
-	log_view = view_open(0, 0, 0, begin_x, TOG_VIEW_LOG);
+	log_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_LOG);
 	if (log_view == NULL)
 		return got_error_from_errno("view_open");
 
@@ -6371,7 +6387,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct tog_view *log_view, *ref_view;
 	struct got_tree_entry *te;
-	int begin_x = 0, n, nscroll = view->nlines - 3;
+	int begin_y = 0, begin_x = 0, n, nscroll = view->nlines - 3;
 
 	switch (ch) {
 	case 'i':
@@ -6383,10 +6399,18 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (!s->selected_entry)
 			break;
 		if (view_is_parent_view(view))
-			begin_x = view_split_begin_x(view->begin_x);
-		err = log_selected_tree_entry(&log_view, begin_x, s);
+			view_get_split(view, &begin_y, &begin_x);
+		err = log_selected_tree_entry(&log_view, begin_y, begin_x, s);
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
 		view->focussed = 0;
 		log_view->focussed = 1;
+		log_view->mode = view->mode;
+		log_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
@@ -6401,9 +6425,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'r':
 		view->count = 0;
 		if (view_is_parent_view(view))
-			begin_x = view_split_begin_x(view->begin_x);
-		ref_view = view_open(view->nlines, view->ncols,
-		    view->begin_y, begin_x, TOG_VIEW_REF);
+			view_get_split(view, &begin_y, &begin_x);
+		ref_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_REF);
 		if (ref_view == NULL)
 			return got_error_from_errno("view_open");
 		err = open_ref_view(ref_view, s->repo);
@@ -6411,8 +6434,16 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			view_close(ref_view);
 			return err;
 		}
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
 		view->focussed = 0;
 		ref_view->focussed = 1;
+		ref_view->mode = view->mode;
+		ref_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
@@ -6580,7 +6611,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			if (err)
 				break;
 
-			if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+			if (view_is_parent_view(view) &&
+			    view->mode == TOG_VIEW_SPLIT_HRZN) {
 				err = view_init_hsplit(view, begin_y);
 				if (err)
 					break;
@@ -7114,8 +7146,7 @@ show_ref_view(struct tog_view *view)
 	werase(view->window);
 
 	s->ndisplayed = 0;
-	if (view->mode == TOG_VIEW_SPLIT_HRZN && view->child &&
-	    view_is_splitscreen(view->child))
+	if (view_is_hsplit_top(view))
 		--limit;  /* border */
 
 	if (limit == 0)
@@ -7253,7 +7284,7 @@ show_ref_view(struct tog_view *view)
 }
 
 static const struct got_error *
-browse_ref_tree(struct tog_view **new_view, int begin_x,
+browse_ref_tree(struct tog_view **new_view, int begin_y, int begin_x,
     struct tog_reflist_entry *re, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -7271,7 +7302,7 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 	}
 
 
-	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
+	tree_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL) {
 		err = got_error_from_errno("view_open");
 		goto done;
@@ -7334,7 +7365,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (err)
 			break;
 
-		if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
 			err = view_init_hsplit(view, begin_y);
 			if (err)
 				break;
@@ -7360,13 +7392,21 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (!s->selected_entry)
 			break;
 		if (view_is_parent_view(view))
-			begin_x = view_split_begin_x(view->begin_x);
-		err = browse_ref_tree(&tree_view, begin_x, s->selected_entry,
-		    s->repo);
+			view_get_split(view, &begin_y, &begin_x);
+		err = browse_ref_tree(&tree_view, begin_y, begin_x,
+		    s->selected_entry, s->repo);
 		if (err || tree_view == NULL)
 			break;
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
 		view->focussed = 0;
 		tree_view->focussed = 1;
+		tree_view->mode = view->mode;
+		tree_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
