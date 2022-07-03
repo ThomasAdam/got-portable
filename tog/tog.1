@@ -305,7 +305,8 @@ Find the Nth previous line which matches the current search pattern
 Toggle display of whitespace-only changes.
 .It Cm A
 Change the diff algorithm.
-Supported diff algorithms are Myers and Patience.
+Supported diff algorithms are Myers (quick and dirty) and
+Patience (slow and tidy).
 This is a global setting which also affects the
 .Cm blame
 view.
@@ -395,7 +396,8 @@ Find the Nth previous line which matches the current search pattern
 (default: 1).
 .It Cm A
 Change the diff algorithm.
-Supported diff algorithms are Myers and Patience.
+Supported diff algorithms are Myers (quick and dirty) and
+Patience (slow and tidy).
 This is a global setting which also affects the
 .Cm diff
 view.
@@ -584,7 +586,11 @@ work tree, use the repository path associated with this work tree.
 .It Ev TOG_DIFF_ALGORITHM
 Determines the default diff algorithm used by
 .Nm .
-Valid values are
+Supported diff algorithms are Myers (quick and dirty) and
+Patience (slow and tidy).
+Valid values for
+.Ev TOG_DIFF_ALGORITHM
+are
 .Dq patience
 and
 .Dq myers .
