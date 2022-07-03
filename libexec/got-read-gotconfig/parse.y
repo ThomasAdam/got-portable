@@ -375,7 +375,8 @@ lookup(char *s)
 		{"fetch",		FETCH},
 		{"fetch-all-branches",	FETCH_ALL_BRANCHES}, /* deprecated */
 		{"fetch_all_branches",	FETCH_ALL_BRANCHES},
-		{"mirror-references",	MIRROR_REFERENCES},
+		{"mirror-references",	MIRROR_REFERENCES}, /* deprecated */
+		{"mirror_references",	MIRROR_REFERENCES},
 		{"port",		PORT},
 		{"protocol",		PROTOCOL},
 		{"reference",		REFERENCE},
