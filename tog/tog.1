@@ -62,6 +62,10 @@ operation as indicated.
 will echo digits to the screen when count modifiers are entered, and complete
 the sequence upon input of the first non-numeric character.
 Count modifiers can be aborted by entering an unmapped key.
+Once a compound command is executed, the operation can be cancelled with
+.Cm C-g
+or
+.Cm Backspace .
 The global key bindings are:
 .Bl -tag -width Ds
 .It Cm Q
@@ -138,6 +142,8 @@ Move the cursor to the oldest commit.
 This will traverse all commits on the current branch which may take
 a long time depending on the number of commits in branch history.
 If needed, this operation can be cancelled with
+.Cm C-g
+or
 .Cm Backspace .
 .It Cm Enter
 Open a
@@ -163,14 +169,18 @@ Regular expression syntax is documented in
 .It Cm n
 Find the Nth next commit which matches the current search pattern (default: 1).
 .br
-Searching continues until either a match is found or the
+Searching continues until either a match is found or
+.Cm C-g
+or the
 .Cm Backspace
 key is pressed.
 .It Cm N
 Find the Nth previous commit which matches the current search pattern
 (default: 1).
 .br
-Searching continues until either a match is found or the
+Searching continues until either a match is found or
+.Cm C-g
+or the
 .Cm Backspace
 key is pressed.
 .It Cm Ctrl+l
@@ -295,7 +305,7 @@ Find the Nth previous line which matches the current search pattern
 Toggle display of whitespace-only changes.
 .It Cm A
 Change the diff algorithm.
-Supported diff algorithms are Myers and Patience. 
+Supported diff algorithms are Myers and Patience.
 This is a global setting which also affects the
 .Cm blame
 view.
@@ -385,7 +395,7 @@ Find the Nth previous line which matches the current search pattern
 (default: 1).
 .It Cm A
 Change the diff algorithm.
-Supported diff algorithms are Myers and Patience. 
+Supported diff algorithms are Myers and Patience.
 This is a global setting which also affects the
 .Cm diff
 view.
