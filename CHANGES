@@ -1,3 +1,29 @@
+* got 0.73; 2022-07-04
+- got patch: use diff3 to merge changes if possible (op)
+- tog: alias C-b/C-f to scroll page back/forward with b/f (jamsek)
+- tog: make SPACE page down in all views (naddy)
+- tog: allow prefixing movement keys with count modifier (jamsek)
+- always show commit or tree IDs in diff header, in order to help 'got patch'
+- build non-release builds with -Wwrite-strings (op)
+- got patch: handle git-style diffs for the 3-way merge too (op)
+- implement support for commit coloring in got-read-pack for speed
+- move got_opentemp out of open_blob and blame.c for future gotwebd (tracey)
+- move got_opentemp out of diff.c and diffreg.c for future gotwebd
+- tog: refactor log cursor movement in preparation for horizontal split (jamsek)
+- tog: implement support for horizontal splitscreens (jamsek)
+- switch 'tog diff' and 'tog blame' to Myers diff by default for speed
+- make the diff algorithm used by 'tog diff' and 'tog blame' configurable
+- make the patch parser look for the next "diff" header for robustness (op)
+- got patch: don't loose the x bit when merging with diff3 (op)
+- got patch: handle mangled whitespace (op)
+- fix "imsg_add TREE_ENTRY: Result too large" error on i386 (semarie, op)
+- create and verify tags signed by SSH keys (jrick)
+- tog: add C-g/backspace key map to abort compound commands (jamsek)
+- rename got.conf(5) fetch-all-branches to fetch_all_branches for consistency
+- rename got.conf(5) mirror-references to mirror_references for consistency
+- use pipe() which is a more portable syscall than pipe2() (jrick)
+- got patch: check for specific chars instead of using isspace(3) (op)
+
 * got 0.72; 2022-06-18
 - fix "bad offset in pack file" error due to uninitialized variable (op)
 - initialize all variables used for sending privsep messages to zero (op)
