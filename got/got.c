@@ -6908,7 +6908,7 @@ usage_tag(void)
 {
 	fprintf(stderr,
 	    "usage: %s tag [-c commit] [-r repository] [-l] "
-	        "[-m message] [-s signer_id] name\n",
+	        "[-m message] [-s signer-id] [-V] name\n",
 	        getprogname());
 	exit(1);
 }
