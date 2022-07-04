@@ -1204,7 +1204,7 @@ test_send_to_empty_repo() {
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
-	got init $testroot/repo2
+	gotadmin init $testroot/repo2
 
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1240,7 +1240,7 @@ EOF
 		return 1
 	fi
 
-	# XXX Workaround: We cannot give the target for HEAD to 'got init'
+	# XXX Workaround: We cannot give the target for HEAD to 'gotadmin init'
 	got ref -r $testroot/repo2 -s refs/heads/master HEAD
 
 	got ref -l -r $testroot/repo > $testroot/stdout
