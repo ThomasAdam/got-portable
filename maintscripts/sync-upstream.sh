@@ -50,11 +50,29 @@ git cherry-pick --no-rerere-autoupdate -Xtheirs \
 	$(git rev-list --first-parent main...origin/main)
 
 [ $? -eq 0 ] && {
+	# Sanity-check header files which are found portably and remove them.
+	for h in 'sys\/queue.h' 'ssl\.h' 'endian\.h'
+	do
+		# Use git's pathspec notation to exclude matching on files
+		# where we *want* to keep those headers.
+		git grep -Li "$h" -- \
+			':!maintscripts/**' \
+			':!configure.ac' \
+			':!gotweb/parse.y' \
+			':!include/got_compat.h' | \
+			while read file
+			do
+				sed -i -e "/$h/d" "$file"
+			done
+	done
+
 	echo "Performing sanity build..."
 	./autogen.sh >/dev/null 2>&1 && \
 	./configure >/dev/null 2>&1  && \
 	make -j $(nproc) >/dev/null 2>&1 && {
 		echo "   Passed!"
+		echo "Creating commit for portable changes..."
+		git commit -am "portable: remove include files found portably"
 		echo "...Merging branch to linux"
 		git checkout linux && git merge --ff-only - && {
 			echo "Pushing to GH..."
