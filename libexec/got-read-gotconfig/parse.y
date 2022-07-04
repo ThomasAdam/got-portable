@@ -120,6 +120,7 @@ grammar		: /* empty */
 		| grammar author '\n'
 		| grammar remote '\n'
 		| grammar allowed_signers '\n'
+		| grammar revoked_signers '\n'
 		;
 boolean		: STRING {
 			if (strcasecmp($1, "true") == 0 ||
