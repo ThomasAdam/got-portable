@@ -55,6 +55,34 @@ Because
 may fail to parse commits without an email address in author data,
 .Xr got 1
 attempts to reject author information with a missing email address.
+.It Ic allowed_signers Pa path
+Configure a
+.Ar path
+to the "allowed signers" file which contains a list of trusted
+SSH signer identities.
+The file will be passed to
+.Xr ssh-keygen 1
+during verification of SSH-based signatures with
+.Cm got tag Fl V .
+The format of the "allowed signers" file is documented in the
+ALLOWED SIGNERS section of
+.Xr ssh-keygen 1 .
+.Pp
+Verification of SSH-based signatures is impossible unless the
+.Ic allowed_signers
+option is set in
+.Nm .
+.It Ic revoked_signers Pa path
+Configure a
+.Ar path
+to the optional "revoked signers" file, which contains a list of revoked
+SSH signer identities.
+This file is passed to
+.Xr ssh-keygen 1
+during signature verification with
+.Cm got tag Fl V .
+Revoked identities are no longer considered trustworthy and verification
+of relevant signatures will fail.
 .It Ic remote Ar name Brq ...
 Define a remote repository.
 The specified
