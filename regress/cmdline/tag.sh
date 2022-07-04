@@ -307,7 +307,7 @@ test_tag_create_ssh_signed() {
 		return 1
 	fi
 
-	GOOD_SIG='Good "git" signature for flan_hacker@openbsd.org with ED25519 key SHA256:'
+	GOOD_SIG='Good "git" signature for flan_hacker@openbsd.org with ED25519 key '
 
 	# Validate the signature with the key allowed
 	echo -n 'flan_hacker@openbsd.org ' > $testroot/allowed_signers
@@ -349,6 +349,31 @@ test_tag_create_ssh_signed() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create another signed tag with a SHA1 commit ID
+	got tag -s $testroot/id_ed25519 -m 'test' -r $testroot/repo \
+		-c $commit_id $tag2 > $testroot/stdout
+
+	# got tag -V behaves like got tag -l, but with verification enabled.
+	got tag -l -r $testroot/repo > $testroot/stdout.list
+	got tag -V -r $testroot/repo > $testroot/stdout.verify
+	diff -U0 $testroot/stdout.list $testroot/stdout.verify |
+	    sed -e '/^--- /d' -e '/^+++ /d' > $testroot/stdout
+	echo "@@ -5,0 +6 @@" > $testroot/stdout.expected
+	echo -n "+signature: $GOOD_SIG" >> $testroot/stdout.expected
+	ssh-keygen -l -f $testroot/id_ed25519.pub | cut -d' ' -f 2 \
+		>> $testroot/stdout.expected
+	echo "@@ -19,0 +21 @@" >> $testroot/stdout.expected
+	echo -n "+signature: $GOOD_SIG" >> $testroot/stdout.expected
+	ssh-keygen -l -f $testroot/id_ed25519.pub | cut -d' ' -f 2 \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
