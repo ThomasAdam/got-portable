@@ -286,7 +286,10 @@ test_tag_create_ssh_signed() {
 		return 1
 	fi
 	touch $testroot/allowed_signers
-	echo "allowed_signers \"$testroot/allowed_signers\"" > \
+	touch $testroot/revoked_signers
+	echo "allowed_signers \"$testroot/allowed_signers\"" >> \
+		$testroot/repo/.git/got.conf
+	echo "revoked_signers \"$testroot/revoked_signers\"" >> \
 		$testroot/repo/.git/got.conf
 
 	# Create a signed tag based on repository's HEAD reference
@@ -341,6 +344,22 @@ test_tag_create_ssh_signed() {
 		test_done "$testroot" "1"
 		return 1
 	fi
+
+	# Ensure validation fails after revoking the key
+	ssh-keygen -y -f $testroot/id_ed25519 >> $testroot/revoked_signers
+	echo "signature: Could not verify signature." > \
+		$testroot/stdout.expected
+	VERIFY_STDOUT=$(got tag -r $testroot/repo -V $tag 2> $testroot/stderr)
+	ret=$?
+	echo "$VERIFY_STDOUT" | grep '^signature: ' > $testroot/stdout
+	if [ $ret -eq 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Later tests expect validation to work
+	echo -n > $testroot/revoked_signers
 
 	# Ensure that Git recognizes and verifies the tag Got has created
 	(cd $testroot/repo && git checkout -q $tag)
