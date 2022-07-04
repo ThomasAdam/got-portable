@@ -7379,12 +7379,22 @@ cmd_tag(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (do_list) {
+	if (do_list || verify_tags) {
 		if (commit_id_arg != NULL)
 			errx(1,
 			    "-c option can only be used when creating a tag");
-		if (tagmsg)
-			option_conflict('l', 'm');
+		if (tagmsg) {
+			if (do_list)
+				option_conflict('l', 'm');
+			else
+				option_conflict('V', 'm');
+		}
+		if (signer_id) {
+			if (do_list)
+				option_conflict('l', 's');
+			else
+				option_conflict('V', 's');
+		}
 		if (argc > 1)
 			usage_tag();
 	} else if (argc != 1)
