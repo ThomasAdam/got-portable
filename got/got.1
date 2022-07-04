@@ -1183,7 +1183,7 @@ Git's garbage collector or
 .It Fl n
 Do not switch and update the work tree after creating a new branch.
 .El
-.It Cm tag Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Ar name
+.It Cm tag Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl s Ar signer-id Oc Oo Fl v Oc Oo Fl V Oc Ar name
 Manage tags in a repository.
 .Pp
 Tags are managed via references which live in the
@@ -1236,6 +1236,47 @@ If a
 .Ar name
 argument is passed, show only the tag with the given
 .Ar name .
+.It Fl s Ar signer-id
+While creating a new tag, sign this tag with the identity given in
+.Ar signer-id .
+.Pp
+For SSH-based signatures,
+.Ar signer-id
+is the path to a file which may refer to either a private SSH key,
+or a public SSH key with the private half available via
+.Xr ssh-agent 1 .
+.Cm got tag
+will sign the tag object by invoking
+.Xr ssh-keygen 1
+with the
+.Fl Y Ar sign
+command, using the signature namespace
+.Dq git
+for compatibility with
+.Xr git 1 .
+.It Fl v
+Verbose mode.
+During SSH signature creation and verification this option will be passed to
+.Xr ssh-keygen 1 .
+Multiple -v options increase the verbosity.
+The maximum is 3.
+.It Fl V
+Verify tag object signatures.
+If a
+.Ar name
+is specified, show and verify the tag object with the provided name.
+Otherwise, list all tag objects and verify signatures where present.
+.Pp
+.Cm got tag
+verifies SSH-based signatures by invoking
+.Xr ssh-keygen 1
+with the options
+.Fl Y Ar verify Fl f Ar allowed_signers .
+A path to the
+.Ar allowed_signers
+file must be set in
+.Xr got.conf 5 ,
+otherwise verification is impossible.
 .El
 .Pp
 By design, the
