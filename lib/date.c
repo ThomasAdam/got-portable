@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/time.h>
+#include <sys/types.h>
+
 #include <stdio.h>
 
 #include "got_date.h"
