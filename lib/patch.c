@@ -415,11 +415,11 @@ linecmp(const char *a, const char *b, int *mangled)
 
 	*mangled = 1;
 	for (;;) {
-		while (isspace(*a))
+		while (*a == '\t' || *a == ' ' || *a == '\f')
 			a++;
-		while (isspace(*b))
+		while (*b == '\t' || *b == ' ' || *b == '\f')
 			b++;
-		if (*a == '\0' || *b == '\0' || *a != *b)
+		if (*a == '\0' || *a != *b)
 			break;
 		a++, b++;
 	}
