@@ -78,12 +78,14 @@ struct gotadmin_cmd {
 };
 
 __dead static void	usage(int, int);
+__dead static void	usage_init(void);
 __dead static void	usage_info(void);
 __dead static void	usage_pack(void);
 __dead static void	usage_indexpack(void);
 __dead static void	usage_listpack(void);
 __dead static void	usage_cleanup(void);
 
+static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_info(int, char *[]);
 static const struct got_error*		cmd_pack(int, char *[]);
 static const struct got_error*		cmd_indexpack(int, char *[]);
@@ -91,6 +93,7 @@ static const struct got_error*		cmd_listpack(int, char *[]);
 static const struct got_error*		cmd_cleanup(int, char *[]);
 
 static const struct gotadmin_cmd gotadmin_commands[] = {
+	{ "init",	cmd_init,	usage_init,	"" },
 	{ "info",	cmd_info,	usage_info,	"" },
 	{ "pack",	cmd_pack,	usage_pack,	"" },
 	{ "indexpack",	cmd_indexpack,	usage_indexpack,"ix" },
@@ -262,6 +265,59 @@ done:
 		got_worktree_close(worktree);
 	free(cwd);
 	return err;
+}
+
+__dead static void
+usage_init(void)
+{
+	fprintf(stderr, "usage: %s init repository-path\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_init(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	char *repo_path = NULL;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_init();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	if (argc != 1)
+		usage_init();
+
+	repo_path = strdup(argv[0]);
+	if (repo_path == NULL)
+		return got_error_from_errno("strdup");
+
+	got_path_strip_trailing_slashes(repo_path);
+
+	error = got_path_mkdir(repo_path);
+	if (error &&
+	    !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
+		goto done;
+
+	error = apply_unveil(repo_path, 0);
+	if (error)
+		goto done;
+
+	error = got_repo_init(repo_path);
+done:
+	free(repo_path);
+	return error;
 }
 
 static const struct got_error *

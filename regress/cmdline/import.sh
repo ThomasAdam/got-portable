@@ -20,7 +20,7 @@ test_import_basic() {
 	local testname=import_basic
 	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
 
-	got init $testroot/repo
+	gotadmin init $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -176,7 +176,7 @@ test_import_ignores() {
 	local testname=import_ignores
 	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
 
-	got init $testroot/repo
+	gotadmin init $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -206,7 +206,7 @@ test_import_empty_dir() {
 	local testname=import_empty_dir
 	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
 
-	got init $testroot/repo
+	gotadmin init $testroot/repo
 
 	mkdir $testroot/tree
 	mkdir -p $testroot/tree/empty $testroot/tree/notempty
@@ -249,7 +249,7 @@ test_import_symlink() {
 	local testname=import_symlink
 	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
 
-	got init $testroot/repo
+	gotadmin init $testroot/repo
 
 	mkdir $testroot/tree
 	echo 'this is file alpha' > $testroot/tree/alpha
