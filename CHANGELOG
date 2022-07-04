@@ -8,8 +8,11 @@ All changes are on top of the versioned changes listed in CHANGES.
 
 # got-portable 0.73 (2022-07-04)
 
-* Changes as found in got-0.73.  Some portable work has taken place, but these
-  have been merged upstream and hence will be in the got-0.73 changes file.
+* Changes as found in got-0.73.
+* portable: the libexec helpers now support Capsicum on FreeBSD, which is
+  similar to OpenBSD's pledge() syscall.
+* Some portable work has taken place, but these have been merged upstream and
+  hence will be in the got-0.73 changes file.
 
 # got-portable 0.71 (2022-06-23)
 
