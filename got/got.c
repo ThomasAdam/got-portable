@@ -7386,10 +7386,26 @@ cmd_tag(int argc, char *argv[])
 			    "-c option can only be used when creating a tag");
 		if (tagmsg)
 			option_conflict('l', 'm');
+		if (signer_id)
+			option_conflict('l', 's');
+		if (verify_tags)
+			option_conflict('l', 'V');
 		if (argc > 1)
 			usage_tag();
 	} else if (argc != 1)
 		usage_tag();
+
+	if (verify_tags) {
+		if (commit_id_arg != NULL)
+			errx(1,
+			    "-c option can only be used when creating a tag");
+		if (tagmsg)
+			option_conflict('V', 'm');
+		if (signer_id)
+			option_conflict('V', 's');
+		if (do_list)
+			option_conflict('V', 'l');
+	}
 
 	if (argc == 1)
 		tag_name = argv[0];
