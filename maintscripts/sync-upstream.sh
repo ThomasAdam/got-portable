@@ -46,8 +46,9 @@ read -p "Proceed? [Y/n]: " resp
 
 [ "$resp" = "N" -o "$resp" = "n" ] && exit
 
-git cherry-pick --no-rerere-autoupdate -Xtheirs \
-	$(git rev-list --first-parent main...origin/main)
+# Pick the commits in reverse order.
+git rev-list --reverse --first-parent main...origin/main | \
+	git cherry-pick --stdin --no-rerere-autoupdate -Xtheirs
 
 [ $? -eq 0 ] && {
 	# Sanity-check header files which are found portably and remove them.
