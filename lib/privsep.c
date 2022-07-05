@@ -2387,6 +2387,17 @@ got_privsep_send_gotconfig_revoked_signers_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_gotconfig_signer_id_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GOTCONFIG_SIGNERID_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_SIGNERID_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_gotconfig_remotes_req(struct imsgbuf *ibuf)
 {
 	if (imsg_compose(ibuf,

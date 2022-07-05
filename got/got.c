@@ -703,6 +703,39 @@ get_revoked_signers(char **revoked_signers, struct got_repository *repo,
 }
 
 static const struct got_error *
+get_signer_id(char **signer_id, struct got_repository *repo,
+    struct got_worktree *worktree)
+{
+	const char *got_signer_id = NULL;
+	const struct got_gotconfig *worktree_conf = NULL, *repo_conf = NULL;
+
+	*signer_id = NULL;
+
+	if (worktree)
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+	repo_conf = got_repo_get_gotconfig(repo);
+
+	/*
+	 * Priority of potential author information sources, from most
+	 * significant to least significant:
+	 * 1) work tree's .got/got.conf file
+	 * 2) repository's got.conf file
+	 */
+
+	if (worktree_conf)
+		got_signer_id = got_gotconfig_get_signer_id(worktree_conf);
+	if (got_signer_id == NULL)
+		got_signer_id = got_gotconfig_get_signer_id(repo_conf);
+
+	if (got_signer_id) {
+		*signer_id = strdup(got_signer_id);
+		if (*signer_id == NULL)
+			return got_error_from_errno("strdup");
+	}
+	return NULL;
+}
+
+static const struct got_error *
 get_gitconfig_path(char **gitconfig_path)
 {
 	const char *homedir = getenv("HOME");
@@ -7280,9 +7313,9 @@ cmd_tag(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
 	char *gitconfig_path = NULL, *tagger = NULL;
 	char *allowed_signers = NULL, *revoked_signers = NULL;
+	char *signer_id = NULL;
 	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
-	const char *signer_id = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:m:r:ls:Vv")) != -1) {
@@ -7295,16 +7328,22 @@ cmd_tag(int argc, char *argv[])
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
-			if (repo_path == NULL)
-				return got_error_from_errno2("realpath",
+			if (repo_path == NULL) {
+				error = got_error_from_errno2("realpath",
 				    optarg);
+				goto done;
+			}
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'l':
 			do_list = 1;
 			break;
 		case 's':
-			signer_id = optarg;
+			signer_id = strdup(optarg);
+			if (signer_id == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
 			break;
 		case 'V':
 			verify_tags = 1;
@@ -7437,6 +7476,11 @@ cmd_tag(int argc, char *argv[])
 		error = get_author(&tagger, repo, worktree);
 		if (error)
 			goto done;
+		if (signer_id == NULL) {
+			error = get_signer_id(&signer_id, repo, worktree);
+			if (error)
+				goto done;
+		}
 		if (worktree) {
 			/* Release work tree lock. */
 			got_worktree_close(worktree);
@@ -7497,6 +7541,7 @@ done:
 	free(tagger);
 	free(allowed_signers);
 	free(revoked_signers);
+	free(signer_id);
 	return error;
 }
 

@@ -577,6 +577,14 @@ main(int argc, char *argv[])
 			    gotconfig->revoked_signers_file ?
 			        gotconfig->revoked_signers_file : "");
 			break;
+		case GOT_IMSG_GOTCONFIG_SIGNERID_REQUEST:
+			if (gotconfig == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = send_gotconfig_str(&ibuf,
+			    gotconfig->signer_id ? gotconfig->signer_id : "");
+			break;
 		case GOT_IMSG_GOTCONFIG_REMOTES_REQUEST:
 			if (gotconfig == NULL) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);

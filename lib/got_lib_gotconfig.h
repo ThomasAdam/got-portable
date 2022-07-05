@@ -22,6 +22,7 @@ struct got_gotconfig {
 	struct got_remote_repo *remotes;
 	char *allowed_signers_file;
 	char *revoked_signers_file;
+	char *signer_id;
 };
 
 const struct got_error *got_gotconfig_read(struct got_gotconfig **,
