@@ -1479,7 +1479,7 @@ test_commit_large_file() {
 		return 1
 	fi
 
-	dd status=none if=/dev/zero of=$testroot/wt/new bs=1m count=64
+	dd status=none if=/dev/zero of=$testroot/wt/new bs=1M count=64
 	(cd $testroot/wt && got add new >/dev/null)
 
 	(cd $testroot/wt && got commit -m 'test commit_large_file' \
