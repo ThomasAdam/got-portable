@@ -55,6 +55,18 @@ Because
 may fail to parse commits without an email address in author data,
 .Xr got 1
 attempts to reject author information with a missing email address.
+.It Ic signer_id Pa signer-id
+Configure a
+.Ar signer-id
+to sign tag objects.
+This key will be used to sign all tag objects unless overridden by
+.Cm got tag Fl s Ar signer-id .
+.Pp
+For SSH-based signatures,
+.Ar signer-id
+is the path to a file which may refer to either a private SSH key,
+or a public SSH key with the private half available via
+.Xr ssh-agent 1 .
 .It Ic allowed_signers Pa path
 Configure a
 .Ar path

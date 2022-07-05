@@ -262,6 +262,7 @@ test_tag_create_ssh_signed() {
 	local commit_id=`git_show_head $testroot/repo`
 	local tag=1.0.0
 	local tag2=2.0.0
+	local tag3=3.0.0
 
 	ssh-keygen -q -N '' -t ed25519 -f $testroot/id_ed25519
 	ret=$?
@@ -376,6 +377,17 @@ test_tag_create_ssh_signed() {
 	got tag -s $testroot/id_ed25519 -m 'test' -r $testroot/repo \
 		-c $commit_id $tag2 > $testroot/stdout
 
+	# Create another signed tag with key defined in got.conf(5)
+	echo "signer_id \"$testroot/id_ed25519\"" >> \
+		$testroot/repo/.git/got.conf
+	got tag -m 'test' -r $testroot/repo -c HEAD $tag3 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got tag command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	# got tag -V behaves like got tag -l, but with verification enabled.
 	got tag -l -r $testroot/repo > $testroot/stdout.list
 	got tag -V -r $testroot/repo > $testroot/stdout.verify
@@ -386,6 +398,10 @@ test_tag_create_ssh_signed() {
 	ssh-keygen -l -f $testroot/id_ed25519.pub | cut -d' ' -f 2 \
 		>> $testroot/stdout.expected
 	echo "@@ -19,0 +21 @@" >> $testroot/stdout.expected
+	echo -n "+signature: $GOOD_SIG" >> $testroot/stdout.expected
+	ssh-keygen -l -f $testroot/id_ed25519.pub | cut -d' ' -f 2 \
+		>> $testroot/stdout.expected
+	echo "@@ -33,0 +36 @@" >> $testroot/stdout.expected
 	echo -n "+signature: $GOOD_SIG" >> $testroot/stdout.expected
 	ssh-keygen -l -f $testroot/id_ed25519.pub | cut -d' ' -f 2 \
 		>> $testroot/stdout.expected

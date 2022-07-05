@@ -119,6 +119,14 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	if (err)
 		goto done;
 
+	err = got_privsep_send_gotconfig_signer_id_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gotconfig_str(&(*conf)->signer_id, ibuf);
+	if (err)
+		goto done;
+
 	err = got_privsep_send_gotconfig_remotes_req(ibuf);
 	if (err)
 		goto done;
@@ -187,4 +195,10 @@ const char *
 got_gotconfig_get_revoked_signers_file(const struct got_gotconfig *conf)
 {
 	return conf->revoked_signers_file;
+}
+
+const char *
+got_gotconfig_get_signer_id(const struct got_gotconfig *conf)
+{
+	return conf->signer_id;
 }

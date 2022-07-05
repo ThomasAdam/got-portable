@@ -45,3 +45,11 @@ got_gotconfig_get_allowed_signers_file(const struct got_gotconfig *);
  */
 const char *
 got_gotconfig_get_revoked_signers_file(const struct got_gotconfig *);
+
+/*
+ * Obtain the signer identity used to sign tag objects
+ * Returns NULL if no configuration file is found or no revoked signers file
+ * is configured.
+ */
+const char *
+got_gotconfig_get_signer_id(const struct got_gotconfig *);

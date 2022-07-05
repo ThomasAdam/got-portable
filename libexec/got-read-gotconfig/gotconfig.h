@@ -69,6 +69,7 @@ struct gotconfig {
 	int nremotes;
 	char	*allowed_signers_file;
 	char	*revoked_signers_file;
+	char	*signer_id;
 };
 
 /*
