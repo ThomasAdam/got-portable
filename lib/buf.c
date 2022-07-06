@@ -57,7 +57,7 @@ buf_alloc(BUF **b, size_t len)
 
 	*b = malloc(sizeof(**b));
 	if (*b == NULL)
-		return NULL;
+		return got_error_from_errno("malloc");
 	/* Postpone creation of zero-sized buffers */
 	if (len > 0) {
 		(*b)->cb_buf = calloc(1, len);
