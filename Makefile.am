@@ -102,6 +102,9 @@ regress-fetch:
 		$(top_srcdir)/lib/dial.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/murmurhash2.c \
+		$(top_srcdir)/lib/buf.c \
+		$(top_srcdir)/lib/sigs.c \
+		$(top_srcdir)/lib/date.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) -lm && \
 			$(top_builddir)/regress/fetch/fetch_test
 
