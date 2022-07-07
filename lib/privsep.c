@@ -709,9 +709,6 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_FETCH_SYMREFS:
 		if (datalen < sizeof(*isymrefs)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -933,9 +930,6 @@ got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
 			return err;
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 		switch (imsg.hdr.type) {
-		case GOT_IMSG_ERROR:
-			err = recv_imsg_error(&imsg, datalen);
-			goto done;
 		case GOT_IMSG_SEND_REMOTE_REF:
 			if (datalen < sizeof(iremote_ref)) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -1016,9 +1010,6 @@ got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_SEND_UPLOAD_PROGRESS:
 		if (datalen < sizeof(*bytes_sent)) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -1099,9 +1090,6 @@ got_privsep_recv_index_progress(int *done, int *nobj_total,
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_IDXPACK_PROGRESS:
 		if (datalen < sizeof(*iprogress)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -1602,9 +1590,6 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 		switch (imsg.hdr.type) {
-		case GOT_IMSG_ERROR:
-			err = recv_imsg_error(&imsg, datalen);
-			break;
 		case GOT_IMSG_TREE:
 			/* This message should only appear once. */
 			if (*tree != NULL) {
@@ -2400,9 +2385,6 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_GOTCONFIG_STR_VAL:
 		if (datalen == 0)
 			break;
@@ -2446,9 +2428,6 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_GOTCONFIG_REMOTES:
 		if (datalen != sizeof(iremotes)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -2487,9 +2466,6 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 		switch (imsg.hdr.type) {
-		case GOT_IMSG_ERROR:
-			err = recv_imsg_error(&imsg, datalen);
-			break;
 		case GOT_IMSG_GOTCONFIG_REMOTE:
 			remote = &(*remotes)[*nremotes];
 			memset(remote, 0, sizeof(*remote));
