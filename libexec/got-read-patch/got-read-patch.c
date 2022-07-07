@@ -92,9 +92,7 @@ send_patch_done(void)
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH_DONE, 0, 0, -1,
 	    NULL, 0) == -1)
 		return got_error_from_errno("imsg_compose GOT_IMSG_PATCH_EOF");
-	if (imsg_flush(&ibuf) == -1)
-		return got_error_from_errno("imsg_flush");
-	return NULL;
+	return got_privsep_flush_imsg(&ibuf);
 }
 
 /* based on fetchname from usr.bin/patch/util.c */
