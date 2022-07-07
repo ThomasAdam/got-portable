@@ -97,12 +97,7 @@ send_patch(struct imsgbuf *ibuf, int fd)
 		return err;
 	}
 
-	if (imsg_flush(ibuf) == -1) {
-		err = got_error_from_errno("imsg_flush");
-		imsg_clear(ibuf);
-	}
-
-	return err;
+	return got_privsep_flush_imsg(ibuf);
 }
 
 static void
