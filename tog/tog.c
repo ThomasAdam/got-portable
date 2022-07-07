@@ -1004,6 +1004,68 @@ view_search_start(struct tog_view *view)
 	return NULL;
 }
 
+static void view_get_split(struct tog_view *, int *, int *);
+static const struct got_error *view_init_hsplit(struct tog_view *, int);
+
+/*
+ * If view is a parent or child view and is currently in a splitscreen, switch
+ * to the alternate split. If in a hsplit and LINES < 120, don't vsplit.
+ */
+static const struct got_error *
+switch_split(struct tog_view *view)
+{
+	const struct got_error	*err = NULL;
+	struct tog_view		*v = NULL;
+
+	if (view->parent)
+		v = view->parent;
+	else
+		v = view;
+
+	if (!v->child || !view_is_splitscreen(v->child))
+		return NULL;
+	if (v->mode == TOG_VIEW_SPLIT_HRZN && v->cols < 120)
+		return NULL;
+
+	if (!v->mode || v->mode == TOG_VIEW_SPLIT_HRZN) {
+		v->child->nscrolled = LINES - v->child->nlines;
+		v->mode = TOG_VIEW_SPLIT_VERT;
+	} else if (v->mode == TOG_VIEW_SPLIT_VERT)
+		v->mode = TOG_VIEW_SPLIT_HRZN;
+
+	view_get_split(v, &v->child->begin_y, &v->child->begin_x);
+
+	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
+		v->ncols = COLS;
+		v->child->ncols = COLS;
+
+		err = view_init_hsplit(v, v->child->begin_y);
+		if (err)
+			return err;
+	}
+	v->child->mode = v->mode;
+	v->child->nlines = v->lines - v->child->begin_y;
+	v->focus_child = 1;
+
+	err = view_fullscreen(v);
+	if (err)
+		return err;
+	err = view_splitscreen(v->child);
+	if (err)
+		return err;
+
+	if (v->mode == TOG_VIEW_SPLIT_HRZN)
+		err = offset_selection_down(v->child);
+	else if (v->mode == TOG_VIEW_SPLIT_VERT) {
+		if (v->type == TOG_VIEW_LOG)
+			err = request_log_commits(v);
+		else if (v->child->type == TOG_VIEW_LOG)
+			err = request_log_commits(v->child);
+	}
+
+	return err;
+}
+
 /*
  * Compute view->count from numeric input. Assign total to view->count and
  * return first non-numeric key entered.
@@ -1160,7 +1222,6 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 					break;
 			}
 			offset_selection_up(view->parent);
-			view->parent->mode = TOG_VIEW_SPLIT_NONE;
 		}
 		err = view->input(new, view, ch);
 		view->dying = 1;
@@ -1208,6 +1269,9 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			err = offset_selection_down(view->parent);
 		if (!err)
 			err = offset_selection_down(view);
+		break;
+	case 'S':
+		err = switch_split(view);
 		break;
 	case KEY_RESIZE:
 		break;
@@ -1274,8 +1338,15 @@ view_loop(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
 	struct tog_view *new_view;
+	char *mode;
 	int fast_refresh = 10;
 	int done = 0, errcode;
+
+	mode = getenv("TOG_VIEW_SPLIT_MODE");
+	if (!mode || !(*mode == 'h' || *mode == 'H'))
+		view->mode = TOG_VIEW_SPLIT_VERT;
+	else
+		view->mode = TOG_VIEW_SPLIT_HRZN;
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
@@ -2881,30 +2952,16 @@ log_move_cursor_down(struct tog_view *view, int page)
 	return NULL;
 }
 
-/*
- * Get splitscreen dimensions based on TOG_VIEW_SPLIT_MODE:
- *    TOG_VIEW_SPLIT_VERT    vertical split if COLS > 119 (default)
- *    TOG_VIEW_SPLIT_HRZN    horizontal split
- * Assign start column and line of the new split to *x and *y, respectively,
- * and assign view mode to view->mode.
- */
 static void
 view_get_split(struct tog_view *view, int *y, int *x)
 {
-	char *mode;
-
 	*x = 0;
 	*y = 0;
 
-	mode = getenv("TOG_VIEW_SPLIT_MODE");
-
-	if (!mode || mode[0] != 'h') {
-		view->mode = TOG_VIEW_SPLIT_VERT;
-		*x = view_split_begin_x(view->begin_x);
-	} else if (mode && mode[0] == 'h') {
-		view->mode = TOG_VIEW_SPLIT_HRZN;
+	if (view->mode == TOG_VIEW_SPLIT_HRZN)
 		*y = view_split_begin_y(view->lines);
-	}
+	else
+		*x = view_split_begin_x(view->begin_x);
 }
 
 /* Split view horizontally at y and offset view->state->selected line. */
@@ -2914,6 +2971,7 @@ view_init_hsplit(struct tog_view *view, int y)
 	const struct got_error *err = NULL;
 
 	view->nlines = y;
+	view->ncols = COLS;
 	err = view_resize(view);
 	if (err)
 		return err;
@@ -7710,7 +7768,7 @@ offset_selection_down(struct tog_view *view)
 	case TOG_VIEW_LOG: {
 		struct tog_log_view_state *s = &view->state.log;
 		scrolld = &log_scroll_down;
-		header = 3;
+		header = view_is_parent_view(view) ? 3 : 2;
 		selected = &s->selected;
 		break;
 	}

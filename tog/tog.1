@@ -80,6 +80,12 @@ Toggle fullscreen mode for a split-screen view.
 .Nm
 will automatically use split-screen views if the size of the terminal
 window is sufficiently large.
+.It Cm S
+When in a split-screen view,
+.Nm
+will switch to the alternate split mode.
+If the current view is in a horizontal split and the terminal window is not
+wide enough, the view will remain unchanged.
 .El
 .Pp
 Global options must precede the command name, and are as follows:
@@ -582,7 +588,7 @@ work tree, use the repository path associated with this work tree.
 .El
 .El
 .Sh ENVIRONMENT
-.Bl -tag -width TOG_DIFF_ALGORITHM
+.Bl -tag -width TOG_VIEW_SPLIT_MODE
 .It Ev TOG_DIFF_ALGORITHM
 Determines the default diff algorithm used by
 .Nm .
@@ -603,6 +609,7 @@ If set to
 .Dq h
 then split-screen views will be split horizontally.
 Otherwise, split-screen views will be split vertically.
+Splits can be manipulated in-session as documented above.
 .It Ev TOG_COLORS
 .Nm
 shows colorized output if this variable is set to a non-empty value.
