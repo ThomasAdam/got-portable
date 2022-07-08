@@ -510,10 +510,12 @@ struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x; /* based on split height/width */
+	int resized_y, resized_x; /* begin_y/x based on user resizing */
 	int maxx, x; /* max column and current start column */
 	int lines, cols; /* copies of LINES and COLS */
 	int nscrolled, offset; /* lines scrolled and hsplit line offset */
 	int ch, count; /* current keymap and count prefix */
+	int resize; /* set when in a resize event */
 	int focussed; /* Only set on one parent or child view at a time. */
 	int dying;
 	struct tog_view *parent;
@@ -727,11 +729,18 @@ view_splitscreen(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 
-	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
-		view->begin_y = view_split_begin_y(view->nlines);
+	if (!view->resize && view->mode == TOG_VIEW_SPLIT_HRZN) {
+		if (view->resized_y && view->resized_y < view->lines)
+			view->begin_y = view->resized_y;
+		else
+			view->begin_y = view_split_begin_y(view->nlines);
 		view->begin_x = 0;
-	} else {
-		view->begin_x = view_split_begin_x(0);
+	} else if (!view->resize) {
+		if (view->resized_x && view->resized_x < view->cols - 1 &&
+		    view->cols > 119)
+			view->begin_x = view->resized_x;
+		else
+			view->begin_x = view_split_begin_x(0);
 		view->begin_y = 0;
 	}
 	view->nlines = LINES - view->begin_y;
@@ -757,8 +766,8 @@ view_fullscreen(struct tog_view *view)
 	const struct got_error *err = NULL;
 
 	view->begin_x = 0;
-	view->begin_y = 0;
-	view->nlines = LINES;
+	view->begin_y = view->resize ? view->begin_y : 0;
+	view->nlines = view->resize ? view->nlines : LINES;
 	view->ncols = COLS;
 	view->lines = LINES;
 	view->cols = COLS;
@@ -820,9 +829,11 @@ view_border(struct tog_view *view)
 		    got_locale_is_utf8() ? ACS_VLINE : '|', view->nlines);
 }
 
+static const struct got_error *view_init_hsplit(struct tog_view *, int);
 static const struct got_error *request_log_commits(struct tog_view *);
 static const struct got_error *offset_selection_down(struct tog_view *);
 static void offset_selection_up(struct tog_view *);
+static void view_get_split(struct tog_view *, int *, int *);
 
 static const struct got_error *
 view_resize(struct tog_view *view)
@@ -917,6 +928,96 @@ view_resize(struct tog_view *view)
 }
 
 static const struct got_error *
+view_resize_split(struct tog_view *view, int resize)
+{
+	const struct got_error	*err = NULL;
+	struct tog_view		*v = NULL;
+
+	if (view->parent)
+		v = view->parent;
+	else
+		v = view;
+
+	if (!v->child || !view_is_splitscreen(v->child))
+		return NULL;
+
+	v->resize = v->child->resize = resize;  /* lock for resize event */
+
+	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+		if (v->child->resized_y)
+			v->child->begin_y = v->child->resized_y;
+		if (view->parent)
+			v->child->begin_y -= resize;
+		else
+			v->child->begin_y += resize;
+		if (v->child->begin_y < 3) {
+			view->count = 0;
+			v->child->begin_y = 3;
+		} else if (v->child->begin_y > LINES - 1) {
+			view->count = 0;
+			v->child->begin_y = LINES - 1;
+		}
+		v->ncols = COLS;
+		v->child->ncols = COLS;
+		err = view_init_hsplit(v, v->child->begin_y);
+		if (err)
+			return err;
+		v->child->resized_y = v->child->begin_y;
+	} else {
+		if (v->child->resized_x)
+			v->child->begin_x = v->child->resized_x;
+		if (view->parent)
+			v->child->begin_x -= resize;
+		else
+			v->child->begin_x += resize;
+		if (v->child->begin_x < 11) {
+			view->count = 0;
+			v->child->begin_x = 11;
+		} else if (v->child->begin_x > COLS - 1) {
+			view->count = 0;
+			v->child->begin_x = COLS - 1;
+		}
+		v->child->resized_x = v->child->begin_x;
+	}
+
+	v->child->mode = v->mode;
+	v->child->nlines = v->lines - v->child->begin_y;
+	v->child->ncols = v->cols - v->child->begin_x;
+	v->focus_child = 1;
+
+	err = view_fullscreen(v);
+	if (err)
+		return err;
+	err = view_splitscreen(v->child);
+	if (err)
+		return err;
+
+	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
+		err = offset_selection_down(v->child);
+		if (err)
+			return err;
+	}
+
+	if (v->type == TOG_VIEW_LOG)
+		err = request_log_commits(v);
+	else if (v->child->type == TOG_VIEW_LOG)
+		err = request_log_commits(v->child);
+
+	v->resize = v->child->resize = 0;
+
+	return err;
+}
+
+static void
+view_transfer_size(struct tog_view *dst, struct tog_view *src)
+{
+	struct tog_view *v = src->child ? src->child : src;
+
+	dst->resized_x = v->resized_x;
+	dst->resized_y = v->resized_y;
+}
+
+static const struct got_error *
 view_close_child(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
@@ -932,10 +1033,19 @@ view_close_child(struct tog_view *view)
 static const struct got_error *
 view_set_child(struct tog_view *view, struct tog_view *child)
 {
+	const struct got_error *err = NULL;
+
 	view->child = child;
 	child->parent = view;
 
-	return view_resize(view);
+	err = view_resize(view);
+	if (err)
+		return err;
+
+	if (view->child->resized_x || view->child->resized_y)
+		err = view_resize_split(view, 0);
+
+	return err;
 }
 
 static void
@@ -1004,9 +1114,6 @@ view_search_start(struct tog_view *view)
 	return NULL;
 }
 
-static void view_get_split(struct tog_view *, int *, int *);
-static const struct got_error *view_init_hsplit(struct tog_view *, int);
-
 /*
  * If view is a parent or child view and is currently in a splitscreen, switch
  * to the alternate split. If in a hsplit and LINES < 120, don't vsplit.
@@ -1034,6 +1141,10 @@ switch_split(struct tog_view *view)
 		v->mode = TOG_VIEW_SPLIT_HRZN;
 
 	view_get_split(v, &v->child->begin_y, &v->child->begin_x);
+	if (v->mode == TOG_VIEW_SPLIT_HRZN && v->child->resized_y)
+		v->child->begin_y = v->child->resized_y;
+	if (v->mode == TOG_VIEW_SPLIT_VERT && v->child->resized_x)
+		v->child->begin_x = v->child->resized_x;
 
 	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
 		v->ncols = COLS;
@@ -1184,6 +1295,11 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 				    KEY_RESIZE);
 				if (err)
 					return err;
+				if (v->child->resized_x || v->child->resized_y) {
+					err = view_resize_split(v, 0);
+					if (err)
+						return err;
+				}
 			}
 		}
 	}
@@ -1238,8 +1354,11 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 				view->focussed = 0;
 				view->child->focussed = 1;
 				err = view_fullscreen(view->child);
-			} else
+			} else {
 				err = view_splitscreen(view->child);
+				if (!err)
+					err = view_resize_split(view, 0);
+			}
 			if (err)
 				break;
 			err = view->child->input(new, view->child,
@@ -1253,6 +1372,8 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 				err = view_splitscreen(view);
 				if (!err && view->mode != TOG_VIEW_SPLIT_HRZN)
 					err = view_resize(view->parent);
+				if (!err)
+					err = view_resize_split(view, 0);
 			}
 			if (err)
 				break;
@@ -1271,7 +1392,14 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			err = offset_selection_down(view);
 		break;
 	case 'S':
+		view->count = 0;
 		err = switch_split(view);
+		break;
+	case '-':
+		err = view_resize_split(view, -1);
+		break;
+	case '+':
+		err = view_resize_split(view, 1);
 		break;
 	case KEY_RESIZE:
 		break;
@@ -1386,6 +1514,8 @@ view_loop(struct tog_view *view)
 				err = view_resize(view->parent);
 				if (err)
 					break;
+				/* Make resized splits persist. */
+				view_transfer_size(view->parent, view);
 			} else
 				TAILQ_REMOVE(&views, view, entry);
 
@@ -2958,10 +3088,17 @@ view_get_split(struct tog_view *view, int *y, int *x)
 	*x = 0;
 	*y = 0;
 
-	if (view->mode == TOG_VIEW_SPLIT_HRZN)
-		*y = view_split_begin_y(view->lines);
-	else
-		*x = view_split_begin_x(view->begin_x);
+	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+		if (view->child && view->child->resized_y)
+			*y = view->child->resized_y;
+		else
+			*y = view_split_begin_y(view->lines);
+	} else {
+		if (view->child && view->child->resized_x)
+			*x = view->child->resized_x;
+		else
+			*x = view_split_begin_x(view->begin_x);
+	}
 }
 
 /* Split view horizontally at y and offset view->state->selected line. */
@@ -3132,6 +3269,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		diff_view->nlines = view->lines - begin_y;
 
 		if (view_is_parent_view(view)) {
+			view_transfer_size(diff_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -3164,6 +3302,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		tree_view->mode = view->mode;
 		tree_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(tree_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -3261,6 +3400,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		ref_view->mode = view->mode;
 		ref_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(ref_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -5699,6 +5839,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		diff_view->mode = view->mode;
 		diff_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(diff_view, view);
 			err = view_close_child(view);
 			if (err)
 				break;
@@ -6479,6 +6620,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		log_view->mode = view->mode;
 		log_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(log_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -6512,6 +6654,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		ref_view->mode = view->mode;
 		ref_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(ref_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -6691,6 +6834,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			blame_view->mode = view->mode;
 			blame_view->nlines = view->lines - begin_y;
 			if (view_is_parent_view(view)) {
+				view_transfer_size(blame_view, view);
 				err = view_close_child(view);
 				if (err)
 					return err;
@@ -7444,6 +7588,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		log_view->mode = view->mode;
 		log_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(log_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
@@ -7475,6 +7620,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		tree_view->mode = view->mode;
 		tree_view->nlines = view->lines - begin_y;
 		if (view_is_parent_view(view)) {
+			view_transfer_size(tree_view, view);
 			err = view_close_child(view);
 			if (err)
 				return err;
