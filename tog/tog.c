@@ -58,9 +58,6 @@
 #include "got_path.h"
 #include "got_worktree.h"
 
-//#define update_panels() (0)
-//#define doupdate() (0)
-
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif

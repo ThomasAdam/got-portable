@@ -42,11 +42,6 @@
 #include <stdio.h>
 #include <stdint.h>
 
-/*
-#include <termios.h>
-#include <wchar.h>
-*/
-
 /* For flock. */
 #ifndef O_EXLOCK
 #define O_EXLOCK 0
