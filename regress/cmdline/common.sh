@@ -26,6 +26,14 @@ export GOT_TEST_ROOT="/tmp"
 
 export MALLOC_OPTIONS=S
 
+# Check to see if PLATFORM has a value.  PLATFORM is populated when running
+# via `./configure && make` but this isn't guaranteed if an individual test is
+# run directly, such as `regress/cmdline/tag.sh`.  In such cases, PLATFORM
+# will be empty, but we still want to use it.  Since we test for non-linux
+# values, only set PLATFORM if we're running on Linu so that the correct
+# commands are used.
+[ -z "$PLATFORM" ] && [ "$OSTYPE" = "linux-gnu" ] && PLATFORM="linux"
+
 date()
 {
 	DATECMD="date"
