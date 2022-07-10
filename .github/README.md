@@ -33,18 +33,21 @@ FreeBSD:
 
 * `automake`
 * `pkgconf`
+* `GNU coreutils` (for running tests)
 
 NetBSD:
 
 * `automake`
 * `libuuid`
 * `ncuresesw`
+* `GNU coreutils` (for running tests)
 
 DragonFlyBSD:
 
 * `automake`
 * `pkgconf`
 * `openssl`
+* `GNU coreutils` (for running tests)
 
 Darwin (MacOS):
 
@@ -65,7 +68,8 @@ To run the test suite:
 ```
 
 NOTE: For Linux, you must have the jot(1) command which is typically in the
-`athena-jot` package, or similar.
+`athena-jot` package, or similar.  For non-linux systems (as mentioned above),
+GNU Coreutils needs to be installed.
 
 NOTE:  THIS ONLY WORKS AFTER `make install` DUE TO HOW PATHS TO LIBEXEC
        HELPERS ARE HARD-CODED INTO THE BINARIES.
