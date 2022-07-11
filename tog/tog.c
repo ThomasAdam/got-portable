@@ -969,6 +969,8 @@ view_resize_split(struct tog_view *view, int resize)
 	v->resize = v->child->resize = resize;  /* lock for resize event */
 
 	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+		int y = v->child->begin_y;
+
 		if (v->child->resized_y)
 			v->child->begin_y = v->child->resized_y;
 		if (view->parent)
@@ -989,6 +991,8 @@ view_resize_split(struct tog_view *view, int resize)
 		if (err)
 			return err;
 		v->child->resized_y = v->child->begin_y;
+		if (y > v->child->begin_y)  /* split increased */
+			v->child->nscrolled = y - v->child->begin_y;
 	} else {
 		if (v->child->resized_x)
 			v->child->begin_x = v->child->resized_x;
@@ -1024,9 +1028,9 @@ view_resize_split(struct tog_view *view, int resize)
 			return err;
 	}
 
-	if (v->type == TOG_VIEW_LOG)
+	if (v->type == TOG_VIEW_LOG && v->nscrolled)
 		err = request_log_commits(v);
-	else if (v->child->type == TOG_VIEW_LOG)
+	else if (v->child->type == TOG_VIEW_LOG && v->child->nscrolled)
 		err = request_log_commits(v->child);
 
 	v->resize = v->child->resize = 0;
@@ -1198,9 +1202,9 @@ switch_split(struct tog_view *view)
 		offset_selection_up(v);
 		offset_selection_up(v->child);
 	}
-	if (v->type == TOG_VIEW_LOG)
+	if (v->type == TOG_VIEW_LOG && v->nscrolled)
 		err = request_log_commits(v);
-	else if (v->child->type == TOG_VIEW_LOG)
+	else if (v->child->type == TOG_VIEW_LOG && v->child->nscrolled)
 		err = request_log_commits(v->child);
 
 	return err;
@@ -2402,7 +2406,7 @@ request_log_commits(struct tog_view *view)
 	struct tog_log_view_state	*state = &view->state.log;
 	const struct got_error		*err = NULL;
 
-	state->thread_args.commits_needed = view->nscrolled;
+	state->thread_args.commits_needed += view->nscrolled;
 	err = trigger_log_thread(view, 1);
 	view->nscrolled = 0;
 
