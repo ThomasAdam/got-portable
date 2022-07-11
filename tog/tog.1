@@ -81,11 +81,11 @@ Toggle fullscreen mode for a split-screen view.
 will automatically use split-screen views if the size of the terminal
 window is sufficiently large.
 .It Cm S
-When in a split-screen view,
+Switch the current split mode.
 .Nm
-will switch to the alternate split mode.
-If the current view is in a horizontal split and the terminal window is not
-wide enough, the view will remain unchanged.
+will also render the view in the new split mode.
+If the terminal is not wide enough when switching to a vertical split, the
+view will render in fullscreen.
 .It Cm -
 When in a split-screen view, decrease the size of the focussed split
 N increments (default: 1).
