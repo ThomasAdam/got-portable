@@ -41,7 +41,7 @@ date()
 		command -v "gdate" >/dev/null 2>&1 && {
 			DATECMD="gdate"
 		} || {
-			echo "Couldn't find `gdate` is GNU coreutils installed?"
+			echo "Couldn't find gdate is GNU coreutils installed?"
 		}
 	}
 	command "$DATECMD" "$@"
@@ -54,7 +54,7 @@ ln()
 		command -v "gln" >/dev/null 2>&1 && {
 			LNCMD="gln"
 		} || {
-			echo "Couldn't find `gln` is GNU coreutils installed?"
+			echo "Couldn't find gln is GNU coreutils installed?"
 		}
 	}
 	command "$LNCMD" "$@"
