@@ -296,13 +296,20 @@ If the
 .Cm diff
 view was opened via the
 .Cm log
-view, move to the Nth previous (younger) commit (default: 1).
+view, move to the Nth previous (younger) commit.
+If the diff was opened via the
+.Cm blame
+view, move to the Nth previous line and load the corresponding commit
+(default: 1).
 .It Cm >, Full stop
 If the
 .Cm diff
 view was opened via the
 .Cm log
-view, move to the Nth next (older) commit (default: 1).
+view, move to the Nth next (older) commit.
+If the diff was opened via the
+.Cm blame
+view, move to the Nth next line and load the corresponding commit (default: 1).
 .It Cm /
 Prompt for a search pattern and start searching for matching lines.
 The search pattern is an extended regular expression.

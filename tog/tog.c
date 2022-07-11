@@ -336,8 +336,8 @@ struct tog_diff_view_state {
 	int matched_line;
 	int selected_line;
 
-	/* passed from log view; may be NULL */
-	struct tog_view *log_view;
+	/* passed from log or blame view; may be NULL */
+	struct tog_view *parent_view;
 };
 
 pthread_mutex_t tog_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -433,6 +433,7 @@ struct tog_blame_view_state {
 	int first_displayed_line;
 	int last_displayed_line;
 	int selected_line;
+	int last_diffed_line;
 	int blame_complete;
 	int eof;
 	int done;
@@ -4430,7 +4431,7 @@ static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    struct tog_view *log_view, struct got_repository *repo)
+    struct tog_view *parent_view, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
@@ -4502,7 +4503,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
-	s->log_view = log_view;
+	s->parent_view = parent_view;
 	s->repo = repo;
 
 	STAILQ_INIT(&s->colors);
@@ -4544,8 +4545,9 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 			goto done;
 	}
 
-	if (log_view && view_is_splitscreen(view))
-		show_log_view(log_view); /* draw vborder */
+	if (parent_view && parent_view->type == TOG_VIEW_LOG &&
+	    view_is_splitscreen(view))
+		show_log_view(parent_view); /* draw border */
 	diff_view_indicate_progress(view);
 
 	err = create_diff(s);
@@ -4636,6 +4638,11 @@ reset_diff_view(struct tog_view *view)
 	return create_diff(s);
 }
 
+static struct got_object_id *get_selected_commit_id(struct tog_blame_line *,
+    int, int, int);
+static struct got_object_id *get_annotation_for_line(struct tog_blame_line *,
+    int, int);
+
 static const struct got_error *
 input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
@@ -4646,7 +4653,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	int i, nscroll = view->nlines - 1;
+	int i, nscroll = view->nlines - 1, up = 0;
 
 	switch (ch) {
 	case '0':
@@ -4773,54 +4780,61 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '<':
 	case ',':
-		if (s->log_view == NULL) {
-			view->count = 0;
-			break;
-		}
-		ls = &s->log_view->state.log;
-		old_selected_entry = ls->selected_entry;
-
-		/* view->count handled in input_log_view() */
-		err = input_log_view(NULL, s->log_view, KEY_UP);
-		if (err)
-			break;
-
-		if (old_selected_entry == ls->selected_entry)
-			break;
-
-		err = set_selected_commit(s, ls->selected_entry);
-		if (err)
-			break;
-
-		s->first_displayed_line = 1;
-		s->last_displayed_line = view->nlines;
-		s->matched_line = 0;
-		view->x = 0;
-
-		diff_view_indicate_progress(view);
-		err = create_diff(s);
-		break;
+		up = 1;
+		/* FALL THROUGH */
 	case '>':
 	case '.':
-		if (s->log_view == NULL) {
+		if (s->parent_view == NULL) {
 			view->count = 0;
 			break;
 		}
-		ls = &s->log_view->state.log;
-		old_selected_entry = ls->selected_entry;
+		s->parent_view->count = view->count;
 
-		/* view->count handled in input_log_view() */
-		err = input_log_view(NULL, s->log_view, KEY_DOWN);
-		if (err)
-			break;
+		if (s->parent_view->type == TOG_VIEW_LOG) {
+			ls = &s->parent_view->state.log;
+			old_selected_entry = ls->selected_entry;
 
-		if (old_selected_entry == ls->selected_entry)
-			break;
+			err = input_log_view(NULL, s->parent_view,
+			    up ? KEY_UP : KEY_DOWN);
+			if (err)
+				break;
+			view->count = s->parent_view->count;
 
-		err = set_selected_commit(s, ls->selected_entry);
-		if (err)
-			break;
+			if (old_selected_entry == ls->selected_entry)
+				break;
 
+			err = set_selected_commit(s, ls->selected_entry);
+			if (err)
+				break;
+		} else if (s->parent_view->type == TOG_VIEW_BLAME) {
+			struct tog_blame_view_state *bs;
+			struct got_object_id *id, *prev_id;
+
+			bs = &s->parent_view->state.blame;
+			prev_id = get_annotation_for_line(bs->blame.lines,
+			    bs->blame.nlines, bs->last_diffed_line);
+
+			err = input_blame_view(&view, s->parent_view,
+			    up ? KEY_UP : KEY_DOWN);
+			if (err)
+				break;
+			view->count = s->parent_view->count;
+
+			if (prev_id == NULL)
+				break;
+			id = get_selected_commit_id(bs->blame.lines,
+			    bs->blame.nlines, bs->first_displayed_line,
+			    bs->selected_line);
+			if (id == NULL)
+				break;
+
+			if (!got_object_id_cmp(prev_id, id))
+				break;
+
+			err = input_blame_view(&view, s->parent_view, KEY_ENTER);
+			if (err)
+				break;
+		}
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
 		s->matched_line = 0;
@@ -5081,15 +5095,14 @@ draw_blame(struct tog_view *view)
 		wline = NULL;
 		view->maxx = MAX(view->maxx, width);
 
-		if (view->focussed && nprinted == s->selected_line - 1)
+		if (nprinted == s->selected_line - 1)
 			wstandout(view->window);
 
 		if (blame->nlines > 0) {
 			blame_line = &blame->lines[lineno - 1];
 			if (blame_line->annotated && prev_id &&
 			    got_object_id_cmp(prev_id, blame_line->id) == 0 &&
-			    !(view->focussed &&
-			    nprinted == s->selected_line - 1)) {
+			    !(nprinted == s->selected_line - 1)) {
 				waddstr(view->window, "        ");
 			} else if (blame_line->annotated) {
 				char *id_str;
@@ -5118,7 +5131,7 @@ draw_blame(struct tog_view *view)
 			prev_id = NULL;
 		}
 
-		if (view->focussed && nprinted == s->selected_line - 1)
+		if (nprinted == s->selected_line - 1)
 			wstandend(view->window);
 		waddstr(view->window, " ");
 
@@ -5282,6 +5295,22 @@ get_selected_commit_id(struct tog_blame_line *lines, int nlines,
 		return NULL;
 
 	line = &lines[first_displayed_line - 1 + selected_line - 1];
+	if (!line->annotated)
+		return NULL;
+
+	return line->id;
+}
+
+static struct got_object_id *
+get_annotation_for_line(struct tog_blame_line *lines, int nlines,
+    int lineno)
+{
+	struct tog_blame_line *line;
+
+	if (nlines <= 0 || lineno >= nlines)
+		return NULL;
+
+	line = &lines[lineno - 1];
 	if (!line->annotated)
 		return NULL;
 
@@ -5849,22 +5878,35 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (err)
 			break;
 		pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
+		if (*new_view) {
+			/* traversed from diff view, release diff resources  */
+			err = close_diff_view(*new_view);
+			if (err)
+				break;
+			diff_view = *new_view;
+		} else {
+			if (view_is_parent_view(view))
+				view_get_split(view, &begin_y, &begin_x);
 
-		diff_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_DIFF);
-		if (diff_view == NULL) {
-			got_object_commit_close(commit);
-			err = got_error_from_errno("view_open");
-			break;
+			diff_view = view_open(0, 0, begin_y, begin_x,
+			    TOG_VIEW_DIFF);
+			if (diff_view == NULL) {
+				got_object_commit_close(commit);
+				err = got_error_from_errno("view_open");
+				break;
+			}
 		}
 		err = open_diff_view(diff_view, pid ? &pid->id : NULL,
-		    id, NULL, NULL, 3, 0, 0, NULL, s->repo);
+		    id, NULL, NULL, 3, 0, 0, view, s->repo);
 		got_object_commit_close(commit);
 		if (err) {
 			view_close(diff_view);
 			break;
 		}
+		s->last_diffed_line = s->first_displayed_line - 1 +
+		    s->selected_line;
+		if (*new_view)
+			break;	/* still open from active diff view */
 		if (view_is_parent_view(view) &&
 		    view->mode == TOG_VIEW_SPLIT_HRZN) {
 			err = view_init_hsplit(view, begin_y);
