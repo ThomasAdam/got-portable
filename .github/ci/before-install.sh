@@ -20,7 +20,9 @@ fi
 if [ "$CIRRUS_OS" = "freebsd" ]; then
 	pkg install -y \
 		automake \
-		pkgconf
+		pkgconf \
+		git \
+		coreutils
 fi
 
 if [ "$CIRRUS_OS" = "darwin" ]; then
@@ -28,5 +30,6 @@ if [ "$CIRRUS_OS" = "darwin" ]; then
 		automake \
 		pkg-config \
 		ncurses \
-		ossp-uuid
+		ossp-uuid \
+		git
 fi
