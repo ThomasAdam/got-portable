@@ -337,6 +337,7 @@ struct tog_diff_view_state {
 };
 
 pthread_mutex_t tog_mutex = PTHREAD_MUTEX_INITIALIZER;
+static volatile sig_atomic_t tog_thread_error;
 
 struct tog_log_thread_args {
 	pthread_cond_t need_commits;
@@ -659,10 +660,10 @@ tog_fatal_signal_received(void)
 static const struct got_error *
 view_close(struct tog_view *view)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *child_err = NULL;
 
 	if (view->child) {
-		view_close(view->child);
+		child_err = view_close(view->child);
 		view->child = NULL;
 	}
 	if (view->close)
@@ -672,7 +673,7 @@ view_close(struct tog_view *view)
 	if (view->window)
 		delwin(view->window);
 	free(view);
-	return err;
+	return err ? err : child_err;
 }
 
 static struct tog_view *
@@ -1489,7 +1490,8 @@ view_loop(struct tog_view *view)
 		return err;
 	update_panels();
 	doupdate();
-	while (!TAILQ_EMPTY(&views) && !done && !tog_fatal_signal_received()) {
+	while (!TAILQ_EMPTY(&views) && !done && !tog_thread_error &&
+	    !tog_fatal_signal_received()) {
 		/* Refresh fast during initialization, then become slower. */
 		if (fast_refresh && fast_refresh-- == 0)
 			halfdelay(10); /* switch to once per second */
@@ -1590,9 +1592,12 @@ view_loop(struct tog_view *view)
 	}
 done:
 	while (!TAILQ_EMPTY(&views)) {
+		const struct got_error *close_err;
 		view = TAILQ_FIRST(&views);
 		TAILQ_REMOVE(&views, view, entry);
-		view_close(view);
+		close_err = view_close(view);
+		if (close_err && err == NULL)
+			err = close_err;
 	}
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
@@ -2328,10 +2333,8 @@ trigger_log_thread(struct tog_view *view, int wait)
 
 	halfdelay(1); /* fast refresh while loading commits */
 
-	while (ta->commits_needed > 0 || ta->load_all) {
-		if (ta->log_complete)
-			break;
-
+	while (!ta->log_complete && !tog_thread_error &&
+	    (ta->commits_needed > 0 || ta->load_all)) {
 		/* Wake the log thread. */
 		errcode = pthread_cond_signal(&ta->need_commits);
 		if (errcode)
@@ -2606,15 +2609,33 @@ log_thread(void *arg)
 	struct tog_log_thread_args *a = arg;
 	int done = 0;
 
-	err = block_signals_used_by_main_thread();
-	if (err)
+	/*
+	 * Sync startup with main thread such that we begin our
+	 * work once view_input() has released the mutex.
+	 */
+	errcode = pthread_mutex_lock(&tog_mutex);
+	if (errcode) {
+		err = got_error_set_errno(errcode, "pthread_mutex_lock");
 		return (void *)err;
+	}
+
+	err = block_signals_used_by_main_thread();
+	if (err) {
+		pthread_mutex_unlock(&tog_mutex);
+		goto done;
+	}
 
 	while (!done && !err && !tog_fatal_signal_received()) {
+		errcode = pthread_mutex_unlock(&tog_mutex);
+		if (errcode) {
+			err = got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
+			goto done;
+		}
 		err = queue_commits(a);
 		if (err) {
 			if (err->code != GOT_ERR_ITER_COMPLETED)
-				return (void *)err;
+				goto done;
 			err = NULL;
 			done = 1;
 		} else if (a->commits_needed > 0 && !a->load_all)
@@ -2624,7 +2645,7 @@ log_thread(void *arg)
 		if (errcode) {
 			err = got_error_set_errno(errcode,
 			    "pthread_mutex_lock");
-			break;
+			goto done;
 		} else if (*a->quit)
 			done = 1;
 		else if (*a->first_displayed_entry == NULL) {
@@ -2638,7 +2659,7 @@ log_thread(void *arg)
 			err = got_error_set_errno(errcode,
 			    "pthread_cond_signal");
 			pthread_mutex_unlock(&tog_mutex);
-			break;
+			goto done;
 		}
 
 		if (done)
@@ -2647,27 +2668,33 @@ log_thread(void *arg)
 			if (a->commits_needed == 0 && !a->load_all) {
 				errcode = pthread_cond_wait(&a->need_commits,
 				    &tog_mutex);
-				if (errcode)
+				if (errcode) {
 					err = got_error_set_errno(errcode,
 					    "pthread_cond_wait");
+					pthread_mutex_unlock(&tog_mutex);
+					goto done;
+				}
 				if (*a->quit)
 					done = 1;
 			}
 		}
-
-		errcode = pthread_mutex_unlock(&tog_mutex);
-		if (errcode && err == NULL)
-			err = got_error_set_errno(errcode,
-			    "pthread_mutex_unlock");
 	}
 	a->log_complete = 1;
+	errcode = pthread_mutex_unlock(&tog_mutex);
+	if (errcode)
+		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
+done:
+	if (err) {
+		tog_thread_error = 1;
+		pthread_cond_signal(&a->commit_loaded);
+	}
 	return (void *)err;
 }
 
 static const struct got_error *
 stop_log_thread(struct tog_log_view_state *s)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *thread_err = NULL;
 	int errcode;
 
 	if (s->thread) {
@@ -2680,7 +2707,7 @@ stop_log_thread(struct tog_log_view_state *s)
 		if (errcode)
 			return got_error_set_errno(errcode,
 			    "pthread_mutex_unlock");
-		errcode = pthread_join(s->thread, (void **)&err);
+		errcode = pthread_join(s->thread, (void **)&thread_err);
 		if (errcode)
 			return got_error_set_errno(errcode, "pthread_join");
 		errcode = pthread_mutex_lock(&tog_mutex);
@@ -2708,7 +2735,7 @@ stop_log_thread(struct tog_log_view_state *s)
 		s->thread_args.graph = NULL;
 	}
 
-	return err;
+	return err ? err : thread_err;
 }
 
 static const struct got_error *
