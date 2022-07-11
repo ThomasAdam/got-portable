@@ -32,7 +32,7 @@ export MALLOC_OPTIONS=S
 # will be empty, but we still want to use it.  Since we test for non-linux
 # values, only set PLATFORM if we're running on Linu so that the correct
 # commands are used.
-[ -z "$PLATFORM" ] && [ "$OSTYPE" = "linux-gnu" ] && PLATFORM="linux"
+[ -z "$PLATFORM" -a "$(uname)" = "Linux" ] && PLATFORM="linux"
 
 date()
 {
