@@ -4,6 +4,13 @@ got_linux_task:
   before_build_script: .github/ci/before-install.sh
   build:script: .github/ci/build.sh
 
+got_ubuntu_task:
+  container:
+    image: ubuntu:latest
+  before_build_script: .github/ci/before-install.sh
+  build:script: .github/ci/build.sh
+  test_script: make install && make tests
+
 got_alpine_linux_task:
   container:
     image: alpine:latest

@@ -2,7 +2,7 @@
 
 if [ "$CIRRUS_OS" = "linux" ]; then
 	apt-get update -qq && \
-	apt-get -y install bison \
+	apt-get -y install bison autoconf \
 				autotools-dev \
 				libncurses5-dev \
 				pkg-config \
@@ -11,7 +11,10 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				libssl-dev \
 				libbsd-dev \
 				uuid-dev \
-				zlib1g-dev
+				zlib1g-dev \
+				git \
+				athena-jot \
+				ed
 fi
 
 if [ "$CIRRUS_OS" = "freebsd" ]; then
