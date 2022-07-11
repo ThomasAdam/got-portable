@@ -1119,10 +1119,7 @@ view_search_start(struct tog_view *view)
 	return NULL;
 }
 
-/*
- * If view is a parent or child view and is currently in a splitscreen, switch
- * to the alternate split. If in a hsplit and LINES < 120, don't vsplit.
- */
+/* Switch split mode. If view is a parent or child, draw the new splitscreen. */
 static const struct got_error *
 switch_split(struct tog_view *view)
 {
@@ -1134,26 +1131,27 @@ switch_split(struct tog_view *view)
 	else
 		v = view;
 
-	if (!v->child || !view_is_splitscreen(v->child))
-		return NULL;
-	if (v->mode == TOG_VIEW_SPLIT_HRZN && v->cols < 120)
-		return NULL;
-
-	if (!v->mode || v->mode == TOG_VIEW_SPLIT_HRZN) {
-		v->child->nscrolled = LINES - v->child->nlines;
+	if (v->mode == TOG_VIEW_SPLIT_HRZN)
 		v->mode = TOG_VIEW_SPLIT_VERT;
-	} else if (v->mode == TOG_VIEW_SPLIT_VERT)
+	else
 		v->mode = TOG_VIEW_SPLIT_HRZN;
+
+	if (!v->child)
+		return NULL;
+	else if (v->mode == TOG_VIEW_SPLIT_VERT && v->cols < 120)
+		v->mode = TOG_VIEW_SPLIT_NONE;
 
 	view_get_split(v, &v->child->begin_y, &v->child->begin_x);
 	if (v->mode == TOG_VIEW_SPLIT_HRZN && v->child->resized_y)
 		v->child->begin_y = v->child->resized_y;
-	if (v->mode == TOG_VIEW_SPLIT_VERT && v->child->resized_x)
+	else if (v->mode == TOG_VIEW_SPLIT_VERT && v->child->resized_x)
 		v->child->begin_x = v->child->resized_x;
+
 
 	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
 		v->ncols = COLS;
 		v->child->ncols = COLS;
+		v->child->nscrolled = LINES - v->child->nlines;
 
 		err = view_init_hsplit(v, v->child->begin_y);
 		if (err)
@@ -1170,14 +1168,19 @@ switch_split(struct tog_view *view)
 	if (err)
 		return err;
 
-	if (v->mode == TOG_VIEW_SPLIT_HRZN)
+	if (v->mode == TOG_VIEW_SPLIT_NONE)
+		v->mode = TOG_VIEW_SPLIT_VERT;
+	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
+		err = offset_selection_down(v);
 		err = offset_selection_down(v->child);
-	else if (v->mode == TOG_VIEW_SPLIT_VERT) {
-		if (v->type == TOG_VIEW_LOG)
-			err = request_log_commits(v);
-		else if (v->child->type == TOG_VIEW_LOG)
-			err = request_log_commits(v->child);
+	} else {
+		offset_selection_up(v);
+		offset_selection_up(v->child);
 	}
+	if (v->type == TOG_VIEW_LOG)
+		err = request_log_commits(v);
+	else if (v->child->type == TOG_VIEW_LOG)
+		err = request_log_commits(v->child);
 
 	return err;
 }
@@ -3122,11 +3125,15 @@ view_get_split(struct tog_view *view, int *y, int *x)
 	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
 		if (view->child && view->child->resized_y)
 			*y = view->child->resized_y;
+		else if (view->resized_y)
+			*y = view->resized_y;
 		else
 			*y = view_split_begin_y(view->lines);
-	} else {
+	} else if (view->mode == TOG_VIEW_SPLIT_VERT) {
 		if (view->child && view->child->resized_x)
 			*x = view->child->resized_x;
+		else if (view->resized_x)
+			*x = view->resized_x;
 		else
 			*x = view_split_begin_x(view->begin_x);
 	}
