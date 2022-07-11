@@ -71,20 +71,28 @@ sed()
 	#
 	# Therefore, scan the argument list and remove "-i ''", replacing it
 	# with just "-i".
+
+	original_cmd="$@"
 	[ "$PLATFORM" = "linux" ] && {
 		set -- "$@"
-		i=1
-		while [ "$i" -le "$#" ]; do
-			m=$((i + 1))
-			[ "${!i}" = "-i" ] && [ -z "${!m}" ] && {
+
+		for w in "$@"
+		do
+			[ "$w" = "-i" ] && {
+				seen=1
+				continue
+			}
+
+			[ "$seen" = "1" -a -z "$w" ] && {
+				# Move past -i and ''
 				shift 2
-				command "$SEDCMD" -i "$@"
+
+				command "$SEDCMD" -i $@
 				return
 			}
-			i=$((i + 1))
 		done
 	}
-	command "$SEDCMD" "$@"
+	command "$SEDCMD" $original_cmd
 }
 
 
