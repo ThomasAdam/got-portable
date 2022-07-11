@@ -929,6 +929,25 @@ view_resize(struct tog_view *view)
 	return NULL;
 }
 
+static void
+view_adjust_offset(struct tog_view *view, int n)
+{
+	if (n == 0)
+		return;
+
+	if (view->parent && view->parent->offset) {
+		if (view->parent->offset + n >= 0)
+			view->parent->offset += n;
+		else
+			view->parent->offset = 0;
+	} else if (view->offset) {
+		if (view->offset - n >= 0)
+			view->offset -= n;
+		else
+			view->offset = 0;
+	}
+}
+
 static const struct got_error *
 view_resize_split(struct tog_view *view, int resize)
 {
@@ -961,6 +980,7 @@ view_resize_split(struct tog_view *view, int resize)
 		}
 		v->ncols = COLS;
 		v->child->ncols = COLS;
+		view_adjust_offset(view, resize);
 		err = view_init_hsplit(v, v->child->begin_y);
 		if (err)
 			return err;
