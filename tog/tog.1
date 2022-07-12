@@ -81,11 +81,10 @@ Toggle fullscreen mode for a split-screen view.
 will automatically use split-screen views if the size of the terminal
 window is sufficiently large.
 .It Cm S
-Switch the current split mode.
-.Nm
-will also render the view in the new split mode.
-If the terminal is not wide enough when switching to a vertical split, the
-view will render in fullscreen.
+Switch the current split-screen layout, and render all active views in
+this new layout.
+If the terminal is not wide enough when switching to a vertical split,
+views will render in fullscreen.
 .It Cm -
 When in a split-screen view, decrease the size of the focussed split
 N increments (default: 1).
@@ -615,14 +614,18 @@ and
 .Dq myers .
 If unset, the Myers diff algorithm will be used by default.
 .It Ev TOG_VIEW_SPLIT_MODE
-Determines whether
-.Nm
-will use vertical or horizontal split for split-screen views.
+Determines the default layout of split-screen views.
 If set to
 .Dq h
-then split-screen views will be split horizontally.
-Otherwise, split-screen views will be split vertically.
-Splits can be manipulated in-session as documented above.
+or
+.Dq H ,
+.Nm
+will use horizontal split by default.
+Otherwise, vertical split will be used.
+The
+.Cm S
+key can be used to switch between vertical and horizontal split layout
+at run-time.
 .It Ev TOG_COLORS
 .Nm
 shows colorized output if this variable is set to a non-empty value.
