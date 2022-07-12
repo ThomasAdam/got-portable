@@ -51,6 +51,7 @@ struct buf {
 
 const struct got_error *buf_alloc(BUF **, size_t);
 const struct got_error *buf_load(BUF **, FILE *);
+const struct got_error *buf_load_fd(BUF **, int fd);
 void		 buf_free(BUF *);
 void		*buf_release(BUF *);
 u_char		 buf_getc(BUF *, size_t);

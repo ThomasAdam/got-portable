@@ -125,6 +125,32 @@ out:
 	return err;
 }
 
+const struct got_error *
+buf_load_fd(BUF **buf, int fd)
+{
+	const struct got_error *err = NULL;
+	unsigned char out[8192];
+	ssize_t r;
+	size_t len;
+
+	err = buf_alloc(buf, 8192);
+	if (err)
+		return err;
+
+	do {
+		r = read(fd, out, sizeof(out));
+		if (r == -1)
+			return got_error_from_errno("read");
+		if (r > 0) {
+			err = buf_append(&len, *buf, out, r);
+			if (err)
+				return err;
+		}
+	} while (r > 0);
+
+	return NULL;
+}
+
 void
 buf_free(BUF *b)
 {
