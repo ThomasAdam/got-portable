@@ -2097,16 +2097,20 @@ Lines which begin with the
 .Sq #
 character are ignored entirely.
 .Pp
-The available commands are as follows:
+The available histedit script commands are as follows:
 .Bl -column YXZ pick-commit
-.It pick Ar commit Ta Use the specified commit as it is.
-.It edit Ar commit Ta Use the specified commit but once changes have been
+.It Cm pick Ar commit Ta Use the specified commit as it is.
+.It Cm edit Ar commit Ta Use the specified commit but once changes have been
 merged into the work tree interrupt the histedit operation for amending.
-.It fold Ar commit Ta Combine the specified commit with the next commit
+.It Cm fold Ar commit Ta Combine the specified commit with the next commit
 listed further below that will be used.
-.It drop Ar commit Ta Remove this commit from the edited history.
-.It mesg Oo Ar log-message Oc Ta Create a new log message for the commit of
-a preceding pick or edit command on the previous line of the histedit script.
+.It Cm drop Ar commit Ta Remove this commit from the edited history.
+.It Cm mesg Oo Ar log-message Oc Ta Create a new log message for the commit of
+a preceding
+.Cm pick
+or
+.Cm edit
+command on the previous line of the histedit script.
 The optional
 .Ar log-message
 argument provides a new single-line log message to use.
