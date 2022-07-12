@@ -2105,15 +2105,14 @@ merged into the work tree interrupt the histedit operation for amending.
 .It fold Ar commit Ta Combine the specified commit with the next commit
 listed further below that will be used.
 .It drop Ar commit Ta Remove this commit from the edited history.
-.It mesg Oo Ar log-message Oc Ta Create a new log message for the commit
-listed on the previous line of the histedit script.
+.It mesg Oo Ar log-message Oc Ta Create a new log message for the commit of
+a preceding pick or edit command on the previous line of the histedit script.
 The optional
 .Ar log-message
 argument provides a new single-line log message to use.
 If the
 .Ar log-message
 argument is omitted, open an editor where a new log message can be written.
-Can only be used immediately after a pick or edit command.
 .El
 .Pp
 Every commit in the history being edited must be mentioned in the script.
