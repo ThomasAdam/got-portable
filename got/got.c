@@ -10699,7 +10699,7 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 	char *line = NULL, *p, *end;
 	size_t i, size;
 	ssize_t len;
-	int lineno = 0;
+	int lineno = 0, lastcmd = -1;
 	const struct got_histedit_cmd *cmd;
 	struct got_object_id *commit_id = NULL;
 	struct got_histedit_list_entry *hle = NULL;
@@ -10743,7 +10743,8 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		while (isspace((unsigned char)p[0]))
 			p++;
 		if (cmd->code == GOT_HISTEDIT_MESG) {
-			if (hle == NULL || hle->logmsg != NULL) {
+			if (lastcmd != GOT_HISTEDIT_PICK &&
+			    lastcmd != GOT_HISTEDIT_EDIT) {
 				err = got_error(GOT_ERR_HISTEDIT_CMD);
 				break;
 			}
@@ -10760,6 +10761,7 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 			}
 			free(line);
 			line = NULL;
+			lastcmd = cmd->code;
 			continue;
 		} else {
 			end = p;
@@ -10786,6 +10788,7 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		free(line);
 		line = NULL;
 		TAILQ_INSERT_TAIL(histedit_cmds, hle, entry);
+		lastcmd = cmd->code;
 	}
 
 	free(line);
