@@ -116,11 +116,11 @@ got_sigs_sign_tag_ssh(pid_t *newpid, int *in_fd, int *out_fd,
 	} else if (pid == 0) {
 		if (close(in_pfd[1]) == -1)
 			err(1, "close");
-		if (close(out_pfd[1]) == -1)
+		if (close(out_pfd[0]) == -1)
 			err(1, "close");
 		if (dup2(in_pfd[0], 0) == -1)
 			err(1, "dup2");
-		if (dup2(out_pfd[0], 1) == -1)
+		if (dup2(out_pfd[1], 1) == -1)
 			err(1, "dup2");
 		if (execv(GOT_TAG_PATH_SSH_KEYGEN, (char **const)argv) == -1)
 			err(1, "execv");
@@ -128,11 +128,11 @@ got_sigs_sign_tag_ssh(pid_t *newpid, int *in_fd, int *out_fd,
 	}
 	if (close(in_pfd[0]) == -1)
 		return got_error_from_errno("close");
-	if (close(out_pfd[0]) == -1)
+	if (close(out_pfd[1]) == -1)
 		return got_error_from_errno("close");
 	*newpid = pid;
 	*in_fd = in_pfd[1];
-	*out_fd = out_pfd[1];
+	*out_fd = out_pfd[0];
 	return NULL;
 }
 
@@ -267,7 +267,7 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 	char* parsed_identity = NULL;
 	const char *identity;
 	char* tmppath = NULL;
-	FILE *tmpsig, *out = NULL;
+	FILE *tmpsig = NULL;
 	BUF *buf;
 	int i = 0, j;
 
@@ -342,11 +342,11 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 	} else if (pid == 0) {
 		if (close(in_pfd[1]) == -1)
 			err(1, "close");
-		if (close(out_pfd[1]) == -1)
+		if (close(out_pfd[0]) == -1)
 			err(1, "close");
 		if (dup2(in_pfd[0], 0) == -1)
 			err(1, "dup2");
-		if (dup2(out_pfd[0], 1) == -1)
+		if (dup2(out_pfd[1], 1) == -1)
 			err(1, "dup2");
 		if (execv(GOT_TAG_PATH_SSH_KEYGEN, (char **const)argv) == -1)
 			err(1, "execv");
@@ -356,7 +356,7 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 		error = got_error_from_errno("close");
 		goto done;
 	}
-	if (close(out_pfd[0]) == -1) {
+	if (close(out_pfd[1]) == -1) {
 		error = got_error_from_errno("close");
 		goto done;
 	}
@@ -377,22 +377,16 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 		goto done;
 	}
 
-	out = fdopen(out_pfd[1], "r");
-	if (out == NULL) {
-		error = got_error_from_errno("fdopen");
-		goto done;
-	}
-	error = buf_load(&buf, out);
+	error = buf_load_fd(&buf, out_pfd[0]);
 	if (error)
 		goto done;
 	error = buf_putc(buf, '\0');
 	if (error)
 		goto done;
-	if (close(out_pfd[1]) == -1) {
+	if (close(out_pfd[0]) == -1) {
 		error = got_error_from_errno("close");
 		goto done;
 	}
-	out = NULL;
 	*msg = buf_get(buf);
 	if (WEXITSTATUS(status) != 0)
 		error = got_error(GOT_ERR_BAD_TAG_SIGNATURE);
@@ -400,9 +394,8 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 done:
 	free(parsed_identity);
 	free(tmppath);
+	close(out_pfd[0]);
 	if (tmpsig && fclose(tmpsig) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
-	if (out && fclose(out) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	return error;
 }

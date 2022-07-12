@@ -688,7 +688,6 @@ got_object_tag_create(struct got_object_id **id,
 		msg++;
 
 	if (signer_id) {
-		FILE *out;
 		pid_t pid;
 		size_t len;
 		int in_fd, out_fd;
@@ -743,13 +742,8 @@ got_object_tag_create(struct got_object_id **id,
 			goto done;
 		}
 
-		out = fdopen(out_fd, "r");
-		if (out == NULL) {
-			err = got_error_from_errno("fdopen");
-			goto done;
-		}
 		buf_empty(buf);
-		err = buf_load(&buf, out);
+		err = buf_load_fd(&buf, out_fd);
 		if (err)
 			goto done;
 		sig_len = buf_len(buf) + 1;
