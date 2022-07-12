@@ -72,10 +72,7 @@ sed()
 	# Therefore, scan the argument list and remove "-i ''", replacing it
 	# with just "-i".
 
-	original_cmd="$@"
 	[ "$PLATFORM" = "linux" ] && {
-		set -- "$@"
-
 		for w in "$@"
 		do
 			[ "$w" = "-i" ] && {
@@ -87,12 +84,12 @@ sed()
 				# Move past -i and ''
 				shift 2
 
-				command "$SEDCMD" -i $@
+				command "$SEDCMD" -i "$@"
 				return
 			}
 		done
 	}
-	command "$SEDCMD" $original_cmd
+	command "$SEDCMD" "$@"
 }
 
 
