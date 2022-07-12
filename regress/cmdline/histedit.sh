@@ -744,7 +744,6 @@ test_histedit_fold_last_commit() {
 
 	echo "pick $old_commit1" > $testroot/histedit-script
 	echo "fold $old_commit2" >> $testroot/histedit-script
-	echo "mesg committing folded changes" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
@@ -1981,6 +1980,125 @@ EOF
 	test_done "$testroot" $ret
 }
 
+test_histedit_mesg_invalid() {
+	local testroot=`test_init mesg_invalid`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m 'committing changes'
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m 'committing to zeto on master'
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+	fi
+
+	# try with a leading mesg
+
+	echo "mesg something something" > $testroot/histedit-script
+	echo "pick $old_commit1" >> $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "got: bad histedit command" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# try again with mesg -> mesg
+
+	echo "pick $old_commit1" > $testroot/histedit-script
+	echo "mesg something something" >> $testroot/histedit-script
+	echo "mesg something something else" >> $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "got: bad histedit command" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# try again with drop -> mesg
+
+	echo "drop $old_commit1" > $testroot/histedit-script
+	echo "mesg something something" >> $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "got: bad histedit command" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# try again with fold -> mesg
+
+	echo "fold $old_commit1" > $testroot/histedit-script
+	echo "mesg something something" >> $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "got: bad histedit command" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2001,3 +2119,4 @@ run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
 run_test test_histedit_edit_only
 run_test test_histedit_prepend_line
+run_test test_histedit_mesg_invalid
