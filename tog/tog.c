@@ -991,8 +991,10 @@ view_resize_split(struct tog_view *view, int resize)
 		if (err)
 			return err;
 		v->child->resized_y = v->child->begin_y;
-		if (y > v->child->begin_y)  /* split increased */
+		if (y > v->child->begin_y && v->child->type == TOG_VIEW_LOG)
 			v->child->nscrolled = y - v->child->begin_y;
+		else if (y < v->child->begin_y && v->type == TOG_VIEW_LOG)
+			v->nscrolled = v->child->begin_y - y;
 	} else {
 		if (v->child->resized_x)
 			v->child->begin_x = v->child->resized_x;
@@ -1028,9 +1030,9 @@ view_resize_split(struct tog_view *view, int resize)
 			return err;
 	}
 
-	if (v->type == TOG_VIEW_LOG && v->nscrolled)
+	if (v->nscrolled)
 		err = request_log_commits(v);
-	else if (v->child->type == TOG_VIEW_LOG && v->child->nscrolled)
+	else if (v->child->nscrolled)
 		err = request_log_commits(v->child);
 
 	v->resize = v->child->resize = 0;
@@ -2406,6 +2408,9 @@ request_log_commits(struct tog_view *view)
 	struct tog_log_view_state	*state = &view->state.log;
 	const struct got_error		*err = NULL;
 
+	if (state->thread_args.log_complete)
+		return NULL;
+
 	state->thread_args.commits_needed += view->nscrolled;
 	err = trigger_log_thread(view, 1);
 	view->nscrolled = 0;
@@ -2450,7 +2455,7 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 		s->first_displayed_entry = pentry;
 	} while (++nscrolled < maxscroll);
 
-	if (view->mode == TOG_VIEW_SPLIT_HRZN)
+	if (view->mode == TOG_VIEW_SPLIT_HRZN && !s->thread_args.log_complete)
 		view->nscrolled += nscrolled;
 	else
 		view->nscrolled = 0;
