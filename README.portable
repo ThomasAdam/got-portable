@@ -26,6 +26,7 @@ Linux:
 * `pkg-config` (for searching libraries)
 * `bison` (for configuration file grammar)
 * `libevent` (for gotwebd)
+* `libtls` (for gotwebd)
 
 FreeBSD:
 
@@ -33,6 +34,7 @@ FreeBSD:
 * `pkgconf`
 * `GNU coreutils` (for running tests)
 * `libevent` (for gotwebd)
+* `libtls` (for gotwebd)
 
 NetBSD:
 
@@ -60,6 +62,7 @@ Darwin (MacOS):
 * `ossp-uuid`
 * `GNU coreutils` (for running tests)
 * `libevent` (for gotwebd)
+* `libtls` (for gotwebd)
 
 TESTS (REGRESS)
 ===============

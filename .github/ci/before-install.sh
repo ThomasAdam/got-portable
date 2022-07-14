@@ -15,6 +15,7 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				zlib1g-dev \
 				git \
 				athena-jot \
+				libtls-dev \
 				ed
 fi
 
@@ -34,5 +35,6 @@ if [ "$CIRRUS_OS" = "darwin" ]; then
 		ncurses \
 		ossp-uuid \
 		git \
-		libevent
+		libevent \
+		libressl
 fi
