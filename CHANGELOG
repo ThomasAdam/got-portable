@@ -6,6 +6,15 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.74 (2022-07-14)
+
+* portable: made the 'date' command more portable in the test suite.
+* portable: improved error-handling for commands on BSD-systems without
+  coreutils being installed.
+* portable: reworked how 'sed' is wrapped portably, so that it now doesn't use
+  any bashisms, and will therefore run under strict POSIX-sh (dash on Ubuntu,
+  for instance).
+
 # got-portable 0.73 (2022-07-04)
 
 * Changes as found in got-0.73.
