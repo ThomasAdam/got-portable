@@ -1,0 +1,152 @@
+.\"
+.\" Copyright (c) 2020 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTWEB 8
+.Os
+.Sh NAME
+.Nm gotweb
+.Nd Game of Trees Git repository server for web browsers -- which obviously
+needs to be updated to gotwebd
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+provides a web interface allowing Git repository contents to be viewed
+with a web browser.
+.Pp
+.Nm
+is a CGI program based on
+.Xr got 1
+and
+.Xr kcgi 3
+which is intended to run in a
+.Xr chroot 2
+environment in
+.Pa /var/www .
+The program has been designed to work out of the box with
+the
+.Xr httpd 8
+web server in conjunction with
+.Xr slowcgi 8 .
+.Pp
+Enabling
+.Nm
+requires the following steps:
+.Bl -enum
+.It
+The
+.Xr httpd.conf 5
+configuration file must be adjusted to run
+.Nm
+as a CGI program with
+.Xr slowcgi 8 .
+The
+.Sx EXAMPLES
+section below contains an appropriate configuration file sample.
+.It
+httpd(8) and slowcgi(8) must be enabled and started:
+.Bd -literal -offset indent
+  # rcctl enable httpd slowcgi
+  # rcctl start httpd slowcgi
+.Ed
+.It
+Optionally, the run-time behaviour of
+.Nm
+can be configured via the
+.Xr gotweb.conf 5
+configuration file.
+.It
+Git repositories must be created at a suitable location inside the
+web server's
+.Xr chroot 2
+environment.
+These repositories should
+.Em not
+be writable by the user ID of the
+.Xr httpd 8
+server.
+The default location for repositories published by
+.Nm
+is
+.Pa /var/www/got/public .
+.It
+Git repositories served by
+.Nm
+should be kept up-to-date with a mechanism such as
+.Cm got fetch ,
+.Xr git-fetch 1 ,
+or
+.Xr rsync 1 ,
+scheduled by
+.Xr cron 8 .
+.El
+.Sh FILES
+.Bl -tag -width /var/www/got/public/ -compact
+.It Pa /var/www/got/public/
+Default location for Git repositories served by
+.Nm .
+This location can be adjusted in the
+.Xr gotweb.conf 5
+configuration file.
+.It Pa /var/www/cgi-bin/gotweb/gotweb
+The
+.Nm
+CGI program, statically linked for use in a
+.Xr chroot 2
+environment.
+.It Pa /var/www/cgi-bin/gotweb/gw_tmpl/
+Directory for template files used by
+.Nm .
+.It Pa /var/www/cgi-bin/gotweb/libexec/
+Directory containing statically linked
+.Xr got 1
+helper programs which are run by
+.Nm
+to read Git repositories.
+.It Pa /var/www/htdocs/gotweb/
+Directory containing HTML, CSS, and image files used by
+.Nm .
+.It Pa /var/www/got/tmp/
+Directory for temporary files created by
+.Nm .
+.El
+.Sh EXAMPLES
+Example configuration for httpd.conf:
+.Bd -literal -offset indent
+
+  types { include "/usr/share/misc/mime.types" }
+  server "gotweb.example.com" {
+  	listen on * port 80
+  	root "/htdocs/gotweb"
+  	location "/cgi-bin/*" {
+  		root "/"
+  		fastcgi
+  	}
+  	location "/*" {
+  		directory index "index.html"
+  	}
+  }
+.Ed
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr kcgi 3 ,
+.Xr git-repository 5 ,
+.Xr gotweb.conf 5 ,
+.Xr httpd 8 ,
+.Xr slowcgi 8
+.Sh AUTHORS
+.An Tracey Emery Aq Mt tracey@traceyemery.net
+.An Stefan Sperling Aq Mt stsp@openbsd.org

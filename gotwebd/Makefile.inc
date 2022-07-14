@@ -1,0 +1,11 @@
+LDADD +=	-lz -lutil
+PREFIX ?=	/usr/local
+BINDIR ?=	${PREFIX}/sbin
+CHROOT_DIR ?=	/var/www
+GOTWEB_DIR =	/bin/gotwebd
+LIBEXECDIR =	${GOTWEB_DIR}/libexec
+LIBEXEC_DIR =	${CHROOT_DIR}${LIBEXECDIR}
+HTTPD_DIR =	${CHROOT_DIR}/htdocs
+PROG_DIR =	${HTTPD_DIR}/${PROG}
+WWWUSR ?=	www
+WWWGRP ?=	www
