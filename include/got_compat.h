@@ -61,6 +61,11 @@
 #define WAIT_ANY (-1)
 #endif
 
+/* SOCK_NONBLOCK isn't available across BSDs... */
+#ifndef SOCK_NONBLOCK
+#define SOCK_NONBLOCK 00004000
+#endif
+
 #ifndef __dead
 #define __dead __attribute__ ((__noreturn__))
 #endif
