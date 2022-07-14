@@ -16,9 +16,11 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+
+/* TA: FIXME */
+#include <grp.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -29,9 +31,10 @@
 #include <signal.h>
 #include <pwd.h>
 #include <event.h>
-#include <imsg.h>
 
 #include "proc.h"
+
+#include "got_compat.h"
 
 void	 proc_exec(struct privsep *, struct privsep_proc *, unsigned int,
 	    int, char **);

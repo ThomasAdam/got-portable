@@ -17,13 +17,11 @@
  */
 
 #include <arpa/inet.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include <errno.h>
 #include <event.h>
-#include <imsg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +29,8 @@
 #include <unistd.h>
 
 #include "got_error.h"
+
+#include "got_compat.h"
 
 #include "proc.h"
 #include "gotwebd.h"

@@ -16,7 +16,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/cdefs.h>
@@ -32,18 +31,18 @@
 #include <errno.h>
 #include <event.h>
 #include <fcntl.h>
-#include <imsg.h>
 #include <pwd.h>
 #include <signal.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <ctype.h>
-#include <util.h>
 
 #include "got_opentemp.h"
 
 #include "proc.h"
 #include "gotwebd.h"
+
+#include "got_compat.h"
 
 __dead void usage(void);
 

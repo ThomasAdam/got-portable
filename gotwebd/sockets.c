@@ -19,7 +19,6 @@
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
-#include <sys/queue.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
 #include <sys/resource.h>
@@ -37,7 +36,6 @@
 #include <event.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
-#include <imsg.h>
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
@@ -47,13 +45,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <util.h>
 
 #include "got_error.h"
 #include "got_opentemp.h"
 
 #include "proc.h"
 #include "gotwebd.h"
+
+#include "got_compat.h"
 
 #define SOCKS_BACKLOG 5
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
@@ -296,13 +295,19 @@ sockets_socket_af(struct sockaddr_storage *ss, in_port_t port)
 	switch (ss->ss_family) {
 	case AF_INET:
 		((struct sockaddr_in *)ss)->sin_port = port;
+/* TA: Iffy... */
+#ifndef __linux__
 		((struct sockaddr_in *)ss)->sin_len =
 		    sizeof(struct sockaddr_in);
+#endif
 		break;
 	case AF_INET6:
 		((struct sockaddr_in6 *)ss)->sin6_port = port;
+/* TA: Iffy... */
+#ifndef __linux__
 		((struct sockaddr_in6 *)ss)->sin6_len =
 		    sizeof(struct sockaddr_in6);
+#endif
 		break;
 	default:
 		return -1;
@@ -579,7 +584,8 @@ sockets_create_socket(struct addresslist *al, in_port_t port)
 		flags |= O_NONBLOCK;
 		fcntl(fd, F_SETFL, flags);
 
-		if (bind(fd, (struct sockaddr *)&a->ss, a->ss.ss_len) == -1) {
+		/* TA: 'sizeof a' vs a->ss.len */ 
+		if (bind(fd, (struct sockaddr *)&a->ss, sizeof a) == -1) {
 			close(fd);
 			log_info("%s: can't bind to port %d", __func__,
 			    ntohs(port));

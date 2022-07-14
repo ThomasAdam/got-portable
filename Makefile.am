@@ -1,4 +1,4 @@
-SUBDIRS = compat libexec got tog gotadmin
+SUBDIRS = compat libexec got tog gotadmin gotwebd
 
 include $(top_builddir)/Makefile.common
 

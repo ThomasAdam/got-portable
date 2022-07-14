@@ -20,8 +20,6 @@
 #include <sys/stat.h>
 
 #include <event.h>
-#include <imsg.h>
-#include <sha1.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -37,6 +35,8 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+
+#include "got_compat.h"
 
 #include "proc.h"
 #include "gotwebd.h"

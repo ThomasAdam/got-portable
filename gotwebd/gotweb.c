@@ -26,8 +26,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <event.h>
-#include <imsg.h>
-#include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,6 +45,8 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+
+#include "got_compat.h"
 
 enum gotweb_ref_tm {
 	TM_DIFF,

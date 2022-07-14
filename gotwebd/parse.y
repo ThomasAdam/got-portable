@@ -23,7 +23,6 @@
 %{
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 
@@ -37,7 +36,6 @@
 #include <errno.h>
 #include <event.h>
 #include <ifaddrs.h>
-#include <imsg.h>
 #include <limits.h>
 #include <netdb.h>
 #include <stdarg.h>
@@ -50,6 +48,7 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+#include "got_compat.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
@@ -1047,7 +1046,10 @@ host_v4(const char *s)
 	if ((h = calloc(1, sizeof(*h))) == NULL)
 		fatal(__func__);
 	sain = (struct sockaddr_in *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 	sain->sin_len = sizeof(struct sockaddr_in);
+#endif
 	sain->sin_family = AF_INET;
 	sain->sin_addr.s_addr = ina.s_addr;
 	if (sain->sin_addr.s_addr == INADDR_ANY)
@@ -1072,7 +1074,10 @@ host_v6(const char *s)
 		if ((h = calloc(1, sizeof(*h))) == NULL)
 			fatal(__func__);
 		sa_in6 = (struct sockaddr_in6 *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 		sa_in6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 		sa_in6->sin6_family = AF_INET6;
 		memcpy(&sa_in6->sin6_addr,
 		    &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
@@ -1142,12 +1147,18 @@ host_dns(const char *s, struct addresslist *al, int max,
 
 		if (res->ai_family == AF_INET) {
 			sain = (struct sockaddr_in *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 			sain->sin_len = sizeof(struct sockaddr_in);
+#endif
 			sain->sin_addr.s_addr = ((struct sockaddr_in *)
 			    res->ai_addr)->sin_addr.s_addr;
 		} else {
 			sin6 = (struct sockaddr_in6 *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 			memcpy(&sin6->sin6_addr, &((struct sockaddr_in6 *)
 			    res->ai_addr)->sin6_addr, sizeof(struct in6_addr));
 		}
@@ -1208,12 +1219,18 @@ host_if(const char *s, struct addresslist *al, int max,
 
 		if (af == AF_INET) {
 			sain = (struct sockaddr_in *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 			sain->sin_len = sizeof(struct sockaddr_in);
+#endif
 			sain->sin_addr.s_addr = ((struct sockaddr_in *)
 			    p->ifa_addr)->sin_addr.s_addr;
 		} else {
 			sin6 = (struct sockaddr_in6 *)&h->ss;
+/* TA:  Iffy... */
+#ifndef __linux__
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 			memcpy(&sin6->sin6_addr, &((struct sockaddr_in6 *)
 			    p->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
 			sin6->sin6_scope_id = ((struct sockaddr_in6 *)
@@ -1274,6 +1291,8 @@ host(const char *s, struct addresslist *al, int max,
 int
 is_if_in_group(const char *ifname, const char *groupname)
 {
+/* TA: Check this... */
+#ifdef HAVE_STRUCT_IFGROUPREQ
 	unsigned int len;
 	struct ifgroupreq ifgr;
 	struct ifg_req *ifg;
@@ -1313,6 +1332,9 @@ is_if_in_group(const char *ifname, const char *groupname)
 end:
 	close(s);
 	return (ret);
+#else
+	return (0);
+#endif
 }
 
 int

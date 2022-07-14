@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <time.h>
 
+#include "got_compat.h"
+
 static int	 debug;
 static int	 verbose;
 const char	*log_procname;

@@ -78,6 +78,9 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
+# Check for ifgroupreq which is only available on BSD.
+AC_CHECK_TYPES([struct ifgroupreq])
+
 # Look for library needed for flock.
 AC_SEARCH_LIBS(flock, bsd)
 
@@ -225,6 +228,56 @@ if test "x$found_imsg_init" = xyes; then
 else
 	AC_LIBOBJ(imsg)
 	AC_LIBOBJ(imsg-buffer)
+fi
+
+# libevent (for gotwebd).  Lifted from tmux.
+# Look for libevent. Try libevent_core or libevent with pkg-config first then
+# look for the library.
+PKG_CHECK_MODULES(
+	LIBEVENT_CORE,
+	[libevent_core >= 2],
+	[
+		AM_CPPFLAGS="$LIBEVENT_CORE_CFLAGS $AM_CPPFLAGS"
+		CPPFLAGS="$AM_CPPFLAGS $SAVED_CPPFLAGS"
+		LIBS="$LIBEVENT_CORE_LIBS $LIBS"
+		found_libevent=yes
+	],
+	found_libevent=no
+)
+if test x$found_libevent = xno; then
+	PKG_CHECK_MODULES(
+		LIBEVENT,
+		[libevent >= 2],
+		[
+			AM_CPPFLAGS="$LIBEVENT_CFLAGS $AM_CPPFLAGS"
+			CPPFLAGS="$AM_CPPFLAGS $SAVED_CPPFLAGS"
+			LIBS="$LIBEVENT_LIBS $LIBS"
+			found_libevent=yes
+		],
+		found_libevent=no
+	)
+fi
+if test x$found_libevent = xno; then
+	AC_SEARCH_LIBS(
+		event_init,
+		[event_core event event-1.4],
+		found_libevent=yes,
+		found_libevent=no
+	)
+fi
+AC_CHECK_HEADER(
+	event2/event.h,
+	AC_DEFINE(HAVE_EVENT2_EVENT_H),
+	[
+		AC_CHECK_HEADER(
+			event.h,
+			AC_DEFINE(HAVE_EVENT_H),
+			found_libevent=no
+		)
+	]
+)
+if test "x$found_libevent" = xno; then
+	AC_MSG_ERROR("libevent not found")
 fi
 
 # libcrypto (via libssl for SHA information)
@@ -493,6 +546,7 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-send-pack/Makefile
 		 got/Makefile
 		 gotadmin/Makefile
+		 gotwebd/Makefile
 		 tog/Makefile
 		 Makefile.common:Makefile.common.in])
 AC_OUTPUT
