@@ -266,7 +266,7 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 	int pid, status, in_pfd[2], out_pfd[2];
 	char* parsed_identity = NULL;
 	const char *identity;
-	char* tmppath = NULL;
+	char *tmppath = NULL;
 	FILE *tmpsig = NULL;
 	BUF *buf;
 	int i = 0, j;
@@ -393,6 +393,8 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 
 done:
 	free(parsed_identity);
+	if (tmppath && unlink(tmppath) == -1 && error == NULL)
+		error = got_error_from_errno("unlink");
 	free(tmppath);
 	close(out_pfd[0]);
 	if (tmpsig && fclose(tmpsig) == EOF && error == NULL)
