@@ -10,6 +10,7 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				libmd-dev \
 				libssl-dev \
 				libbsd-dev \
+				libevent-dev \
 				uuid-dev \
 				zlib1g-dev \
 				git \
@@ -22,6 +23,7 @@ if [ "$CIRRUS_OS" = "freebsd" ]; then
 		automake \
 		pkgconf \
 		git \
+		libevent \
 		coreutils
 fi
 
@@ -31,5 +33,6 @@ if [ "$CIRRUS_OS" = "darwin" ]; then
 		pkg-config \
 		ncurses \
 		ossp-uuid \
-		git
+		git \
+		libevent
 fi

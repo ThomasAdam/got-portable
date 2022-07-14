@@ -25,12 +25,14 @@ Linux:
 * `libz` (for Z compression)
 * `pkg-config` (for searching libraries)
 * `bison` (for configuration file grammar)
+* `libevent` (for gotwebd)
 
 FreeBSD:
 
 * `automake`
 * `pkgconf`
 * `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 NetBSD:
 
@@ -38,6 +40,7 @@ NetBSD:
 * `libuuid`
 * `ncuresesw`
 * `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 DragonFlyBSD:
 
@@ -45,6 +48,7 @@ DragonFlyBSD:
 * `pkgconf`
 * `openssl`
 * `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 Darwin (MacOS):
 
@@ -55,6 +59,7 @@ Darwin (MacOS):
 * `openssl`
 * `ossp-uuid`
 * `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 TESTS (REGRESS)
 ===============
