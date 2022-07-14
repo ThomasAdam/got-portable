@@ -1,8 +1,8 @@
-got_linux_task:
-  container:
-    image: gcc:latest
-  before_build_script: .github/ci/before-install.sh
-  build:script: .github/ci/build.sh
+#got_linux_task:
+  #  container:
+  #  image: gcc:latest
+  #before_build_script: .github/ci/before-install.sh
+  #build:script: .github/ci/build.sh
 
 got_ubuntu_task:
   container:
