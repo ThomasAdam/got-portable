@@ -1,3 +1,22 @@
+* got 0.74; 2022-07-14
+- cast printf argument of type time_t to long long to match the %lld (naddy)
+- add missing revoked_signers grammar to got.conf(5) (jrick)
+- move 'got init' command to 'gotadmin init'
+- regress test SSH key revocations (jrick)
+- long overdue update of AUTHORS lists in man pages
+- add signer_id option to got.conf(5) (jrick)
+- delta_cache.c needs to include <stdint.h>; unbreaks -portable build on ubuntu
+- regress: use bs=1M for dd, not bs=1m; fixes -portable test failure on ubuntu
+- fix buf_alloca error handling (op)
+- some privsep.c refactoring and cleanup (op)
+- tog: implement global 'S' key map to switch split mode (jamsek)
+- tog: implement +/- keymaps to resize the focussed split (jamsek)
+- make 'tog log' error out in shallow Git repositories instead of hanging
+- tog: enable moving to prev/next blame line in diff view (jamsek)
+- improve documentation of the histedit 'mesg' command
+- histedit script: allow mesg command only after pick or edit commands (op)
+- for linux, fix usage of pipe(2) during SSH signing and verification (jrick)
+
 * got 0.73; 2022-07-04
 - got patch: use diff3 to merge changes if possible (op)
 - tog: alias C-b/C-f to scroll page back/forward with b/f (jamsek)
