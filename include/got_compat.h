@@ -56,6 +56,11 @@
 #include <sys/file.h>
 #endif
 
+/* POSIX doesn't define WAIT_ANY, so provide it if it's not found. */
+#ifndef WAIT_ANY
+#define WAIT_ANY (-1)
+#endif
+
 #ifndef __dead
 #define __dead __attribute__ ((__noreturn__))
 #endif
