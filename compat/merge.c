@@ -32,8 +32,6 @@
 
 #include <sys/cdefs.h>
 
-#include "got_compat.h"
-
 /*
  * Hybrid exponential search/linear search merge sort with hybrid
  * natural/pairwise first pass.  Requires about .3% more comparisons
@@ -53,6 +51,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "got_compat.h"
 
 static void setup(unsigned char *, unsigned char *, size_t, size_t,
     int (*)(const void *, const void *));

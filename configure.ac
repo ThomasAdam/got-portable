@@ -109,6 +109,7 @@ AC_CHECK_FUNCS([ \
 	rmdir \
 	setlocale \
 	socket \
+	setproctitle \
 	strcasecmp \
 	strchr \
 	strcspn \
@@ -124,6 +125,8 @@ AC_CHECK_FUNCS([ \
 	strtoul \
 	wcwidth \
 ])
+
+AM_CONDITIONAL([HAVE_SETPROCTITLE], [test "x$ac_cv_func_setproctitle" = xyes])
 
 # Siphash support.
 AC_CHECK_FUNCS([SipHash])

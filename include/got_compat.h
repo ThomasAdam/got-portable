@@ -70,6 +70,10 @@
 #define __dead __attribute__ ((__noreturn__))
 #endif
 
+#ifndef __unused
+#define __unused __attribute__ ((__unused__))
+#endif
+
 #ifndef __OpenBSD__
 #define pledge(s, p) (0)
 #define unveil(s, p) (0)
@@ -265,6 +269,11 @@ void		*reallocarray(void *, size_t, size_t);
 #ifndef HAVE_RECALLOCARRAY
 /* recallocarray.c */
 void		*recallocarray(void *, size_t, size_t, size_t);
+#endif
+
+#ifndef HAVE_SETPROCTITLE
+/* setproctitle.c */
+void 		 setproctitle(const char *, ...);
 #endif
 
 #ifndef HAVE_FMT_SCALED

@@ -50,6 +50,10 @@ if !HAVE_SIPHASH
 libopenbsd_compat_a_SOURCES += siphash.c siphash.h
 endif
 
+if !HAVE_SETPROCTITLE
+libopenbsd_compat_a_SOURCES += setproctitle.c
+endif
+
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \
