@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([got-portable], [0.74], [thomas@xteddy.org])
+AC_INIT([got-portable], [0.75], [thomas@xteddy.org])
 AC_CONFIG_AUX_DIR(etc)
 AC_CONFIG_SRCDIR([lib/rcsutil.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
