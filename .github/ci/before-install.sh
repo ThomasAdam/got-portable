@@ -25,12 +25,14 @@ if [ "$CIRRUS_OS" = "freebsd" ]; then
 		pkgconf \
 		git \
 		libevent \
+		libretls \
 		coreutils
 fi
 
 if [ "$CIRRUS_OS" = "darwin" ]; then
 	brew install autoconf \
 		automake \
+		bison \
 		pkg-config \
 		ncurses \
 		ossp-uuid \
