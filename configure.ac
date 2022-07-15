@@ -110,6 +110,8 @@ AC_CHECK_FUNCS([ \
 	rmdir \
 	setlocale \
 	socket \
+	setresgid \
+	setresuid \
 	setproctitle \
 	strcasecmp \
 	strchr \
@@ -128,6 +130,8 @@ AC_CHECK_FUNCS([ \
 ])
 
 AM_CONDITIONAL([HAVE_SETPROCTITLE], [test "x$ac_cv_func_setproctitle" = xyes])
+AM_CONDITIONAL([HAVE_SETRESGID], [test "x$ac_cv_func_setresgid" = xyes])
+AM_CONDITIONAL([HAVE_SETRESUID], [test "x$ac_cv_func_setresuid" = xyes])
 
 # Siphash support.
 AC_CHECK_FUNCS([SipHash])
