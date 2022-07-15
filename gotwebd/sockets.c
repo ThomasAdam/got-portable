@@ -622,9 +622,14 @@ sockets_accept_reserve(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
 		errno = EMFILE;
 		return -1;
 	}
+/* TA:  This needs fixing upstream. */
+#ifdef __APPLE__
+	ret = accept(sockfd, addr, addrlen);
+#else
+	ret = accept4(sockfd, addr, addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+#endif
 
-	if ((ret = accept4(sockfd, addr, addrlen,
-	    SOCK_NONBLOCK | SOCK_CLOEXEC)) > -1) {
+	if (ret > -1) {
 		(*counter)++;
 		log_debug("inflight incremented, now %d", *counter);
 	}
