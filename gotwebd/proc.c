@@ -230,8 +230,11 @@ proc_init(struct privsep *ps, struct privsep_proc *procs, unsigned int nproc,
 			for (proc = 0; proc < ps->ps_instances[dst]; proc++) {
 				pa = &ps->ps_pipes[PROC_GOTWEBD][0];
 				pb = &ps->ps_pipes[dst][proc];
-				if (socketpair(AF_UNIX,
-				    SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+				int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+#ifdef SOCK_CLOEXEC
+				sock_flags |= SOCK_CLOEXEC;
+#endif
+				if (socketpair(AF_UNIX, sock_flags,
 				    PF_UNSPEC, fds) == -1)
 					fatal("%s: socketpair", __func__);
 
@@ -423,8 +426,11 @@ proc_open(struct privsep *ps, int src, int dst)
 
 			pa = &ps->ps_pipes[src][i];
 			pb = &ps->ps_pipes[dst][j];
-			if (socketpair(AF_UNIX,
-			    SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+			int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+#ifdef SOCK_CLOEXEC
+			sock_flags |= SOCK_CLOEXEC;
+#endif
+			if (socketpair(AF_UNIX, sock_flags,
 			    PF_UNSPEC, fds) == -1)
 				fatal("%s: socketpair", __func__);
 

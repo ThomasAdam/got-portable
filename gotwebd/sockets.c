@@ -491,7 +491,12 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 			return (tsock->fd);
 	}
 
-	u_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK| SOCK_CLOEXEC, 0);
+	/* TA: FIXME:  this needs upstreaming. */
+	int socket_flags = SOCK_STREAM | SOCK_NONBLOCK;
+#ifdef SOCK_CLOEXEC
+	socket_flags |= SOCK_CLOEXEC;
+#endif
+	u_fd = socket(AF_UNIX, socket_flags, 0);
 	if (u_fd == -1) {
 		log_warn("%s: socket", __func__);
 		return -1;
