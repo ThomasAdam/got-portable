@@ -66,6 +66,13 @@
 #define SOCK_NONBLOCK 00004000
 #endif
 
+/* On FreeBSD (and possibly others), EAI_NODATA was removed, in favour of
+ * using EAI_NONAME.
+ */
+#ifndef EAI_NODATA
+#define EAI_NODATA EAI_NONAME
+#endif
+
 #ifndef __dead
 #define __dead __attribute__ ((__noreturn__))
 #endif
