@@ -133,7 +133,7 @@ struct fcgi_record_header {
 	uint16_t	content_len;
 	uint8_t		padding_len;
 	uint8_t		reserved;
-}__packed;
+}__attribute__((__packed__));
 
 struct fcgi_response {
 	TAILQ_ENTRY(fcgi_response)	entry;
@@ -236,7 +236,7 @@ struct fcgi_begin_request_body {
 	uint16_t	role;
 	uint8_t		flags;
 	uint8_t		reserved[5];
-}__packed;
+}__attribute__((__packed__));
 
 struct fcgi_end_request_body {
 	uint32_t	app_status;
