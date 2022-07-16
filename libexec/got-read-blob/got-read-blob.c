@@ -15,6 +15,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 

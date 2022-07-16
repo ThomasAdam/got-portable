@@ -15,6 +15,7 @@
  */
 
 #include <sys/time.h>
+#include <sys/queue.h>
 #include <sys/resource.h>
 
 #include <stdio.h>

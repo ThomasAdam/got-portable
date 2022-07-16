@@ -65,6 +65,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/queue.h>
 
 #include <ctype.h>
 #include <limits.h>

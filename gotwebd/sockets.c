@@ -19,6 +19,7 @@
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
+#include <sys/queue.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
 #include <sys/resource.h>

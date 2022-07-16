@@ -16,6 +16,7 @@
  */
 
 
+#include <sys/queue.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>

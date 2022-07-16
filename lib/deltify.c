@@ -16,6 +16,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #include <assert.h>
 #include <errno.h>

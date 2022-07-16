@@ -16,6 +16,7 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/mman.h>

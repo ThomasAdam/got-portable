@@ -15,6 +15,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/queue.h>
 
 #include <dirent.h>
 #include <limits.h>
