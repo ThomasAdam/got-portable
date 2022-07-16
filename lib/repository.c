@@ -1834,12 +1834,10 @@ got_repo_match_object_id(struct got_object_id **id, char **label,
 			return err;
 	}
 
-	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
-	if (err) {
-		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
-			return err;
-		err = got_ref_open(&ref, repo, id_str, 0);
-		if (err != NULL)
+	err = got_ref_open(&ref, repo, id_str, 0);
+	if (err == NULL) {
+		err = got_ref_resolve(id, repo, ref);
+		if (err)
 			goto done;
 		if (label) {
 			*label = strdup(got_ref_get_name(ref));
@@ -1848,12 +1846,23 @@ got_repo_match_object_id(struct got_object_id **id, char **label,
 				goto done;
 			}
 		}
-		err = got_ref_resolve(id, repo, ref);
-	} else if (label) {
-		err = got_object_id_str(label, *id);
-		if (*label == NULL) {
-			err = got_error_from_errno("strdup");
+	} else {
+		if (err->code != GOT_ERR_NOT_REF &&
+		    err->code != GOT_ERR_BAD_REF_NAME)
 			goto done;
+		err = got_repo_match_object_id_prefix(id, id_str,
+		    obj_type, repo);
+		if (err) {
+			if (err->code == GOT_ERR_BAD_OBJ_ID_STR)
+				err = got_error_not_ref(id_str);
+			goto done;
+		}
+		if (label) {
+			err = got_object_id_str(label, *id);
+			if (*label == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
 	}
 done:
