@@ -59,7 +59,6 @@ AC_CHECK_HEADERS([ \
 	sys/socket.h \
 	sys/time.h \
 	sys/tree.h \
-	tls.h \
 	util.h \
 	unistd.h \
 	wchar.h \
