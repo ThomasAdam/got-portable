@@ -6795,7 +6795,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		te = got_object_tree_get_last_entry(s->tree);
 		for (n = 0; n < eos; n++) {
 			if (te == NULL) {
-				if(s->tree != s->root) {
+				if (s->tree != s->root) {
 					s->first_displayed_entry = NULL;
 					n++;
 				}
