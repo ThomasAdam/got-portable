@@ -20,7 +20,6 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <sys/queue.h>
-#include <sys/queue.h>
 
 #include <limits.h>
 #include <stdio.h>
