@@ -24,8 +24,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_SYS_TREE_H_
-#define	_SYS_TREE_H_
+#warning "I'M IN YOUR TREE"
+#include_next <sys/tree.h>
+
+#ifndef	_COMPAT_SYS_TREE_H_
+#define	_COMPAT_SYS_TREE_H_
 
 /*
  * This file defines data structures for different types of trees:

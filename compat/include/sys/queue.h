@@ -32,8 +32,11 @@
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  */
 
-#ifndef	_SYS_QUEUE_H_
-#define	_SYS_QUEUE_H_
+#warning "I'M IN YOUR QUEUE"
+#include_next <sys/queue.h>
+
+#ifndef	_COMPAT_SYS_QUEUE_H_
+#define	_COMPAT_SYS_QUEUE_H_
 
 /*
  * This file defines five types of data structures: singly-linked lists,

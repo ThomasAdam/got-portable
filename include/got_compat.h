@@ -144,21 +144,6 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include <inttypes.h>
 #endif
 
-/* Only include sys/queue.h if it's not found on the system (libbsd provides
- * a copy of this).
- */
-#if !defined(HAVE_QUEUE_H) && !defined(HAVE_LIBBSD)
-#include "compat/queue.h"
-#else
-#include <sys/queue.h>
-#endif
-
-#ifdef HAVE_TREE_H
-#include <sys/tree.h>
-#else
-#include "compat/tree.h"
-#endif
-
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif

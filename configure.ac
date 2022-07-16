@@ -431,6 +431,16 @@ if test "x$found_queue_h" = xyes -o "x$ac_cv_header_sys_queue_h" = xyes; then
 	AC_DEFINE(HAVE_QUEUE_H)
 fi
 
+AC_CHECK_DECL(
+	RB_FOREACH_REVERSE_SAFE,
+	,
+	found_tree_h=no,
+)
+
+if test "x$found_tree_h" = xyes -o "x$ac_cv_header_sys_tree_h" = xyes; then
+	AC_DEFINE(HAVE_TREE_H)
+fi
+
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)
 AC_LINK_IFELSE([AC_LANG_SOURCE(
