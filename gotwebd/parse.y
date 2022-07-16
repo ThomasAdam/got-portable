@@ -45,7 +45,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <syslog.h>
-#include <tls.h>
 #include <unistd.h>
 
 #include "proc.h"
