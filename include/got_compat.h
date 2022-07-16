@@ -35,6 +35,7 @@
 
 #else /* Linux, etc... */
 #include <endian.h>
+#include <grp.h>
 #endif
 
 #include <fnmatch.h>

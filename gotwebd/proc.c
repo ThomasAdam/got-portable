@@ -19,9 +19,6 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
-/* TA: FIXME */
-#include <grp.h>
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
