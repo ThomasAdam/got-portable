@@ -55,6 +55,7 @@ AC_CHECK_HEADERS([ \
 	sys/ioctl.h \
 	sys/param.h \
 	sys/poll.h \
+	sys/queue.h \
 	sys/socket.h \
 	sys/time.h \
 	sys/tree.h \
@@ -339,39 +340,34 @@ AC_CHECK_DECL(
 	SIMPLEQ_INIT,
 	found_queue_h=yes,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_CONCAT,
 	found_queue_h=yes,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_PREV,
-	found_queue_h=yes,
+	,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_REPLACE,
-	found_queue_h=yes,
+	,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	SIMPLEQ_ENTRY,
 	,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_FOREACH_SAFE,
 	,
 	found_queue_h=no,
-	[#include <sys/queue.h>]
 )
-if test "x$found_queue_h" = xyes; then
+
+if test "x$found_queue_h" = xyes -o "x$ac_cv_header_sys_queue_h" = xyes; then
 	AC_DEFINE(HAVE_QUEUE_H)
 fi
 
