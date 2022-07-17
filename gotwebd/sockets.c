@@ -709,7 +709,8 @@ sockets_rlimit(int maxfd)
 
 	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
 		fatal("%s: failed to get resource limit", __func__);
-	log_debug("%s: max open files %llu", __func__, rl.rlim_max);
+	log_debug("%s: max open files %llu", __func__,
+	    (unsigned long long)rl.rlim_max);
 
 	/*
 	 * Allow the maximum number of open file descriptors for this
