@@ -16,6 +16,11 @@ got:
     objects otherwise.
   - When rebasing/histediting commits, we could keep the original 'author'
     field intact but reset the 'committer' field to the value of GOT_AUTHOR.
+- Add an option where 'got cherrypick' and 'got backout' will immediately
+  create a new commit with a log-message based on the original log message.
+  This must require an up-to-date and clean work tree to avoid unrelated
+  changes from getting mixed in. Perform an implicit work tree base-commit
+  bump after committing, like 'got rebase' and 'got histedit' do it.
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
