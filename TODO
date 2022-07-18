@@ -8,6 +8,14 @@ got:
   instead of the root directory checked out at /usr/src.
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
+- Improve distinction between author and committer meta-data:
+  - When creating commits honor GOT_AUTHOR as the default value for both
+    fields, with an option to override the 'author ' field in the commit
+    object (displayed as 'from: ' in got log) with a name + email-address.
+    Careful, Git requires an email address and will *fail to parse* commit
+    objects otherwise.
+  - When rebasing/histediting commits, we could keep the original 'author'
+    field intact but reset the 'committer' field to the value of GOT_AUTHOR.
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
@@ -24,6 +32,7 @@ tog:
   very often, and 'tog log' blocks far too long in this case
 - make it possible to view the contents of tag objects
 - verify signed tag objects
+- add a toggle to switch between display of author/committer in the log view
 
 gotweb:
 - tracey has a gotwebd thingy in progress somewhere
