@@ -9,9 +9,13 @@ got:
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
 
-libexec:
-- add http(s) transport with libtls in dial.c, speaking Git's HTTP protocol
-  via got-fetch-pack or a new helper
+network protocol:
+- add http(s) transport with libtls, speaking the two Git HTTP protocols
+  (both "dumb" and "smart" need to work) via got-fetch-pack, or a new helper
+  like got-fetch-http; it is fine if HTTP remains a fetch-only protocol, and
+  works only against servers which don't require authentication for fetches;
+  anything beyond this would require a full-featured HTTP client (Git uses
+  libcurl, which we cannot use as it is not in the OpenBSD base system)
 
 tog:
 - implement 'limit' for 'tog log' (like search but display matched commits only)
