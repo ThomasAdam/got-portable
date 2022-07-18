@@ -15,6 +15,11 @@ libexec:
 
 tog:
 - implement 'limit' for 'tog log' (like search but display matched commits only)
+- make 'tog log' respond to key presses while 'loading...' history; loading
+  can be slow for paths in a deep history if the path has not been changed
+  very often, and 'tog log' blocks far too long in this case
+- make it possible to view the contents of tag objects
+- verify signed tag objects
 
 gotweb:
 - tracey has a gotwebd thingy in progress somewhere
