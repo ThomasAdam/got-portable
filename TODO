@@ -14,11 +14,7 @@ libexec:
   via got-fetch-pack or a new helper
 
 tog:
-- implement horizonal scrolling in all views
-- implement horizonal split view mode
 - implement 'limit' for 'tog log' (like search but display matched commits only)
-- allow moving to prev/next blamed line in diff view if opened from blame view,
-  similar to how the diff view can switch commits if opened from log view
 
 gotweb:
 - tracey has a gotwebd thingy in progress somewhere
