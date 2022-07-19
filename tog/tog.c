@@ -522,7 +522,7 @@ struct tog_view {
 	int lines, cols; /* copies of LINES and COLS */
 	int nscrolled, offset; /* lines scrolled and hsplit line offset */
 	int ch, count; /* current keymap and count prefix */
-	int resize; /* set when in a resize event */
+	int resized; /* set when in a resize event */
 	int focussed; /* Only set on one parent or child view at a time. */
 	int dying;
 	struct tog_view *parent;
@@ -554,6 +554,7 @@ struct tog_view {
 	const struct got_error *(*input)(struct tog_view **,
 	    struct tog_view *, int);
 	const struct got_error *(*reset)(struct tog_view *);
+	const struct got_error *(*resize)(struct tog_view *, int);
 	const struct got_error *(*close)(struct tog_view *);
 
 	const struct got_error *(*search_start)(struct tog_view *);
@@ -588,6 +589,7 @@ static const struct got_error *open_log_view(struct tog_view *,
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view *, int);
+static const struct got_error *resize_log_view(struct tog_view *, int);
 static const struct got_error *close_log_view(struct tog_view *);
 static const struct got_error *search_start_log_view(struct tog_view *);
 static const struct got_error *search_next_log_view(struct tog_view *);
@@ -736,13 +738,13 @@ view_splitscreen(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 
-	if (!view->resize && view->mode == TOG_VIEW_SPLIT_HRZN) {
+	if (!view->resized && view->mode == TOG_VIEW_SPLIT_HRZN) {
 		if (view->resized_y && view->resized_y < view->lines)
 			view->begin_y = view->resized_y;
 		else
 			view->begin_y = view_split_begin_y(view->nlines);
 		view->begin_x = 0;
-	} else if (!view->resize) {
+	} else if (!view->resized) {
 		if (view->resized_x && view->resized_x < view->cols - 1 &&
 		    view->cols > 119)
 			view->begin_x = view->resized_x;
@@ -773,8 +775,8 @@ view_fullscreen(struct tog_view *view)
 	const struct got_error *err = NULL;
 
 	view->begin_x = 0;
-	view->begin_y = view->resize ? view->begin_y : 0;
-	view->nlines = view->resize ? view->nlines : LINES;
+	view->begin_y = view->resized ? view->begin_y : 0;
+	view->nlines = view->resized ? view->nlines : LINES;
 	view->ncols = COLS;
 	view->lines = LINES;
 	view->cols = COLS;
@@ -880,24 +882,6 @@ view_resize(struct tog_view *view)
 			show_panel(view->child->panel);
 		}
 		/*
-		 * Request commits if terminal height was increased in a log
-		 * view so we have enough commits loaded to populate the view.
-		 */
-		if (view->type == TOG_VIEW_LOG && dif > 0) {
-			struct tog_log_view_state *ts = &view->state.log;
-
-			if (ts->commits.ncommits < ts->selected_entry->idx +
-			    view->lines - ts->selected) {
-				view->nscrolled = ts->selected_entry->idx +
-				    view->lines - ts->selected -
-				    ts->commits.ncommits + dif;
-				err = request_log_commits(view);
-				if (err)
-					return err;
-			}
-		}
-
-		/*
 		 * XXX This is ugly and needs to be moved into the above
 		 * logic but "works" for now and my attempts at moving it
 		 * break either 'tab' or 'F' key maps in horizontal splits.
@@ -920,6 +904,12 @@ view_resize(struct tog_view *view)
 	} else if (view->parent == NULL)
 		ncols = COLS;
 
+	if (view->resize && dif > 0) {
+		err = view->resize(view, dif);
+		if (err)
+			return err;
+	}
+
 	if (wresize(view->window, nlines, ncols) == ERR)
 		return got_error_from_errno("wresize");
 	if (replace_panel(view->panel, view->window) == ERR)
@@ -932,6 +922,25 @@ view_resize(struct tog_view *view)
 	view->cols = COLS;
 
 	return NULL;
+}
+
+static const struct got_error *
+resize_log_view(struct tog_view *view, int increase)
+{
+	struct tog_log_view_state *s = &view->state.log;
+	const struct got_error *err = NULL;
+	int n = s->selected_entry->idx + view->lines - s->selected;
+
+	/*
+	 * Request commits to account for the increased
+	 * height so we have enough to populate the view.
+	 */
+	if (s->commits.ncommits < n) {
+		view->nscrolled = n - s->commits.ncommits + increase + 1;
+		err = request_log_commits(view);
+	}
+
+	return err;
 }
 
 static void
@@ -967,7 +976,7 @@ view_resize_split(struct tog_view *view, int resize)
 	if (!v->child || !view_is_splitscreen(v->child))
 		return NULL;
 
-	v->resize = v->child->resize = resize;  /* lock for resize event */
+	v->resized = v->child->resized = resize;  /* lock for resize event */
 
 	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
 		int y = v->child->begin_y;
@@ -1036,7 +1045,7 @@ view_resize_split(struct tog_view *view, int resize)
 	else if (v->child->nscrolled)
 		err = request_log_commits(v->child);
 
-	v->resize = v->child->resize = 0;
+	v->resized = v->child->resized = 0;
 
 	return err;
 }
@@ -2989,6 +2998,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 
 	view->show = show_log_view;
 	view->input = input_log_view;
+	view->resize = resize_log_view;
 	view->close = close_log_view;
 	view->search_start = search_start_log_view;
 	view->search_next = search_next_log_view;
