@@ -640,6 +640,10 @@ test_commit_outside_refs_heads() {
 
 test_commit_no_email() {
 	local testroot=`test_init commit_no_email`
+	local errmsg=""
+
+	errmsg="commit author's email address is required for"
+	errmsg="$errmsg compatibility with Git"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -653,10 +657,7 @@ test_commit_no_email() {
 		got commit -m 'test no email' > $testroot/stdout \
 		2> $testroot/stderr)
 
-	echo -n "got: :flan_hacker:: commit author's email address " \
-		> $testroot/stderr.expected
-	echo "is required for compatibility with Git" \
-		>> $testroot/stderr.expected
+	printf "got: :flan_hacker:: %s\n" "$errmsg" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -670,8 +671,56 @@ test_commit_no_email() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" $ret
+		return 1
 	fi
-	test_done "$testroot" "$ret"
+
+	# try again with a newline inside the email
+	(cd $testroot/wt \
+		&& FS=' ' env GOT_AUTHOR="$(printf "Flan <hack\ner>")" \
+		got commit -m 'test invalid email' > $testroot/stdout \
+		2> $testroot/stderr)
+
+	printf "got: Flan <hack\ner>: %s\n" "$errmsg" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# try again with a < inside the email
+	(cd $testroot/wt && env GOT_AUTHOR="$(printf "Flan <ha<ker>")" \
+		got commit -m 'test invalid email' > $testroot/stdout \
+		2> $testroot/stderr)
+
+	printf "got: Flan <ha<ker>: %s\n" "$errmsg" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" $ret
 }
 
 test_commit_tree_entry_sorting() {

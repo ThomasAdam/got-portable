@@ -548,24 +548,28 @@ import_progress(void *arg, const char *path)
 	return NULL;
 }
 
-static int
+static const struct got_error *
 valid_author(const char *author)
 {
+	const char *email = author;
+
 	/*
-	 * Really dumb email address check; we're only doing this to
-	 * avoid git's object parser breaking on commits we create.
+	 * Git' expects the author (or committer) to be in the form
+	 * "name <email>", which are mostly free form (see the
+	 * "committer" description in git-fast-import(1)).  We're only
+	 * doing this to avoid git's object parser breaking on commits
+	 * we create.
 	 */
-	while (*author && *author != '<')
+
+	while (*author && *author != '\n' && *author != '<' && *author != '>')
 		author++;
-	if (*author != '<')
-		return 0;
-	while (*author && *author != '@')
+	if (*author++ != '<')
+		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
+	while (*author && *author != '\n' && *author != '<' && *author != '>')
 		author++;
-	if (*author != '@')
-		return 0;
-	while (*author && *author != '>')
-		author++;
-	return *author == '>';
+	if (strcmp(author, ">") != 0)
+		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
+	return NULL;
 }
 
 static const struct got_error *
@@ -625,8 +629,8 @@ get_author(char **author, struct got_repository *repo,
 	if (*author == NULL)
 		return got_error_from_errno("strdup");
 
-	if (!valid_author(*author)) {
-		err = got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", *author);
+	err = valid_author(*author);
+	if (err) {
 		free(*author);
 		*author = NULL;
 	}
