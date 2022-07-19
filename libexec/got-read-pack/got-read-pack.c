@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 
+#include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdint.h>
@@ -1663,7 +1664,8 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 		default:
 			/* should not happen */
 			err = got_error_fmt(GOT_ERR_NOT_IMPL,
-			    "%s invalid commit color %d", __func__, color);
+			    "%s invalid commit color %"PRIdPTR, __func__,
+			    color);
 			goto done;
 		}
 

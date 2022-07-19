@@ -267,7 +267,8 @@ const struct got_error *got_error_path(const char *, int);
  * from the provided format string and the variable-length list of
  * additional arguments.
 */
-const struct got_error *got_error_fmt(int, const char *, ...);
+const struct got_error *got_error_fmt(int, const char *, ...)
+	__attribute__((__format__ (printf, 2, 3)));
 
 /*
  * Check whether open(2) with O_NOFOLLOW failed on a symlink.

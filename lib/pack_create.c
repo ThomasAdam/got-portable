@@ -24,6 +24,8 @@
 
 #include <errno.h>
 #include <stdint.h>
+#include <imsg.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1372,7 +1374,7 @@ recv_painted_commit(void *arg, struct got_object_id *id, intptr_t color)
 	default:
 		/* should not happen */
 		return got_error_fmt(GOT_ERR_NOT_IMPL,
-		    "%s invalid commit color %d", __func__, color);
+		    "%s invalid commit color %"PRIdPTR, __func__, color);
 	}
 
 	STAILQ_FOREACH_SAFE(qid, a->ids, entry, tmp) {
@@ -1616,7 +1618,8 @@ paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		default:
 			/* should not happen */
 			err = got_error_fmt(GOT_ERR_NOT_IMPL,
-			    "%s invalid commit color %d", __func__, color);
+			    "%s invalid commit color %"PRIdPTR, __func__,
+			    color);
 			goto done;
 		}
 
