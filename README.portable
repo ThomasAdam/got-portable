@@ -97,6 +97,17 @@ BRANCHES + SUBMITTING PATCHES
 Patches for portable code fixes should be based from the `linux` branch and
 sent to the mailing list for review [2] or sent to me directly (see CONTACT).
 
+Portable-specific patches should have a shortlog in the form of:
+
+```
+portable: AREA: description
+```
+
+Where `AREA` relates to the change in question (for example, `regress`,
+`libexec`, etc).  In some cases, this can be omitted if it's a generic change.
+
+This helps to delineate `-portable` changes from upstream `got`.
+
 The read-only Github repository also runs CI checks using Cirrus-CI on Linux
 and FreeBSD.
 
