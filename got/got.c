@@ -8319,8 +8319,8 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-F path] [-m msg] [-N] [-S] "
-	    "[path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-A author] [-F path] [-m msg] "
+	    "[-N] [-S] [path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -8480,7 +8480,8 @@ cmd_commit(int argc, char *argv[])
 	const char *logmsg = NULL;
 	char *prepared_logmsg = NULL;
 	struct collect_commit_logmsg_arg cl_arg;
-	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
+	const char *author = NULL;
+	char *gitconfig_path = NULL, *editor = NULL, *committer = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
 	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
 	struct got_pathlist_head paths;
@@ -8489,8 +8490,14 @@ cmd_commit(int argc, char *argv[])
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
-	while ((ch = getopt(argc, argv, "F:m:NS")) != -1) {
+	while ((ch = getopt(argc, argv, "A:F:m:NS")) != -1) {
 		switch (ch) {
+		case 'A':
+			author = optarg;
+			error = valid_author(author);
+			if (error)
+				return error;
+			break;
 		case 'F':
 			if (logmsg != NULL)
 				option_conflict('F', 'm');
@@ -8570,9 +8577,17 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 	}
 
-	error = get_author(&author, repo, worktree);
+	error = get_author(&committer, repo, worktree);
 	if (error)
 		return error;
+
+	if (author != NULL && !strcmp(committer, author)) {
+		error = got_error(GOT_ERR_COMMIT_REDUNDANT_AUTHOR);
+		goto done;
+	}
+
+	if (author == NULL)
+		author = committer;
 
 	/*
 	 * unveil(2) traverses exec(2); if an editor is used we have
@@ -8604,7 +8619,7 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 11;
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	error = got_worktree_commit(&id, worktree, &paths, author, NULL,
+	error = got_worktree_commit(&id, worktree, &paths, author, committer,
 	    allow_bad_symlinks, collect_commit_logmsg, &cl_arg,
 	    print_status, NULL, repo);
 	if (error) {
@@ -8643,7 +8658,7 @@ done:
 	free(id_str);
 	free(gitconfig_path);
 	free(editor);
-	free(author);
+	free(committer);
 	free(prepared_logmsg);
 	return error;
 }

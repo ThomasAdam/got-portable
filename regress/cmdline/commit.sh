@@ -752,6 +752,65 @@ test_commit_tree_entry_sorting() {
 	test_done "$testroot" "$ret"
 }
 
+test_commit_cmdline_author() {
+	local testroot=`test_init commit_cmdline_author`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	# first try with a -A equals to $GOT_AUTHOR
+	(cd $testroot/wt && got commit -A "$GOT_AUTHOR" -m 'edit alpha') \
+		> /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo 'got: specified author is equal to the default one' \
+	     > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# try again with a different author
+	local author="Foo <foo@example.com>"
+	(cd $testroot/wt && got commit -A "$author" -m 'edit alpha') \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	(cd $testroot/repo && got log -l1 | egrep '^(from|via):') \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo "from: $author" > $testroot/stdout.expected
+	echo "via: $GOT_AUTHOR" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" $ret
+}
+
 test_commit_gotconfig_author() {
 	local testroot=`test_init commit_gotconfig_author`
 
@@ -1575,6 +1634,7 @@ run_test test_commit_selected_paths
 run_test test_commit_outside_refs_heads
 run_test test_commit_no_email
 run_test test_commit_tree_entry_sorting
+run_test test_commit_cmdline_author
 run_test test_commit_gotconfig_author
 run_test test_commit_gotconfig_worktree_author
 run_test test_commit_gitconfig_author
