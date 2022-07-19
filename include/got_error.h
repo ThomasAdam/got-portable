@@ -174,6 +174,7 @@
 #define GOT_ERR_BAD_TAG_SIGNATURE 154
 #define GOT_ERR_VERIFY_TAG_SIGNATURE 155
 #define GOT_ERR_SIGNING_TAG	156
+#define GOT_ERR_COMMIT_REDUNDANT_AUTHOR 157
 
 struct got_error {
         int code;

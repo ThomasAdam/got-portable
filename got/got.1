@@ -1476,7 +1476,7 @@ will refuse to run if a specified
 is a directory.
 .El
 .Tg ci
-.It Cm commit Oo Fl F Ar path Oc Oo Fl m Ar message Oc Oo Fl N Oc Oo Fl S Oc Op Ar path ...
+.It Cm commit Oo Fl A Ar author Oc Oo Fl F Ar path Oc Oo Fl m Ar message Oc Oo Fl N Oc Oo Fl S Oc Op Ar path ...
 .Dl Pq alias: Cm ci
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
@@ -1541,6 +1541,25 @@ The options for
 .Cm got commit
 are as follows:
 .Bl -tag -width Ds
+.It Fl A Ar author
+Set author information in the newly created commit to
+.Ar author .
+This is useful when committing changes which were written by someone
+else.
+The
+.Ar author
+argument must use the same format as the
+.Ev GOT_AUTHOR
+environment variable.
+.Pp
+In addition to storing author information, the newly created commit
+object will retain
+.Dq committer
+information which is obtained, as usual, from the
+.Ev GOT_AUTHOR
+environment variable, or
+.Xr got.conf 5 ,
+or Git configuration settings.
 .It Fl F Ar path
 Use the prepared log message stored in the file found at
 .Ar path

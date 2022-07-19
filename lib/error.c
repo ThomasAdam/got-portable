@@ -228,6 +228,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_BAD_TAG_SIGNATURE, "invalid tag signature" },
 	{ GOT_ERR_VERIFY_TAG_SIGNATURE, "cannot verify signature" },
 	{ GOT_ERR_SIGNING_TAG, "unable to sign tag" },
+	{ GOT_ERR_COMMIT_REDUNDANT_AUTHOR, "specified author is equal to the "
+	    "default one"},
 };
 
 static struct got_custom_error {
