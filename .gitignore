@@ -23,6 +23,8 @@ configure
 etc/*
 got/got
 gotadmin/gotadmin
+gotwebd/gotwebd
+gotwebd/parse.c
 libexec/got-fetch-pack/got-fetch-pack
 libexec/got-index-pack/got-index-pack
 libexec/got-read-blob/got-read-blob
