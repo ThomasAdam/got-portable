@@ -376,6 +376,7 @@ struct tog_log_view_state {
 	struct commit_queue_entry *matched_entry;
 	struct commit_queue_entry *search_entry;
 	struct tog_colors colors;
+	int use_committer;
 };
 
 #define TOG_COLOR_DIFF_MINUS		1
@@ -1971,7 +1972,10 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 			goto done;
 	}
 
-	author = strdup(got_object_commit_get_author(commit));
+	if (s->use_committer)
+		author = strdup(got_object_commit_get_committer(commit));
+	else
+		author = strdup(got_object_commit_get_author(commit));
 	if (author == NULL) {
 		err = got_error_from_errno("strdup");
 		goto done;
@@ -2281,12 +2285,16 @@ draw_commits(struct tog_view *view)
 	ncommits = 0;
 	view->maxx = 0;
 	while (entry) {
+		struct got_commit_object *c = entry->commit;
 		char *author, *eol, *msg, *msg0;
 		wchar_t *wauthor, *wmsg;
 		int width;
 		if (ncommits >= limit - 1)
 			break;
-		author = strdup(got_object_commit_get_author(entry->commit));
+		if (s->use_committer)
+			author = strdup(got_object_commit_get_committer(c));
+		else
+			author = strdup(got_object_commit_get_author(c));
 		if (author == NULL) {
 			err = got_error_from_errno("strdup");
 			goto done;
@@ -2297,7 +2305,7 @@ draw_commits(struct tog_view *view)
 			author_cols = width;
 		free(wauthor);
 		free(author);
-		err = got_object_commit_get_logmsg(&msg0, entry->commit);
+		err = got_object_commit_get_logmsg(&msg0, c);
 		if (err)
 			goto done;
 		msg = msg0;
@@ -3267,6 +3275,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case '.':
 	case CTRL('n'):
 		err = log_move_cursor_down(view, 0);
+		break;
+	case '@':
+		s->use_committer = !s->use_committer;
 		break;
 	case 'G':
 	case KEY_END: {
