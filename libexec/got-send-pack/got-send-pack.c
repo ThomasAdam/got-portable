@@ -387,6 +387,9 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			goto done;
 
 		err = got_pathlist_append(&their_refs, refname, id);
+		if (err)
+			goto done;
+
 		if (chattygot)
 			fprintf(stderr, "%s: remote has %s %s\n",
 			    getprogname(), refname, id_str);
