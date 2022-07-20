@@ -453,7 +453,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
     const char *refname, int lock)
 {
 	const struct got_error *err = NULL;
-	char *path_refs = NULL;
+	char *packed_refs_path = NULL, *path_refs = NULL;
 	const char *subdirs[] = {
 	    GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
 	};
@@ -472,7 +472,6 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	if (well_known) {
 		err = open_ref(ref, path_refs, "", refname, lock);
 	} else {
-		char *packed_refs_path;
 		FILE *f;
 
 		/* Search on-disk refs before packed refs! */
@@ -496,7 +495,6 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 				goto done;
 		}
 		f = fopen(packed_refs_path, "rbe");
-		free(packed_refs_path);
 		if (f != NULL) {
 			struct stat sb;
 			if (fstat(fileno(f), &sb) == -1) {
@@ -521,6 +519,7 @@ done:
 		err = got_error_not_ref(refname);
 	if (err && lf)
 		got_lockfile_unlock(lf, -1);
+	free(packed_refs_path);
 	free(path_refs);
 	return err;
 }
@@ -997,7 +996,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
     const char *ref_namespace, got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
-	char *packed_refs_path, *path_refs = NULL;
+	char *packed_refs_path = NULL, *path_refs = NULL;
 	char *abs_namespace = NULL, *buf = NULL;
 	const char *ondisk_ref_namespace = NULL;
 	char *line = NULL;
@@ -1090,7 +1089,6 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	}
 
 	f = fopen(packed_refs_path, "re");
-	free(packed_refs_path);
 	if (f) {
 		size_t linesize = 0;
 		ssize_t linelen;
@@ -1135,6 +1133,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		}
 	}
 done:
+	free(packed_refs_path);
 	free(abs_namespace);
 	free(buf);
 	free(line);
