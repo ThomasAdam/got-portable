@@ -396,7 +396,6 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	const struct got_error *err = NULL;
 	char *line = NULL;
 	size_t linesize = 0;
-	ssize_t linelen;
 	struct stat st, st2;
 	FILE *fp = NULL;
 	size_t len, logmsg_len;
@@ -463,7 +462,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	}
 
 	len = 0;
-	while ((linelen = getline(&line, &linesize, fp)) != -1) {
+	while (getline(&line, &linesize, fp) != -1) {
 		if ((line[0] == '#' || (len == 0 && line[0] == '\n')))
 			continue; /* remove comments and leading empty lines */
 		len = strlcat(*logmsg, line, logmsg_len + 1);
@@ -3933,7 +3932,6 @@ match_patch(int *have_match, struct got_commit_object *commit,
 	const struct got_error *err = NULL;
 	char *line = NULL;
 	size_t linesize = 0;
-	ssize_t linelen;
 	regmatch_t regmatch;
 
 	*have_match = 0;
@@ -3951,7 +3949,7 @@ match_patch(int *have_match, struct got_commit_object *commit,
 		goto done;
 	}
 
-	while ((linelen = getline(&line, &linesize, f)) != -1) {
+	while (getline(&line, &linesize, f) != -1) {
 		if (regexec(regex, line, 1, &regmatch, 0) == 0) {
 			*have_match = 1;
 			break;
