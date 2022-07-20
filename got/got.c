@@ -12631,7 +12631,7 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	got_date_format_gmtoff(gmtoff, sizeof(gmtoff),
 	    got_object_commit_get_committer_gmtoff(commit));
 	fprintf(outfile, "%s%s %lld %s\n", GOT_COMMIT_LABEL_COMMITTER,
-	    got_object_commit_get_author(commit),
+	    got_object_commit_get_committer(commit),
 	    (long long)got_object_commit_get_committer_time(commit),
 	    gmtoff);
 
