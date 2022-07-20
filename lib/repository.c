@@ -783,8 +783,10 @@ got_repo_open(struct got_repository **repop, const char *path,
 	err = read_gitconfig(repo, global_gitconfig_path);
 	if (err)
 		goto done;
-	if (repo->gitconfig_repository_format_version != 0)
+	if (repo->gitconfig_repository_format_version != 0) {
 		err = got_error_path(path, GOT_ERR_GIT_REPO_FORMAT);
+		goto done;
+	}
 	for (i = 0; i < repo->nextensions; i++) {
 		char *ext = repo->extensions[i];
 		int j, supported = 0;
