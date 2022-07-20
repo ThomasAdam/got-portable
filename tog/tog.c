@@ -5732,10 +5732,32 @@ show_blame_view(struct tog_view *view)
 }
 
 static const struct got_error *
+log_annotated_line(struct tog_view **new_view, int begin_y, int begin_x,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	struct tog_view		*log_view;
+	const struct got_error	*err = NULL;
+
+	*new_view = NULL;
+
+	log_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_LOG);
+	if (log_view == NULL)
+		return got_error_from_errno("view_open");
+
+	err = open_log_view(log_view, id, repo, GOT_REF_HEAD, "", 0);
+	if (err)
+		view_close(log_view);
+	else
+		*new_view = log_view;
+
+	return err;
+}
+
+static const struct got_error *
 input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
-	struct tog_view *diff_view;
+	struct tog_view *diff_view, *log_view;
 	struct tog_blame_view_state *s = &view->state.blame;
 	int eos, nscroll, begin_y = 0, begin_x = 0;
 
@@ -5914,6 +5936,45 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = run_blame(view);
 		if (err)
 			break;
+		break;
+	}
+	case 'L': {
+		struct got_object_id *id = NULL;
+
+		view->count = 0;
+		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
+		    s->first_displayed_line, s->selected_line);
+		if (id == NULL)
+			break;
+
+		if (view_is_parent_view(view))
+			view_get_split(view, &begin_y, &begin_x);
+		err = log_annotated_line(&log_view, begin_y, begin_x,
+		    s->repo, id);
+		if (err)
+			break;
+		if (view_is_parent_view(view) &&
+		    view->mode == TOG_VIEW_SPLIT_HRZN) {
+			err = view_init_hsplit(view, begin_y);
+			if (err)
+				break;
+		}
+
+		view->focussed = 0;
+		log_view->focussed = 1;
+		log_view->mode = view->mode;
+		log_view->nlines = view->lines - begin_y;
+		if (view_is_parent_view(view)) {
+			view_transfer_size(log_view, view);
+			err = view_close_child(view);
+			if (err)
+				return err;
+			err = view_set_child(view, log_view);
+			if (err)
+				return err;
+			view->focus_child = 1;
+		} else
+			*new_view = log_view;
 		break;
 	}
 	case KEY_ENTER:
