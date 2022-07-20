@@ -3123,6 +3123,98 @@ command must be used instead:
 .Pp
 .Dl $ cd /var/git/src.git
 .Dl $ git push origin master
+.Pp
+When making contributions to projects which use the
+.Dq pull request
+workflow, SSH protocol repository access needs to be set up first.
+Once an account has been created on a Git hosting site it should
+be possible to upload a public SSH key for repository access
+authentication.
+.Pp
+The
+.Dq pull request
+workflow will usually involve two remote repositories.
+In the real-life example below, the
+.Dq origin
+repository was forked from the
+.Dq upstream
+repository by using the Git hosting site's web interface.
+The
+.Xr got.conf 5
+file in the local repository describes both remote repositories:
+.Bd -literal -offset indent
+# Jelmers's repository, which accepts pull requests
+remote "upstream" {
+	server git@github.com
+	protocol ssh
+	repository "/jelmer/dulwich"
+	branch { "master" }
+}
+
+# Stefan's fork, used as the default remote repository
+remote "origin" {
+	server git@github.com
+	protocol ssh
+	repository "/stspdotname/dulwich"
+	branch { "master" }
+}
+.Ed
+.Pp
+With this configuration, Stefan can create commits on
+.Dq refs/heads/master
+and send them to the
+.Dq origin
+repository by running:
+.Pp
+.Dl $ got send -b master origin
+.Pp
+The changes can now be proposed to Jelmer by opening a pull request
+via the Git hosting site's web interface.
+If Jelmer requests further changes to be made, additional commits
+can be created on the
+.Dq master
+branch and be added to the pull request by running
+.Cd got send
+again.
+.Pp
+If Jelmer prefers additional commits to be
+.Dq squashed
+then the following commands can be used to achieve this:
+.Pp
+.Dl $ got update -b master
+.Dl $ got update -c origin/master
+.Dl $ got histedit -f
+.Dl $ got send -f -b master origin
+.Pp
+Once Jelmer has accepted the pull request, Stefan can fetch the
+merged changes, and possibly several other new changes, by running:
+.Pp
+.Dl $ got fetch upstream
+.Pp
+The merged changes will now be visible under the reference
+.Dq refs/remotes/upstream/master .
+The local
+.Dq master
+branch can now be rebased on top of the latest changes
+from upstream:
+.Pp
+.Dl $ got update -b upstream/master
+.Dl $ got rebase master
+.Pp
+As a final step, the forked repository's copy of the master branch needs
+to be kept in sync by sending the new changes there:
+.Pp
+.Dl $ got send -f -b master origin
+.Pp
+If multiple pull requests need to be managed in parallel, a separate branch
+must be created for each pull request with
+.Cm got branch .
+Each such branch can then be used as above, in place of
+.Dq refs/heads/master .
+Changes for any accepted pull requests will still appear under
+.Dq refs/remotes/upstream/master,
+regardless of which branch was used in the forked repository to
+create a pull request.
 .Sh SEE ALSO
 .Xr gotadmin 1 ,
 .Xr tog 1 ,
