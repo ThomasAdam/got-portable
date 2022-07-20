@@ -1256,13 +1256,12 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	const struct got_error *err = NULL;
 	char target_path[PATH_MAX];
 	size_t len, target_len = 0;
-	char *path_got = NULL;
 	const uint8_t *buf = got_object_blob_get_read_buf(blob);
 	size_t hdrlen = got_object_blob_get_hdrlen(blob);
 
 	*is_bad_symlink = 0;
 
-	/* 
+	/*
 	 * Blob object content specifies the target path of the link.
 	 * If a symbolic link cannot be installed we instead create
 	 * a regular file which contains the link target path stored
@@ -1305,7 +1304,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
 		    path_is_unversioned, repo, progress_cb, progress_arg);
-		goto done;
+		return err;
 	}
 
 	if (symlink(target_path, ondisk_path) == -1) {
@@ -1314,12 +1313,12 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			if (path_is_unversioned) {
 				err = (*progress_cb)(progress_arg,
 				    GOT_STATUS_UNVERSIONED, path);
-				goto done;
+				return err;
 			}
 			err = replace_existing_symlink(&symlink_replaced,
 			    ondisk_path, target_path, target_len);
 			if (err)
-				goto done;
+				return err;
 			if (progress_cb) {
 				if (symlink_replaced) {
 					err = (*progress_cb)(progress_arg,
@@ -1331,25 +1330,25 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 					    GOT_STATUS_EXISTS, path);
 				}
 			}
-			goto done; /* Nothing else to do. */
+			return err; /* Nothing else to do. */
 		}
 
 		if (errno == ENOENT) {
 			char *parent;
 			err = got_path_dirname(&parent, ondisk_path);
 			if (err)
-				goto done;
+				return err;
 			err = add_dir_on_disk(worktree, parent);
 			free(parent);
 			if (err)
-				goto done;
+				return err;
 			/*
 			 * Retry, and fall through to error handling
 			 * below if this second attempt fails.
 			 */
 			if (symlink(target_path, ondisk_path) != -1) {
 				err = NULL; /* success */
-				goto done;
+				return err;
 			}
 		}
 
@@ -1373,8 +1372,6 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	} else if (progress_cb)
 		err = (*progress_cb)(progress_arg, reverting_versioned_file ?
 		    GOT_STATUS_REVERT : GOT_STATUS_ADD, path);
-done:
-	free(path_got);
 	return err;
 }
 
