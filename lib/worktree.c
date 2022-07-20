@@ -1268,6 +1268,9 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	 */
 	do {
 		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			return err;
+
 		if (len + target_len >= sizeof(target_path)) {
 			/* Path too long; install as a regular file. */
 			*is_bad_symlink = 1;
