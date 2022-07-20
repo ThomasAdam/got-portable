@@ -4826,10 +4826,12 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '<':
 	case ',':
+	case 'K':
 		up = 1;
 		/* FALL THROUGH */
 	case '>':
 	case '.':
+	case 'J':
 		if (s->parent_view == NULL) {
 			view->count = 0;
 			break;
