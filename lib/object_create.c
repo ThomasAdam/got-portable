@@ -454,8 +454,10 @@ got_object_commit_create(struct got_object_id **id,
 	}
 
 	if (asprintf(&author_str, "%s%s %lld +0000\n",
-	    GOT_COMMIT_LABEL_AUTHOR, author, (long long)author_time) == -1)
-		return got_error_from_errno("asprintf");
+	    GOT_COMMIT_LABEL_AUTHOR, author, (long long)author_time) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	if (asprintf(&committer_str, "%s%s %lld +0000\n",
 	    GOT_COMMIT_LABEL_COMMITTER, committer ? committer : author,
