@@ -10312,6 +10312,8 @@ cmd_rebase(int argc, char *argv[])
 			if (error)
 				goto done;
 			error = got_object_id_str(&id_str, new_head_commit_id);
+			if (error)
+				goto done;
 			printf("Forwarding %s to commit %s\n",
 			    got_ref_get_name(branch), id_str);
 			free(id_str);
