@@ -2000,6 +2000,7 @@ test_histedit_mesg_invalid() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" $ret
+		return 1
 	fi
 
 	# try with a leading mesg
