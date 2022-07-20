@@ -247,11 +247,16 @@ const struct got_error *
 got_repo_pack_fds_open(int **pack_fds)
 {
 	const struct got_error *err = NULL;
-	int i, pack_fds_tmp[GOT_PACK_NUM_TEMPFILES];
+	int i, *pack_fds_tmp;
 
-	*pack_fds = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(**pack_fds));
-	if (*pack_fds == NULL)
+	pack_fds_tmp = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(int));
+	if (pack_fds_tmp == NULL)
 		return got_error_from_errno("calloc");
+	*pack_fds = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(**pack_fds));
+	if (*pack_fds == NULL) {
+		free(pack_fds_tmp);
+		return got_error_from_errno("calloc");
+	}
 
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
 		pack_fds_tmp[i] = got_opentempfd();
@@ -261,7 +266,7 @@ got_repo_pack_fds_open(int **pack_fds)
 			return err;
 		}
 	}
-	memcpy(*pack_fds, pack_fds_tmp, sizeof(pack_fds_tmp));
+	memcpy(*pack_fds, pack_fds_tmp, GOT_PACK_NUM_TEMPFILES * sizeof(int));
 	return err;
 }
 
