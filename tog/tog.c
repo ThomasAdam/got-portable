@@ -2310,6 +2310,8 @@ draw_commits(struct tog_view *view)
 			author_cols = width;
 		free(wauthor);
 		free(author);
+		if (err)
+			goto done;
 		err = got_object_commit_get_logmsg(&msg0, c);
 		if (err)
 			goto done;
