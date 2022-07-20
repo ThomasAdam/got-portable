@@ -1235,7 +1235,7 @@ got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
     got_lonely_packidx_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	DIR *packdir = NULL;
 	struct dirent *dent;
 	char *pack_relpath = NULL;
