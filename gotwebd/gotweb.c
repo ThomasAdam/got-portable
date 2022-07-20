@@ -2768,7 +2768,7 @@ const struct got_error *
 gotweb_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 {
 	struct tm tm;
-	time_t diff_time;
+	long long diff_time;
 	const char *years = "years ago", *months = "months ago";
 	const char *weeks = "weeks ago", *days = "days ago";
 	const char *hours = "hours ago",  *minutes = "minutes ago";
