@@ -175,10 +175,10 @@ sometimes a release of `-portable` might happen outside of that cadence, where
 a `-portable`-specific issue needs addressing, for example.
 
 Before creating a new release, check the version of GoT as found in
-`configure.ac`:
+`util/got-portable-ver.sh` -- as `GOT_PORTABLE_VER`:
 
 ```
-AC_INIT([got-portable], [0.75], [thomas@xteddy.org])
+GOT_PORTABLE_VER=0.75
 
 ```
 
