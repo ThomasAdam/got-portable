@@ -196,6 +196,19 @@ AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
 AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 
+if test x"$PLATFORM" = "xdarwin"; then
+	if ! test -x "/usr/local/opt/bison/bin/bison"; then
+		AC_MSG_ERROR("GNU Bison not found")
+	fi
+
+	# Override YACC here to point to the GNU version of bison.
+	export YACC="/usr/local/opt/bison/bin/bison -y"
+	export LDFLAGS="-L/usr/local/opt/ncurses/lib -L/usr/local/opt/openssl@3/lib $LDFLAGS"
+	export CPPFLAGS="-I/usr/local/opt/ncurses/include -I/usr/local/opt/openssl@3/include $CPPFLAGS"
+	export PKG_CONFIG_PATH="/usr/local/opt/ncurses/lib/pkgconfig"
+	export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/usr/local/opt/openssl@3/lib/pkgconfig"
+fi
+
 # Landlock detection.
 AC_MSG_CHECKING([for landlock])
 AM_CONDITIONAL([HAVE_LINUX_LANDLOCK],
