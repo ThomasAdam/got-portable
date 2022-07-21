@@ -342,7 +342,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	int i, nours = 0, ntheirs = 0;
 	size_t nalloc_ours = 0, nalloc_theirs = 0;
 	int refs_to_send = 0, refs_to_delete = 0;
-	off_t bytes_sent = 0;
+	off_t bytes_sent = 0, bytes_sent_cur = 0;
 	struct pack_progress_arg ppa;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
 	FILE *packfile = NULL;
@@ -665,7 +665,6 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	while (!done) {
 		int success = 0;
 		char *refname = NULL;
-		off_t bytes_sent_cur = 0;
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
