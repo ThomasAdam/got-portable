@@ -8577,7 +8577,7 @@ cmd_commit(int argc, char *argv[])
 
 	error = get_author(&committer, repo, worktree);
 	if (error)
-		return error;
+		goto done;
 
 	if (author != NULL && !strcmp(committer, author)) {
 		error = got_error(GOT_ERR_COMMIT_REDUNDANT_AUTHOR);
