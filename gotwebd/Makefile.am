@@ -56,7 +56,8 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/worktree_open.c
 
 gotwebd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-EXTRA_DIST = gotwebd.8 gotwebd.conf.5
+EXTRA_DIST = $(top_srcdir)/gotwebd/*.h \
+	     gotwebd.8 gotwebd.conf.5
 
 man5_MANS = gotwebd.conf.5
 man8_MANS = gotwebd.8
