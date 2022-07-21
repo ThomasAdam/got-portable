@@ -10386,6 +10386,7 @@ cmd_rebase(int argc, char *argv[])
 		error = rebase_complete(worktree, fileindex, branch,
 		    new_base_branch, tmp_branch, repo, create_backup);
 done:
+	free(cwd);
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
 	free(resume_commit_id);
@@ -11777,6 +11778,7 @@ cmd_histedit(int argc, char *argv[])
 		error = histedit_complete(worktree, fileindex, tmp_branch,
 		    branch, repo);
 done:
+	free(cwd);
 	got_object_id_queue_free(&commits);
 	histedit_free_list(&histedit_cmds);
 	free(head_commit_id);
