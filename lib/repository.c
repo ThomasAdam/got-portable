@@ -266,7 +266,8 @@ got_repo_pack_fds_open(int **pack_fds)
 	/*
 	 * got_repo_pack_fds_close will try to close all of the
 	 * GOT_PACK_NUM_TEMPFILES fds, even the ones that didn't manage to get
-	 * a value from got_opentempfd(), resulting in a close(0).
+	 * a value from got_opentempfd(), which would result in a close(0) if
+	 * we do not initialize to -1 here.
 	 */
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++)
 		pack_fds_tmp[i] = -1;
