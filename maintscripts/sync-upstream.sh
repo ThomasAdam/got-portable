@@ -16,6 +16,7 @@ echo "Updating main from origin..."
 
 # Update our copy of main 
 git checkout -q main && \
+git fetch -q -n gh >/dev/null 2>&1
 git fetch -q -n upstream >/dev/null 2>&1 && \
 git reset -q --hard upstream/main || {
 	die "Couldn't fetch from main and reset to that branch"
