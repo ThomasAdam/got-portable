@@ -111,6 +111,61 @@ This helps to delineate `-portable` changes from upstream `got`.
 The read-only Github repository also runs CI checks using Cirrus-CI on Linux
 and FreeBSD.
 
+SYNCING UPSTREAM CHANGES WITH PORTABLE
+======================================
+
+The `-portable` GoT repository uses the following workflow:
+
+```
+                Github (gh)               GoT (upstream)
+		  ^                              ^
+		  |                              |
+		  |                              |
+		  |                              |
+		  |                              |
+		  +--------> GoT-portable <------+
+
+```
+
+Here, `got-portable` is a clone of the `-portable` repository, locally on
+disk.  There are two remotes set up within that repository, via `git-remote`:
+
+* `upstream` -- which points to the official GoT repository;
+* `gh` -- which points to the mirrored `-portable` repository so that CI can
+  be run for cross-platform/test purposes [3]
+* `origin` -- our cloned copy from `-portable`
+
+Within the `-portable` repository are two key branches (there may be other
+topic branches which represent on-going work):
+
+* `main` -- this is the branch that tracks (without modification) those
+  changes from `upstream`.  This branch is continually reset to
+  `upstream/main` whenever changes occur.
+
+* `linux` -- this is the *default* branch of the `-portable` repository which
+  contains portable-specific changes to make `GoT` compile across different
+  OSes.
+
+When updating `-portable` from upstream changes, the following actions happen:
+
+1. Changes from `upstream` are fetched.  If there are no new changes, there's
+   nothing else to do.
+2. Changes from `gh` are fetch so that the result can be pushed out to `gh`.
+3. The difference between the local copy of `main` and `origin/main` is used
+   to represent the set of commits which have *NOT* yet been merged to
+   `-portable`.
+4. A topic-branch called `syncup` is created from the HEAD of the `linux`
+   branch to hold the to-be-cherry-picked commits from step 3.
+5. These commits are then cherry-picked to the `syncup` branch.
+6. If there's any conflicts, they must be resolved.
+7. Once done, a sanity build is done in-situ to check there's nothing amiss.
+8. If that succeeds, the `syncup` branch is merged to `linux` and pushed to
+   `gh` for verification against CI.
+9. If that fails, fixes continue and pushed up to `gh` as required.
+10. Once happy, both the `main` and `linux` branches can be merged to `origin`.
+
+These steps are encapsulated in a script within `-portable`.  [Link](../maintscripts/sync-upstream.sh)
+
 TODO
 ====
 
@@ -120,8 +175,9 @@ finer-grained control of where to search for includes/libraries, etc.
 CONTACT
 =======
 
-Thomas Adam <thomas@xteddy.org>
+Thomas Adam <thomas@xteddy.org><br />
 thomas_adam (#gameoftrees on irc.libera.chat)
 
-[1]  https://gameoftrees.org
+[1]  https://gameoftrees.org<br />
 [2]  https://lists.openbsd.org/cgi-bin/mj_wwwusr?user=&passw=&func=lists-long-full&extra=gameoftrees
+[3]  https://github.com/ThomasAdam/got-portable
