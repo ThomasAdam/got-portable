@@ -166,6 +166,49 @@ When updating `-portable` from upstream changes, the following actions happen:
 
 These steps are encapsulated in a script within `-portable`.  [Link](../maintscripts/sync-upstream.sh)
 
+RELEASING A NEW VERSION
+=======================
+
+Release for `-portable` try and align as close to upstream GoT as much as
+possible, even on the same day where that can happen.  That being said,
+sometimes a release of `-portable` might happen outside of that cadence, where
+a `-portable`-specific issue needs addressing, for example.
+
+Before creating a new release, check the version of GoT as found in
+`configure.ac`:
+
+```
+AC_INIT([got-portable], [0.75], [thomas@xteddy.org])
+
+```
+
+Here, the *to be released* version of `got-portable` will be `0.75`.
+Typically, this version is incremented directly after a release, such that
+there's no need to change this value.  The only exception would be if there
+were an out-of-band release to `-portable`.  In such cases, that would take
+the form:
+
+```
+0.75a
+```
+
+Where the suffix of `a`, `b`, etc., can be used to denote any sub-releases
+from the `0.75` version.
+
+Once the version is verified, the following should be run from the `linux`
+branch -- and the repository should not have any outstanding modifications to
+the source:
+
+```
+make clean ; ./autogen && ./configure && make distcheck
+```
+
+If this succeeds, the tarball is in the CWD, as: `got-portable-VERSION.tar.gz`
+
+This can then be copied to the `got-www` repository and uploaded, along with
+changing a couple of HTML pages therein to represent the new released version.
+Additionally, the CHANGELOG file can be copied to the `got-www` and committed.
+
 TODO
 ====
 
