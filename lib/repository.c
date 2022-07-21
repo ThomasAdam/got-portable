@@ -258,6 +258,14 @@ got_repo_pack_fds_open(int **pack_fds)
 		return got_error_from_errno("calloc");
 	}
 
+	/*
+	 * got_repo_pack_fds_close will try to close all of the
+	 * GOT_PACK_NUM_TEMPFILES fds, even the ones that didn't manage to get
+	 * a value from got_opentempfd(), resulting in a close(0).
+	 */
+	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++)
+		pack_fds_tmp[i] = -1;
+
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
 		pack_fds_tmp[i] = got_opentempfd();
 		if (pack_fds_tmp[i] == -1) {
