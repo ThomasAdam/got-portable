@@ -5679,6 +5679,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	struct got_object_id_queue parent_ids;
 	struct got_object_qid *pid = NULL;
 	char *logmsg = NULL;
+	time_t timestamp;
 
 	*new_commit_id = NULL;
 
@@ -5747,8 +5748,9 @@ commit_worktree(struct got_object_id **new_commit_id,
 		STAILQ_INSERT_TAIL(&parent_ids, pid, entry);
 		nparents++;
 	}
+	timestamp = time(NULL);
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
-	    nparents, author, time(NULL), committer, time(NULL), logmsg, repo);
+	    nparents, author, timestamp, committer, timestamp, logmsg, repo);
 	if (logmsg != NULL)
 		free(logmsg);
 	if (err)
