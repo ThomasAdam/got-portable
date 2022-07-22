@@ -3369,7 +3369,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else
 			*new_view = diff_view;
 		break;
-	case 't':
+	case 'T':
 		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
@@ -3467,7 +3467,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->search_entry = NULL;
 		view->offset = 0;
 		break;
-	case 'r':
+	case 'R':
 		view->count = 0;
 		if (view_is_parent_view(view))
 			view_get_split(view, &begin_y, &begin_x);
@@ -6796,7 +6796,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->show_ids = !s->show_ids;
 		view->count = 0;
 		break;
-	case 'l':
+	case 'L':
 		view->count = 0;
 		if (!s->selected_entry)
 			break;
@@ -6825,7 +6825,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else
 			*new_view = log_view;
 		break;
-	case 'r':
+	case 'R':
 		view->count = 0;
 		if (view_is_parent_view(view))
 			view_get_split(view, &begin_y, &begin_x);
@@ -7793,7 +7793,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		} else
 			*new_view = log_view;
 		break;
-	case 't':
+	case 'T':
 		view->count = 0;
 		if (!s->selected_entry)
 			break;
