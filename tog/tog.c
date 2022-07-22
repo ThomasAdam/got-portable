@@ -923,9 +923,12 @@ view_resize(struct tog_view *view)
 static const struct got_error *
 resize_log_view(struct tog_view *view, int increase)
 {
-	struct tog_log_view_state *s = &view->state.log;
-	const struct got_error *err = NULL;
-	int n = s->selected_entry->idx + view->lines - s->selected;
+	struct tog_log_view_state	*s = &view->state.log;
+	const struct got_error		*err = NULL;
+	int				 n = 0;
+
+	if (s->selected_entry)
+		n = s->selected_entry->idx + view->lines - s->selected;
 
 	/*
 	 * Request commits to account for the increased
@@ -975,8 +978,6 @@ view_resize_split(struct tog_view *view, int resize)
 	v->resized = v->child->resized = resize;  /* lock for resize event */
 
 	if (view->mode == TOG_VIEW_SPLIT_HRZN) {
-		int y = v->child->begin_y;
-
 		if (v->child->resized_y)
 			v->child->begin_y = v->child->resized_y;
 		if (view->parent)
@@ -997,10 +998,6 @@ view_resize_split(struct tog_view *view, int resize)
 		if (err)
 			return err;
 		v->child->resized_y = v->child->begin_y;
-		if (y > v->child->begin_y && v->child->type == TOG_VIEW_LOG)
-			v->child->nscrolled = y - v->child->begin_y;
-		else if (y < v->child->begin_y && v->type == TOG_VIEW_LOG)
-			v->nscrolled = v->child->begin_y - y;
 	} else {
 		if (v->child->resized_x)
 			v->child->begin_x = v->child->resized_x;
@@ -1036,10 +1033,10 @@ view_resize_split(struct tog_view *view, int resize)
 			return err;
 	}
 
-	if (v->nscrolled)
-		err = request_log_commits(v);
-	else if (v->child->nscrolled)
-		err = request_log_commits(v->child);
+	if (v->resize)
+		err = v->resize(v, 0);
+	else if (v->child->resize)
+		err = v->child->resize(v->child, 0);
 
 	v->resized = v->child->resized = 0;
 
@@ -1357,9 +1354,9 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			view->parent->focussed = 1;
 			view->parent->focus_child = 0;
 			if (!view_is_splitscreen(view)) {
-				if (view->mode == TOG_VIEW_SPLIT_HRZN &&
-				    view->parent->type == TOG_VIEW_LOG) {
-					err = request_log_commits(view->parent);
+				if (view->parent->resize) {
+					err = view->parent->resize(view->parent,
+					    0);
 					if (err)
 						return err;
 				}
@@ -1372,9 +1369,9 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		break;
 	case 'q':
 		if (view->parent && view->mode == TOG_VIEW_SPLIT_HRZN) {
-			if (view->parent->type == TOG_VIEW_LOG) {
+			if (view->parent->resize) {
 				/* might need more commits to fill fullscreen */
-				err = request_log_commits(view->parent);
+				err = view->parent->resize(view->parent, 0);
 				if (err)
 					break;
 			}
@@ -1422,8 +1419,8 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		}
 		if (err)
 			break;
-		if (view->type == TOG_VIEW_LOG) {
-			err = request_log_commits(view);
+		if (view->resize) {
+			err = view->resize(view, 0);
 			if (err)
 				break;
 		}
