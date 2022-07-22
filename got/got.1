@@ -1926,6 +1926,18 @@ Once rebasing has completed successfully, the temporary branch becomes
 the new version of the specified
 .Ar branch
 and the work tree is automatically switched to it.
+If author information is available via the
+.Ev GOT_AUTHOR
+environment variable,
+.Xr got.conf 5
+or Git's
+.Dv user.name
+and
+.Dv user.email
+configuration settings, this author information will be used to identify
+the
+.Dq committer
+of rebased commits.
 .Pp
 Old commits in their pre-rebase state are automatically backed up in the
 .Dq refs/got/backup/rebase
@@ -2077,6 +2089,23 @@ None of the other options can be used together with
 .Dl Pq alias: Cm he
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
+.Pp
+The
+.Cm got histedit
+command requires the
+.Ev GOT_AUTHOR
+environment variable to be set,
+unless an author has been configured in
+.Xr got.conf 5
+or Git's
+.Dv user.name
+and
+.Dv user.email
+configuration settings can be obtained from the repository's
+.Pa .git/config
+file or from Git's global
+.Pa ~/.gitconfig
+configuration file.
 .Pp
 Before starting a
 .Cm histedit
@@ -2723,12 +2752,15 @@ for all tracked files.
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
 .It Ev GOT_AUTHOR
-The author's name and email address for
-.Cm got commit
-and
-.Cm got import ,
-for example:
+The author's name and email address, such as
 .Dq An Flan Hacker Aq Mt flan_hacker@openbsd.org .
+Used by the
+.Cm got commit ,
+.Cm got import ,
+.Cm got rebase ,
+and
+.Cm got histedit
+commands.
 Because
 .Xr git 1
 may fail to parse commits without an email address in author data,
