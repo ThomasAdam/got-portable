@@ -11260,7 +11260,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_fileindex *fileindex = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL, *committer = NULL;
+	char *cwd = NULL, *committer = NULL, *gitconfig_path = NULL;
 	struct got_reference *branch = NULL;
 	struct got_reference *tmp_branch = NULL;
 	struct got_object_id *resume_commit_id = NULL;
@@ -11435,8 +11435,11 @@ cmd_histedit(int argc, char *argv[])
 		goto done; /* nothing else to do */
 	}
 
+	error = get_gitconfig_path(&gitconfig_path);
+	if (error)
+		goto done;
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL, pack_fds);
+	    gitconfig_path, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -11795,6 +11798,7 @@ cmd_histedit(int argc, char *argv[])
 done:
 	free(cwd);
 	free(committer);
+	free(gitconfig_path);
 	got_object_id_queue_free(&commits);
 	histedit_free_list(&histedit_cmds);
 	free(head_commit_id);
