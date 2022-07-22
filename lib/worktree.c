@@ -6536,8 +6536,9 @@ rebase_commit(struct got_object_id **new_commit_id,
 	/* NB: commit_worktree will call free(logmsg) */
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    NULL, worktree, got_object_commit_get_author(orig_commit),
-	    committer, collect_rebase_commit_msg, logmsg, rebase_status, NULL,
-	    repo);
+	    committer ? committer :
+	    got_object_commit_get_committer(orig_commit),
+	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
 	if (err)
 		goto done;
 

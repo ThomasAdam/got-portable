@@ -1568,6 +1568,93 @@ test_rebase_resets_committer() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_no_author_info() {
+	local testroot=`test_init rebase_no_author_info`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
+	local committer="$GOT_AUTHOR"
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+	local orig_author_time2=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	unset GOT_AUTHOR
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+	local new_author_time2=`git_show_author_time $testroot/repo`
+
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> $short_new_commit1" \
+		>> $testroot/stdout.expected
+	echo ": committing to delta on newbranch" >> $testroot/stdout.expected
+	echo "G  alpha" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit2 -> $short_new_commit2" \
+		>> $testroot/stdout.expected
+	echo ": committing more changes on newbranch" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/newbranch" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Original commit only had one author
+	(cd $testroot/repo && got log -l1 -c $orig_commit2 | \
+		egrep '^(from|via):' > $testroot/stdout)
+	echo "from: $committer" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Author info of rebased commit should match the original
+	(cd $testroot/repo && got log -l1 -c $new_commit2 | \
+		egrep '^(from|via):' > $testroot/stdout)
+	echo "from: $committer" > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -1584,3 +1671,4 @@ run_test test_rebase_trims_empty_dir
 run_test test_rebase_delete_missing_file
 run_test test_rebase_rm_add_rm_file
 run_test test_rebase_resets_committer
+run_test test_rebase_no_author_info
