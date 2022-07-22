@@ -2100,6 +2100,71 @@ test_histedit_mesg_invalid() {
 	test_done "$testroot" $ret
 }
 
+test_histedit_resets_committer() {
+	local testroot=`test_init histedit_resets_committer`
+	local orig_commit=`git_show_head $testroot/repo`
+	local committer="Flan Luck <flan_luck@openbsd.org>"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt/ && got commit -m 'modified alpha on master' \
+		alpha > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local top_commit=`git_show_head $testroot/repo`
+	echo "pick $top_commit" > "$testroot/histedit-script"
+
+	(cd $testroot/wt/ && got update -c $orig_commit > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && env GOT_AUTHOR="$committer" \
+		got histedit -F "$testroot/histedit-script" > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got histedit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	local edited_commit=`git_show_head $testroot/repo`
+
+	# Original commit only had one author
+	(cd $testroot/repo && got log -l1 -c $top_commit | \
+		egrep '^(from|via):' > $testroot/stdout)
+	echo "from: $GOT_AUTHOR" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Edited commit should have new committer name added
+	(cd $testroot/repo && got log -l1 -c $edited_commit | \
+		egrep '^(from|via):' > $testroot/stdout)
+	echo "from: $GOT_AUTHOR" > $testroot/stdout.expected
+	echo "via: $committer" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2121,3 +2186,4 @@ run_test test_histedit_fold_only_empty_logmsg
 run_test test_histedit_edit_only
 run_test test_histedit_prepend_line
 run_test test_histedit_mesg_invalid
+run_test test_histedit_resets_committer

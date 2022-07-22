@@ -301,7 +301,7 @@ const struct got_error *got_worktree_rebase_merge_files(
  */
 const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
-    struct got_reference *, struct got_commit_object *,
+    struct got_reference *, const char *, struct got_commit_object *,
     struct got_object_id *, struct got_repository *);
 
 /* Free a list of merged paths from got_worktree_merge_files. */
@@ -378,7 +378,7 @@ const struct got_error *got_worktree_histedit_merge_files(
  */
 const struct got_error *got_worktree_histedit_commit(struct got_object_id **,
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
-    struct got_reference *, struct got_commit_object *,
+    struct got_reference *, const char *, struct got_commit_object *,
     struct got_object_id *, const char *, struct got_repository *);
 
 /*

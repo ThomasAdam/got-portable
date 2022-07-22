@@ -9578,7 +9578,7 @@ rebase_complete(struct got_worktree *worktree, struct got_fileindex *fileindex,
 static const struct got_error *
 rebase_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_reference *tmp_branch,
+    struct got_reference *tmp_branch, const char *committer,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *error;
@@ -9590,7 +9590,8 @@ rebase_commit(struct got_pathlist_head *merged_paths,
 		return error;
 
 	error = got_worktree_rebase_commit(&new_commit_id, merged_paths,
-	    worktree, fileindex, tmp_branch, commit, commit_id, repo);
+	    worktree, fileindex, tmp_branch, committer, commit, commit_id,
+	    repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -10016,7 +10017,7 @@ cmd_rebase(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
 	struct got_fileindex *fileindex = NULL;
-	char *cwd = NULL;
+	char *cwd = NULL, *committer = NULL;
 	struct got_reference *branch = NULL;
 	struct got_reference *new_base_branch = NULL, *tmp_branch = NULL;
 	struct got_object_id *commit_id = NULL, *parent_id = NULL;
@@ -10122,6 +10123,10 @@ cmd_rebase(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	error = get_author(&committer, repo, worktree);
+	if (error)
+		goto done;
+
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
@@ -10189,7 +10194,7 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 
 		error = rebase_commit(NULL, worktree, fileindex, tmp_branch,
-		    resume_commit_id, repo);
+		    committer, resume_commit_id, repo);
 		if (error)
 			goto done;
 
@@ -10352,7 +10357,7 @@ cmd_rebase(int argc, char *argv[])
 		}
 
 		error = rebase_commit(&merged_paths, worktree, fileindex,
-		    tmp_branch, commit_id, repo);
+		    tmp_branch, committer, commit_id, repo);
 		got_worktree_rebase_pathlist_free(&merged_paths);
 		if (error)
 			goto done;
@@ -10387,6 +10392,7 @@ cmd_rebase(int argc, char *argv[])
 		    new_base_branch, tmp_branch, repo, create_backup);
 done:
 	free(cwd);
+	free(committer);
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
 	free(resume_commit_id);
@@ -11157,7 +11163,7 @@ static const struct got_error *
 histedit_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *tmp_branch, struct got_histedit_list_entry *hle,
-    struct got_repository *repo)
+    const char *committer, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit;
@@ -11175,7 +11181,7 @@ histedit_commit(struct got_pathlist_head *merged_paths,
 		return err;
 
 	err = got_worktree_histedit_commit(&new_commit_id, merged_paths,
-	    worktree, fileindex, tmp_branch, commit, hle->commit_id,
+	    worktree, fileindex, tmp_branch, committer, commit, hle->commit_id,
 	    hle->logmsg, repo);
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_NO_CHANGES)
@@ -11250,7 +11256,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_fileindex *fileindex = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL;
+	char *cwd = NULL, *committer = NULL;
 	struct got_reference *branch = NULL;
 	struct got_reference *tmp_branch = NULL;
 	struct got_object_id *resume_commit_id = NULL;
@@ -11494,6 +11500,10 @@ cmd_histedit(int argc, char *argv[])
 		goto done;
 	}
 
+	error = get_author(&committer, repo, worktree);
+	if (error)
+		goto done;
+
 	if (continue_edit) {
 		char *path;
 
@@ -11668,7 +11678,8 @@ cmd_histedit(int argc, char *argv[])
 				}
 				if (have_changes) {
 					error = histedit_commit(NULL, worktree,
-					    fileindex, tmp_branch, hle, repo);
+					    fileindex, tmp_branch, hle,
+					    committer, repo);
 					if (error)
 						goto done;
 				} else {
@@ -11744,7 +11755,7 @@ cmd_histedit(int argc, char *argv[])
 		}
 
 		error = histedit_commit(&merged_paths, worktree, fileindex,
-		    tmp_branch, hle, repo);
+		    tmp_branch, hle, committer, repo);
 		got_worktree_rebase_pathlist_free(&merged_paths);
 		if (error)
 			goto done;
@@ -11779,6 +11790,7 @@ cmd_histedit(int argc, char *argv[])
 		    branch, repo);
 done:
 	free(cwd);
+	free(committer);
 	got_object_id_queue_free(&commits);
 	histedit_free_list(&histedit_cmds);
 	free(head_commit_id);
