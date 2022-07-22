@@ -1215,10 +1215,10 @@ switch_split(struct tog_view *view)
 		offset_selection_up(v);
 		offset_selection_up(v->child);
 	}
-	if (v->type == TOG_VIEW_LOG && v->nscrolled)
-		err = request_log_commits(v);
-	else if (v->child->type == TOG_VIEW_LOG && v->child->nscrolled)
-		err = request_log_commits(v->child);
+	if (v->resize)
+		err = v->resize(v, 0);
+	else if (v->child->resize)
+		err = v->child->resize(v->child, 0);
 
 	return err;
 }
