@@ -109,8 +109,7 @@
 #define FCGI_OVERLOADED		2
 #define FCGI_UNKNOWN_ROLE	3
 
-/* XXX: move this later after ig */
-#define GOT_PACK_NUM_TEMPFILES     32
+#define GOTWEB_PACK_NUM_TEMPFILES     32
 
 enum imsg_type {
 	IMSG_CFG_SRV = IMSG_PROC_MAX,
@@ -320,7 +319,7 @@ struct socket {
 	struct socket_conf	 conf;
 
 	int		 fd;
-	int		 pack_fds[GOT_PACK_NUM_TEMPFILES];
+	int		 pack_fds[GOTWEB_PACK_NUM_TEMPFILES];
 	int		 priv_fd[PRIV_FDS__MAX];
 
 	struct event	 evt;

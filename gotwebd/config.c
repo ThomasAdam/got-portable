@@ -214,7 +214,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	for (i = 0; i < PRIV_FDS__MAX; i++)
 		sock->priv_fd[i] = -1;
 
-	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++)
+	for (i = 0; i < GOTWEB_PACK_NUM_TEMPFILES; i++)
 		sock->pack_fds[i] = -1;
 
 	/* log new socket info */
@@ -240,9 +240,9 @@ config_setfd(struct gotwebd *env, struct socket *sock)
 	unsigned int what;
 
 	log_debug("%s: Allocating %d file descriptors",
-	    __func__, PRIV_FDS__MAX + GOT_PACK_NUM_TEMPFILES);
+	    __func__, PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES);
 
-	for (j = 0; j < PRIV_FDS__MAX + GOT_PACK_NUM_TEMPFILES; j++) {
+	for (j = 0; j < PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES; j++) {
 		for (id = 0; id < PROC_MAX; id++) {
 			what = ps->ps_what[id];
 
@@ -300,7 +300,8 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 	memcpy(&sock_id, p, sizeof(sock_id));
 
 	TAILQ_FOREACH(sock, env->sockets, entry) {
-		for (i = 0; i < (GOT_PACK_NUM_TEMPFILES + PRIV_FDS__MAX); i++) {
+		const int nfds = (GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX);
+		for (i = 0; i < nfds; i++) {
 			if (i < PRIV_FDS__MAX && sock->priv_fd[i] == -1) {
 				log_debug("%s: assigning socket %d priv_fd %d",
 				    __func__, sock_id, imsg->fd);
