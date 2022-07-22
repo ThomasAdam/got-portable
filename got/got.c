@@ -10017,7 +10017,7 @@ cmd_rebase(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
 	struct got_fileindex *fileindex = NULL;
-	char *cwd = NULL, *committer = NULL;
+	char *cwd = NULL, *committer = NULL, *gitconfig_path = NULL;
 	struct got_reference *branch = NULL;
 	struct got_reference *new_base_branch = NULL, *tmp_branch = NULL;
 	struct got_object_id *commit_id = NULL, *parent_id = NULL;
@@ -10117,14 +10117,17 @@ cmd_rebase(int argc, char *argv[])
 		}
 	}
 
+	error = get_gitconfig_path(&gitconfig_path);
+	if (error)
+		goto done;
 	error = got_repo_open(&repo,
-	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL,
-	    pack_fds);
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd,
+	    gitconfig_path, pack_fds);
 	if (error != NULL)
 		goto done;
 
 	error = get_author(&committer, repo, worktree);
-	if (error)
+	if (error && error->code != GOT_ERR_COMMIT_NO_AUTHOR)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
@@ -10393,6 +10396,7 @@ cmd_rebase(int argc, char *argv[])
 done:
 	free(cwd);
 	free(committer);
+	free(gitconfig_path);
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
 	free(resume_commit_id);
