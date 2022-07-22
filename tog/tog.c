@@ -3460,6 +3460,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->thread_args.commits_needed = view->lines;
 		s->matched_entry = NULL;
 		s->search_entry = NULL;
+		view->offset = 0;
 		break;
 	case 'r':
 		view->count = 0;
