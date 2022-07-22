@@ -6452,8 +6452,9 @@ static const struct got_error *
 rebase_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_reference *commit_ref,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
-    const char *new_logmsg, struct got_repository *repo)
+    struct got_reference *tmp_branch, const char *committer,
+    struct got_commit_object *orig_commit, const char *new_logmsg,
+    struct got_repository *repo)
 {
 	const struct got_error *err, *sync_err;
 	struct got_pathlist_head commitable_paths;
@@ -6535,8 +6536,8 @@ rebase_commit(struct got_object_id **new_commit_id,
 	/* NB: commit_worktree will call free(logmsg) */
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    NULL, worktree, got_object_commit_get_author(orig_commit),
-	    got_object_commit_get_committer(orig_commit),
-	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
+	    committer, collect_rebase_commit_msg, logmsg, rebase_status, NULL,
+	    repo);
 	if (err)
 		goto done;
 
@@ -6569,7 +6570,7 @@ const struct got_error *
 got_worktree_rebase_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_reference *tmp_branch,
-    struct got_commit_object *orig_commit,
+    const char *committer, struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -6593,7 +6594,8 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
-	    worktree, fileindex, tmp_branch, orig_commit, NULL, repo);
+	    worktree, fileindex, tmp_branch, committer, orig_commit,
+	    NULL, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
@@ -6606,7 +6608,7 @@ const struct got_error *
 got_worktree_histedit_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_reference *tmp_branch,
-    struct got_commit_object *orig_commit,
+    const char *committer, struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, const char *new_logmsg,
     struct got_repository *repo)
 {
@@ -6623,7 +6625,8 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
-	    worktree, fileindex, tmp_branch, orig_commit, new_logmsg, repo);
+	    worktree, fileindex, tmp_branch, committer, orig_commit,
+	    new_logmsg, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
