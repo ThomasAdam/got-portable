@@ -2750,7 +2750,7 @@ argument corresponds to the work tree's root directory, display information
 for all tracked files.
 .El
 .Sh ENVIRONMENT
-.Bl -tag -width GOT_AUTHOR
+.Bl -tag -width GOT_IGNORE_GITCONFIG
 .It Ev GOT_AUTHOR
 The author's name and email address, such as
 .Dq An Flan Hacker Aq Mt flan_hacker@openbsd.org .
@@ -2806,6 +2806,9 @@ The default limit on the number of commits traversed by
 .Cm got log .
 If set to zero, the limit is unbounded.
 This variable will be silently ignored if it is set to a non-numeric value.
+.It Ev GOT_IGNORE_GITCONFIG
+If this variable is set then any remote repository definitions or author
+information found in Git configuration files will be ignored.
 .El
 .Sh FILES
 .Bl -tag -width packed-refs -compact
