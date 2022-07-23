@@ -439,6 +439,7 @@ struct tog_blame_view_state {
 	char *path;
 	struct got_repository *repo;
 	struct got_object_id *commit_id;
+	struct got_object_id *id_to_log;
 	struct tog_blame blame;
 	int matched_line;
 	struct tog_colors colors;
@@ -1081,6 +1082,52 @@ view_set_child(struct tog_view *view, struct tog_view *child)
 		err = view_resize_split(view, 0);
 
 	return err;
+}
+
+static const struct got_error *view_dispatch_request(struct tog_view **,
+    struct tog_view *, enum tog_view_type, int, int);
+
+static const struct got_error *
+view_request_new(struct tog_view **requested, struct tog_view *view,
+    enum tog_view_type request)
+{
+	struct tog_view		*new_view = NULL;
+	const struct got_error	*err;
+	int			 y = 0, x = 0;
+
+	*requested = NULL;
+
+	if (view_is_parent_view(view))
+		view_get_split(view, &y, &x);
+
+	err = view_dispatch_request(&new_view, view, request, y, x);
+	if (err)
+		return err;
+
+	if (view_is_parent_view(view) && view->mode == TOG_VIEW_SPLIT_HRZN) {
+		err = view_init_hsplit(view, y);
+		if (err)
+			return err;
+	}
+
+	view->focussed = 0;
+	new_view->focussed = 1;
+	new_view->mode = view->mode;
+	new_view->nlines = view->lines - y;
+
+	if (view_is_parent_view(view)) {
+		view_transfer_size(new_view, view);
+		err = view_close_child(view);
+		if (err)
+			return err;
+		err = view_set_child(view, new_view);
+		if (err)
+			return err;
+		view->focus_child = 1;
+	} else
+		*requested = new_view;
+
+	return NULL;
 }
 
 static void
@@ -3204,10 +3251,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
-	struct tog_view *diff_view = NULL, *tree_view = NULL;
-	struct tog_view *ref_view = NULL;
 	struct commit_queue_entry *entry;
-	int begin_x = 0, begin_y = 0, eos, n, nscroll;
+	int eos, n, nscroll;
 
 	if (s->thread_args.load_all) {
 		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
@@ -3329,73 +3374,13 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
-
-		/* get dimensions--don't split till initialisation succeeds */
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-
-		err = open_diff_view_for_commit(&diff_view, begin_y, begin_x,
-		    s->selected_entry->commit, s->selected_entry->id,
-		    view, s->repo);
-		if (err)
-			break;
-
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {  /* safe to split */
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-
-		view->focussed = 0;
-		diff_view->focussed = 1;
-		diff_view->mode = view->mode;
-		diff_view->nlines = view->lines - begin_y;
-
-		if (view_is_parent_view(view)) {
-			view_transfer_size(diff_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, diff_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = diff_view;
+		err = view_request_new(new_view, view, TOG_VIEW_DIFF);
 		break;
 	case 'T':
 		view->count = 0;
 		if (s->selected_entry == NULL)
 			break;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		err = browse_commit_tree(&tree_view, begin_y, begin_x,
-		    s->selected_entry, s->in_repo_path, s->head_ref_name,
-		    s->repo);
-		if (err)
-			break;
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-		view->focussed = 0;
-		tree_view->focussed = 1;
-		tree_view->mode = view->mode;
-		tree_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(tree_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, tree_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = tree_view;
+		err = view_request_new(new_view, view, TOG_VIEW_TREE);
 		break;
 	case KEY_BACKSPACE:
 	case CTRL('l'):
@@ -3464,37 +3449,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'R':
 		view->count = 0;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		ref_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_REF);
-		if (ref_view == NULL)
-			return got_error_from_errno("view_open");
-		err = open_ref_view(ref_view, s->repo);
-		if (err) {
-			view_close(ref_view);
-			return err;
-		}
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-		view->focussed = 0;
-		ref_view->focussed = 1;
-		ref_view->mode = view->mode;
-		ref_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(ref_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, ref_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = ref_view;
+		err = view_request_new(new_view, view, TOG_VIEW_REF);
 		break;
 	default:
 		view->count = 0;
@@ -5752,7 +5707,7 @@ static const struct got_error *
 input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
-	struct tog_view *diff_view, *log_view;
+	struct tog_view *diff_view;
 	struct tog_blame_view_state *s = &view->state.blame;
 	int eos, nscroll, begin_y = 0, begin_x = 0;
 
@@ -5933,45 +5888,13 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		break;
 	}
-	case 'L': {
-		struct got_object_id *id = NULL;
-
+	case 'L':
 		view->count = 0;
-		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
-		    s->first_displayed_line, s->selected_line);
-		if (id == NULL)
-			break;
-
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		err = log_annotated_line(&log_view, begin_y, begin_x,
-		    s->repo, id);
-		if (err)
-			break;
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-
-		view->focussed = 0;
-		log_view->focussed = 1;
-		log_view->mode = view->mode;
-		log_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(log_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, log_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = log_view;
+		s->id_to_log = get_selected_commit_id(s->blame.lines,
+		    s->blame.nlines, s->first_displayed_line, s->selected_line);
+		if (s->id_to_log)
+			err = view_request_new(new_view, view, TOG_VIEW_LOG);
 		break;
-	}
 	case KEY_ENTER:
 	case '\r': {
 		struct got_object_id *id = NULL;
@@ -6782,9 +6705,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
-	struct tog_view *log_view, *ref_view;
 	struct got_tree_entry *te;
-	int begin_y = 0, begin_x = 0, n, nscroll = view->nlines - 3;
+	int n, nscroll = view->nlines - 3;
 
 	switch (ch) {
 	case 'i':
@@ -6795,64 +6717,11 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		view->count = 0;
 		if (!s->selected_entry)
 			break;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		err = log_selected_tree_entry(&log_view, begin_y, begin_x, s);
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-		view->focussed = 0;
-		log_view->focussed = 1;
-		log_view->mode = view->mode;
-		log_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(log_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, log_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = log_view;
+		err = view_request_new(new_view, view, TOG_VIEW_LOG);
 		break;
 	case 'R':
 		view->count = 0;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		ref_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_REF);
-		if (ref_view == NULL)
-			return got_error_from_errno("view_open");
-		err = open_ref_view(ref_view, s->repo);
-		if (err) {
-			view_close(ref_view);
-			return err;
-		}
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-		view->focussed = 0;
-		ref_view->focussed = 1;
-		ref_view->mode = view->mode;
-		ref_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(ref_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, ref_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = ref_view;
+		err = view_request_new(new_view, view, TOG_VIEW_REF);
 		break;
 	case 'g':
 	case KEY_HOME:
@@ -6996,44 +6865,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 				got_object_tree_close(subtree);
 				break;
 			}
-		} else if (S_ISREG(got_tree_entry_get_mode(
-		    s->selected_entry))) {
-			struct tog_view *blame_view;
-			int begin_x = 0, begin_y = 0;
-
-			if (view_is_parent_view(view))
-				view_get_split(view, &begin_y, &begin_x);
-
-			err = blame_tree_entry(&blame_view, begin_y, begin_x,
-			    s->selected_entry, &s->parents,
-			    s->commit_id, s->repo);
-			if (err)
-				break;
-
-			if (view_is_parent_view(view) &&
-			    view->mode == TOG_VIEW_SPLIT_HRZN) {
-				err = view_init_hsplit(view, begin_y);
-				if (err)
-					break;
-			}
-
-			view->count = 0;
-			view->focussed = 0;
-			blame_view->focussed = 1;
-			blame_view->mode = view->mode;
-			blame_view->nlines = view->lines - begin_y;
-			if (view_is_parent_view(view)) {
-				view_transfer_size(blame_view, view);
-				err = view_close_child(view);
-				if (err)
-					return err;
-				err = view_set_child(view, blame_view);
-				if (err)
-					return err;
-				view->focus_child = 1;
-			} else
-				*new_view = blame_view;
-		}
+		} else if (S_ISREG(got_tree_entry_get_mode(s->selected_entry)))
+			err = view_request_new(new_view, view, TOG_VIEW_BLAME);
 		break;
 	case KEY_RESIZE:
 		if (view->nlines >= 4 && s->selected >= view->nlines - 3)
@@ -7723,9 +7556,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_ref_view_state *s = &view->state.ref;
-	struct tog_view *log_view, *tree_view;
 	struct tog_reflist_entry *re;
-	int begin_y = 0, begin_x = 0, n, nscroll = view->nlines - 1;
+	int n, nscroll = view->nlines - 1;
 
 	switch (ch) {
 	case 'i':
@@ -7757,68 +7589,13 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		view->count = 0;
 		if (!s->selected_entry)
 			break;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-
-		err = log_ref_entry(&log_view, begin_y, begin_x,
-		    s->selected_entry, s->repo);
-		if (err)
-			break;
-
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-
-		view->focussed = 0;
-		log_view->focussed = 1;
-		log_view->mode = view->mode;
-		log_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(log_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, log_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = log_view;
+		err = view_request_new(new_view, view, TOG_VIEW_LOG);
 		break;
 	case 'T':
 		view->count = 0;
 		if (!s->selected_entry)
 			break;
-		if (view_is_parent_view(view))
-			view_get_split(view, &begin_y, &begin_x);
-		err = browse_ref_tree(&tree_view, begin_y, begin_x,
-		    s->selected_entry, s->repo);
-		if (err || tree_view == NULL)
-			break;
-		if (view_is_parent_view(view) &&
-		    view->mode == TOG_VIEW_SPLIT_HRZN) {
-			err = view_init_hsplit(view, begin_y);
-			if (err)
-				break;
-		}
-		view->focussed = 0;
-		tree_view->focussed = 1;
-		tree_view->mode = view->mode;
-		tree_view->nlines = view->lines - begin_y;
-		if (view_is_parent_view(view)) {
-			view_transfer_size(tree_view, view);
-			err = view_close_child(view);
-			if (err)
-				return err;
-			err = view_set_child(view, tree_view);
-			if (err)
-				return err;
-			view->focus_child = 1;
-		} else
-			*new_view = tree_view;
+		err = view_request_new(new_view, view, TOG_VIEW_TREE);
 		break;
 	case 'g':
 	case KEY_HOME:
@@ -8032,6 +7809,88 @@ done:
 	}
 	tog_free_refs();
 	return error;
+}
+
+static const struct got_error *
+view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
+    enum tog_view_type request, int y, int x)
+{
+	const struct got_error *err = NULL;
+
+	*new_view = NULL;
+
+	switch (request) {
+	case TOG_VIEW_DIFF:
+		if (view->type == TOG_VIEW_LOG) {
+			struct tog_log_view_state *s = &view->state.log;
+
+			err = open_diff_view_for_commit(new_view, y, x,
+			    s->selected_entry->commit, s->selected_entry->id,
+			    view, s->repo);
+		} else
+			return got_error_msg(GOT_ERR_NOT_IMPL,
+			    "parent/child view pair not supported");
+		break;
+	case TOG_VIEW_BLAME:
+		if (view->type == TOG_VIEW_TREE) {
+			struct tog_tree_view_state *s = &view->state.tree;
+
+			err = blame_tree_entry(new_view, y, x,
+			    s->selected_entry, &s->parents, s->commit_id,
+			    s->repo);
+		} else
+			return got_error_msg(GOT_ERR_NOT_IMPL,
+			    "parent/child view pair not supported");
+		break;
+	case TOG_VIEW_LOG:
+		if (view->type == TOG_VIEW_BLAME)
+			err = log_annotated_line(new_view, y, x,
+			    view->state.blame.repo, view->state.blame.id_to_log);
+		else if (view->type == TOG_VIEW_TREE)
+			err = log_selected_tree_entry(new_view, y, x,
+			    &view->state.tree);
+		else if (view->type == TOG_VIEW_REF)
+			err = log_ref_entry(new_view, y, x,
+			    view->state.ref.selected_entry,
+			    view->state.ref.repo);
+		else
+			return got_error_msg(GOT_ERR_NOT_IMPL,
+			    "parent/child view pair not supported");
+		break;
+	case TOG_VIEW_TREE:
+		if (view->type == TOG_VIEW_LOG)
+			err = browse_commit_tree(new_view, y, x,
+			    view->state.log.selected_entry,
+			    view->state.log.in_repo_path,
+			    view->state.log.head_ref_name,
+			    view->state.log.repo);
+		else if (view->type == TOG_VIEW_REF)
+			err = browse_ref_tree(new_view, y, x,
+			    view->state.ref.selected_entry,
+			    view->state.ref.repo);
+		else
+			return got_error_msg(GOT_ERR_NOT_IMPL,
+			    "parent/child view pair not supported");
+		break;
+	case TOG_VIEW_REF:
+		*new_view = view_open(0, 0, y, x, TOG_VIEW_REF);
+		if (*new_view == NULL)
+			return got_error_from_errno("view_open");
+		if (view->type == TOG_VIEW_LOG)
+			err = open_ref_view(*new_view, view->state.log.repo);
+		else if (view->type == TOG_VIEW_TREE)
+			err = open_ref_view(*new_view, view->state.tree.repo);
+		else
+			err = got_error_msg(GOT_ERR_NOT_IMPL,
+			    "parent/child view pair not supported");
+		if (err)
+			view_close(*new_view);
+		break;
+	default:
+		return got_error_msg(GOT_ERR_NOT_IMPL, "invalid view");
+	}
+
+	return err;
 }
 
 /*
