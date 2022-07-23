@@ -312,6 +312,35 @@ done:
 	return err;
 }
 
+static void
+reverse_patch(struct got_patch *p)
+{
+	struct got_patch_hunk *h;
+	size_t i;
+	int tmp;
+
+	STAILQ_FOREACH(h, &p->head, entries) {
+		tmp = h->old_from;
+		h->old_from = h->new_from;
+		h->new_from = tmp;
+
+		tmp = h->old_lines;
+		h->old_lines = h->new_lines;
+		h->new_lines = tmp;
+
+		tmp = h->old_nonl;
+		h->old_nonl = h->new_nonl;
+		h->new_nonl = tmp;
+
+		for (i = 0; i < h->len; ++i) {
+			if (*h->lines[i] == '+')
+				*h->lines[i] = '-';
+			else if (*h->lines[i] == '-')
+				*h->lines[i] = '+';
+		}
+	}
+}
+
 /*
  * Copy data from orig starting at copypos until pos into tmp.
  * If pos is -1, copy until EOF.
@@ -698,7 +727,8 @@ static const struct got_error *
 apply_patch(int *overlapcnt, struct got_worktree *worktree,
     struct got_repository *repo, struct got_fileindex *fileindex,
     const char *old, const char *new, struct got_patch *p, int nop,
-    struct patch_args *pa, got_cancel_cb cancel_cb, void *cancel_arg)
+    int reverse, struct patch_args *pa,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct stat sb;
@@ -726,6 +756,8 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			return err;
 		else if (err == NULL)
 			do_merge = 1;
+		else if (reverse)
+			reverse_patch(p);
 		err = NULL;
 	}
 
@@ -804,6 +836,19 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			err = got_error_from_errno("asprintf");
 			anclabel = NULL;
 			goto done;
+		}
+
+		if (reverse) {
+			char *s;
+			FILE *t;
+
+			s = anclabel;
+			anclabel = newlabel;
+			newlabel = s;
+
+			t = afile;
+			afile = tmpfile;
+			tmpfile = t;
 		}
 
 		err = got_opentemp_named(&mergepath, &mergefile, template);
@@ -907,35 +952,6 @@ done:
 	return err;
 }
 
-static void
-reverse_patch(struct got_patch *p)
-{
-	struct got_patch_hunk *h;
-	size_t i;
-	int tmp;
-
-	STAILQ_FOREACH(h, &p->head, entries) {
-		tmp = h->old_from;
-		h->old_from = h->new_from;
-		h->new_from = tmp;
-
-		tmp = h->old_lines;
-		h->old_lines = h->new_lines;
-		h->new_lines = tmp;
-
-		tmp = h->old_nonl;
-		h->old_nonl = h->new_nonl;
-		h->new_nonl = tmp;
-
-		for (i = 0; i < h->len; ++i) {
-			if (*h->lines[i] == '+')
-				*h->lines[i] = '-';
-			else if (*h->lines[i] == '-')
-				*h->lines[i] = '+';
-		}
-	}
-}
-
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
     int nop, int strip, int reverse, got_patch_progress_cb progress_cb,
@@ -1000,15 +1016,16 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err || done)
 			break;
 
-		if (reverse)
+		/* reversal application with merge base is done differently */
+		if (reverse && *p.blob == '\0')
 			reverse_patch(&p);
 
 		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
 		    &newpath, worktree, repo, fileindex);
 		if (err == NULL)
 			err = apply_patch(&overlapcnt, worktree, repo,
-			    fileindex, oldpath, newpath, &p, nop, &pa,
-			    cancel_cb, cancel_arg);
+			    fileindex, oldpath, newpath, &p, nop, reverse,
+			    &pa, cancel_cb, cancel_arg);
 		if (err != NULL) {
 			failed = 1;
 			/* recoverable errors */
