@@ -1875,6 +1875,80 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_merge_reverse() {
+	local testroot=`test_init patch_merge_simple`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+
+	jot 10 | sed s/5/five/g > $testroot/wt/numbers
+	(cd $testroot/wt && got diff > $testroot/wt/patch \
+		&& got commit -m 'edit numbers') > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed -e s/5/five/g -e s/6/six/g > $testroot/wt/numbers
+	(cd $testroot/wt && got commit -m 'edit numbers again') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch -R patch) >/dev/null 2>&1
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "unexpectedly reverted the patch" >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	cat <<-EOF > $testroot/wt/numbers.expected
+	1
+	2
+	3
+	4
+	<<<<<<< --- numbers
+	5
+	6
+	||||||| +++ numbers
+	five
+	=======
+	five
+	six
+	>>>>>>> commit $commit_id
+	7
+	8
+	9
+	10
+EOF
+
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_add_file
 run_test test_patch_rm_file
@@ -1905,3 +1979,4 @@ run_test test_patch_merge_simple
 run_test test_patch_merge_gitdiff
 run_test test_patch_merge_conflict
 run_test test_patch_merge_unknown_blob
+run_test test_patch_merge_reverse
