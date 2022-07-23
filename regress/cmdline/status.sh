@@ -345,7 +345,6 @@ test_status_shows_no_mods_after_complete_merge() {
 	sed -i '' -e 's/2/22/' $testroot/repo/numbers
 	git_commit $testroot/repo -m "modified line 2"
 
-	sleep 1
 	# modify line 2 again; no local changes are left after merge
 	sed -i '' -e 's/2/22/' $testroot/wt/numbers
 
