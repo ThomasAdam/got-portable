@@ -673,6 +673,23 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 	    repo_gitconfig_path);
 	if (err)
 		goto done;
+
+	if (getenv("GOT_IGNORE_GITCONFIG") != NULL) {
+		int i;
+
+		for (i = 0; i < repo->ngitconfig_remotes; i++) {
+			got_repo_free_remote_repo_data(
+			    &repo->gitconfig_remotes[i]);
+		}
+		free(repo->gitconfig_remotes);
+		repo->ngitconfig_remotes = 0;
+
+		free(repo->gitconfig_author_name);
+		repo->gitconfig_author_name = NULL;
+		free(repo->gitconfig_author_email);
+		repo->gitconfig_author_email = NULL;
+	}
+
 done:
 	free(repo_gitconfig_path);
 	return err;
