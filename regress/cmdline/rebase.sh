@@ -1600,8 +1600,9 @@ test_rebase_no_author_info() {
 		return 1
 	fi
 
-	unset GOT_AUTHOR
-	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_AUTHOR && cd $testroot/wt && \
+		got rebase newbranch > $testroot/stdout)
 
 	(cd $testroot/repo && git checkout -q newbranch)
 	local new_commit1=`git_show_parent_commit $testroot/repo`
