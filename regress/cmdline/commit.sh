@@ -901,7 +901,10 @@ test_commit_gitconfig_author() {
 	(cd $testroot/repo && git config user.email 'flan_luck@openbsd.org')
 
 	echo "modified alpha" > $testroot/wt/alpha
-	(cd $testroot/wt && got commit -m 'test gitconfig author' > /dev/null)
+
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_IGNORE_GITCONFIG && cd $testroot/wt && \
+		 got commit -m 'test gitconfig author' > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
