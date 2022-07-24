@@ -682,12 +682,18 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 			    &repo->gitconfig_remotes[i]);
 		}
 		free(repo->gitconfig_remotes);
+		repo->gitconfig_remotes = NULL;
 		repo->ngitconfig_remotes = 0;
 
 		free(repo->gitconfig_author_name);
 		repo->gitconfig_author_name = NULL;
 		free(repo->gitconfig_author_email);
 		repo->gitconfig_author_email = NULL;
+
+		free(repo->global_gitconfig_author_name);
+		repo->global_gitconfig_author_name = NULL;
+		free(repo->global_gitconfig_author_email);
+		repo->global_gitconfig_author_email = NULL;
 	}
 
 done:
