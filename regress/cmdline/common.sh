@@ -23,6 +23,7 @@ export GOT_AUTHOR_8="flan_hac"
 export GOT_AUTHOR_11="flan_hacker"
 export GOT_LOG_DEFAULT_LIMIT=0
 export GOT_TEST_ROOT="/tmp"
+export GOT_IGNORE_GITCONFIG=1
 
 export MALLOC_OPTIONS=S
 
