@@ -12988,7 +12988,6 @@ cmd_info(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	char *uuidstr = NULL;
 	int ch, show_files = 0;
-	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 
@@ -13014,10 +13013,6 @@ cmd_info(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -13026,9 +13021,8 @@ cmd_info(int argc, char *argv[])
 	}
 
 #ifndef PROFILE
-	/* Remove "cpath" promise. */
-	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
-	    NULL) == -1)
+	/* Remove "wpath cpath proc exec sendfd" promises. */
+	if (pledge("stdio rpath flock unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
@@ -13085,12 +13079,8 @@ cmd_info(int argc, char *argv[])
 		}
 	}
 done:
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
+	if (worktree)
+		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
