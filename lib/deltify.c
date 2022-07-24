@@ -523,8 +523,8 @@ stretchblk_file_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
 
 	if (base_offset > basefile_size) {
 		return got_error_fmt(GOT_ERR_RANGE,
-		    "read beyond the size of delta base at offset %llu",
-		    base_offset);
+		    "read beyond the size of delta base at offset %lld",
+		    (long long)base_offset);
 	}
 
 	while (buf_equal && *blocklen < (1 << 24) - 1) {
@@ -559,8 +559,8 @@ stretchblk_mem_file(FILE *basefile, off_t base_offset0,
 
 	if (fileoffset > filesize) {
 		return got_error_fmt(GOT_ERR_RANGE,
-		    "read beyond the size of deltify file at offset %llu",
-		    fileoffset);
+		    "read beyond the size of deltify file at offset %lld",
+		    (long long)fileoffset);
 	}
 
 	if (fseeko(basefile, base_offset0 + block->offset + *blocklen,
@@ -599,14 +599,14 @@ stretchblk_mem_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
 
 	if (base_offset > basefile_size) {
 		return got_error_fmt(GOT_ERR_RANGE,
-		    "read beyond the size of delta base at offset %llu",
-		    base_offset);
+		    "read beyond the size of delta base at offset %lld",
+		    (long long)base_offset);
 	}
 
 	if (fileoffset > filesize) {
 		return got_error_fmt(GOT_ERR_RANGE,
-		    "read beyond the size of deltify file at offset %llu",
-		    fileoffset);
+		    "read beyond the size of deltify file at offset %lld",
+		    (long long)fileoffset);
 	}
 
 	p = data + fileoffset;

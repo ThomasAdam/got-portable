@@ -1135,7 +1135,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 		return got_error(GOT_ERR_NO_OBJ);
 
 	base_offset = got_packidx_get_object_offset(packidx, idx);
-	if (base_offset == (uint64_t)-1)
+	if (base_offset == -1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
 	if (base_offset >= pack->filesize)
@@ -1238,7 +1238,7 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 	*obj = NULL;
 
 	offset = got_packidx_get_object_offset(packidx, idx);
-	if (offset == (uint64_t)-1)
+	if (offset == -1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
 	err = got_pack_parse_object_type_and_size(&type, &size, &tslen,
@@ -1816,7 +1816,7 @@ got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
 	*result_size = 0;
 
 	offset = got_packidx_get_object_offset(packidx, idx);
-	if (offset == (uint64_t)-1)
+	if (offset == -1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
 	if (offset >= pack->filesize)
@@ -1846,8 +1846,8 @@ got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
 		break;
 	default:
 		return got_error_fmt(GOT_ERR_OBJ_TYPE,
-		    "non-delta object type %d found at offset %llu",
-		    type, offset);
+		    "non-delta object type %d found at offset %lld",
+		    type, (long long)offset);
 	}
 
 	if (tslen + delta_hdrlen < delta_hdrlen ||
