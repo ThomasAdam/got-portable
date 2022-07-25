@@ -7941,6 +7941,7 @@ cmd_patch(int argc, char *argv[])
 	const struct got_error *error = NULL, *close_error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
+	struct stat sb;
 	const char *errstr;
 	char *cwd = NULL;
 	int ch, nop = 0, strip = -1, reverse = 0;
@@ -7979,6 +7980,14 @@ cmd_patch(int argc, char *argv[])
 		if (patchfd == -1) {
 			error = got_error_from_errno2("open", argv[0]);
 			return error;
+		}
+		if (fstat(patchfd, &sb) == -1) {
+			error = got_error_from_errno2("fstat", argv[0]);
+			goto done;
+		}
+		if (!S_ISREG(sb.st_mode)) {
+			error = got_error_path(argv[0], GOT_ERR_BAD_FILETYPE);
+			goto done;
 		}
 	} else
 		usage_patch();
