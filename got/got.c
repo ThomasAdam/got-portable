@@ -7948,6 +7948,12 @@ cmd_patch(int argc, char *argv[])
 	int patchfd;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr proc exec sendfd flock "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "np:R")) != -1) {
 		switch (ch) {
 		case 'n':
@@ -8014,12 +8020,6 @@ cmd_patch(int argc, char *argv[])
 	    got_worktree_get_root_path(worktree));
 	if (error != NULL)
 		goto done;
-
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr proc exec sendfd flock",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 
 	error = got_patch(patchfd, worktree, repo, nop, strip, reverse,
 	    &patch_progress, NULL, check_cancelled, NULL);
