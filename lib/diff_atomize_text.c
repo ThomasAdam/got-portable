@@ -92,7 +92,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 			r = fread(buf, sizeof(char), sizeof(buf), d->root->f);
 			if (r == 0 && ferror(d->root->f))
 				return errno;
-			if (r == 1 && buf[0] == '\n' )
+			if (r > 0 && buf[0] == '\n')
 				line_end++;
 		}
 
@@ -151,11 +151,9 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 
 		/* When not at the end of data, the line ending char ('\r' or
 		 * '\n') must follow */
-		if (line_end < end)
+		if (line_end < end && *line_end == '\r')
 			line_end++;
-		/* If that was an '\r', also pull in any following '\n' */
-		if (line_end < end - 1 && line_end[0] == '\r' &&
-		    line_end[1] == '\n')
+		if (line_end < end && *line_end == '\n')
 			line_end++;
 
 		/* Record the found line as diff atom */
