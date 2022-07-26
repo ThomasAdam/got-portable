@@ -1258,6 +1258,42 @@ test_diff_ignored_file() {
 	test_done "$testroot" "$ret"
 }
 
+test_diff_crlf() {
+	local testroot=`test_init diff_crlf`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	printf 'test\r\n' > $testroot/wt/crlf
+	(cd $testroot/wt && got add crlf && got commit -m +crlf) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	printf 'test 2\r\n' > $testroot/wt/crlf
+	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > $testroot/stdout)
+	cat <<EOF > $testroot/stdout.expected
+--- crlf
++++ crlf
+@@ -1 +1 @@
+-test
++test 2
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1270,3 +1306,4 @@ run_test test_diff_symlinks_in_repo
 run_test test_diff_binary_files
 run_test test_diff_commits
 run_test test_diff_ignored_file
+run_test test_diff_crlf
