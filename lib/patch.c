@@ -758,10 +758,11 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			return err;
 		else if (err == NULL)
 			do_merge = 1;
-		else if (reverse)
-			reverse_patch(p);
 		err = NULL;
 	}
+
+	if (reverse && !do_merge)
+		reverse_patch(p);
 
 	if (asprintf(&oldpath, "%s/%s", got_worktree_get_root_path(worktree),
 	    old) == -1) {
@@ -1017,10 +1018,6 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		err = recv_patch(ibuf, &done, &p, strip);
 		if (err || done)
 			break;
-
-		/* reversal application with merge base is done differently */
-		if (reverse && *p.blob == '\0')
-			reverse_patch(&p);
 
 		err = got_worktree_patch_check_path(p.old, p.new, &oldpath,
 		    &newpath, worktree, repo, fileindex);
