@@ -399,7 +399,7 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 		}
 
 		if (nw != resp->data_len - off)
-			log_debug("partial write: %zu vs %zu", nw,
+			log_debug("%s: partial write: %zu vs %zu", __func__, nw,
 			    resp->data_len - off);
 	}
 
