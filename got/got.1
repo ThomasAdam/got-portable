@@ -1337,7 +1337,7 @@ option)
 .El
 .El
 .Tg pa
-.It Cm patch Oo Fl n Oc Oo Fl p Ar strip-count Oc Oo Fl R Oc Op Ar patchfile
+.It Cm patch Oo Fl c Ar commit Oc Oo Fl n Oc Oo Fl p Ar strip-count Oc Oo Fl R Oc Op Ar patchfile
 .Dl Pq alias: Cm pa
 Apply changes from
 .Ar patchfile
@@ -1401,6 +1401,15 @@ The options for
 .Cm got patch
 are as follows:
 .Bl -tag -width Ds
+.It Fl c Ar commit
+Use files found in in the specified
+.Ar commit
+as a merge base for 3-way merges, overriding the meta-data in
+.Ar patchfile
+.Pq if any .
+In case no merge-base is available for a file
+.Cm got patch
+will attempt to apply the changes without doing a 3-way merge.
 .It Fl n
 Do not make any modifications to the work tree.
 This can be used to check whether a patch would apply without issues.

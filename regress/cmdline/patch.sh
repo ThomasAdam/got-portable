@@ -1661,6 +1661,66 @@ test_patch_merge_gitdiff() {
 	test_done $testroot $ret
 }
 
+test_patch_merge_base_provided() {
+	local testroot=`test_init patch_merge_base_provided`
+
+	got checkout $testroot/repo $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+
+	jot 10 | sed s/4/four/ > $testroot/wt/numbers
+
+	# get rid of the metadata
+	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > patch) \
+		>/dev/null
+
+	jot 10 | sed s/6/six/ > $testroot/wt/numbers
+	(cd $testroot/wt && got commit -m 'edit numbers') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch -c $commit_id patch) >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'G  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+	test_done $testroot $ret
+}
+
 test_patch_merge_conflict() {
 	local testroot=`test_init patch_merge_conflict`
 
@@ -1977,6 +2037,7 @@ run_test test_patch_relpath_with_path_prefix
 run_test test_patch_reverse
 run_test test_patch_merge_simple
 run_test test_patch_merge_gitdiff
+run_test test_patch_merge_base_provided
 run_test test_patch_merge_conflict
 run_test test_patch_merge_unknown_blob
 run_test test_patch_merge_reverse

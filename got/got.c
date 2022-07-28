@@ -7851,7 +7851,7 @@ done:
 __dead static void
 usage_patch(void)
 {
-	fprintf(stderr, "usage: %s patch [-n] [-p strip-count] "
+	fprintf(stderr, "usage: %s patch [-c commit] [-n] [-p strip-count] "
 	    "[-R] [patchfile]\n", getprogname());
 	exit(1);
 }
@@ -7941,6 +7941,9 @@ cmd_patch(int argc, char *argv[])
 	const struct got_error *error = NULL, *close_error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
+	struct got_reflist_head refs;
+	struct got_object_id *commit_id = NULL;
+	const char *commit_id_str = NULL;
 	struct stat sb;
 	const char *errstr;
 	char *cwd = NULL;
@@ -7948,14 +7951,19 @@ cmd_patch(int argc, char *argv[])
 	int patchfd;
 	int *pack_fds = NULL;
 
+	TAILQ_INIT(&refs);
+
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr proc exec sendfd flock "
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "np:R")) != -1) {
+	while ((ch = getopt(argc, argv, "c:np:R")) != -1) {
 		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
 		case 'n':
 			nop = 1;
 			break;
@@ -8021,10 +8029,23 @@ cmd_patch(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
+	if (commit_id_str != NULL) {
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		if (error)
+			goto done;
+	}
+
 	error = got_patch(patchfd, worktree, repo, nop, strip, reverse,
-	    &patch_progress, NULL, check_cancelled, NULL);
+	    commit_id, &patch_progress, NULL, check_cancelled, NULL);
 
 done:
+	got_ref_list_free(&refs);
+	free(commit_id);
 	if (repo) {
 		close_error = got_repo_close(repo);
 		if (error == NULL)

@@ -726,10 +726,54 @@ done:
 }
 
 static const struct got_error *
+prepare_merge(int *do_merge, char **apath, FILE **afile,
+    struct got_worktree *worktree, struct got_repository *repo,
+    struct got_patch *p, struct got_object_id *commit_id,
+    struct got_tree_object *tree, const char *path)
+{
+	const struct got_error *err = NULL;
+
+	*do_merge = 0;
+	*apath = NULL;
+	*afile = NULL;
+
+	/* don't run the diff3 merge on creations/deletions */
+	if (p->old == NULL || p->new == NULL)
+		return NULL;
+
+	if (commit_id) {
+		struct got_object_id *id;
+
+		err = got_object_tree_find_path(&id, NULL, repo, tree, path);
+		if (err)
+			return err;
+		got_sha1_digest_to_str(id->sha1, p->blob, sizeof(p->blob));
+		got_sha1_digest_to_str(commit_id->sha1, p->cid, sizeof(p->cid));
+		free(id);
+		err = open_blob(apath, afile, p->blob, repo);
+		*do_merge = err == NULL;
+	} else if (*p->blob != '\0') {
+		err = open_blob(apath, afile, p->blob, repo);
+		/*
+		 * ignore failures to open this blob, we might have
+		 * parsed gibberish.
+		 */
+		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT) &&
+		    err->code != GOT_ERR_NO_OBJ)
+			return err;
+		*do_merge = err == NULL;
+		err = NULL;
+	}
+
+	return err;
+}
+
+static const struct got_error *
 apply_patch(int *overlapcnt, struct got_worktree *worktree,
     struct got_repository *repo, struct got_fileindex *fileindex,
     const char *old, const char *new, struct got_patch *p, int nop,
-    int reverse, struct patch_args *pa,
+    int reverse, struct got_object_id *commit_id,
+    struct got_tree_object *tree, struct patch_args *pa,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
@@ -746,20 +790,10 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 
 	*overlapcnt = 0;
 
-	/* don't run the diff3 merge on creations/deletions */
-	if (*p->blob != '\0' && p->old != NULL && p->new != NULL) {
-		err = open_blob(&apath, &afile, p->blob, repo);
-		/*
-		 * ignore failures to open this blob, we might have
-		 * parsed gibberish.
-		 */
-		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT) &&
-		    err->code != GOT_ERR_NO_OBJ)
-			return err;
-		else if (err == NULL)
-			do_merge = 1;
-		err = NULL;
-	}
+	err = prepare_merge(&do_merge, &apath, &afile, worktree, repo, p,
+	    commit_id, tree, old);
+	if (err)
+		return err;
 
 	if (reverse && !do_merge)
 		reverse_patch(p);
@@ -957,11 +991,14 @@ done:
 
 const struct got_error *
 got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
-    int nop, int strip, int reverse, got_patch_progress_cb progress_cb,
-    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
+    int nop, int strip, int reverse, struct got_object_id *commit_id,
+    got_patch_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *complete_err = NULL;
 	struct got_fileindex *fileindex = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL;
 	char *oldpath, *newpath;
 	struct imsgbuf *ibuf;
@@ -1007,6 +1044,16 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	if (err)
 		goto done;
 
+	if (commit_id) {
+		err = got_object_open_as_commit(&commit, repo, commit_id);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&tree, repo, commit->tree_id);
+		if (err)
+			goto done;
+	}
+
 	while (!done && err == NULL) {
 		struct got_patch p;
 		struct patch_args pa;
@@ -1024,7 +1071,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		if (err == NULL)
 			err = apply_patch(&overlapcnt, worktree, repo,
 			    fileindex, oldpath, newpath, &p, nop, reverse,
-			    &pa, cancel_cb, cancel_arg);
+			    commit_id, tree, &pa, cancel_cb, cancel_arg);
 		if (err != NULL) {
 			failed = 1;
 			/* recoverable errors */
@@ -1054,6 +1101,10 @@ done:
 	if (complete_err && err == NULL)
 		err = complete_err;
 	free(fileindex_path);
+	if (tree)
+		got_object_tree_close(tree);
+	if (commit)
+		got_object_commit_close(commit);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (ibuf != NULL)
