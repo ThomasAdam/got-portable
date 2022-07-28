@@ -177,11 +177,6 @@ gotweb_process_request(struct request *c)
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto done;
-		error = gotweb_render_content_type(c, "text/plain");
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
-		}
 		error = got_output_file_blob(c);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
