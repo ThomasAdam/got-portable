@@ -1410,6 +1410,9 @@ as a merge base for 3-way merges, overriding the meta-data in
 In case no merge-base is available for a file
 .Cm got patch
 will attempt to apply the changes without doing a 3-way merge.
+If
+.Fl p
+is used, the paths are stripped before being looked up.
 .It Fl n
 Do not make any modifications to the work tree.
 This can be used to check whether a patch would apply without issues.
