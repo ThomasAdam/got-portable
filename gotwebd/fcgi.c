@@ -392,7 +392,7 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 				nanosleep(&ts, NULL);
 				continue;
 			}
-			log_warn("write");
+			log_warn("%s: write failure", __func__);
 			c->sock->client_status = CLIENT_DISCONNECT;
 			break;
 		}
