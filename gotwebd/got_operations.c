@@ -55,12 +55,7 @@ static const struct got_error *got_gotweb_blame_cb(void *, int, int,
 static int
 isbinary(const uint8_t *buf, size_t n)
 {
-	size_t i;
-
-	for (i = 0; i < n; i++)
-		if (buf[i] == 0)
-			return 1;
-	return 0;
+	return memchr(buf, '\0', n) != NULL;
 }
 
 
