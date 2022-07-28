@@ -311,7 +311,7 @@ fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 	if (c->sock->client_status == CLIENT_DISCONNECT)
 		return -1;
 
-	if (data == NULL)
+	if (data == NULL || len == 0)
 		return 0;
 
 	if ((resp = calloc(1, sizeof(struct fcgi_response))) == NULL) {
@@ -342,43 +342,9 @@ fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 int
 fcgi_gen_response(struct request *c, const char *data)
 {
-	struct fcgi_response *resp;
-	struct fcgi_record_header *header;
-	ssize_t n = 0;
-	int i;
-
-	if (c->sock->client_status == CLIENT_DISCONNECT)
-		return -1;
-
-	if (data == NULL)
+	if (data == NULL || *data == '\0')
 		return 0;
-
-	if (strlen(data) == 0)
-		return 0;
-
-	if ((resp = calloc(1, sizeof(struct fcgi_response))) == NULL) {
-		log_warn("%s: cannot calloc fcgi_response", __func__);
-		return -1;
-	}
-
-	header = (struct fcgi_record_header*) resp->data;
-	header->version = 1;
-	header->type = FCGI_STDOUT;
-	header->id = htons(c->id);
-	header->padding_len = 0;
-	header->reserved = 0;
-
-	for (i = 0; i < strlen(data); i++) {
-		resp->data[i+8] = data[i];
-		n++;
-	}
-
-	header->content_len = htons(n);
-	resp->data_pos = 0;
-	resp->data_len = n + sizeof(struct fcgi_record_header);
-	fcgi_send_response(c, resp);
-
-	return 0;
+	return fcgi_gen_binary_response(c, data, strlen(data));
 }
 
 void
