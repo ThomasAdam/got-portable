@@ -353,7 +353,8 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 {
 	struct fcgi_record_header *header;
 	struct timespec ts;
-	size_t padded_len;
+	size_t padded_len, off;
+	ssize_t nw;
 	int err = 0, th = 2000;
 
 	ts.tv_sec = 0;
@@ -379,14 +380,27 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 	 * disconnect. Let's at least try to write the data a few times before
 	 * giving up.
 	 */
-	while ((write(c->fd, resp->data + resp->data_pos,
-	    resp->data_len)) == -1) {
-		nanosleep(&ts, NULL);
-		err++;
-		if (err == th) {
+	for (off = 0; off < resp->data_len; off += nw) {
+		nw = write(c->fd, resp->data + off, resp->data_len - off);
+		if (nw == 0) {
 			c->sock->client_status = CLIENT_DISCONNECT;
 			break;
 		}
+		if (nw == -1) {
+			err++;
+			if (errno == EAGAIN && err < th) {
+				nw = 0;
+				nanosleep(&ts, NULL);
+				continue;
+			}
+			log_warn("write");
+			c->sock->client_status = CLIENT_DISCONNECT;
+			break;
+		}
+
+		if (nw != resp->data_len - off)
+			log_debug("partial write: %zu vs %zu", nw,
+			    resp->data_len - off);
 	}
 
 	free(resp);
