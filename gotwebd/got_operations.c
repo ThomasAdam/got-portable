@@ -1196,8 +1196,7 @@ got_output_file_blob(struct request *c)
 	struct got_reflist_head refs;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
-	int obj_type, set_mime = 0, type = 0, fd = -1;
-	char *buf_output = NULL;
+	int obj_type, set_mime = 0, fd = -1;
 	size_t len, hdrlen;
 	const uint8_t *buf;
 
@@ -1269,7 +1268,6 @@ got_output_file_blob(struct request *c)
 					    error->msg);
 					goto done;
 				}
-				type = 0;
 			} else {
 				error = gotweb_render_content_type(c,
 				  "text/plain");
@@ -1278,23 +1276,10 @@ got_output_file_blob(struct request *c)
 					    error->msg);
 					goto done;
 				}
-				type = 1;
 			}
 		}
 		set_mime = 1;
-		if (type) {
-			buf_output = calloc(len - hdrlen + 1,
-			    sizeof(*buf_output));
-			if (buf_output == NULL) {
-				error = got_error_from_errno("calloc");
-				goto done;
-			}
-			memcpy(buf_output, buf, len - hdrlen);
-			fcgi_gen_response(c, buf_output);
-			free(buf_output);
-			buf_output = NULL;
-		} else
-			fcgi_gen_binary_response(c, buf, len - hdrlen);
+		fcgi_gen_binary_response(c, buf, len - hdrlen);
 
 		hdrlen = 0;
 	} while (len != 0);
@@ -1305,7 +1290,6 @@ done:
 		error = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
-	free(buf_output);
 	free(in_repo_path);
 	free(commit_id);
 	free(path);
