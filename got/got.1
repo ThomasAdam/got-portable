@@ -1402,17 +1402,38 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl c Ar commit
-Use files found in in the specified
+Attempt to locate files within the specified
 .Ar commit
-as a merge base for 3-way merges, overriding the meta-data in
+for use as a merge-base for 3-way merges.
+Ideally, the specified
+.Ar commit
+should contain versions of files which the changes contained in the
 .Ar patchfile
-.Pq if any .
-In case no merge-base is available for a file
-.Cm got patch
-will attempt to apply the changes without doing a 3-way merge.
-If
+were based on.
+Files will be located by path, relative to the repository root.
+If the
 .Fl p
-is used, the paths are stripped before being looked up.
+option is used then leading path components will be stripped
+before paths are looked up in the repository.
+.Pp
+If the
+.Fl c
+option is not used then
+.Cm got patch
+will attempt to locate merge-bases via object IDs found in
+.Ar patchfile
+meta-data, such as produced by
+.Cm got diff
+or
+.Xr git-diff 1 .
+Use of the
+.Fl c
+option is only recommended in the absence of such meta-data.
+.Pp
+In case no merge-base is available for a file, changes will be applied
+without doing a 3-way merge.
+Changes which do not apply cleanly may then be rejected entirely, rather
+than producing merge conflicts in the patched target file.
 .It Fl n
 Do not make any modifications to the work tree.
 This can be used to check whether a patch would apply without issues.
