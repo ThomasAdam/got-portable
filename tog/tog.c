@@ -8130,11 +8130,6 @@ tog_log_with_path(int argc, char *argv[])
 		/* not reached */
 	}
 
-	close_err = got_repo_close(repo);
-	if (error == NULL)
-		error = close_err;
-	repo = NULL;
-
 	error = got_object_id_str(&commit_id_str, commit_id);
 	if (error)
 		goto done;
