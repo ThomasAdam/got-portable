@@ -1254,7 +1254,11 @@ switch_split(struct tog_view *view)
 		v->mode = TOG_VIEW_SPLIT_VERT;
 	if (v->mode == TOG_VIEW_SPLIT_HRZN) {
 		err = offset_selection_down(v);
+		if (err)
+			return err;
 		err = offset_selection_down(v->child);
+		if (err)
+			return err;
 	} else {
 		offset_selection_up(v);
 		offset_selection_up(v->child);
