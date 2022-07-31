@@ -37,9 +37,6 @@ tog:
   very often, and 'tog log' blocks far too long in this case
 - make it possible to view the contents of tag objects
 - verify signed tag objects
-- in the blame view, make it possible to open a log view for the commit on
-  the selected line; useful when the blamed commit is a merge commit and
-  the user wants to view relevant parent commits
 
 gotweb:
 - tracey has a gotwebd thingy in progress somewhere
