@@ -8,14 +8,6 @@ got:
   instead of the root directory checked out at /usr/src.
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
-- Improve distinction between author and committer meta-data:
-  - When creating commits honor GOT_AUTHOR as the default value for both
-    fields, with an option to override the 'author ' field in the commit
-    object (displayed as 'from: ' in got log) with a name + email-address.
-    Careful, Git requires an email address and will *fail to parse* commit
-    objects otherwise.
-  - When rebasing/histediting commits, we could keep the original 'author'
-    field intact but reset the 'committer' field to the value of GOT_AUTHOR.
 - Add an option where 'got cherrypick' and 'got backout' will immediately
   create a new commit with a log-message based on the original log message.
   This must require an up-to-date and clean work tree to avoid unrelated
