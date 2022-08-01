@@ -376,6 +376,8 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 	return NULL;
 }
 
+static int linecmp(const char *, const char *, int *);
+
 static const struct got_error *
 locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 {
@@ -385,7 +387,7 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 	size_t linesize = 0;
 	ssize_t linelen;
 	off_t match = -1;
-	int match_lineno = -1;
+	int mangled = 0, match_lineno = -1;
 
 	for (;;) {
 		linelen = getline(&line, &linesize, orig);
@@ -400,8 +402,8 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 			line[linelen - 1] = '\0';
 		(*lineno)++;
 
-		if ((mode == ' ' && !strcmp(h->lines[0] + 1, line)) ||
-		    (mode == '-' && !strcmp(h->lines[0] + 1, line)) ||
+		if ((mode == ' ' && !linecmp(h->lines[0] + 1, line, &mangled)) ||
+		    (mode == '-' && !linecmp(h->lines[0] + 1, line, &mangled)) ||
 		    (mode == '+' && *lineno == h->old_from)) {
 			match = ftello(orig);
 			if (match == -1) {
@@ -415,6 +417,9 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 		if (*lineno >= h->old_from && match != -1)
 			break;
 	}
+
+	if (mangled)
+		h->ws_mangled = 1;
 
 	if (err == NULL) {
 		*pos = match;
