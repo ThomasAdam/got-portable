@@ -20,6 +20,7 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 
 #include <errno.h>
 #include <event.h>
@@ -39,7 +40,7 @@ size_t	 fcgi_parse_record(uint8_t *, size_t, struct request *);
 void	 fcgi_parse_begin_request(uint8_t *, uint16_t, struct request *,
 	    uint16_t);
 void	 fcgi_parse_params(uint8_t *, uint16_t, struct request *, uint16_t);
-void	 fcgi_send_response(struct request *, struct fcgi_response *);
+void	 fcgi_send_response(struct request *, int, const void *, size_t);
 
 void	 dump_fcgi_record_header(const char *, struct fcgi_record_header *);
 void	 dump_fcgi_begin_request_body(const char *,
@@ -303,39 +304,13 @@ fcgi_timeout(int fd, short events, void *arg)
 int
 fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 {
-	struct fcgi_response *resp;
-	struct fcgi_record_header *header;
-	ssize_t n = 0;
-	int i;
-
 	if (c->sock->client_status == CLIENT_DISCONNECT)
 		return -1;
 
 	if (data == NULL || len == 0)
 		return 0;
 
-	if ((resp = calloc(1, sizeof(struct fcgi_response))) == NULL) {
-		log_warn("%s: cannot calloc fcgi_response", __func__);
-		return -1;
-	}
-
-	header = (struct fcgi_record_header*) resp->data;
-	header->version = 1;
-	header->type = FCGI_STDOUT;
-	header->id = htons(c->id);
-	header->padding_len = 0;
-	header->reserved = 0;
-
-	for (i = 0; i < len; i++) {
-		resp->data[i+8] = data[i];
-		n++;
-	}
-
-	header->content_len = htons(n);
-	resp->data_pos = 0;
-	resp->data_len = n + sizeof(struct fcgi_record_header);
-	fcgi_send_response(c, resp);
-
+	fcgi_send_response(c, FCGI_STDOUT, data, len);
 	return 0;
 }
 
@@ -347,31 +322,45 @@ fcgi_gen_response(struct request *c, const char *data)
 	return fcgi_gen_binary_response(c, data, strlen(data));
 }
 
-void
-fcgi_send_response(struct request *c, struct fcgi_response *resp)
+static void
+send_response(struct request *c, int type, const uint8_t *data,
+    size_t len)
 {
-	struct fcgi_record_header *header;
+	static const uint8_t padding[FCGI_PADDING_SIZE];
+	struct fcgi_record_header header;
+	struct iovec iov[3];
 	struct timespec ts;
-	size_t padded_len, off;
 	ssize_t nw;
-	int err = 0, th = 2000;
+	size_t padded_len, tot;
+	int i, err = 0, th = 2000;
 
 	ts.tv_sec = 0;
 	ts.tv_nsec = 50;
 
-	header = (struct fcgi_record_header*)resp->data;
+	memset(&header, 0, sizeof(header));
+	header.version = 1;
+	header.type = type;
+	header.id = htons(c->id);
+	header.content_len = htons(len);
 
 	/* The FastCGI spec suggests to align the output buffer */
-	padded_len = FCGI_ALIGN(resp->data_len);
-	if (padded_len > resp->data_len) {
-		/* There should always be FCGI_PADDING_SIZE bytes left */
-		if (padded_len > FCGI_RECORD_SIZE)
-			log_warn("response too long");
-		header->padding_len = padded_len - resp->data_len;
-		resp->data_len = padded_len;
+	tot = sizeof(header) + len;
+	padded_len = FCGI_ALIGN(tot);
+	if (padded_len > tot) {
+		header.padding_len = padded_len - tot;
+		tot += header.padding_len;
 	}
 
-	dump_fcgi_record("resp ", header);
+	iov[0].iov_base = &header;
+	iov[0].iov_len = sizeof(header);
+
+	iov[1].iov_base = (void *)data;
+	iov[1].iov_len = len;
+
+	iov[2].iov_base = (void *)padding;
+	iov[2].iov_len = header.padding_len;
+
+	dump_fcgi_record("resp ", &header);
 
 	/*
 	 * XXX: add some simple write heuristics here
@@ -379,8 +368,8 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 	 * disconnect. Let's at least try to write the data a few times before
 	 * giving up.
 	 */
-	for (off = 0; off < resp->data_len; off += nw) {
-		nw = write(c->fd, resp->data + off, resp->data_len - off);
+	while (tot > 0) {
+		nw = writev(c->fd, iov, nitems(iov));
 		if (nw == 0) {
 			c->sock->client_status = CLIENT_DISCONNECT;
 			break;
@@ -388,7 +377,6 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 		if (nw == -1) {
 			err++;
 			if (errno == EAGAIN && err < th) {
-				nw = 0;
 				nanosleep(&ts, NULL);
 				continue;
 			}
@@ -397,44 +385,53 @@ fcgi_send_response(struct request *c, struct fcgi_response *resp)
 			break;
 		}
 
-		if (nw != resp->data_len - off)
-			log_debug("%s: partial write: %zu vs %zu", __func__, nw,
-			    resp->data_len - off);
+		if (nw != tot)
+			log_debug("%s: partial write: %zu vs %zu", __func__,
+			    nw, tot);
+
+		tot -= nw;
+		for (i = 0; i < nitems(iov); ++i) {
+			if (nw < iov[i].iov_len) {
+				iov[i].iov_base += nw;
+				iov[i].iov_len -= nw;
+				break;
+			}
+			nw -= iov[i].iov_len;
+			iov[i].iov_len = 0;
+		}
+	}
+}
+
+void
+fcgi_send_response(struct request *c, int type, const void *data,
+    size_t len)
+{
+	while (len > FCGI_CONTENT_SIZE) {
+		send_response(c, type, data, len);
+		if (c->sock->client_status == CLIENT_DISCONNECT)
+			return;
+
+		data += FCGI_CONTENT_SIZE;
+		len -= FCGI_CONTENT_SIZE;
 	}
 
-	free(resp);
+	if (len == 0)
+		return;
+
+	send_response(c, type, data, len);
 }
 
 void
 fcgi_create_end_record(struct request *c)
 {
-	struct fcgi_response *resp;
-	struct fcgi_record_header *header;
-	struct fcgi_end_request_body *end_request;
+	struct fcgi_end_request_body end_request;
 
-	if ((resp = calloc(1, sizeof(struct fcgi_response))) == NULL) {
-		log_warn("cannot calloc fcgi_response");
-		return;
-	}
-	header = (struct fcgi_record_header*) resp->data;
-	header->version = 1;
-	header->type = FCGI_END_REQUEST;
-	header->id = htons(c->id);
-	header->content_len = htons(sizeof(struct
-	    fcgi_end_request_body));
-	header->padding_len = 0;
-	header->reserved = 0;
-	end_request = (struct fcgi_end_request_body *) (resp->data +
-	    sizeof(struct fcgi_record_header));
-	end_request->app_status = htonl(0); /* script_status */
-	end_request->protocol_status = FCGI_REQUEST_COMPLETE;
-	end_request->reserved[0] = 0;
-	end_request->reserved[1] = 0;
-	end_request->reserved[2] = 0;
-	resp->data_pos = 0;
-	resp->data_len = sizeof(struct fcgi_end_request_body) +
-	    sizeof(struct fcgi_record_header);
-	fcgi_send_response(c, resp);
+	memset(&end_request, 0, sizeof(end_request));
+	end_request.app_status = htonl(0); /* script status */
+	end_request.protocol_status = FCGI_REQUEST_COMPLETE;
+
+	fcgi_send_response(c, FCGI_END_REQUEST, &end_request,
+	    sizeof(end_request));
 }
 
 void

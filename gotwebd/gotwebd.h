@@ -134,13 +134,6 @@ struct fcgi_record_header {
 	uint8_t		reserved;
 }__attribute__((__packed__));
 
-struct fcgi_response {
-	TAILQ_ENTRY(fcgi_response)	entry;
-	uint8_t				data[FCGI_RECORD_SIZE];
-	size_t				data_pos;
-	size_t				data_len;
-};
-
 struct repo_dir {
 	char			*name;
 	char			*owner;
