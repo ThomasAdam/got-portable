@@ -412,12 +412,12 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 			match_lineno = (*lineno)-1;
 		}
 
-		if (*lineno >= h->old_from && match != -1)
+		if (*lineno >= h->old_from && match != -1) {
+			if (mangled)
+				h->ws_mangled = 1;
 			break;
+		}
 	}
-
-	if (mangled)
-		h->ws_mangled = 1;
 
 	if (err == NULL) {
 		*pos = match;
