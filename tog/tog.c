@@ -523,6 +523,7 @@ struct tog_view {
 	int maxx, x; /* max column and current start column */
 	int lines, cols; /* copies of LINES and COLS */
 	int nscrolled, offset; /* lines scrolled and hsplit line offset */
+	int gline, hiline; /* navigate to and highlight this nG line */
 	int ch, count; /* current keymap and count prefix */
 	int resized; /* set when in a resize event */
 	int focussed; /* Only set on one parent or child view at a time. */
@@ -1288,6 +1289,7 @@ get_compound_key(struct tog_view *view, int c)
 
 	view->count = 0;
 	cbreak();  /* block for input */
+	nodelay(view->window, FALSE);
 	wmove(v->window, v->nlines - 1, 0);
 	wclrtoeol(v->window);
 	waddch(v->window, ':');
@@ -1308,6 +1310,12 @@ get_compound_key(struct tog_view *view, int c)
 		else
 			n = n * 10 + (c - '0');
 	} while (((c = wgetch(view->window))) >= '0' && c <= '9' && c != ERR);
+
+	if (c == 'G' || c == 'g') {	/* nG key map */
+		view->gline = view->hiline = n;
+		n = 0;
+		c = 0;
+	}
 
 	/* Massage excessive or inapplicable values at the input handler. */
 	view->count = n;
@@ -1346,7 +1354,6 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		return NULL;
 	}
 
-	nodelay(view->window, FALSE);
 	/* Allow threads to make progress while we are waiting for input. */
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
@@ -1365,10 +1372,12 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		if (ch >= '1' && ch  <= '9')
 			view->ch = ch = get_compound_key(view, ch);
 	}
+	if (view->hiline && ch != ERR && ch != 0)
+		view->hiline = 0;  /* key pressed, clear line highlight */
+	nodelay(view->window, TRUE);
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_lock");
-	nodelay(view->window, TRUE);
 
 	if (tog_sigwinch_received || tog_sigcont_received) {
 		tog_resizeterm();
@@ -2503,7 +2512,8 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 		/*
 		 * Ask the log thread for required amount of commits.
 		 */
-		s->thread_args.commits_needed += maxscroll;
+		s->thread_args.commits_needed +=
+		    ncommits_needed - s->commits.ncommits;
 		err = trigger_log_thread(view, 1);
 		if (err)
 			return err;
@@ -3256,6 +3266,42 @@ view_init_hsplit(struct tog_view *view, int y)
 }
 
 static const struct got_error *
+log_goto_line(struct tog_view *view, int nlines)
+{
+	const struct got_error		*err = NULL;
+	struct tog_log_view_state	*s = &view->state.log;
+	int				 g, idx = s->selected_entry->idx;
+
+	g = view->gline;
+	view->gline = 0;
+
+	if (g >= s->first_displayed_entry->idx + 1 &&
+	    g <= s->last_displayed_entry->idx + 1 &&
+	    g - s->first_displayed_entry->idx - 1 < nlines) {
+		s->selected = g - s->first_displayed_entry->idx - 1;
+		select_commit(s);
+		return NULL;
+	}
+
+	if (idx + 1 < g) {
+		err = log_move_cursor_down(view, g - idx - 1);
+		if (!err && g > s->selected_entry->idx + 1)
+			err = log_move_cursor_down(view,
+			    g - s->first_displayed_entry->idx - 1);
+		if (err)
+			return err;
+	} else if (idx + 1 > g)
+		log_move_cursor_up(view, idx - g + 1, 0);
+
+	if (g < nlines && s->first_displayed_entry->idx == 0)
+		s->selected = g - 1;
+
+	select_commit(s);
+	return NULL;
+
+}
+
+static const struct got_error *
 input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
@@ -3276,6 +3322,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	eos = nscroll = view->nlines - 1;
 	if (view_is_hsplit_top(view))
 		--eos;  /* border */
+
+	if (view->gline)
+		return log_goto_line(view, eos);
 
 	switch (ch) {
 	case 'q':
@@ -3844,13 +3893,55 @@ done:
 	return err;
 }
 
+static int
+gotoline(struct tog_view *view, int *lineno, int *nprinted)
+{
+	FILE	*f = NULL;
+	int	*eof, *first, *selected;
+
+	if (view->type == TOG_VIEW_DIFF) {
+		struct tog_diff_view_state *s = &view->state.diff;
+
+		first = &s->first_displayed_line;
+		selected = first;
+		eof = &s->eof;
+		f = s->f;
+	} else if (view->type == TOG_VIEW_BLAME) {
+		struct tog_blame_view_state *s = &view->state.blame;
+
+		first = &s->first_displayed_line;
+		selected = &s->selected_line;
+		eof = &s->eof;
+		f = s->blame.f;
+	} else
+		return 0;
+
+	/* Center gline in the middle of the page like vi(1). */
+	if (*lineno < view->gline - (view->nlines - 3) / 2)
+		return 0;
+	if (*first != 1 && (*lineno > view->gline - (view->nlines - 3) / 2)) {
+		rewind(f);
+		*eof = 0;
+		*first = 1;
+		*lineno = 0;
+		*nprinted = 0;
+		return 0;
+	}
+
+	*selected = view->gline <= (view->nlines - 3) / 2 ?
+		view->gline : (view->nlines - 3) / 2 + 1;
+	view->gline = 0;
+
+	return 1;
+}
+
 static const struct got_error *
 draw_file(struct tog_view *view, const char *header)
 {
 	struct tog_diff_view_state *s = &view->state.diff;
 	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
-	int nprinted = 0;
+	int lineno, nprinted = 0;
 	char *line;
 	size_t linesize = 0;
 	ssize_t linelen;
@@ -3860,17 +3951,24 @@ draw_file(struct tog_view *view, const char *header)
 	int max_lines = view->nlines;
 	int nlines = s->nlines;
 	off_t line_offset;
+	attr_t attr;
 
+	lineno = s->first_displayed_line - 1;
 	line_offset = s->line_offsets[s->first_displayed_line - 1];
 	if (fseeko(s->f, line_offset, SEEK_SET) == -1)
 		return got_error_from_errno("fseek");
 
 	werase(view->window);
 
+	if (view->gline > s->nlines - 1)
+		view->gline = s->nlines - 1;
+
 	if (header) {
-		if (asprintf(&line, "[%d/%d] %s",
-		    s->first_displayed_line - 1 + s->selected_line, nlines,
-		    header) == -1)
+		int ln = view->gline ? view->gline <= (view->nlines - 3) / 2 ?
+		    1 : view->gline - (view->nlines - 3) / 2 :
+		    lineno + s->selected_line;
+
+		if (asprintf(&line, "[%d/%d] %s", ln, nlines, header) == -1)
 			return got_error_from_errno("asprintf");
 		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
 		    0, 0);
@@ -3907,6 +4005,14 @@ draw_file(struct tog_view *view, const char *header)
 			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
+		attr = 0;
+		if (++lineno < s->first_displayed_line)
+			continue;
+		if (view->gline && !gotoline(view, &lineno, &nprinted))
+			continue;
+		if (lineno == view->hiline)
+			attr = A_STANDOUT;
+
 		/* Set view->maxx based on full line length. */
 		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 0,
 		    view->x ? 1 : 0);
@@ -3920,8 +4026,9 @@ draw_file(struct tog_view *view, const char *header)
 
 		tc = match_color(&s->colors, line);
 		if (tc)
-			wattr_on(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
+			attr |= COLOR_PAIR(tc->colorpair);
+		if (attr)
+			wattron(view->window, attr);
 		if (s->first_displayed_line + nprinted == s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
 			err = add_matched_line(&width, line, view->ncols, 0,
@@ -3942,12 +4049,18 @@ draw_file(struct tog_view *view, const char *header)
 			free(wline);
 			wline = NULL;
 		}
-		if (tc)
-			wattr_off(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
-		if (width <= view->ncols - 1)
-			waddch(view->window, '\n');
-		nprinted++;
+		if (lineno == view->hiline) {
+			/* highlight full gline length */
+			while (width++ < view->ncols)
+				waddch(view->window, ' ');
+		} else {
+			if (width <= view->ncols - 1)
+				waddch(view->window, '\n');
+		}
+		if (attr)
+			wattroff(view->window, attr);
+		if (++nprinted == 1)
+			s->first_displayed_line = lineno;
 	}
 	free(line);
 	if (nprinted >= 1)
@@ -5064,7 +5177,10 @@ draw_blame(struct tog_view *view)
 	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 
-	if (asprintf(&line, "[%d/%d] %s%s",
+	if (view->gline > blame->nlines)
+		view->gline = blame->nlines;
+
+	if (asprintf(&line, "[%d/%d] %s%s", view->gline ? view->gline :
 	    s->first_displayed_line - 1 + s->selected_line, blame->nlines,
 	    s->blame_complete ? "" : "annotating... ", s->path) == -1) {
 		free(id_str);
@@ -5095,6 +5211,8 @@ draw_blame(struct tog_view *view)
 			return got_ferror(blame->f, GOT_ERR_IO);
 		}
 		if (++lineno < s->first_displayed_line)
+			continue;
+		if (view->gline && !gotoline(view, &lineno, &nprinted))
 			continue;
 
 		/* Set view->maxx based on full line length. */
@@ -6180,7 +6298,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	struct got_tree_entry *te;
 	wchar_t *wline;
 	struct tog_color *tc;
-	int width, n, i, nentries;
+	int width, n, nentries, i = 1;
 	int limit = view->nlines;
 
 	s->ndisplayed = 0;
@@ -6210,6 +6328,15 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		wstandend(view->window);
 	free(wline);
 	wline = NULL;
+
+	if (s->selected_entry) {
+		i = got_tree_entry_get_index(s->selected_entry);
+		i += s->tree == s->root ? 1 : 2;  /* account for ".." entry */
+	}
+	nentries = got_object_tree_get_nentries(s->tree);
+	wprintw(view->window, " [%d/%d]", i,
+	    nentries + (s->tree == s->root ? 0 : 1));  /* ".." in !root tree */
+
 	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 	if (--limit <= 0)
@@ -6248,7 +6375,6 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		te = s->first_displayed_entry;
 	}
 
-	nentries = got_object_tree_get_nentries(s->tree);
 	for (i = got_tree_entry_get_index(te); i < nentries; i++) {
 		char *line = NULL, *id_str = NULL, *link_target = NULL;
 		const char *modestr = "";
@@ -6368,8 +6494,10 @@ tree_scroll_down(struct tog_view *view, int maxscroll)
 
 	last = s->last_displayed_entry;
 	while (next && n++ < maxscroll) {
-		if (last)
+		if (last) {
+			s->last_displayed_entry = last;
 			last = got_tree_entry_get_next(s->tree, last);
+		}
 		if (last || (view->mode == TOG_VIEW_SPLIT_HRZN && next)) {
 			s->first_displayed_entry = next;
 			next = got_tree_entry_get_next(s->tree, next);
@@ -6710,12 +6838,76 @@ show_tree_view(struct tog_view *view)
 }
 
 static const struct got_error *
+tree_goto_line(struct tog_view *view, int nlines)
+{
+	const struct got_error		 *err = NULL;
+	struct tog_tree_view_state	 *s = &view->state.tree;
+	struct got_tree_entry		**fte, **lte, **ste;
+	int				  g, last, first = 1, i = 1;
+	int				  root = s->tree == s->root;
+	int				  off = root ? 1 : 2;
+
+	g = view->gline;
+	view->gline = 0;
+
+	if (g == 0)
+		g = 1;
+	else if (g > got_object_tree_get_nentries(s->tree))
+		g = got_object_tree_get_nentries(s->tree) + (root ? 0 : 1);
+
+	fte = &s->first_displayed_entry;
+	lte = &s->last_displayed_entry;
+	ste = &s->selected_entry;
+
+	if (*fte != NULL) {
+		first = got_tree_entry_get_index(*fte);
+		first += off;  /* account for ".." */
+	}
+	last = got_tree_entry_get_index(*lte);
+	last += off;
+
+	if (g >= first && g <= last && g - first < nlines) {
+		s->selected = g - first;
+		return NULL;	/* gline is on the current page */
+	}
+
+	if (*ste != NULL) {
+		i = got_tree_entry_get_index(*ste);
+		i += off;
+	}
+
+	if (i < g) {
+		err = tree_scroll_down(view, g - i);
+		if (err)
+			return err;
+		if (got_tree_entry_get_index(*lte) >=
+		    got_object_tree_get_nentries(s->tree) - 1 &&
+		    first + s->selected < g &&
+		    s->selected < s->ndisplayed - 1) {
+			first = got_tree_entry_get_index(*fte);
+			first += off;
+			s->selected = g - first;
+		}
+	} else if (i > g)
+		tree_scroll_up(s, i - g);
+
+	if (g < nlines &&
+	    (*fte == NULL || (root && !got_tree_entry_get_index(*fte))))
+		s->selected = g - 1;
+
+	return NULL;
+}
+
+static const struct got_error *
 input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct got_tree_entry *te;
 	int n, nscroll = view->nlines - 3;
+
+	if (view->gline)
+		return tree_goto_line(view, nscroll);
 
 	switch (ch) {
 	case 'i':
@@ -7278,8 +7470,10 @@ ref_scroll_down(struct tog_view *view, int maxscroll)
 
 	last = s->last_displayed_entry;
 	while (next && n++ < maxscroll) {
-		if (last)
+		if (last) {
+			s->last_displayed_entry = last;
 			last = TAILQ_NEXT(last, entry);
+		}
 		if (last || (view->mode == TOG_VIEW_SPLIT_HRZN)) {
 			s->first_displayed_entry = next;
 			next = TAILQ_NEXT(next, entry);
@@ -7560,6 +7754,47 @@ done:
 	free(commit_id);
 	return err;
 }
+
+static const struct got_error *
+ref_goto_line(struct tog_view *view, int nlines)
+{
+	const struct got_error		*err = NULL;
+	struct tog_ref_view_state	*s = &view->state.ref;
+	int				 g, idx = s->selected_entry->idx;
+
+	g = view->gline;
+	view->gline = 0;
+
+	if (g == 0)
+		g = 1;
+	else if (g > s->nrefs)
+		g = s->nrefs;
+
+	if (g >= s->first_displayed_entry->idx + 1 &&
+	    g <= s->last_displayed_entry->idx + 1 &&
+	    g - s->first_displayed_entry->idx - 1 < nlines) {
+		s->selected = g - s->first_displayed_entry->idx - 1;
+		return NULL;
+	}
+
+	if (idx + 1 < g) {
+		err = ref_scroll_down(view, g - idx - 1);
+		if (err)
+			return err;
+		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL &&
+		    s->first_displayed_entry->idx + s->selected < g &&
+		    s->selected < s->ndisplayed - 1)
+			s->selected = g - s->first_displayed_entry->idx - 1;
+	} else if (idx + 1 > g)
+		ref_scroll_up(s, idx - g + 1);
+
+	if (g < nlines && s->first_displayed_entry->idx == 0)
+		s->selected = g - 1;
+
+	return NULL;
+
+}
+
 static const struct got_error *
 input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
@@ -7567,6 +7802,9 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_reflist_entry *re;
 	int n, nscroll = view->nlines - 1;
+
+	if (view->gline)
+		return ref_goto_line(view, nscroll);
 
 	switch (ch) {
 	case 'i':
