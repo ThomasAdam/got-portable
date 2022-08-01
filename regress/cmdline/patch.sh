@@ -16,8 +16,8 @@
 
 . ./common.sh
 
-test_patch_add_file() {
-	local testroot=`test_init patch_add_file`
+test_patch_basic() {
+	local testroot=`test_init patch_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -26,90 +26,12 @@ test_patch_add_file() {
 		return 1
 	fi
 
-	cat <<EOF > $testroot/wt/patch
---- /dev/null
-+++ eta
-@@ -0,0 +5,5 @@
-+1
-+2
-+3
-+4
-+5
-EOF
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	jot 100 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		>/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	echo "A  eta" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	jot 5 > $testroot/wt/eta.expected
-	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/wt/eta.expected $testroot/wt/eta
-	fi
-	test_done $testroot $ret
-}
-
-test_patch_rm_file() {
-	local testroot=`test_init patch_rm_file`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cat <<EOF > $testroot/wt/patch
---- alpha
-+++ /dev/null
-@@ -1 +0,0 @@
--alpha
-EOF
-
-	echo "D  alpha" > $testroot/stdout.expected
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	if [ -f $testroot/wt/alpha ]; then
-		ret=1
-		echo "alpha still exists!"
-	fi
-	test_done $testroot $ret
-}
-
-test_patch_simple_edit_file() {
-	local testroot=`test_init patch_simple_edit_file`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
+		test_done "$testroot" $ret
 		return 1
 	fi
 
@@ -119,16 +41,63 @@ test_patch_simple_edit_file() {
 @@ -1 +1 @@
 -alpha
 +alpha is my favourite character
+--- beta
++++ /dev/null
+@@ -1 +0,0 @@
+-beta
+--- gamma/delta
++++ gamma/delta
+@@ -1 +1,2 @@
++this is:
+ delta
+--- /dev/null
++++ eta
+@@ -0,0 +5,5 @@
++1
++2
++3
++4
++5
+--- numbers
++++ numbers
+@@ -3,7 +3,7 @@
+ 3
+ 4
+ 5
+-6
++six
+ 7
+ 8
+ 9
+@@ -57,7 +57,7 @@
+ 57
+ 58
+ 59
+-60
++sixty
+ 61
+ 62
+ 63
+@@ -98,3 +98,6 @@
+ 98
+ 99
+ 100
++101
++102
++103
 EOF
 
-	echo "M  alpha" > $testroot/stdout.expected
-
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
 	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
+		test_done "$testroot" $ret
 		return 1
 	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'M  gamma/delta' >> $testroot/stdout.expected
+	echo 'A  eta' >> $testroot/stdout.expected
+	echo 'M  numbers' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -143,258 +112,43 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
-	fi
-	test_done $testroot $ret
-}
-
-test_patch_prepend_line() {
-	local testroot=`test_init patch_prepend_line`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
+		test_done "$testroot" $ret
 		return 1
 	fi
 
-	cat <<EOF > $testroot/wt/patch
---- alpha
-+++ alpha
-@@ -1 +1,2 @@
-+hatsuseno
- alpha
-EOF
-
-	echo "M  alpha" > $testroot/stdout.expected
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
+	if [ -f "$testroot/wt/beta" ]; then
+		echo "beta was not deleted!" >&2
+		test_done "$testroot" 1
 		return 1
 	fi
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	echo 'this is:' > $testroot/wt/gamma/delta.expected
+	echo 'delta' >> $testroot/wt/gamma/delta.expected
+	cmp -s $testroot/wt/gamma/delta.expected $testroot/wt/gamma/delta
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
+		diff -u $testroot/wt/gamma/delta.expected $testroot/wt/gamma/delta
+		test_done "$testroot" $ret
 		return 1
 	fi
 
-	echo hatsuseno > $testroot/wt/alpha.expected
-	echo alpha    >> $testroot/wt/alpha.expected
-	cmp -s $testroot/wt/alpha.expected $testroot/wt/alpha
+	jot 5 > $testroot/wt/eta.expected
+	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/wt/alpha.expected $testroot/wt/alpha
-	fi
-	test_done $testroot $ret
-}
-
-test_patch_replace_line() {
-	local testroot=`test_init patch_replace_line`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
+		diff -u $testroot/wt/eta.expected $testroot/wt/eta
+		test_done "$testroot" $ret
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
-	(cd $testroot/wt/ && got add numbers && got ci -m 'add numbers') \
-		>/dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cat <<EOF > $testroot/wt/patch
---- numbers
-+++ numbers
-@@ -3,7 +3,7 @@
- 3
- 4
- 5
--6
-+foo
- 7
- 8
- 9
-EOF
-
-	echo "M  numbers" > $testroot/stdout.expected
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	jot 10 | sed 's/6/foo/' > $testroot/wt/numbers.expected
-	cmp -s $testroot/wt/numbers.expected $testroot/wt/numbers
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/wt/numbers.expected $testroot/wt/numbers
-	fi
-	test_done $testroot $ret
-}
-
-test_patch_multiple_hunks() {
-	local testroot=`test_init patch_replace_multiple_hunks`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	jot 100 > $testroot/wt/numbers
-	(cd $testroot/wt/ && got add numbers && got ci -m 'add numbers') \
-		>/dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cat <<EOF > $testroot/wt/patch
---- numbers
-+++ numbers
-@@ -3,7 +3,7 @@
- 3
- 4
- 5
--6
-+foo
- 7
- 8
- 9
-@@ -57,7 +57,7 @@
- 57
- 58
- 59
--60
-+foo foo
- 61
- 62
- 63
-@@ -98,3 +98,6 @@
- 98
- 99
- 100
-+101
-+102
-+...
-EOF
-
-	echo "M  numbers" > $testroot/stdout.expected
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	jot 100 | sed -e 's/^6$/foo/' -e 's/^60$/foo foo/' \
+	jot 103 | sed -e 's/^6$/six/' -e 's/60/sixty/' \
 		> $testroot/wt/numbers.expected
-	echo "101" >> $testroot/wt/numbers.expected
-	echo "102" >> $testroot/wt/numbers.expected
-	echo "..." >> $testroot/wt/numbers.expected
-
 	cmp -s $testroot/wt/numbers.expected $testroot/wt/numbers
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/wt/numbers.expected $testroot/wt/numbers
 	fi
 	test_done $testroot $ret
-}
-
-test_patch_multiple_files() {
-	local testroot=`test_init patch_multiple_files`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cat <<EOF > $testroot/wt/patch
---- alpha	Mon Mar  7 19:02:07 2022
-+++ alpha	Mon Mar  7 19:01:53 2022
-@@ -1 +1,3 @@
-+new
- alpha
-+available
---- beta	Mon Mar  7 19:02:11 2022
-+++ beta	Mon Mar  7 19:01:46 2022
-@@ -1 +1,3 @@
- beta
-+was
-+improved
---- gamma/delta	Mon Mar  7 19:02:17 2022
-+++ gamma/delta	Mon Mar  7 19:01:37 2022
-@@ -1 +1 @@
--delta
-+delta new
-EOF
-
-	echo "M  alpha" > $testroot/stdout.expected
-	echo "M  beta" >> $testroot/stdout.expected
-	echo "M  gamma/delta" >> $testroot/stdout.expected
-
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done $testroot $ret
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done $testroot $ret
-		return 1
-	fi
-
-	printf 'new\nalpha\navailable\n' > $testroot/wt/alpha.expected
-	printf 'beta\nwas\nimproved\n' > $testroot/wt/beta.expected
-	printf 'delta new\n' > $testroot/wt/gamma/delta.expected
-
-	for f in alpha beta gamma/delta; do
-		cmp -s $testroot/wt/$f.expected $testroot/wt/$f
-		ret=$?
-		if [ $ret -ne 0 ]; then
-			diff -u $testroot/wt/$f.expected $testroot/wt/$f
-			test_done $testroot $ret
-			return 1
-		fi
-	done
-
-	test_done $testroot 0
 }
 
 test_patch_dont_apply() {
@@ -2010,13 +1764,7 @@ EOF
 }
 
 test_parseargs "$@"
-run_test test_patch_add_file
-run_test test_patch_rm_file
-run_test test_patch_simple_edit_file
-run_test test_patch_prepend_line
-run_test test_patch_replace_line
-run_test test_patch_multiple_hunks
-run_test test_patch_multiple_files
+run_test test_patch_basic
 run_test test_patch_dont_apply
 run_test test_patch_malformed
 run_test test_patch_no_patch
