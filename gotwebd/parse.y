@@ -814,20 +814,30 @@ closefile(struct file *xfile)
 	free(xfile);
 }
 
+static void
+add_default_server(void)
+{
+	new_srv = conf_new_server(D_SITENAME);
+	log_debug("%s: adding default server %s", __func__, D_SITENAME);
+}
+
 int
 parse_config(const char *filename, struct gotwebd *env)
 {
 	struct sym *sym, *next;
 
-	file = newfile(filename, 0);
-	if (file == NULL)
-		/* just return, as we don't require a conf file */
-		return (0);
-
 	if (config_init(env) == -1)
 		fatalx("failed to initialize configuration");
 
 	gotwebd = env;
+
+	file = newfile(filename, 0);
+	if (file == NULL) {
+		add_default_server();
+		sockets_parse_sockets(env);
+		/* just return, as we don't require a conf file */
+		return (0);
+	}
 
 	yyparse();
 	errors = file->errors;
@@ -850,10 +860,8 @@ parse_config(const char *filename, struct gotwebd *env)
 		return (-1);
 
 	/* just add default server if no config specified */
-	if (gotwebd->server_cnt == 0) {
-		new_srv = conf_new_server(D_SITENAME);
-		log_debug("%s: adding default server %s", __func__, D_SITENAME);
-	}
+	if (gotwebd->server_cnt == 0)
+		add_default_server();
 
 	/* setup our listening sockets */
 	sockets_parse_sockets(env);
