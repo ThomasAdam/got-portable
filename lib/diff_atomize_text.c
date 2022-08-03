@@ -29,7 +29,11 @@
 #include "diff_internal.h"
 #include "diff_debug.h"
 
-unsigned int
+/*
+ * Mix another atom_byte into the provided hash value and return the result.
+ * The hash value passed in for the first byte of the atom must be zero.
+ */
+static unsigned int
 diff_atom_hash_update(unsigned int hash, unsigned char atom_byte)
 {
 	return hash * 23 + atom_byte;

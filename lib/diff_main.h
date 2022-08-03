@@ -39,11 +39,6 @@ struct diff_atom {
 	unsigned int hash;
 };
 
-/* Mix another atom_byte into the provided hash value and return the result.
- * The hash value passed in for the first byte of the atom must be zero. */
-unsigned int
-diff_atom_hash_update(unsigned int hash, unsigned char atom_byte);
-
 /* Compare two atoms for equality. Return 0 on success, or errno on failure.
  * Set cmp to -1, 0, or 1, just like strcmp(). */
 int
