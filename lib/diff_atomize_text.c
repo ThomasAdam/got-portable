@@ -143,7 +143,7 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 		while (line_end < end && *line_end != '\r' && *line_end != '\n') {
 			if (!ignore_whitespace
 			    || !isspace(*line_end))
-				hash = hash * 23 + *line_end;
+				hash = diff_atom_hash_update(hash, *line_end);
 			if (*line_end == '\0')
 				embedded_nul = true;
 			line_end++;
