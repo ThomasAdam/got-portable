@@ -7478,11 +7478,6 @@ cmd_tag(int argc, char *argv[])
 			if (error)
 				goto done;
 		}
-		if (worktree) {
-			/* Release work tree lock. */
-			got_worktree_close(worktree);
-			worktree = NULL;
-		}
 
 		if (tagmsg) {
 			if (signer_id) {
@@ -7511,6 +7506,12 @@ cmd_tag(int argc, char *argv[])
 			free(commit_id);
 			if (error)
 				goto done;
+		}
+
+		if (worktree) {
+			/* Release work tree lock. */
+			got_worktree_close(worktree);
+			worktree = NULL;
 		}
 
 		error = add_tag(repo, tagger, tag_name,
