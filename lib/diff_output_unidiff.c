@@ -229,6 +229,7 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 {
 	int rc, left_start, left_len, right_start, right_len;
 	off_t outoff = 0, *offp;
+	uint8_t *typep;
 
 	if (diff_range_empty(&cc->left) && diff_range_empty(&cc->right))
 		return DIFF_RC_OK;
@@ -249,7 +250,10 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 				return ENOMEM;
 			outoff += rc;
 			*offp = outoff;
-
+			ARRAYLIST_ADD(typep, outinfo->line_types);
+			if (typep == NULL)
+				return ENOMEM;
+			*typep = DIFF_LINE_MINUS;
 		}
 		rc = fprintf(dest, "+++ %s\n",
 		    diff_output_get_label_right(info));
@@ -261,7 +265,10 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 				return ENOMEM;
 			outoff += rc;
 			*offp = outoff;
-
+			ARRAYLIST_ADD(typep, outinfo->line_types);
+			if (typep == NULL)
+				return ENOMEM;
+			*typep = DIFF_LINE_PLUS;
 		}
 		state->header_printed = true;
 	}
@@ -319,7 +326,10 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 			return ENOMEM;
 		outoff += rc;
 		*offp = outoff;
-
+		ARRAYLIST_ADD(typep, outinfo->line_types);
+		if (typep == NULL)
+			return ENOMEM;
+		*typep = DIFF_LINE_HUNK;
 	}
 
 	/* Got the absolute line numbers where to start printing, and the index
@@ -426,6 +436,7 @@ diff_output_unidiff(struct diff_output_info **output_info,
 	bool force_text = (flags & DIFF_FLAG_FORCE_TEXT_DATA);
 	bool have_binary = (atomizer_flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
 	off_t outoff = 0, *offp;
+	uint8_t *typep;
 	int rc, i;
 
 	if (!result)
@@ -463,7 +474,10 @@ diff_output_unidiff(struct diff_output_info **output_info,
 					return ENOMEM;
 				outoff += rc;
 				*offp = outoff;
-
+				ARRAYLIST_ADD(typep, outinfo->line_types);
+				if (typep == NULL)
+					return ENOMEM;
+				*typep = DIFF_LINE_NONE;
 			}
 			break;
 		}
