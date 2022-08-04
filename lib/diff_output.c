@@ -64,6 +64,7 @@ diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 {
 	struct diff_atom *atom;
 	off_t outoff = 0, *offp;
+	uint8_t *typep;
 	int rc;
 
 	if (outinfo && outinfo->line_offsets.len > 0) {
@@ -122,6 +123,12 @@ diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 				return ENOMEM;
 			outoff += outlen;
 			*offp = outoff;
+			ARRAYLIST_ADD(typep, outinfo->line_types);
+			if (typep == NULL)
+				return ENOMEM;
+			*typep = *prefix == ' ' ? DIFF_LINE_CONTEXT :
+			    *prefix == '-' ? DIFF_LINE_MINUS :
+			    *prefix == '+' ? DIFF_LINE_PLUS : DIFF_LINE_NONE;
 		}
 	}
 
@@ -207,6 +214,8 @@ diff_output_trailing_newline_msg(struct diff_output_info *outinfo, FILE *dest,
 	unsigned int atom_count;
 	int rc, ch;
 	off_t outoff = 0, *offp;
+	uint8_t *typep;
+
 
 	if (chunk_type == CHUNK_MINUS || chunk_type == CHUNK_SAME) {
 		start_atom = c->left_start;
@@ -240,6 +249,10 @@ diff_output_trailing_newline_msg(struct diff_output_info *outinfo, FILE *dest,
 				return ENOMEM;
 			outoff += rc;
 			*offp = outoff;
+			ARRAYLIST_ADD(typep, outinfo->line_types);
+			if (typep == NULL)
+				return ENOMEM;
+			*typep = DIFF_LINE_NONE;
 		}
 	}
 
@@ -316,6 +329,7 @@ diff_output_info_alloc(void)
 {
 	struct diff_output_info *output_info;
 	off_t *offp;
+	uint8_t *typep;
 
 	output_info = malloc(sizeof(*output_info));
 	if (output_info != NULL) {
@@ -326,6 +340,13 @@ diff_output_info_alloc(void)
 			return NULL;
 		}
 		*offp = 0;
+		ARRAYLIST_INIT(output_info->line_types, 128);
+		ARRAYLIST_ADD(typep, output_info->line_types);
+		if (typep == NULL) {
+			diff_output_info_free(output_info);
+			return NULL;
+		}
+		*typep = DIFF_LINE_NONE;
 	}
 	return output_info;
 }
@@ -334,6 +355,7 @@ void
 diff_output_info_free(struct diff_output_info *output_info)
 {
 	ARRAYLIST_FREE(output_info->line_offsets);
+	ARRAYLIST_FREE(output_info->line_types);
 	free(output_info);
 }
 
