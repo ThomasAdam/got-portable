@@ -61,6 +61,10 @@ test_tag_create() {
 	fi
 
 	# Create a tag based on implied worktree HEAD ref
+	(cd $testroot/wt && got branch foo > /dev/null)
+	echo 'foo' >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m foo > /dev/null)
+	local commit_id2=`git_show_branch_head $testroot/repo foo`
 	(cd $testroot/wt && got tag -m 'test' $tag2 > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -79,6 +83,14 @@ test_tag_create() {
 		return 1
 	fi
 
+	tagged_commit=`got cat -r $testroot/repo $tag2 | grep ^object \
+		| cut -d' ' -f2`
+	if [ "$tagged_commit" != "$commit_id2" ]; then
+		echo "wrong commit was tagged" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	(cd $testroot/repo && git checkout -q $tag2)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -93,7 +105,7 @@ test_tag_create() {
 		2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
-		echo "git tag command succeeded unexpectedly"
+		echo "got tag command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -109,10 +121,11 @@ test_tag_create() {
 	fi
 
 	got ref -r $testroot/repo -l > $testroot/stdout
-	echo "HEAD: $commit_id" > $testroot/stdout.expected
+	echo "HEAD: $commit_id2" > $testroot/stdout.expected
 	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
 	cat $testroot/wt/.got/uuid | tr -d '\n' >> $testroot/stdout.expected
-	echo ": $commit_id" >> $testroot/stdout.expected
+	echo ": $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id2" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/tags/$tag: $tag_id" >> $testroot/stdout.expected
 	echo "refs/tags/$tag2: $tag_id2" >> $testroot/stdout.expected
