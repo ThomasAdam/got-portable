@@ -252,7 +252,7 @@ done:
 }
 
 const struct got_error *
-got_diffreg_output(off_t **line_offsets, size_t *nlines,
+got_diffreg_output(struct got_diff_line **lines, size_t *nlines,
     struct got_diffreg_result *diff_result, int f1_exists, int f2_exists,
     const char *path1, const char *path2,
     enum got_diff_output_format output_format, int context_lines, FILE *outfile)
@@ -273,13 +273,13 @@ got_diffreg_output(off_t **line_offsets, size_t *nlines,
 	switch (output_format) {
 	case GOT_DIFF_OUTPUT_UNIDIFF:
 		rc = diff_output_unidiff(
-		    line_offsets ? &output_info : NULL, outfile, &info,
+		    lines ? &output_info : NULL, outfile, &info,
 		    diff_result->result, context_lines);
 		if (rc != DIFF_RC_OK)
 			return got_error_set_errno(rc, "diff_output_unidiff");
 		break;
 	case GOT_DIFF_OUTPUT_EDSCRIPT:
-		rc = diff_output_edscript(line_offsets ? &output_info : NULL,
+		rc = diff_output_edscript(lines ? &output_info : NULL,
 		    outfile, &info, diff_result->result);
 		if (rc != DIFF_RC_OK)
 			return got_error_set_errno(rc, "diff_output_edscript");
@@ -287,29 +287,34 @@ got_diffreg_output(off_t **line_offsets, size_t *nlines,
 
 	}
 
-	if (line_offsets && *line_offsets) {
+	if (lines && *lines) {
 		if (output_info->line_offsets.len > 0) {
-			off_t prev_offset = 0, *p, *o;
+			struct got_diff_line *p;
+			off_t prev_offset = 0, *o;
+			uint8_t *o2;
 			int i, len;
 			if (*nlines > 0) {
-				prev_offset = (*line_offsets)[*nlines - 1];
+				prev_offset = (*lines)[*nlines - 1].offset;
 				/*
 				 * First line offset is always zero. Skip it
 				 * when appending to a pre-populated array.
 				 */
 				o = &output_info->line_offsets.head[1];
+				o2 = &output_info->line_types.head[1];
 				len = output_info->line_offsets.len - 1;
 			} else {
 				o = &output_info->line_offsets.head[0];
+				o2 = &output_info->line_types.head[0];
 				len = output_info->line_offsets.len;
 			}
-			p = reallocarray(*line_offsets, *nlines + len,
-			    sizeof(off_t));
+			p = reallocarray(*lines, *nlines + len, sizeof(**lines));
 			if (p == NULL)
 				return got_error_from_errno("calloc");
-			for (i = 0; i < len; i++)
-				p[*nlines + i] = o[i] + prev_offset;
-			*line_offsets = p;
+			for (i = 0; i < len; i++) {
+				p[*nlines + i].offset = o[i] + prev_offset;
+				p[*nlines + i].type = o2[i];
+			}
+			*lines = p;
 			*nlines += len;
 		}
 		diff_output_info_free(output_info);

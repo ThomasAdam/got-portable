@@ -20,6 +20,31 @@ enum got_diff_algorithm {
 };
 
 /*
+ * List of all line types in a diff (including '{got,tog} log' lines).
+ * XXX GOT_DIFF_LINE_HUNK to GOT_DIFF_LINE_NONE inclusive must map to the
+ * DIFF_LINE_* macro counterparts defined in lib/diff_output.h (i.e., 60-64).
+ */
+enum got_diff_line_type {
+	GOT_DIFF_LINE_LOGMSG,
+	GOT_DIFF_LINE_AUTHOR,
+	GOT_DIFF_LINE_DATE,
+	GOT_DIFF_LINE_CHANGES,
+	GOT_DIFF_LINE_META,
+	GOT_DIFF_LINE_BLOB_MIN,
+	GOT_DIFF_LINE_BLOB_PLUS,
+	GOT_DIFF_LINE_HUNK = 60,
+	GOT_DIFF_LINE_MINUS,
+	GOT_DIFF_LINE_PLUS,
+	GOT_DIFF_LINE_CONTEXT,
+	GOT_DIFF_LINE_NONE
+};
+
+struct got_diff_line {
+	off_t	offset;
+	uint8_t	type;
+};
+
+/*
  * Compute the differences between two blobs and write unified diff text
  * to the provided output file. Two open temporary files must be provided
  * for internal use; these files can be obtained from got_opentemp() and
@@ -34,7 +59,7 @@ enum got_diff_algorithm {
  * If not NULL, the two initial output arguments will be populated with an
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_blob(off_t **, size_t *,
+const struct got_error *got_diff_blob(struct got_diff_line **, size_t *,
     struct got_blob_object *, struct got_blob_object *, FILE *, FILE *,
     const char *, const char *, enum got_diff_algorithm, int, int, int,
     FILE *);
@@ -84,18 +109,18 @@ struct got_diff_blob_output_unidiff_arg {
 
 	/*
 	 * The number of lines contained in produced unidiff text output,
-	 * and an array of byte offsets to each line. May be initialized to
-	 * zero and NULL to ignore line offsets. If not NULL, then the line
-	 * offsets array will be populated. Optionally, the array can be
-	 * pre-populated with line offsets, with nlines > 0 indicating
-	 * the length of the pre-populated array. This is useful if the
-	 * output file already contains some lines of text.
-	 * The array will be grown as needed to accomodate additional line
-	 * offsets, and the last offset found in a pre-populated array will
-	 * be added to all subsequent offsets.
+	 * and an array of got_diff_lines with byte offset and line type to
+	 * each line. May be initialized to zero and NULL to ignore line
+	 * metadata. If not NULL, then the array of line offsets and types will
+	 * be populated. Optionally, the array can be pre-populated with line
+	 * offsets and types, with nlines > 0 indicating the length of the
+	 * pre-populated array.  This is useful if the output file already
+	 * contains some lines of text.  The array will be grown as needed to
+	 * accomodate additional offsets and types, and the last offset found
+	 * in a pre-populated array will be added to all subsequent offsets.
 	 */
 	size_t nlines;
-	off_t *line_offsets;	/* Dispose of with free(3) when done. */
+	struct got_diff_line *lines; /* Dispose of with free(3) when done. */
 };
 const struct got_error *got_diff_blob_output_unidiff(void *,
     struct got_blob_object *, struct got_blob_object *, FILE *, FILE *,
@@ -155,10 +180,10 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  * If not NULL, the two initial output arguments will be populated with an
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
-    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    const char *, const char *, enum got_diff_algorithm, int, int, int,
-    struct got_repository *, FILE *);
+const struct got_error *got_diff_objects_as_blobs(struct got_diff_line **,
+    size_t *, FILE *, FILE *, int, int, struct got_object_id *,
+    struct got_object_id *, const char *, const char *, enum got_diff_algorithm,
+    int, int, int, struct got_repository *, FILE *);
 
 struct got_pathlist_head;
 
@@ -177,10 +202,11 @@ struct got_pathlist_head;
  * If not NULL, the two initial output arguments will be populated with an
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
-    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    struct got_pathlist_head *, const char *, const char *,
-    enum got_diff_algorithm, int, int, int, struct got_repository *, FILE *);
+const struct got_error *got_diff_objects_as_trees(struct got_diff_line **,
+    size_t *, FILE *, FILE *, int, int, struct got_object_id *,
+    struct got_object_id *, struct got_pathlist_head *, const char *,
+    const char *, enum got_diff_algorithm, int, int, int,
+    struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
@@ -194,9 +220,9 @@ const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
  * If not NULL, the two initial output arguments will be populated with an
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
-    FILE *, FILE *, int, int, struct got_object_id *, struct got_object_id *,
-    struct got_pathlist_head *, enum got_diff_algorithm, int, int, int,
-    struct got_repository *, FILE *);
+const struct got_error *got_diff_objects_as_commits(struct got_diff_line **,
+    size_t *, FILE *, FILE *, int, int, struct got_object_id *,
+    struct got_object_id *, struct got_pathlist_head *, enum got_diff_algorithm,
+    int, int, int, struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64
