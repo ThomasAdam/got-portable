@@ -3701,7 +3701,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.force_text_diff = force_text_diff;
 	arg.diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
 	arg.outfile = outfile;
-	arg.line_offsets = NULL;
+	arg.lines = NULL;
 	arg.nlines = 0;
 	while (path[0] == '/')
 		path++;
