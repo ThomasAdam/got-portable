@@ -13095,8 +13095,7 @@ cmd_info(int argc, char *argv[])
 			 * Assume this path will fail. This will be corrected
 			 * in print_path_info() in case the path does suceeed.
 			 */
-			pe->data = (void *)got_error_path(pe->path,
-			    GOT_ERR_BAD_PATH);
+			pe->data = (void *)got_error(GOT_ERR_BAD_PATH);
 		}
 		error = got_worktree_path_info(worktree, &paths,
 		    print_path_info, &paths, check_cancelled, NULL);
@@ -13104,7 +13103,11 @@ cmd_info(int argc, char *argv[])
 			goto done;
 		TAILQ_FOREACH(pe, &paths, entry) {
 			if (pe->data != NULL) {
-				error = pe->data; /* bad path */
+				const struct got_error *perr;
+
+				perr = pe->data;
+				error = got_error_fmt(perr->code, "%s",
+				    pe->path);
 				break;
 			}
 		}
