@@ -331,7 +331,6 @@ struct tog_diff_view_state {
 	int ignore_whitespace;
 	int force_text_diff;
 	struct got_repository *repo;
-	struct tog_colors colors;
 	struct got_diff_line *lines;
 	size_t nlines;
 	int matched_line;
@@ -3945,13 +3944,11 @@ draw_file(struct tog_view *view, const char *header)
 	char *line;
 	size_t linesize = 0;
 	ssize_t linelen;
-	struct tog_color *tc;
 	wchar_t *wline;
 	int width;
 	int max_lines = view->nlines;
 	int nlines = s->nlines;
 	off_t line_offset;
-	attr_t attr;
 
 	s->lineno = s->first_displayed_line - 1;
 	line_offset = s->lines[s->first_displayed_line - 1].offset;
@@ -3995,6 +3992,9 @@ draw_file(struct tog_view *view, const char *header)
 	view->maxx = 0;
 	line = NULL;
 	while (max_lines > 0 && nprinted < max_lines) {
+		enum got_diff_line_type linetype;
+		attr_t attr = 0;
+
 		linelen = getline(&line, &linesize, s->f);
 		if (linelen == -1) {
 			if (feof(s->f)) {
@@ -4005,7 +4005,6 @@ draw_file(struct tog_view *view, const char *header)
 			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
-		attr = 0;
 		if (++s->lineno < s->first_displayed_line)
 			continue;
 		if (view->gline && !gotoline(view, &s->lineno, &nprinted))
@@ -4024,9 +4023,10 @@ draw_file(struct tog_view *view, const char *header)
 		free(wline);
 		wline = NULL;
 
-		tc = match_color(&s->colors, line);
-		if (tc)
-			attr |= COLOR_PAIR(tc->colorpair);
+		linetype = s->lines[s->lineno].type;
+		if (linetype > GOT_DIFF_LINE_LOGMSG &&
+		    linetype < GOT_DIFF_LINE_CONTEXT)
+			attr |= COLOR_PAIR(linetype);
 		if (attr)
 			wattron(view->window, attr);
 		if (s->first_displayed_line + nprinted == s->matched_line &&
@@ -4549,7 +4549,6 @@ close_diff_view(struct tog_view *view)
 	if (s->fd2 != -1 && close(s->fd2) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	s->fd2 = -1;
-	free_colors(&s->colors);
 	free(s->lines);
 	s->lines = NULL;
 	s->nlines = 0;
@@ -4635,43 +4634,39 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->parent_view = parent_view;
 	s->repo = repo;
 
-	STAILQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
-		err = add_color(&s->colors,
-		    "^-", TOG_COLOR_DIFF_MINUS,
-		    get_color_value("TOG_COLOR_DIFF_MINUS"));
-		if (err)
-			goto done;
-		err = add_color(&s->colors, "^\\+",
-		    TOG_COLOR_DIFF_PLUS,
-		    get_color_value("TOG_COLOR_DIFF_PLUS"));
-		if (err)
-			goto done;
-		err = add_color(&s->colors,
-		    "^@@", TOG_COLOR_DIFF_CHUNK_HEADER,
-		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
-		if (err)
-			goto done;
+		int rc;
 
-		err = add_color(&s->colors,
-		    "^(commit [0-9a-f]|parent [0-9]|"
-		    "(blob|file|tree|commit) [-+] |"
-		    "[MDmA]  [^ ])", TOG_COLOR_DIFF_META,
-		    get_color_value("TOG_COLOR_DIFF_META"));
-		if (err)
+		rc = init_pair(GOT_DIFF_LINE_MINUS,
+		    get_color_value("TOG_COLOR_DIFF_MINUS"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_PLUS,
+			    get_color_value("TOG_COLOR_DIFF_PLUS"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_HUNK,
+			    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_META,
+			    get_color_value("TOG_COLOR_DIFF_META"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_CHANGES,
+			    get_color_value("TOG_COLOR_DIFF_META"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_BLOB_MIN,
+			    get_color_value("TOG_COLOR_DIFF_META"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_BLOB_PLUS,
+			    get_color_value("TOG_COLOR_DIFF_META"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_AUTHOR,
+			    get_color_value("TOG_COLOR_AUTHOR"), -1);
+		if (rc != ERR)
+			rc = init_pair(GOT_DIFF_LINE_DATE,
+			    get_color_value("TOG_COLOR_DATE"), -1);
+		if (rc == ERR) {
+			err = got_error(GOT_ERR_RANGE);
 			goto done;
-
-		err = add_color(&s->colors,
-		    "^(from|via): ", TOG_COLOR_AUTHOR,
-		    get_color_value("TOG_COLOR_AUTHOR"));
-		if (err)
-			goto done;
-
-		err = add_color(&s->colors,
-		    "^date: ", TOG_COLOR_DATE,
-		    get_color_value("TOG_COLOR_DATE"));
-		if (err)
-			goto done;
+		}
 	}
 
 	if (parent_view && parent_view->type == TOG_VIEW_LOG &&
