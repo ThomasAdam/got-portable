@@ -75,7 +75,6 @@ void	 sockets_rlimit(int);
 int	 sockets_dispatch_gotwebd(int, struct privsep_proc *, struct imsg *);
 int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
 int	 sockets_create_socket(struct addresslist *, in_port_t);
-int	 sockets_socket_af(struct sockaddr_storage *, in_port_t);
 int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *, int,
 	    volatile int *);
 
@@ -288,27 +287,6 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 	}
 done:
 	return (sock);
-}
-
-int
-sockets_socket_af(struct sockaddr_storage *ss, in_port_t port)
-{
-	switch (ss->ss_family) {
-	case AF_INET:
-		((struct sockaddr_in *)ss)->sin_port = port;
-		((struct sockaddr_in *)ss)->sin_len =
-		    sizeof(struct sockaddr_in);
-		break;
-	case AF_INET6:
-		((struct sockaddr_in6 *)ss)->sin6_port = port;
-		((struct sockaddr_in6 *)ss)->sin6_len =
-		    sizeof(struct sockaddr_in6);
-		break;
-	default:
-		return -1;
-	}
-
-	return 0;
 }
 
 void
@@ -558,8 +536,15 @@ sockets_create_socket(struct addresslist *al, in_port_t port)
 	hints.ai_flags |= AI_PASSIVE;
 
 	TAILQ_FOREACH(a, al, entry) {
-		if (sockets_socket_af(&a->ss, port) == -1) {
-			log_warnx("%s: sockets_socket_af", __func__);
+		switch (a->ss.ss_family) {
+		case AF_INET:
+			((struct sockaddr_in *)(&a->ss))->sin_port = port;
+			break;
+		case AF_INET6:
+			((struct sockaddr_in6 *)(&a->ss))->sin6_port = port;
+			break;
+		default:
+			log_warnx("%s: unknown address family", __func__);
 			goto fail;
 		}
 
