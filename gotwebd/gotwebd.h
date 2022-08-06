@@ -234,7 +234,7 @@ struct fcgi_end_request_body {
 	uint32_t	app_status;
 	uint8_t		protocol_status;
 	uint8_t		reserved[3];
-}__packed;
+}__attribute__((__packed__));
 
 struct address {
 	TAILQ_ENTRY(address)	 entry;
