@@ -831,8 +831,8 @@ got_output_repo_tree(struct request *c)
 	struct repo_dir *repo_dir = t->repo_dir;
 	char *id_str = NULL;
 	char *path = NULL, *in_repo_path = NULL, *build_folder = NULL;
-	char *modestr = NULL, *name = NULL, *class = NULL;
-	int nentries, i, class_flip = 0;
+	char *modestr = NULL, *name = NULL;
+	int nentries, i;
 
 	TAILQ_INIT(&refs);
 
@@ -917,22 +917,6 @@ got_output_repo_tree(struct request *c)
 			}
 		}
 
-		if (class_flip == 0) {
-			class = strdup("back_lightgray");
-			if (class == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			class_flip = 1;
-		} else {
-			class = strdup("back_white");
-			if (class == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			class_flip = 0;
-		}
-
 		name = strdup(got_tree_entry_get_name(te));
 		if (name == NULL) {
 			error = got_error_from_errno("strdup");
@@ -950,12 +934,7 @@ got_output_repo_tree(struct request *c)
 			    "<div class='tree_wrapper'>\n") == -1)
 			goto done;
 
-			if (fcgi_gen_response(c, "<div class='tree_line' "
-			    "class='") == -1)
-				goto done;
-			if (fcgi_gen_response(c, class) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "'>") == -1)
+			if (fcgi_gen_response(c, "<div class='tree_line'>") == -1)
 				goto done;
 
 			if (fcgi_gen_response(c, "<a class='diff_directory' "
@@ -989,12 +968,7 @@ got_output_repo_tree(struct request *c)
 			if (fcgi_gen_response(c, "</div>\n") == -1)
 				goto done;
 
-			if (fcgi_gen_response(c, "<div class='tree_line_blank' "
-			    "class='") == -1)
-				goto done;
-			if (fcgi_gen_response(c, class) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "'>") == -1)
+			if (fcgi_gen_response(c, "<div class='tree_line_blank'>") == -1)
 				goto done;
 			if (fcgi_gen_response(c, "&nbsp;") == -1)
 				goto done;
@@ -1015,12 +989,7 @@ got_output_repo_tree(struct request *c)
 			if (fcgi_gen_response(c,
 			    "<div class='tree_wrapper'>\n") == -1)
 				goto done;
-			if (fcgi_gen_response(c, "<div class='tree_line' "
-			    "class='") == -1)
-				goto done;
-			if (fcgi_gen_response(c, class) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "'>") == -1)
+			if (fcgi_gen_response(c, "<div class='tree_line'>") == -1)
 				goto done;
 
 			if (fcgi_gen_response(c,
@@ -1066,12 +1035,7 @@ got_output_repo_tree(struct request *c)
 			if (fcgi_gen_response(c, "</div>\n") == -1)
 				goto done;
 
-			if (fcgi_gen_response(c, "<div class='tree_line_blank' "
-			    "class='") == -1)
-				goto done;
-			if (fcgi_gen_response(c, class) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "'>") == -1)
+			if (fcgi_gen_response(c, "<div class='tree_line_blank'>") == -1)
 				goto done;
 
 			if (fcgi_gen_response(c,
@@ -1166,8 +1130,6 @@ got_output_repo_tree(struct request *c)
 		name = NULL;
 		free(modestr);
 		modestr = NULL;
-		free(class);
-		class = NULL;
 	}
 done:
 	free(id_str);
@@ -1175,7 +1137,6 @@ done:
 	free(modestr);
 	free(path);
 	free(name);
-	free(class);
 	got_ref_list_free(&refs);
 	if (commit)
 		got_object_commit_close(commit);
