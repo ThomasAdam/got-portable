@@ -947,10 +947,10 @@ got_output_repo_tree(struct request *c)
 			}
 
 			if (fcgi_gen_response(c,
-			    "<div id='tree_wrapper'>\n") == -1)
+			    "<div class='tree_wrapper'>\n") == -1)
 			goto done;
 
-			if (fcgi_gen_response(c, "<div id='tree_line' "
+			if (fcgi_gen_response(c, "<div class='tree_line' "
 			    "class='") == -1)
 				goto done;
 			if (fcgi_gen_response(c, class) == -1)
@@ -989,7 +989,7 @@ got_output_repo_tree(struct request *c)
 			if (fcgi_gen_response(c, "</div>\n") == -1)
 				goto done;
 
-			if (fcgi_gen_response(c, "<div id='tree_line_blank' "
+			if (fcgi_gen_response(c, "<div class='tree_line_blank' "
 			    "class='") == -1)
 				goto done;
 			if (fcgi_gen_response(c, class) == -1)
@@ -1013,9 +1013,9 @@ got_output_repo_tree(struct request *c)
 			}
 
 			if (fcgi_gen_response(c,
-			    "<div id='tree_wrapper'>\n") == -1)
+			    "<div class='tree_wrapper'>\n") == -1)
 				goto done;
-			if (fcgi_gen_response(c, "<div id='tree_line' "
+			if (fcgi_gen_response(c, "<div class='tree_line' "
 			    "class='") == -1)
 				goto done;
 			if (fcgi_gen_response(c, class) == -1)
@@ -1066,7 +1066,7 @@ got_output_repo_tree(struct request *c)
 			if (fcgi_gen_response(c, "</div>\n") == -1)
 				goto done;
 
-			if (fcgi_gen_response(c, "<div id='tree_line_blank' "
+			if (fcgi_gen_response(c, "<div class='tree_line_blank' "
 			    "class='") == -1)
 				goto done;
 			if (fcgi_gen_response(c, class) == -1)
@@ -1400,9 +1400,9 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		if (nl)
 			*nl = '\0';
 
-		if (fcgi_gen_response(c, "<div id='blame_wrapper'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_wrapper'>") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='blame_number'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_number'>") == -1)
 			goto done;
 		if (snprintf(out_buff, strlen(out_buff), "%.*d", a->nlines_prec,
 		    a->lineno_cur) < 0)
@@ -1412,7 +1412,7 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		if (fcgi_gen_response(c, "</div>") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='blame_hash'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_hash'>") == -1)
 			goto done;
 
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
@@ -1436,21 +1436,21 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		if (fcgi_gen_response(c, "</a></div>") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='blame_date'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_date'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, bline->datebuf) == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='blame_author'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_author'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, committer) == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='blame_code'>") == -1)
+		if (fcgi_gen_response(c, "<div class='blame_code'>") == -1)
 			goto done;
 		err = gotweb_escape_html(&eline, line);
 		if (err)
@@ -1806,7 +1806,7 @@ got_output_repo_diff(struct request *c)
 				goto done;
 			}
 		}
-		if (fcgi_gen_response(c, "<div id='diff_line' class='") == -1)
+		if (fcgi_gen_response(c, "<div class='diff_line' class='") == -1)
 			goto done;
 		if (fcgi_gen_response(c, color ? color : "") == -1)
 			goto done;

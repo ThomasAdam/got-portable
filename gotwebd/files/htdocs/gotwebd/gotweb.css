@@ -60,12 +60,12 @@ body {
 #logo {
 	height: 50px;
 }
-#refs_str {
+.refs_str {
 	background-color: #243647;
 	color: #ffffff;
 	font-style: italic;
 }
-#dotted_line {
+.dotted_line {
 	clear: left;
 	float: left;
 	width: 100%;
@@ -106,12 +106,6 @@ body {
 	color: #ffffff;
 	text-decoration: none;
 }
-#search {
-	float: right;
-	padding-right: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
 #got_link {
 	float: left;
 	padding-bottom: 10px;
@@ -142,13 +136,13 @@ body {
 	text-align: right;
 	overflow: hidden;
 }
-#navs_wrapper {
+.navs_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 	background-color: #ced7e0;
 }
-#navs {
+.navs {
 	padding-left: 10px;
 	padding-top: 2px;
 	padding-bottom: 2px;
@@ -225,7 +219,7 @@ body {
 	white-space: pre-wrap;
 }
 
-#header_commit_title {
+.header_commit_title {
 	clear: left;
 	float: left;
 	width: 6.5em;
@@ -233,7 +227,7 @@ body {
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_commit {
+.header_commit {
 	float: left;
 	width: 72%;
 	padding-top: 2px;
@@ -253,7 +247,7 @@ body {
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_author_title {
+.header_author_title {
 	clear: left;
 	float: left;
 	width: 6.5em;
@@ -261,13 +255,13 @@ body {
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_author {
+.header_author {
 	float: left;
 	width: 72%;
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_committer_title {
+.header_age_title {
 	clear: left;
 	float: left;
 	width: 6.5em;
@@ -275,21 +269,7 @@ body {
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_committer {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_age_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_age {
+.header_age {
 	float: left;
 	width: 72%;
 	padding-top: 2px;
@@ -351,7 +331,7 @@ body {
 	float: left;
 	width: 100%;
 }
-#briefs_age {
+.briefs_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -359,7 +339,7 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
-#briefs_author {
+.briefs_author {
 	float: left;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -367,7 +347,7 @@ body {
 	font-style: italic;
 	overflow: auto;
 }
-#briefs_log {
+.briefs_log {
 	float: left;
 	padding-left: 10px;
 	padding-right: 10px;
@@ -393,7 +373,7 @@ body {
 	float: left;
 	width: 100%;
 }
-#tag_age {
+.tag_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -401,7 +381,7 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
-#tags_log {
+.tag_log {
 	float: left;
 	padding-left: 10px;
 	padding-right: 10px;
@@ -423,7 +403,7 @@ body {
 	padding-bottom: 2px;
 	width: 80%;
 }
-#tag {
+.tag {
 	float: left;
 	width: 8.5em;
 	font-style: italic;
@@ -465,48 +445,40 @@ body {
 	padding: 10px;
 	overflow: hidden;
 }
-#index_wrapper {
+.index_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#index_project {
+.index_project {
 	float: left;
 	width: 20%;
 	padding: 10px;
 	overflow: hidden;
 }
-#index_project_description {
+.index_project_description {
 	float: left;
 	width: 30%;
 	padding: 10px;
 	overflow: auto;
 }
-#index_project_owner {
+.index_project_owner {
 	float: left;
 	width: 12%;
 	padding: 10px;
 	overflow: hidden;
 }
-#index_project_age {
+.index_project_age {
 	float: left;
 	width: 14%;
 	padding: 10px;
 	overflow: visible;
 }
-#index_project a {
+.index_project a {
 	color: #444444;
 	text-decoration: none;
 }
-#index_project a:hover {
-	color: SteelBlue;
-	text-decoration: none;
-}
-#index_project_navs a {
-	color: #444444;
-	text-decoration: none;
-}
-#index_project_navs a:hover {
+.index_project a:hover {
 	color: SteelBlue;
 	text-decoration: none;
 }
@@ -527,44 +499,40 @@ body {
 	text-decoration: none;
 }
 
-#commits_title_wrapper {
+.commits_title_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 	background-color: LightSlateGray;
 	color: #ffffff;
 }
-#commits_title {
+.commits_title {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
-#commits_content {
+.commits_content {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#commits_header_wrapper {
+.commits_header_wrapper {
 	float: left;
 	background-color: #f5fcfb;
 	width: 100%;
 }
-#commits_header {
+.commits_header {
 	float: left;
 	padding-top: 5px;
 	padding-bottom: 2px;
 	width: 80%;
 }
-#commit {
+.commit {
 	clear: left;
 	float: left;
 	padding-left: 20px;
 	padding-bottom: 20px;
 	white-space: pre-wrap;
-}
-#commits_line {
-	clear: left;
-	float: left;
 }
 
 #blame_title_wrapper {
@@ -605,32 +573,32 @@ body {
 	white-space: pre;
 	overflow: auto;
 }
-#blame_wrapper {
+.blame_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#blame_number {
+.blame_number {
 	float: left;
 	width: 6em;
 	overflow: hidden;
 }
-#blame_hash {
+.blame_hash {
 	float: left;
 	width: 6em;
 	overflow: auto;
 }
-#blame_date {
+.blame_date {
 	float: left;
 	width: 7em;
 	overflow: auto;
 }
-#blame_author {
+.blame_author {
 	float: left;
 	width: 6em;
 	overflow: hidden;
 }
-#blame_code {
+.blame_code {
 	float:left;
 	width: 50%;
 	overflow: visible;
@@ -674,26 +642,21 @@ body {
 	margin-bottom: 20px;
 	font-family: monospace;
 }
-#tree_wrapper {
+.tree_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#tree_line {
+.tree_line {
 	clear: left;
 	float: left;
 	width: 20em;
 	padding: 1px;
 }
-#tree_line_blank {
+.tree_line_blank {
 	float: left;
 	padding: 1px;
 	width: 9.5em;
-}
-#tree_line_navs {
-	float: left;
-	text-align: right;
-	padding: 1px;
 }
 
 #diff_title_wrapper {
@@ -733,7 +696,7 @@ body {
 	font-family: monospace;
 	white-space: pre;
 }
-#diff_line {
+.diff_line {
 	clear: left;
 	float: left;
 }
@@ -763,12 +726,12 @@ body {
 	width: 100%;
 }
 
-#branches_wrapper {
+.branches_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#branches_age {
+.branches_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -776,7 +739,7 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
-#branches_space {
+.branches_space {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -784,7 +747,7 @@ body {
 	width: 8.5em;
 	overflow: auto;
 }
-#branch {
+.branch {
 	float: left;
 	padding-right: 10px;
 	padding-top: 5px;
