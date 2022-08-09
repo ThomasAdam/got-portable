@@ -1128,9 +1128,9 @@ gotweb_render_index(struct request *c)
 render:
 		d_disp++;
 		t->prev_disp++;
-		if (fcgi_gen_response(c, "<div id='index_wrapper'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='index_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='index_project'>") == -1)
+		if (fcgi_gen_response(c, "<div class='index_project'>") == -1)
 			goto done;
 
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
@@ -1153,7 +1153,7 @@ render:
 
 		if (srv->show_repo_description) {
 			if (fcgi_gen_response(c,
-			    "<div id='index_project_description'>\n") == -1)
+			    "<div class='index_project_description'>\n") == -1)
 				goto done;
 			if (fcgi_gen_response(c, repo_dir->description) == -1)
 				goto done;
@@ -1163,7 +1163,7 @@ render:
 
 		if (srv->show_repo_owner) {
 			if (fcgi_gen_response(c,
-			    "<div id='index_project_owner'>") == -1)
+			    "<div class='index_project_owner'>") == -1)
 				goto done;
 			if (fcgi_gen_response(c, repo_dir->owner) == -1)
 				goto done;
@@ -1173,7 +1173,7 @@ render:
 
 		if (srv->show_repo_age) {
 			if (fcgi_gen_response(c,
-			    "<div id='index_project_age'>") == -1)
+			    "<div class='index_project_age'>") == -1)
 				goto done;
 			if (fcgi_gen_response(c, repo_dir->age) == -1)
 				goto done;
@@ -1181,9 +1181,9 @@ render:
 				goto done;
 		}
 
-		if (fcgi_gen_response(c, "<div id='navs_wrapper'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs_wrapper'>") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='navs'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs'>") == -1)
 			goto done;;
 
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
@@ -1264,7 +1264,7 @@ render:
 		if (fcgi_gen_response(c, "</div>") == -1)
 			goto done;
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
@@ -1332,10 +1332,10 @@ gotweb_render_blame(struct request *c)
 	if (fcgi_gen_response(c, "<div id='blame_header'>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_age_title'>Date:"
+	if (fcgi_gen_response(c, "<div class='header_age_title'>Date:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_age'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_age'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, age ? age : "") == -1)
 		goto done;
@@ -1357,7 +1357,7 @@ gotweb_render_blame(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='dotted_line'></div>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='dotted_line'></div>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "<div id='blame'>\n") == -1)
 		goto done;
@@ -1407,14 +1407,14 @@ gotweb_render_briefs(struct request *c)
 		error = gotweb_get_time_str(&age, rc->committer_time, TM_DIFF);
 		if (error)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='briefs_age'>") == -1)
+		if (fcgi_gen_response(c, "<div class='briefs_age'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, age ? age : "") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='briefs_author'>") == -1)
+		if (fcgi_gen_response(c, "<div class='briefs_author'>") == -1)
 			goto done;
 		smallerthan = strchr(rc->author, '<');
 		if (smallerthan)
@@ -1424,7 +1424,7 @@ gotweb_render_briefs(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='briefs_log'>") == -1)
+		if (fcgi_gen_response(c, "<div class='briefs_log'>") == -1)
 			goto done;
 		newline = strchr(rc->commit_msg, '\n');
 		if (newline)
@@ -1454,7 +1454,7 @@ gotweb_render_briefs(struct request *c)
 			goto done;
 		if (rc->refs_str) {
 			if (fcgi_gen_response(c,
-			    " <span id='refs_str'>(") == -1)
+			    " <span class='refs_str'>(") == -1)
 				goto done;
 			if (fcgi_gen_response(c, rc->refs_str) == -1)
 				goto done;
@@ -1464,9 +1464,9 @@ gotweb_render_briefs(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='navs_wrapper'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='navs_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='navs'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
 			goto done;
@@ -1521,7 +1521,7 @@ gotweb_render_briefs(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 
 		free(age);
@@ -1551,15 +1551,15 @@ gotweb_render_commits(struct request *c)
 	char *age = NULL, *author = NULL;
 	/* int commit_found = 0; */
 
-	if (fcgi_gen_response(c, "<div id='commits_title_wrapper'>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='commits_title_wrapper'>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c,
-	    "<div id='commits_title'>Commits</div>\n") == -1)
+	    "<div class='commits_title'>Commits</div>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='commits_content'>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='commits_content'>\n") == -1)
 		goto done;
 
 	error = got_get_repo_commits(c, srv->max_commits_display);
@@ -1575,36 +1575,36 @@ gotweb_render_commits(struct request *c)
 			goto done;
 
 		if (fcgi_gen_response(c,
-		    "<div id='commits_header_wrapper'>\n") == -1)
+		    "<div class='commits_header_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='commits_header'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='commits_header'>\n") == -1)
 			goto done;
 
 
-		if (fcgi_gen_response(c, "<div id='header_commit_title'>Commit:"
+		if (fcgi_gen_response(c, "<div class='header_commit_title'>Commit:"
 		    "</div>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='header_commit'>") == -1)
+		if (fcgi_gen_response(c, "<div class='header_commit'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, rc->commit_id) == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='header_author_title'>Author:"
+		if (fcgi_gen_response(c, "<div class='header_author_title'>Author:"
 		    "</div>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='header_author'>") == -1)
+		if (fcgi_gen_response(c, "<div class='header_author'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, author ? author : "") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='header_age_title'>Date:"
+		if (fcgi_gen_response(c, "<div class='header_age_title'>Date:"
 		    "</div>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='header_age'>") == -1)
+		if (fcgi_gen_response(c, "<div class='header_age'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, age ? age : "") == -1)
 			goto done;
@@ -1617,9 +1617,9 @@ gotweb_render_commits(struct request *c)
 			goto done;
 
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='commit'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='commit'>\n") == -1)
 			goto done;
 
 		if (fcgi_gen_response(c, rc->commit_msg) == -1)
@@ -1630,9 +1630,9 @@ gotweb_render_commits(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='navs_wrapper'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='navs_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='navs'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
 			goto done;
@@ -1679,7 +1679,7 @@ gotweb_render_commits(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 		free(age);
 		age = NULL;
@@ -1694,7 +1694,6 @@ gotweb_render_commits(struct request *c)
 	}
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
-	fcgi_gen_response(c, "</div>\n");
 done:
 	free(age);
 	return error;
@@ -1751,24 +1750,24 @@ gotweb_render_branches(struct request *c)
 		if (strncmp(refname, "refs/heads/", 11) == 0)
 			refname += 11;
 
-		if (fcgi_gen_response(c, "<div id='branches_wrapper'>") == -1)
+		if (fcgi_gen_response(c, "<div class='branches_wrapper'>") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='branches_age'>") == -1)
+		if (fcgi_gen_response(c, "<div class='branches_age'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, age ? age : "") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='branches_space'>") == -1)
+		if (fcgi_gen_response(c, "<div class='branches_space'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "&nbsp;") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='branch'>") == -1)
+		if (fcgi_gen_response(c, "<div class='branch'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
 			goto done;
@@ -1791,9 +1790,9 @@ gotweb_render_branches(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='navs_wrapper'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='navs_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='navs'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs'>") == -1)
 			goto done;
 
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
@@ -1865,7 +1864,11 @@ gotweb_render_branches(struct request *c)
 			goto done;
 
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
+			goto done;
+
+		/* branches_wrapper */
+		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
 		free(age);
@@ -1920,10 +1923,10 @@ gotweb_render_tree(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_age_title'>Date:"
+	if (fcgi_gen_response(c, "<div class='header_age_title'>Date:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_age'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_age'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, age ? age : "") == -1)
 		goto done;
@@ -1945,7 +1948,7 @@ gotweb_render_tree(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='dotted_line'></div>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='dotted_line'></div>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "<div id='tree'>\n") == -1)
 		goto done;
@@ -2010,10 +2013,10 @@ gotweb_render_diff(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_commit_title'>Commit:"
+	if (fcgi_gen_response(c, "<div class='header_commit_title'>Commit:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_commit'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_commit'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, rc->commit_id) == -1)
 		goto done;
@@ -2030,20 +2033,20 @@ gotweb_render_diff(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_author_title'>Author:"
+	if (fcgi_gen_response(c, "<div class='header_author_title'>Author:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_author'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_author'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, author ? author : "") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_age_title'>Date:"
+	if (fcgi_gen_response(c, "<div class='header_age_title'>Date:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_age'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_age'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, age ? age : "") == -1)
 		goto done;
@@ -2064,7 +2067,7 @@ gotweb_render_diff(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='dotted_line'></div>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='dotted_line'></div>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "<div id='diff'>\n") == -1)
 		goto done;
@@ -2208,10 +2211,10 @@ gotweb_render_tag(struct request *c)
 	if (fcgi_gen_response(c, "<div id='tag_header'>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_commit_title'>Commit:"
+	if (fcgi_gen_response(c, "<div class='header_commit_title'>Commit:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_commit'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_commit'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, rt->commit_id) == -1)
 		goto done;
@@ -2219,7 +2222,7 @@ gotweb_render_tag(struct request *c)
 	if (strncmp(rt->tag_name, "refs/", 5) == 0)
 		rt->tag_name += 5;
 
-	if (fcgi_gen_response(c, " <span id='refs_str'>(") == -1)
+	if (fcgi_gen_response(c, " <span class='refs_str'>(") == -1)
 		goto done;
 	if (fcgi_gen_response(c, rt->tag_name) == -1)
 		goto done;
@@ -2229,20 +2232,20 @@ gotweb_render_tag(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_author_title'>Tagger:"
+	if (fcgi_gen_response(c, "<div class='header_author_title'>Tagger:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_author'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_author'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, author ? author : "") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='header_age_title'>Date:"
+	if (fcgi_gen_response(c, "<div class='header_age_title'>Date:"
 	    "</div>\n") == -1)
 		goto done;
-	if (fcgi_gen_response(c, "<div id='header_age'>") == -1)
+	if (fcgi_gen_response(c, "<div class='header_age'>") == -1)
 		goto done;
 	if (fcgi_gen_response(c, age ? age : "") == -1)
 		goto done;
@@ -2261,7 +2264,7 @@ gotweb_render_tag(struct request *c)
 	if (fcgi_gen_response(c, "</div>\n") == -1)
 		goto done;
 
-	if (fcgi_gen_response(c, "<div id='dotted_line'></div>\n") == -1)
+	if (fcgi_gen_response(c, "<div class='dotted_line'></div>\n") == -1)
 		goto done;
 	if (fcgi_gen_response(c, "<div id='tag_commit'>\n") == -1)
 		goto done;
@@ -2332,14 +2335,14 @@ gotweb_render_tags(struct request *c)
 		error = gotweb_get_time_str(&age, rt->tagger_time, TM_DIFF);
 		if (error)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='tag_age'>") == -1)
+		if (fcgi_gen_response(c, "<div class='tag_age'>") == -1)
 			goto done;
 		if (fcgi_gen_response(c, age ? age : "") == -1)
 			goto done;
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='tag'>") == -1)
+		if (fcgi_gen_response(c, "<div class='tag'>") == -1)
 			goto done;
 		if (strncmp(rt->tag_name, "refs/tags/", 10) == 0)
 			rt->tag_name += 10;
@@ -2348,7 +2351,7 @@ gotweb_render_tags(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='tags_log'>") == -1)
+		if (fcgi_gen_response(c, "<div class='tag_log'>") == -1)
 			goto done;
 		if (rt->tag_commit != NULL) {
 			newline = strchr(rt->tag_commit, '\n');
@@ -2378,9 +2381,9 @@ gotweb_render_tags(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "<div id='navs_wrapper'>\n") == -1)
+		if (fcgi_gen_response(c, "<div class='navs_wrapper'>\n") == -1)
 			goto done;
-		if (fcgi_gen_response(c, "<div id='navs'>") == -1)
+		if (fcgi_gen_response(c, "<div class='navs'>") == -1)
 			goto done;
 
 		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
@@ -2451,7 +2454,7 @@ gotweb_render_tags(struct request *c)
 		if (fcgi_gen_response(c, "</div>\n") == -1)
 			goto done;
 		if (fcgi_gen_response(c,
-		    "<div id='dotted_line'></div>\n") == -1)
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 
 		free(age);
