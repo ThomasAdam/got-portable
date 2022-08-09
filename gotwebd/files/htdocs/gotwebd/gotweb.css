@@ -50,13 +50,6 @@ body {
 	color: blue;
 }
 
-.back_white {
-	background-color: #ffffff;
-}
-.back_lightgray {
-	background-color: #d8f3ef;
-}
-
 #logo {
 	height: 50px;
 }
@@ -646,6 +639,10 @@ body {
 	clear: left;
 	float: left;
 	width: 100%;
+	background-color: #d8f3ef;
+}
+.tree_wrapper:nth-child(even) {
+	background-color: #ffffff;
 }
 .tree_line {
 	clear: left;
