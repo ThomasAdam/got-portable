@@ -39,6 +39,7 @@
 
 #define GOTWEBD_USER		 "www"
 
+#define GOTWEBD_CACHESIZE	 1024
 #define GOTWEBD_MAXCLIENTS	 1024
 #define GOTWEBD_MAXTEXT		 511
 #define GOTWEBD_MAXNAME		 64
@@ -212,6 +213,9 @@ struct request {
 	uint8_t				 buf[FCGI_RECORD_SIZE];
 	size_t				 buf_pos;
 	size_t				 buf_len;
+
+	uint8_t				 outbuf[GOTWEBD_CACHESIZE];
+	size_t				 outbuf_len;
 
 	char				 querystring[MAX_QUERYSTRING];
 	char				 http_host[GOTWEBD_MAXTEXT];

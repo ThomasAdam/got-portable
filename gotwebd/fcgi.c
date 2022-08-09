@@ -41,7 +41,7 @@ size_t	 fcgi_parse_record(uint8_t *, size_t, struct request *);
 void	 fcgi_parse_begin_request(uint8_t *, uint16_t, struct request *,
 	    uint16_t);
 void	 fcgi_parse_params(uint8_t *, uint16_t, struct request *, uint16_t);
-void	 fcgi_send_response(struct request *, int, const void *, size_t);
+int	 fcgi_send_response(struct request *, int, const void *, size_t);
 
 void	 dump_fcgi_record_header(const char *, struct fcgi_record_header *);
 void	 dump_fcgi_begin_request_body(const char *,
@@ -138,6 +138,12 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 		break;
 	case FCGI_STDIN:
 	case FCGI_ABORT_REQUEST:
+		if (c->sock->client_status != CLIENT_DISCONNECT &&
+		    c->outbuf_len != 0) {
+			fcgi_send_response(c, FCGI_STDOUT, c->outbuf,
+			    c->outbuf_len);
+		}
+
 		fcgi_create_end_record(c);
 		fcgi_cleanup_request(c);
 		return 0;
@@ -305,13 +311,39 @@ fcgi_timeout(int fd, short events, void *arg)
 int
 fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 {
+	int r;
+
 	if (c->sock->client_status == CLIENT_DISCONNECT)
 		return -1;
 
 	if (data == NULL || len == 0)
 		return 0;
 
-	fcgi_send_response(c, FCGI_STDOUT, data, len);
+	/*
+	 * special case: send big replies -like blobs- directly
+	 * without copying.
+	 */
+	if (len > sizeof(c->outbuf)) {
+		if (c->outbuf_len > 0) {
+			fcgi_send_response(c, FCGI_STDOUT,
+			    c->outbuf, c->outbuf_len);
+			c->outbuf_len = 0;
+		}
+		return fcgi_send_response(c, FCGI_STDOUT, data, len);
+	}
+
+	if (len < sizeof(c->outbuf) - c->outbuf_len) {
+		memcpy(c->outbuf + c->outbuf_len, data, len);
+		c->outbuf_len += len;
+		return 0;
+	}
+
+	r = fcgi_send_response(c, FCGI_STDOUT, c->outbuf, c->outbuf_len);
+	if (r == -1)
+		return -1;
+
+	memcpy(c->outbuf, data, len);
+	c->outbuf_len = len;
 	return 0;
 }
 
@@ -323,7 +355,7 @@ fcgi_gen_response(struct request *c, const char *data)
 	return fcgi_gen_binary_response(c, data, strlen(data));
 }
 
-static void
+static int
 send_response(struct request *c, int type, const uint8_t *data,
     size_t len)
 {
@@ -383,7 +415,7 @@ send_response(struct request *c, int type, const uint8_t *data,
 			}
 			log_warn("%s: write failure", __func__);
 			c->sock->client_status = CLIENT_DISCONNECT;
-			break;
+			return -1;
 		}
 
 		if (nw != tot)
@@ -401,25 +433,29 @@ send_response(struct request *c, int type, const uint8_t *data,
 			iov[i].iov_len = 0;
 		}
 	}
+
+	return 0;
 }
 
-void
+int
 fcgi_send_response(struct request *c, int type, const void *data,
     size_t len)
 {
+	if (c->sock->client_status == CLIENT_DISCONNECT)
+		return -1;
+
 	while (len > FCGI_CONTENT_SIZE) {
-		send_response(c, type, data, len);
-		if (c->sock->client_status == CLIENT_DISCONNECT)
-			return;
+		if (send_response(c, type, data, len) == -1)
+			return -1;
 
 		data += FCGI_CONTENT_SIZE;
 		len -= FCGI_CONTENT_SIZE;
 	}
 
 	if (len == 0)
-		return;
+		return 0;
 
-	send_response(c, type, data, len);
+	return send_response(c, type, data, len);
 }
 
 void
