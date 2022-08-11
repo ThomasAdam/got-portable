@@ -8901,7 +8901,7 @@ cmd_send(int argc, char *argv[])
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
 	const struct got_remote_repo *remotes, *remote = NULL;
-	int nremotes, nbranches = 0, ntags = 0, ndelete_branches = 0;
+	int nremotes, nbranches = 0, ndelete_branches = 0;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
@@ -8958,7 +8958,6 @@ cmd_send(int argc, char *argv[])
 			error = got_pathlist_append(&tags, optarg, NULL);
 			if (error)
 				return error;
-			ntags++;
 			break;
 		case 'T':
 			send_all_tags = 1;
@@ -9135,7 +9134,6 @@ cmd_send(int argc, char *argv[])
 			    tagname, NULL);
 			if (error)
 				goto done;
-			ntags++;
 		}
 	}
 
