@@ -114,7 +114,7 @@ typedef struct {
 
 %}
 
-%token	BIND INTERFACE WWW_PATH MAX_REPOS SITE_NAME SITE_OWNER SITE_LINK LOGO
+%token	LISTEN WWW_PATH MAX_REPOS SITE_NAME SITE_OWNER SITE_LINK LOGO
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK FCGI_SOCKET
@@ -380,7 +380,7 @@ serveropts2	: serveropts2 serveropts1 nl
 		| serveropts1 optnl
 		;
 
-socketopts1	: BIND INTERFACE STRING {
+socketopts1	: LISTEN ON STRING {
 			n = strlcpy(new_srv->fcgi_socket_bind, $3,
 			    sizeof(new_srv->fcgi_socket_bind));
 			if (n >= sizeof(new_srv->fcgi_socket_bind)) {
@@ -408,7 +408,7 @@ socketopts2	: socketopts2 socketopts1 nl
 		| socketopts1 optnl
 		;
 
-socketopts3	: BIND INTERFACE STRING {
+socketopts3	: LISTEN ON STRING {
 			n = strlcpy(gotwebd->fcgi_socket_bind, $3,
 			    sizeof(gotwebd->fcgi_socket_bind));
 			if (n >= sizeof(gotwebd->fcgi_socket_bind)) {
@@ -469,16 +469,16 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
-		{ "bind",			BIND },
 		{ "chroot",			CHROOT },
 		{ "custom_css",			CUSTOM_CSS },
 		{ "fcgi_socket",		FCGI_SOCKET },
-		{ "interface",			INTERFACE },
+		{ "listen",			LISTEN },
 		{ "logo",			LOGO },
 		{ "logo_url"	,		LOGO_URL },
 		{ "max_commits_display",	MAX_COMMITS_DISPLAY },
 		{ "max_repos",			MAX_REPOS },
 		{ "max_repos_display",		MAX_REPOS_DISPLAY },
+		{ "on",				ON },
 		{ "port",			PORT },
 		{ "prefork",			PREFORK },
 		{ "repos_path",			REPOS_PATH },
