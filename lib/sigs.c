@@ -55,7 +55,7 @@
 #endif
 
 const struct got_error *
-got_sigs_apply_unveil()
+got_sigs_apply_unveil(void)
 {
 	if (unveil(GOT_TAG_PATH_SSH_KEYGEN, "x") != 0) {
 		return got_error_from_errno2("unveil",
