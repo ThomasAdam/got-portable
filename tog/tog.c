@@ -2238,7 +2238,7 @@ draw_commits(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry = s->selected_entry;
-	const int limit = view->nlines;
+	int limit = view->nlines;
 	int width;
 	int ncommits, author_cols = 4;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
@@ -2246,6 +2246,9 @@ draw_commits(struct tog_view *view)
 	wchar_t *wline;
 	struct tog_color *tc;
 	static const size_t date_display_cols = 12;
+
+	if (view_is_hsplit_top(view))
+		--limit;  /* account for border */
 
 	if (s->selected_entry &&
 	    !(view->searching && view->search_next_done == 0)) {
@@ -3161,14 +3164,7 @@ static const struct got_error *
 log_move_cursor_down(struct tog_view *view, int page)
 {
 	struct tog_log_view_state	*s = &view->state.log;
-	struct commit_queue_entry	*first;
 	const struct got_error		*err = NULL;
-
-	first = s->first_displayed_entry;
-	if (first == NULL) {
-		view->count = 0;
-		return NULL;
-	}
 
 	if (s->thread_args.log_complete &&
 	    s->selected_entry->idx >= s->commits.ncommits - 1)
@@ -3192,13 +3188,12 @@ log_move_cursor_down(struct tog_view *view, int page)
 			    s->commits.ncommits - s->selected_entry->idx - 1));
 		s->selected = MIN(view->nlines - 2, s->commits.ncommits - 1);
 	} else {
-		err = log_scroll_down(view, page);
-		if (err)
-			return err;
-		if (first == s->first_displayed_entry && s->selected <
-		    MIN(view->nlines - 2, s->commits.ncommits - 1)) {
-			s->selected = MIN(s->commits.ncommits - 1, page);
-		}
+		if (s->last_displayed_entry->idx == s->commits.ncommits - 1 &&
+		    s->thread_args.log_complete)
+			s->selected += MIN(page,
+			    s->commits.ncommits - s->selected_entry->idx - 1);
+		else
+			err = log_scroll_down(view, page);
 	}
 	if (err)
 		return err;
