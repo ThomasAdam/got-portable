@@ -3170,28 +3170,35 @@ log_move_cursor_down(struct tog_view *view, int page)
 {
 	struct tog_log_view_state	*s = &view->state.log;
 	const struct got_error		*err = NULL;
+	int				 eos = view->nlines - 2;
 
 	if (s->thread_args.log_complete &&
 	    s->selected_entry->idx >= s->commits.ncommits - 1)
 		return NULL;
 
-	if (!page) {
-		int eos = view->nlines - 2;
+	if (view_is_hsplit_top(view))
+		--eos;  /* border consumes the last line */
 
-		if (view_is_hsplit_top(view))
-			--eos;  /* border consumes the last line */
+	if (!page) {
 		if (s->selected < MIN(eos, s->commits.ncommits - 1))
 			++s->selected;
 		else
 			err = log_scroll_down(view, 1);
 	} else if (s->thread_args.load_all) {
-		if (s->last_displayed_entry->idx == s->commits.ncommits - 1)
-			s->selected += MIN(s->last_displayed_entry->idx -
-			    s->selected_entry->idx, page + 1);
-		else
-			err = log_scroll_down(view, MIN(page,
-			    s->commits.ncommits - s->selected_entry->idx - 1));
-		s->selected = MIN(view->nlines - 2, s->commits.ncommits - 1);
+		struct commit_queue_entry *entry;
+		int n;
+
+		s->selected = 0;
+		entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
+		s->last_displayed_entry = entry;
+		for (n = 0; n <= eos; n++) {
+			if (entry == NULL)
+				break;
+			s->first_displayed_entry = entry;
+			entry = TAILQ_PREV(entry, commit_queue_head, entry);
+		}
+		if (n > 0)
+			s->selected = n - 1;
 	} else {
 		if (s->last_displayed_entry->idx == s->commits.ncommits - 1 &&
 		    s->thread_args.log_complete)
@@ -3300,8 +3307,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
-	struct commit_queue_entry *entry;
-	int eos, n, nscroll;
+	int eos, nscroll;
 
 	if (s->thread_args.load_all) {
 		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
@@ -3380,22 +3386,11 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		/* We don't know yet how many commits, so we're forced to
 		 * traverse them all. */
 		view->count = 0;
-		if (!s->thread_args.log_complete) {
-			s->thread_args.load_all = 1;
+		s->thread_args.load_all = 1;
+		if (!s->thread_args.log_complete)
 			return trigger_log_thread(view, 0);
-		}
-
-		s->selected = 0;
-		entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
-		for (n = 0; n < eos; n++) {
-			if (entry == NULL)
-				break;
-			s->first_displayed_entry = entry;
-			entry = TAILQ_PREV(entry, commit_queue_head, entry);
-		}
-		if (n > 0)
-			s->selected = n - 1;
-		select_commit(s);
+		err = log_move_cursor_down(view, s->commits.ncommits);
+		s->thread_args.load_all = 0;
 		break;
 	}
 	case CTRL('d'):
