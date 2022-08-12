@@ -3179,7 +3179,7 @@ log_move_cursor_down(struct tog_view *view, int page)
 			++s->selected;
 		else
 			err = log_scroll_down(view, 1);
-	} else if (s->thread_args.load_all) {
+	} else if (s->thread_args.load_all && s->thread_args.log_complete) {
 		struct commit_queue_entry *entry;
 		int n;
 
@@ -3311,7 +3311,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			err = log_move_cursor_down(view, s->commits.ncommits);
 			s->thread_args.load_all = 0;
 		}
-		return err;
+		if (err)
+			return err;
 	}
 
 	eos = nscroll = view->nlines - 1;
