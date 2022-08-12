@@ -6365,9 +6365,11 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	free(wline);
 	wline = NULL;
 
-	if (s->selected_entry) {
-		i = got_tree_entry_get_index(s->selected_entry);
-		i += s->tree == s->root ? 1 : 2;  /* account for ".." entry */
+	i += s->selected;
+	if (s->first_displayed_entry) {
+		i += got_tree_entry_get_index(s->first_displayed_entry);
+		if (s->tree != s->root)
+			++i;  /* account for ".." entry */
 	}
 	nentries = got_object_tree_get_nentries(s->tree);
 	wprintw(view->window, " [%d/%d]", i,
