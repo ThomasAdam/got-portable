@@ -410,39 +410,28 @@ if test "$PLATFORM" = "linux"; then
 fi
 
 # Look for a suitable queue.h.  We hope libbsd is enough, but that is missing
-# SIMPLEQ.
-AC_CHECK_DECL(
-	SIMPLEQ_INIT,
-	found_queue_h=yes,
-	found_queue_h=no,
-)
+# some declarations.
 AC_CHECK_DECL(
 	TAILQ_CONCAT,
 	found_queue_h=yes,
 	found_queue_h=no,
+	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_PREV,
 	,
 	found_queue_h=no,
-)
-AC_CHECK_DECL(
-	TAILQ_REPLACE,
-	,
-	found_queue_h=no,
-)
-AC_CHECK_DECL(
-	SIMPLEQ_ENTRY,
-	,
-	found_queue_h=no,
+	[#include <sys/queue.h>]
 )
 AC_CHECK_DECL(
 	TAILQ_FOREACH_SAFE,
 	,
 	found_queue_h=no,
+	[#include <sys/queue.h>]
 )
 
-if test "x$found_queue_h" = xyes -o "x$ac_cv_header_sys_queue_h" = xyes; then
+if test "x$found_queue_h" = xyes; then
+	AC_MSG_NOTICE([Using sys/queue.h - not compat])
 	AC_DEFINE(HAVE_QUEUE_H)
 fi
 
