@@ -3214,8 +3214,11 @@ log_move_cursor_down(struct tog_view *view, int page)
 	 * We might necessarily overshoot in horizontal
 	 * splits; if so, select the last displayed commit.
 	 */
-	s->selected = MIN(s->selected,
-	    s->last_displayed_entry->idx - s->first_displayed_entry->idx);
+	if (s->first_displayed_entry && s->last_displayed_entry) {
+		s->selected = MIN(s->selected,
+		    s->last_displayed_entry->idx -
+		    s->first_displayed_entry->idx);
+	}
 
 	select_commit(s);
 
@@ -3272,6 +3275,9 @@ log_goto_line(struct tog_view *view, int nlines)
 	const struct got_error		*err = NULL;
 	struct tog_log_view_state	*s = &view->state.log;
 	int				 g, idx = s->selected_entry->idx;
+
+	if (s->first_displayed_entry == NULL || s->last_displayed_entry == NULL)
+		return NULL;
 
 	g = view->gline;
 	view->gline = 0;
