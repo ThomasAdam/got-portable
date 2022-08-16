@@ -160,10 +160,11 @@ const struct got_error *
 got_pkt_writepkt(int fd, char *buf, int nbuf, int chattygot)
 {
 	char len[5];
-	int i;
+	int i, ret;
 	ssize_t w;
 
-	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
+	ret = snprintf(len, sizeof(len), "%04x", nbuf + 4);
+	if (ret < 0 || (size_t)ret >= sizeof(len))
 		return got_error(GOT_ERR_NO_SPACE);
 	w = write(fd, len, 4);
 	if (w == -1)

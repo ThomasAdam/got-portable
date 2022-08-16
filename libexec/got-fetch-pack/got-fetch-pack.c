@@ -490,7 +490,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
 		    sent_my_capabilites || my_capabilities == NULL ?
 		    "" : my_capabilities);
-		if (n >= sizeof(buf)) {
+		if (n < 0 || (size_t)n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
@@ -511,7 +511,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		struct got_object_id *id = pe->data;
 		got_sha1_digest_to_str(id->sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
-		if (n >= sizeof(buf)) {
+		if (n < 0 || (size_t)n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}

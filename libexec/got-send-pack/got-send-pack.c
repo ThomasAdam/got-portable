@@ -282,7 +282,7 @@ describe_refchange(int *n, int *sent_my_capabilites,
 {
 	*n = snprintf(buf, bufsize, "%s %s %s",
 	    old_hashstr, new_hashstr, refname);
-	if (*n >= bufsize)
+	if (*n < 0 || (size_t)*n >= bufsize)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	/*
@@ -298,7 +298,7 @@ describe_refchange(int *n, int *sent_my_capabilites,
 			return got_error(GOT_ERR_NO_SPACE);
 		m = snprintf(buf + *n + 1, /* offset after '\0' */
 		    bufsize - (*n + 1), "%s\n", my_capabilities);
-		if (*n + m >= bufsize)
+		if (m < 0 || *n + m >= bufsize)
 			return got_error(GOT_ERR_NO_SPACE);
 		*n += m;
 		*sent_my_capabilites = 1;

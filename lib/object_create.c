@@ -273,7 +273,7 @@ te_mode2str(char *buf, size_t len, struct got_tree_entry *te)
 		return got_error(GOT_ERR_BAD_FILETYPE);
 
 	ret = snprintf(buf, len, "%o ", mode);
-	if (ret == -1 || ret >= len)
+	if (ret < 0 || (size_t)ret >= len)
 		return got_error(GOT_ERR_NO_SPACE);
 	return NULL;
 }

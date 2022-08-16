@@ -10598,7 +10598,7 @@ histedit_syntax_error(int lineno)
 
 	ret = snprintf(msg, sizeof(msg), "histedit syntax error on line %d",
 	    lineno);
-	if (ret == -1 || ret >= sizeof(msg))
+	if (ret < 0 || (size_t)ret >= sizeof(msg))
 		return got_error(GOT_ERR_HISTEDIT_SYNTAX);
 
 	return got_error_msg(GOT_ERR_HISTEDIT_SYNTAX, msg);

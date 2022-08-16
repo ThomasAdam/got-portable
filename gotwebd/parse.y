@@ -201,7 +201,8 @@ main		: PREFORK NUMBER {
 			    sizeof(gotwebd->unix_socket_name), "%s%s",
 			    strlen(gotwebd->httpd_chroot) ?
 			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $2);
-			if (n < 0) {
+			if (n < 0 ||
+			    (size_t)n >= sizeof(gotwebd->unix_socket_name)) {
 				yyerror("%s: unix_socket_name truncated",
 				    __func__);
 				free($2);
@@ -366,7 +367,8 @@ serveropts1	: REPOS_PATH STRING {
 			    sizeof(new_srv->unix_socket_name), "%s%s",
 			    strlen(gotwebd->httpd_chroot) ?
 			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $2);
-			if (n < 0) {
+			if (n < 0 ||
+			    (size_t)n >= sizeof(new_srv->unix_socket_name)) {
 				yyerror("%s: unix_socket_name truncated",
 				    __func__);
 				free($2);
@@ -885,7 +887,7 @@ conf_new_server(const char *name)
 	n = snprintf(srv->unix_socket_name,
 	    sizeof(srv->unix_socket_name), "%s%s", D_HTTPD_CHROOT,
 	    D_UNIX_SOCKET);
-	if (n < 0)
+	if (n < 0 || (size_t)n >= sizeof(srv->unix_socket_name))
 		fatalx("%s: snprintf", __func__);
 	n = strlcpy(srv->repos_path, D_GOTPATH,
 	    sizeof(srv->repos_path));

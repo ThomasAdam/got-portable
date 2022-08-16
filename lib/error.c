@@ -372,7 +372,7 @@ got_error_no_obj(struct got_object_id *id)
 		return got_error(GOT_ERR_NO_OBJ);
 
 	ret = snprintf(msg, sizeof(msg), "object %s not found", id_str);
-	if (ret == -1 || ret >= sizeof(msg))
+	if (ret < 0 || (size_t)ret >= sizeof(msg))
 		return got_error(GOT_ERR_NO_OBJ);
 
 	return got_error_msg(GOT_ERR_NO_OBJ, msg);
@@ -385,7 +385,7 @@ got_error_not_ref(const char *refname)
 	int ret;
 
 	ret = snprintf(msg, sizeof(msg), "reference %s not found", refname);
-	if (ret == -1 || ret >= sizeof(msg))
+	if (ret < 0 || (size_t)ret >= sizeof(msg))
 		return got_error(GOT_ERR_NOT_REF);
 
 	return got_error_msg(GOT_ERR_NOT_REF, msg);
