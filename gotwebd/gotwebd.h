@@ -252,7 +252,7 @@ TAILQ_HEAD(addresslist, address);
 
 struct server {
 	TAILQ_ENTRY(server)	 entry;
-	struct addresslist	*al;
+	struct addresslist	al;
 
 	char		 name[GOTWEBD_MAXTEXT];
 
@@ -294,7 +294,7 @@ enum sock_type {
 };
 
 struct socket_conf {
-	struct addresslist	*al;
+	struct addresslist	al;
 
 	char		 name[GOTWEBD_MAXTEXT];
 	char		 srv_name[GOTWEBD_MAXTEXT];

@@ -141,7 +141,7 @@ sockets_parse_sockets(struct gotwebd *env)
 			TAILQ_FOREACH(sock, env->sockets, entry) {
 				ipv4 = ipv6 = 0;
 
-				TAILQ_FOREACH(a, sock->conf.al, entry) {
+				TAILQ_FOREACH(a, &sock->conf.al, entry) {
 					if (a->ss.ss_family == AF_INET)
 						ipv4 = 1;
 					if (a->ss.ss_family == AF_INET6)
@@ -180,14 +180,12 @@ sockets_dup_new_socket(struct socket *p_sock, struct socket *sock)
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_child",
 	    p_sock->conf.srv_name);
 	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
-		free(p_sock->conf.al);
 		free(p_sock);
-		free(sock->conf.al);
 		free(sock);
 		fatalx("%s: snprintf", __func__);
 	}
 
-	TAILQ_FOREACH(a, p_sock->conf.al, entry) {
+	TAILQ_FOREACH(a, &p_sock->conf.al, entry) {
 		if (a->ss.ss_family == AF_INET)
 			continue;
 
@@ -205,7 +203,7 @@ sockets_dup_new_socket(struct socket *p_sock, struct socket *sock)
 			}
 		}
 
-		TAILQ_INSERT_TAIL(sock->conf.al, acp, entry);
+		TAILQ_INSERT_TAIL(&sock->conf.al, acp, entry);
 	}
 }
 
@@ -220,11 +218,7 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 	if ((sock = calloc(1, sizeof(*sock))) == NULL)
 		fatalx("%s: calloc", __func__);
 
-	if ((sock->conf.al = calloc(1, sizeof(*sock->conf.al))) == NULL) {
-		free(sock);
-		fatalx("%s: calloc", __func__);
-	}
-	TAILQ_INIT(sock->conf.al);
+	TAILQ_INIT(&sock->conf.al);
 
 	sock->conf.parent_id = 0;
 	sock->conf.id = id;
@@ -238,7 +232,6 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 		    srv->unix_socket_name,
 		    sizeof(sock->conf.unix_socket_name)) >=
 		    sizeof(sock->conf.unix_socket_name)) {
-			free(sock->conf.al);
 			free(sock);
 			fatalx("%s: strlcpy", __func__);
 		}
@@ -253,21 +246,18 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
 	    srv->name);
 	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
-		free(sock->conf.al);
 		free(sock);
 		fatalx("%s: snprintf", __func__);
 	}
 
 	if (strlcpy(sock->conf.srv_name, srv->name,
 	    sizeof(sock->conf.srv_name)) >= sizeof(sock->conf.srv_name)) {
-		free(sock->conf.al);
 		free(sock);
 		fatalx("%s: strlcpy", __func__);
 	}
 
-	TAILQ_FOREACH(a, srv->al, entry) {
+	TAILQ_FOREACH(a, &srv->al, entry) {
 		if ((acp = calloc(1, sizeof(*acp))) == NULL) {
-			free(sock->conf.al);
 			free(sock);
 			fatal("%s: calloc", __func__);
 		}
@@ -283,7 +273,7 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 			}
 		}
 
-		TAILQ_INSERT_TAIL(sock->conf.al, acp, entry);
+		TAILQ_INSERT_TAIL(&sock->conf.al, acp, entry);
 	}
 done:
 	return (sock);
@@ -437,7 +427,7 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 	if (sock->conf.type == FCGI) {
 		log_debug("%s: initializing fcgi socket for %s", __func__,
 		    sock->conf.name);
-		sock->fd = sockets_create_socket(sock->conf.al,
+		sock->fd = sockets_create_socket(&sock->conf.al,
 		    sock->conf.fcgi_socket_port);
 		if (sock->fd == -1) {
 			log_warnx("%s: create unix socket failed", __func__);

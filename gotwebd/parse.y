@@ -226,7 +226,7 @@ server		: SERVER STRING {
 			new_srv = conf_new_server($2);
 			if (new_srv->fcgi_socket)
 				if (get_addrs(new_srv->fcgi_socket_bind,
-				    new_srv->al,
+				    &new_srv->al,
 				    new_srv->fcgi_socket_port) == -1) {
 					yyerror("could not get tcp iface "
 					    "addrs");
@@ -251,7 +251,7 @@ server		: SERVER STRING {
 			free($2);
 		} '{' optnl serveropts2 '}' {
 			if (get_addrs(new_srv->fcgi_socket_bind,
-			    new_srv->al, new_srv->fcgi_socket_port) == -1) {
+			    &new_srv->al, new_srv->fcgi_socket_port) == -1) {
 				yyerror("could not get tcp iface addrs");
 				YYERROR;
 			}
@@ -933,10 +933,7 @@ conf_new_server(const char *name)
 	srv->unix_socket = 1;
 	srv->fcgi_socket = gotwebd->fcgi_socket ? gotwebd->fcgi_socket : 0;
 
-	if ((srv->al = calloc(1, sizeof(*srv->al))) == NULL)
-		fatalx("%s: calloc", __func__);
-
-	TAILQ_INIT(srv->al);
+	TAILQ_INIT(&srv->al);
 	TAILQ_INSERT_TAIL(gotwebd->servers, srv, entry);
 	gotwebd->server_cnt++;
 
