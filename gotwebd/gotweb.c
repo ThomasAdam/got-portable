@@ -308,24 +308,24 @@ gotweb_get_server(uint8_t *server_name, uint8_t *document_root,
 
 	/* check against document_root first */
 	if (strlen(server_name) > 0)
-		TAILQ_FOREACH(srv, gotwebd_env->servers, entry)
+		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, server_name) == 0)
 				goto done;
 
 	/* check against document_root second */
 	if (strlen(document_root) > 0)
-		TAILQ_FOREACH(srv, gotwebd_env->servers, entry)
+		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, document_root) == 0)
 				goto done;
 
 	/* check against subdomain third */
 	if (strlen(subdomain) > 0)
-		TAILQ_FOREACH(srv, gotwebd_env->servers, entry)
+		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, subdomain) == 0)
 				goto done;
 
 	/* if those fail, send first server */
-	TAILQ_FOREACH(srv, gotwebd_env->servers, entry)
+	TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 		if (srv != NULL)
 			break;
 done:

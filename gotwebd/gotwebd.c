@@ -292,13 +292,13 @@ gotwebd_configure(struct gotwebd *env)
 	env->gotwebd_reload = env->prefork_gotwebd;
 
 	/* send our gotweb servers */
-	TAILQ_FOREACH(srv, env->servers, entry) {
+	TAILQ_FOREACH(srv, &env->servers, entry) {
 		if (config_setserver(env, srv) == -1)
 			fatalx("%s: send server error", __func__);
 	}
 
 	/* send our sockets */
-	TAILQ_FOREACH(sock, env->sockets, entry) {
+	TAILQ_FOREACH(sock, &env->sockets, entry) {
 		if (config_setsock(env, sock) == -1)
 			fatalx("%s: send socket error", __func__);
 		if (config_setfd(env, sock) == -1)
