@@ -216,7 +216,7 @@ main		: PREFORK NUMBER {
 server		: SERVER STRING {
 			struct server *srv;
 
-			TAILQ_FOREACH(srv, gotwebd->servers, entry) {
+			TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
 				if (strcmp(srv->name, $2) == 0) {
 					yyerror("server name exists '%s'", $2);
 					free($2);
@@ -239,7 +239,7 @@ server		: SERVER STRING {
 		| SERVER STRING {
 			struct server *srv;
 
-			TAILQ_FOREACH(srv, gotwebd->servers, entry) {
+			TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
 				if (strcmp(srv->name, $2) == 0) {
 					yyerror("server name exists '%s'", $2);
 					free($2);
@@ -397,7 +397,7 @@ socketopts1	: LISTEN ON STRING {
 		| PORT fcgiport {
 			struct server	*srv;
 
-			TAILQ_FOREACH(srv, gotwebd->servers, entry) {
+			TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
 				if (srv->fcgi_socket_port == $2) {
 					yyerror("port already assigned");
 					YYERROR;
@@ -935,7 +935,7 @@ conf_new_server(const char *name)
 	srv->fcgi_socket = gotwebd->fcgi_socket ? gotwebd->fcgi_socket : 0;
 
 	TAILQ_INIT(&srv->al);
-	TAILQ_INSERT_TAIL(gotwebd->servers, srv, entry);
+	TAILQ_INSERT_TAIL(&gotwebd->servers, srv, entry);
 	gotwebd->server_cnt++;
 
 	return srv;

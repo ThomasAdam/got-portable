@@ -58,14 +58,8 @@ config_init(struct gotwebd *env)
 	what = ps->ps_what[privsep_process];
 	if (what & CONFIG_SOCKS) {
 		env->server_cnt = 0;
-		env->servers = calloc(1, sizeof(*env->servers));
-		if (env->servers == NULL)
-			fatalx("%s: calloc", __func__);
-		env->sockets = calloc(1, sizeof(*env->sockets));
-		if (env->sockets == NULL)
-			fatalx("%s: calloc", __func__);
-		TAILQ_INIT(env->servers);
-		TAILQ_INIT(env->sockets);
+		TAILQ_INIT(&env->servers);
+		TAILQ_INIT(&env->sockets);
 	}
 	 return 0;
 }
@@ -116,7 +110,7 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	    srv->name, srv->fcgi_socket ? "yes" : "no", srv->unix_socket ?
 	    "yes" : "no");
 
-	TAILQ_INSERT_TAIL(env->servers, srv, entry);
+	TAILQ_INSERT_TAIL(&env->servers, srv, entry);
 
 	 return 0;
 }
@@ -209,7 +203,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	memcpy(&sock->conf, &sock_conf, sizeof(sock->conf));
 	sock->fd = imsg->fd;
 
-	TAILQ_INSERT_TAIL(env->sockets, sock, entry);
+	TAILQ_INSERT_TAIL(&env->sockets, sock, entry);
 
 	for (i = 0; i < PRIV_FDS__MAX; i++)
 		sock->priv_fd[i] = -1;
@@ -299,7 +293,7 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 	IMSG_SIZE_CHECK(imsg, &sock_id);
 	memcpy(&sock_id, p, sizeof(sock_id));
 
-	TAILQ_FOREACH(sock, env->sockets, entry) {
+	TAILQ_FOREACH(sock, &env->sockets, entry) {
 		const int nfds = (GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX);
 		for (i = 0; i < nfds; i++) {
 			if (i < PRIV_FDS__MAX && sock->priv_fd[i] == -1) {

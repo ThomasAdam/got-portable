@@ -328,8 +328,8 @@ struct socket {
 TAILQ_HEAD(socketlist, socket);
 
 struct gotwebd {
-	struct serverlist	*servers;
-	struct socketlist	*sockets;
+	struct serverlist	servers;
+	struct socketlist	sockets;
 
 	struct privsep	*gotwebd_ps;
 	const char	*gotwebd_conffile;

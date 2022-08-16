@@ -123,22 +123,22 @@ sockets_parse_sockets(struct gotwebd *env)
 	struct address *a;
 	int sock_id = 0, ipv4 = 0, ipv6 = 0;
 
-	TAILQ_FOREACH(srv, env->servers, entry) {
+	TAILQ_FOREACH(srv, &env->servers, entry) {
 		if (srv->unix_socket) {
 			sock_id++;
 			new_sock = sockets_conf_new_socket(env, srv,
 			    sock_id, UNIX, 0);
-			TAILQ_INSERT_TAIL(env->sockets, new_sock, entry);
+			TAILQ_INSERT_TAIL(&env->sockets, new_sock, entry);
 		}
 
 		if (srv->fcgi_socket) {
 			sock_id++;
 			new_sock = sockets_conf_new_socket(env, srv,
 			    sock_id, FCGI, 0);
-			TAILQ_INSERT_TAIL(env->sockets, new_sock, entry);
+			TAILQ_INSERT_TAIL(&env->sockets, new_sock, entry);
 
 			/* add ipv6 children */
-			TAILQ_FOREACH(sock, env->sockets, entry) {
+			TAILQ_FOREACH(sock, &env->sockets, entry) {
 				ipv4 = ipv6 = 0;
 
 				TAILQ_FOREACH(a, &sock->conf.al, entry) {
@@ -155,7 +155,7 @@ sockets_parse_sockets(struct gotwebd *env)
 					new_sock = sockets_conf_new_socket(env,
 					    srv, sock_id, FCGI, 1);
 					sockets_dup_new_socket(sock, new_sock);
-					TAILQ_INSERT_TAIL(env->sockets,
+					TAILQ_INSERT_TAIL(&env->sockets,
 					    new_sock, entry);
 					continue;
 				}
@@ -284,7 +284,7 @@ sockets_launch(void)
 {
 	struct socket *sock;
 
-	TAILQ_FOREACH(sock, gotwebd_env->sockets, entry) {
+	TAILQ_FOREACH(sock, &gotwebd_env->sockets, entry) {
 		log_debug("%s: configuring socket %d (%d)", __func__,
 		    sock->conf.id, sock->fd);
 
@@ -307,7 +307,7 @@ sockets_purge(struct gotwebd *env)
 	struct socket *sock, *tsock;
 
 	/* shutdown and remove sockets */
-	TAILQ_FOREACH_SAFE(sock, env->sockets, entry, tsock) {
+	TAILQ_FOREACH_SAFE(sock, &env->sockets, entry, tsock) {
 		if (event_initialized(&sock->ev))
 			event_del(&sock->ev);
 		if (evtimer_initialized(&sock->evt))
@@ -316,7 +316,7 @@ sockets_purge(struct gotwebd *env)
 			evtimer_del(&sock->pause);
 		if (sock->fd != -1)
 			close(sock->fd);
-		TAILQ_REMOVE(env->sockets, sock, entry);
+		TAILQ_REMOVE(&env->sockets, sock, entry);
 	}
 }
 
@@ -394,18 +394,16 @@ sockets_shutdown(void)
 	sockets_purge(gotwebd_env);
 
 	/* clean sockets */
-	TAILQ_FOREACH_SAFE(sock, gotwebd_env->sockets, entry, tsock) {
-		TAILQ_REMOVE(gotwebd_env->sockets, sock, entry);
+	TAILQ_FOREACH_SAFE(sock, &gotwebd_env->sockets, entry, tsock) {
+		TAILQ_REMOVE(&gotwebd_env->sockets, sock, entry);
 		close(sock->fd);
 		free(sock);
 	}
 
 	/* clean servers */
-	TAILQ_FOREACH_SAFE(srv, gotwebd_env->servers, entry, tsrv)
+	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv)
 		free(srv);
 
-	free(gotwebd_env->sockets);
-	free(gotwebd_env->servers);
 	free(gotwebd_env);
 }
 
@@ -447,7 +445,7 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 	int u_fd = -1;
 	mode_t old_umask, mode;
 
-	TAILQ_FOREACH(tsock, env->sockets, entry) {
+	TAILQ_FOREACH(tsock, &env->sockets, entry) {
 		if (strcmp(tsock->conf.unix_socket_name,
 		    sock->conf.unix_socket_name) == 0 &&
 		    tsock->fd != -1)
