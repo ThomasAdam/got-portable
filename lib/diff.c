@@ -904,6 +904,9 @@ show_object_id(struct got_diff_line **lines, size_t *nlines,
 	off_t outoff = 0;
 
 	n = fprintf(outfile, "%s %c %s\n", obj_typestr, ch, id_str);
+	if (n < 0)
+		return got_error_from_errno("fprintf");
+
 	if (lines != NULL && *lines != NULL) {
 		if (*nlines == 0) {
 			err = add_line_metadata(lines, nlines, 0,
