@@ -179,7 +179,7 @@ sockets_dup_new_socket(struct socket *p_sock, struct socket *sock)
 
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_child",
 	    p_sock->conf.srv_name);
-	if (n < 0) {
+	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
 		free(p_sock->conf.al);
 		free(p_sock);
 		free(sock->conf.al);
@@ -252,7 +252,7 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
 	    srv->name);
-	if (n < 0) {
+	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
 		free(sock->conf.al);
 		free(sock);
 		fatalx("%s: snprintf", __func__);
