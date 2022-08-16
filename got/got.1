@@ -63,7 +63,7 @@ The commands for
 are as follows:
 .Bl -tag -width checkout
 .Tg im
-.It Cm import Oo Fl b Ar branch Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl I Ar pattern Oc Ar directory
+.It Cm import Oo Fl b Ar branch Oc Oo Fl I Ar pattern Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Ar directory
 .Dl Pq alias: Cm im
 Create an initial commit in a repository from the file hierarchy
 within the specified
@@ -103,6 +103,14 @@ instead of creating the default branch
 Use of this option is required if the
 .Dq main
 branch already exists.
+.It Fl I Ar pattern
+Ignore files or directories with a name which matches the specified
+.Ar pattern .
+This option may be specified multiple times to build a list of ignore patterns.
+The
+.Ar pattern
+follows the globbing rules documented in
+.Xr glob 7 .
 .It Fl m Ar message
 Use the specified log message when creating the new commit.
 Without the
@@ -114,17 +122,9 @@ opens a temporary file in an editor where a log message can be written.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
-.It Fl I Ar pattern
-Ignore files or directories with a name which matches the specified
-.Ar pattern .
-This option may be specified multiple times to build a list of ignore patterns.
-The
-.Ar pattern
-follows the globbing rules documented in
-.Xr glob 7 .
 .El
 .Tg cl
-.It Cm clone Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl l Oc Oo Fl m Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Ar repository-URL Op Ar directory
+.It Cm clone Oo Fl almqv Oc Oo Fl b Ar branch Oc Oo Fl R Ar reference Oc Ar repository-URL Op Ar directory
 .Dl Pq alias: Cm cl
 Clone a Git repository at the specified
 .Ar repository-URL
@@ -268,16 +268,6 @@ Suppress progress reporting output.
 The same option will be passed to
 .Xr ssh 1
 if applicable.
-.It Fl v
-Verbose mode.
-Causes
-.Cm got clone
-to print debugging messages to standard error output.
-This option will be passed to
-.Xr ssh 1
-if applicable.
-Multiple -v options increase the verbosity.
-The maximum is 3.
 .It Fl R Ar reference
 In addition to the branches and tags that will be fetched, fetch an arbitrary
 .Ar reference
@@ -305,9 +295,19 @@ will refuse to fetch references from the remote repository's
 or
 .Dq refs/got/
 namespace.
+.It Fl v
+Verbose mode.
+Causes
+.Cm got clone
+to print debugging messages to standard error output.
+This option will be passed to
+.Xr ssh 1
+if applicable.
+Multiple -v options increase the verbosity.
+The maximum is 3.
 .El
 .Tg fe
-.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl t Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Oo Fl X Oc Op Ar remote-repository
+.It Cm fetch Oo Fl adlqtvX Oc Oo Fl b Ar branch Oc Oo Fl R Ar reference Oc Oo Fl r Ar repository-path Oc Op Ar remote-repository
 .Dl Pq alias: Cm fe
 Fetch new changes from a remote repository.
 If no
@@ -397,33 +397,11 @@ Cannot be used together with any of the other options except
 .Fl q ,
 and
 .Fl r .
-.It Fl t
-Allow existing references in the
-.Dq refs/tags
-namespace to be updated if they have changed on the server.
-If not specified, only new tag references will be created.
-.It Fl r Ar repository-path
-Use the repository at the specified path.
-If not specified, assume the repository is located at or above the current
-working directory.
-If this directory is a
-.Nm
-work tree, use the repository path associated with this work tree.
 .It Fl q
 Suppress progress reporting output.
 The same option will be passed to
 .Xr ssh 1
 if applicable.
-.It Fl v
-Verbose mode.
-Causes
-.Cm got fetch
-to print debugging messages to standard error output.
-The same option will be passed to
-.Xr ssh 1
-if applicable.
-Multiple -v options increase the verbosity.
-The maximum is 3.
 .It Fl R Ar reference
 In addition to the branches and tags that will be fetched, fetch an arbitrary
 .Ar reference
@@ -455,6 +433,28 @@ will refuse to fetch references from the remote repository's
 or
 .Dq refs/got/
 namespace.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl t
+Allow existing references in the
+.Dq refs/tags
+namespace to be updated if they have changed on the server.
+If not specified, only new tag references will be created.
+.It Fl v
+Verbose mode.
+Causes
+.Cm got fetch
+to print debugging messages to standard error output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+Multiple -v options increase the verbosity.
+The maximum is 3.
 .It Fl X
 Delete all references which correspond to a particular
 .Ar remote-repository
@@ -480,7 +480,7 @@ will generally be stored in pack files and may be removed separately with
 and Git's garbage collector.
 .El
 .Tg co
-.It Cm checkout  Oo Fl E Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Oo Fl q Oc Ar repository-path Op Ar work-tree-path
+.It Cm checkout Oo Fl Eq Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
 .Dl Pq alias: Cm co
 Copy files from a repository into a new work tree.
 Show the status of each affected file, using the following status codes:
@@ -502,11 +502,6 @@ The options for
 .Cm got checkout
 are as follows:
 .Bl -tag -width Ds
-.It Fl E
-Proceed with the checkout operation even if the directory at
-.Ar work-tree-path
-is not empty.
-Existing files will be left intact.
 .It Fl b Ar branch
 Check out files from a commit on the specified
 .Ar branch .
@@ -536,6 +531,11 @@ before
 .Cm got checkout
 can be used.
 Checking out work trees with an unknown branch is intentionally not supported.
+.It Fl E
+Proceed with the checkout operation even if the directory at
+.Ar work-tree-path
+is not empty.
+Existing files will be left intact.
 .It Fl p Ar path-prefix
 Restrict the work tree to a subset of the repository's tree hierarchy.
 Only files beneath the specified
@@ -545,7 +545,7 @@ will be checked out.
 Silence progress output.
 .El
 .Tg up
-.It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl q Oc Op Ar path ...
+.It Cm update Oo Fl q Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
 .Dl Pq alias: Cm up
 Update an existing work tree to a different
 .Ar commit .
@@ -643,7 +643,7 @@ branch will be used.
 Silence progress output.
 .El
 .Tg st
-.It Cm status Oo Fl I Oc Oo Fl s Ar status-codes Oc Oo Fl S Ar status-codes Oc Op Ar path ...
+.It Cm status Oo Fl I Oc Oo Fl S Ar status-codes Oc Oo Fl s Ar status-codes Oc Op Ar path ...
 .Dl Pq alias: Cm st
 Show the current modification status of files in a work tree,
 using the following status codes:
@@ -689,17 +689,6 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl I
 Show unversioned files even if they match an ignore pattern.
-.It Fl s Ar status-codes
-Only show files with a modification status matching any of the
-single-character status codes contained in the
-.Ar status-codes
-argument.
-Any combination of codes from the above list of possible status codes
-may be specified.
-For staged files, status codes displayed in either column will be matched.
-Cannot be used together with the
-.Fl S
-option.
 .It Fl S Ar status-codes
 Suppress the output of files with a modification status matching any of the
 single-character status codes contained in the
@@ -710,6 +699,17 @@ may be specified.
 For staged files, status codes displayed in either column will be matched.
 Cannot be used together with the
 .Fl s
+option.
+.It Fl s Ar status-codes
+Only show files with a modification status matching any of the
+single-character status codes contained in the
+.Ar status-codes
+argument.
+Any combination of codes from the above list of possible status codes
+may be specified.
+For staged files, status codes displayed in either column will be matched.
+Cannot be used together with the
+.Fl S
 option.
 .El
 .Pp
@@ -745,7 +745,7 @@ does not support negated ignore patterns prefixed with
 and gives no special significance to the location of path component separators,
 .Dq / ,
 in a pattern.
-.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl P Oc Oo Fl s Oc Oo Fl S Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl R Oc Oo Fl x Ar commit Oc Op Ar path
+.It Cm log Oo Fl bPpRs Oc Oo Fl C Ar number Oc Oo Fl c Ar commit Oc Oo Fl l Ar N Oc Oo Fl r Ar repository-path Oc Oo Fl S Ar search-pattern Oc Oo Fl x Ar commit Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -766,6 +766,10 @@ from other branches.
 By default,
 .Cm got log
 shows the linear history of the current branch only.
+.It Fl C Ar number
+Set the number of context lines shown in diffs with
+.Fl p .
+By default, 3 lines of context are shown.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
@@ -775,10 +779,6 @@ An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
-.It Fl C Ar number
-Set the number of context lines shown in diffs with
-.Fl p .
-By default, 3 lines of context are shown.
 .It Fl l Ar N
 Limit history traversal to a given number of commits.
 If this option is not specified, a default limit value of zero is used,
@@ -786,14 +786,6 @@ which is treated as an unbounded limit.
 The
 .Ev GOT_LOG_DEFAULT_LIMIT
 environment variable may be set to change this default value.
-.It Fl p
-Display the patch of modifications made in each commit.
-If a
-.Ar path
-is specified, only show the patch of modifications at or within this path.
-Cannot be used with the
-.Fl s
-option.
 .It Fl P
 Display the list of file paths changed in each commit, using the following
 status codes:
@@ -807,14 +799,24 @@ status codes:
 Cannot be used with the
 .Fl s
 option.
-.It Fl s
-Display a short one-line summary of each commit, instead of the default
-history format.
-Cannot be used together with the
-.Fl p
-or
-.Fl P
+.It Fl p
+Display the patch of modifications made in each commit.
+If a
+.Ar path
+is specified, only show the patch of modifications at or within this path.
+Cannot be used with the
+.Fl s
 option.
+.It Fl R
+Determine a set of commits to display as usual, but display these commits
+in reverse order.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
 .It Fl S Ar search-pattern
 If specified, show only commits with a log message, author name,
 committer name, or ID SHA1 hash matched by the extended regular
@@ -828,16 +830,14 @@ File paths changed by a commit will be matched if
 is specified.
 Regular expression syntax is documented in
 .Xr re_format 7 .
-.It Fl r Ar repository-path
-Use the repository at the specified path.
-If not specified, assume the repository is located at or above the current
-working directory.
-If this directory is a
-.Nm
-work tree, use the repository path associated with this work tree.
-.It Fl R
-Determine a set of commits to display as usual, but display these commits
-in reverse order.
+.It Fl s
+Display a short one-line summary of each commit, instead of the default
+history format.
+Cannot be used together with the
+.Fl p
+or
+.Fl P
+option.
 .It Fl x Ar commit
 Stop traversing commit history immediately after the specified
 .Ar commit
@@ -847,7 +847,7 @@ This option has no effect if the specified
 is never traversed.
 .El
 .Tg di
-.It Cm diff Oo Fl a Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl P Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path ...
+.It Cm diff Oo Fl aPsw Oc Oo Fl C Ar number Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar object1 Ar object2 | Ar path ...
 .Dl Pq alias: Cm di
 When invoked within a work tree without any arguments, display all
 local changes in the work tree.
@@ -874,9 +874,12 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Treat file contents as ASCII text even if binary data is detected.
+.It Fl C Ar number
+Set the number of context lines shown in the diff.
+By default, 3 lines of context are shown.
 .It Fl c Ar commit
 Show differences between commits in the repository.
-This options may be used up to two times.
+This option may be used up to two times.
 When used only once, show differences between the specified
 .Ar commit
 and its first parent commit.
@@ -897,9 +900,13 @@ arguments are provided, only show differences for the specified paths.
 Cannot be used together with the
 .Fl P
 option.
-.It Fl C Ar number
-Set the number of context lines shown in the diff.
-By default, 3 lines of context are shown.
+.It Fl P
+Interpret all arguments as paths only.
+This option can be used to resolve ambiguity in cases where paths
+look like tag names, reference names, or object IDs.
+This option is only valid when
+.Cm got diff
+is invoked in a work tree.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -911,13 +918,6 @@ work tree, use the repository path associated with this work tree.
 Show changes staged with
 .Cm got stage
 instead of showing local changes in the work tree.
-This option is only valid when
-.Cm got diff
-is invoked in a work tree.
-.It Fl P
-Interpret all arguments as paths only.
-This option can be used to resolve ambiguity in cases where paths
-look like tag names, reference names, or object IDs.
 This option is only valid when
 .Cm got diff
 is invoked in a work tree.
@@ -949,7 +949,7 @@ If this directory is a
 work tree, use the repository path associated with this work tree.
 .El
 .Tg tr
-.It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl i Oc Oo Fl R Oc Op Ar path
+.It Cm tree Oo Fl iR Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
 .Dl Pq alias: Cm tr
 Display a listing of files and directories at the specified
 directory path in the repository.
@@ -981,6 +981,10 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.It Fl i
+Show object IDs of files (blob objects) and directories (tree objects).
+.It Fl R
+Recurse into sub-directories in the repository.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -988,12 +992,8 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
-.It Fl i
-Show object IDs of files (blob objects) and directories (tree objects).
-.It Fl R
-Recurse into sub-directories in the repository.
 .El
-.It Cm ref Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl t Oc Oo Fl c Ar object Oc Oo Fl s Ar reference Oc Oo Fl d Oc Op Ar name
+.It Cm ref Oo Fl dlt Oc Oo Fl c Ar object Oc Oo Fl r Ar repository-path Oc Oo Fl s Ar reference Oc Op Ar name
 Manage references in a repository.
 .Pp
 References may be listed, created, deleted, and changed.
@@ -1006,13 +1006,28 @@ The options for
 .Cm got ref
 are as follows:
 .Bl -tag -width Ds
-.It Fl r Ar repository-path
-Use the repository at the specified path.
-If not specified, assume the repository is located at or above the current
-working directory.
-If this directory is a
-.Nm
-work tree, use the repository path associated with this work tree.
+.It Fl c Ar object
+Create a reference or change an existing reference.
+The reference with the specified
+.Ar name
+will point at the specified
+.Ar object .
+The expected
+.Ar object
+argument is a ID SHA1 hash or an existing reference or tag name which will
+be resolved to the ID of a corresponding commit, tree, tag, or blob object.
+Cannot be used together with any other options except
+.Fl r .
+.It Fl d
+Delete the reference with the specified
+.Ar name
+from the repository.
+Any commit, tree, tag, and blob objects belonging to deleted references
+remain in the repository and may be removed separately with
+Git's garbage collector or
+.Cm gotadmin cleanup .
+Cannot be used together with any other options except
+.Fl r .
 .It Fl l
 List references in the repository.
 If no
@@ -1027,24 +1042,13 @@ Cannot be used together with any other options except
 .Fl r
 and
 .Fl t .
-.It Fl t
-Sort listed references by modification time (most recently modified first)
-instead of sorting by lexicographical order.
-Use of this option requires the
-.Fl l
-option to be used as well.
-.It Fl c Ar object
-Create a reference or change an existing reference.
-The reference with the specified
-.Ar name
-will point at the specified
-.Ar object .
-The expected
-.Ar object
-argument is a ID SHA1 hash or an existing reference or tag name which will
-be resolved to the ID of a corresponding commit, tree, tag, or blob object.
-Cannot be used together with any other options except
-.Fl r .
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
 .It Fl s Ar reference
 Create a symbolic reference, or change an existing symbolic reference.
 The symbolic reference with the specified
@@ -1056,19 +1060,15 @@ Care should be taken not to create loops between references when
 this option is used.
 Cannot be used together with any other options except
 .Fl r .
-.It Fl d
-Delete the reference with the specified
-.Ar name
-from the repository.
-Any commit, tree, tag, and blob objects belonging to deleted references
-remain in the repository and may be removed separately with
-Git's garbage collector or
-.Cm gotadmin cleanup .
-Cannot be used together with any other options except
-.Fl r .
+.It Fl t
+Sort listed references by modification time (most recently modified first)
+instead of sorting by lexicographical order.
+Use of this option requires the
+.Fl l
+option to be used as well.
 .El
 .Tg br
-.It Cm branch Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl t Oc Oo Fl d Ar name Oc Oo Fl n Oc Op Ar name
+.It Cm branch Oo Fl lnt Oc Oo Fl c Ar commit Oc Oo Fl d Ar name Oc Oo Fl r Ar repository-path Oc Op Ar name
 .Dl Pq alias: Cm br
 Create, list, or delete branches.
 .Pp
@@ -1125,36 +1125,6 @@ The expected
 .Ar commit
 argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
-.It Fl r Ar repository-path
-Use the repository at the specified path.
-If not specified, assume the repository is located at or above the current
-working directory.
-If this directory is a
-.Nm
-work tree, use the repository path associated with this work tree.
-.It Fl l
-List all existing branches in the repository, including copies of remote
-repositories' branches in the
-.Dq refs/remotes/
-reference namespace.
-.Pp
-If invoked in a work tree, the work tree's current branch is shown
-with one the following annotations:
-.Bl -column YXZ description
-.It * Ta work tree's base commit matches the branch tip
-.It \(a~ Ta work tree's base commit is out-of-date
-.El
-.It Fl t
-Sort listed branches by modification time (most recently modified first)
-instead of sorting by lexicographical order.
-Branches in the
-.Dq refs/heads/
-reference namespace are listed before branches in
-.Dq refs/remotes/
-regardless.
-Use of this option requires the
-.Fl l
-option to be used as well.
 .It Fl d Ar name
 Delete the branch with the specified
 .Ar name
@@ -1169,10 +1139,40 @@ Any commit, tree, and blob objects belonging to the branch
 remain in the repository and may be removed separately with
 Git's garbage collector or
 .Cm gotadmin cleanup .
+.It Fl l
+List all existing branches in the repository, including copies of remote
+repositories' branches in the
+.Dq refs/remotes/
+reference namespace.
+.Pp
+If invoked in a work tree, the work tree's current branch is shown
+with one the following annotations:
+.Bl -column YXZ description
+.It * Ta work tree's base commit matches the branch tip
+.It \(a~ Ta work tree's base commit is out-of-date
+.El
 .It Fl n
 Do not switch and update the work tree after creating a new branch.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl t
+Sort listed branches by modification time (most recently modified first)
+instead of sorting by lexicographical order.
+Branches in the
+.Dq refs/heads/
+reference namespace are listed before branches in
+.Dq refs/remotes/
+regardless.
+Use of this option requires the
+.Fl l
+option to be used as well.
 .El
-.It Cm tag Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl s Ar signer-id Oc Oo Fl v Oc Oo Fl V Oc Ar name
+.It Cm tag Oo Fl lVv Oc Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl s Ar signer-id Oc Ar name
 Manage tags in a repository.
 .Pp
 Tags are managed via references which live in the
@@ -1205,6 +1205,12 @@ argument is a commit ID SHA1 hash or an existing reference or tag name which
 will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.It Fl l
+List all existing tags in the repository instead of creating a new tag.
+If a
+.Ar name
+argument is passed, show only the tag with the given
+.Ar name .
 .It Fl m Ar message
 Use the specified tag message when creating the new tag.
 Without the
@@ -1219,12 +1225,6 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
-.It Fl l
-List all existing tags in the repository instead of creating a new tag.
-If a
-.Ar name
-argument is passed, show only the tag with the given
-.Ar name .
 .It Fl s Ar signer-id
 While creating a new tag, sign this tag with the identity given in
 .Ar signer-id .
@@ -1243,12 +1243,6 @@ command, using the signature namespace
 .Dq git
 for compatibility with
 .Xr git 1 .
-.It Fl v
-Verbose mode.
-During SSH signature creation and verification this option will be passed to
-.Xr ssh-keygen 1 .
-Multiple -v options increase the verbosity.
-The maximum is 3.
 .It Fl V
 Verify tag object signatures.
 If a
@@ -1266,6 +1260,12 @@ A path to the
 file must be set in
 .Xr got.conf 5 ,
 otherwise verification is impossible.
+.It Fl v
+Verbose mode.
+During SSH signature creation and verification this option will be passed to
+.Xr ssh-keygen 1 .
+Multiple -v options increase the verbosity.
+The maximum is 3.
 .El
 .Pp
 By design, the
@@ -1276,7 +1276,7 @@ If a tag must be deleted, the
 command may be used to delete a tag's reference.
 This should only be done if the tag has not already been copied to
 another repository.
-.It Cm add Oo Fl R Oc Oo Fl I Oc Ar path ...
+.It Cm add Oo Fl IR Oc Ar path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
 By default, files which match a
@@ -1287,6 +1287,10 @@ The options for
 .Cm got add
 are as follows:
 .Bl -tag -width Ds
+.It Fl I
+Add files even if they match a
+.Cm got status
+ignore pattern.
 .It Fl R
 Permit recursion into directories.
 If this option is not specified,
@@ -1294,13 +1298,9 @@ If this option is not specified,
 will refuse to run if a specified
 .Ar path
 is a directory.
-.It Fl I
-Add files even if they match a
-.Cm got status
-ignore pattern.
 .El
 .Tg rm
-.It Cm remove Oo Fl f Oc Oo Fl k Oc Oo Fl R Oc Oo Fl s Ar status-codes Oc Ar path ...
+.It Cm remove Oo Fl fkR Oc Oo Fl s Ar status-codes Oc Ar path ...
 .Dl Pq alias: Cm rm
 Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
@@ -1337,7 +1337,7 @@ option)
 .El
 .El
 .Tg pa
-.It Cm patch Oo Fl c Ar commit Oc Oo Fl n Oc Oo Fl p Ar strip-count Oc Oo Fl R Oc Op Ar patchfile
+.It Cm patch Oo Fl nR Oc Oo Fl c Ar commit Oc Oo Fl p Ar strip-count Oc Op Ar patchfile
 .Dl Pq alias: Cm pa
 Apply changes from
 .Ar patchfile
@@ -1458,7 +1458,7 @@ will be recognized and stripped automatically.
 Reverse the patch before applying it.
 .El
 .Tg rv
-.It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
+.It Cm revert Oo Fl pR Oc Oo Fl F Ar response-script Oc Ar path ...
 .Dl Pq alias: Cm rv
 Revert any local changes in files at the specified paths in a work tree.
 File contents will be overwritten with those contained in the
@@ -1477,6 +1477,17 @@ The options for
 .Cm got revert
 are as follows:
 .Bl -tag -width Ds
+.It Fl F Ar response-script
+With the
+.Fl p
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from the specified
+.Ar response-script
+file instead of prompting interactively.
 .It Fl p
 Instead of reverting all changes in files, interactively select or reject
 changes to revert based on
@@ -1489,17 +1500,6 @@ changes to revert based on
 If a file is in modified status, individual patches derived from the
 modified file content can be reverted.
 Files in added or deleted status may only be reverted in their entirety.
-.It Fl F Ar response-script
-With the
-.Fl p
-option, read
-.Dq y ,
-.Dq n ,
-and
-.Dq q
-responses line-by-line from the specified
-.Ar response-script
-file instead of prompting interactively.
 .It Fl R
 Permit recursion into directories.
 If this option is not specified,
@@ -1509,7 +1509,7 @@ will refuse to run if a specified
 is a directory.
 .El
 .Tg ci
-.It Cm commit Oo Fl A Ar author Oc Oo Fl F Ar path Oc Oo Fl m Ar message Oc Oo Fl N Oc Oo Fl S Oc Op Ar path ...
+.It Cm commit Oo Fl NS Oc Oo Fl A Ar author Oc Oo Fl F Ar path Oc Oo Fl m Ar message Oc Op Ar path ...
 .Dl Pq alias: Cm ci
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
@@ -1644,7 +1644,7 @@ If a path is found to be out of date,
 must be used first in order to merge local changes with changes made
 in the repository.
 .Tg se
-.It Cm send Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Ar branch Oc Oo Fl f Oc Oo Fl r Ar repository-path Oc Oo Fl t Ar tag Oc Oo Fl T Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
+.It Cm send Oo Fl afqTv Oc Oo Fl b Ar branch Oc Oo Fl d Ar branch Oc Oo Fl r Ar repository-path Oc Oo Fl t Ar tag Oc Op Ar remote-repository
 .Dl Pq alias: Cm se
 Send new changes to a remote repository.
 If no
@@ -1771,6 +1771,11 @@ copy of a branch or tag is known to be out-of-date and is considered
 disposable.
 The risks of creating inconsistencies between different repositories
 should also be taken into account.
+.It Fl q
+Suppress progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -1778,6 +1783,18 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
+.It Fl T
+Attempt to send all tags from the local repository's
+.Dq refs/tags/
+reference namespace.
+The
+.Fl T
+option is equivalent to listing all tags with multiple
+.Fl t
+options.
+Cannot be used together with the
+.Fl t
+option.
 .It Fl t Ar tag
 Send the specified
 .Ar tag
@@ -1802,23 +1819,6 @@ instead of overwriting an existing tag.
 Cannot be used together with the
 .Fl T
 option.
-.It Fl T
-Attempt to send all tags from the local repository's
-.Dq refs/tags/
-reference namespace.
-The
-.Fl T
-option is equivalent to listing all tags with multiple
-.Fl t
-options.
-Cannot be used together with the
-.Fl t
-option.
-.It Fl q
-Suppress progress reporting output.
-The same option will be passed to
-.Xr ssh 1
-if applicable.
 .It Fl v
 Verbose mode.
 Causes
@@ -1917,7 +1917,7 @@ to a single base commit with
 If any relevant files already contain merge conflicts, these
 conflicts must be resolved first.
 .Tg rb
-.It Cm rebase Oo Fl a Oc Oo Fl c Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
+.It Cm rebase Oo Fl aclX Oc Op Ar branch
 .Dl Pq alias: Cm rb
 Rebase commits on the specified
 .Ar branch
@@ -2118,7 +2118,7 @@ None of the other options can be used together with
 .Fl X .
 .El
 .Tg he
-.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl e Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
+.It Cm histedit Oo Fl aceflmX Oc Oo Fl F Ar histedit-script Oc Op Ar branch
 .Dl Pq alias: Cm he
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
@@ -2301,25 +2301,17 @@ The
 .Fl e
 option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl F Ar histedit-script
+Use the specified
+.Ar histedit-script
+instead of opening a temporary file in an editor where a histedit script
+can be written.
 .It Fl f
 Fold all commits into a single commit.
 This option is a quick equivalent to a histedit script which folds all
 commits, combining them all into one commit.
 The
 .Fl f
-option can only be used when starting a new histedit operation.
-If this option is used, no other command-line arguments are allowed.
-.It Fl F Ar histedit-script
-Use the specified
-.Ar histedit-script
-instead of opening a temporary file in an editor where a histedit script
-can be written.
-.It Fl m
-Edit log messages only.
-This option is a quick equivalent to a histedit script which edits
-only log messages but otherwise leaves every picked commit as-is.
-The
-.Fl m
 option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl l
@@ -2355,6 +2347,14 @@ If this option is used,
 does not require a work tree.
 None of the other options can be used together with
 .Fl l .
+.It Fl m
+Edit log messages only.
+This option is a quick equivalent to a histedit script which edits
+only log messages but otherwise leaves every picked commit as-is.
+The
+.Fl m
+option can only be used when starting a new histedit operation.
+If this option is used, no other command-line arguments are allowed.
 .It Fl X
 Delete backups created by past histedit operations, represented by references
 in the
@@ -2431,7 +2431,7 @@ committed with
 or reverted with
 .Cm got revert .
 .Tg mg
-.It Cm merge Oo Fl a Oc Oo Fl c Oc Oo Fl n Oc Op Ar branch
+.It Cm merge Oo Fl acn Oc Op Ar branch
 .Dl Pq alias: Cm mg
 Create a merge commit based on the current branch of the work tree and
 the specified
@@ -2557,7 +2557,7 @@ Alternatively, the merge may be aborted with
 .Cm got merge -a .
 .El
 .Tg sg
-.It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl S Oc Op Ar path ...
+.It Cm stage Oo Fl lpS Oc Oo Fl F Ar response-script Oc Op Ar path ...
 .Dl Pq alias: Cm sg
 Stage local changes for inclusion in the next commit.
 If no
@@ -2604,6 +2604,17 @@ The options for
 .Cm got stage
 are as follows:
 .Bl -tag -width Ds
+.It Fl F Ar response-script
+With the
+.Fl p
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from the specified
+.Ar response-script
+file instead of prompting interactively.
 .It Fl l
 Instead of staging new changes, list paths which are already staged,
 along with the IDs of staged blob objects and stage status codes.
@@ -2623,17 +2634,6 @@ If a file is in modified status, individual patches derived from the
 modified file content can be staged.
 Files in added or deleted status may only be staged or rejected in
 their entirety.
-.It Fl F Ar response-script
-With the
-.Fl p
-option, read
-.Dq y ,
-.Dq n ,
-and
-.Dq q
-responses line-by-line from the specified
-.Ar response-script
-file instead of prompting interactively.
 .It Fl S
 Allow staging of symbolic links which point outside of the path space
 that is under version control.
@@ -2696,6 +2696,17 @@ The options for
 .Cm got unstage
 are as follows:
 .Bl -tag -width Ds
+.It Fl F Ar response-script
+With the
+.Fl p
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from the specified
+.Ar response-script
+file instead of prompting interactively.
 .It Fl p
 Instead of unstaging the entire content of a changed file, interactively
 select or reject changes for unstaging based on
@@ -2708,19 +2719,8 @@ select or reject changes for unstaging based on
 If a file is staged in modified status, individual patches derived from the
 staged file content can be unstaged.
 Files staged in added or deleted status may only be unstaged in their entirety.
-.It Fl F Ar response-script
-With the
-.Fl p
-option, read
-.Dq y ,
-.Dq n ,
-and
-.Dq q
-responses line-by-line from the specified
-.Ar response-script
-file instead of prompting interactively.
 .El
-.It Cm cat Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl P Oc Ar arg ...
+.It Cm cat Oo Fl P Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar arg ...
 Parse and print contents of objects to standard output in a line-based
 text format.
 Content of commit, tree, and tag objects is printed in a way similar
@@ -2752,6 +2752,10 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.It Fl P
+Interpret all arguments as paths only.
+This option can be used to resolve ambiguity in cases where paths
+look like tag names, reference names, or object IDs.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -2759,10 +2763,6 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
-.It Fl P
-Interpret all arguments as paths only.
-This option can be used to resolve ambiguity in cases where paths
-look like tag names, reference names, or object IDs.
 .El
 .It Cm info Op Ar path ...
 Display meta-data stored in a work tree.

@@ -347,8 +347,8 @@ apply_unveil(const char *repo_path, int repo_read_only,
 __dead static void
 usage_import(void)
 {
-	fprintf(stderr, "usage: %s import [-b branch] [-m message] "
-	    "[-r repository-path] [-I pattern] path\n", getprogname());
+	fprintf(stderr, "usage: %s import [-b branch] [-I pattern] [-m message] "
+	    "[-r repository-path] directory\n", getprogname());
 	exit(1);
 }
 
@@ -987,8 +987,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-a] [-b branch] [-l] [-m] [-q] [-v] "
-	    "[-R reference] repository-url [directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-R reference] "
+	    "repository-URL [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -2035,9 +2035,8 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-d] [-l] "
-	    "[-r repository-path] [-t] [-q] [-v] [-R reference] [-X] "
-	    "[remote-repository-name]\n",
+	fprintf(stderr, "usage: %s fetch [-adlqtvX] [-b branch] "
+	    "[-R reference] [-r repository-path] [remote-repository]\n",
 	    getprogname());
 	exit(1);
 }
@@ -2733,8 +2732,8 @@ done:
 __dead static void
 usage_checkout(void)
 {
-	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
-	    "[-p prefix] [-q] repository-path [worktree-path]\n",
+	fprintf(stderr, "usage: %s checkout [-Eq] [-b branch] [-c commit] "
+	    "[-p path-prefix] repository-path [work-tree-path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -3219,9 +3218,8 @@ print_merge_progress_stats(struct got_update_progress_arg *upa)
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [-q] "
-	    "[path ...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s update [-q] [-b branch] [-c commit] "
+	    "[path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -4356,9 +4354,9 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-b] [-p] [-P] [-s] [-c commit] "
-	    "[-C number] [ -l N ] [-x commit] [-S search-pattern] "
-	    "[-r repository-path] [-R] [path]\n", getprogname());
+	fprintf(stderr, "usage: %s log [-bPpRs] [-C number] [-c commit] [-l N] "
+	    "[-r repository-path] [-S search-pattern] [-x commit] [path]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -4631,9 +4629,9 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-a] [-c commit] [-C number] "
-	    "[-r repository-path] [-s] [-w] [-P] "
-	    "[object1 object2 | path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s diff [-aPsw] [-C number] [-c commit] "
+	    "[-r repository-path] [object1 object2 | path ...]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -5683,9 +5681,8 @@ done:
 __dead static void
 usage_tree(void)
 {
-	fprintf(stderr,
-	    "usage: %s tree [-c commit] [-r repository-path] [-iR] [path]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s tree [-iR] [-c commit] [-r repository-path] "
+	    "[path]\n", getprogname());
 	exit(1);
 }
 
@@ -5984,8 +5981,8 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [-I] [-s status-codes ] "
-	    "[-S status-codes] [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s status [-I] [-S status-codes] "
+	    "[-s status-codes] [path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -6149,10 +6146,8 @@ done:
 __dead static void
 usage_ref(void)
 {
-	fprintf(stderr,
-	    "usage: %s ref [-r repository] [-l] [-t] [-c object] "
-	        "[-s reference] [-d] [name]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s ref [-dlt] [-c object] [-r repository-path] "
+	    "[-s reference] [name]\n", getprogname());
 	exit(1);
 }
 
@@ -6442,9 +6437,8 @@ done:
 __dead static void
 usage_branch(void)
 {
-	fprintf(stderr,
-	    "usage: %s branch [-c commit] [-d] [-r repository] [-l] [-t] "
-	        "[-n] [name]\n", getprogname());
+	fprintf(stderr, "usage: %s branch [-lnt] [-c commit] [-d name] "
+	    "[-r repository-path] [name]\n", getprogname());
 	exit(1);
 }
 
@@ -6887,10 +6881,8 @@ done:
 __dead static void
 usage_tag(void)
 {
-	fprintf(stderr,
-	    "usage: %s tag [-c commit] [-r repository] [-l] "
-	        "[-m message] [-s signer-id] [-v] [-V] name\n",
-	        getprogname());
+	fprintf(stderr, "usage: %s tag [-lVv] [-c commit] [-m message] "
+	    "[-r repository-path] [-s signer-id] name\n", getprogname());
 	exit(1);
 }
 
@@ -7546,8 +7538,7 @@ done:
 __dead static void
 usage_add(void)
 {
-	fprintf(stderr, "usage: %s add [-R] [-I] path ...\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s add [-IR] path ...\n", getprogname());
 	exit(1);
 }
 
@@ -7685,8 +7676,8 @@ done:
 __dead static void
 usage_remove(void)
 {
-	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] [-s status-codes] "
-	    "path ...\n", getprogname());
+	fprintf(stderr, "usage: %s remove [-fkR] [-s status-codes] path ...\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -7852,8 +7843,8 @@ done:
 __dead static void
 usage_patch(void)
 {
-	fprintf(stderr, "usage: %s patch [-c commit] [-n] [-p strip-count] "
-	    "[-R] [patchfile]\n", getprogname());
+	fprintf(stderr, "usage: %s patch [-nR] [-c commit] [-p strip-count] "
+	    "[patchfile]\n", getprogname());
 	exit(1);
 }
 
@@ -8070,8 +8061,8 @@ done:
 __dead static void
 usage_revert(void)
 {
-	fprintf(stderr, "usage: %s revert [-p] [-F response-script] [-R] "
-	    "path ...\n", getprogname());
+	fprintf(stderr, "usage: %s revert [-pR] [-F response-script] path ...\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -8348,8 +8339,8 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-A author] [-F path] [-m msg] "
-	    "[-N] [-S] [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-NS] [-A author] [-F path] "
+	    "[-m message] [path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -8695,9 +8686,9 @@ done:
 __dead static void
 usage_send(void)
 {
-	fprintf(stderr, "usage: %s send [-a] [-b branch] [-d branch] [-f] "
-	    "[-r repository-path] [-t tag] [-T] [-q] [-v] "
-	    "[remote-repository]\n", getprogname());
+	fprintf(stderr, "usage: %s send [-afqTv] [-b branch] [-d branch] "
+	    "[-r repository-path] [-t tag] [remote-repository]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -9482,8 +9473,7 @@ done:
 __dead static void
 usage_rebase(void)
 {
-	fprintf(stderr, "usage: %s rebase [-a] [-c] [-l] [-X] [branch]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s rebase [-aclX] [branch]\n", getprogname());
 	exit(1);
 }
 
@@ -10457,9 +10447,8 @@ done:
 __dead static void
 usage_histedit(void)
 {
-	fprintf(stderr, "usage: %s histedit [-a] [-c] [-e] [-f] "
-	    "[-F histedit-script] [-m] [-l] [-X] [branch]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s histedit [-aceflmX] [-F histedit-script] "
+	    "[branch]\n", getprogname());
 	exit(1);
 }
 
@@ -12016,8 +12005,7 @@ done:
 __dead static void
 usage_merge(void)
 {
-	fprintf(stderr, "usage: %s merge [-a] [-c] [-n] [branch]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s merge [-acn] [branch]\n", getprogname());
 	exit(1);
 }
 
@@ -12293,9 +12281,8 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F response-script] "
-	    "[-S] [file-path ...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s stage [-lpS] [-F response-script] "
+	    "[path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -12458,8 +12445,7 @@ __dead static void
 usage_unstage(void)
 {
 	fprintf(stderr, "usage: %s unstage [-p] [-F response-script] "
-	    "[file-path ...]\n",
-	    getprogname());
+	    "[path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -12581,8 +12567,8 @@ done:
 __dead static void
 usage_cat(void)
 {
-	fprintf(stderr, "usage: %s cat [-r repository ] [ -c commit ] [ -P ] "
-	    "arg1 [arg2 ...]\n", getprogname());
+	fprintf(stderr, "usage: %s cat [-P] [-c commit] [-r repository-path] "
+	    "arg ...\n", getprogname());
 	exit(1);
 }
 

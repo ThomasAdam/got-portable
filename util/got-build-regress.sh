@@ -15,7 +15,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 prog=`basename $0`
-usage="$prog [-b branch] [-f] [-w worktree ] [ -r from-address ] [-R testroot] email-address [email-address ...]"
+usage="$prog [-f] [-b branch] [-R testroot] [-r from-address] [-w worktree] email-address ..."
 branch=main
 worktree=$HOME/got
 fromaddr_arg=
