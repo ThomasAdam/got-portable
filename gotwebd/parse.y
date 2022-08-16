@@ -250,10 +250,13 @@ server		: SERVER STRING {
 			log_debug("adding server %s", $2);
 			free($2);
 		} '{' optnl serveropts2 '}' {
-			if (get_addrs(new_srv->fcgi_socket_bind,
-			    &new_srv->al, new_srv->fcgi_socket_port) == -1) {
-				yyerror("could not get tcp iface addrs");
-				YYERROR;
+			if (new_srv->fcgi_socket) {
+				if (get_addrs(new_srv->fcgi_socket_bind,
+				    &new_srv->al, new_srv->fcgi_socket_port)
+				    == -1) {
+					yyerror("could not get tcp iface addr");
+					YYERROR;
+				}
 			}
 		}
 		;
