@@ -83,7 +83,7 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm pack Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Oo Fl q Oc Op Ar reference ...
+.It Cm pack Oo Fl aq Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Op Ar reference ...
 Generate a new pack file and a corresponding pack file index.
 By default, add any loose objects which are reachable via any references
 to the generated pack file.
@@ -111,6 +111,8 @@ are as follows:
 Add objects to the generated pack file even if they are already packed
 in a different pack file.
 Unless this option is specified, only loose objects will be added.
+.It Fl q
+Suppress progress reporting output.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -133,8 +135,6 @@ option may be specified multiple times to build a list of references to exclude.
 Exclusion takes precedence over inclusion.
 If a reference appears in both the included and excluded lists, it will
 be excluded.
-.It Fl q
-Suppress progress reporting output.
 .El
 .Tg ix
 .It Cm indexpack Ar packfile-path
@@ -164,7 +164,7 @@ The filename of the corresponding pack index is equivalent, except
 that it ends in
 .Pa .idx .
 .Tg ls
-.It Cm listpack Oo Fl h Oc Oo Fl s Oc Ar packfile-path
+.It Cm listpack Oo Fl hs Oc Ar packfile-path
 .Dl Pq alias: Cm ls
 List the contents of the pack file at
 .Ar packfile-path .
@@ -201,7 +201,7 @@ This includes the total number of objects stored in the pack file
 and a break-down of the number of objects per object type.
 .El
 .Tg cl
-.It Cm cleanup Oo Fl a Oc Oo Fl p Oc Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
+.It Cm cleanup Oo Fl anpq Oc Op Fl r Ar repository-path
 .Dl Pq alias: Cm cl
 Purge unreferenced loose objects from the repository and display
 the amount of disk space which has been freed as a result.
@@ -286,12 +286,14 @@ modification timestamp are kept on disk to prevent race conditions
 with other commands that add new objects to the repository while
 .Cm gotadmin cleanup
 is running.
-.It Fl p
-Instead of purging unreferenced loose objects, remove any pack index files
-which do not have a corresponding pack file.
 .It Fl n
 Display the usual progress output and summary information but do not actually
 remove any files from disk.
+.It Fl p
+Instead of purging unreferenced loose objects, remove any pack index files
+which do not have a corresponding pack file.
+.It Fl q
+Suppress progress reporting and disk space summary output.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -299,8 +301,6 @@ working directory.
 If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
-.It Fl q
-Suppress progress reporting and disk space summary output.
 .El
 .El
 .Sh EXIT STATUS

@@ -3751,8 +3751,8 @@ __dead static void
 usage_diff(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s diff [-a] [-C number] [-r repository-path] "
-	    "[-w] object1 object2\n", getprogname());
+	fprintf(stderr, "usage: %s diff [-aw] [-C number] [-r repository-path] "
+	    "object1 object2\n", getprogname());
 	exit(1);
 }
 

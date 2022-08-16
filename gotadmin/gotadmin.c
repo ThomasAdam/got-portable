@@ -445,9 +445,8 @@ done:
 __dead static void
 usage_pack(void)
 {
-	fprintf(stderr, "usage: %s pack [-a] [-r repository-path] "
-	    "[-x reference] [-q] [reference ...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s pack [-aq] [-r repository-path] "
+	    "[-x reference] [reference ...]\n", getprogname());
 	exit(1);
 }
 
@@ -925,7 +924,7 @@ done:
 __dead static void
 usage_listpack(void)
 {
-	fprintf(stderr, "usage: %s listpack [-h] [-s] packfile-path\n",
+	fprintf(stderr, "usage: %s listpack [-hs] packfile-path\n",
 	    getprogname());
 	exit(1);
 }
@@ -1116,8 +1115,8 @@ done:
 __dead static void
 usage_cleanup(void)
 {
-	fprintf(stderr, "usage: %s cleanup [-a] [-p] [-n] [-r repository-path] "
-	    "[-q]\n", getprogname());
+	fprintf(stderr, "usage: %s cleanup [-anpq] [-r repository-path]\n",
+	    getprogname());
 	exit(1);
 }
 
