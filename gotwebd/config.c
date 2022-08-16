@@ -212,11 +212,11 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 		sock->pack_fds[i] = -1;
 
 	/* log new socket info */
-	log_debug("%s: name=%s id=%d server=%s child_id=%d parent_id=%d "
-	    "type=%s ipv4=%d ipv6=%d socket_path=%s",
+	log_debug("%s: name=%s id=%d server=%s af_type=%s socket_path=%s",
 	    __func__, sock->conf.name, sock->conf.id, sock->conf.srv_name,
-	    sock->conf.child_id, sock->conf.parent_id, sock->conf.type ?
-	    "fcgi" : "unix", sock->conf.ipv4, sock->conf.ipv6,
+	    sock->conf.af_type == AF_UNIX ? "unix" :
+	    (sock->conf.af_type == AF_INET ? "inet" :
+	    (sock->conf.af_type == AF_INET6 ? "inet6" : "unknown")),
 	    strlen(sock->conf.unix_socket_name) ?
 	    sock->conf.unix_socket_name : "none");
 

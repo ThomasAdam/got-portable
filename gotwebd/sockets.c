@@ -68,7 +68,6 @@ void	 sockets_run(struct privsep *, struct privsep_proc *, void *);
 void	 sockets_launch(void);
 void	 sockets_purge(struct gotwebd *);
 void	 sockets_accept_paused(int, short, void *);
-void	 sockets_dup_new_socket(struct socket *, struct socket *);
 void	 sockets_rlimit(int);
 
 
@@ -78,9 +77,8 @@ int	 sockets_create_socket(struct addresslist *, in_port_t);
 int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *, int,
 	    volatile int *);
 
-struct socket
-	*sockets_conf_new_socket(struct gotwebd *, struct server *, int, int,
-	    int);
+struct socket *sockets_conf_new_socket(struct gotwebd *, struct server *,
+    int, int);
 
 int cgi_inflight = 0;
 
@@ -119,97 +117,49 @@ void
 sockets_parse_sockets(struct gotwebd *env)
 {
 	struct server *srv;
-	struct socket *sock, *new_sock = NULL;
-	struct address *a;
+	struct socket *new_sock = NULL;
 	int sock_id = 0, ipv4 = 0, ipv6 = 0;
 
 	TAILQ_FOREACH(srv, &env->servers, entry) {
 		if (srv->unix_socket) {
 			sock_id++;
 			new_sock = sockets_conf_new_socket(env, srv,
-			    sock_id, UNIX, 0);
+			    sock_id, AF_UNIX);
+			/* Should always succeed. */
 			TAILQ_INSERT_TAIL(&env->sockets, new_sock, entry);
 		}
 
 		if (srv->fcgi_socket) {
 			sock_id++;
-			new_sock = sockets_conf_new_socket(env, srv,
-			    sock_id, FCGI, 0);
-			TAILQ_INSERT_TAIL(&env->sockets, new_sock, entry);
+			new_sock = sockets_conf_new_socket(env, srv, sock_id,
+			    AF_INET);
+			if (new_sock) {
+				TAILQ_INSERT_TAIL(&env->sockets, new_sock,
+				    entry);
+				ipv4 = 1;
+				sock_id++;
+			}
 
-			/* add ipv6 children */
-			TAILQ_FOREACH(sock, &env->sockets, entry) {
-				ipv4 = ipv6 = 0;
+			new_sock = sockets_conf_new_socket(env, srv, sock_id,
+			    AF_INET6);
+			if (new_sock) {
+				TAILQ_INSERT_TAIL(&env->sockets,
+				    new_sock, entry);
+				ipv6 = 1;
+			}
 
-				TAILQ_FOREACH(a, &sock->conf.al, entry) {
-					if (a->ss.ss_family == AF_INET)
-						ipv4 = 1;
-					if (a->ss.ss_family == AF_INET6)
-						ipv6 = 1;
-				}
-
-				/* create ipv6 sock */
-				if (ipv4 == 1 && ipv6 == 1) {
-					sock_id++;
-					sock->conf.child_id = sock_id;
-					new_sock = sockets_conf_new_socket(env,
-					    srv, sock_id, FCGI, 1);
-					sockets_dup_new_socket(sock, new_sock);
-					TAILQ_INSERT_TAIL(&env->sockets,
-					    new_sock, entry);
-					continue;
-				}
+			if (ipv4 == 0 && ipv6 == 0) {
+				fatalx("%s: have no IP addresses to listen "
+				    "for FCGI connections", __func__);
 			}
 		}
 	}
 }
 
-void
-sockets_dup_new_socket(struct socket *p_sock, struct socket *sock)
-{
-	struct address *a, *acp;
-	int n;
-
-	sock->conf.parent_id = p_sock->conf.id;
-	sock->conf.ipv4 = 0;
-	sock->conf.ipv6 = 1;
-
-	memcpy(&sock->conf.srv_name, p_sock->conf.srv_name,
-	    sizeof(sock->conf.srv_name));
-
-	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_child",
-	    p_sock->conf.srv_name);
-	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
-		free(p_sock);
-		free(sock);
-		fatalx("%s: snprintf", __func__);
-	}
-
-	TAILQ_FOREACH(a, &p_sock->conf.al, entry) {
-		if (a->ss.ss_family == AF_INET)
-			continue;
-
-		if ((acp = calloc(1, sizeof(*acp))) == NULL)
-			fatal("%s: calloc", __func__);
-		memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
-		acp->ipproto = a->ipproto;
-		acp->prefixlen = a->prefixlen;
-		acp->port = a->port;
-		if (strlen(a->ifname) != 0) {
-			if (strlcpy(acp->ifname, a->ifname,
-			    sizeof(acp->ifname)) >= sizeof(acp->ifname)) {
-				fatalx("%s: interface name truncated",
-				    __func__);
-			}
-		}
-
-		TAILQ_INSERT_TAIL(&sock->conf.al, acp, entry);
-	}
-}
-
+/* Returns NULL if no addresses in the requested family are configured. */
 struct socket *
 sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
-    int type, int is_dup)
+    int af_type)
 {
 	struct socket *sock;
 	struct address *a, *acp;
@@ -220,14 +170,11 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 
 	TAILQ_INIT(&sock->conf.al);
 
-	sock->conf.parent_id = 0;
 	sock->conf.id = id;
-
 	sock->fd = -1;
+	sock->conf.af_type = af_type;
 
-	sock->conf.type = type;
-
-	if (type == UNIX) {
+	if (af_type == AF_UNIX) {
 		if (strlcpy(sock->conf.unix_socket_name,
 		    srv->unix_socket_name,
 		    sizeof(sock->conf.unix_socket_name)) >=
@@ -235,13 +182,9 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 			free(sock);
 			fatalx("%s: strlcpy", __func__);
 		}
-	} else
-		sock->conf.ipv4 = 1;
+	}
 
 	sock->conf.fcgi_socket_port = srv->fcgi_socket_port;
-
-	if (is_dup)
-		goto done;
 
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
 	    srv->name);
@@ -257,6 +200,9 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 	}
 
 	TAILQ_FOREACH(a, &srv->al, entry) {
+		if (a->ss.ss_family != af_type)
+			continue;
+
 		if ((acp = calloc(1, sizeof(*acp))) == NULL) {
 			free(sock);
 			fatal("%s: calloc", __func__);
@@ -275,7 +221,13 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 
 		TAILQ_INSERT_TAIL(&sock->conf.al, acp, entry);
 	}
-done:
+
+	if ((af_type == AF_INET || af_type == AF_INET6) &&
+	    TAILQ_EMPTY(&sock->conf.al)) {
+		free(sock);
+		return NULL;
+	}
+
 	return (sock);
 }
 
@@ -412,7 +364,7 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 {
 	struct privsep *ps = env->gotwebd_ps;
 
-	if (sock->conf.type == UNIX) {
+	if (sock->conf.af_type == AF_UNIX) {
 		log_debug("%s: initializing unix socket %s", __func__,
 		    sock->conf.unix_socket_name);
 		sock->fd = sockets_unix_socket_listen(ps, sock);
@@ -422,9 +374,10 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 		}
 	}
 
-	if (sock->conf.type == FCGI) {
-		log_debug("%s: initializing fcgi socket for %s", __func__,
-		    sock->conf.name);
+	if (sock->conf.af_type == AF_INET || sock->conf.af_type == AF_INET6) {
+		log_debug("%s: initializing %s FCGI socket on port %d for %s",
+		    __func__, sock->conf.af_type == AF_INET ? "inet" : "inet6",
+		    sock->conf.fcgi_socket_port, sock->conf.name);
 		sock->fd = sockets_create_socket(&sock->conf.al,
 		    sock->conf.fcgi_socket_port);
 		if (sock->fd == -1) {
