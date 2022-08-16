@@ -288,11 +288,6 @@ enum client_action {
 	CLIENT_DISCONNECT,
 };
 
-enum sock_type {
-	UNIX,
-	FCGI,
-};
-
 struct socket_conf {
 	struct addresslist	al;
 
@@ -300,13 +295,7 @@ struct socket_conf {
 	char		 srv_name[GOTWEBD_MAXTEXT];
 
 	int		 id;
-	int		 child_id;
-	int		 parent_id;
-
-	int		 ipv4;
-	int		 ipv6;
-
-	int		 type;
+	int		 af_type;
 	char		 unix_socket_name[PATH_MAX];
 	in_port_t	 fcgi_socket_port;
 };
