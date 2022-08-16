@@ -250,7 +250,7 @@ test_revert_no_arguments() {
 		return 1
 	fi
 
-	echo "usage: got revert [-p] [-F response-script] [-R] path ..." \
+	echo "usage: got revert [-pR] [-F response-script] path ..." \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
