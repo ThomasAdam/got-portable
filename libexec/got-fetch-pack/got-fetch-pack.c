@@ -550,7 +550,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		acked++;
 	}
 
-	n = snprintf(buf, sizeof(buf), "done\n");
+	n = strlcpy(buf, "done\n", sizeof(buf));
 	err = got_pkt_writepkt(fd, buf, n, chattygot);
 	if (err)
 		goto done;

@@ -905,12 +905,10 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 
 		}
 		if (pass++ > 3 && n == 0) {
-			static char msg[64];
-			snprintf(msg, sizeof(msg), "could not resolve "
-			    "any of deltas; packfile could be corrupt");
-			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "could not resolve any of deltas; packfile could "
+			    "be corrupt");
 			goto done;
-
 		}
 		nresolved += n;
 		nvalid += nresolved;
