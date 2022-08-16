@@ -1238,7 +1238,7 @@ or a public SSH key with the private half available via
 will sign the tag object by invoking
 .Xr ssh-keygen 1
 with the
-.Fl Y Ar sign
+.Fl Y Cm sign
 command, using the signature namespace
 .Dq git
 for compatibility with
@@ -1254,7 +1254,7 @@ Otherwise, list all tag objects and verify signatures where present.
 verifies SSH-based signatures by invoking
 .Xr ssh-keygen 1
 with the options
-.Fl Y Ar verify Fl f Ar allowed_signers .
+.Fl Y Cm verify Fl f Ar allowed_signers .
 A path to the
 .Ar allowed_signers
 file must be set in
