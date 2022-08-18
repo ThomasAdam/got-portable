@@ -5366,7 +5366,7 @@ blame_cb(void *arg, int nlines, int lineno,
 		goto done;
 	}
 
-	while (bline->annotated) {
+	while (a->lineno_cur <= a->nlines && bline->annotated) {
 		char *smallerthan, *at, *nl, *committer;
 		size_t len;
 
