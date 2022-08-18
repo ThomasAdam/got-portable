@@ -1334,7 +1334,7 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		goto done;
 	}
 
-	while (bline->annotated) {
+	while (a->lineno_cur <= a->nlines && bline->annotated) {
 		int out_buff_size = 100;
 		char *smallerthan, *at, *nl, *committer;
 		char out_buff[out_buff_size];
