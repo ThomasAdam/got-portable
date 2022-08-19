@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <event.h>
 #include <imsg.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -308,6 +309,27 @@ fcgi_timeout(int fd, short events, void *arg)
 }
 
 int
+fcgi_printf(struct request *c, const char *fmt, ...)
+{
+	va_list ap;
+	char *str;
+	int r;
+
+	va_start(ap, fmt);
+	r = vasprintf(&str, fmt, ap);
+	va_end(ap);
+
+	if (r == -1) {
+		log_warn("%s: asprintf", __func__);
+		return -1;
+	}
+
+	r = fcgi_gen_binary_response(c, str, r);
+	free(str);
+	return r;
+}
+
+int
 fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 {
 	int r;
@@ -344,14 +366,6 @@ fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
 	memcpy(c->outbuf, data, len);
 	c->outbuf_len = len;
 	return 0;
-}
-
-int
-fcgi_gen_response(struct request *c, const char *data)
-{
-	if (data == NULL || *data == '\0')
-		return 0;
-	return fcgi_gen_binary_response(c, data, strlen(data));
 }
 
 static int

@@ -829,10 +829,10 @@ got_output_repo_tree(struct request *c)
 	struct got_reflist_head refs;
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
+	const char *name, *index_page_str, *folder;
 	char *id_str = NULL;
-	char *path = NULL, *in_repo_path = NULL, *build_folder = NULL;
-	char *modestr = NULL, *name = NULL;
-	int nentries, i;
+	char *path = NULL, *in_repo_path = NULL, *modestr = NULL;
+	int nentries, i, r;
 
 	TAILQ_INIT(&refs);
 
@@ -870,6 +870,9 @@ got_output_repo_tree(struct request *c)
 		goto done;
 
 	nentries = got_object_tree_get_nentries(tree);
+
+	index_page_str = qs->index_page_str ? qs->index_page_str : "";
+	folder = qs->folder ? qs->folder : "";
 
 	for (i = 0; i < nentries; i++) {
 		struct got_tree_entry *te;
@@ -917,226 +920,55 @@ got_output_repo_tree(struct request *c)
 			}
 		}
 
-		name = strdup(got_tree_entry_get_name(te));
-		if (name == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 		if (S_ISDIR(mode)) {
-			if (asprintf(&build_folder, "%s/%s",
-			    qs->folder ? qs->folder : "",
-			    got_tree_entry_get_name(te)) == -1) {
-				error = got_error_from_errno("asprintf");
+			name = got_tree_entry_get_name(te);
+			r = fcgi_printf(c,
+			    "<div class='tree_wrapper'>\n"
+			    "<div class='tree_line'>"
+			    "<a class='diff_directory' "
+			    "href='?index_page=%s&path=%s&action=tree"
+			    "&commit=%s&folder=%s/%s'>%s%s</a>"
+			    "</div>\n" /* .tree_line */
+			    "<div class='tree_line_blank'>&nbsp;</div>\n"
+			    "</div>\n", /* .tree_wrapper */
+			    index_page_str, qs->path, rc->commit_id,
+			    folder, name, name, modestr);
+			if (r == -1)
 				goto done;
-			}
-
-			if (fcgi_gen_response(c,
-			    "<div class='tree_wrapper'>\n") == -1)
-			goto done;
-
-			if (fcgi_gen_response(c, "<div class='tree_line'>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "<a class='diff_directory' "
-			    "href='?index_page=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->index_page_str) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "&path=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->path) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "&action=tree") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "&commit=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, rc->commit_id) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "&folder=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, build_folder) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "'>") == -1)
-				goto done;
-			if (fcgi_gen_response(c, name) == -1)
-				goto done;
-			if (fcgi_gen_response(c, modestr) == -1)
-				goto done;
-			if (fcgi_gen_response(c, "</a>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "</div>\n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "<div class='tree_line_blank'>") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "&nbsp;") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "</div>\n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "</div>\n") == -1)
-				goto done;
-
 		} else {
-			free(name);
-			name = strdup(got_tree_entry_get_name(te));
-			if (name == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-
-			if (fcgi_gen_response(c,
-			    "<div class='tree_wrapper'>\n") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "<div class='tree_line'>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c,
-			    "<a href='?index_page=") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, qs->index_page_str) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&path=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->path) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&action=blob") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&commit=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, rc->commit_id) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&folder=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->folder) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&file=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, name) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "'>") == -1)
-				goto done;
-			if (fcgi_gen_response(c, name) == -1)
-				goto done;
-			if (fcgi_gen_response(c, modestr) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "</a>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "</div>\n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "<div class='tree_line_blank'>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c,
-			    "<a href='?index_page=") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, qs->index_page_str) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&path=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->path) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&action=commits") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&commit=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, rc->commit_id) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&folder=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->folder) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&file=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, name) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "'>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "commits") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "</a>\n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, " | \n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c,
-			    "<a href='?index_page=") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, qs->index_page_str) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&path=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->path) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&action=blame") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&commit=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, rc->commit_id) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&folder=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, qs->folder) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "&file=") == -1)
-				goto done;
-			if (fcgi_gen_response(c, name) == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "'>") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "blame") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "</a>\n") == -1)
-				goto done;
-
-			if (fcgi_gen_response(c, "</div>\n") == -1)
-				goto done;
-			if (fcgi_gen_response(c, "</div>\n") == -1)
+			name = got_tree_entry_get_name(te);
+			r = fcgi_printf(c,
+			    "<div class='tree_wrapper'>\n"
+			    "<div class='tree_line'>"
+			    "<a href='?index_page=%s&path=%s&action=blob"
+			    "&commit=%s&folder=%s&file=%s'>%s%s</a>"
+			    "</div>\n" /* .tree_line */
+			    "<div class='tree_line_blank'>"
+			    "<a href='?index_page=%s&path=%s&action=commits"
+			    "&commit=%s&folder=%s&file=%s'>commits</a>\n"
+			    " | \n"
+			    "<a href='?index_page=%s&path=%s&action=blame"
+			    "&commit=%s&folder=%s&file=%s'>blame</a>\n"
+			    "</div>\n"  /* .tree_line_blank */
+			    "</div>\n", /* .tree_wrapper */
+			    index_page_str, qs->path, rc->commit_id,
+			    folder, name, name, modestr,
+			    index_page_str, qs->path, rc->commit_id,
+			    folder, name,
+			    index_page_str, qs->path, rc->commit_id,
+			    folder, name);
+			if (r == -1)
 				goto done;
 		}
 		free(id_str);
 		id_str = NULL;
-		free(build_folder);
-		build_folder = NULL;
-		free(name);
-		name = NULL;
 		free(modestr);
 		modestr = NULL;
 	}
 done:
 	free(id_str);
-	free(build_folder);
 	free(modestr);
 	free(path);
-	free(name);
 	got_ref_list_free(&refs);
 	if (commit)
 		got_object_commit_close(commit);
@@ -1286,11 +1118,13 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
+	const char *index_page_str;
 	char *line = NULL, *eline = NULL;
 	size_t linesize = 0;
 	off_t offset;
 	struct tm tm;
 	time_t committer_time;
+	int r;
 
 	if (nlines != a->nlines ||
 	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
@@ -1334,10 +1168,10 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		goto done;
 	}
 
+	index_page_str = qs->index_page_str ? qs->index_page_str : "";
+
 	while (a->lineno_cur <= a->nlines && bline->annotated) {
-		int out_buff_size = 100;
 		char *smallerthan, *at, *nl, *committer;
-		char out_buff[out_buff_size];
 		size_t len;
 
 		if (getline(&line, &linesize, a->f) == -1) {
@@ -1361,68 +1195,29 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		if (nl)
 			*nl = '\0';
 
-		if (fcgi_gen_response(c, "<div class='blame_wrapper'>") == -1)
-			goto done;
-		if (fcgi_gen_response(c, "<div class='blame_number'>") == -1)
-			goto done;
-		if (snprintf(out_buff, strlen(out_buff), "%.*d", a->nlines_prec,
-		    a->lineno_cur) < 0)
-			goto done;
-		if (fcgi_gen_response(c, out_buff) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "</div>") == -1)
-			goto done;
-
-		if (fcgi_gen_response(c, "<div class='blame_hash'>") == -1)
-			goto done;
-
-		if (fcgi_gen_response(c, "<a href='?index_page=") == -1)
-			goto done;
-		if (fcgi_gen_response(c, qs->index_page_str) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "&path=") == -1)
-			goto done;
-		if (fcgi_gen_response(c, repo_dir->name) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "&action=diff&commit=") == -1)
-			goto done;
-		if (fcgi_gen_response(c, bline->id_str) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "'>") == -1)
-			goto done;
-		if (snprintf(out_buff, 10, "%.8s", bline->id_str) < 0)
-			goto done;
-		if (fcgi_gen_response(c, out_buff) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "</a></div>") == -1)
-			goto done;
-
-		if (fcgi_gen_response(c, "<div class='blame_date'>") == -1)
-			goto done;
-		if (fcgi_gen_response(c, bline->datebuf) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "</div>") == -1)
-			goto done;
-
-		if (fcgi_gen_response(c, "<div class='blame_author'>") == -1)
-			goto done;
-		if (fcgi_gen_response(c, committer) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "</div>") == -1)
-			goto done;
-
-		if (fcgi_gen_response(c, "<div class='blame_code'>") == -1)
-			goto done;
 		err = gotweb_escape_html(&eline, line);
 		if (err)
 			goto done;
-		if (fcgi_gen_response(c, eline) == -1)
-			goto done;
-		if (fcgi_gen_response(c, "</div>") == -1)
+
+		r = fcgi_printf(c, "<div class='blame_wrapper'>"
+		    "<div class='blame_number'>%.*d</div>"
+		    "<div class='blame_hash'>"
+		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s'>"
+		    "%.8s</a>"
+		    "</div>"
+		    "<div class='blame_date'>%s</div>"
+		    "<div class='blame_author'>%s</div>"
+		    "<div class='blame_code'>%s</div>"
+		    "</div>",	/* .blame_wrapper */
+		    a->nlines_prec, a->lineno_cur,
+		    index_page_str, repo_dir->name, bline->id_str,
+		    bline->id_str,
+		    bline->datebuf,
+		    committer,
+		    eline);
+		if (r == -1)
 			goto done;
 
-		if (fcgi_gen_response(c, "</div>") == -1)
-			goto done;
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
 	}
@@ -1767,12 +1562,7 @@ got_output_repo_diff(struct request *c)
 				goto done;
 			}
 		}
-		if (fcgi_gen_response(c, "<div class='diff_line' class='") == -1)
-			goto done;
-		if (fcgi_gen_response(c, color ? color : "") == -1)
-			goto done;
-		if (fcgi_gen_response(c, "'>") == -1)
-			goto done;
+
 		newline = strchr(line, '\n');
 		if (newline)
 			*newline = '\0';
@@ -1780,13 +1570,12 @@ got_output_repo_diff(struct request *c)
 		error = gotweb_escape_html(&eline, line);
 		if (error)
 			goto done;
-		if (fcgi_gen_response(c, eline) == -1)
-			goto done;
+
+		fcgi_printf(c, "<div class='diff_line %s'>%s</div>\n",
+		    color ? color : "", eline);
 		free(eline);
 		eline = NULL;
 
-		if (fcgi_gen_response(c, "</div>\n") == -1)
-			goto done;
 		if (linelen > 0)
 			wrlen = wrlen + linelen;
 		free(color);

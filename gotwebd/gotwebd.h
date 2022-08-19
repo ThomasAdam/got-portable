@@ -427,7 +427,9 @@ void fcgi_timeout(int, short, void *);
 void fcgi_cleanup_request(struct request *);
 void fcgi_create_end_record(struct request *);
 void dump_fcgi_record(const char *, struct fcgi_record_header *);
-int fcgi_gen_response(struct request *, const char *);
+int fcgi_printf(struct request *, const char *, ...)
+	__attribute__((__format__(printf, 2, 3)))
+	__attribute__((__nonnull__(2)));
 int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 
 /* got_operations.c */
