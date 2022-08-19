@@ -289,7 +289,7 @@ enum client_action {
 };
 
 struct socket_conf {
-	struct addresslist	al;
+	struct address	 addr;
 
 	char		 name[GOTWEBD_MAXTEXT];
 	char		 srv_name[GOTWEBD_MAXTEXT];

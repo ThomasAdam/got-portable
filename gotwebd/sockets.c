@@ -73,12 +73,14 @@ void	 sockets_rlimit(int);
 
 int	 sockets_dispatch_gotwebd(int, struct privsep_proc *, struct imsg *);
 int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
-int	 sockets_create_socket(struct addresslist *, in_port_t);
+int	 sockets_create_socket(struct address *, in_port_t);
 int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *, int,
 	    volatile int *);
 
-struct socket *sockets_conf_new_socket(struct gotwebd *, struct server *,
-    int, int);
+struct socket *sockets_conf_new_socket_unix(struct gotwebd *, struct server *,
+    int);
+struct socket *sockets_conf_new_socket_fcgi(struct gotwebd *, struct server *,
+    int, struct address *);
 
 int cgi_inflight = 0;
 
@@ -117,72 +119,94 @@ void
 sockets_parse_sockets(struct gotwebd *env)
 {
 	struct server *srv;
+	struct address *a;
 	struct socket *new_sock = NULL;
-	int sock_id = 0, ipv4 = 0, ipv6 = 0;
+	int sock_id = 1;
 
 	TAILQ_FOREACH(srv, &env->servers, entry) {
 		if (srv->unix_socket) {
-			sock_id++;
-			new_sock = sockets_conf_new_socket(env, srv,
-			    sock_id, AF_UNIX);
-			/* Should always succeed. */
-			TAILQ_INSERT_TAIL(&env->sockets, new_sock, entry);
+			new_sock = sockets_conf_new_socket_unix(env, srv,
+			    sock_id);
+			if (new_sock) {
+				sock_id++;
+				TAILQ_INSERT_TAIL(&env->sockets, new_sock,
+				    entry);
+			}
 		}
 
 		if (srv->fcgi_socket) {
-			sock_id++;
-			new_sock = sockets_conf_new_socket(env, srv, sock_id,
-			    AF_INET);
-			if (new_sock) {
-				TAILQ_INSERT_TAIL(&env->sockets, new_sock,
-				    entry);
-				ipv4 = 1;
-				sock_id++;
+			if (TAILQ_EMPTY(&srv->al)) {
+				fatalx("%s: server %s has no IP addresses to "
+				    "listen for FCGI connections", __func__,
+				    srv->name);
 			}
-
-			new_sock = sockets_conf_new_socket(env, srv, sock_id,
-			    AF_INET6);
-			if (new_sock) {
-				TAILQ_INSERT_TAIL(&env->sockets,
-				    new_sock, entry);
-				ipv6 = 1;
-			}
-
-			if (ipv4 == 0 && ipv6 == 0) {
-				fatalx("%s: have no IP addresses to listen "
-				    "for FCGI connections", __func__);
+			TAILQ_FOREACH(a, &srv->al, entry) {
+				if (a->ss.ss_family != AF_INET &&
+				    a->ss.ss_family != AF_INET6)
+					continue;
+				new_sock = sockets_conf_new_socket_fcgi(env,
+				    srv, sock_id, a);
+				if (new_sock) {
+					sock_id++;
+					TAILQ_INSERT_TAIL(&env->sockets,
+					    new_sock, entry);
+				}
 			}
 		}
 	}
 }
 
-/* Returns NULL if no addresses in the requested family are configured. */
 struct socket *
-sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
-    int af_type)
+sockets_conf_new_socket_unix(struct gotwebd *env, struct server *srv, int id)
 {
 	struct socket *sock;
-	struct address *a, *acp;
 	int n;
 
 	if ((sock = calloc(1, sizeof(*sock))) == NULL)
 		fatalx("%s: calloc", __func__);
 
-	TAILQ_INIT(&sock->conf.al);
+	sock->conf.id = id;
+	sock->fd = -1;
+	sock->conf.af_type = AF_UNIX;
+
+	if (strlcpy(sock->conf.unix_socket_name,
+	    srv->unix_socket_name,
+	    sizeof(sock->conf.unix_socket_name)) >=
+	    sizeof(sock->conf.unix_socket_name)) {
+		free(sock);
+		fatalx("%s: strlcpy", __func__);
+	}
+
+	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
+	    srv->name);
+	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
+		free(sock);
+		fatalx("%s: snprintf", __func__);
+	}
+
+	if (strlcpy(sock->conf.srv_name, srv->name,
+	    sizeof(sock->conf.srv_name)) >= sizeof(sock->conf.srv_name)) {
+		free(sock);
+		fatalx("%s: strlcpy", __func__);
+	}
+
+	return sock;
+}
+
+struct socket *
+sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
+    struct address *a)
+{
+	struct socket *sock;
+	struct address *acp;
+	int n;
+
+	if ((sock = calloc(1, sizeof(*sock))) == NULL)
+		fatalx("%s: calloc", __func__);
 
 	sock->conf.id = id;
 	sock->fd = -1;
-	sock->conf.af_type = af_type;
-
-	if (af_type == AF_UNIX) {
-		if (strlcpy(sock->conf.unix_socket_name,
-		    srv->unix_socket_name,
-		    sizeof(sock->conf.unix_socket_name)) >=
-		    sizeof(sock->conf.unix_socket_name)) {
-			free(sock);
-			fatalx("%s: strlcpy", __func__);
-		}
-	}
+	sock->conf.af_type = a->ss.ss_family;
 
 	sock->conf.fcgi_socket_port = srv->fcgi_socket_port;
 
@@ -199,33 +223,18 @@ sockets_conf_new_socket(struct gotwebd *env, struct server *srv, int id,
 		fatalx("%s: strlcpy", __func__);
 	}
 
-	TAILQ_FOREACH(a, &srv->al, entry) {
-		if (a->ss.ss_family != af_type)
-			continue;
+	acp = &sock->conf.addr;
 
-		if ((acp = calloc(1, sizeof(*acp))) == NULL) {
-			free(sock);
-			fatal("%s: calloc", __func__);
+	memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
+	acp->ipproto = a->ipproto;
+	acp->prefixlen = a->prefixlen;
+	acp->port = a->port;
+	if (strlen(a->ifname) != 0) {
+		if (strlcpy(acp->ifname, a->ifname,
+		    sizeof(acp->ifname)) >= sizeof(acp->ifname)) {
+			fatalx("%s: interface name truncated",
+			    __func__);
 		}
-		memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
-		acp->ipproto = a->ipproto;
-		acp->prefixlen = a->prefixlen;
-		acp->port = a->port;
-		if (strlen(a->ifname) != 0) {
-			if (strlcpy(acp->ifname, a->ifname,
-			    sizeof(acp->ifname)) >= sizeof(acp->ifname)) {
-				fatalx("%s: interface name truncated",
-				    __func__);
-			}
-		}
-
-		TAILQ_INSERT_TAIL(&sock->conf.al, acp, entry);
-	}
-
-	if ((af_type == AF_INET || af_type == AF_INET6) &&
-	    TAILQ_EMPTY(&sock->conf.al)) {
-		free(sock);
-		return NULL;
 	}
 
 	return (sock);
@@ -378,10 +387,10 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 		log_debug("%s: initializing %s FCGI socket on port %d for %s",
 		    __func__, sock->conf.af_type == AF_INET ? "inet" : "inet6",
 		    sock->conf.fcgi_socket_port, sock->conf.name);
-		sock->fd = sockets_create_socket(&sock->conf.al,
+		sock->fd = sockets_create_socket(&sock->conf.addr,
 		    sock->conf.fcgi_socket_port);
 		if (sock->fd == -1) {
-			log_warnx("%s: create unix socket failed", __func__);
+			log_warnx("%s: create FCGI socket failed", __func__);
 			return -1;
 		}
 	}
@@ -465,10 +474,9 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 }
 
 int
-sockets_create_socket(struct addresslist *al, in_port_t port)
+sockets_create_socket(struct address *a, in_port_t port)
 {
 	struct addrinfo hints;
-	struct address *a;
 	int fd = -1, o_val = 1, flags;
 
 	memset(&hints, 0, sizeof(hints));
@@ -476,53 +484,55 @@ sockets_create_socket(struct addresslist *al, in_port_t port)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags |= AI_PASSIVE;
 
-	TAILQ_FOREACH(a, al, entry) {
-		switch (a->ss.ss_family) {
-		case AF_INET:
-			((struct sockaddr_in *)(&a->ss))->sin_port = port;
-			break;
-		case AF_INET6:
-			((struct sockaddr_in6 *)(&a->ss))->sin6_port = port;
-			break;
-		default:
-			log_warnx("%s: unknown address family", __func__);
-			goto fail;
-		}
-
-		fd = socket(a->ss.ss_family, hints.ai_socktype,
-		    a->ipproto);
-			log_debug("%s: opening socket (%d) for %s", __func__,
-			    fd, a->ifname);
-
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &o_val,
-		    sizeof(int)) == -1) {
-			log_warn("%s: setsockopt error", __func__);
-			return -1;
-		}
-
-		/* non-blocking */
-		flags = fcntl(fd, F_GETFL);
-		flags |= O_NONBLOCK;
-		fcntl(fd, F_SETFL, flags);
-
-		if (bind(fd, (struct sockaddr *)&a->ss, a->ss.ss_len) == -1) {
-			close(fd);
-			log_info("%s: can't bind to port %d", __func__,
-			    ntohs(port));
-			goto fail;
-		}
-
-		if (listen(fd, SOMAXCONN) == -1) {
-			log_warn("%s, unable to listen on socket", __func__);
-			goto fail;
-		}
+	switch (a->ss.ss_family) {
+	case AF_INET:
+		((struct sockaddr_in *)(&a->ss))->sin_port = port;
+		break;
+	case AF_INET6:
+		((struct sockaddr_in6 *)(&a->ss))->sin6_port = port;
+		break;
+	default:
+		log_warnx("%s: unknown address family", __func__);
+		return -1;
 	}
 
-	free(a);
+	fd = socket(a->ss.ss_family, hints.ai_socktype, a->ipproto);
+	if (fd == -1)
+		return -1;
+
+	log_debug("%s: opened socket (%d) for %s", __func__,
+	    fd, a->ifname);
+
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &o_val,
+	    sizeof(int)) == -1) {
+		log_warn("%s: setsockopt error", __func__);
+		close(fd);
+		return -1;
+	}
+
+	/* non-blocking */
+	flags = fcntl(fd, F_GETFL);
+	flags |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) == -1) {
+		log_info("%s: could not enable non-blocking I/O", __func__);
+		close(fd);
+		return -1;
+	}
+
+	if (bind(fd, (struct sockaddr *)&a->ss, a->ss.ss_len) == -1) {
+		close(fd);
+		log_info("%s: can't bind to port %d", __func__,
+		    ntohs(port));
+		return -1;
+	}
+
+	if (listen(fd, SOMAXCONN) == -1) {
+		log_warn("%s, unable to listen on socket", __func__);
+		close(fd);
+		return -1;
+	}
+
 	return (fd);
-fail:
-	free(a);
-	return -1;
 }
 
 int
