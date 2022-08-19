@@ -1326,13 +1326,13 @@ int
 get_addrs(const char *addr, struct addresslist *al, in_port_t port)
 {
 	if (strcmp("", addr) == 0) {
-		if (host("0.0.0.0", al, 1, port, "0.0.0.0", -1) <= 0) {
+		if (host("127.0.0.1", al, 1, port, "127.0.0.1", -1) <= 0) {
 			yyerror("invalid listen ip: %s",
-			    "0.0.0.0");
+			    "127.0.0.1");
 			return (-1);
 		}
-		if (host("::", al, 1, port, "::", -1) <= 0) {
-			yyerror("invalid listen ip: %s", "::");
+		if (host("::1", al, 1, port, "::1", -1) <= 0) {
+			yyerror("invalid listen ip: %s", "::1");
 			return (-1);
 		}
 	} else {
