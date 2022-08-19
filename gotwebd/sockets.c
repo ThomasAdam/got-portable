@@ -486,10 +486,10 @@ sockets_create_socket(struct address *a, in_port_t port)
 
 	switch (a->ss.ss_family) {
 	case AF_INET:
-		((struct sockaddr_in *)(&a->ss))->sin_port = port;
+		((struct sockaddr_in *)(&a->ss))->sin_port = htons(port);
 		break;
 	case AF_INET6:
-		((struct sockaddr_in6 *)(&a->ss))->sin6_port = port;
+		((struct sockaddr_in6 *)(&a->ss))->sin6_port = htons(port);
 		break;
 	default:
 		log_warnx("%s: unknown address family", __func__);

@@ -1037,10 +1037,10 @@ getservice(const char *n)
 			s = getservbyname(n, "udp");
 		if (s == NULL)
 			return (-1);
-		return htons(s->s_port);
+		return ntohs(s->s_port);
 	}
 
-	return (htons((unsigned short)llval));
+	return (unsigned short)llval;
 }
 
 struct address *
