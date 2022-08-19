@@ -921,7 +921,7 @@ conf_new_server(const char *name)
 
 	val = getservice(D_FCGI_PORT);
 	srv->fcgi_socket_port = gotwebd->fcgi_socket_port ?
-	    gotwebd->fcgi_socket_port: htons(val);
+	    gotwebd->fcgi_socket_port: val;
 
 	srv->show_site_owner = D_SHOWSOWNER;
 	srv->show_repo_owner = D_SHOWROWNER;
@@ -1036,7 +1036,7 @@ getservice(const char *n)
 			s = getservbyname(n, "udp");
 		if (s == NULL)
 			return (-1);
-		return (s->s_port);
+		return htons(s->s_port);
 	}
 
 	return (htons((unsigned short)llval));
