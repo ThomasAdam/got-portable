@@ -1621,7 +1621,7 @@ gotweb_render_summary(struct request *c)
 		r = fcgi_printf(c,
 		    "<div id='description_title'>Description:</div>\n"
 		    "<div id='description'>%s</div>\n",
-		    t->repo_dir->description);
+		    t->repo_dir->description ? t->repo_dir->description : "");
 		if (r == -1)
 			goto done;
 	}
@@ -1630,7 +1630,7 @@ gotweb_render_summary(struct request *c)
 		r = fcgi_printf(c,
 		    "<div id='repo_owner_title'>Owner:</div>\n"
 		    "<div id='repo_owner'>%s</div>\n",
-		    t->repo_dir->owner);
+		    t->repo_dir->owner ? t->repo_dir->owner : "");
 		if (r == -1)
 			goto done;
 	}
