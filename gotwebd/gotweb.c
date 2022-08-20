@@ -676,14 +676,14 @@ gotweb_render_header(struct request *c)
 	    "<div id='gw_body'>\n"
 	    "<div id='header'>\n"
 	    "<div id='got_link'>"
-	    "<a href='%s' target='_sotd'>"
+	    "<a href='%s' target='_blank'>"
 	    "<img src='%s%s' alt='logo' id='logo' />"
 	    "</a>\n"
 	    "</div>\n"		/* #got_link */
 	    "</div>\n"		/* #header */
 	    "<div id='site_path'>\n"
 	    "<div id='site_link'>\n"
-	    "<a href='/%s?index_page=%d' alt='sitelink'>%s</a>",
+	    "<a href='/%s?index_page=%d'>%s</a>",
 	    srv->site_name,
 	    droot, srv->custom_css,
 	    srv->logo_url,
@@ -695,8 +695,8 @@ gotweb_render_header(struct request *c)
 	if (qs != NULL) {
 		if (qs->path != NULL) {
 			r = fcgi_printf(c, " / "
-			    "<a href='/%s?index_page=%d&path=%s&action=summary'"
-			    " alt='summlink'>%s</a>",
+			    "<a href='/%s?index_page=%d&path=%s&action=summary'>"
+			    "%s</a>",
 			    c->document_root, qs->index_page, qs->path,
 			    qs->path);
 			if (r == -1)
