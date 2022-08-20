@@ -2,7 +2,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT([got-portable],
-	m4_esyscmd([util/got-portable-ver.sh]),
+	m4_esyscmd_s(util/got-portable-ver.sh),
 	[thomas@xteddy.org])
 AC_CONFIG_AUX_DIR(etc)
 AC_CONFIG_SRCDIR([lib/rcsutil.h])
