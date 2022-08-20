@@ -9,7 +9,7 @@
 # Intended to be called from configure.ac (via autogen.sh)
 GOT_PORTABLE_VER=0.75
 
-[ -d ".git" ] || { echo "$B_EM_VERSION" ; exit ; }
+[ -d ".git" ] || { echo "$GOT_PORTABLE_VER" ; exit ; }
 
 git describe --always --dirty 2>/dev/null || \
 	echo "$GOT_PORTABLE_VER"
