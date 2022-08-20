@@ -830,7 +830,7 @@ got_output_repo_tree(struct request *c)
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name, *index_page_str, *folder;
-	char *id_str = NULL;
+	char *id_str = NULL, *escaped_name;
 	char *path = NULL, *in_repo_path = NULL, *modestr = NULL;
 	int nentries, i, r;
 
@@ -920,8 +920,12 @@ got_output_repo_tree(struct request *c)
 			}
 		}
 
+		name = got_tree_entry_get_name(te);
+		error = gotweb_escape_html(&escaped_name, name);
+		if (error)
+			goto done;
+
 		if (S_ISDIR(mode)) {
-			name = got_tree_entry_get_name(te);
 			r = fcgi_printf(c,
 			    "<div class='tree_wrapper'>\n"
 			    "<div class='tree_line'>"
@@ -932,11 +936,10 @@ got_output_repo_tree(struct request *c)
 			    "<div class='tree_line_blank'>&nbsp;</div>\n"
 			    "</div>\n", /* .tree_wrapper */
 			    index_page_str, qs->path, rc->commit_id,
-			    folder, name, name, modestr);
+			    folder, name, escaped_name, modestr);
 			if (r == -1)
 				goto done;
 		} else {
-			name = got_tree_entry_get_name(te);
 			r = fcgi_printf(c,
 			    "<div class='tree_wrapper'>\n"
 			    "<div class='tree_line'>"
@@ -952,7 +955,7 @@ got_output_repo_tree(struct request *c)
 			    "</div>\n"  /* .tree_line_blank */
 			    "</div>\n", /* .tree_wrapper */
 			    index_page_str, qs->path, rc->commit_id,
-			    folder, name, name, modestr,
+			    folder, name, escaped_name, modestr,
 			    index_page_str, qs->path, rc->commit_id,
 			    folder, name,
 			    index_page_str, qs->path, rc->commit_id,

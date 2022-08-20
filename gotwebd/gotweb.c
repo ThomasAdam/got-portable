@@ -1136,7 +1136,7 @@ gotweb_render_blame(struct request *c)
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
 	struct repo_commit *rc = NULL;
-	char *age = NULL;
+	char *age = NULL, *msg = NULL;
 	int r;
 
 	error = got_get_repo_commits(c, 1);
@@ -1146,6 +1146,9 @@ gotweb_render_blame(struct request *c)
 	rc = TAILQ_FIRST(&t->repo_commits);
 
 	error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
+	if (error)
+		goto done;
+	error = gotweb_escape_html(&msg, rc->commit_msg);
 	if (error)
 		goto done;
 
@@ -1164,7 +1167,7 @@ gotweb_render_blame(struct request *c)
 	    "<div class='dotted_line'></div>\n"
 	    "<div id='blame'>\n",
 	    age ? age : "",
-	    rc->commit_msg);
+	    msg);
 	if (r == -1)
 		goto done;
 
@@ -1175,6 +1178,7 @@ gotweb_render_blame(struct request *c)
 	fcgi_printf(c, "</div>\n"	/* #blame */
 	    "</div>\n");		/* #blame_content */
 done:
+	free(msg);
 	return error;
 }
 
@@ -1189,7 +1193,7 @@ gotweb_render_briefs(struct request *c)
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *index_page_str;
 	char *smallerthan, *newline;
-	char *age = NULL;
+	char *age = NULL, *author = NULL, *msg = NULL;
 	int r;
 
 	index_page_str = qs->index_page_str ? qs->index_page_str : "";
@@ -1222,22 +1226,34 @@ gotweb_render_briefs(struct request *c)
 		if (newline)
 			*newline = '\0';
 
+		error = gotweb_escape_html(&author, rc->author);
+		if (error)
+			goto done;
+		error = gotweb_escape_html(&msg, rc->commit_msg);
+		if (error)
+			goto done;
+
 		r = fcgi_printf(c, "<div class='briefs_age'>%s</div>\n"
 		    "<div class='briefs_author'>%s</div>\n"
 		    "<div class='briefs_log'>"
 		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s"
 		    "&headref=%s'>%s</a>",
 		    age ? age : "",
-		    rc->author,
+		    author,
 		    index_page_str, repo_dir->name, rc->commit_id, qs->headref,
-		    rc->commit_msg);
+		    msg);
 		if (r == -1)
 			goto done;
 
 		if (rc->refs_str) {
+			char *refs;
+
+			error = gotweb_escape_html(&refs, rc->refs_str);
+			if (error)
+				goto done;
 			r = fcgi_printf(c,
-			    " <span class='refs_str'>(%s)</span>",
-			    rc->refs_str);
+			    " <span class='refs_str'>(%s)</span>", refs);
+			free(refs);
 			if (r == -1)
 				goto done;
 		}
@@ -1261,6 +1277,10 @@ gotweb_render_briefs(struct request *c)
 
 		free(age);
 		age = NULL;
+		free(author);
+		author = NULL;
+		free(msg);
+		msg = NULL;
 	}
 
 	if (t->next_id || t->prev_id) {
@@ -1271,6 +1291,8 @@ gotweb_render_briefs(struct request *c)
 	fcgi_printf(c, "</div>\n"); /* #briefs_content */
 done:
 	free(age);
+	free(author);
+	free(msg);
 	return error;
 }
 
@@ -1284,7 +1306,7 @@ gotweb_render_commits(struct request *c)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *index_page_str;
-	char *age = NULL, *author = NULL;
+	char *age = NULL, *author = NULL, *msg = NULL;
 	int r;
 
 	index_page_str = qs->index_page_str ? qs->index_page_str : "";
@@ -1307,6 +1329,9 @@ gotweb_render_commits(struct request *c)
 		error = gotweb_escape_html(&author, rc->author);
 		if (error)
 			goto done;
+		error = gotweb_escape_html(&msg, rc->commit_msg);
+		if (error)
+			goto done;
 
 		r = fcgi_printf(c, "<div class='commits_header_wrapper'>\n"
 		    "<div class='commits_header'>\n"
@@ -1321,9 +1346,9 @@ gotweb_render_commits(struct request *c)
 		    "<div class='dotted_line'></div>\n"
 		    "<div class='commit'>\n%s</div>\n",
 		    rc->commit_id,
-		    author ? author : "",
+		    author,
 		    age ? age : "",
-		    rc->commit_msg);
+		    msg);
 		if (r == -1)
 			goto done;
 
@@ -1344,6 +1369,8 @@ gotweb_render_commits(struct request *c)
 		age = NULL;
 		free(author);
 		author = NULL;
+		free(msg);
+		msg = NULL;
 	}
 
 	if (t->next_id || t->prev_id) {
@@ -1354,6 +1381,8 @@ gotweb_render_commits(struct request *c)
 	fcgi_printf(c, "</div>\n"); /* .commits_content */
 done:
 	free(age);
+	free(author);
+	free(msg);
 	return error;
 }
 
@@ -1387,12 +1416,13 @@ gotweb_render_branches(struct request *c)
 		goto done;
 
 	TAILQ_FOREACH(re, &refs, entry) {
-		char *refname = NULL;
+		const char *refname = NULL;
+		char *escaped_refname = NULL;
 
 		if (got_ref_is_symbolic(re->ref))
 			continue;
 
-		refname = strdup(got_ref_get_name(re->ref));
+		refname = got_ref_get_name(re->ref);
 		if (refname == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
@@ -1407,6 +1437,9 @@ gotweb_render_branches(struct request *c)
 
 		if (strncmp(refname, "refs/heads/", 11) == 0)
 			refname += 11;
+		error = gotweb_escape_html(&escaped_refname, refname);
+		if (error)
+			goto done;
 
 		r = fcgi_printf(c, "<div class='branches_wrapper'>\n"
 		    "<div class='branches_age'>%s</div>\n"
@@ -1431,10 +1464,11 @@ gotweb_render_branches(struct request *c)
 		    "</div>\n",	/* .branches_wrapper */
 		    age ? age : "",
 		    index_page_str, qs->path, refname,
-		    refname,
+		    escaped_refname,
 		    index_page_str, qs->path, refname,
 		    index_page_str, qs->path, refname,
 		    index_page_str, qs->path, refname);
+		free(escaped_refname);
 		if (r == -1)
 			goto done;
 
@@ -1453,7 +1487,7 @@ gotweb_render_tree(struct request *c)
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
 	struct repo_commit *rc = NULL;
-	char *age = NULL;
+	char *age = NULL, *msg = NULL;
 	int r;
 
 	error = got_get_repo_commits(c, 1);
@@ -1463,6 +1497,10 @@ gotweb_render_tree(struct request *c)
 	rc = TAILQ_FIRST(&t->repo_commits);
 
 	error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
+	if (error)
+		goto done;
+
+	error = gotweb_escape_html(&msg, rc->commit_msg);
 	if (error)
 		goto done;
 
@@ -1484,7 +1522,7 @@ gotweb_render_tree(struct request *c)
 	    "<div id='tree'>\n",
 	    rc->tree_id,
 	    age ? age : "",
-	    rc->commit_msg);
+	    msg);
 	if (r == -1)
 		goto done;
 
@@ -1495,6 +1533,7 @@ gotweb_render_tree(struct request *c)
 	fcgi_printf(c, "</div>\n"); /* #tree */
 	fcgi_printf(c, "</div>\n"); /* #tree_content */
 done:
+	free(msg);
 	return error;
 }
 
@@ -1504,7 +1543,7 @@ gotweb_render_diff(struct request *c)
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
 	struct repo_commit *rc = NULL;
-	char *age = NULL, *author = NULL;
+	char *age = NULL, *author = NULL, *msg = NULL;
 	int r;
 
 	error = got_get_repo_commits(c, 1);
@@ -1517,6 +1556,9 @@ gotweb_render_diff(struct request *c)
 	if (error)
 		goto done;
 	error = gotweb_escape_html(&author, rc->author);
+	if (error)
+		goto done;
+	error = gotweb_escape_html(&msg, rc->commit_msg);
 	if (error)
 		goto done;
 
@@ -1545,9 +1587,9 @@ gotweb_render_diff(struct request *c)
 	    rc->parent_id, rc->commit_id,
 	    rc->commit_id,
 	    rc->tree_id,
-	    author ? author : "",
+	    author,
 	    age ? age : "",
-	    rc->commit_msg);
+	    msg);
 	if (r == -1)
 		goto done;
 
@@ -1560,6 +1602,7 @@ gotweb_render_diff(struct request *c)
 done:
 	free(age);
 	free(author);
+	free(msg);
 	return error;
 }
 
@@ -1639,7 +1682,7 @@ gotweb_render_tag(struct request *c)
 	const struct got_error *error = NULL;
 	struct repo_tag *rt = NULL;
 	struct transport *t = c->t;
-	char *age = NULL, *author = NULL;
+	char *tagname = NULL, *age = NULL, *author = NULL, *msg = NULL;
 
 	error = got_get_repo_tags(c, 1);
 	if (error)
@@ -1659,9 +1702,15 @@ gotweb_render_tag(struct request *c)
 	error = gotweb_escape_html(&author, rt->tagger);
 	if (error)
 		goto done;
+	error = gotweb_escape_html(&msg, rt->commit_msg);
+	if (error)
+		goto done;
 
 	if (strncmp(rt->tag_name, "refs/", 5) == 0)
 		rt->tag_name += 5;
+	error = gotweb_escape_html(&tagname, rt->tag_name);
+	if (error)
+		goto done;
 
 	fcgi_printf(c, "<div id='tags_title_wrapper'>\n"
 	    "<div id='tags_title'>Tag</div>\n"
@@ -1683,15 +1732,16 @@ gotweb_render_tag(struct request *c)
 	    "<div id='tag_commit'>\n%s</div>"
 	    "</div>",		/* tag_header_wrapper */
 	    rt->commit_id,
-	    rt->tag_name,
-	    author ? author : "",
+	    tagname,
+	    author,
 	    age ? age : "",
-	    rt->commit_msg,
+	    msg,
 	    rt->tag_commit);
 
 done:
 	free(age);
 	free(author);
+	free(msg);
 	return error;
 }
 
@@ -1705,8 +1755,7 @@ gotweb_render_tags(struct request *c)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *index_page_str;
-	char *newline;
-	char *age = NULL;
+	char *age = NULL, *tagname = NULL, *msg = NULL, *newline;
 	int r, commit_found = 0;
 
 	index_page_str = qs->index_page_str ? qs->index_page_str : "";
@@ -1746,11 +1795,17 @@ gotweb_render_tags(struct request *c)
 
 		if (strncmp(rt->tag_name, "refs/tags/", 10) == 0)
 			rt->tag_name += 10;
+		error = gotweb_escape_html(&tagname, rt->tag_name);
+		if (error)
+			goto done;
 
 		if (rt->tag_commit != NULL) {
 			newline = strchr(rt->tag_commit, '\n');
 			if (newline)
 				*newline = '\0';
+			error = gotweb_escape_html(&msg, rt->tag_commit);
+			if (error)
+				goto done;
 		}
 
 		r = fcgi_printf(c, "<div class='tag_age'>%s</div>\n"
@@ -1773,9 +1828,9 @@ gotweb_render_tags(struct request *c)
 		    "</div>\n"	/* .navs_wrapper */
 		    "<div class='dotted_line'></div>\n",
 		    age ? age : "",
-		    rt->tag_name,
+		    tagname,
 		    index_page_str, repo_dir->name, rt->commit_id,
-		    rt->tag_commit ? rt->tag_commit : "",
+		    msg ? msg : "",
 		    index_page_str, repo_dir->name, rt->commit_id,
 		    index_page_str, repo_dir->name, rt->commit_id,
 		    index_page_str, repo_dir->name, rt->commit_id);
@@ -1784,6 +1839,10 @@ gotweb_render_tags(struct request *c)
 
 		free(age);
 		age = NULL;
+		free(tagname);
+		tagname = NULL;
+		free(msg);
+		msg = NULL;
 	}
 	if (t->next_id || t->prev_id) {
 		error = gotweb_render_navs(c);
@@ -1793,6 +1852,8 @@ gotweb_render_tags(struct request *c)
 	fcgi_printf(c, "</div>\n"); /* #tags_content */
 done:
 	free(age);
+	free(tagname);
+	free(msg);
 	return error;
 }
 
