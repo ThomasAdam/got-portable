@@ -61,26 +61,26 @@
 
 volatile int client_cnt;
 
-struct timeval	timeout = { TIMEOUT_DEFAULT, 0 };
+static struct timeval	timeout = { TIMEOUT_DEFAULT, 0 };
 
-void	 sockets_sighdlr(int, short, void *);
-void	 sockets_run(struct privsep *, struct privsep_proc *, void *);
-void	 sockets_launch(void);
-void	 sockets_purge(struct gotwebd *);
-void	 sockets_accept_paused(int, short, void *);
-void	 sockets_rlimit(int);
+static void	 sockets_sighdlr(int, short, void *);
+static void	 sockets_run(struct privsep *, struct privsep_proc *, void *);
+static void	 sockets_launch(void);
+static void	 sockets_purge(struct gotwebd *);
+static void	 sockets_accept_paused(int, short, void *);
+static void	 sockets_rlimit(int);
 
+static int	 sockets_dispatch_gotwebd(int, struct privsep_proc *,
+		    struct imsg *);
+static int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
+static int	 sockets_create_socket(struct address *, in_port_t);
+static int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *,
+		    int, volatile int *);
 
-int	 sockets_dispatch_gotwebd(int, struct privsep_proc *, struct imsg *);
-int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
-int	 sockets_create_socket(struct address *, in_port_t);
-int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *, int,
-	    volatile int *);
-
-struct socket *sockets_conf_new_socket_unix(struct gotwebd *, struct server *,
-    int);
-struct socket *sockets_conf_new_socket_fcgi(struct gotwebd *, struct server *,
-    int, struct address *);
+static struct socket *sockets_conf_new_socket_unix(struct gotwebd *,
+		    struct server *, int);
+static struct socket *sockets_conf_new_socket_fcgi(struct gotwebd *,
+		    struct server *, int, struct address *);
 
 int cgi_inflight = 0;
 
@@ -94,7 +94,7 @@ sockets(struct privsep *ps, struct privsep_proc *p)
 	proc_run(ps, p, procs, nitems(procs), sockets_run, NULL);
 }
 
-void
+static void
 sockets_run(struct privsep *ps, struct privsep_proc *p, void *arg)
 {
 	if (config_init(ps->ps_env) == -1)
@@ -156,7 +156,7 @@ sockets_parse_sockets(struct gotwebd *env)
 	}
 }
 
-struct socket *
+static struct socket *
 sockets_conf_new_socket_unix(struct gotwebd *env, struct server *srv, int id)
 {
 	struct socket *sock;
@@ -193,7 +193,7 @@ sockets_conf_new_socket_unix(struct gotwebd *env, struct server *srv, int id)
 	return sock;
 }
 
-struct socket *
+static struct socket *
 sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
     struct address *a)
 {
@@ -240,7 +240,7 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 	return (sock);
 }
 
-void
+static void
 sockets_launch(void)
 {
 	struct socket *sock;
@@ -262,7 +262,7 @@ sockets_launch(void)
 	}
 }
 
-void
+static void
 sockets_purge(struct gotwebd *env)
 {
 	struct socket *sock, *tsock;
@@ -281,7 +281,7 @@ sockets_purge(struct gotwebd *env)
 	}
 }
 
-int
+static int
 sockets_dispatch_gotwebd(int fd, struct privsep_proc *p, struct imsg *imsg)
 {
 	struct privsep *ps = p->p_ps;
@@ -325,7 +325,7 @@ sockets_dispatch_gotwebd(int fd, struct privsep_proc *p, struct imsg *imsg)
 	return 0;
 }
 
-void
+static void
 sockets_sighdlr(int sig, short event, void *arg)
 {
 	switch (sig) {
@@ -398,7 +398,7 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 	return 0;
 }
 
-int
+static int
 sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 {
 	struct gotwebd *env = ps->ps_env;
@@ -473,7 +473,7 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 	return u_fd;
 }
 
-int
+static int
 sockets_create_socket(struct address *a, in_port_t port)
 {
 	struct addrinfo hints;
@@ -535,7 +535,7 @@ sockets_create_socket(struct address *a, in_port_t port)
 	return (fd);
 }
 
-int
+static int
 sockets_accept_reserve(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
     int reserve, volatile int *counter)
 {
@@ -557,7 +557,7 @@ sockets_accept_reserve(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
 	return ret;
 }
 
-void
+static void
 sockets_accept_paused(int fd, short events, void *arg)
 {
 	struct socket *sock = (struct socket *)arg;
@@ -638,7 +638,7 @@ err:
 		free(c);
 }
 
-void
+static void
 sockets_rlimit(int maxfd)
 {
 	struct rlimit rl;
