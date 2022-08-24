@@ -749,10 +749,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = buf_load_fd(&buf, out_fd);
 		if (err)
 			goto done;
-		sig_len = buf_len(buf) + 1;
-		err = buf_putc(buf, '\0');
-		if (err)
-			goto done;
+		sig_len = buf_len(buf);
 		if (close(out_fd) == -1) {
 			err = got_error_from_errno("close");
 			goto done;
