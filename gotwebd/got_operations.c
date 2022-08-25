@@ -830,7 +830,7 @@ got_output_repo_tree(struct request *c)
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name, *index_page_str, *folder;
-	char *id_str = NULL, *escaped_name;
+	char *id_str = NULL, *escaped_name = NULL;
 	char *path = NULL, *in_repo_path = NULL, *modestr = NULL;
 	int nentries, i, r;
 
@@ -967,8 +967,11 @@ got_output_repo_tree(struct request *c)
 		id_str = NULL;
 		free(modestr);
 		modestr = NULL;
+		free(escaped_name);
+		escaped_name = NULL;
 	}
 done:
+	free(escaped_name);
 	free(id_str);
 	free(modestr);
 	free(path);
