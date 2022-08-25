@@ -124,7 +124,7 @@ gotweb_process_request(struct request *c)
 	error = gotweb_init_transport(&c->t);
 	if (error) {
 		log_warnx("%s: %s", __func__, error->msg);
-		goto err;
+		return;
 	}
 	/* don't process any further if client disconnected */
 	if (c->sock->client_status == CLIENT_DISCONNECT)
@@ -292,7 +292,7 @@ err:
 	if (html && fcgi_printf(c, "</div>\n") == -1)
 		return;
 done:
-	if (c->t->repo != NULL && qs->action != INDEX)
+	if (c->t->repo != NULL && qs && qs->action != INDEX)
 		got_repo_close(c->t->repo);
 	if (html && srv != NULL)
 		gotweb_render_footer(c);
