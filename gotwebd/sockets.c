@@ -524,7 +524,7 @@ sockets_create_socket(struct address *a, in_port_t port)
 		return -1;
 	}
 
-	if (bind(fd, (struct sockaddr *)&a->ss, a->ss.ss_len) == -1) {
+	if (bind(fd, (struct sockaddr *)&a->ss, SS_LEN(&a->ss)) == -1) {
 		close(fd);
 		log_info("%s: can't bind to port %d", __func__,
 		    ntohs(port));

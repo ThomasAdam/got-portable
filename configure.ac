@@ -83,6 +83,35 @@ AC_TYPE_UINT8_T
 # Check for ifgroupreq which is only available on BSD.
 AC_CHECK_TYPES([struct ifgroupreq])
 
+# Check for sockaddr_storage.  On some systems, ss_len is filled out, although
+# this is not mandated by POSIX, and hence systems such as linux, don't have
+# it.
+AC_CHECK_TYPES([struct sockaddr_storage], [], [], [
+#include <sys/types.h>
+#include <sys/socket.h>
+])
+
+# Same thing as sockaddr_storage above, only now check if the member exists in
+# the struct as well.
+AC_CHECK_MEMBERS([struct sockaddr_storage.ss_len], , ,
+	[ #include <netdb.h>
+	  #include <netinet/in.h>
+	  #include <sys/socket.h> ]
+)
+
+AC_CHECK_MEMBERS([struct sockaddr.sa_len], , ,
+	[ #include <netdb.h>
+	  #include <netinet/in.h>
+	  #include <sys/socket.h> ]
+)
+
+# Both checks above will result in:
+#
+# HAVE_STRUCT_SOCKADDR_AS_LEN
+# SS_LEN
+#
+# Either being defined or not.
+
 # Look for library needed for flock.
 AC_SEARCH_LIBS(flock, bsd)
 

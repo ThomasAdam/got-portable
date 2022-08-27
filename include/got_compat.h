@@ -202,6 +202,34 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #define SHA1Final	SHA1_Final
 #endif
 
+/*
+ * The following SA_LEN/SS_LEN dance comes from various source, notably
+ * OpenSMTP by way of OpenNTPD and OpenBGPD (thanks everyone!).  got-portable
+ * has tweaked a lot of the following macros to suit the needs of
+ * got-portable.
+ */
+
+/* From OpenNTPD portable */
+#if !defined(SA_LEN)
+# if defined(HAVE_STRUCT_SOCKADDR_SA_LEN)
+#  define SA_LEN(x)	((x)->sa_len)
+# else
+#  define SA_LEN(x)     ((x)->sa_family == AF_INET6 ? \
+			sizeof(struct sockaddr_in6) : \
+			sizeof(struct sockaddr_in))
+# endif
+
+#endif
+
+/* From OpenBGPD portable */
+#if !defined(SS_LEN)
+# if defined(HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN)
+#  define SS_LEN(x)  ((x)->ss_len)
+# else
+#  define SS_LEN(x)  SA_LEN((struct sockaddr *)(x))
+# endif
+#endif
+
 #ifndef HAVE_ASPRINTF
 /* asprintf.c */
 int		 asprintf(char **, const char *, ...);
