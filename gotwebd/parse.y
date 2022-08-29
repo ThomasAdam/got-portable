@@ -153,22 +153,22 @@ boolean		: STRING {
 		| NUMBER { $$ = $1; }
 		;
 
-fcgiport	: NUMBER {
-			if ($1 <= 0 || $1 > (int)USHRT_MAX) {
-				yyerror("invalid port: %lld", $1);
+fcgiport	: PORT NUMBER {
+			if ($2 <= 0 || $2 > (int)USHRT_MAX) {
+				yyerror("invalid port: %lld", $2);
 				YYERROR;
 			}
-			$$ = htons($1);
+			$$ = $2;
 		}
-		| STRING {
+		| PORT STRING {
 			int	 val;
 
-			if ((val = getservice($1)) == -1) {
-				yyerror("invalid port: %s", $1);
-				free($1);
+			if ((val = getservice($2)) == -1) {
+				yyerror("invalid port: %s", $2);
+				free($2);
 				YYERROR;
 			}
-			free($1);
+			free($2);
 
 			$$ = val;
 		}
@@ -190,9 +190,6 @@ main		: PREFORK NUMBER {
 		| FCGI_SOCKET boolean {
 			gotwebd->fcgi_socket = $2;
 		}
-		| FCGI_SOCKET boolean  {
-			gotwebd->fcgi_socket = $2;
-		} '{' optnl socketopts4 '}'
 		| UNIX_SOCKET boolean {
 			gotwebd->unix_socket = $2;
 		}
@@ -330,6 +327,18 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			free($2);
 		}
+		| LISTEN ON STRING fcgiport {
+			n = strlcpy(new_srv->fcgi_socket_bind, $3,
+			    sizeof(new_srv->fcgi_socket_bind));
+			if (n >= sizeof(new_srv->fcgi_socket_bind)) {
+				yyerror("%s: fcgi_socket_bind truncated",
+				    __func__);
+				free($3);
+				YYERROR;
+			}
+			free($3);
+			new_srv->fcgi_socket_port = $4;
+		}
 		| MAX_REPOS NUMBER {
 			if ($2 > 0)
 				new_srv->max_repos = $2;
@@ -359,9 +368,6 @@ serveropts1	: REPOS_PATH STRING {
 		| FCGI_SOCKET boolean {
 			new_srv->fcgi_socket = $2;
 		}
-		| FCGI_SOCKET boolean  {
-			new_srv->fcgi_socket = $2;
-		} '{' optnl socketopts2 '}'
 		| UNIX_SOCKET boolean {
 			new_srv->unix_socket = $2;
 		}
@@ -383,54 +389,6 @@ serveropts1	: REPOS_PATH STRING {
 
 serveropts2	: serveropts2 serveropts1 nl
 		| serveropts1 optnl
-		;
-
-socketopts1	: LISTEN ON STRING {
-			n = strlcpy(new_srv->fcgi_socket_bind, $3,
-			    sizeof(new_srv->fcgi_socket_bind));
-			if (n >= sizeof(new_srv->fcgi_socket_bind)) {
-				yyerror("%s: fcgi_socket_bind truncated",
-				    __func__);
-				free($3);
-				YYERROR;
-			}
-			free($3);
-		}
-		| PORT fcgiport {
-			struct server	*srv;
-
-			TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
-				if (srv->fcgi_socket_port == $2) {
-					yyerror("port already assigned");
-					YYERROR;
-				}
-			}
-			new_srv->fcgi_socket_port = $2;
-		}
-		;
-
-socketopts2	: socketopts2 socketopts1 nl
-		| socketopts1 optnl
-		;
-
-socketopts3	: LISTEN ON STRING {
-			n = strlcpy(gotwebd->fcgi_socket_bind, $3,
-			    sizeof(gotwebd->fcgi_socket_bind));
-			if (n >= sizeof(gotwebd->fcgi_socket_bind)) {
-				yyerror("%s: fcgi_socket_bind truncated",
-				    __func__);
-				free($3);
-				YYERROR;
-			}
-			free($3);
-		}
-		| PORT fcgiport {
-			gotwebd->fcgi_socket_port = $2;
-		}
-		;
-
-socketopts4	: socketopts4 socketopts3 nl
-		| socketopts3 optnl
 		;
 
 nl		: '\n' optnl
