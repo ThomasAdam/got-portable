@@ -38,7 +38,7 @@ the
 environment of
 .Xr httpd 8 .
 .Sh GLOBAL CONFIGURATION
-The available configuration directives are as follows:
+The available global configuration directives are as follows:
 .Bl -tag -width Ds
 .It Ic chroot Ar path
 Set the path to the
@@ -49,13 +49,51 @@ environment of
 If not specified then
 .Pa /var/www
 will be used.
+.It Ic prefork Ar number
+Run the specified number of server processes.
+.It Ic fgci_socket Ar on | off
+Controls whether the server will listen on FCGI TCP sockets by default.
+.It Ic unix_socket Ar on | off
+Controls whether the servers will listen on unix sockets by default.
+.It Ic unix_socket_name Ar path
+Set the path to the default unix socket.
+.El
+.Sh SERVER CONFIGURATION
+At least one server context must exist for
+.Xr gotwebd 8
+to function.
+In case no server context is defined in the configuration file, a default
+server context will be used, which listens on a unix socket at
+.Pa /var/www/run/gotweb.sock
+and uses default parameters for all applicable settings.
+.Pp
+A server context is declared with a unique
+.Ar name,
+followed by server-specific configuration directives inside curly braces:
+.Pp
+.Ic server Ar name Brq ...
+.Pp
+The available server configuration directives are as follows:
+.Bl -tag -width Ds
 .It Ic custom_css Ar path
 Set the path to a custom Cascading Style Sheet (CSS) to be used.
+If this option is not specified then a default style sheet will be used.
 .It Ic fgci_socket Ar on | off
-Enable or disable use of FCGI TCP listening sockets.
+Enable or disable listening on FCGI TCP sockets.
 .It Ic listen on Ar address Ic port Ar number
-Set an address and port to listen on for incoming FCGI TCP connections.
-Can be specified multiple times to build up a list of listening sockets.
+Configure an address and port for incoming FCGI TCP connections.
+Valid
+.Ar address
+arguments are hostnames, IP4 addresses, IPv6 addresses, and network
+interface names.
+The
+.Ar port
+argument may be number or a service name defined in
+.Xr services 5 .
+.Pp
+May be specified multiple times to build up a list of listening sockets.
+However, a given combination of address and port may only be used by
+one server.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
 .It Ic logo_url Ar url
@@ -68,19 +106,9 @@ Set the maximum amount of repositories
 will work with.
 .It Ic max_repos_display Ar number
 Set the maximum amount of repositories displayed on the index screen.
-.It Ic prefork Ar number
-Run the specified number of server processes.
 .It Ic repos_path Ar path
 Set the path to the directory which contains Git repositories that
-.Xr gotwebd 8
-should publish.
-.It Ic server Ar name Brq ...
-Declare a server context.
-At least one server context must exist for
-.Xr gotwebd 8
-to function.
-If not specified, a default server context is used which listens only on
-a unix socket and uses default parameters for all applicable settings.
+the server should publish.
 .It Ic show_repo_age Ar on | off
 Toggle display of last repository modification date.
 .It Ic show_repo_cloneurl Ar on | off
@@ -113,48 +141,44 @@ Set the displayed site name title.
 Set the displayed site owner.
 .It Ic show_site_owner Ar on | off
 Toggle display of the site owner.
-.El
 .It Ic unix_socket Ar on | off
-Enable or disable use of FCGI unix sockets.
+Enable or disable use of unix sockets.
 .It Ic unix_socket_name Ar path
-Set the path to the unix socket used by
-.Xr gotwebd 8 .
+Set the path to the unix socket used by the server.
+.El
 .Sh EXAMPLES
 These are the currently configurable items for
 .Xr gotwebd 8
 with their default values.
 .Bd -literal -offset indent
-
 #
 # gotwebd options
 # all paths relative to /var/www (httpd chroot jail)
 #
-
-repos_path   "/got/public"
-
-#max_repos   100
-#max_repos_display  25
-max_commits_display  50
-
-got_site_name   "my public repos"
-got_site_owner   "Got Owner"
-got_site_link   "repos"
-
-logo   "got.png"
-logo_url   "https://gameoftrees.org"
-
-# on by default
-#show_site_owner  off
-#show_repo_owner  off
-#show_repo_age  false
-#show_repo_description no
-#show_repo_cloneurl  off
 
 prefork 1
 
 server "localhost-unix" {
 	repos_path "/got/public"
 	unix_socket_name "/run/gotweb.sock"
+
+	got_site_name   "my public repos"
+	got_site_owner   "Got Owner"
+	got_site_link   "repos"
+
+	logo   "got.png"
+	logo_url   "https://gameoftrees.org"
+
+	# on by default
+	#show_site_owner  off
+	#show_repo_owner  off
+	#show_repo_age  false
+	#show_repo_description no
+	#show_repo_cloneurl  off
+
+	#max_repos   100
+	#max_repos_display  25
+	#max_commits_display  50
 }
 
 # Example server context for FCGI over TCP connections:
@@ -175,4 +199,5 @@ configuration file.
 .El
 .Sh SEE ALSO
 .Xr got 1 ,
+.Xr services 5 ,
 .Xr gotwebd 8
