@@ -14,15 +14,15 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate$
-.Dt GOTWEB.CONF 5
+.Dt GOTWEBD.CONF 5
 .Os
 .Sh NAME
-.Nm gotweb.conf
-.Nd gotweb configuration file
+.Nm gotwebd.conf
+.Nd gotwebd configuration file
 .Sh DESCRIPTION
 .Nm
 is the run-time configuration file for
-.Xr gotweb 8 .
+.Xr gotwebd 8 .
 .Pp
 The file format is line-based, with one configuration directive per line.
 Any lines beginning with a
@@ -40,88 +40,131 @@ environment of
 .Sh GLOBAL CONFIGURATION
 The available configuration directives are as follows:
 .Bl -tag -width Ds
-.It Ic got_max_commits_display Ar number
-Set the maximum amount of commits displayed per page.
-.It Ic got_logo Ar path
+.It Ic chroot Ar path
+Set the path to the
+the
+.Xr chroot 2
+environment of
+.Xr httpd 8 .
+If not specified then
+.Pa /var/www
+will be used.
+.It Ic custom_css Ar path
+Set the path to a custom Cascading Style Sheet (CSS) to be used.
+.It Ic fgci_socket Ar on | off
+Enable or disable use of FCGI TCP listening sockets.
+.It Ic listen on Ar address Ic port Ar number
+Set an address and port to listen on for incoming FCGI TCP connections.
+Can be specified multiple times to build up a list of listening sockets.
+.It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
-.It Ic got_logo_url Ar url
+.It Ic logo_url Ar url
 Set a hyperlink for the logo.
-.It Ic got_max_repos Ar number
+.It Ic max_commits_display Ar number
+Set the maximum amount of commits displayed per page.
+.It Ic max_repos Ar number
 Set the maximum amount of repositories
-.Xr gotweb 8
+.Xr gotwebd 8
 will work with.
-.It Ic got_max_repos_display Ar number
+.It Ic max_repos_display Ar number
 Set the maximum amount of repositories displayed on the index screen.
-.It Ic got_show_repo_age Ar on | off
+.It Ic prefork Ar number
+Run the specified number of server processes.
+.It Ic repos_path Ar path
+Set the path to the directory which contains Git repositories that
+.Xr gotwebd 8
+should publish.
+.It Ic server Ar name Brq ...
+Declare a server context.
+At least one server context must exist for
+.Xr gotwebd 8
+to function.
+If not specified, a default server context is used which listens only on
+a unix socket and uses default parameters for all applicable settings.
+.It Ic show_repo_age Ar on | off
 Toggle display of last repository modification date.
-.It Ic got_show_repo_cloneurl Ar on | off
+.It Ic show_repo_cloneurl Ar on | off
 Toggle display of clone URLs for a repository.
 This requires the creation of a
 .Pa cloneurl
 file inside the repository which contains one URL per line.
-.It Ic got_show_repo_description Ar on | off
+.It Ic show_repo_description Ar on | off
 Toggle display of the repository description.
 The
 .Pa description
 file in the repository should be updated with an appropriate description.
-.It Ic got_repos_path Ar path
-Set the path to the directory which contains Git repositories that
-.Xr gotweb 8
-should publish.
-.It Ic got_show_repo_owner Ar on | off
+.It Ic show_repo_owner Ar on | off
 Set whether to display the repository owner.
 Displaying the owner requires owner information to be added to the
 .Pa config
 file in the repository.
-.Xr gotweb 8
+.Xr gotwebd 8
 will parse owner information from either a [gotweb] or a [gitweb] section.
 For example:
 .Bd -literal -offset indent
 [gotweb]
 owner = "Your Name"
 .Ed
-.It Ic got_site_link Ar string
+.It Ic site_link Ar string
 Set the displayed site link name for the index page.
-.It Ic got_site_name Ar string
+.It Ic site_name Ar string
 Set the displayed site name title.
-.It Ic got_site_owner Ar string
+.It Ic site_owner Ar string
 Set the displayed site owner.
-.It Ic got_show_site_owner Ar on | off
+.It Ic show_site_owner Ar on | off
 Toggle display of the site owner.
-.It Ic got_www_path Ar string
-Set the public gotweb httpd path.
 .El
+.It Ic unix_socket Ar on | off
+Enable or disable use of FCGI unix sockets.
+.It Ic unix_socket_name Ar path
+Set the path to the unix socket used by
+.Xr gotwebd 8 .
 .Sh EXAMPLES
 These are the currently configurable items for
-.Xr gotweb 8
+.Xr gotwebd 8
 with their default values.
 .Bd -literal -offset indent
 
 #
-# gotweb options
+# gotwebd options
 # all paths relative to /var/www (httpd chroot jail)
 #
 
-got_repos_path   "/got/public"
-got_www_path   "/gotweb"
+repos_path   "/got/public"
 
-#got_max_repos   100
-#got_max_repos_display  25
-got_max_commits_display  50
+#max_repos   100
+#max_repos_display  25
+max_commits_display  50
 
 got_site_name   "my public repos"
 got_site_owner   "Got Owner"
 got_site_link   "repos"
 
-got_logo   "got.png"
-got_logo_url   "https://gameoftrees.org"
+logo   "got.png"
+logo_url   "https://gameoftrees.org"
 
 # on by default
-#got_show_site_owner  off
-#got_show_repo_owner  off
-#got_show_repo_age  false
-#got_show_repo_description no
-#got_show_repo_cloneurl  off
+#show_site_owner  off
+#show_repo_owner  off
+#show_repo_age  false
+#show_repo_description no
+#show_repo_cloneurl  off
+
+prefork 1
+
+server "localhost-unix" {
+	repos_path "/got/public"
+	unix_socket_name "/run/gotweb.sock"
+}
+
+# Example server context for FCGI over TCP connections:
+#server "localhost-tcp" {
+#	repos_path "/got/public"
+#	unix_socket		off
+#	fcgi_socket		on
+#	listen on 127.0.0.1 port 9000
+#	listen on ::1 port 9000
+#}
 .Ed
 .Sh FILES
 .Bl -tag -width Ds -compact
