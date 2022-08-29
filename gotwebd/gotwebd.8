@@ -14,33 +14,21 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate$
-.Dt GOTWEB 8
+.Dt GOTWEBD 8
 .Os
 .Sh NAME
-.Nm gotweb
-.Nd Game of Trees Git repository server for web browsers -- which obviously
-needs to be updated to gotwebd
+.Nm gotwebd
+.Nd Game of Trees Git Fast-CGI repository server for web browsers
 .Sh SYNOPSIS
 .Nm
 .Sh DESCRIPTION
 .Nm
-provides a web interface allowing Git repository contents to be viewed
-with a web browser.
-.Pp
-.Nm
-is a CGI program based on
-.Xr got 1
-and
-.Xr kcgi 3
-which is intended to run in a
-.Xr chroot 2
-environment in
-.Pa /var/www .
+is a Fast-CGI server program which can display the contents of Git
+repositories via a web browser.
 The program has been designed to work out of the box with
 the
 .Xr httpd 8
-web server in conjunction with
-.Xr slowcgi 8 .
+web server.
 .Pp
 Enabling
 .Nm
@@ -51,22 +39,21 @@ The
 .Xr httpd.conf 5
 configuration file must be adjusted to run
 .Nm
-as a CGI program with
-.Xr slowcgi 8 .
+as a Fast-CGI helper program.
 The
 .Sx EXAMPLES
 section below contains an appropriate configuration file sample.
 .It
-httpd(8) and slowcgi(8) must be enabled and started:
+httpd(8) must be enabled and started:
 .Bd -literal -offset indent
-  # rcctl enable httpd slowcgi
-  # rcctl start httpd slowcgi
+  # rcctl enable httpd
+  # rcctl start httpd
 .Ed
 .It
 Optionally, the run-time behaviour of
 .Nm
 can be configured via the
-.Xr gotweb.conf 5
+.Xr gotwebd.conf 5
 configuration file.
 .It
 Git repositories must be created at a suitable location inside the
@@ -99,27 +86,18 @@ scheduled by
 Default location for Git repositories served by
 .Nm .
 This location can be adjusted in the
-.Xr gotweb.conf 5
+.Xr gotwebd.conf 5
 configuration file.
-.It Pa /var/www/cgi-bin/gotweb/gotweb
-The
-.Nm
-CGI program, statically linked for use in a
-.Xr chroot 2
-environment.
-.It Pa /var/www/cgi-bin/gotweb/gw_tmpl/
-Directory for template files used by
-.Nm .
-.It Pa /var/www/cgi-bin/gotweb/libexec/
+.It Pa /var/www/bin/gotwebd/
 Directory containing statically linked
 .Xr got 1
 helper programs which are run by
 .Nm
 to read Git repositories.
-.It Pa /var/www/htdocs/gotweb/
+.It Pa /var/www/htdocs/gotwebd/
 Directory containing HTML, CSS, and image files used by
 .Nm .
-.It Pa /var/www/got/tmp/
+.It Pa /tmp/
 Directory for temporary files created by
 .Nm .
 .El
@@ -130,23 +108,24 @@ Example configuration for httpd.conf:
   types { include "/usr/share/misc/mime.types" }
   server "gotweb.example.com" {
   	listen on * port 80
-  	root "/htdocs/gotweb"
-  	location "/cgi-bin/*" {
-  		root "/"
-  		fastcgi
-  	}
-  	location "/*" {
-  		directory index "index.html"
-  	}
+  	root "/htdocs"
+        location "/gotwebd-unix/*" {
+              fastcgi socket "/run/gotweb.sock"
+        }
+        location "/gotwebd-tcp/*" {
+              fastcgi socket tcp 127.0.0.1 9000
+        }
+        location "/*" {
+              directory index "index.html"
+        }
   }
 .Ed
 .Sh SEE ALSO
 .Xr got 1 ,
-.Xr kcgi 3 ,
 .Xr git-repository 5 ,
-.Xr gotweb.conf 5 ,
-.Xr httpd 8 ,
-.Xr slowcgi 8
+.Xr gotwebd.conf 5 ,
+.Xr httpd 8
 .Sh AUTHORS
-.An Tracey Emery Aq Mt tracey@traceyemery.net
+.An Omar Polo Aq Mt op@openbsd.org
 .An Stefan Sperling Aq Mt stsp@openbsd.org
+.An Tracey Emery Aq Mt tracey@traceyemery.net
