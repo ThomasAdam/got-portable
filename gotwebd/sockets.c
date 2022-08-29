@@ -208,7 +208,7 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 	sock->fd = -1;
 	sock->conf.af_type = a->ss.ss_family;
 
-	sock->conf.fcgi_socket_port = srv->fcgi_socket_port;
+	sock->conf.fcgi_socket_port = a->port;
 
 	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
 	    srv->name);
