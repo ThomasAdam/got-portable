@@ -278,8 +278,6 @@ struct server {
 	char		 unix_socket_name[PATH_MAX];
 
 	int		 fcgi_socket;
-	char		 fcgi_socket_bind[GOTWEBD_MAXTEXT];
-	in_port_t	 fcgi_socket_port;
 };
 TAILQ_HEAD(serverlist, server);
 
@@ -338,8 +336,6 @@ struct gotwebd {
 	char		 unix_socket_name[PATH_MAX];
 
 	int		 fcgi_socket;
-	char		 fcgi_socket_bind[GOTWEBD_MAXTEXT];
-	in_port_t	 fcgi_socket_port;
 };
 
 struct querystring {

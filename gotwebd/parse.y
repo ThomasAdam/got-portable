@@ -92,14 +92,17 @@ static struct server		*conf_new_server(const char *);
 int				 getservice(const char *);
 int				 n;
 
-int		 get_addrs(const char *, struct addresslist *, in_port_t);
+int		 get_addrs(const char *, struct server *, in_port_t);
+int		 addr_dup_check(struct addresslist *, struct address *,
+		    const char *, const char *);
+int		 add_addr(struct server *, struct address *);
 struct address	*host_v4(const char *);
 struct address	*host_v6(const char *);
-int		 host_dns(const char *, struct addresslist *,
+int		 host_dns(const char *, struct server *,
 		    int, in_port_t, const char *, int);
-int		 host_if(const char *, struct addresslist *,
+int		 host_if(const char *, struct server *,
 		    int, in_port_t, const char *, int);
-int		 host(const char *, struct addresslist *,
+int		 host(const char *, struct server *,
 		    int, in_port_t, const char *, int);
 int		 is_if_in_group(const char *, const char *);
 
@@ -221,14 +224,6 @@ server		: SERVER STRING {
 			}
 
 			new_srv = conf_new_server($2);
-			if (new_srv->fcgi_socket)
-				if (get_addrs(new_srv->fcgi_socket_bind,
-				    &new_srv->al,
-				    new_srv->fcgi_socket_port) == -1) {
-					yyerror("could not get tcp iface "
-					    "addrs");
-					YYERROR;
-				}
 			log_debug("adding server %s", $2);
 			free($2);
 		}
@@ -247,14 +242,6 @@ server		: SERVER STRING {
 			log_debug("adding server %s", $2);
 			free($2);
 		} '{' optnl serveropts2 '}' {
-			if (new_srv->fcgi_socket) {
-				if (get_addrs(new_srv->fcgi_socket_bind,
-				    &new_srv->al, new_srv->fcgi_socket_port)
-				    == -1) {
-					yyerror("could not get tcp iface addr");
-					YYERROR;
-				}
-			}
 		}
 		;
 
@@ -328,16 +315,10 @@ serveropts1	: REPOS_PATH STRING {
 			free($2);
 		}
 		| LISTEN ON STRING fcgiport {
-			n = strlcpy(new_srv->fcgi_socket_bind, $3,
-			    sizeof(new_srv->fcgi_socket_bind));
-			if (n >= sizeof(new_srv->fcgi_socket_bind)) {
-				yyerror("%s: fcgi_socket_bind truncated",
-				    __func__);
-				free($3);
+			if (get_addrs($3, new_srv, $4) == -1) {
+				yyerror("could not get addrs");
 				YYERROR;
 			}
-			free($3);
-			new_srv->fcgi_socket_port = $4;
 		}
 		| MAX_REPOS NUMBER {
 			if ($2 > 0)
@@ -836,7 +817,6 @@ struct server *
 conf_new_server(const char *name)
 {
 	struct server *srv = NULL;
-	int val;
 
 	srv = calloc(1, sizeof(*srv));
 	if (srv == NULL)
@@ -876,10 +856,6 @@ conf_new_server(const char *name)
 	n = strlcpy(srv->custom_css, D_GOTWEBCSS, sizeof(srv->custom_css));
 	if (n >= sizeof(srv->custom_css))
 		fatalx("%s: strlcpy", __func__);
-
-	val = getservice(D_FCGI_PORT);
-	srv->fcgi_socket_port = gotwebd->fcgi_socket_port ?
-	    gotwebd->fcgi_socket_port: val;
 
 	srv->show_site_owner = D_SHOWSOWNER;
 	srv->show_repo_owner = D_SHOWROWNER;
@@ -1052,7 +1028,7 @@ host_v6(const char *s)
 }
 
 int
-host_dns(const char *s, struct addresslist *al, int max,
+host_dns(const char *s, struct server *new_srv, int max,
     in_port_t port, const char *ifname, int ipproto)
 {
 	struct addrinfo hints, *res0, *res;
@@ -1061,7 +1037,7 @@ host_dns(const char *s, struct addresslist *al, int max,
 	struct sockaddr_in6 *sin6;
 	struct address *h;
 
-	if ((cnt = host_if(s, al, max, port, ifname, ipproto)) != 0)
+	if ((cnt = host_if(s, new_srv, max, port, ifname, ipproto)) != 0)
 		return (cnt);
 
 	memset(&hints, 0, sizeof(hints));
@@ -1113,7 +1089,8 @@ host_dns(const char *s, struct addresslist *al, int max,
 			got_sockaddr_inet6_init(sin6, &ra->sin6_addr, 0);
 		}
 
-		TAILQ_INSERT_HEAD(al, h, entry);
+		if (add_addr(new_srv, h))
+			return -1;
 		cnt++;
 	}
 	if (cnt == max && res) {
@@ -1125,7 +1102,7 @@ host_dns(const char *s, struct addresslist *al, int max,
 }
 
 int
-host_if(const char *s, struct addresslist *al, int max,
+host_if(const char *s, struct server *new_srv, int max,
     in_port_t port, const char *ifname, int ipproto)
 {
 	struct ifaddrs *ifap, *p;
@@ -1180,7 +1157,8 @@ host_if(const char *s, struct addresslist *al, int max,
 			    ra->sin6_scope_id);
 		}
 
-		TAILQ_INSERT_HEAD(al, h, entry);
+		if (add_addr(new_srv, h))
+			return -1;
 		cnt++;
 	}
 	if (af == AF_INET) {
@@ -1198,7 +1176,7 @@ host_if(const char *s, struct addresslist *al, int max,
 }
 
 int
-host(const char *s, struct addresslist *al, int max,
+host(const char *s, struct server *new_srv, int max,
     in_port_t port, const char *ifname, int ipproto)
 {
 	struct address *h;
@@ -1224,11 +1202,12 @@ host(const char *s, struct addresslist *al, int max,
 		if (ipproto != -1)
 			h->ipproto = ipproto;
 
-		TAILQ_INSERT_HEAD(al, h, entry);
+		if (add_addr(new_srv, h))
+			return -1;
 		return (1);
 	}
 
-	return (host_dns(s, al, max, port, ifname, ipproto));
+	return (host_dns(s, new_srv, max, port, ifname, ipproto));
 }
 
 int
@@ -1281,24 +1260,99 @@ end:
 }
 
 int
-get_addrs(const char *addr, struct addresslist *al, in_port_t port)
+get_addrs(const char *addr, struct server *new_srv, in_port_t port)
 {
 	if (strcmp("", addr) == 0) {
-		if (host("127.0.0.1", al, 1, port, "127.0.0.1", -1) <= 0) {
+		if (host("127.0.0.1", new_srv, 1, port, "127.0.0.1",
+		    -1) <= 0) {
 			yyerror("invalid listen ip: %s",
 			    "127.0.0.1");
 			return (-1);
 		}
-		if (host("::1", al, 1, port, "::1", -1) <= 0) {
+		if (host("::1", new_srv, 1, port, "::1", -1) <= 0) {
 			yyerror("invalid listen ip: %s", "::1");
 			return (-1);
 		}
 	} else {
-		if (host(addr, al, GOTWEBD_MAXIFACE, port, addr,
+		if (host(addr, new_srv, GOTWEBD_MAXIFACE, port, addr,
 		    -1) <= 0) {
 			yyerror("invalid listen ip: %s", addr);
 			return (-1);
 		}
 	}
 	return (0);
+}
+
+int
+addr_dup_check(struct addresslist *al, struct address *h, const char *new_srv,
+    const char *other_srv)
+{
+	struct address *a;
+	void *ia;
+	char buf[INET6_ADDRSTRLEN];
+	const char *addrstr;
+
+	TAILQ_FOREACH(a, al, entry) {
+		if (memcmp(&a->ss, &h->ss, sizeof(h->ss)) != 0 ||
+		    a->port != h->port)
+			continue;
+
+		switch (h->ss.ss_family) {
+		case AF_INET:
+			ia = &((struct sockaddr_in *)(&h->ss))->sin_addr;
+			break;
+		case AF_INET6:
+			ia = &((struct sockaddr_in6 *)(&h->ss))->sin6_addr;
+			break;
+		default:
+			yyerror("unknown address family: %d", h->ss.ss_family);
+			return -1;
+		}
+		addrstr = inet_ntop(h->ss.ss_family, ia, buf, sizeof(buf));
+		if (addrstr) {
+			if (other_srv) {
+				yyerror("server %s: duplicate fcgi listen "
+				    "address %s:%d, already used by server %s",
+				    new_srv, addrstr, h->port, other_srv);
+			} else {
+				log_warnx("server: %s: duplicate fcgi listen "
+				    "address %s:%d", new_srv, addrstr, h->port);
+			}
+		} else {
+			if (other_srv) {
+				yyerror("server: %s: duplicate fcgi listen "
+				    "address, already used by server %s",
+				    new_srv, other_srv);
+			} else {
+				log_warnx("server %s: duplicate fcgi listen "
+				    "address", new_srv);
+			}
+		}
+
+		return -1;
+	}
+
+	return 0;
+}
+
+int
+add_addr(struct server *new_srv, struct address *h)
+{
+	struct server *srv;
+
+	/* Address cannot be shared between different servers. */
+	TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
+		if (srv == new_srv)
+			continue;
+		if (addr_dup_check(&srv->al, h, new_srv->name, srv->name))
+			return -1;
+	}
+
+	/* Tolerate duplicate address lines within the scope of a server. */
+	if (addr_dup_check(&new_srv->al, h, NULL, NULL) == 0)
+		TAILQ_INSERT_TAIL(&new_srv->al, h, entry);
+	else
+		free(h);
+
+	return 0;
 }
