@@ -72,7 +72,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	off_t outoff = 0;
 	int n;
 
-	if (lines && *lines && nlines > 0)
+	if (lines && *lines && *nlines > 0)
 		outoff = (*lines)[*nlines - 1].offset;
 	else if (lines) {
 		err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
