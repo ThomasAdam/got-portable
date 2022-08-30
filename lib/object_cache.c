@@ -298,7 +298,7 @@ print_cache_stats(struct got_object_cache *cache, const char *name)
 	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge);
 }
 
-const struct got_error *
+static const struct got_error *
 check_refcount(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_object_cache *cache = arg;
