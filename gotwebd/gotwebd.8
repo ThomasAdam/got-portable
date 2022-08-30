@@ -105,19 +105,35 @@ Directory for temporary files created by
 .Sh EXAMPLES
 Example configuration for httpd.conf:
 .Bd -literal -offset indent
-
   types { include "/usr/share/misc/mime.types" }
-  server "gotweb.example.com" {
-  	listen on * port 80
-  	root "/htdocs"
-        location "/gotwebd-unix/*" {
+
+  # one gotwebd reachable at http://gotweb1.example.com/
+  server "gotweb1.example.com" {
+        listen on * port 80
+        root "/htdocs/gotwebd"
+        location "/" {
+              fastcgi socket tcp localhost 9000
+        }
+  }
+
+  # hosting multiple gotwebd instances on the same HTTP server:
+  # http://gotweb2.example.com/gotwebd-unix/
+  # http://gotweb2.example.com/gotwebd-tcp/
+  server "gotweb2.example.com" {
+        listen on * port 80
+        location "/gotwebd-unix/" {
               fastcgi socket "/run/gotweb.sock"
         }
-        location "/gotwebd-tcp/*" {
+        location "/gotwebd-unix/*" {
+               root "/htdocs/gotwebd"
+               request strip 1
+        }
+        location "/gotwebd-tcp/" {
               fastcgi socket tcp 127.0.0.1 9000
         }
-        location "/*" {
-              directory index "index.html"
+        location "/gotwebd-tcp/*" {
+               root "/htdocs/gotwebd"
+               request strip 1
         }
   }
 .Ed
