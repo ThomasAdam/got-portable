@@ -108,7 +108,7 @@ static const struct got_error *gotweb_render_branches(struct request *);
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
 
-struct server *gotweb_get_server(uint8_t *, uint8_t *, uint8_t *);
+struct server *gotweb_get_server(uint8_t *, uint8_t *);
 
 void
 gotweb_process_request(struct request *c)
@@ -130,7 +130,7 @@ gotweb_process_request(struct request *c)
 	if (c->sock->client_status == CLIENT_DISCONNECT)
 		return;
 	/* get the gotwebd server */
-	srv = gotweb_get_server(c->server_name, c->document_root, c->http_host);
+	srv = gotweb_get_server(c->server_name, c->http_host);
 	if (srv == NULL) {
 		log_warnx("%s: error server is NULL", __func__);
 		goto err;
@@ -299,24 +299,17 @@ done:
 }
 
 struct server *
-gotweb_get_server(uint8_t *server_name, uint8_t *document_root,
-    uint8_t *subdomain)
+gotweb_get_server(uint8_t *server_name, uint8_t *subdomain)
 {
 	struct server *srv = NULL;
 
-	/* check against document_root first */
+	/* check against the server name first */
 	if (strlen(server_name) > 0)
 		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, server_name) == 0)
 				goto done;
 
-	/* check against document_root second */
-	if (strlen(document_root) > 0)
-		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
-			if (strcmp(srv->name, document_root) == 0)
-				goto done;
-
-	/* check against subdomain third */
+	/* check against subdomain second */
 	if (strlen(subdomain) > 0)
 		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, subdomain) == 0)
@@ -650,15 +643,7 @@ gotweb_render_header(struct request *c)
 {
 	struct server *srv = c->srv;
 	struct querystring *qs = c->t->qs;
-	char droot[PATH_MAX];
 	int r;
-
-	if (strlen(c->document_root) > 0) {
-		r = snprintf(droot, sizeof(droot), "/%s/", c->document_root);
-		if (r < 0 || (size_t)r >= sizeof(droot))
-			return got_error(GOT_ERR_NO_SPACE);
-	} else
-		strlcpy(droot, "/", sizeof(droot));
 
 	r = fcgi_printf(c, "<!doctype html>\n"
 	    "<html>\n"
@@ -689,22 +674,21 @@ gotweb_render_header(struct request *c)
 	    "</div>\n"		/* #header */
 	    "<div id='site_path'>\n"
 	    "<div id='site_link'>\n"
-	    "<a href='/%s?index_page=%d'>%s</a>",
+	    "<a href='?index_page=%d'>%s</a>",
 	    srv->site_name,
-	    droot, srv->custom_css,
+	    c->script_name, srv->custom_css,
 	    srv->logo_url,
-	    droot, srv->logo,
-	    c->document_root, qs->index_page, srv->site_link);
+	    c->script_name, srv->logo,
+	    qs->index_page, srv->site_link);
 	if (r == -1)
 		goto done;
 
 	if (qs != NULL) {
 		if (qs->path != NULL) {
 			r = fcgi_printf(c, " / "
-			    "<a href='/%s?index_page=%d&path=%s&action=summary'>"
+			    "<a href='?index_page=%d&path=%s&action=summary'>"
 			    "%s</a>",
-			    c->document_root, qs->index_page, qs->path,
-			    qs->path);
+			    qs->index_page, qs->path, qs->path);
 			if (r == -1)
 				goto done;
 		}

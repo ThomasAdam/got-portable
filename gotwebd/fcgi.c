@@ -274,19 +274,13 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 			bcopy(buf, c->http_host, val_len);
 			c->http_host[val_len] = '\0';
 		}
-		if (val_len < MAX_DOCUMENT_ROOT && strcmp(env_entry->val,
-		    "DOCUMENT_ROOT") == 0 && c->document_root[0] == '\0') {
-
-			/* drop first char, as it's always / */
-			dr_buf = &buf[1];
-
-			bcopy(dr_buf, c->document_root, val_len - 1);
-			c->document_root[val_len] = '\0';
+		if (val_len < MAX_SCRIPT_NAME && strcmp(env_entry->val,
+		    "SCRIPT_NAME") == 0 && c->script_name[0] == '\0') {
+			bcopy(dr_buf, c->script_name, val_len);
+			c->script_name[val_len] = '\0';
 		}
 		if (val_len < MAX_SERVER_NAME && strcmp(env_entry->val,
 		    "SERVER_NAME") == 0 && c->server_name[0] == '\0') {
-			/* drop first char, as it's always / */
-
 			bcopy(buf, c->server_name, val_len);
 			c->server_name[val_len] = '\0';
 		}
