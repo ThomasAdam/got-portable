@@ -2058,8 +2058,12 @@ gotweb_get_repo_description(char **description, struct server *srv, char *dir)
 		goto done;
 	}
 
-	if (len == 0)
+	if (len == 0) {
+		*description = strdup("");
+		if (*description == NULL)
+			return got_error_from_errno("strdup");
 		goto done;
+	}
 
 	if (fseek(f, 0, SEEK_SET) == -1) {
 		error = got_ferror(f, GOT_ERR_IO);
