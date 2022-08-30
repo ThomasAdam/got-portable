@@ -228,13 +228,14 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id,
 			got_object_raw_close(ce->data.raw);
 			break;
 		}
-		free(ce);
+		memset(ce, 0, sizeof(*ce));
 		cache->cache_evict++;
+	} else {
+		ce = malloc(sizeof(*ce));
+		if (ce == NULL)
+			return got_error_from_errno("malloc");
 	}
 
-	ce = malloc(sizeof(*ce));
-	if (ce == NULL)
-		return got_error_from_errno("malloc");
 	memcpy(&ce->id, id, sizeof(ce->id));
 	switch (cache->type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:
