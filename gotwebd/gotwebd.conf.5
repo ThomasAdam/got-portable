@@ -51,8 +51,6 @@ If not specified then
 will be used.
 .It Ic prefork Ar number
 Run the specified number of server processes.
-.It Ic fgci_socket Ar on | off
-Controls whether the server will listen on FCGI TCP sockets by default.
 .It Ic unix_socket Ar on | off
 Controls whether the servers will listen on unix sockets by default.
 .It Ic unix_socket_name Ar path
@@ -86,8 +84,6 @@ The available server configuration directives are as follows:
 .It Ic custom_css Ar path
 Set the path to a custom Cascading Style Sheet (CSS) to be used.
 If this option is not specified then a default style sheet will be used.
-.It Ic fgci_socket Ar on | off
-Enable or disable listening on FCGI TCP sockets.
 .It Ic listen on Ar address Ic port Ar number
 Configure an address and port for incoming FCGI TCP connections.
 Valid
@@ -193,7 +189,6 @@ server "localhost-unix" {
 #server "localhost-tcp" {
 #	repos_path "/got/public"
 #	unix_socket		off
-#	fcgi_socket		on
 #	listen on 127.0.0.1 port 9000
 #	listen on ::1 port 9000
 #}
