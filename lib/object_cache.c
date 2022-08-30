@@ -257,6 +257,8 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id,
 	err = got_object_idset_add(cache->idset, id, ce);
 	if (err)
 		free(ce);
+	else if (size > cache->max_cached_size)
+		cache->max_cached_size = size;
 	return err;
 }
 
@@ -292,10 +294,12 @@ static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
 	fprintf(stderr, "%s: %s cache: %d elements, %d searches, %d hits, "
-	    "%d missed, %d evicted, %d too large\n", getprogname(), name,
+	    "%d missed, %d evicted, %d too large, max cached %zd bytes\n",
+	    getprogname(), name,
 	    got_object_idset_num_elements(cache->idset),
 	    cache->cache_searches, cache->cache_hit,
-	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge);
+	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge,
+	    cache->max_cached_size);
 }
 
 static const struct got_error *

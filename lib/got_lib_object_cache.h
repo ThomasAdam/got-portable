@@ -42,6 +42,7 @@ struct got_object_cache {
 	int cache_miss;
 	int cache_evict;
 	int cache_toolarge;
+	size_t max_cached_size;
 };
 
 const struct got_error *got_object_cache_init(struct got_object_cache *,
