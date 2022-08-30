@@ -5157,7 +5157,7 @@ cmd_diff(int argc, char *argv[])
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
-	if (type1 == GOT_OBJ_TYPE_BLOB && argc > 0) {
+	if (type1 == GOT_OBJ_TYPE_BLOB && argc > 2) {
 		error = got_error_msg(GOT_ERR_OBJ_TYPE,
 		    "path arguments cannot be used when diffing blobs");
 		goto done;
