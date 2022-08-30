@@ -111,7 +111,13 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width blame
-.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
+.It Xo
+.Cm log
+.Op Fl b
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Op Ar path
+.Xc
 Display history of a repository.
 If a
 .Ar path
@@ -251,7 +257,14 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff Oo Fl aw Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Ar object1 Ar object2
+.It Xo
+.Cm diff
+.Op Fl aw
+.Op Fl C Ar number
+.Op Fl r Ar repository-path
+.Ar object1
+.Ar object2
+.Xc
 Display the differences between two objects in the repository.
 Treat each of the two arguments as a reference, a tag name, or an object
 ID SHA1 hash, and display differences between the corresponding objects.
@@ -365,7 +378,12 @@ work tree, use the repository path associated with this work tree.
 .It Fl w
 Ignore whitespace-only changes.
 .El
-.It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
+.It Xo
+.Cm blame
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Ar path
+.Xc
 Display line-by-line history of a file at the specified path.
 .Pp
 The key bindings for
@@ -459,7 +477,12 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
+.It Xo
+.Cm tree
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Op Ar path
+.Xc
 Display the repository tree.
 If a
 .Ar path
@@ -548,7 +571,7 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm ref Oo Fl r Ar repository-path Oc
+.It Cm ref Op Fl r Ar repository-path
 Display references in the repository.
 .Pp
 The key bindings for

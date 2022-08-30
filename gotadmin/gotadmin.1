@@ -64,7 +64,7 @@ the
 command must be used to populate the empty repository before
 .Cm got checkout
 can be used.
-.It Cm info Oo Fl r Ar repository-path Oc
+.It Cm info Op Fl r Ar repository-path
 Display information about a repository.
 This includes some configuration settings from
 .Xr got.conf 5 ,
@@ -83,7 +83,13 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm pack Oo Fl aq Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Op Ar reference ...
+.It Xo
+.Cm pack
+.Op Fl aq
+.Op Fl r Ar repository-path
+.Op Fl x Ar reference
+.Op Ar reference ...
+.Xc
 Generate a new pack file and a corresponding pack file index.
 By default, add any loose objects which are reachable via any references
 to the generated pack file.
@@ -164,7 +170,11 @@ The filename of the corresponding pack index is equivalent, except
 that it ends in
 .Pa .idx .
 .Tg ls
-.It Cm listpack Oo Fl hs Oc Ar packfile-path
+.It Xo
+.Cm listpack
+.Op Fl hs
+.Ar packfile-path
+.Xc
 .Dl Pq alias: Cm ls
 List the contents of the pack file at
 .Ar packfile-path .
@@ -201,7 +211,11 @@ This includes the total number of objects stored in the pack file
 and a break-down of the number of objects per object type.
 .El
 .Tg cl
-.It Cm cleanup Oo Fl anpq Oc Op Fl r Ar repository-path
+.It Xo
+.Cm cleanup
+.Op Fl anpq
+.Op Fl r Ar repository-path
+.Xc
 .Dl Pq alias: Cm cl
 Purge unreferenced loose objects from the repository and display
 the amount of disk space which has been freed as a result.
