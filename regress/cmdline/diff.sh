@@ -19,6 +19,7 @@
 test_diff_basic() {
 	local testroot=`test_init diff_basic`
 	local head_rev=`git_show_head $testroot/repo`
+	local alpha_blobid=`get_blob_id $testroot/repo "" alpha`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -385,6 +386,37 @@ test_diff_basic() {
 		diff -u $testroot/stderr.expected $testroot/stderr
 		return 1
 	fi
+
+	# diff two blob ids
+	(cd $testroot/wt && got commit -m 'edit' alpha >/dev/null)
+	local alpha_new_blobid=`get_blob_id $testroot/repo "" alpha`
+	(cd $testroot/wt && got diff $alpha_blobid $alpha_new_blobid) > $testroot/diff
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<EOF >$testroot/diff.expected
+blob - $alpha_blobid
+blob + $alpha_new_blobid
+--- $alpha_blobid
++++ $alpha_new_blobid
+@@ -1 +1 @@
+-alpha
++modified alpha
+EOF
+
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo
+		diff -u $testroot/diff.expected $testroot/diff
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
