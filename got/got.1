@@ -63,7 +63,14 @@ The commands for
 are as follows:
 .Bl -tag -width checkout
 .Tg im
-.It Cm import Oo Fl b Ar branch Oc Oo Fl I Ar pattern Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Ar directory
+.It Xo
+.Cm import
+.Op Fl b Ar branch
+.Op Fl I Ar pattern
+.Op Fl m Ar message
+.Op Fl r Ar repository-path
+.Ar directory
+.Xc
 .Dl Pq alias: Cm im
 Create an initial commit in a repository from the file hierarchy
 within the specified
@@ -124,7 +131,14 @@ If not specified, assume the repository is located at or above the current
 working directory.
 .El
 .Tg cl
-.It Cm clone Oo Fl almqv Oc Oo Fl b Ar branch Oc Oo Fl R Ar reference Oc Ar repository-URL Op Ar directory
+.It Xo
+.Cm clone
+.Op Fl almqv
+.Op Fl b Ar branch
+.Op Fl R Ar reference
+.Ar repository-URL
+.Op Ar directory
+.Xc
 .Dl Pq alias: Cm cl
 Clone a Git repository at the specified
 .Ar repository-URL
@@ -307,7 +321,14 @@ Multiple -v options increase the verbosity.
 The maximum is 3.
 .El
 .Tg fe
-.It Cm fetch Oo Fl adlqtvX Oc Oo Fl b Ar branch Oc Oo Fl R Ar reference Oc Oo Fl r Ar repository-path Oc Op Ar remote-repository
+.It Xo
+.Cm fetch
+.Op Fl adlqtvX
+.Op Fl b Ar branch
+.Op Fl R Ar reference
+.Op Fl r Ar repository-path
+.Op Ar remote-repository
+.Xc
 .Dl Pq alias: Cm fe
 Fetch new changes from a remote repository.
 If no
@@ -480,7 +501,15 @@ will generally be stored in pack files and may be removed separately with
 and Git's garbage collector.
 .El
 .Tg co
-.It Cm checkout Oo Fl Eq Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
+.It Xo
+.Cm checkout
+.Op Fl Eq
+.Op Fl b Ar branch
+.Op Fl c Ar commit
+.Op Fl p Ar path-prefix
+.Ar repository-path
+.Op Ar work-tree-path
+.Xc
 .Dl Pq alias: Cm co
 Copy files from a repository into a new work tree.
 Show the status of each affected file, using the following status codes:
@@ -545,7 +574,13 @@ will be checked out.
 Silence progress output.
 .El
 .Tg up
-.It Cm update Oo Fl q Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
+.It Xo
+.Cm update
+.Op Fl q
+.Op Fl b Ar branch
+.Op Fl c Ar commit
+.Op Ar path ...
+.Xc
 .Dl Pq alias: Cm up
 Update an existing work tree to a different
 .Ar commit .
@@ -643,7 +678,13 @@ branch will be used.
 Silence progress output.
 .El
 .Tg st
-.It Cm status Oo Fl I Oc Oo Fl S Ar status-codes Oc Oo Fl s Ar status-codes Oc Op Ar path ...
+.It Xo
+.Cm status
+.Op Fl I
+.Op Fl S Ar status-codes
+.Op Fl s Ar status-codes
+.Op Ar path ...
+.Xc
 .Dl Pq alias: Cm st
 Show the current modification status of files in a work tree,
 using the following status codes:
@@ -745,7 +786,17 @@ does not support negated ignore patterns prefixed with
 and gives no special significance to the location of path component separators,
 .Dq / ,
 in a pattern.
-.It Cm log Oo Fl bPpRs Oc Oo Fl C Ar number Oc Oo Fl c Ar commit Oc Oo Fl l Ar N Oc Oo Fl r Ar repository-path Oc Oo Fl S Ar search-pattern Oc Oo Fl x Ar commit Oc Op Ar path
+.It Xo
+.Cm log
+.Op Fl bPpRs
+.Op Fl C Ar number
+.Op Fl c Ar commit
+.Op Fl l Ar N
+.Op Fl r Ar repository-path
+.Op Fl S Ar search-pattern
+.Op Fl x Ar commit
+.Op Ar path
+.Xc
 Display history of a repository.
 If a
 .Ar path
@@ -847,7 +898,14 @@ This option has no effect if the specified
 is never traversed.
 .El
 .Tg di
-.It Cm diff Oo Fl aPsw Oc Oo Fl C Ar number Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar object1 Ar object2 | Ar path ...
+.It Xo
+.Cm diff
+.Op Fl aPsw
+.Op Fl C Ar number
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Op Ar object1 Ar object2 | Ar path ...
+.Xc
 .Dl Pq alias: Cm di
 When invoked within a work tree without any arguments, display all
 local changes in the work tree.
@@ -925,7 +983,12 @@ is invoked in a work tree.
 Ignore whitespace-only changes.
 .El
 .Tg bl
-.It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
+.It Xo
+.Cm blame
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Ar path
+.Xc
 .Dl Pq alias: Cm bl
 Display line-by-line history of a file at the specified path.
 .Pp
@@ -949,7 +1012,13 @@ If this directory is a
 work tree, use the repository path associated with this work tree.
 .El
 .Tg tr
-.It Cm tree Oo Fl iR Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
+.It Xo
+.Cm tree
+.Op Fl iR
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Op Ar path
+.Xc
 .Dl Pq alias: Cm tr
 Display a listing of files and directories at the specified
 directory path in the repository.
@@ -993,7 +1062,14 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm ref Oo Fl dlt Oc Oo Fl c Ar object Oc Oo Fl r Ar repository-path Oc Oo Fl s Ar reference Oc Op Ar name
+.It Xo
+.Cm ref
+.Op Fl dlt
+.Op Fl c Ar object 
+.Op Fl r Ar repository-path
+.Op Fl s Ar reference
+.Op Ar name
+.Xc
 Manage references in a repository.
 .Pp
 References may be listed, created, deleted, and changed.
@@ -1068,7 +1144,14 @@ Use of this option requires the
 option to be used as well.
 .El
 .Tg br
-.It Cm branch Oo Fl lnt Oc Oo Fl c Ar commit Oc Oo Fl d Ar name Oc Oo Fl r Ar repository-path Oc Op Ar name
+.It Xo
+.Cm branch
+.Op Fl lnt
+.Op Fl c Ar commit
+.Op Fl d Ar name
+.Op Fl r Ar repository-path
+.Op Ar name
+.Xc
 .Dl Pq alias: Cm br
 Create, list, or delete branches.
 .Pp
@@ -1172,7 +1255,15 @@ Use of this option requires the
 .Fl l
 option to be used as well.
 .El
-.It Cm tag Oo Fl lVv Oc Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl s Ar signer-id Oc Ar name
+.It Xo
+.Cm tag
+.Op Fl lVv
+.Op Fl c Ar commit
+.Op Fl m Ar message
+.Op Fl r Ar repository-path
+.Op Fl s Ar signer-id
+.Ar name
+.Xc
 Manage tags in a repository.
 .Pp
 Tags are managed via references which live in the
@@ -1276,7 +1367,11 @@ If a tag must be deleted, the
 command may be used to delete a tag's reference.
 This should only be done if the tag has not already been copied to
 another repository.
-.It Cm add Oo Fl IR Oc Ar path ...
+.It Xo
+.Cm add
+.Op Fl IR
+.Ar path ...
+.Xc
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
 By default, files which match a
@@ -1300,7 +1395,12 @@ will refuse to run if a specified
 is a directory.
 .El
 .Tg rm
-.It Cm remove Oo Fl fkR Oc Oo Fl s Ar status-codes Oc Ar path ...
+.It Xo
+.Cm remove
+.Op Fl fkR
+.Op Fl s Ar status-codes
+.Ar path ...
+.Xc
 .Dl Pq alias: Cm rm
 Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
@@ -1337,7 +1437,13 @@ option)
 .El
 .El
 .Tg pa
-.It Cm patch Oo Fl nR Oc Oo Fl c Ar commit Oc Oo Fl p Ar strip-count Oc Op Ar patchfile
+.It Xo
+.Cm patch
+.Op Fl nR
+.Op Fl c Ar commit
+.Op Fl p Ar strip-count
+.Op Ar patchfile
+.Xc
 .Dl Pq alias: Cm pa
 Apply changes from
 .Ar patchfile
@@ -1458,7 +1564,12 @@ will be recognized and stripped automatically.
 Reverse the patch before applying it.
 .El
 .Tg rv
-.It Cm revert Oo Fl pR Oc Oo Fl F Ar response-script Oc Ar path ...
+.It Xo
+.Cm revert
+.Op Fl pR
+.Op Fl F Ar response-script
+.Ar path ...
+.Xc
 .Dl Pq alias: Cm rv
 Revert any local changes in files at the specified paths in a work tree.
 File contents will be overwritten with those contained in the
@@ -1509,7 +1620,14 @@ will refuse to run if a specified
 is a directory.
 .El
 .Tg ci
-.It Cm commit Oo Fl NS Oc Oo Fl A Ar author Oc Oo Fl F Ar path Oc Oo Fl m Ar message Oc Op Ar path ...
+.It Xo
+.Cm commit
+.Op Fl NS
+.Op Fl A Ar author
+.Op Fl F Ar path
+.Op Fl m Ar message
+.Op Ar path ...
+.Xc
 .Dl Pq alias: Cm ci
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
@@ -1644,7 +1762,15 @@ If a path is found to be out of date,
 must be used first in order to merge local changes with changes made
 in the repository.
 .Tg se
-.It Cm send Oo Fl afqTv Oc Oo Fl b Ar branch Oc Oo Fl d Ar branch Oc Oo Fl r Ar repository-path Oc Oo Fl t Ar tag Oc Op Ar remote-repository
+.It Xo
+.Cm send
+.Op Fl afqTv
+.Op Fl b Ar branch
+.Op Fl d Ar branch
+.Op Fl r Ar repository-path
+.Op Fl t Ar tag
+.Op Ar remote-repository
+.Xc
 .Dl Pq alias: Cm se
 Send new changes to a remote repository.
 If no
@@ -1917,7 +2043,11 @@ to a single base commit with
 If any relevant files already contain merge conflicts, these
 conflicts must be resolved first.
 .Tg rb
-.It Cm rebase Oo Fl aclX Oc Op Ar branch
+.It Xo
+.Cm rebase
+.Op Fl aclX
+.Op Ar branch
+.Xc
 .Dl Pq alias: Cm rb
 Rebase commits on the specified
 .Ar branch
@@ -2118,7 +2248,12 @@ None of the other options can be used together with
 .Fl X .
 .El
 .Tg he
-.It Cm histedit Oo Fl aceflmX Oc Oo Fl F Ar histedit-script Oc Op Ar branch
+.It Xo
+.Cm histedit
+.Op Fl aceflmX
+.Op Fl F Ar histedit-script
+.Op Ar branch
+.Xc
 .Dl Pq alias: Cm he
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
@@ -2431,7 +2566,11 @@ committed with
 or reverted with
 .Cm got revert .
 .Tg mg
-.It Cm merge Oo Fl acn Oc Op Ar branch
+.It Xo
+.Cm merge
+.Op Fl acn
+.Op Ar branch
+.Xc
 .Dl Pq alias: Cm mg
 Create a merge commit based on the current branch of the work tree and
 the specified
@@ -2557,7 +2696,12 @@ Alternatively, the merge may be aborted with
 .Cm got merge -a .
 .El
 .Tg sg
-.It Cm stage Oo Fl lpS Oc Oo Fl F Ar response-script Oc Op Ar path ...
+.It Xo
+.Cm stage
+.Op Fl lpS
+.Op Fl F Ar response-script
+.Op Ar path ...
+.Xc
 .Dl Pq alias: Cm sg
 Stage local changes for inclusion in the next commit.
 If no
@@ -2673,7 +2817,12 @@ before it can be updated with
 .Cm got update ,
 and may then be staged again if necessary.
 .Tg ug
-.It Cm unstage Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
+.It Xo
+.Cm unstage
+.Op Fl p
+.Op Fl F Ar response-script
+.Op Ar path ...
+.Xc
 .Dl Pq alias: Cm ug
 Merge staged changes back into the work tree and put affected paths
 back into non-staged status.
@@ -2720,7 +2869,13 @@ If a file is staged in modified status, individual patches derived from the
 staged file content can be unstaged.
 Files staged in added or deleted status may only be unstaged in their entirety.
 .El
-.It Cm cat Oo Fl P Oc Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar arg ...
+.It Xo
+.Cm cat
+.Op Fl P
+.Op Fl c Ar commit
+.Op Fl r Ar repository-path
+.Ar arg ...
+.Xc
 Parse and print contents of objects to standard output in a line-based
 text format.
 Content of commit, tree, and tag objects is printed in a way similar
