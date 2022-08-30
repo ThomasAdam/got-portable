@@ -191,9 +191,6 @@ main		: PREFORK NUMBER {
 			}
 			free($2);
 		}
-		| FCGI_SOCKET boolean {
-			gotwebd->fcgi_socket = $2;
-		}
 		| UNIX_SOCKET boolean {
 			gotwebd->unix_socket = $2;
 		}
@@ -320,6 +317,7 @@ serveropts1	: REPOS_PATH STRING {
 				yyerror("could not get addrs");
 				YYERROR;
 			}
+			new_srv->fcgi_socket = 1;
 		}
 		| MAX_REPOS NUMBER {
 			if ($2 > 0)
@@ -346,9 +344,6 @@ serveropts1	: REPOS_PATH STRING {
 		| MAX_COMMITS_DISPLAY NUMBER {
 			if ($2 > 0)
 				new_srv->max_commits_display = $2;
-		}
-		| FCGI_SOCKET boolean {
-			new_srv->fcgi_socket = $2;
 		}
 		| UNIX_SOCKET boolean {
 			new_srv->unix_socket = $2;
@@ -416,7 +411,6 @@ lookup(char *s)
 	static const struct keywords keywords[] = {
 		{ "chroot",			CHROOT },
 		{ "custom_css",			CUSTOM_CSS },
-		{ "fcgi_socket",		FCGI_SOCKET },
 		{ "listen",			LISTEN },
 		{ "logo",			LOGO },
 		{ "logo_url"	,		LOGO_URL },
@@ -869,7 +863,7 @@ conf_new_server(const char *name)
 	srv->max_repos = D_MAXREPO;
 
 	srv->unix_socket = 1;
-	srv->fcgi_socket = gotwebd->fcgi_socket ? gotwebd->fcgi_socket : 0;
+	srv->fcgi_socket = 0;
 
 	TAILQ_INIT(&srv->al);
 	TAILQ_INSERT_TAIL(&gotwebd->servers, srv, entry);

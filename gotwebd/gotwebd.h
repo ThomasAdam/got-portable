@@ -334,8 +334,6 @@ struct gotwebd {
 
 	int		 unix_socket;
 	char		 unix_socket_name[PATH_MAX];
-
-	int		 fcgi_socket;
 };
 
 struct querystring {
