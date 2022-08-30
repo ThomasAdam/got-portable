@@ -503,7 +503,7 @@ test_log_end_at_commit() {
 
 	# got will refuse -x with a non-existent commit
 	(cd $testroot/wt && got log -x nonexistent \
-		> $testroot/stdout 2> $testroot/stderr) 
+		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2
@@ -530,9 +530,9 @@ test_log_end_at_commit() {
 
 	# try the same with the hash of an empty string which is very
 	# unlikely to match any object
-	local empty_sha1=da39a3ee5e6b4b0d3255bfef95601890afd80709 
+	local empty_sha1=da39a3ee5e6b4b0d3255bfef95601890afd80709
 	(cd $testroot/wt && got log -x $empty_sha1 \
-		> $testroot/stdout 2> $testroot/stderr) 
+		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "log command succeeded unexpectedly" >&2

@@ -827,7 +827,6 @@ load_tree_entries(struct got_object_id_queue *ids,
 			err = got_object_idset_add(traversed_ids, id, NULL);
 			if (err)
 				break;
-			
 		}
 		free(p);
 		p = NULL;
@@ -1010,7 +1009,7 @@ load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
 		    nloose, *ncommits, -1);
 		if (err)
 			break;
- 
+
 		if (commit) {
 			/* Find parent commits to scan. */
 			const struct got_object_id_queue *parent_ids;

@@ -815,7 +815,7 @@ const struct got_error *got_privsep_send_delta_reuse_req(struct imsgbuf *);
 const struct got_error *got_privsep_send_reused_deltas(struct imsgbuf *,
     struct got_imsg_reused_delta *, size_t);
 const struct got_error *got_privsep_send_reused_deltas_done(struct imsgbuf *);
-const struct got_error *got_privsep_recv_reused_deltas(int *, 
+const struct got_error *got_privsep_recv_reused_deltas(int *,
     struct got_imsg_reused_delta *, size_t *, struct imsgbuf *);
 
 const struct got_error *got_privsep_init_commit_painting(struct imsgbuf *);

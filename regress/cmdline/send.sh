@@ -54,7 +54,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -128,7 +128,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
@@ -178,7 +178,7 @@ EOF
 		test_done "$testroot" 1
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -258,7 +258,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -530,7 +530,7 @@ test_send_clone_and_send() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -629,7 +629,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -706,7 +706,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -771,7 +771,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	# overwrite the 1.0 tag only
 	got send -q -r $testroot/repo -t 1.0 -f > $testroot/stdout \
 		2> $testroot/stderr
@@ -781,7 +781,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	got tag -l -r $testroot/repo-clone | grep ^tag | sort > $testroot/stdout
 	echo "tag 1.0 $tag_id3" > $testroot/stdout.expected
 	echo "tag 2.0 $tag_id2" >> $testroot/stdout.expected
@@ -890,7 +890,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -994,7 +994,7 @@ test_send_new_branch() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -1230,7 +1230,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -1290,7 +1290,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
@@ -1473,7 +1473,7 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	got branch -r $testroot/repo foo
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr

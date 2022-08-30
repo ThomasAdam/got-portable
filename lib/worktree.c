@@ -1032,7 +1032,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	/* 
+	/*
 	 * In order the run a 3-way merge with a symlink we copy the symlink's
 	 * target path into a temporary file and use that file with diff3.
 	 */
@@ -3552,7 +3552,7 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 				    ignorespath);
 		} else {
 			ignoresfile = fdopen(fd, "r");
-			if (ignoresfile == NULL) 
+			if (ignoresfile == NULL)
 				err = got_error_from_errno2("fdopen",
 				    ignorespath);
 			else {
@@ -4096,7 +4096,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 			if (status == a->status_codes[i])
 				break;
 		}
-		if (i == ncodes) { 
+		if (i == ncodes) {
 			/* Do not delete files in non-matching status. */
 			free(ondisk_path);
 			return NULL;
@@ -4353,7 +4353,7 @@ apply_or_reject_change(int *choice, int *nchunks_used,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
 	const struct got_error *err = NULL;
-	struct diff_chunk_context cc = {}; 
+	struct diff_chunk_context cc = {};
 	int start_old, end_old, start_new, end_new;
 	FILE *hunkfile;
 	struct diff_output_unidiff_state *diff_state;
@@ -4560,7 +4560,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 
 	/* Count the number of actual changes in the diff result. */
 	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
-		struct diff_chunk_context cc = {}; 
+		struct diff_chunk_context cc = {};
 		diff_chunk_context_load_change(&cc, &nchunks_used,
 		    diffreg_result->result, n, 0);
 		nchanges++;
@@ -8542,7 +8542,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		if (err)
 			goto done;
 
-		/* 
+		/*
 		 * In order the run a 3-way merge with a symlink we copy the symlink's
 		 * target path into a temporary file and use that file with diff3.
 		 */

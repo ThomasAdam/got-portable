@@ -1162,7 +1162,7 @@ add_packidx_bloom_filter(struct got_repository *repo,
 		free(bf);
 		return got_error_from_errno("calloc");
 	}
-	
+
 	len = strlcpy(bf->path, path_packidx, sizeof(bf->path));
 	if (len >= sizeof(bf->path)) {
 		free(bf->bloom);
@@ -1432,7 +1432,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return got_error_from_errno("ftruncate");
 		if (ftruncate(repo->packs[i].accumfd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
-		memcpy(&tmp, &repo->packs[i], sizeof(tmp)); 
+		memcpy(&tmp, &repo->packs[i], sizeof(tmp));
 		memcpy(&repo->packs[i], &repo->packs[0],
 		    sizeof(repo->packs[i]));
 		memcpy(&repo->packs[0], &tmp, sizeof(repo->packs[0]));
@@ -2063,7 +2063,7 @@ import_subdir(struct got_tree_entry **new_te, struct dirent *de,
 	if (err)
 		goto done;
 	memcpy(&(*new_te)->id, id, sizeof((*new_te)->id));
-	
+
 done:
 	free(id);
 	free(subdirpath);

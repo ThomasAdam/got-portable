@@ -433,7 +433,7 @@ test_ref_list() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
-	done	
+	done
 
 	test_done "$testroot" "$ret"
 }

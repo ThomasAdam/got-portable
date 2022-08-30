@@ -1323,8 +1323,8 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
 	    remote_repo_path, branches ? "\tbranch { " : "",
-	    branches ? branches : "", branches ? "}\n" : "", 
-	    refs ? "\treference { " : "", refs ? refs : "", refs ? "}\n" : "", 
+	    branches ? branches : "", branches ? "}\n" : "",
+	    refs ? "\treference { " : "", refs ? refs : "", refs ? "}\n" : "",
 	    mirror_references ? "\tmirror_references yes\n" : "",
 	    fetch_all_branches ? "\tfetch_all_branches yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
@@ -2125,7 +2125,7 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 
 			their_refname = local_refname;
 		}
-	
+
 		TAILQ_FOREACH(pe, their_refs, entry) {
 			if (strcmp(their_refname, pe->path) == 0)
 				break;
@@ -2597,7 +2597,7 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(remote_refname, id, 
+				error = create_ref(remote_refname, id,
 				    verbosity, repo);
 				if (error)
 					goto done;
@@ -4126,7 +4126,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 	printf(GOT_COMMIT_SEP_STR);
 	if (custom_refs_str)
-		printf("commit %s (%s)\n", id_str, custom_refs_str); 
+		printf("commit %s (%s)\n", id_str, custom_refs_str);
 	else
 		printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
 		    refs_str ? refs_str : "", refs_str ? ")" : "");
@@ -8403,7 +8403,6 @@ done:
 		*logmsg = NULL;
 	}
 	return err;
-	
 }
 
 static const struct got_error *

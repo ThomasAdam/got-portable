@@ -270,7 +270,7 @@ test_cherrypick_into_work_tree_with_mixed_commits() {
 	local first_rev=`git_show_head $testroot/repo`
 
 	echo "modified alpha" > $testroot/repo/alpha
-	git_commit $testroot/repo -m "committing to alpha" 
+	git_commit $testroot/repo -m "committing to alpha"
 	local second_rev=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1308,7 +1308,6 @@ got_ref_list_free(struct got_reflist_head *refs)
                 TAILQ_REMOVE(refs, re, entry);
                 free(re);
         }
-
 }
 EOF
 	(cd $testroot/repo && git add reference.c)
@@ -1369,7 +1368,7 @@ EOF
 +                got_ref_close(re->ref);
                  free(re);
          }
- 
+ }
 EOF
 	(cd $testroot/wt && got diff |
 		egrep -v '^(diff|blob|file|commit|path)' > $testroot/diff)

@@ -566,7 +566,7 @@ test_status_cvsignore() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-		
+
 	echo -n '' > $testroot/stdout.expected
 	(cd $testroot/wt && got status epsilon/new > $testroot/stdout)
 

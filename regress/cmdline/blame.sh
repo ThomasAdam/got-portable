@@ -579,7 +579,7 @@ blob + c787aadf05e2afab61bd34976f7349912252e6da
 @@ -14,5 +14,22 @@
   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   */
- 
+
 +/*
 + * Write an annotated version of a file at a given in-repository path,
 + * as found in the commit specified by ID, to the specified output file.
@@ -658,7 +658,7 @@ blob + 6075cadbd177e1802679c7353515bf4ceebb51d0
 +++ got_blame.h
 @@ -15,14 +15,7 @@
   */
- 
+
  /*
 - * Write an annotated version of a file at a given in-repository path,
 - * as found in the commit specified by ID, to the specified output file.
