@@ -497,7 +497,7 @@ add_meta(struct got_pack_meta *m, struct got_pack_metavec *v)
 		if (new == NULL)
 			return got_error_from_errno("reallocarray");
 		v->meta = new;
-		v->metasz = newsize; 
+		v->metasz = newsize;
 	}
 
 	v->meta[v->nmeta++] = m;
@@ -1740,7 +1740,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
 		if (err)
 			goto done;
-	}		
+	}
 
 	for (i = 0; i < ntail; i++) {
 		struct got_object_id *id = tail[i];

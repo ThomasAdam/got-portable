@@ -215,7 +215,7 @@ proc_init(struct privsep *ps, struct privsep_proc *procs, unsigned int nproc,
 		proc_setup(ps, procs, nproc);
 
 		/*
-		 * Create the children sockets so we can use them 
+		 * Create the children sockets so we can use them
 		 * to distribute the rest of the socketpair()s using
 		 * proc_connect() later.
 		 */

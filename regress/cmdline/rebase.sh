@@ -971,7 +971,7 @@ test_rebase_forward() {
 		> /dev/null)
 	local commit2=`git_show_head $testroot/repo`
 
-	# Simulate a situation where fast-forward is required. 
+	# Simulate a situation where fast-forward is required.
 	# We want to fast-forward master to origin/master:
 	# commit 3907e11dceaae2ca7f8db79c2af31794673945ad (origin/master)
 	# commit ffcffcd102cf1af6572fbdbb4cf07a0f1fd2d840 (master)

@@ -16,7 +16,7 @@
 
 /*
  * Git-compatible lock file implementation. Lock files are used to
- * ensure exclusive access when files in a GIt repository are modified. 
+ * ensure exclusive access when files in a Git repository are modified.
  */
 
 #define GOT_LOCKFILE_SUFFIX ".lock"

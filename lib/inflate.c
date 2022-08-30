@@ -347,7 +347,7 @@ done:
 
 const struct got_error *
 got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
-    size_t *consumed_total, struct got_inflate_checksum *csum, 
+    size_t *consumed_total, struct got_inflate_checksum *csum,
     size_t expected_size, int infd)
 {
 	const struct got_error *err;

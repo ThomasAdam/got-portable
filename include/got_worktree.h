@@ -530,7 +530,7 @@ typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
     struct got_object_id *commit_id);
 
-/* 
+/*
  * Report work-tree meta data for paths in the work tree.
  * The info callback will be invoked with the provided void * argument,
  * a path, and meta-data arguments (see got_worktree_path_info_cb).

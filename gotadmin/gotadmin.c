@@ -980,7 +980,7 @@ list_pack_cb(void *arg, struct got_object_id *id, int type, off_t offset,
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 		type_str = "ref-delta";
-		err = got_object_id_str(&base_id_str, base_id);	
+		err = got_object_id_str(&base_id_str, base_id);
 		if (err)
 			goto done;
 		if (asprintf(&delta_str, " base-id %s", base_id_str) == -1) {

@@ -75,10 +75,10 @@ struct got_indexed_object {
 	uint64_t size;
 
 	/* Length of on-disk type+size data. */
-	size_t tslen; 
+	size_t tslen;
 
 	/* Length of object data following type+size. */
-	size_t len; 
+	size_t len;
 
 	uint32_t crc;
 
@@ -499,7 +499,7 @@ print_packidx(struct got_packidx *packidx)
 		uint32_t offset = be32toh(packidx->hdr.offsets[i]);
 		if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
 			int j = offset & GOT_PACKIDX_OFFSET_VAL_MASK;
-			fprintf(stderr, "%u -> %llu\n", offset, 
+			fprintf(stderr, "%u -> %llu\n", offset,
 			    be64toh(packidx->hdr.large_offsets[j]));
 		} else
 			fprintf(stderr, "%u\n", offset);

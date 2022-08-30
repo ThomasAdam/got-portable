@@ -119,7 +119,7 @@ recv_packfd(int *packfd, struct imsgbuf *ibuf)
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
-		
+
 	if (imsg.hdr.type == GOT_IMSG_STOP) {
 		err = got_error(GOT_ERR_CANCELLED);
 		goto done;

@@ -166,7 +166,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 
 	if (set->totelem == UINT_MAX)
 		return got_error(GOT_ERR_NO_SPACE);
-		
+
 	err = got_object_qid_alloc_partial(&qid);
 	if (err)
 		return err;

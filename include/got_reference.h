@@ -185,7 +185,7 @@ struct got_reflist_object_id_map;
  * The caller must dispose of the map with got_reflist_object_id_map_free().
  */
 const struct got_error *got_reflist_object_id_map_create(
-    struct got_reflist_object_id_map **, struct got_reflist_head *, 
+    struct got_reflist_object_id_map **, struct got_reflist_head *,
     struct got_repository *);
 
 /*

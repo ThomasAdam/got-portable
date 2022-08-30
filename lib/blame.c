@@ -62,7 +62,7 @@ struct got_blame {
 	 * These change with every traversed commit. After diffing
 	 * commits N:N-1, in preparation for diffing commits N-1:N-2,
 	 * data for commit N is retained and flipped into data for N-1.
-	 * 
+	 *
 	 */
 	FILE *f1; /* older version from commit N-1. */
 	FILE *f2; /* newer version from commit N. */
@@ -473,7 +473,7 @@ flip_files(struct got_blame *blame)
 
 	err = got_opentemp_truncate(blame->f2);
 	if (err)
-		return err; 
+		return err;
 	tmp = blame->f2;
 	blame->f2 = blame->f1;
 	blame->f1 = tmp;

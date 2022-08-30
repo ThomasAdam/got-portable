@@ -77,7 +77,7 @@ match_remote_ref(struct got_pathlist_head *have_refs,
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		struct got_object_id *id = pe->data;
-		if (strcmp(pe->path, refname) == 0) { 
+		if (strcmp(pe->path, refname) == 0) {
 			memcpy(my_id, id, sizeof(*my_id));
 			break;
 		}

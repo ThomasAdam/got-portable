@@ -246,7 +246,7 @@ done:
 			*diffreg_result = NULL;
 		}
 	}
-	
+
 	return err;
 }
 

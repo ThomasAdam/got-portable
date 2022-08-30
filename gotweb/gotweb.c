@@ -268,7 +268,7 @@ static const struct gw_query_action gw_query_funcs[] = {
 	{ GW_TREE,	"tree",		gw_tree,	"gw_tmpl/tree.tmpl" },
 };
 
-static const char * 
+static const char *
 gw_get_action_name(struct gw_trans *gw_trans)
 {
 	return gw_query_funcs[gw_trans->action].func_name;
@@ -4503,7 +4503,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans, struct gw_header *header)
 			href_blame = khttp_urlpart(NULL, NULL, "gotweb", "path",
 			    gw_trans->repo_name, "action", "blame", "commit",
 			    gw_trans->commit_id, "file",
-			    got_tree_entry_get_name(te), "folder", 
+			    got_tree_entry_get_name(te), "folder",
 			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 			    NULL);
 			if (href_blame == NULL) {

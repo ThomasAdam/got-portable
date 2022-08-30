@@ -240,7 +240,7 @@ int got_object_tree_entry_is_symlink(struct got_tree_entry *);
  * corresponding to the specified commit. If the specified path is not
  * a symlink then set *link_target to NULL.
  * Otherwise, resolve symlinks recursively and return the final link
- * target path. The caller must dispose of it with free(3). 
+ * target path. The caller must dispose of it with free(3).
  */
 const struct got_error *got_object_resolve_symlinks(char **, const char *,
     struct got_commit_object *, struct got_repository *);

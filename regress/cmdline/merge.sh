@@ -52,7 +52,7 @@ test_merge_basic() {
 		return 1
 	fi
 
-	# need a divergant commit on the main branch for 'got merge' 
+	# need a divergant commit on the main branch for 'got merge'
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
@@ -82,7 +82,7 @@ test_merge_basic() {
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
@@ -110,7 +110,7 @@ test_merge_basic() {
 		return 1
 	fi
 
-	# must not use a mixed-commit work tree with 'got merge' 
+	# must not use a mixed-commit work tree with 'got merge'
 	(cd $testroot/wt && got update -c $commit0 alpha > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -146,7 +146,7 @@ test_merge_basic() {
 		return 1
 	fi
 
-	# must not have staged files with 'got merge' 
+	# must not have staged files with 'got merge'
 	echo "modified file alpha"  > $testroot/wt/alpha
 	(cd $testroot/wt && got stage alpha > /dev/null)
 	ret=$?
@@ -179,7 +179,7 @@ test_merge_basic() {
 		return 1
 	fi
 
-	# must not have local changes with 'got merge' 
+	# must not have local changes with 'got merge'
 	(cd $testroot/wt && got merge newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
@@ -406,7 +406,7 @@ test_merge_continue() {
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -631,7 +631,7 @@ test_merge_abort() {
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -812,7 +812,7 @@ test_merge_in_progress() {
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -916,7 +916,7 @@ test_merge_path_prefix() {
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -970,7 +970,7 @@ test_merge_missing_file() {
 	git_commit $testroot/repo -m "moving alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1053,7 +1053,7 @@ test_merge_no_op() {
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1271,7 +1271,7 @@ test_merge_interrupt() {
 	git_commit $testroot/repo -m "committing to beta on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	# need an up-to-date work tree for 'got merge' 
+	# need an up-to-date work tree for 'got merge'
 	(cd $testroot/wt && got update > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then

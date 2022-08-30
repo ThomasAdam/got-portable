@@ -422,7 +422,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
- 
+
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1) {
 		err = got_error_from_errno("socketpair");
 		goto done;

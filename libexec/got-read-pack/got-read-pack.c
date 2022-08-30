@@ -851,7 +851,7 @@ get_base_object_id(struct got_object_id *base_id, struct got_packidx *packidx,
 	const struct got_error *err;
 	int idx;
 
-	err = got_packidx_get_offset_idx(&idx, packidx, base_offset); 
+	err = got_packidx_get_offset_idx(&idx, packidx, base_offset);
 	if (err)
 		return err;
 	if (idx == -1)
@@ -1727,7 +1727,7 @@ commit_painting_free(struct got_object_idset **keep,
 		*drop = NULL;
 	}
 	if (*skip) {
-		got_object_idset_free(*skip); 
+		got_object_idset_free(*skip);
 		*skip = NULL;
 	}
 }

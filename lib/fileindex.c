@@ -1205,7 +1205,7 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
 
 	TAILQ_INIT(&dirlist);
 
-	/* 
+	/*
 	 * Duplicate the file descriptor so we can call closedir() below
 	 * without closing the file descriptor passed in by our caller.
 	 */

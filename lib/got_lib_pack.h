@@ -73,7 +73,7 @@ struct got_packidx_v2_hdr {
 #define GOT_PACKIDX_V2_MAGIC 0xff744f63	/* "\377t0c" */
 	uint32_t	*version;
 
-	/* 
+	/*
 	 * Each entry N in the fanout table contains the number of objects in
 	 * the packfile whose SHA1 begins with a byte less than or equal to N.
 	 * The last entry (index 255) contains the number of objects in the
@@ -132,7 +132,7 @@ struct got_packfile_hdr {
 };
 
 struct got_packfile_obj_hdr {
-	/* 
+	/*
 	 * The object size field uses a variable length encoding:
 	 * size0...sizeN form a 4+7+7+...+7 bit integer, where size0 is the
 	 * least significant part and sizeN is the most significant part.
@@ -161,7 +161,7 @@ struct got_packfile_object_data_ref_delta {
 
 /* If object is of type GOT_OBJ_TYPE_OFFSET_DELTA. */
 struct got_packfile_object_data_offset_delta {
-	/* 
+	/*
 	 * This offset is interpreted as a negative offset from
 	 * the got_packfile_obj_hdr corresponding to this object.
 	 * The size provided in the header specifies the amount

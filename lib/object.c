@@ -177,7 +177,7 @@ pack_child_send_tempfiles(struct imsgbuf *ibuf, struct got_pack *pack)
 	const struct got_error *err;
 	int basefd = -1, accumfd = -1;
 
-	/* 
+	/*
 	 * For performance reasons, the child will keep reusing the
 	 * same temporary files during every object request.
 	 * Opening and closing new files for every object request is
@@ -888,7 +888,7 @@ got_object_id_queue_copy(const struct got_object_id_queue *src,
 		 * Deep-copy the object ID only. Let the caller deal
 		 * with setting up the new->data pointer if needed.
 		 */
-		err = got_object_qid_alloc(&new, &qid->id); 
+		err = got_object_qid_alloc(&new, &qid->id);
 		if (err) {
 			got_object_id_queue_free(dest);
 			return err;

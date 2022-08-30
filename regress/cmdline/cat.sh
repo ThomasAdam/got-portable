@@ -70,7 +70,6 @@ test_cat_basic() {
 	# TODO: test cat tag
 
 	test_done "$testroot" "$ret"
-	
 }
 
 test_cat_path() {

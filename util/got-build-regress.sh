@@ -38,7 +38,7 @@ while [ $# -ne 0 ]; do
 			force=1; shift;;
 		-w)
 			worktree="$2"; shift; shift;;
-		-r)	
+		-r)
 			fromaddr_arg="-r $2"; shift; shift;;
 		-R)
 			testroot="$2"; shift; shift;;
