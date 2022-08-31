@@ -83,8 +83,6 @@ got_gotweb_flushfile(FILE *f, int fd)
 static const struct got_error *
 got_gotweb_openfile(FILE **f, int *priv_fd, int *fd)
 {
-	const struct got_error *error = NULL;
-
 	*fd = dup(*priv_fd);
 
 	if (*fd < 0)
@@ -93,29 +91,26 @@ got_gotweb_openfile(FILE **f, int *priv_fd, int *fd)
 	*f = fdopen(*fd, "w+");
 	if (*f == NULL) {
 		close(*fd);
-		error = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 	}
 
-	return error;
+	return NULL;
 }
 
 static const struct got_error *
 got_gotweb_dupfd(int *priv_fd, int *fd)
 {
-	const struct got_error *error = NULL;
-
 	*fd = dup(*priv_fd);
 
 	if (*fd < 0)
 		return NULL;
 
-	return error;
+	return NULL;
 }
 
 const struct got_error *
 got_get_repo_owner(char **owner, struct request *c, char *dir)
 {
-	const struct got_error *error = NULL;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct got_repository *repo = t->repo;
@@ -136,7 +131,7 @@ got_get_repo_owner(char **owner, struct request *c, char *dir)
 		if (*owner == NULL)
 			return got_error_from_errno("strdup");
 	}
-	return error;
+	return NULL;
 }
 
 const struct got_error *
@@ -1630,8 +1625,6 @@ done:
 static const struct got_error *
 got_init_repo_commit(struct repo_commit **rc)
 {
-	const struct got_error *error = NULL;
-
 	*rc = calloc(1, sizeof(**rc));
 	if (*rc == NULL)
 		return got_error_from_errno2("%s: calloc", __func__);
@@ -1645,14 +1638,12 @@ got_init_repo_commit(struct repo_commit **rc)
 	(*rc)->tree_id = NULL;
 	(*rc)->commit_msg = NULL;
 
-	return error;
+	return NULL;
 }
 
 static const struct got_error *
 got_init_repo_tag(struct repo_tag **rt)
 {
-	const struct got_error *error = NULL;
-
 	*rt = calloc(1, sizeof(**rt));
 	if (*rt == NULL)
 		return got_error_from_errno2("%s: calloc", __func__);
@@ -1663,5 +1654,5 @@ got_init_repo_tag(struct repo_tag **rt)
 	(*rt)->commit_msg = NULL;
 	(*rt)->tagger = NULL;
 
-	return error;
+	return NULL;
 }
