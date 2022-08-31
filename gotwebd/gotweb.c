@@ -1156,7 +1156,7 @@ gotweb_render_blame(struct request *c)
 	    "</div>\n"		/* #blame_header_wrapper */
 	    "<div class='dotted_line'></div>\n"
 	    "<div id='blame'>\n",
-	    age ? age : "",
+	    age,
 	    msg);
 	if (r == -1)
 		goto done;
@@ -1168,6 +1168,7 @@ gotweb_render_blame(struct request *c)
 	fcgi_printf(c, "</div>\n"	/* #blame */
 	    "</div>\n");		/* #blame_content */
 done:
+	free(age);
 	free(msg);
 	return error;
 }
@@ -1228,7 +1229,7 @@ gotweb_render_briefs(struct request *c)
 		    "<div class='briefs_log'>"
 		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s"
 		    "&headref=%s'>%s</a>",
-		    age ? age : "",
+		    age,
 		    author,
 		    index_page_str, repo_dir->name, rc->commit_id, qs->headref,
 		    msg);
@@ -1337,7 +1338,7 @@ gotweb_render_commits(struct request *c)
 		    "<div class='commit'>\n%s</div>\n",
 		    rc->commit_id,
 		    author,
-		    age ? age : "",
+		    age,
 		    msg);
 		if (r == -1)
 			goto done;
@@ -1511,7 +1512,7 @@ gotweb_render_tree(struct request *c)
 	    "<div class='dotted_line'></div>\n"
 	    "<div id='tree'>\n",
 	    rc->tree_id,
-	    age ? age : "",
+	    age,
 	    msg);
 	if (r == -1)
 		goto done;
@@ -1523,6 +1524,7 @@ gotweb_render_tree(struct request *c)
 	fcgi_printf(c, "</div>\n"); /* #tree */
 	fcgi_printf(c, "</div>\n"); /* #tree_content */
 done:
+	free(age);
 	free(msg);
 	return error;
 }
@@ -1578,7 +1580,7 @@ gotweb_render_diff(struct request *c)
 	    rc->commit_id,
 	    rc->tree_id,
 	    author,
-	    age ? age : "",
+	    age,
 	    msg);
 	if (r == -1)
 		goto done;
@@ -1724,7 +1726,7 @@ gotweb_render_tag(struct request *c)
 	    rt->commit_id,
 	    tagname,
 	    author,
-	    age ? age : "",
+	    age,
 	    msg,
 	    rt->tag_commit);
 
@@ -1817,7 +1819,7 @@ gotweb_render_tags(struct request *c)
 		    "</div>\n"	/* .navs */
 		    "</div>\n"	/* .navs_wrapper */
 		    "<div class='dotted_line'></div>\n",
-		    age ? age : "",
+		    age,
 		    tagname,
 		    index_page_str, repo_dir->name, rt->commit_id,
 		    msg ? msg : "",
