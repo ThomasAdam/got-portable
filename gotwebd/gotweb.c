@@ -968,7 +968,7 @@ gotweb_render_index(struct request *c)
 
 		if (lstat(c_path, &st) == 0 && S_ISDIR(st.st_mode) &&
 		    !got_path_dir_is_empty(c_path))
-		t->repos_total++;
+			t->repos_total++;
 		free(c_path);
 		c_path = NULL;
 	}
