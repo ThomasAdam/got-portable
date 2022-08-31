@@ -390,7 +390,8 @@ test_diff_basic() {
 	# diff two blob ids
 	(cd $testroot/wt && got commit -m 'edit' alpha >/dev/null)
 	local alpha_new_blobid=`get_blob_id $testroot/repo "" alpha`
-	(cd $testroot/wt && got diff $alpha_blobid $alpha_new_blobid) > $testroot/diff
+	(cd $testroot/wt && got diff $alpha_blobid $alpha_new_blobid) \
+		> $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "diff failed unexpectedly" >&2
