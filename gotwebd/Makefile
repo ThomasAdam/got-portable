@@ -49,7 +49,7 @@ realinstall:
 	if [ ! -d ${DESTDIR}${PROG_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${PROG_DIR}; \
 	fi
-	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0644 \
 	    ${.CURDIR}/files/htdocs/${PROG}/* ${DESTDIR}${PROG_DIR}
 
 .include <bsd.prog.mk>
