@@ -38,13 +38,7 @@ tog:
 - make it possible to view the contents of tag objects
 - verify signed tag objects
 
-gotweb:
-- man pages need to be written
-- gotwebd always listens on 0.0.0.0 and/or ::, even in case the
-  config says "bind interface lo0"; it should be possible to bind
-  gotwebd's TCP socket to localhost only
-- gotwebd.conf should allow binding to one or more IP addresses
-- it should be possible to select an address family with "bind interface"
+gotwebd:
 - run-time changes of addresses on interfaces are being ignored by gotwebd
 - perhaps "bind interface" should be removed in favour of using only IP
   addresses? This makes the address family selection explicit and avoids
