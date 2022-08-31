@@ -84,9 +84,8 @@ static const struct got_error *
 got_gotweb_openfile(FILE **f, int *priv_fd, int *fd)
 {
 	*fd = dup(*priv_fd);
-
-	if (*fd < 0)
-		return NULL;
+	if (*fd == -1)
+		return got_error_from_errno("dup");
 
 	*f = fdopen(*fd, "w+");
 	if (*f == NULL) {
