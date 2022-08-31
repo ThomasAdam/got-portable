@@ -39,6 +39,7 @@ tog:
 - verify signed tag objects
 
 gotwebd:
+- gotwebd should display the committer field if it differs from the author
 - run-time changes of addresses on interfaces are being ignored by gotwebd
 - perhaps "bind interface" should be removed in favour of using only IP
   addresses? This makes the address family selection explicit and avoids
