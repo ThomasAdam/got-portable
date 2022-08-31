@@ -867,6 +867,7 @@ got_repo_close(struct got_repository *repo)
 	    &repo->packidx_bloom_filters))) {
 		RB_REMOVE(got_packidx_bloom_filter_tree,
 		    &repo->packidx_bloom_filters, bf);
+		bloom_free(bf->bloom);
 		free(bf->bloom);
 		free(bf);
 	}
