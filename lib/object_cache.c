@@ -297,7 +297,7 @@ print_cache_stats(struct got_object_cache *cache, const char *name)
 	fprintf(stderr, "%s: %s cache: %d elements, %d searches, %d hits, "
 	    "%d missed, %d evicted, %d too large, max cached %zd bytes\n",
 	    getprogname(), name,
-	    got_object_idset_num_elements(cache->idset),
+	    cache->idset ? got_object_idset_num_elements(cache->idset) : -1,
 	    cache->cache_searches, cache->cache_hit,
 	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge,
 	    cache->max_cached_size);
@@ -382,7 +382,8 @@ got_object_cache_close(struct got_object_cache *cache)
 		break;
 	}
 
-	got_object_idset_for_each(cache->idset, check_refcount, cache);
+	if (cache->idset)
+		got_object_idset_for_each(cache->idset, check_refcount, cache);
 #endif
 
 	if (cache->idset) {
