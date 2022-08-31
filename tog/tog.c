@@ -4692,14 +4692,14 @@ show_diff_view(struct tog_view *view)
 		err = got_object_id_str(&id_str1, s->id1);
 		if (err)
 			return err;
-		label1 = s->label1 ? : id_str1;
+		label1 = s->label1 ? s->label1 : id_str1;
 	} else
 		label1 = "/dev/null";
 
 	err = got_object_id_str(&id_str2, s->id2);
 	if (err)
 		return err;
-	label2 = s->label2 ? : id_str2;
+	label2 = s->label2 ? s->label2 : id_str2;
 
 	if (asprintf(&header, "diff %s %s", label1, label2) == -1) {
 		err = got_error_from_errno("asprintf");
