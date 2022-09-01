@@ -538,8 +538,10 @@ void
 gotweb_free_repo_tag(struct repo_tag *rt)
 {
 	if (rt != NULL) {
-		free(rt->commit_msg);
 		free(rt->commit_id);
+		free(rt->tag_name);
+		free(rt->tag_commit);
+		free(rt->commit_msg);
 		free(rt->tagger);
 	}
 	free(rt);
