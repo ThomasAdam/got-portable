@@ -227,8 +227,7 @@ got_get_repo_commit(struct request *c, struct repo_commit *repo_commit,
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0) {
 			name += 8;
-			s = strstr(name, "/" GOT_REF_HEAD);
-			if (s != NULL && s[strlen(s)] == '\0')
+			if (strstr(name, "/" GOT_REF_HEAD) != NULL)
 				continue;
 		}
 		error = got_ref_resolve(&ref_id, t->repo, re->ref);
@@ -523,10 +522,6 @@ got_get_repo_commits(struct request *c, int limit)
 					got_object_commit_close(commit);
 					commit = NULL;
 				}
-				if (t->next_id == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
 				TAILQ_REMOVE(&t->repo_commits, new_repo_commit,
 				    entry);
 				gotweb_free_repo_commit(new_repo_commit);
@@ -584,9 +579,6 @@ got_get_repo_tags(struct request *c, int limit)
 	if (asprintf(&repo_path, "%s/%s", srv->repos_path,
 	    repo_dir->name) == -1)
 		return got_error_from_errno("asprintf");
-
-	if (error)
-		return error;
 
 	if (qs->commit == NULL && qs->action == TAGS) {
 		error = got_ref_open(&ref, repo, qs->headref, 0);
@@ -723,10 +715,6 @@ got_get_repo_tags(struct request *c, int limit)
 			if (commit) {
 				got_object_commit_close(commit);
 				commit = NULL;
-			}
-			if (t->next_id == NULL) {
-				error = got_error_from_errno("strdup");
-				goto err;
 			}
 			TAILQ_REMOVE(&t->repo_tags, new_repo_tag, entry);
 			gotweb_free_repo_tag(new_repo_tag);

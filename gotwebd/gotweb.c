@@ -606,10 +606,8 @@ gotweb_free_transport(struct transport *t)
 	}
 	gotweb_free_repo_dir(t->repo_dir);
 	gotweb_free_querystring(t->qs);
-	if (t != NULL) {
-		free(t->next_id);
-		free(t->prev_id);
-	}
+	free(t->next_id);
+	free(t->prev_id);
 	free(t);
 }
 
