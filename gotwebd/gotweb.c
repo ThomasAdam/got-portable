@@ -940,7 +940,7 @@ gotweb_render_index(struct request *c)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = NULL;
 	DIR *d;
-	struct dirent **sd_dent;
+	struct dirent **sd_dent = NULL;
 	const char *index_page_str;
 	char *c_path = NULL;
 	struct stat st;
@@ -957,6 +957,7 @@ gotweb_render_index(struct request *c)
 
 	d_cnt = scandir(srv->repos_path, &sd_dent, NULL, alphasort);
 	if (d_cnt == -1) {
+		sd_dent = NULL;
 		error = got_error_from_errno2("scandir", srv->repos_path);
 		goto done;
 	}
@@ -1119,6 +1120,11 @@ render:
 	if (error)
 		goto done;
 done:
+	if (sd_dent) {
+		for (d_i = 0; d_i < d_cnt; d_i++)
+			free(sd_dent[d_i]);
+		free(sd_dent);
+	}
 	if (d != NULL && closedir(d) == EOF && error == NULL)
 		error = got_error_from_errno("closedir");
 	return error;
