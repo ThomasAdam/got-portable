@@ -652,13 +652,13 @@ gotweb_render_header(struct request *c)
 	    "<meta name='msapplication-TileColor' content='#da532c' />\n"
 	    "<meta name='theme-color' content='#ffffff'/>\n"
 	    "<link rel='apple-touch-icon' sizes='180x180'"
-	    " href='/apple-touch-icon.png' />\n"
+	    " href='%sapple-touch-icon.png' />\n"
 	    "<link rel='icon' type='image/png' sizes='32x32'"
-	    " href='/favicon-32x32.png' />\n"
+	    " href='%sfavicon-32x32.png' />\n"
 	    "<link rel='icon' type='image/png' sizes='16x16'"
-	    " href='/favicon-16x16.png' />\n"
-	    "<link rel='manifest' href='/site.webmanifest'/>\n"
-	    "<link rel='mask-icon' href='/safari-pinned-tab.svg' />\n"
+	    " href='%sfavicon-16x16.png' />\n"
+	    "<link rel='manifest' href='%ssite.webmanifest'/>\n"
+	    "<link rel='mask-icon' href='%ssafari-pinned-tab.svg' />\n"
 	    "<link rel='stylesheet' type='text/css' href='%s%s' />\n"
 	    "</head>\n"
 	    "<body>\n"
@@ -673,6 +673,11 @@ gotweb_render_header(struct request *c)
 	    "<div id='site_path'>\n"
 	    "<div id='site_link'>\n"
 	    "<a href='?index_page=%d'>%s</a>",
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
 	    srv->site_name,
 	    c->script_name, srv->custom_css,
 	    srv->logo_url,
