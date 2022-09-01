@@ -222,9 +222,6 @@ struct request {
 	char				 script_name[MAX_SCRIPT_NAME];
 	char				 server_name[MAX_SERVER_NAME];
 
-	struct env_head			 env;
-	int				 env_count;
-
 	uint8_t				 request_started;
 };
 

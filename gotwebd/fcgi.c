@@ -175,18 +175,14 @@ fcgi_parse_begin_request(uint8_t *buf, uint16_t n,
 	}
 
 	c->request_started = 1;
-
 	c->id = id;
-	SLIST_INIT(&c->env);
-	c->env_count = 0;
 }
 
 void
 fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 {
-	struct env_val *env_entry;
 	uint32_t name_len, val_len;
-	uint8_t *sd, *dr_buf;
+	uint8_t *sd, *val;
 
 	if (!c->request_started) {
 		log_warn("FCGI_PARAMS without FCGI_BEGIN_REQUEST, ignoring");
@@ -218,83 +214,72 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 				return;
 		}
 
-		if (n > 0) {
-			if (buf[0] >> 7 == 0) {
-				val_len = buf[0];
-				n--;
-				buf++;
-			} else {
-				if (n > 3) {
-					val_len = ((buf[0] & 0x7f) << 24) +
-					    (buf[1] << 16) + (buf[2] << 8) +
-					     buf[3];
-					n -= 4;
-					buf += 4;
-				} else
-					return;
-			}
-		} else
+		if (n == 0)
 			return;
+
+		if (buf[0] >> 7 == 0) {
+			val_len = buf[0];
+			n--;
+			buf++;
+		} else {
+			if (n > 3) {
+				val_len = ((buf[0] & 0x7f) << 24) +
+					(buf[1] << 16) + (buf[2] << 8) +
+					buf[3];
+				n -= 4;
+				buf += 4;
+			} else
+				return;
+		}
 
 		if (n < name_len + val_len)
 			return;
 
-		if ((env_entry = malloc(sizeof(struct env_val))) == NULL) {
-			log_warn("cannot malloc env_entry");
-			return;
-		}
+		val = buf + name_len;
 
-		if ((env_entry->val = calloc(sizeof(char), name_len + val_len +
-		    2)) == NULL) {
-			log_warn("cannot allocate env_entry->val");
-			free(env_entry);
-			return;
-		}
-
-		bcopy(buf, env_entry->val, name_len);
-		buf += name_len;
-		n -= name_len;
-
-		env_entry->val[name_len] = '\0';
-		if (val_len < MAX_QUERYSTRING && strcmp(env_entry->val,
-		    "QUERY_STRING") == 0 && c->querystring[0] == '\0') {
-			bcopy(buf, c->querystring, val_len);
+		if (c->querystring[0] == '\0' &&
+		    val_len < MAX_QUERYSTRING &&
+		    name_len == 12 &&
+		    strncmp(buf, "QUERY_STRING", 12) == 0) {
+			memcpy(c->querystring, val, val_len);
 			c->querystring[val_len] = '\0';
 		}
-		if (val_len < GOTWEBD_MAXTEXT && strcmp(env_entry->val,
-		    "HTTP_HOST") == 0 && c->http_host[0] == '\0') {
+
+		if (c->http_host[0] == '\0' &&
+		    val_len < GOTWEBD_MAXTEXT &&
+		    name_len == 9 &&
+		    strncmp(buf, "HTTP_HOST", 9) == 0) {
+			memcpy(c->http_host, val, val_len);
+			c->http_host[val_len] = '\0';
 
 			/*
 			 * lazily get subdomain
 			 * will only get domain if no subdomain exists
 			 * this can still work if gotweb server name is the same
 			 */
-			sd = strchr(buf, '.');
+			sd = strchr(c->http_host, '.');
 			if (sd)
 				*sd = '\0';
-
-			bcopy(buf, c->http_host, val_len);
-			c->http_host[val_len] = '\0';
 		}
-		if (val_len < MAX_SCRIPT_NAME && strcmp(env_entry->val,
-		    "SCRIPT_NAME") == 0 && c->script_name[0] == '\0') {
-			bcopy(dr_buf, c->script_name, val_len);
+
+		if (c->script_name[0] == '\0' &&
+		    val_len < MAX_SCRIPT_NAME &&
+		    name_len == 11 &&
+		    strncmp(buf, "SCRIPT_NAME", 11) == 0) {
+			memcpy(c->script_name, val, val_len);
 			c->script_name[val_len] = '\0';
 		}
-		if (val_len < MAX_SERVER_NAME && strcmp(env_entry->val,
-		    "SERVER_NAME") == 0 && c->server_name[0] == '\0') {
-			bcopy(buf, c->server_name, val_len);
+
+		if (c->server_name[0] == '\0' &&
+		    val_len < MAX_SERVER_NAME &&
+		    name_len == 11 &&
+		    strncmp(buf, "SERVER_NAME", 11) == 0) {
+			memcpy(c->server_name, val, val_len);
 			c->server_name[val_len] = '\0';
 		}
-		env_entry->val[name_len] = '=';
 
-		bcopy(buf, (env_entry->val) + name_len + 1, val_len);
-		buf += val_len;
-		n -= val_len;
-
-		SLIST_INSERT_HEAD(&c->env, env_entry, entry);
-		log_debug("env[%d], %s", c->env_count, env_entry->val);
-		c->env_count++;
+		buf += name_len + val_len;
+		n -= name_len - val_len;
 	}
 }
 
