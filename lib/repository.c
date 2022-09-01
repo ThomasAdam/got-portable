@@ -1282,6 +1282,7 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 	struct dirent *dent;
 	char *path_packidx = NULL;
 	int packdir_fd;
+	struct stat sb;
 
 	packdir_fd = openat(got_repo_get_fd(repo),
 	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY | O_CLOEXEC);
@@ -1296,6 +1297,12 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 		err = got_error_from_errno("fdopendir");
 		goto done;
 	}
+
+	if (fstat(packdir_fd, &sb) == -1) {
+		err = got_error_from_errno("fstat");
+		goto done;
+	}
+	repo->pack_path_mtime = sb.st_mtime;
 
 	while ((dent = readdir(packdir)) != NULL) {
 		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
@@ -1608,6 +1615,19 @@ got_repo_init(const char *repo_path)
 	return NULL;
 }
 
+static void
+purge_packidx_paths(struct got_pathlist_head *packidx_paths)
+{
+	struct got_pathlist_entry *pe;
+
+	while (!TAILQ_EMPTY(packidx_paths)) {
+		pe = TAILQ_FIRST(packidx_paths);
+		TAILQ_REMOVE(packidx_paths, pe, entry);
+		free((char *)pe->path);
+		free(pe);
+	}
+}
+
 static const struct got_error *
 match_packed_object(struct got_object_id **unique_id,
     struct got_repository *repo, const char *id_str_prefix, int obj_type)
@@ -1615,8 +1635,20 @@ match_packed_object(struct got_object_id **unique_id,
 	const struct got_error *err = NULL;
 	struct got_object_id_queue matched_ids;
 	struct got_pathlist_entry *pe;
+	struct stat sb;
 
 	STAILQ_INIT(&matched_ids);
+
+	if (stat(got_repo_get_path_objects_pack(repo), &sb) == -1) {
+		if (errno != ENOENT)
+			return got_error_from_errno2("stat",
+			    got_repo_get_path_objects_pack(repo));
+	} else if (sb.st_mtime != repo->pack_path_mtime) {
+		purge_packidx_paths(&repo->packidx_paths);
+		err = got_repo_list_packidx(&repo->packidx_paths, repo);
+		if (err)
+			return err;
+	}
 
 	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
 		const char *path_packidx = pe->path;
