@@ -53,7 +53,6 @@
 #define MAX_SCRIPT_NAME		 255
 #define MAX_SERVER_NAME		 255
 
-#define GOTWEB_GOT_DIR		 ".got"
 #define GOTWEB_GIT_DIR		 ".git"
 
 #define D_HTTPD_CHROOT		 "/var/www"
