@@ -292,8 +292,6 @@ err:
 	if (html && fcgi_printf(c, "</div>\n") == -1)
 		return;
 done:
-	if (c->t->repo != NULL && qs && qs->action != INDEX)
-		got_repo_close(c->t->repo);
 	if (html && srv != NULL)
 		gotweb_render_footer(c);
 }
@@ -1096,9 +1094,6 @@ render:
 
 		gotweb_free_repo_dir(repo_dir);
 		repo_dir = NULL;
-		error = got_repo_close(t->repo);
-		if (error)
-			goto done;
 		t->next_disp++;
 		if (d_disp == srv->max_repos_display)
 			break;
@@ -1913,6 +1908,67 @@ done:
 	return error;
 }
 
+static struct got_repository *
+find_cached_repo(struct server *srv, const char *path)
+{
+	int i;
+
+	for (i = 0; i < srv->ncached_repos; i++) {
+		if (strcmp(srv->cached_repos[i].path, path) == 0)
+			return srv->cached_repos[i].repo;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+cache_repo(struct got_repository **new, struct server *srv,
+    struct repo_dir *repo_dir, struct socket *sock)
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo;
+	struct cached_repo *cr;
+	int evicted = 0;
+
+	if (srv->ncached_repos >= nitems(srv->cached_repos)) {
+		cr = &srv->cached_repos[srv->ncached_repos - 1];
+		error = got_repo_close(cr->repo);
+		memset(cr, 0, sizeof(*cr));
+		srv->ncached_repos--;
+		if (error)
+			return error;
+		memmove(&srv->cached_repos[1], &srv->cached_repos[0],
+		    srv->ncached_repos * sizeof(srv->cached_repos[0]));
+		cr = &srv->cached_repos[0];
+		evicted = 1;
+	} else {
+		cr = &srv->cached_repos[srv->ncached_repos];
+	}
+
+	error = got_repo_open(&repo, repo_dir->path, NULL, sock->pack_fds);
+	if (error) {
+		if (evicted) {
+			memmove(&srv->cached_repos[0], &srv->cached_repos[1],
+			    srv->ncached_repos * sizeof(srv->cached_repos[0]));
+		}
+		return error;
+	}
+
+	if (strlcpy(cr->path, repo_dir->path, sizeof(cr->path))
+	    >= sizeof(cr->path)) {
+		if (evicted) {
+			memmove(&srv->cached_repos[0], &srv->cached_repos[1],
+			    srv->ncached_repos * sizeof(srv->cached_repos[0]));
+		}
+		return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	cr->repo = repo;
+	srv->ncached_repos++;
+	*new = repo;
+	return NULL;
+}
+
 static const struct got_error *
 gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 {
@@ -1920,6 +1976,7 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	struct socket *sock = c->sock;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
+	struct got_repository *repo = NULL;
 	DIR *dt;
 	char *dir_test;
 	int opened = 0;
@@ -1979,9 +2036,13 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	} else
 		opened = 1;
 done:
-	error = got_repo_open(&t->repo, repo_dir->path, NULL, sock->pack_fds);
-	if (error)
-		goto err;
+	repo = find_cached_repo(srv, repo_dir->path);
+	if (repo == NULL) {
+		error = cache_repo(&repo, srv, repo_dir, sock);
+		if (error)
+			goto err;
+	}
+	t->repo = repo;
 	error = gotweb_get_repo_description(&repo_dir->description, srv,
 	    repo_dir->path);
 	if (error)

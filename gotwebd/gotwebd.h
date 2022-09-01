@@ -46,6 +46,7 @@
 #define GOTWEBD_MAXPORT		 6
 #define GOTWEBD_NUMPROC		 3
 #define GOTWEBD_MAXIFACE	 16
+#define GOTWEBD_REPO_CACHESIZE	 4
 
 /* GOTWEB DEFAULTS */
 #define MAX_QUERYSTRING		 2048
@@ -250,9 +251,17 @@ struct address {
 };
 TAILQ_HEAD(addresslist, address);
 
+struct cached_repo {
+	char path[PATH_MAX];
+	struct got_repository *repo;
+};
+
 struct server {
 	TAILQ_ENTRY(server)	 entry;
 	struct addresslist	al;
+
+	struct cached_repo	cached_repos[GOTWEBD_REPO_CACHESIZE];
+	int		 ncached_repos;
 
 	char		 name[GOTWEBD_MAXTEXT];
 

@@ -49,6 +49,7 @@
 
 #include "got_error.h"
 #include "got_opentemp.h"
+#include "got_repository.h"
 
 #include "proc.h"
 #include "gotwebd.h"
@@ -351,6 +352,7 @@ sockets_shutdown(void)
 {
 	struct server *srv, *tsrv;
 	struct socket *sock, *tsock;
+	int i;
 
 	sockets_purge(gotwebd_env);
 
@@ -362,8 +364,11 @@ sockets_shutdown(void)
 	}
 
 	/* clean servers */
-	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv)
+	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv) {
+		for (i = 0; i < srv->ncached_repos; i++)
+			got_repo_close(srv->cached_repos[i].repo);
 		free(srv);
+	}
 
 	free(gotwebd_env);
 }
