@@ -353,14 +353,17 @@ gotweb_init_querystring(struct querystring **qs)
 	if (*qs == NULL)
 		return got_error_from_errno2("%s: calloc", __func__);
 
+	(*qs)->headref = strdup("HEAD");
+	if ((*qs)->headref == NULL) {
+		free(*qs);
+		*qs = NULL;
+		return got_error_from_errno2("%s: strdup", __func__);
+	}
+
 	(*qs)->action = INDEX;
 	(*qs)->commit = NULL;
 	(*qs)->file = NULL;
 	(*qs)->folder = NULL;
-	(*qs)->headref = strdup("HEAD");
-	if ((*qs)->headref == NULL) {
-		return got_error_from_errno2("%s: strdup", __func__);
-	}
 	(*qs)->index_page = 0;
 	(*qs)->index_page_str = NULL;
 	(*qs)->path = NULL;
