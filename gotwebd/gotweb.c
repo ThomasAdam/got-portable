@@ -1693,9 +1693,10 @@ gotweb_render_tag(struct request *c)
 	if (error)
 		goto done;
 
-	if (strncmp(rt->tag_name, "refs/", 5) == 0)
-		rt->tag_name += 5;
-	error = gotweb_escape_html(&tagname, rt->tag_name);
+	tagname = rt->tag_name;
+	if (strncmp(tagname, "refs/", 5) == 0)
+		tagname += 5;
+	error = gotweb_escape_html(&tagname, tagname);
 	if (error)
 		goto done;
 
@@ -1780,9 +1781,10 @@ gotweb_render_tags(struct request *c)
 		if (error)
 			goto done;
 
-		if (strncmp(rt->tag_name, "refs/tags/", 10) == 0)
-			rt->tag_name += 10;
-		error = gotweb_escape_html(&tagname, rt->tag_name);
+		tagname = rt->tag_name;
+		if (strncmp(tagname, "refs/tags/", 10) == 0)
+			tagname += 10;
+		error = gotweb_escape_html(&tagname, tagname);
 		if (error)
 			goto done;
 
