@@ -472,6 +472,7 @@ qa_found:
 			}
 			break;
 		case HEADREF:
+			free((*qs)->headref);
 			(*qs)->headref = strdup(value);
 			if ((*qs)->headref == NULL) {
 				error = got_error_from_errno2("%s: strdup",
