@@ -1355,6 +1355,8 @@ gotweb_render_commits(struct request *c)
 		    "<div class='dotted_line'></div>\n",
 		    index_page_str, repo_dir->name, rc->commit_id,
 		    index_page_str, repo_dir->name, rc->commit_id);
+		if (r == -1)
+			goto done;
 
 		free(age);
 		age = NULL;
