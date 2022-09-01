@@ -350,12 +350,14 @@ got_get_repo_commits(struct request *c, int limit)
 			return got_error_from_errno("asprintf");
 
 	if (asprintf(&repo_path, "%s/%s", srv->repos_path,
-	    repo_dir->name) == -1)
-		return got_error_from_errno("asprintf");
+	    repo_dir->name) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	error = got_init_repo_commit(&repo_commit);
 	if (error)
-		return error;
+		goto done;
 
 	/*
 	 * XXX: jumping directly to a commit id via
