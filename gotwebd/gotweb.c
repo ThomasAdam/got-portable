@@ -1979,7 +1979,6 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	struct got_repository *repo = NULL;
 	DIR *dt;
 	char *dir_test;
-	int opened = 0;
 
 	if (asprintf(&dir_test, "%s/%s/%s", srv->repos_path, repo_dir->name,
 	    GOTWEB_GIT_DIR) == -1)
@@ -1989,52 +1988,24 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	if (dt == NULL) {
 		free(dir_test);
 	} else {
-		repo_dir->path = strdup(dir_test);
-		if (repo_dir->path == NULL) {
-			opened = 1;
-			error = got_error_from_errno("strdup");
-			goto err;
-		}
-		opened = 1;
+		repo_dir->path = dir_test;
+		dir_test = NULL;
 		goto done;
 	}
 
-	if (asprintf(&dir_test, "%s/%s/%s", srv->repos_path, repo_dir->name,
-	    GOTWEB_GOT_DIR) == -1) {
-		dir_test = NULL;
-		error = got_error_from_errno("asprintf");
-		goto err;
-	}
-
-	dt = opendir(dir_test);
-	if (dt == NULL)
-		free(dir_test);
-	else {
-		opened = 1;
-		error = got_error(GOT_ERR_NOT_GIT_REPO);
-		goto err;
-	}
-
 	if (asprintf(&dir_test, "%s/%s", srv->repos_path,
-	    repo_dir->name) == -1) {
-		error = got_error_from_errno("asprintf");
-		dir_test = NULL;
-		goto err;
-	}
-
-	repo_dir->path = strdup(dir_test);
-	if (repo_dir->path == NULL) {
-		opened = 1;
-		error = got_error_from_errno("strdup");
-		goto err;
-	}
+	    repo_dir->name) == -1)
+		return got_error_from_errno("asprintf");
 
 	dt = opendir(dir_test);
 	if (dt == NULL) {
 		error = got_error_path(repo_dir->name, GOT_ERR_NOT_GIT_REPO);
 		goto err;
-	} else
-		opened = 1;
+	} else {
+		repo_dir->path = dir_test;
+		dir_test = NULL;
+	}
+
 done:
 	repo = find_cached_repo(srv, repo_dir->path);
 	if (repo == NULL) {
@@ -2057,9 +2028,8 @@ done:
 	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path);
 err:
 	free(dir_test);
-	if (opened)
-		if (dt != NULL && closedir(dt) == EOF && error == NULL)
-			error = got_error_from_errno("closedir");
+	if (dt != NULL && closedir(dt) == EOF && error == NULL)
+		error = got_error_from_errno("closedir");
 	return error;
 }
 
