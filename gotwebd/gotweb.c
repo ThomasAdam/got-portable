@@ -2073,9 +2073,8 @@ gotweb_get_repo_description(char **description, struct server *srv, char *dir)
 
 	f = fopen(d_file, "r");
 	if (f == NULL) {
-		if (errno == ENOENT || errno == EACCES)
-			return NULL;
-		error = got_error_from_errno2("fopen", d_file);
+		if (errno != ENOENT && errno != EACCES)
+			error = got_error_from_errno2("fopen", d_file);
 		goto done;
 	}
 
@@ -2092,7 +2091,7 @@ gotweb_get_repo_description(char **description, struct server *srv, char *dir)
 	if (len == 0) {
 		*description = strdup("");
 		if (*description == NULL)
-			return got_error_from_errno("strdup");
+			error = got_error_from_errno("strdup");
 		goto done;
 	}
 
