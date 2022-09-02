@@ -331,7 +331,7 @@ got_get_repo_commits(struct request *c, int limit)
 	struct got_commit_graph *graph = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_reflist_head refs;
-	struct got_reference *ref;
+	struct got_reference *ref = NULL;
 	struct repo_commit *repo_commit = NULL;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
@@ -373,7 +373,6 @@ got_get_repo_commits(struct request *c, int limit)
 			goto done;
 
 		error = got_ref_resolve(&id, repo, ref);
-		got_ref_close(ref);
 		if (error)
 			goto done;
 	} else if (qs->commit != NULL) {
@@ -383,7 +382,6 @@ got_get_repo_commits(struct request *c, int limit)
 			if (error)
 				goto done;
 			error = got_object_get_type(&obj_type, repo, id);
-			got_ref_close(ref);
 			if (error)
 				goto done;
 			if (obj_type == GOT_OBJ_TYPE_TAG) {
@@ -545,6 +543,8 @@ got_get_repo_commits(struct request *c, int limit)
 	}
 done:
 	gotweb_free_repo_commit(repo_commit);
+	if (ref)
+		got_ref_close(ref);
 	if (commit)
 		got_object_commit_close(commit);
 	if (graph)
