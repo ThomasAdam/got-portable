@@ -365,7 +365,7 @@ diff_output_get_label_left(const struct diff_input_info *info)
 	if (info->flags & DIFF_INPUT_LEFT_NONEXISTENT)
 		return "/dev/null";
 
-	return info->left_path ? : "a";
+	return info->left_path ? info->left_path : "a";
 }
 
 const char *
@@ -374,5 +374,5 @@ diff_output_get_label_right(const struct diff_input_info *info)
 	if (info->flags & DIFF_INPUT_RIGHT_NONEXISTENT)
 		return "/dev/null";
 
-	return info->right_path ? : "b";
+	return info->right_path ? info->right_path : "b";
 }

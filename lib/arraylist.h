@@ -68,7 +68,8 @@
 				(ARRAY_LIST).allocated + \
 				((ARRAY_LIST).allocated ? \
 				(ARRAY_LIST).allocated / 2 : \
-				(ARRAY_LIST).alloc_blocksize ? : 8), \
+				(ARRAY_LIST).alloc_blocksize ? \
+				(ARRAY_LIST).alloc_blocksize : 8), \
 				sizeof(*(ARRAY_LIST).head)); \
 			if ((ARRAY_LIST).p == NULL) { \
 				NEW_ITEM_P = NULL; \
@@ -77,7 +78,8 @@
 			(ARRAY_LIST).allocated += \
 				(ARRAY_LIST).allocated ? \
 				(ARRAY_LIST).allocated / 2 : \
-				(ARRAY_LIST).alloc_blocksize ? : 8, \
+				(ARRAY_LIST).alloc_blocksize ? \
+				(ARRAY_LIST).alloc_blocksize : 8, \
 			(ARRAY_LIST).head = (ARRAY_LIST).p; \
 			(ARRAY_LIST).p = NULL; \
 		}; \
