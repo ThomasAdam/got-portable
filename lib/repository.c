@@ -1706,7 +1706,7 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *path;
+	char *path, *id_str = NULL;
 	DIR *dir = NULL;
 	struct dirent *dent;
 	struct got_object_id id;
@@ -1726,8 +1726,10 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 		goto done;
 	}
 	while ((dent = readdir(dir)) != NULL) {
-		char *id_str;
 		int cmp;
+
+		free(id_str);
+		id_str = NULL;
 
 		if (strcmp(dent->d_name, ".") == 0 ||
 		    strcmp(dent->d_name, "..") == 0)
@@ -1746,10 +1748,8 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 		 * sorted order, so we must iterate over all of them.
 		 */
 		cmp = strncmp(id_str, id_str_prefix, strlen(id_str_prefix));
-		if (cmp != 0) {
-			free(id_str);
+		if (cmp != 0)
 			continue;
-		}
 
 		if (*unique_id == NULL) {
 			if (obj_type != GOT_OBJ_TYPE_ANY) {
@@ -1764,14 +1764,12 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 			*unique_id = got_object_id_dup(&id);
 			if (*unique_id == NULL) {
 				err = got_error_from_errno("got_object_id_dup");
-				free(id_str);
 				goto done;
 			}
 		} else {
 			if (got_object_id_cmp(*unique_id, &id) == 0)
 				continue; /* both packed and loose */
 			err = got_error(GOT_ERR_AMBIGUOUS_ID);
-			free(id_str);
 			goto done;
 		}
 	}
@@ -1782,6 +1780,7 @@ done:
 		free(*unique_id);
 		*unique_id = NULL;
 	}
+	free(id_str);
 	free(path);
 	return err;
 }
