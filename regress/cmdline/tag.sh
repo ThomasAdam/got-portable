@@ -259,6 +259,9 @@ test_tag_list_lightweight() {
 
 	got tag -r $testroot/repo -l > $testroot/stdout
 
+	# test signature validation ignoring lightweight tags
+	got tag -r $testroot/repo -V > $testroot/stdout
+
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
 	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
