@@ -654,6 +654,8 @@ got_get_repo_tags(struct request *c, int limit)
 		if (error)
 			goto done;
 
+		if (tag)
+			got_object_tag_close(tag);
 		error = got_object_open_as_tag(&tag, repo, id);
 		if (error) {
 			if (error->code != GOT_ERR_OBJ_TYPE)
@@ -686,9 +688,6 @@ got_get_repo_tags(struct request *c, int limit)
 			    got_object_tag_get_object_id(tag));
 			if (error)
 				goto err;
-
-			got_object_tag_close(tag);
-			tag = NULL;
 		}
 
 		new_repo_tag->commit_id = strdup(id_str);
