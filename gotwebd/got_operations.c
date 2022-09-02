@@ -757,10 +757,8 @@ got_get_repo_tags(struct request *c, int limit)
 			new_repo_tag->commit_msg = strdup(commit_msg);
 			if (new_repo_tag->commit_msg == NULL) {
 				error = got_error_from_errno("strdup");
-				free(commit_msg0);
 				goto err;
 			}
-			free(commit_msg0);
 		}
 
 		if (limit && --limit == 0) {
@@ -806,6 +804,7 @@ err:
 	if (tag)
 		got_object_tag_close(tag);
 	got_ref_list_free(&refs);
+	free(commit_msg0);
 	free(in_repo_path);
 	free(repo_path);
 	free(id);
