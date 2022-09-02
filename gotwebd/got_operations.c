@@ -817,7 +817,7 @@ got_output_repo_tree(struct request *c)
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name, *index_page_str, *folder;
 	char *id_str = NULL, *escaped_name = NULL;
-	char *path = NULL, *in_repo_path = NULL, *modestr = NULL;
+	char *path = NULL, *modestr = NULL;
 	int nentries, i, r;
 
 	TAILQ_INIT(&refs);
@@ -831,11 +831,9 @@ got_output_repo_tree(struct request *c)
 			goto done;
 		}
 	} else {
-		error = got_repo_map_path(&in_repo_path, repo, repo_dir->path);
+		error = got_repo_map_path(&path, repo, repo_dir->path);
 		if (error)
 			goto done;
-		free(path);
-		path = in_repo_path;
 	}
 
 	error = got_repo_match_object_id(&commit_id, NULL, rc->commit_id,
