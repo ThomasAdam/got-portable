@@ -1619,6 +1619,67 @@ test_commit_large_file() {
 
 }
 
+test_commit_gitignore() {
+	local testroot=`test_init commit_gitignores`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/tree1/foo
+	mkdir -p $testroot/wt/tree2/foo
+	echo "tree1/**" > $testroot/wt/.gitignore
+	echo "tree2/**" >> $testroot/wt/.gitignore
+	echo -n > $testroot/wt/tree1/bar
+	echo -n > $testroot/wt/tree1/foo/baz
+	echo -n > $testroot/wt/tree2/bar
+	echo -n > $testroot/wt/tree2/foo/baz
+	echo -n > $testroot/wt/epsilon/zeta1
+	echo -n > $testroot/wt/epsilon/zeta2
+
+	(cd $testroot/wt && got add -I -R tree1 > /dev/null)
+	(cd $testroot/wt && got add -I tree2/foo/baz > /dev/null)
+	(cd $testroot/wt && got commit -m "gitignore add" > /dev/null)
+	(cd $testroot/wt && got log -P -l 1 | egrep '^ .' > $testroot/stdout)
+
+	echo ' gitignore add' > $testroot/stdout.expected
+	echo ' A  tree1/bar' >> $testroot/stdout.expected
+	echo ' A  tree1/foo/baz' >> $testroot/stdout.expected
+	echo ' A  tree2/foo/baz' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo touch > $testroot/wt/tree1/bar
+	echo touch > $testroot/wt/tree1/foo/baz
+	echo touch > $testroot/wt/epsilon/zeta1
+
+	(cd $testroot/wt && got commit -m "gitignore change" > /dev/null)
+	(cd $testroot/wt && got log -P -l 1 | egrep '^ .' > $testroot/stdout)
+
+	echo ' gitignore change' > $testroot/stdout.expected
+	echo ' M  tree1/bar' >> $testroot/stdout.expected
+	echo ' M  tree1/foo/baz' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 
 test_parseargs "$@"
 run_test test_commit_basic
@@ -1648,3 +1709,4 @@ run_test test_commit_symlink
 run_test test_commit_fix_bad_symlink
 run_test test_commit_prepared_logmsg
 run_test test_commit_large_file
+run_test test_commit_gitignore
