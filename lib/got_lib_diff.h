@@ -20,7 +20,7 @@
 
 enum got_diff_output_format {
 	GOT_DIFF_OUTPUT_UNIDIFF,
-	GOT_DIFF_OUTPUT_EDSCRIPT,
+	GOT_DIFF_OUTPUT_PLAIN,
 };
 
 struct got_diffreg_result {
