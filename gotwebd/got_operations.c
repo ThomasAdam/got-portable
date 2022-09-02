@@ -355,10 +355,6 @@ got_get_repo_commits(struct request *c, int limit)
 		goto done;
 	}
 
-	error = got_init_repo_commit(&repo_commit);
-	if (error)
-		goto done;
-
 	/*
 	 * XXX: jumping directly to a commit id via
 	 * got_repo_match_object_id_prefix significantly improves performance,
@@ -439,7 +435,8 @@ got_get_repo_commits(struct request *c, int limit)
 
 	for (;;) {
 		if (limit_chk == ((limit * qs->page) - (limit - 1)) &&
-		    commit_found == 0 && repo_commit->commit_id != NULL) {
+		    commit_found == 0 && repo_commit &&
+		    repo_commit->commit_id != NULL) {
 			t->prev_id = strdup(repo_commit->commit_id);
 			if (t->prev_id == NULL) {
 				error = got_error_from_errno("strdup");
@@ -466,6 +463,12 @@ got_get_repo_commits(struct request *c, int limit)
 		if (error)
 			goto done;
 
+		error = got_init_repo_commit(&repo_commit);
+		if (error)
+			goto done;
+
+		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
+
 		error = got_get_repo_commit(c, repo_commit, commit,
 		    &refs, id);
 		if (error)
@@ -485,18 +488,6 @@ got_get_repo_commits(struct request *c, int limit)
 			}
 		}
 
-		struct repo_commit *new_repo_commit = NULL;
-		error = got_init_repo_commit(&new_repo_commit);
-		if (error)
-			goto done;
-
-		TAILQ_INSERT_TAIL(&t->repo_commits, new_repo_commit, entry);
-
-		error = got_get_repo_commit(c, new_repo_commit, commit,
-		    &refs, id);
-		if (error)
-			goto done;
-
 		free(id);
 		id = NULL;
 
@@ -513,7 +504,7 @@ got_get_repo_commits(struct request *c, int limit)
 			 */
 			if (chk_next && (qs->action == BRIEFS ||
 			    qs->action == COMMITS || qs->action == SUMMARY)) {
-				t->next_id = strdup(new_repo_commit->commit_id);
+				t->next_id = strdup(repo_commit->commit_id);
 				if (t->next_id == NULL) {
 					error = got_error_from_errno("strdup");
 					goto done;
@@ -522,9 +513,9 @@ got_get_repo_commits(struct request *c, int limit)
 					got_object_commit_close(commit);
 					commit = NULL;
 				}
-				TAILQ_REMOVE(&t->repo_commits, new_repo_commit,
+				TAILQ_REMOVE(&t->repo_commits, repo_commit,
 				    entry);
-				gotweb_free_repo_commit(new_repo_commit);
+				gotweb_free_repo_commit(repo_commit);
 				goto done;
 			}
 		}
@@ -542,7 +533,6 @@ got_get_repo_commits(struct request *c, int limit)
 		}
 	}
 done:
-	gotweb_free_repo_commit(repo_commit);
 	if (ref)
 		got_ref_close(ref);
 	if (commit)
