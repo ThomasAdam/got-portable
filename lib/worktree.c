@@ -5919,7 +5919,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL, 1, 0);
+		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
