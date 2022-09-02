@@ -816,8 +816,7 @@ got_output_repo_tree(struct request *c)
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name, *index_page_str, *folder;
-	char *id_str = NULL, *escaped_name = NULL;
-	char *path = NULL, *modestr = NULL;
+	char *id_str = NULL, *escaped_name = NULL, *path = NULL;
 	int nentries, i, r;
 
 	TAILQ_INIT(&refs);
@@ -859,6 +858,7 @@ got_output_repo_tree(struct request *c)
 	folder = qs->folder ? qs->folder : "";
 
 	for (i = 0; i < nentries; i++) {
+		const char *modestr;
 		struct got_tree_entry *te;
 		mode_t mode;
 
@@ -868,41 +868,17 @@ got_output_repo_tree(struct request *c)
 		if (error)
 			goto done;
 
-		modestr = strdup("");
-		if (modestr == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 		mode = got_tree_entry_get_mode(te);
-		if (got_object_tree_entry_is_submodule(te)) {
-			free(modestr);
-			modestr = strdup("$");
-			if (modestr == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (S_ISLNK(mode)) {
-			free(modestr);
-			modestr = strdup("@");
-			if (modestr == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (S_ISDIR(mode)) {
-			free(modestr);
-			modestr = strdup("/");
-			if (modestr == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (mode & S_IXUSR) {
-			free(modestr);
-			modestr = strdup("*");
-			if (modestr == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
+		if (got_object_tree_entry_is_submodule(te))
+			modestr = "$";
+		else if (S_ISLNK(mode))
+			modestr = "@";
+		else if (S_ISDIR(mode))
+			modestr = "/";
+		else if (mode & S_IXUSR)
+			modestr = "*";
+		else
+			modestr = "";
 
 		name = got_tree_entry_get_name(te);
 		error = gotweb_escape_html(&escaped_name, name);
@@ -949,15 +925,12 @@ got_output_repo_tree(struct request *c)
 		}
 		free(id_str);
 		id_str = NULL;
-		free(modestr);
-		modestr = NULL;
 		free(escaped_name);
 		escaped_name = NULL;
 	}
 done:
 	free(escaped_name);
 	free(id_str);
-	free(modestr);
 	free(path);
 	got_ref_list_free(&refs);
 	if (commit)
