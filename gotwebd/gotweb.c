@@ -1481,6 +1481,8 @@ gotweb_render_branches(struct request *c)
 	}
 	fcgi_printf(c, "</div>\n"); /* #branches_content */
 done:
+	free(age);
+	got_ref_list_free(&refs);
 	return error;
 }
 
