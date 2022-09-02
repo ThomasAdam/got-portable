@@ -7043,7 +7043,7 @@ list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
 				break;
 		}
 
-		if (verify_tags) {
+		if (tag && verify_tags) {
 			ssh_sig = got_sigs_get_tagmsg_ssh_signature(
 			    got_object_tag_get_message(tag));
 			if (ssh_sig && allowed_signers == NULL) {
