@@ -644,24 +644,24 @@ got_get_repo_tags(struct request *c, int limit)
 			goto err;
 		}
 
+		free(id);
+		id = NULL;
+
+		free(id_str);
+		id_str = NULL;
+
 		error = got_ref_resolve(&id, repo, re->ref);
 		if (error)
 			goto done;
 
 		error = got_object_open_as_tag(&tag, repo, id);
 		if (error) {
-			if (error->code != GOT_ERR_OBJ_TYPE) {
-				free(id);
-				id = NULL;
+			if (error->code != GOT_ERR_OBJ_TYPE)
 				goto done;
-			}
 			/* "lightweight" tag */
 			error = got_object_open_as_commit(&commit, repo, id);
-			if (error) {
-				free(id);
-				id = NULL;
+			if (error)
 				goto done;
-			}
 			new_repo_tag->tagger =
 			    strdup(got_object_commit_get_committer(commit));
 			if (new_repo_tag->tagger == NULL) {
@@ -673,11 +673,7 @@ got_get_repo_tags(struct request *c, int limit)
 			error = got_object_id_str(&id_str, id);
 			if (error)
 				goto err;
-			free(id);
-			id = NULL;
 		} else {
-			free(id);
-			id = NULL;
 			new_repo_tag->tagger =
 			    strdup(got_object_tag_get_tagger(tag));
 			if (new_repo_tag->tagger == NULL) {
@@ -690,6 +686,9 @@ got_get_repo_tags(struct request *c, int limit)
 			    got_object_tag_get_object_id(tag));
 			if (error)
 				goto err;
+
+			got_object_tag_close(tag);
+			tag = NULL;
 		}
 
 		new_repo_tag->commit_id = strdup(id_str);
@@ -769,8 +768,6 @@ got_get_repo_tags(struct request *c, int limit)
 				break;
 			chk_next = 1;
 		}
-		free(id);
-		id = NULL;
 	}
 
 done:
@@ -806,9 +803,13 @@ done:
 err:
 	if (commit)
 		got_object_commit_close(commit);
+	if (tag)
+		got_object_tag_close(tag);
 	got_ref_list_free(&refs);
+	free(in_repo_path);
 	free(repo_path);
 	free(id);
+	free(id_str);
 	return error;
 }
 
