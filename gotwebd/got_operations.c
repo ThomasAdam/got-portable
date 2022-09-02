@@ -816,7 +816,7 @@ got_output_repo_tree(struct request *c)
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name, *index_page_str, *folder;
-	char *id_str = NULL, *escaped_name = NULL, *path = NULL;
+	char *escaped_name = NULL, *path = NULL;
 	int nentries, i, r;
 
 	TAILQ_INIT(&refs);
@@ -863,10 +863,6 @@ got_output_repo_tree(struct request *c)
 		mode_t mode;
 
 		te = got_object_tree_get_entry(tree, i);
-
-		error = got_object_id_str(&id_str, got_tree_entry_get_id(te));
-		if (error)
-			goto done;
 
 		mode = got_tree_entry_get_mode(te);
 		if (got_object_tree_entry_is_submodule(te))
@@ -923,14 +919,11 @@ got_output_repo_tree(struct request *c)
 			if (r == -1)
 				goto done;
 		}
-		free(id_str);
-		id_str = NULL;
 		free(escaped_name);
 		escaped_name = NULL;
 	}
 done:
 	free(escaped_name);
-	free(id_str);
 	free(path);
 	got_ref_list_free(&refs);
 	if (commit)
