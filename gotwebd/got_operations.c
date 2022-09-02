@@ -550,6 +550,7 @@ done:
 	if (graph)
 		got_commit_graph_close(graph);
 	got_ref_list_free(&refs);
+	free(in_repo_path);
 	free(file_path);
 	free(repo_path);
 	free(id);
