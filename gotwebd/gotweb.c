@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016, 2019, 2020-2022 Tracey Emery <tracey@traceyemery.net>
  * Copyright (c) 2015 Mike Larkin <mlarkin@openbsd.org>
+ * Copyright (c) 2014 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2013 David Gwynne <dlg@openbsd.org>
  * Copyright (c) 2013 Florian Obser <florian@openbsd.org>
  *
@@ -23,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <event.h>
@@ -421,12 +423,61 @@ err:
 	return error;
 }
 
+/*
+ * Adapted from usr.sbin/httpd/httpd.c url_decode.
+ */
+static const struct got_error *
+gotweb_urldecode(char *url)
+{
+	char		*p, *q;
+	char		 hex[3];
+	unsigned long	 x;
+
+	hex[2] = '\0';
+	p = q = url;
+
+	while (*p != '\0') {
+		switch (*p) {
+		case '%':
+			/* Encoding character is followed by two hex chars */
+			if (!isxdigit((unsigned char)p[1]) ||
+			    !isxdigit((unsigned char)p[2]) ||
+			    (p[1] == '0' && p[2] == '0'))
+				return got_error(GOT_ERR_BAD_QUERYSTRING);
+
+			hex[0] = p[1];
+			hex[1] = p[2];
+
+			/*
+			 * We don't have to validate "hex" because it is
+			 * guaranteed to include two hex chars followed by nul.
+			 */
+			x = strtoul(hex, NULL, 16);
+			*q = (char)x;
+			p += 2;
+			break;
+		default:
+			*q = *p;
+			break;
+		}
+		p++;
+		q++;
+	}
+	*q = '\0';
+
+	return NULL;
+}
+
 static const struct got_error *
 gotweb_assign_querystring(struct querystring **qs, char *key, char *value)
 {
 	const struct got_error *error = NULL;
 	const char *errstr;
 	int a_cnt, el_cnt;
+
+	error = gotweb_urldecode(value);
+	if (error)
+		return error;
 
 	for (el_cnt = 0; el_cnt < QSELEM__MAX; el_cnt++) {
 		if (strcmp(key, querystring_keys[el_cnt].name) != 0)
