@@ -53,7 +53,8 @@ struct diff_chunk_context {
 
 int diff_output_plain(struct diff_output_info **output_info, FILE *dest,
 			const struct diff_input_info *info,
-			const struct diff_result *result);
+			const struct diff_result *result,
+			int hunk_headers_only);
 int diff_output_unidiff(struct diff_output_info **output_info,
 			FILE *dest, const struct diff_input_info *info,
 			const struct diff_result *result,
