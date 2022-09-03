@@ -2192,6 +2192,7 @@ resolve_symlink(char **link_target, const char *path,
 		}
 	}
 done:
+	free(parent_path);
 	free(tree_obj_id);
 	if (tree)
 		got_object_tree_close(tree);
