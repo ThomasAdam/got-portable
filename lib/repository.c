@@ -247,16 +247,11 @@ const struct got_error *
 got_repo_pack_fds_open(int **pack_fds)
 {
 	const struct got_error *err = NULL;
-	int i, *pack_fds_tmp;
+	int i;
 
-	pack_fds_tmp = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(int));
-	if (pack_fds_tmp == NULL)
-		return got_error_from_errno("calloc");
 	*pack_fds = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(**pack_fds));
-	if (*pack_fds == NULL) {
-		free(pack_fds_tmp);
+	if (*pack_fds == NULL)
 		return got_error_from_errno("calloc");
-	}
 
 	/*
 	 * got_repo_pack_fds_close will try to close all of the
@@ -265,18 +260,19 @@ got_repo_pack_fds_open(int **pack_fds)
 	 * we do not initialize to -1 here.
 	 */
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++)
-		pack_fds_tmp[i] = -1;
+		(*pack_fds)[i] = -1;
 
 	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
-		pack_fds_tmp[i] = got_opentempfd();
-		if (pack_fds_tmp[i] == -1) {
+		(*pack_fds)[i] = got_opentempfd();
+		if ((*pack_fds)[i] == -1) {
 			err = got_error_from_errno("got_opentempfd");
-			got_repo_pack_fds_close(pack_fds_tmp);
+			got_repo_pack_fds_close(*pack_fds);
+			*pack_fds = NULL;
 			return err;
 		}
 	}
-	memcpy(*pack_fds, pack_fds_tmp, GOT_PACK_NUM_TEMPFILES * sizeof(int));
-	return err;
+
+	return NULL;
 }
 
 const struct got_error *
