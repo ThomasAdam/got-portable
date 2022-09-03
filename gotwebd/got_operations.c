@@ -1228,11 +1228,6 @@ got_output_file_blame(struct request *c)
 	if (error)
 		goto done;
 
-	if (commit_id == NULL) {
-		error = got_error(GOT_ERR_NO_OBJ);
-		goto done;
-	}
-
 	error = got_object_get_type(&obj_type, repo, obj_id);
 	if (error)
 		goto done;
