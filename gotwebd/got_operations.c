@@ -1296,7 +1296,8 @@ got_output_file_blame(struct request *c)
 	    GOT_DIFF_ALGORITHM_MYERS, got_gotweb_blame_cb, &bca, NULL, NULL,
 	    fd3, fd4, f1, f2);
 
-	if (blob) {
+done:
+	if (bca.lines) {
 		free(bca.line_offsets);
 		for (i = 0; i < bca.nlines; i++) {
 			struct blame_line *bline = &bca.lines[i];
@@ -1304,7 +1305,6 @@ got_output_file_blame(struct request *c)
 			free(bline->committer);
 		}
 	}
-done:
 	free(bca.lines);
 	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
 		error = got_error_from_errno("close");
