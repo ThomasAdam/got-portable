@@ -1176,6 +1176,9 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
+
+		free(eline);
+		eline = NULL;
 	}
 done:
 	free(line);
