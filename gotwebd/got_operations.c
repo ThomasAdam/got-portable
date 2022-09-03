@@ -1336,7 +1336,9 @@ done:
 		got_object_blob_close(blob);
 	free(in_repo_path);
 	free(commit_id);
+	free(obj_id);
 	free(path);
+	got_ref_list_free(&refs);
 	return error;
 }
 
