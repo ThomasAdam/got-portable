@@ -31,9 +31,9 @@ static int
 output_plain_chunk(struct diff_output_info *outinfo,
     FILE *dest, const struct diff_input_info *info,
     const struct diff_result *result,
-    struct diff_chunk_context *cc)
+    struct diff_chunk_context *cc, off_t *outoff, bool headers_only)
 {
-	off_t outoff = 0, *offp;
+	off_t *offp;
 	int left_start, left_len, right_start, right_len;
 	int rc;
 	bool change = false;
@@ -95,6 +95,15 @@ output_plain_chunk(struct diff_output_info *outinfo,
 			    cc->left.end, right_start, cc->right.end);
 		}
 	}
+	if (rc < 0)
+		return errno;
+	if (outinfo) {
+		ARRAYLIST_ADD(offp, outinfo->line_offsets);
+		if (offp == NULL)
+			return ENOMEM;
+		*outoff += rc;
+		*offp = *outoff;
+	}
 
 	/*
 	 * Now write out all the joined chunks.
@@ -104,15 +113,27 @@ output_plain_chunk(struct diff_output_info *outinfo,
 	 * additions and deletions when this happens.
 	 */
 	int c_idx;
-	for (c_idx = cc->chunk.start; c_idx < cc->chunk.end; c_idx++) {
+	for (c_idx = cc->chunk.start; !headers_only && c_idx < cc->chunk.end;
+	    c_idx++) {
 		const struct diff_chunk *c = &result->chunks.head[c_idx];
 		if (c->left_count && !c->right_count)
 			rc = diff_output_lines(outinfo, dest,
 					  c->solved ? "< " : "?",
 					  c->left_start, c->left_count);
 		else if (c->right_count && !c->left_count) {
-			if (change)
-				fprintf(dest, "---\n");
+			if (change) {
+				rc = fprintf(dest, "---\n");
+				if (rc < 0)
+					return errno;
+				if (outinfo) {
+					ARRAYLIST_ADD(offp,
+					    outinfo->line_offsets);
+					if (offp == NULL)
+						return ENOMEM;
+					*outoff += rc;
+					*offp = *outoff;
+				}
+			}
 			rc = diff_output_lines(outinfo, dest,
 					  c->solved ? "> " : "?",
 					  c->right_start, c->right_count);
@@ -126,23 +147,13 @@ output_plain_chunk(struct diff_output_info *outinfo,
 		}
 	}
 
-	if (rc < 0)
-		return errno;
-	if (outinfo) {
-		ARRAYLIST_ADD(offp, outinfo->line_offsets);
-		if (offp == NULL)
-			return ENOMEM;
-		outoff += rc;
-		*offp = outoff;
-	}
-
 	return DIFF_RC_OK;
 }
 
 int
 diff_output_plain(struct diff_output_info **output_info,
     FILE *dest, const struct diff_input_info *info,
-    const struct diff_result *result)
+    const struct diff_result *result, int hunk_headers_only)
 {
 	struct diff_output_info *outinfo = NULL;
 	struct diff_chunk_context cc = {};
@@ -153,6 +164,7 @@ diff_output_plain(struct diff_output_info **output_info,
 	bool force_text = (flags & DIFF_FLAG_FORCE_TEXT_DATA);
 	bool have_binary = (atomizer_flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
 	int i, rc;
+	off_t outoff = 0, *offp;
 
 	if (!result)
 		return EINVAL;
@@ -174,9 +186,18 @@ diff_output_plain(struct diff_output_info **output_info,
 			if (t != CHUNK_MINUS && t != CHUNK_PLUS)
 				continue;
 
-			fprintf(dest, "Binary files %s and %s differ\n",
+			rc = fprintf(dest, "Binary files %s and %s differ\n",
 			    diff_output_get_label_left(info),
 			    diff_output_get_label_right(info));
+			if (rc < 0)
+				return errno;
+			if (outinfo) {
+				ARRAYLIST_ADD(offp, outinfo->line_offsets);
+				if (offp == NULL)
+					return ENOMEM;
+				outoff += rc;
+				*offp = outoff;
+			}
 			break;
 		}
 
@@ -212,12 +233,14 @@ diff_output_plain(struct diff_output_info **output_info,
 			 * loop */
 			continue;
 		}
-		rc = output_plain_chunk(outinfo, dest, info, result, &cc);
+		rc = output_plain_chunk(outinfo, dest, info, result, &cc,
+		    &outoff, hunk_headers_only);
 		if (rc != DIFF_RC_OK)
 			return rc;
 		cc = next;
 	}
 	if (!diff_chunk_context_empty(&cc))
-		return output_plain_chunk(outinfo, dest, info, result, &cc);
+		return output_plain_chunk(outinfo, dest, info, result, &cc,
+		    &outoff, hunk_headers_only);
 	return DIFF_RC_OK;
 }

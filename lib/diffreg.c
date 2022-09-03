@@ -280,7 +280,7 @@ got_diffreg_output(struct got_diff_line **lines, size_t *nlines,
 		break;
 	case GOT_DIFF_OUTPUT_PLAIN:
 		rc = diff_output_plain(lines ? &output_info : NULL,
-		    outfile, &info, diff_result->result);
+		    outfile, &info, diff_result->result, 1);
 		if (rc != DIFF_RC_OK)
 			return got_error_set_errno(rc, "diff_output_edscript");
 		break;
