@@ -8119,6 +8119,7 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 		return got_error_path(path, GOT_ERR_FILE_STATUS);
 	}
 
+	fflush(stdout);
 	return NULL;
 }
 
