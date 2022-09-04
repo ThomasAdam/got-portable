@@ -446,10 +446,12 @@ add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 		return err;
 
 	err = add_node(&new_node, a->graph, commit_id, a->repo);
-	if (err)
+	if (err) {
+		got_object_commit_close(commit);
 		return err;
+	}
 
-	a->tips[a->ntips].commit_id = new_node ? &new_node->id : NULL;
+	a->tips[a->ntips].commit_id = &new_node->id;
 	a->tips[a->ntips].commit = commit;
 	a->tips[a->ntips].new_node = new_node;
 	a->ntips++;
