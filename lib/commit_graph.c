@@ -534,6 +534,13 @@ done:
 void
 got_commit_graph_close(struct got_commit_graph *graph)
 {
+	struct got_commit_graph_node *node;
+
+	while ((node = TAILQ_FIRST(&graph->iter_list))) {
+		TAILQ_REMOVE(&graph->iter_list, node, entry);
+		free(node);
+	}
+
 	if (graph->open_branches)
 		got_object_idset_free(graph->open_branches);
 	if (graph->node_ids)
