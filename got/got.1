@@ -2144,6 +2144,11 @@ when the rebase operation continues.
 .Pp
 .Cm got rebase
 will refuse to run if certain preconditions are not met.
+If the
+.Ar branch
+is not in the
+.Dq refs/heads/
+reference namespace, the branch may not be rebased.
 If the work tree is not yet fully updated to the tip commit of its
 branch, then the work tree must first be updated with
 .Cm got update .

@@ -1656,6 +1656,33 @@ test_rebase_no_author_info() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_nonbranch() {
+	local testroot=`test_init rebase_nonbranch`
+
+	got ref -r $testroot/repo -c refs/heads/master \
+		refs/remotes/origin/master >/dev/null
+	
+	got checkout -b master $testroot/repo $testroot/wt >/dev/null
+
+	(cd $testroot/wt && got rebase origin/master > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "rebase succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n "got: will not rebase a branch which lives outside the " \
+		> $testroot/stderr.expected
+	echo '"refs/heads/" reference namespace' >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -1673,3 +1700,4 @@ run_test test_rebase_delete_missing_file
 run_test test_rebase_rm_add_rm_file
 run_test test_rebase_resets_committer
 run_test test_rebase_no_author_info
+run_test test_rebase_nonbranch

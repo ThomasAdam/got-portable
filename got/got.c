@@ -10228,6 +10228,12 @@ cmd_rebase(int argc, char *argv[])
 		error = got_ref_open(&branch, repo, argv[0], 0);
 		if (error != NULL)
 			goto done;
+		if (strncmp(got_ref_get_name(branch), "refs/heads/", 11) != 0) {
+			error = got_error_msg(GOT_ERR_COMMIT_BRANCH,
+			    "will not rebase a branch which lives outside "
+			    "the \"refs/heads/\" reference namespace");
+			goto done;
+		}
 	}
 
 	error = got_ref_resolve(&branch_head_commit_id, repo, branch);
