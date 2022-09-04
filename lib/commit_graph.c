@@ -518,16 +518,20 @@ fetch_commits_from_open_branches(struct got_commit_graph *graph,
 				break;
 			continue;
 		}
-		if (changed)
+		if (changed) {
 			add_node_to_iter_list(graph, new_node,
 			    got_object_commit_get_committer_time(commit));
+			arg.tips[i].new_node = NULL;
+		}
 		err = advance_branch(graph, commit_id, commit, repo);
 		if (err)
 			break;
 	}
 done:
-	for (i = 0; i < arg.ntips; i++)
+	for (i = 0; i < arg.ntips; i++) {
 		got_object_commit_close(arg.tips[i].commit);
+		free(arg.tips[i].new_node);
+	}
 	return err;
 }
 
