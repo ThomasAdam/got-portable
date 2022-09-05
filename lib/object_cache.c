@@ -360,6 +360,35 @@ check_refcount(struct got_object_id *id, void *data, void *arg)
 }
 #endif
 
+static const struct got_error *
+free_entry(struct got_object_id *id, void *data, void *arg)
+{
+	struct got_object_cache *cache = arg;
+	struct got_object_cache_entry *ce = data;
+
+	switch (cache->type) {
+	case GOT_OBJECT_CACHE_TYPE_OBJ:
+		got_object_close(ce->data.obj);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TREE:
+		got_object_tree_close(ce->data.tree);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_COMMIT:
+		got_object_commit_close(ce->data.commit);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		got_object_tag_close(ce->data.tag);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		got_object_raw_close(ce->data.raw);
+		break;
+	}
+
+	free(ce);
+
+	return NULL;
+}
+
 void
 got_object_cache_close(struct got_object_cache *cache)
 {
@@ -387,6 +416,7 @@ got_object_cache_close(struct got_object_cache *cache)
 #endif
 
 	if (cache->idset) {
+		got_object_idset_for_each(cache->idset, free_entry, cache);
 		got_object_idset_free(cache->idset);
 		cache->idset = NULL;
 	}
