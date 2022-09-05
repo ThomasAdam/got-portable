@@ -228,16 +228,38 @@ AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
 AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 
 if test x"$PLATFORM" = "xdarwin"; then
-	if ! test -x "/usr/local/opt/bison/bin/bison"; then
+	# Check for and/or set HOMEBREW_PREFIX.  brew is a common way of
+	# installing applications.  The other is MacPorts.
+	#
+	# Before Apple Silicon existed (M1 onward), the paths for applications
+	# installed via homebrew was typically /usr/local.  However, with M1
+	# onward, this changed to a different path.
+	#
+	# Rather than hardcode this, check for HOMEBREW_PREFIX in the
+	# environment if it's already set, and use it.  Otherwise, chec for
+	# brew(1) and use that.  If that fails, default to /usr/local
+	#
+	# This also means that MacPorts should continue to work.
+	if test -z "$HOMEBREW_PREFIX"; then
+		# HOMEBREW_PREFIX not set, check for brew(1)
+		if test -x command -v brew >/dev/null 2>&1; then
+			export HOMEBREW_PREFIX="$(brew --prefix)"
+		else
+			# Default.
+			export HOMEBREW_PREFIX="/usr/local"
+		fi
+	fi
+
+	if ! test -x "${HOMEBREW_PREFIX}/opt/bison/bin/bison"; then
 		AC_MSG_ERROR("GNU Bison not found")
 	fi
 
 	# Override YACC here to point to the GNU version of bison.
-	export YACC="/usr/local/opt/bison/bin/bison -y"
-	export LDFLAGS="-L/usr/local/opt/ncurses/lib -L/usr/local/opt/openssl@3/lib $LDFLAGS"
-	export CPPFLAGS="-I/usr/local/opt/ncurses/include -I/usr/local/opt/openssl@3/include $CPPFLAGS"
-	export PKG_CONFIG_PATH="/usr/local/opt/ncurses/lib/pkgconfig"
-	export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/usr/local/opt/openssl@3/lib/pkgconfig"
+	export YACC="${HOMEBREW_PREFIX}/opt/bison/bin/bison -y"
+	export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFI}/opt/openssl@3/lib $LDFLAGS"
+	export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/ncurses/include -I${HOMEBREW_PREFIX}/opt/openssl@3/include $CPPFLAGS"
+	export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/ncurses/lib/pkgconfig"
+	export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${HOMEBREW_PREFIX}/opt/openssl@3/lib/pkgconfig"
 fi
 
 # Landlock detection.
