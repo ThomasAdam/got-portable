@@ -90,6 +90,12 @@ struct got_commit_graph {
 	 * commit timestmap.
 	 */
 	struct got_commit_graph_iter_list iter_list;
+
+	/*
+	 * Temporary storage for the id returned by
+	 * got_commit_graph_iter_next.
+	 */
+	struct got_object_id id;
 };
 
 static const struct got_error *
@@ -614,8 +620,11 @@ got_commit_graph_iter_next(struct got_object_id **id,
 			return err;
 	}
 
-	*id = &node->id;
+	memcpy(&graph->id, &node->id, sizeof(graph->id));
+	*id = &graph->id;
+
 	TAILQ_REMOVE(&graph->iter_list, node, entry);
+	free(node);
 	return NULL;
 }
 

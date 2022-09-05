@@ -2092,12 +2092,19 @@ alloc_commit_queue_entry(struct got_commit_object *commit,
     struct got_object_id *id)
 {
 	struct commit_queue_entry *entry;
+	struct got_object_id *dup;
 
 	entry = calloc(1, sizeof(*entry));
 	if (entry == NULL)
 		return NULL;
 
-	entry->id = id;
+	dup = got_object_id_dup(id);
+	if (dup == NULL) {
+		free(entry);
+		return NULL;
+	}
+
+	entry->id = dup;
 	entry->commit = commit;
 	return entry;
 }
@@ -2111,7 +2118,7 @@ pop_commit(struct commit_queue *commits)
 	TAILQ_REMOVE(&commits->head, entry, entry);
 	got_object_commit_close(entry->commit);
 	commits->ncommits--;
-	/* Don't free entry->id! It is owned by the commit graph. */
+	free(entry->id);
 	free(entry);
 }
 

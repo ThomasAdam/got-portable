@@ -9708,6 +9708,7 @@ collect_commits(struct got_object_id_queue *commits,
 	struct got_object_id *parent_id = NULL;
 	struct got_object_qid *qid;
         struct got_object_id *commit_id = initial_commit_id;
+	struct got_object_id *tmp = NULL;
 
 	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
@@ -9738,10 +9739,19 @@ collect_commits(struct got_object_id_queue *commits,
 			if (err)
 				goto done;
 			STAILQ_INSERT_HEAD(commits, qid, entry);
-			commit_id = parent_id;
+
+			free(tmp);
+			tmp = got_object_id_dup(parent_id);
+			if (tmp == NULL) {
+				err = got_error_from_errno(
+				    "got_object_id_dup");
+				goto done;
+			}
+			commit_id = tmp;
 		}
 	}
 done:
+	free(tmp);
 	got_commit_graph_close(graph);
 	return err;
 }

@@ -595,7 +595,12 @@ blame_open(struct got_blame **blamep, const char *path,
 			goto done;
 		}
 		if (next_id) {
-			id = next_id;
+			free(id);
+			id = got_object_id_dup(next_id);
+			if (id == NULL) {
+				err = got_error_from_errno("got_object_id_dup");
+				goto done;
+			}
 			err = blame_commit(blame, id, path, repo, cb, arg);
 			if (err) {
 				if (err->code == GOT_ERR_ITER_COMPLETED)
@@ -628,6 +633,7 @@ done:
 	if (graph)
 		got_commit_graph_close(graph);
 	free(obj_id);
+	free(id);
 	if (blob)
 		got_object_blob_close(blob);
 	if (start_commit)
