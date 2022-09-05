@@ -499,6 +499,44 @@ test_branch_show() {
 
 }
 
+test_branch_packed_ref_collision() {
+	local testroot=`test_init branch_packed_ref_collision`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got br -r $testroot/repo zoo > $testroot/stdout
+	got co -b zoo $testroot/repo $testroot/wt > /dev/null
+	echo "modified alpha" > $testroot/wt/alpha
+
+	# sleep in order to ensure that a significant fraction of time
+	# passes between commits; required for got branch -t option below
+	sleep 1
+
+	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
+	local commit_id2=`git_show_branch_head $testroot/repo zoo`
+
+	# Fabricate a packed reference which points to an older commit
+	# and collides with the existing on-disk reference
+	echo '# pack-refs with: peeled fully-peeled sorted' > \
+		$testroot/repo/.git/packed-refs
+	echo "$commit_id refs/heads/zoo" >> $testroot/repo/.git/packed-refs
+
+	# Bug: This command used to show both packed and on-disk
+	# variants of ref/heads/zoo:
+	(cd $testroot/wt && got br -lt > $testroot/stdout)
+
+	echo "* zoo: $commit_id2" > $testroot/stdout.expected
+	echo "  master: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_branch_create
 run_test test_branch_list
@@ -506,3 +544,4 @@ run_test test_branch_delete
 run_test test_branch_delete_current_branch
 run_test test_branch_delete_packed
 run_test test_branch_show
+run_test test_branch_packed_ref_collision
