@@ -300,6 +300,7 @@ got_dial_git(int *newfd, const char *host, const char *port,
 		err = got_error_from_errno("connect");
 		close(fd);
 	}
+	freeaddrinfo(servinfo);
 	if (p == NULL)
 		goto done;
 
