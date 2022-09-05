@@ -860,6 +860,27 @@ got_reflist_insert(struct got_reflist_entry **newp,
 	new->ref = ref;
 	*newp = new;
 
+	if (cmp_cb != got_ref_cmp_by_name &&
+	    (new->ref->flags & GOT_REF_IS_PACKED)) {
+		/*
+		 * If we are not sorting elements by name then we must still
+		 * detect collisions between a packed ref and an on-disk ref
+		 * using the same name. On-disk refs take precedence and are
+		 * already present on the list before packed refs get added.
+		 */
+		TAILQ_FOREACH(re, refs, entry) {
+			err = got_ref_cmp_by_name(NULL, &cmp,
+			    re->ref, new->ref);
+			if (err)
+				return err;
+			if (cmp == 0) {
+				free(new);
+				*newp = NULL;
+				return NULL;
+			}
+		}
+	}
+
 	/*
 	 * We must de-duplicate entries on insert because packed-refs may
 	 * contain redundant entries. On-disk refs take precedence.
