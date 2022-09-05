@@ -918,18 +918,14 @@ cmdline_symset(char *s)
 {
 	char *sym, *val;
 	int ret;
-	size_t len;
 
 	val = strrchr(s, '=');
 	if (val == NULL)
 		return (-1);
 
-	len = strlen(s) - strlen(val) + 1;
-	sym = malloc(len);
+	sym = strndup(s, val - s);
 	if (sym == NULL)
-		fatal("%s: malloc", __func__);
-
-	memcpy(&sym, s, len);
+		fatal("%s: strndup", __func__);
 
 	ret = symset(sym, val + 1, 1);
 	free(sym);
