@@ -213,8 +213,6 @@ packed_first_parent_traversal(int *ncommits_traversed,
 
 	/* Add all traversed commits to the graph... */
 	STAILQ_FOREACH(qid, &traversed_commits, entry) {
-		struct got_commit_graph_node *node;
-
 		if (got_object_idset_contains(graph->open_branches, &qid->id))
 			continue;
 		if (got_object_idset_contains(graph->node_ids, &qid->id))
@@ -229,7 +227,7 @@ packed_first_parent_traversal(int *ncommits_traversed,
 			break;
 		}
 
-		err = add_node(&node, graph, &qid->id, repo);
+		err = got_object_idset_add(graph->node_ids, &qid->id, NULL);
 		if (err)
 			break;
 	}
