@@ -434,6 +434,8 @@ got_get_repo_commits(struct request *c, int limit)
 		goto done;
 
 	for (;;) {
+		struct got_object_id *next_id;
+
 		if (limit_chk == ((limit * qs->page) - (limit - 1)) &&
 		    commit_found == 0 && repo_commit &&
 		    repo_commit->commit_id != NULL) {
@@ -444,17 +446,15 @@ got_get_repo_commits(struct request *c, int limit)
 			}
 		}
 
-		error = got_commit_graph_iter_next(&id, graph, repo, NULL,
+		error = got_commit_graph_iter_next(&next_id, graph, repo, NULL,
 		    NULL);
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED)
 				error = NULL;
 			goto done;
 		}
-		if (id == NULL)
-			goto done;
 
-		error = got_object_open_as_commit(&commit, repo, id);
+		error = got_object_open_as_commit(&commit, repo, next_id);
 		if (error)
 			goto done;
 
@@ -470,7 +470,7 @@ got_get_repo_commits(struct request *c, int limit)
 		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
 
 		error = got_get_repo_commit(c, repo_commit, commit,
-		    &refs, id);
+		    &refs, next_id);
 		if (error)
 			goto done;
 
@@ -482,14 +482,9 @@ got_get_repo_commits(struct request *c, int limit)
 				commit_found = 1;
 			else {
 				limit_chk++;
-				free(id);
-				id = NULL;
 				continue;
 			}
 		}
-
-		free(id);
-		id = NULL;
 
 		if (limit == 1 && chk_multi == 0 &&
 		    srv->max_commits_display != 1)
