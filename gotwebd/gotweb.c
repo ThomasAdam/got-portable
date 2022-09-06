@@ -728,12 +728,12 @@ gotweb_render_header(struct request *c)
 	    "<div id='site_path'>\n"
 	    "<div id='site_link'>\n"
 	    "<a href='?index_page=%d'>%s</a>",
-	    c->script_name,
-	    c->script_name,
-	    c->script_name,
-	    c->script_name,
-	    c->script_name,
 	    srv->site_name,
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
+	    c->script_name,
 	    c->script_name, srv->custom_css,
 	    srv->logo_url,
 	    c->script_name, srv->logo,
