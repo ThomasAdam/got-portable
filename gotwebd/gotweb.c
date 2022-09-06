@@ -2002,7 +2002,7 @@ cache_repo(struct got_repository **new, struct server *srv,
 	struct cached_repo *cr;
 	int evicted = 0;
 
-	if (srv->ncached_repos >= nitems(srv->cached_repos)) {
+	if (srv->ncached_repos >= GOTWEBD_REPO_CACHESIZE) {
 		cr = &srv->cached_repos[srv->ncached_repos - 1];
 		error = got_repo_close(cr->repo);
 		memset(cr, 0, sizeof(*cr));
