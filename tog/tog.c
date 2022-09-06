@@ -8478,6 +8478,9 @@ main(int argc, char *argv[])
 	};
 	char *diff_algo_str = NULL;
 
+	if (!isatty(STDIN_FILENO))
+		errx(1, "standard input is not a tty");
+
 	setlocale(LC_CTYPE, "");
 
 	while ((ch = getopt_long(argc, argv, "+hV", longopts, NULL)) != -1) {
