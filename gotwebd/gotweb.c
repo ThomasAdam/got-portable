@@ -1788,7 +1788,8 @@ gotweb_render_tag(struct request *c)
 	    "</div>\n"		/* #tag_header */
 	    "<div class='dotted_line'></div>\n"
 	    "<div id='tag_commit'>\n%s</div>"
-	    "</div>",		/* tag_header_wrapper */
+	    "</div>"		/* #tag_header_wrapper */
+	    "</div>",		/* #tags_content */
 	    rt->commit_id,
 	    tagname,
 	    author,
