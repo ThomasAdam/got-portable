@@ -1629,21 +1629,27 @@ match_packed_object(struct got_object_id **unique_id,
     struct got_repository *repo, const char *id_str_prefix, int obj_type)
 {
 	const struct got_error *err = NULL;
+	char *objects_pack_dir = NULL;
 	struct got_object_id_queue matched_ids;
 	struct got_pathlist_entry *pe;
 	struct stat sb;
 
 	STAILQ_INIT(&matched_ids);
 
-	if (stat(got_repo_get_path_objects_pack(repo), &sb) == -1) {
-		if (errno != ENOENT)
-			return got_error_from_errno2("stat",
-			    got_repo_get_path_objects_pack(repo));
+	objects_pack_dir = got_repo_get_path_objects_pack(repo);
+	if (objects_pack_dir == NULL)
+		return got_error_from_errno("got_repo_get_path_objects_pack");
+
+	if (stat(objects_pack_dir, &sb) == -1) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno2("stat", objects_pack_dir);
+			goto done;
+		}
 	} else if (sb.st_mtime != repo->pack_path_mtime) {
 		purge_packidx_paths(&repo->packidx_paths);
 		err = got_repo_list_packidx(&repo->packidx_paths, repo);
 		if (err)
-			return err;
+			goto done;
 	}
 
 	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
@@ -1692,6 +1698,7 @@ match_packed_object(struct got_object_id **unique_id,
 		}
 	}
 done:
+	free(objects_pack_dir);
 	got_object_id_queue_free(&matched_ids);
 	if (err) {
 		free(*unique_id);
@@ -1790,21 +1797,25 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
     const char *id_str_prefix, int obj_type, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *path_objects = got_repo_get_path_objects(repo);
-	char *object_dir = NULL;
+	char *path_objects = NULL, *object_dir = NULL;
 	size_t len;
 	int i;
 
 	*id = NULL;
 
+	path_objects = got_repo_get_path_objects(repo);
+
 	len = strlen(id_str_prefix);
-	if (len > SHA1_DIGEST_STRING_LENGTH - 1)
-		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
+	if (len > SHA1_DIGEST_STRING_LENGTH - 1) {
+		err = got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
+		goto done;
+	}
 
 	for (i = 0; i < len; i++) {
 		if (isxdigit((unsigned char)id_str_prefix[i]))
 			continue;
-		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
+		err = got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
+		goto done;
 	}
 
 	if (len >= 2) {
@@ -1840,6 +1851,7 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 		goto done;
 	}
 done:
+	free(path_objects);
 	free(object_dir);
 	if (err) {
 		free(*id);
