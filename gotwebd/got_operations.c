@@ -923,6 +923,8 @@ done:
 	got_ref_list_free(&refs);
 	if (commit)
 		got_object_commit_close(commit);
+	if (tree)
+		got_object_tree_close(tree);
 	free(commit_id);
 	free(tree_id);
 	return error;
