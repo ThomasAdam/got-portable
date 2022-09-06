@@ -256,7 +256,7 @@ struct server {
 	TAILQ_ENTRY(server)	 entry;
 	struct addresslist	al;
 
-	struct cached_repo	cached_repos[GOTWEBD_REPO_CACHESIZE];
+	struct cached_repo	*cached_repos;
 	int		 ncached_repos;
 
 	char		 name[GOTWEBD_MAXTEXT];

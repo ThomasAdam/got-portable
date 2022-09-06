@@ -82,7 +82,9 @@ config_setserver(struct gotwebd *env, struct server *srv)
 	struct privsep *ps = env->gotwebd_ps;
 
 	memcpy(&ssrv, srv, sizeof(ssrv));
-	proc_compose(ps, PROC_SOCKS, IMSG_CFG_SRV, &ssrv, sizeof(ssrv));
+	if (proc_compose(ps, PROC_SOCKS, IMSG_CFG_SRV, &ssrv, sizeof(ssrv))
+	    == -1)
+		fatal("proc_compose");
 	 return 0;
 }
 
@@ -97,13 +99,19 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	srv = calloc(1, sizeof(*srv));
 	if (srv == NULL)
 		fatalx("%s: calloc", __func__);
-	memcpy(srv, p, sizeof(*srv));
 
 	if (IMSG_DATA_SIZE(imsg) != sizeof(*srv)) {
 		log_debug("%s: imsg size error", __func__);
 		free(srv);
 		return 1;
 	}
+
+	memcpy(srv, p, sizeof(*srv));
+	srv->cached_repos = calloc(GOTWEBD_REPO_CACHESIZE,
+	    sizeof(*srv->cached_repos));
+	if (srv->cached_repos == NULL)
+		fatal("%s: calloc", __func__);
+	srv->ncached_repos = 0;
 
 	/* log server info */
 	log_debug("%s: server=%s fcgi_socket=%s unix_socket=%s", __func__,
