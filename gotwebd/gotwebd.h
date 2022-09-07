@@ -341,6 +341,23 @@ struct gotwebd {
 	char		 unix_socket_name[PATH_MAX];
 };
 
+/*
+ * URL parameter for gotweb_link.  NULL values and int set to -1 are
+ * implicitly ignored, and string are properly escaped.
+ */
+struct gotweb_url {
+	int		 action;
+	int		 index_page;
+	int		 page;
+	const char	*commit;
+	const char	*previd;
+	const char	*prevset;
+	const char	*file;
+	const char	*folder;
+	const char	*headref;
+	const char	*path;
+};
+
 struct querystring {
 	uint8_t		 action;
 	char		*commit;
@@ -411,6 +428,9 @@ const struct got_error
 const struct got_error *gotweb_get_time_str(char **, time_t, int);
 const struct got_error *gotweb_init_transport(struct transport **);
 const struct got_error *gotweb_escape_html(char **, const char *);
+int gotweb_link(struct request *, struct gotweb_url *, const char *, ...)
+	__attribute__((__format__(printf, 3, 4)))
+	__attribute__((__nonnull__(3)));
 void gotweb_free_repo_commit(struct repo_commit *);
 void gotweb_free_repo_tag(struct repo_tag *);
 void gotweb_process_request(struct request *);
@@ -426,6 +446,7 @@ void fcgi_timeout(int, short, void *);
 void fcgi_cleanup_request(struct request *);
 void fcgi_create_end_record(struct request *);
 void dump_fcgi_record(const char *, struct fcgi_record_header *);
+int fcgi_vprintf(struct request *, const char *, va_list);
 int fcgi_printf(struct request *, const char *, ...)
 	__attribute__((__format__(printf, 2, 3)))
 	__attribute__((__nonnull__(2)));

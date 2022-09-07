@@ -288,16 +288,12 @@ fcgi_timeout(int fd, short events, void *arg)
 }
 
 int
-fcgi_printf(struct request *c, const char *fmt, ...)
+fcgi_vprintf(struct request *c, const char *fmt, va_list ap)
 {
-	va_list ap;
 	char *str;
 	int r;
 
-	va_start(ap, fmt);
 	r = vasprintf(&str, fmt, ap);
-	va_end(ap);
-
 	if (r == -1) {
 		log_warn("%s: asprintf", __func__);
 		return -1;
@@ -305,6 +301,19 @@ fcgi_printf(struct request *c, const char *fmt, ...)
 
 	r = fcgi_gen_binary_response(c, str, r);
 	free(str);
+	return r;
+}
+
+int
+fcgi_printf(struct request *c, const char *fmt, ...)
+{
+	va_list ap;
+	int r;
+
+	va_start(ap, fmt);
+	r = fcgi_vprintf(c, fmt, ap);
+	va_end(ap);
+
 	return r;
 }
 
