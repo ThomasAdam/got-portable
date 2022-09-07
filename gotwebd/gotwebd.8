@@ -21,6 +21,9 @@
 .Nd Game of Trees Git Fast-CGI repository server for web browsers
 .Sh SYNOPSIS
 .Nm
+.Op Fl dnv
+.Op Fl D Ar macro=value
+.Op Fl f Ar file
 .Sh DESCRIPTION
 .Nm
 is a Fast-CGI server program which can display the contents of Git
@@ -29,6 +32,25 @@ The program has been designed to work out of the box with
 the
 .Xr httpd 8
 web server.
+.Pp
+.Nm
+provides the following options:
+.Bl -tag -width tenletters
+.It Fl d
+Do not daemonize and log to stderr.
+.It Fl D Ar macro=value
+Override the value of a macro used in the configuration file.
+.It Fl f Ar file
+Set the path to the configuration file.
+If not specified, the file
+.Pa /etc/gotwebd.conf
+will be used.
+.It Fl n
+Parse the configuration file, report errors if any, and exit.
+.It Fl v
+Verbose mode.
+Verbosity increases if this option is used multiple times.
+.El
 .Pp
 Enabling
 .Nm
