@@ -1,3 +1,57 @@
+* got 0.75; 2022-09-07
+  too many changes to list all here; see git repository history for more
+- unlink temporary files created during ssh signature verification
+- add gotwebd, a fast-cgi server and successor of gotweb (tracey)
+- lots of release-preparation work on gotwebd (naddy, op, tracey, stsp)
+- cast argument of type rlim_t to unsigned long long to match the %llu (naddy)
+- tog: add key to toggle author/committer in log view (op)
+- make our email address parsing closer to Git's parsing rules (op)
+- got commit: add -A flag to specify the author of a patch (op)
+- tog: alias J and K to > and < keybindings for diff view (patch by Mikhail)
+- fix 'got cat' printing commit author instead of committer (op)
+- tog: add 'L' key to blame view; opens log view for the annotated line (jamsek)
+- don't chug along if repo format version is unsupported (florian)
+- fix dead stores to variables, found with LLVM's scan-build (florian)
+- fix unitialized error return (florian)
+- make sure got_repo_pack_fds_close() frees a malloc'ed pointer (florian)
+- prevent memory leak when asprintf fails (florian)
+- prevent use-after-free of packed_refs_path in error path (florian)
+- got_repo_pack_fds_close: don't close(0) (patch by Lucas)
+- reset committer's name+email during rebase and histedit
+- tog: fix unintentional move of cursor after closing child views (jamsek)
+- tog: uppercase all the key maps which open new views (jamsek)
+- make 'got histedit' fetch author info from Git configuration as a fallback
+- fix 'got patch -R' when using diff3 merge (op)
+- add GOT_IGNORE_GITCONFIG env var to force ignoring of Git config files
+- fix off_t type mismatches (naddy)
+- got patch: error if patchfile isn't a regular file (op)
+- make 'got patch' apply pledge(2) earlier (op)
+- got/tog diff: fix accounting for line-endings in files containing CRLF (op)
+- got patch: add -c flag to apply at a specified commit (op)
+- fix two missing error checks in tog (found by florian with scan-build)
+- remove pointless repo_close + leaked error (found by florian with scan-build)
+- tog: add n{G,g} key map to jump to line n like less(1) (jamsek)
+- diff: re-alloc arrays in larger chunks for up to 3x more performance (jamsek)
+- fix whitespace-related issues when 'got patch' is matching a hunk (op)
+- tog: add keymaps to jump to next/prev file/hunk in the diff view (jamsek)
+- fix 'got tag' not tagging the work tree's current branch by default
+- tog log: don't block while loading commits after 'G' key was pressed (jamsek)
+- man pages: group options in accordance to style(9) (patch by Josiah Frentsos)
+- man pages: Replace 'Ar sign' with 'Cm sign' (patch by Josiah Frentsos)
+- don't add trailing \0 to signed tag objects; fixes interop with Github (jrick)
+- use Xo/Xc in the man pages (patch by Josiah Frentsos)
+- fix diffing two blobs by object ID with 'got diff' (jamsek)
+- refresh pack-index path list if mtime of the objects/pack directory changed
+- diff3: switch diff output mode from "edscript" to "plain" (patch by Tom Jones)
+- use the faster plain-diff headers-only mode for diff3
+- do not segfault while verifying "lightweight" tags (jrick)
+- don't search through ignored paths and files on commit (sdk)
+- plug a lot of memory leaks (op)
+- forbid rebase of references outside the "refs/heads/" namespace
+- fflush(stdout) after asking questions; improves got-portable behaviour (op)
+- fix bug where 'got branch -lt' produced duplicate listings of a branch
+- tog: ensure stdin is a tty to guard against 'tog < /dev/null' etc. (jamsek)
+
 * got 0.74; 2022-07-14
 - cast printf argument of type time_t to long long to match the %lld (naddy)
 - add missing revoked_signers grammar to got.conf(5) (jrick)
