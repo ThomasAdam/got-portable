@@ -10,6 +10,23 @@ die()
 	exit 1
 }
 
+# Wrap the nproc command found on Linux, to return the number of CPU cores.
+# On non-Linux systems, the same value can be found via sysctl.  For
+# everything else, just return "1".
+nproc()
+{
+	NPROCCMD="nproc"
+
+	command -v "$NPROCCMD" >/dev/null 2>&1 || {
+		NPROCCMD="sysctl -n hw.ncpu"
+	}
+
+	result="$(eval command $NPROCCMD)"
+	[ -z "$result" -o "$result" -le 0 ] && result="1"
+
+	echo "$result"
+}
+
 [ -z "$(git status --porcelain)" ] || die "Working tree is not clean"
 
 echo "Updating main from origin..."
