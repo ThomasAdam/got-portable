@@ -810,7 +810,7 @@ got_output_repo_tree(struct request *c)
 	struct got_reflist_head refs;
 	struct got_tree_object *tree = NULL;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *name, *index_page_str, *folder;
+	const char *name, *folder;
 	char *escaped_name = NULL, *path = NULL;
 	int nentries, i, r;
 
@@ -849,7 +849,6 @@ got_output_repo_tree(struct request *c)
 
 	nentries = got_object_tree_get_nentries(tree);
 
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 	folder = qs->folder ? qs->folder : "";
 
 	for (i = 0; i < nentries; i++) {
@@ -877,41 +876,75 @@ got_output_repo_tree(struct request *c)
 			goto done;
 
 		if (S_ISDIR(mode)) {
-			r = fcgi_printf(c,
-			    "<div class='tree_wrapper'>\n"
-			    "<div class='tree_line'>"
-			    "<a class='diff_directory' "
-			    "href='?index_page=%s&path=%s&action=tree"
-			    "&commit=%s&folder=%s/%s'>%s%s</a>"
-			    "</div>\n" /* .tree_line */
-			    "<div class='tree_line_blank'>&nbsp;</div>\n"
-			    "</div>\n", /* .tree_wrapper */
-			    index_page_str, qs->path, rc->commit_id,
-			    folder, name, escaped_name, modestr);
+			struct gotweb_url url = {
+				.index_page = -1,
+				.page = -1,
+				.action = TREE,
+				.commit = rc->commit_id,
+				.path = qs->path,
+				/* `folder' is filled later */
+			};
+			char *path = NULL;
+
+			if (fcgi_printf(c,"<div class='tree_wrapper'>\n"
+			    "<div class='tree_line'>") == -1)
+				goto done;
+
+			if (asprintf(&path, "%s/%s", folder, name) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			url.folder = path;
+			r = gotweb_link(c, &url, "%s%s", escaped_name,
+			    modestr);
+			free(path);
 			if (r == -1)
 				goto done;
+
+			if (fcgi_printf(c, "</div>\n" /* .tree_line */
+			    "<div class='tree_line_blank'>&nbsp;</div>\n"
+			    "</div>\n") == -1)
+				goto done;
 		} else {
-			r = fcgi_printf(c,
-			    "<div class='tree_wrapper'>\n"
-			    "<div class='tree_line'>"
-			    "<a href='?index_page=%s&path=%s&action=blob"
-			    "&commit=%s&folder=%s&file=%s'>%s%s</a>"
-			    "</div>\n" /* .tree_line */
-			    "<div class='tree_line_blank'>"
-			    "<a href='?index_page=%s&path=%s&action=commits"
-			    "&commit=%s&folder=%s&file=%s'>commits</a>\n"
-			    " | \n"
-			    "<a href='?index_page=%s&path=%s&action=blame"
-			    "&commit=%s&folder=%s&file=%s'>blame</a>\n"
-			    "</div>\n"  /* .tree_line_blank */
-			    "</div>\n", /* .tree_wrapper */
-			    index_page_str, qs->path, rc->commit_id,
-			    folder, name, escaped_name, modestr,
-			    index_page_str, qs->path, rc->commit_id,
-			    folder, name,
-			    index_page_str, qs->path, rc->commit_id,
-			    folder, name);
+			struct gotweb_url url = {
+				.index_page = -1,
+				.page = -1,
+				.path = qs->path,
+				.commit = rc->commit_id,
+				.folder = folder,
+				.file = name,
+			};
+
+			if (fcgi_printf(c, "<div class='tree_wrapper'>\n"
+			    "<div class='tree_line'>") == -1)
+				goto done;
+
+			url.action = BLOB;
+			r = gotweb_link(c, &url, "%s%s", escaped_name,
+			    modestr);
 			if (r == -1)
+				goto done;
+
+			if (fcgi_printf(c, "</div>\n" /* .tree_line */
+			    "<div class='tree_line_blank'>") == -1)
+				goto done;
+
+			url.action = COMMITS;
+			r = gotweb_link(c, &url, "commits");
+			if (r == -1)
+				goto done;
+
+			if (fcgi_printf(c, " | ") == -1)
+				goto done;
+
+			url.action = BLAME;
+			r = gotweb_link(c, &url, "blame");
+			if (r == -1)
+				goto done;
+
+			if (fcgi_printf(c,
+			    "</div>\n"		/* .tree_line_blank */
+			    "</div>\n") == -1)	/* .tree_wrapper */
 				goto done;
 		}
 		free(escaped_name);
@@ -1069,9 +1102,7 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 	struct blame_line *bline;
 	struct request *c = a->c;
 	struct transport *t = c->t;
-	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *index_page_str;
 	char *line = NULL, *eline = NULL;
 	size_t linesize = 0;
 	off_t offset;
@@ -1121,8 +1152,6 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		goto done;
 	}
 
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
-
 	while (a->lineno_cur <= a->nlines && bline->annotated) {
 		char *smallerthan, *at, *nl, *committer;
 		size_t len;
@@ -1152,19 +1181,28 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		if (err)
 			goto done;
 
-		r = fcgi_printf(c, "<div class='blame_wrapper'>"
+		if (fcgi_printf(c, "<div class='blame_wrapper'>"
 		    "<div class='blame_number'>%.*d</div>"
-		    "<div class='blame_hash'>"
-		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s'>"
-		    "%.8s</a>"
+		    "<div class='blame_hash'>",
+		    a->nlines_prec, a->lineno_cur) == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = DIFF,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = bline->id_str,
+		    }, "%.8s", bline->id_str);
+		if (r == -1)
+			goto done;
+
+		r = fcgi_printf(c,
 		    "</div>"
 		    "<div class='blame_date'>%s</div>"
 		    "<div class='blame_author'>%s</div>"
 		    "<div class='blame_code'>%s</div>"
 		    "</div>",	/* .blame_wrapper */
-		    a->nlines_prec, a->lineno_cur,
-		    index_page_str, repo_dir->name, bline->id_str,
-		    bline->id_str,
 		    bline->datebuf,
 		    committer,
 		    eline);

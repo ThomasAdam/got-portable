@@ -694,6 +694,7 @@ gotweb_render_content_type_file(struct request *c, const uint8_t *type,
 static const struct got_error *
 gotweb_render_header(struct request *c)
 {
+	const struct got_error *err = NULL;
 	struct server *srv = c->srv;
 	struct querystring *qs = c->t->qs;
 	int r;
@@ -743,10 +744,21 @@ gotweb_render_header(struct request *c)
 
 	if (qs != NULL) {
 		if (qs->path != NULL) {
-			r = fcgi_printf(c, " / "
-			    "<a href='?index_page=%d&path=%s&action=summary'>"
-			    "%s</a>",
-			    qs->index_page, qs->path, qs->path);
+			char *epath;
+
+			if (fcgi_printf(c, " / ") == -1)
+				goto done;
+
+			err = gotweb_escape_html(&epath, qs->path);
+			if (err)
+				return err;
+			r = gotweb_link(c, &(struct gotweb_url){
+				.action = SUMMARY,
+				.index_page = -1,
+				.page = -1,
+				.path = qs->path,
+			    }, "%s", epath);
+			free(epath);
 			if (r == -1)
 				goto done;
 		}
@@ -826,8 +838,7 @@ gotweb_render_navs(struct request *c)
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct server *srv = c->srv;
-	char *nhref = NULL, *phref = NULL;
-	int r, disp = 0;
+	int r;
 
 	r = fcgi_printf(c, "<div id='np_wrapper'>\n<div id='nav_prev'>\n");
 	if (r == -1)
@@ -836,140 +847,134 @@ gotweb_render_navs(struct request *c)
 	switch(qs->action) {
 	case INDEX:
 		if (qs->index_page > 0) {
-			if (asprintf(&phref, "index_page=%d",
-			    qs->index_page - 1) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = -1,
+				.index_page = qs->index_page - 1,
+				.page = -1,
+			};
+
+			r = gotweb_link(c, &url, "Previous");
 		}
 		break;
 	case BRIEFS:
 		if (t->prev_id && qs->commit != NULL &&
 		    strcmp(qs->commit, t->prev_id) != 0) {
-			if (asprintf(&phref, "index_page=%d&path=%s&page=%d"
-			    "&action=briefs&commit=%s&headref=%s",
-			    qs->index_page, qs->path, qs->page - 1, t->prev_id,
-			    qs->headref) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = BRIEFS,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+			};
+
+			r = gotweb_link(c, &url, "Previous");
 		}
 		break;
 	case COMMITS:
 		if (t->prev_id && qs->commit != NULL &&
 		    strcmp(qs->commit, t->prev_id) != 0) {
-			if (asprintf(&phref, "index_page=%d&path=%s&page=%d"
-			    "&action=commits&commit=%s&headref=%s&folder=%s"
-			    "&file=%s",
-			    qs->index_page, qs->path, qs->page - 1, t->prev_id,
-			    qs->headref, qs->folder ? qs->folder : "",
-			    qs->file ? qs->file : "") == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = COMMIT,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+				.folder = qs->folder,
+				.file = qs->file,
+			};
+
+			r = gotweb_link(c, &url, "Previous");
 		}
 		break;
 	case TAGS:
 		if (t->prev_id && qs->commit != NULL &&
 		    strcmp(qs->commit, t->prev_id) != 0) {
-			if (asprintf(&phref, "index_page=%d&path=%s&page=%d"
-			    "&action=tags&commit=%s&headref=%s",
-			    qs->index_page, qs->path, qs->page - 1, t->prev_id,
-			    qs->headref) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = TAGS,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+			};
+
+			r = gotweb_link(c, &url, "Previous");
 		}
-		break;
-	default:
-		disp = 0;
 		break;
 	}
 
-	if (disp) {
-		r = fcgi_printf(c, "<a href='?%s'>Previous</a>", phref);
-		if (r == -1)
-			goto done;
-	}
+	if (r == -1)
+		goto done;
 
 	r = fcgi_printf(c, "</div>\n"	/* #nav_prev */
 	    "<div id='nav_next'>");
 	if (r == -1)
 		goto done;
 
-	disp = 0;
 	switch(qs->action) {
 	case INDEX:
 		if (t->next_disp == srv->max_repos_display &&
 		    t->repos_total != (qs->index_page + 1) *
 		    srv->max_repos_display) {
-			if (asprintf(&nhref, "index_page=%d",
-			    qs->index_page + 1) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = -1,
+				.index_page = qs->index_page + 1,
+				.page = -1,
+			};
+
+			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case BRIEFS:
 		if (t->next_id) {
-			if (asprintf(&nhref, "index_page=%d&path=%s&page=%d"
-			    "&action=briefs&commit=%s&headref=%s",
-			    qs->index_page, qs->path, qs->page + 1, t->next_id,
-			    qs->headref) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = BRIEFS,
+				.index_page = -1,
+				.page = qs->page + 1,
+				.path = qs->path,
+				.commit = t->next_id,
+				.headref = qs->headref,
+			};
+
+			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case COMMITS:
 		if (t->next_id) {
-			if (asprintf(&nhref, "index_page=%d&path=%s&page=%d"
-			    "&action=commits&commit=%s&headref=%s&folder=%s"
-			    "&file=%s",
-			    qs->index_page, qs->path, qs->page + 1, t->next_id,
-			    qs->headref, qs->folder ? qs->folder : "",
-			    qs->file ? qs->file : "") == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = COMMIT,
+				.index_page = -1,
+				.page = qs->page + 1,
+				.path = qs->path,
+				.commit = t->next_id,
+				.headref = qs->headref,
+				.folder = qs->folder,
+				.file = qs->file,
+			};
+
+			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case TAGS:
 		if (t->next_id) {
-			if (asprintf(&nhref, "index_page=%d&path=%s&page=%d"
-			    "&action=tags&commit=%s&headref=%s",
-			    qs->index_page, qs->path, qs->page + 1, t->next_id,
-			    qs->headref) == -1) {
-				error = got_error_from_errno2("%s: asprintf",
-				    __func__);
-				goto done;
-			}
-			disp = 1;
+			struct gotweb_url url = {
+				.action = TAGS,
+				.index_page = -1,
+				.page = qs->page + 1,
+				.path = qs->path,
+				.commit = t->next_id,
+				.headref = qs->headref,
+			};
+
+			r = gotweb_link(c, &url, "Next");
 		}
 		break;
-	default:
-		disp = 0;
-		break;
 	}
-	if (disp) {
-		r = fcgi_printf(c, "<a href='?%s'>Next</a>", nhref);
-		if (r == -1)
-			goto done;
-	}
+	if (r == -1)
+		goto done;
+
 	fcgi_printf(c, "</div>\n"); /* #nav_next */
 	fcgi_printf(c, "</div>\n"); /* #np_wrapper */
 done:
@@ -977,8 +982,6 @@ done:
 	t->next_id = NULL;
 	free(t->prev_id);
 	t->prev_id = NULL;
-	free(phref);
-	free(nhref);
 	return error;
 }
 
@@ -992,13 +995,10 @@ gotweb_render_index(struct request *c)
 	struct repo_dir *repo_dir = NULL;
 	DIR *d;
 	struct dirent **sd_dent = NULL;
-	const char *index_page_str;
 	char *c_path = NULL;
 	struct stat st;
 	unsigned int d_cnt, d_i, d_disp = 0;
 	int r;
-
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 
 	d = opendir(srv->repos_path);
 	if (d == NULL) {
@@ -1091,15 +1091,20 @@ render:
 		d_disp++;
 		t->prev_disp++;
 
-		r = fcgi_printf(c, "<div class='index_wrapper'>\n"
-		    "<div class='index_project'>"
-		    "<a href='?index_page=%s&path=%s&action=summary'>"
-		    " %s "
-		    "</a>"
-		    "</div>",	/* .index_project */
-		    index_page_str, repo_dir->name,
-		    repo_dir->name);
+		if (fcgi_printf(c, "<div class='index_wrapper'>\n"
+		    "<div class='index_project'>") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = SUMMARY,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+		    }, "%s", repo_dir->name);
 		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, "</div>") == -1) /* .index_project */
 			goto done;
 
 		if (srv->show_repo_description) {
@@ -1124,32 +1129,71 @@ render:
 				goto done;
 		}
 
-		r = fcgi_printf(c, "<div class='navs_wrapper'>"
-		    "<div class='navs'>"
-		    "<a href='?index_page=%s&path=%s&action=summary'>"
-		    "summary"
-		    "</a> | "
-		    "<a href='?index_page=%s&path=%s&action=briefs'>"
-		    "commit briefs"
-		    "</a> | "
-		    "<a href='?index_page=%s&path=%s&action=commits'>"
-		    "commits"
-		    "</a> | "
-		    "<a href='?index_page=%s&path=%s&action=tags'>"
-		    "tags"
-		    "</a> | "
-		    "<a href='?index_page=%s&path=%s&action=tree'>"
-		    "tree"
-		    "</a>"
-		    "</div>"	/* .navs */
+		if (fcgi_printf(c, "<div class='navs_wrapper'>"
+		    "<div class='navs'>") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = SUMMARY,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name
+		    }, "summary");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = BRIEFS,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name
+		    }, "commit briefs");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = COMMITS,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name
+		    }, "commits");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TAGS,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name
+		    }, "tags");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TREE,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name
+		    }, "tree");
+		if (r == -1)
+			goto done;
+
+		r = fcgi_printf(c, "</div>"	/* .navs */
 		    "<div class='dotted_line'></div>\n"
-		    "</div>\n"	/* .navs_wrapper */
-		    "</div>\n",	/* .index_wrapper */
-		    index_page_str, repo_dir->name,
-		    index_page_str, repo_dir->name,
-		    index_page_str, repo_dir->name,
-		    index_page_str, repo_dir->name,
-		    index_page_str, repo_dir->name);
+		    "</div>\n"			/* .navs_wrapper */
+		    "</div>\n");		/* .index_wrapper */
 		if (r == -1)
 			goto done;
 
@@ -1243,12 +1287,9 @@ gotweb_render_briefs(struct request *c)
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *index_page_str;
 	char *smallerthan, *newline;
 	char *age = NULL, *author = NULL, *msg = NULL;
 	int r;
-
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 
 	r = fcgi_printf(c, "<div id='briefs_title_wrapper'>\n"
 	    "<div id='briefs_title'>Commit Briefs</div>\n"
@@ -1287,13 +1328,19 @@ gotweb_render_briefs(struct request *c)
 
 		r = fcgi_printf(c, "<div class='briefs_age'>%s</div>\n"
 		    "<div class='briefs_author'>%s</div>\n"
-		    "<div class='briefs_log'>"
-		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s"
-		    "&headref=%s'>%s</a>",
-		    age,
-		    author,
-		    index_page_str, repo_dir->name, rc->commit_id, qs->headref,
-		    msg);
+		    "<div class='briefs_log'>",
+		    age, author);
+		if (r == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = DIFF,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rc->commit_id,
+			.headref = qs->headref,
+		    }, "%s", msg);
 		if (r == -1)
 			goto done;
 
@@ -1313,18 +1360,38 @@ gotweb_render_briefs(struct request *c)
 			goto done;
 
 		r = fcgi_printf(c, "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>"
-		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s"
-		    "&headref=%s'>diff</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=tree&commit=%s"
-		    "&headref=%s'>tree</a>"
-		    "</div>\n"	/* .navs */
-		    "</div>\n"	/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n",
-		    index_page_str, repo_dir->name, rc->commit_id, qs->headref,
-		    index_page_str, repo_dir->name, rc->commit_id, qs->headref);
+		    "<div class='navs'>");
 		if (r == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = DIFF,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rc->commit_id,
+			.headref = qs->headref,
+		    }, "diff");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TREE,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rc->commit_id,
+			.headref = qs->headref,
+		    }, "tree");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, "</div>\n"	/* .navs */
+		    "</div>\n"	/* .navs_wrapper */
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 
 		free(age);
@@ -1355,13 +1422,9 @@ gotweb_render_commits(struct request *c)
 	struct repo_commit *rc = NULL;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
-	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *index_page_str;
 	char *age = NULL, *author = NULL, *msg = NULL;
 	int r;
-
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 
 	r = fcgi_printf(c, "<div class='commits_title_wrapper'>\n"
 	    "<div class='commits_title'>Commits</div>\n"
@@ -1404,19 +1467,36 @@ gotweb_render_commits(struct request *c)
 		if (r == -1)
 			goto done;
 
-		r = fcgi_printf(c, "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>"
-		    "<a href='?index_page=%s&path=%s&action=diff&commit=%s'>"
-		    "diff</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=tree&commit=%s'>"
-		    "tree</a>"
-		    "</div>\n"	/* .navs */
-		    "</div>\n"	/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n",
-		    index_page_str, repo_dir->name, rc->commit_id,
-		    index_page_str, repo_dir->name, rc->commit_id);
+		if (fcgi_printf(c, "<div class='navs_wrapper'>\n"
+		    "<div class='navs'>") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = DIFF,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rc->commit_id,
+		    }, "diff");
 		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TREE,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rc->commit_id,
+		    }, "tree");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, "</div>\n"	/* .navs */
+		    "</div>\n"	/* .navs_wrapper */
+		    "<div class='dotted_line'></div>\n") == -1)
 			goto done;
 
 		free(age);
@@ -1449,11 +1529,9 @@ gotweb_render_branches(struct request *c)
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct got_repository *repo = t->repo;
-	const char *index_page_str;
+	char *escaped_refname = NULL;
 	char *age = NULL;
 	int r;
-
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 
 	TAILQ_INIT(&refs);
 
@@ -1471,7 +1549,6 @@ gotweb_render_branches(struct request *c)
 
 	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname = NULL;
-		char *escaped_refname = NULL;
 
 		if (got_ref_is_symbolic(re->ref))
 			continue;
@@ -1498,41 +1575,77 @@ gotweb_render_branches(struct request *c)
 		r = fcgi_printf(c, "<div class='branches_wrapper'>\n"
 		    "<div class='branches_age'>%s</div>\n"
 		    "<div class='branches_space'>&nbsp;</div>\n"
-		    "<div class='branch'>"
-		    "<a href='?index_page=%s&path=%s&action=summary&headref=%s'>"
-		    "%s</a>"
-		    "</div>\n"	/* .branch */
+		    "<div class='branch'>", age);
+		if (r == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = SUMMARY,
+			.index_page = -1,
+			.page = -1,
+			.path = qs->path,
+			.headref = refname,
+		    }, "%s", escaped_refname);
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, "</div>\n"	/* .branch */
 		    "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>"
-		    "<a href='?index_page=%s&path=%s&action=summary&headref=%s'>"
-		    "summary</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=briefs&headref=%s'>"
-		    "commit briefs</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=commits&headref=%s'>"
-		    "commits</a>"
-		    "</div>\n"	/* .navs */
-		    "</div>\n"	/* .navs_wrapper */
+		    "<div class='navs'>") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = SUMMARY,
+			.index_page = -1,
+			.page = -1,
+			.path = qs->path,
+			.headref = refname,
+		    }, "summary");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = BRIEFS,
+			.index_page = -1,
+			.page = -1,
+			.path = qs->path,
+			.headref = refname,
+		    }, "commit briefs");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = COMMITS,
+			.index_page = -1,
+			.page = -1,
+			.path = qs->path,
+			.headref = refname,
+		    }, "commits");
+		if (r == -1)
+			goto done;
+
+		r = fcgi_printf(c, "</div>\n"	/* .navs */
+		    "</div>\n"			/* .navs_wrapper */
 		    "<div class='dotted_line'></div>\n"
-		    "</div>\n",	/* .branches_wrapper */
-		    age ? age : "",
-		    index_page_str, qs->path, refname,
-		    escaped_refname,
-		    index_page_str, qs->path, refname,
-		    index_page_str, qs->path, refname,
-		    index_page_str, qs->path, refname);
-		free(escaped_refname);
+		    "</div>\n");		/* .branches_wrapper */
 		if (r == -1)
 			goto done;
 
 		free(age);
 		age = NULL;
-
+		free(escaped_refname);
+		escaped_refname = NULL;
 	}
 	fcgi_printf(c, "</div>\n"); /* #branches_content */
 done:
 	free(age);
+	free(escaped_refname);
 	got_ref_list_free(&refs);
 	return error;
 }
@@ -1813,11 +1926,8 @@ gotweb_render_tags(struct request *c)
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *index_page_str;
 	char *age = NULL, *tagname = NULL, *msg = NULL, *newline;
 	int r, commit_found = 0;
-
-	index_page_str = qs->index_page_str ? qs->index_page_str : "";
 
 	if (qs->action == BRIEFS) {
 		qs->action = TAGS;
@@ -1868,32 +1978,66 @@ gotweb_render_tags(struct request *c)
 				goto done;
 		}
 
-		r = fcgi_printf(c, "<div class='tag_age'>%s</div>\n"
+		if (fcgi_printf(c, "<div class='tag_age'>%s</div>\n"
 		    "<div class='tag'>%s</div>\n"
-		    "<div class='tag_log'>"
-		    "<a href='?index_page=%s&path=%s&action=tag&commit=%s'>"
-		    "%s</a>"
-		    "</div>\n"	/* .tag_log */
+		    "<div class='tag_log'>", age, tagname) == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TAG,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rt->commit_id,
+		    }, "%s", msg ? msg : "");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, "</div>\n"	/* .tag_log */
 		    "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>"
-		    "<a href='?index_page=%s&path=%s&action=tag&commit=%s'>"
-		    "tag</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=briefs&commit=%s'>"
-		    "commit briefs</a>"
-		    " | "
-		    "<a href='?index_page=%s&path=%s&action=commits&commit=%s'>"
-		    "commits</a>"
+		    "<div class='navs'>") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = TAG,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rt->commit_id,
+		    }, "tag");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = BRIEFS,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rt->commit_id,
+		    }, "commit briefs");
+		if (r == -1)
+			goto done;
+
+		if (fcgi_printf(c, " | ") == -1)
+			goto done;
+
+		r = gotweb_link(c, &(struct gotweb_url){
+			.action = COMMITS,
+			.index_page = -1,
+			.page = -1,
+			.path = repo_dir->name,
+			.commit = rt->commit_id,
+		    }, "commits");
+		if (r == -1)
+			goto done;
+
+		r = fcgi_printf(c,
 		    "</div>\n"	/* .navs */
 		    "</div>\n"	/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n",
-		    age,
-		    tagname,
-		    index_page_str, repo_dir->name, rt->commit_id,
-		    msg ? msg : "",
-		    index_page_str, repo_dir->name, rt->commit_id,
-		    index_page_str, repo_dir->name, rt->commit_id,
-		    index_page_str, repo_dir->name, rt->commit_id);
+		    "<div class='dotted_line'></div>\n");
 		if (r == -1)
 			goto done;
 
@@ -1979,6 +2123,223 @@ done:
 	}
 
 	return error;
+}
+
+static inline int
+should_urlencode(int c)
+{
+	if (c <= ' ' || c >= 127)
+		return 1;
+
+	switch (c) {
+		/* gen-delim */
+	case ':':
+	case '/':
+	case '?':
+	case '#':
+	case '[':
+	case ']':
+	case '@':
+		/* sub-delims */
+	case '!':
+	case '$':
+	case '&':
+	case '\'':
+	case '(':
+	case ')':
+	case '*':
+	case '+':
+	case ',':
+	case ';':
+	case '=':
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static char *
+gotweb_urlencode(const char *str)
+{
+	const char *s;
+	char *escaped;
+	size_t i, len;
+	int a, b;
+
+	len = 0;
+	for (s = str; *s; ++s) {
+		len++;
+		if (should_urlencode(*s))
+			len += 2;
+	}
+
+	escaped = calloc(1, len + 1);
+	if (escaped == NULL)
+		return NULL;
+
+	i = 0;
+	for (s = str; *s; ++s) {
+		if (should_urlencode(*s)) {
+			a = (*s & 0xF0) >> 4;
+			b = (*s & 0x0F);
+
+			escaped[i++] = '%';
+			escaped[i++] = a <= 9 ? ('0' + a) : ('7' + a);
+			escaped[i++] = b <= 9 ? ('0' + b) : ('7' + b);
+		} else
+			escaped[i++] = *s;
+	}
+
+	return escaped;
+}
+
+static inline const char *
+action_name(int action)
+{
+	switch (action) {
+	case BLAME:
+		return "blame";
+	case BLOB:
+		return "blob";
+	case BRIEFS:
+		return "briefs";
+	case COMMITS:
+		return "commits";
+	case DIFF:
+		return "diff";
+	case ERR:
+		return "err";
+	case INDEX:
+		return "index";
+	case SUMMARY:
+		return "summary";
+	case TAG:
+		return "tag";
+	case TAGS:
+		return "tags";
+	case TREE:
+		return "tree";
+	default:
+		return NULL;
+	}
+}
+
+static int
+gotweb_print_url(struct request *c, struct gotweb_url *url)
+{
+	const char *sep = "?", *action;
+	char *tmp;
+	int r;
+
+	action = action_name(url->action);
+	if (action != NULL) {
+		if (fcgi_printf(c, "?action=%s", action) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->commit) {
+		if (fcgi_printf(c, "%scommit=%s", sep, url->commit) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->previd) {
+		if (fcgi_printf(c, "%sprevid=%s", sep, url->previd) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->prevset) {
+		if (fcgi_printf(c, "%sprevset=%s", sep, url->prevset) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->file) {
+		tmp = gotweb_urlencode(url->file);
+		if (tmp == NULL)
+			return -1;
+		r = fcgi_printf(c, "%sfile=%s", sep, tmp);
+		free(tmp);
+		if (r == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->folder) {
+		tmp = gotweb_urlencode(url->folder);
+		if (tmp == NULL)
+			return -1;
+		r = fcgi_printf(c, "%sfolder=%s", sep, tmp);
+		free(tmp);
+		if (r == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->headref) {
+		tmp = gotweb_urlencode(url->headref);
+		if (tmp == NULL)
+			return -1;
+		r = fcgi_printf(c, "%sheadref=%s", sep, url->headref);
+		free(tmp);
+		if (r == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->index_page != -1) {
+		if (fcgi_printf(c, "%sindex_page=%d", sep,
+		    url->index_page) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->path) {
+		tmp = gotweb_urlencode(url->path);
+		if (tmp == NULL)
+			return -1;
+		r = fcgi_printf(c, "%spath=%s", sep, tmp);
+		free(tmp);
+		if (r == -1)
+			return -1;
+		sep = "&";
+	}
+
+	if (url->page != -1) {
+		if (fcgi_printf(c, "%spage=%d", sep, url->page) == -1)
+			return -1;
+		sep = "&";
+	}
+
+	return 0;
+}
+
+int
+gotweb_link(struct request *c, struct gotweb_url *url, const char *fmt, ...)
+{
+	va_list ap;
+	int r;
+
+	if (fcgi_printf(c, "<a href='") == -1)
+		return -1;
+
+	if (gotweb_print_url(c, url) == -1)
+		return -1;
+
+	if (fcgi_printf(c, "'>") == -1)
+		return -1;
+
+	va_start(ap, fmt);
+	r = fcgi_vprintf(c, fmt, ap);
+	va_end(ap);
+	if (r == -1)
+		return -1;
+
+	if (fcgi_printf(c, "</a>"))
+		return -1;
+	return 0;
 }
 
 static struct got_repository *
