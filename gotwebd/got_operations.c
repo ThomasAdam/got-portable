@@ -436,16 +436,6 @@ got_get_repo_commits(struct request *c, int limit)
 	for (;;) {
 		struct got_object_id *next_id;
 
-		if (limit_chk == ((limit * qs->page) - (limit - 1)) &&
-		    commit_found == 0 && repo_commit &&
-		    repo_commit->commit_id != NULL) {
-			t->prev_id = strdup(repo_commit->commit_id);
-			if (t->prev_id == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
-
 		error = got_commit_graph_iter_next(&next_id, graph, repo, NULL,
 		    NULL);
 		if (error) {
@@ -467,12 +457,22 @@ got_get_repo_commits(struct request *c, int limit)
 		if (error)
 			goto done;
 
-		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
-
 		error = got_get_repo_commit(c, repo_commit, commit,
 		    &refs, next_id);
-		if (error)
+		if (error) {
+			gotweb_free_repo_commit(repo_commit);
 			goto done;
+		}
+
+		if (limit_chk == ((limit * qs->page) - limit) &&
+		    commit_found == 0 && repo_commit->commit_id != NULL) {
+			t->prev_id = strdup(repo_commit->commit_id);
+			if (t->prev_id == NULL) {
+				error = got_error_from_errno("strdup");
+				gotweb_free_repo_commit(repo_commit);
+				goto done;
+			}
+		}
 
 		if (qs->commit != NULL && commit_found == 0 && limit != 1) {
 			if (strcmp(qs->commit, repo_commit->commit_id) == 0)
@@ -481,10 +481,13 @@ got_get_repo_commits(struct request *c, int limit)
 			    qs->page == 0)
 				commit_found = 1;
 			else {
+				gotweb_free_repo_commit(repo_commit);
 				limit_chk++;
 				continue;
 			}
 		}
+
+		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
 
 		if (limit == 1 && chk_multi == 0 &&
 		    srv->max_commits_display != 1)
