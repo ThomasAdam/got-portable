@@ -2049,15 +2049,15 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wauthor);
-	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
 	col += author_width;
 	while (col < avail && author_width < author_display_cols + 2) {
 		waddch(view->window, ' ');
 		col++;
 		author_width++;
 	}
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	if (col > avail)
 		goto done;
 
