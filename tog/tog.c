@@ -2330,16 +2330,14 @@ draw_commits(struct tog_view *view)
 		wstandout(view->window);
 	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
-		wattr_on(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
-	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
 	while (width < view->ncols) {
 		waddch(view->window, ' ');
 		width++;
 	}
+	if (tc)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
@@ -3977,10 +3975,10 @@ draw_file(struct tog_view *view, const char *header)
 		waddwstr(view->window, wline);
 		free(wline);
 		wline = NULL;
+		while (width++ < view->ncols)
+			waddch(view->window, ' ');
 		if (view_needs_focus_indication(view))
 			wstandend(view->window);
-		if (width <= view->ncols - 1)
-			waddch(view->window, '\n');
 
 		if (max_lines <= 1)
 			return NULL;
@@ -5214,18 +5212,16 @@ draw_blame(struct tog_view *view)
 		wstandout(view->window);
 	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
-		wattr_on(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
+	while (width++ < view->ncols)
+		waddch(view->window, ' ');
 	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
 	wline = NULL;
-	if (width < view->ncols - 1)
-		waddch(view->window, '\n');
 
 	if (view->gline > blame->nlines)
 		view->gline = blame->nlines;
@@ -6347,6 +6343,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
 	wchar_t *wline;
+	char *index = NULL;
 	struct tog_color *tc;
 	int width, n, nentries, i = 1;
 	int limit = view->nlines;
@@ -6368,16 +6365,18 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		wstandout(view->window);
 	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
-		wattr_on(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
-	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
-	if (view_needs_focus_indication(view))
-		wstandend(view->window);
 	free(wline);
 	wline = NULL;
+	while (width++ < view->ncols)
+		waddch(view->window, ' ');
+	if (tc)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	if (view_needs_focus_indication(view))
+		wstandend(view->window);
+	if (--limit <= 0)
+		return NULL;
 
 	i += s->selected;
 	if (s->first_displayed_entry) {
@@ -6386,15 +6385,11 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 			++i;  /* account for ".." entry */
 	}
 	nentries = got_object_tree_get_nentries(s->tree);
-	wprintw(view->window, " [%d/%d]", i,
-	    nentries + (s->tree == s->root ? 0 : 1));  /* ".." in !root tree */
-
-	if (width < view->ncols - 1)
-		waddch(view->window, '\n');
-	if (--limit <= 0)
-		return NULL;
-	err = format_line(&wline, &width, NULL, parent_path, 0, view->ncols,
-	    0, 0);
+	if (asprintf(&index, "[%d/%d] %s",
+	    i, nentries + (s->tree == s->root ? 0 : 1), parent_path) == -1)
+		return got_error_from_errno("asprintf");
+	err = format_line(&wline, &width, NULL, index, 0, view->ncols, 0, 0);
+	free(index);
 	if (err)
 		return err;
 	waddwstr(view->window, wline);
@@ -7654,14 +7649,14 @@ show_ref_view(struct tog_view *view)
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
 	waddwstr(view->window, wline);
+	while (width++ < view->ncols)
+		waddch(view->window, ' ');
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
 	wline = NULL;
 	free(line);
 	line = NULL;
-	if (width < view->ncols - 1)
-		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
 
