@@ -434,7 +434,7 @@ got_get_repo_commits(struct request *c, int limit)
 		goto done;
 
 	for (;;) {
-		struct got_object_id *next_id;
+		struct got_object_id next_id;
 
 		error = got_commit_graph_iter_next(&next_id, graph, repo, NULL,
 		    NULL);
@@ -444,7 +444,7 @@ got_get_repo_commits(struct request *c, int limit)
 			goto done;
 		}
 
-		error = got_object_open_as_commit(&commit, repo, next_id);
+		error = got_object_open_as_commit(&commit, repo, &next_id);
 		if (error)
 			goto done;
 
@@ -458,7 +458,7 @@ got_get_repo_commits(struct request *c, int limit)
 			goto done;
 
 		error = got_get_repo_commit(c, repo_commit, commit,
-		    &refs, next_id);
+		    &refs, &next_id);
 		if (error) {
 			gotweb_free_repo_commit(repo_commit);
 			goto done;

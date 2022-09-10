@@ -90,12 +90,6 @@ struct got_commit_graph {
 	 * commit timestmap.
 	 */
 	struct got_commit_graph_iter_list iter_list;
-
-	/*
-	 * Temporary storage for the id returned by
-	 * got_commit_graph_iter_next.
-	 */
-	struct got_object_id id;
 };
 
 static const struct got_error *
@@ -597,14 +591,12 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 }
 
 const struct got_error *
-got_commit_graph_iter_next(struct got_object_id **id,
+got_commit_graph_iter_next(struct got_object_id *id,
     struct got_commit_graph *graph, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node;
-
-	*id = NULL;
 
 	node = TAILQ_FIRST(&graph->iter_list);
 	if (node == NULL) {
@@ -620,12 +612,34 @@ got_commit_graph_iter_next(struct got_object_id **id,
 			return err;
 	}
 
-	memcpy(&graph->id, &node->id, sizeof(graph->id));
-	*id = &graph->id;
+	memcpy(id, &node->id, sizeof(*id));
 
 	TAILQ_REMOVE(&graph->iter_list, node, entry);
 	free(node);
 	return NULL;
+}
+
+static const struct got_error *
+find_yca_add_id(struct got_object_id **yca_id, struct got_commit_graph *graph,
+    struct got_object_idset *commit_ids, struct got_repository *repo,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id id;
+
+	err = got_commit_graph_iter_next(&id, graph, repo, cancel_cb,
+	    cancel_arg);
+	if (err)
+		return err;
+
+	if (got_object_idset_contains(commit_ids, &id)) {
+		*yca_id = got_object_id_dup(&id);
+		if (*yca_id == NULL)
+			err = got_error_from_errno("got_object_id_dup");
+		return err;
+	}
+
+	return got_object_idset_add(commit_ids, &id, NULL);
 }
 
 const struct got_error *
@@ -664,8 +678,6 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		goto done;
 
 	for (;;) {
-		struct got_object_id *id = NULL, *id2 = NULL;
-
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
@@ -673,7 +685,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		}
 
 		if (!completed) {
-			err = got_commit_graph_iter_next(&id, graph, repo,
+			err = find_yca_add_id(yca_id, graph, commit_ids, repo,
 			    cancel_cb, cancel_arg);
 			if (err) {
 				if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -681,10 +693,12 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				err = NULL;
 				completed = 1;
 			}
+			if (*yca_id)
+				break;
 		}
 
 		if (!completed2) {
-			err = got_commit_graph_iter_next(&id2, graph2, repo,
+			err = find_yca_add_id(yca_id, graph2, commit_ids, repo,
 			    cancel_cb, cancel_arg);
 			if (err) {
 				if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -692,32 +706,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				err = NULL;
 				completed2 = 1;
 			}
-		}
-
-		if (id) {
-			if (got_object_idset_contains(commit_ids, id)) {
-				*yca_id = got_object_id_dup(id);
-				if (*yca_id)
-					break;
-				err = got_error_from_errno("got_object_id_dup");
-				break;
-
-			}
-			err = got_object_idset_add(commit_ids, id, NULL);
-			if (err)
-				break;
-		}
-		if (id2) {
-			if (got_object_idset_contains(commit_ids, id2)) {
-				*yca_id = got_object_id_dup(id2);
-				if (*yca_id)
-					break;
-				err = got_error_from_errno("got_object_id_dup");
-				break;
-
-			}
-			err = got_object_idset_add(commit_ids, id2, NULL);
-			if (err)
+			if (*yca_id)
 				break;
 		}
 
@@ -725,7 +714,6 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 			err = got_error(GOT_ERR_ANCESTRY);
 			break;
 		}
-
 	}
 done:
 	got_object_idset_free(commit_ids);

@@ -2176,20 +2176,20 @@ queue_commits(struct tog_log_thread_args *a)
 	 * while updating the display.
 	 */
 	do {
-		struct got_object_id *id;
+		struct got_object_id id;
 		struct got_commit_object *commit;
 		struct commit_queue_entry *entry;
 		int errcode;
 
 		err = got_commit_graph_iter_next(&id, a->graph, a->repo,
 		    NULL, NULL);
-		if (err || id == NULL)
-			break;
-
-		err = got_object_open_as_commit(&commit, a->repo, id);
 		if (err)
 			break;
-		entry = alloc_commit_queue_entry(commit, id);
+
+		err = got_object_open_as_commit(&commit, a->repo, &id);
+		if (err)
+			break;
+		entry = alloc_commit_queue_entry(commit, &id);
 		if (entry == NULL) {
 			err = got_error_from_errno("alloc_commit_queue_entry");
 			break;
@@ -2209,7 +2209,7 @@ queue_commits(struct tog_log_thread_args *a)
 		if (*a->searching == TOG_SEARCH_FORWARD &&
 		    !*a->search_next_done) {
 			int have_match;
-			err = match_commit(&have_match, id, commit, a->regex);
+			err = match_commit(&have_match, &id, commit, a->regex);
 			if (err)
 				break;
 			if (have_match)
