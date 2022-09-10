@@ -3540,7 +3540,7 @@ gw_init_header()
 
 static const struct got_error *
 gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
-    int limit, struct got_object_id *id)
+    int limit, struct got_object_id *iter_start_id)
 {
 	const struct got_error *error = NULL;
 	struct got_commit_graph *graph = NULL;
@@ -3552,12 +3552,14 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	if (error)
 		return error;
 
-	error = got_commit_graph_iter_start(graph, id, gw_trans->repo, NULL,
-	    NULL);
+	error = got_commit_graph_iter_start(graph, iter_start_id,
+	    gw_trans->repo, NULL, NULL);
 	if (error)
 		goto err;
 
 	for (;;) {
+		struct got_object_id id;
+
 		error = got_commit_graph_iter_next(&id, graph, gw_trans->repo,
 		    NULL, NULL);
 		if (error) {
@@ -3565,15 +3567,13 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				error = NULL;
 			goto done;
 		}
-		if (id == NULL)
-			goto err;
 
-		error = got_object_open_as_commit(&commit, gw_trans->repo, id);
+		error = got_object_open_as_commit(&commit, gw_trans->repo, &id);
 		if (error)
 			goto err;
 		if (limit == 1 && chk_multi == 0 &&
 		    gw_trans->gw_conf->got_max_commits_display != 1) {
-			error = gw_get_commit(gw_trans, header, commit, id);
+			error = gw_get_commit(gw_trans, header, commit, &id);
 			if (error)
 				goto err;
 			commit_found = 1;
@@ -3591,7 +3591,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 			if (error)
 				goto err;
 
-			error = gw_get_commit(gw_trans, n_header, commit, id);
+			error = gw_get_commit(gw_trans, n_header, commit, &id);
 			if (error)
 				goto err;
 			got_ref_list_free(&n_header->refs);

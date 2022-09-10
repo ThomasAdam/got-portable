@@ -2863,7 +2863,8 @@ check_same_branch(struct got_object_id *commit_id,
 		goto done;
 
 	for (;;) {
-		struct got_object_id *id;
+		struct got_object_id id;
+
 		err = got_commit_graph_iter_next(&id, graph, repo,
 		    check_cancelled, NULL);
 		if (err) {
@@ -2872,13 +2873,11 @@ check_same_branch(struct got_object_id *commit_id,
 			break;
 		}
 
-		if (id) {
-			if (yca_id && got_object_id_cmp(id, yca_id) == 0)
-				break;
-			if (got_object_id_cmp(id, commit_id) == 0) {
-				is_same_branch = 1;
-				break;
-			}
+		if (yca_id && got_object_id_cmp(&id, yca_id) == 0)
+			break;
+		if (got_object_id_cmp(&id, commit_id) == 0) {
+			is_same_branch = 1;
+			break;
 		}
 	}
 done:
@@ -4225,7 +4224,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	if (err)
 		goto done;
 	for (;;) {
-		struct got_object_id *id;
+		struct got_object_id id;
 
 		if (sigint_received || sigpipe_received)
 			break;
@@ -4237,10 +4236,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				err = NULL;
 			break;
 		}
-		if (id == NULL)
-			break;
 
-		err = got_object_open_as_commit(&commit, repo, id);
+		err = got_object_open_as_commit(&commit, repo, &id);
 		if (err)
 			break;
 
@@ -4251,7 +4248,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		}
 
 		if (search_pattern) {
-			err = match_commit(&have_match, id, commit, &regex);
+			err = match_commit(&have_match, &id, commit, &regex);
 			if (err) {
 				got_object_commit_close(commit);
 				break;
@@ -4260,7 +4257,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				match_changed_paths(&have_match,
 				    &changed_paths, &regex);
 			if (have_match == 0 && show_patch) {
-				err = match_patch(&have_match, commit, id,
+				err = match_patch(&have_match, commit, &id,
 				    path, diff_context, repo, &regex,
 				    tmpfile);
 				if (err)
@@ -4278,17 +4275,17 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		}
 
 		if (reverse_display_order) {
-			err = got_object_qid_alloc(&qid, id);
+			err = got_object_qid_alloc(&qid, &id);
 			if (err)
 				break;
 			STAILQ_INSERT_HEAD(&reversed_commits, qid, entry);
 			got_object_commit_close(commit);
 		} else {
 			if (one_line)
-				err = print_commit_oneline(commit, id,
+				err = print_commit_oneline(commit, &id,
 				    repo, refs_idmap);
 			else
-				err = print_commit(commit, id, repo, path,
+				err = print_commit(commit, &id, repo, path,
 				    show_changed_paths ? &changed_paths : NULL,
 				    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
@@ -4296,7 +4293,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				break;
 		}
 		if ((limit && --limit == 0) ||
-		    (end_id && got_object_id_cmp(id, end_id) == 0))
+		    (end_id && got_object_id_cmp(&id, end_id) == 0))
 			break;
 
 		TAILQ_FOREACH(pe, &changed_paths, entry) {
@@ -9705,10 +9702,8 @@ collect_commits(struct got_object_id_queue *commits,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL;
-	struct got_object_id *parent_id = NULL;
+	struct got_object_id parent_id, commit_id;
 	struct got_object_qid *qid;
-        struct got_object_id *commit_id = initial_commit_id;
-	struct got_object_id *tmp = NULL;
 
 	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
@@ -9718,7 +9713,9 @@ collect_commits(struct got_object_id_queue *commits,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
-	while (got_object_id_cmp(commit_id, iter_stop_id) != 0) {
+
+	memcpy(&commit_id, initial_commit_id, sizeof(commit_id));
+	while (got_object_id_cmp(&commit_id, iter_stop_id) != 0) {
 		err = got_commit_graph_iter_next(&parent_id, graph, repo,
 		    check_cancelled, NULL);
 		if (err) {
@@ -9730,28 +9727,20 @@ collect_commits(struct got_object_id_queue *commits,
 			}
 			goto done;
 		} else {
-			err = check_path_prefix(parent_id, commit_id,
+			err = check_path_prefix(&parent_id, &commit_id,
 			    path_prefix, path_prefix_errcode, repo);
 			if (err)
 				goto done;
 
-			err = got_object_qid_alloc(&qid, commit_id);
+			err = got_object_qid_alloc(&qid, &commit_id);
 			if (err)
 				goto done;
 			STAILQ_INSERT_HEAD(commits, qid, entry);
 
-			free(tmp);
-			tmp = got_object_id_dup(parent_id);
-			if (tmp == NULL) {
-				err = got_error_from_errno(
-				    "got_object_id_dup");
-				goto done;
-			}
-			commit_id = tmp;
+			memcpy(&commit_id, &parent_id, sizeof(commit_id));
 		}
 	}
 done:
-	free(tmp);
 	got_commit_graph_close(graph);
 	return err;
 }

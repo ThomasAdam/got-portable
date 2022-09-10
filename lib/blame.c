@@ -503,8 +503,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_object_id *id = NULL;
-	int lineno;
+	struct got_object_id id;
+	int lineno, have_id = 0;
 	struct got_commit_graph *graph = NULL;
 
 	*blamep = NULL;
@@ -584,8 +584,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err)
 		goto done;
 	for (;;) {
-		struct got_object_id *next_id;
-		err = got_commit_graph_iter_next(&next_id, graph, repo,
+		err = got_commit_graph_iter_next(&id, graph, repo,
 		    cancel_cb, cancel_arg);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
@@ -594,35 +593,29 @@ blame_open(struct got_blame **blamep, const char *path,
 			}
 			goto done;
 		}
-		if (next_id) {
-			free(id);
-			id = got_object_id_dup(next_id);
-			if (id == NULL) {
-				err = got_error_from_errno("got_object_id_dup");
-				goto done;
-			}
-			err = blame_commit(blame, id, path, repo, cb, arg);
-			if (err) {
-				if (err->code == GOT_ERR_ITER_COMPLETED)
-					err = NULL;
-				goto done;
-			}
-			if (blame->nannotated == blame->nlines)
-				break;
+		have_id = 1;
 
-			err = flip_files(blame);
-			if (err)
-				goto done;
+		err = blame_commit(blame, &id, path, repo, cb, arg);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
+				err = NULL;
+			goto done;
 		}
+		if (blame->nannotated == blame->nlines)
+			break;
+
+		err = flip_files(blame);
+		if (err)
+			goto done;
 	}
 
-	if (id && blame->nannotated < blame->nlines) {
+	if (have_id && blame->nannotated < blame->nlines) {
 		/* Annotate remaining non-annotated lines with last commit. */
-		err = got_object_open_as_commit(&last_commit, repo, id);
+		err = got_object_open_as_commit(&last_commit, repo, &id);
 		if (err)
 			goto done;
 		for (lineno = 0; lineno < blame->nlines; lineno++) {
-			err = annotate_line(blame, lineno, last_commit, id,
+			err = annotate_line(blame, lineno, last_commit, &id,
 			    cb, arg);
 			if (err)
 				goto done;
@@ -633,7 +626,6 @@ done:
 	if (graph)
 		got_commit_graph_close(graph);
 	free(obj_id);
-	free(id);
 	if (blob)
 		got_object_blob_close(blob);
 	if (start_commit)
