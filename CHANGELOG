@@ -6,6 +6,13 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.75 (2022-09-10)
+
+* portable: import gotwebd
+* portable: improve <sys/queue.h> inclusion
+* portable: portably wrap socket functions between BSDs/Linux
+* portable: improve homebrew support for MacOS
+
 # got-portable 0.74 (2022-07-14)
 
 * portable: made the 'date' command more portable in the test suite.
