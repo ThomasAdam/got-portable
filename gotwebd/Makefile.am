@@ -1,4 +1,4 @@
-bin_PROGRAMS = gotwebd
+sbin_PROGRAMS = gotwebd
 
 include $(top_builddir)/Makefile.common
 
