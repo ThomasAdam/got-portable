@@ -195,6 +195,9 @@ the form:
 Where the suffix of `a`, `b`, etc., can be used to denote any sub-releases
 from the `0.75` version.
 
+The variable `GOT_RELEASE` needs be changed to `yes` so that the
+GOT_PORTABLE_VER is asserted correctly.
+
 Once the version is verified, the following should be run from the `linux`
 branch -- and the repository should not have any outstanding modifications to
 the source:
