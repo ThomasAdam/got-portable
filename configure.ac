@@ -611,20 +611,17 @@ AC_CONFIG_FILES([Makefile
 		 Makefile.common:Makefile.common.in])
 AC_OUTPUT
 
-#                tog/GNUMakefile])
-#                regress/GNUMakefile
-#                regress/cmdline/GNUMakefile
-#                regress/delta/GNUMakefile
-#                regress/fetch/GNUMakefile
-#                regress/idset/GNUMakefile
-#                regress/path/GNUMakefile
-#                 gotweb/GNUMakefile
-#                 gotweb/libexec/GNUMakefile
-#                 gotweb/libexec/got-read-blob/GNUMakefile
-#                 gotweb/libexec/got-read-commit/GNUMakefile
-#                 gotweb/libexec/got-read-gitconfig/GNUMakefile
-#                 gotweb/libexec/got-read-gotconfig/GNUMakefile
-#                 gotweb/libexec/got-read-object/GNUMakefile
-#                 gotweb/libexec/got-read-pack/GNUMakefile
-#                 gotweb/libexec/got-read-tag/GNUMakefile
-#                 gotweb/libexec/got-read-tree/GNUMakefile
+executables="$(eval echo ${exec_prefix}/bin)"
+helpers="$(eval echo ${libexecdir})"
+manpages="$(eval echo ${mandir})"
+
+echo "
+Configured got-portable with:
+
+ Version:      $VERSION
+
+ Prefix:       ${prefix}
+ Executables:  ${executables}
+ Helpers:      ${helpers}
+ Man pages:    ${manpages}
+"
