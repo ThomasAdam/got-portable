@@ -349,7 +349,7 @@ struct tog_log_thread_args {
 	int commits_needed;
 	int load_all;
 	struct got_commit_graph *graph;
-	struct commit_queue *commits;
+	struct commit_queue *real_commits;
 	const char *in_repo_path;
 	struct got_object_id *start_id;
 	struct got_repository *repo;
@@ -361,13 +361,18 @@ struct tog_log_thread_args {
 	int *searching;
 	int *search_next_done;
 	regex_t *regex;
+	int *limiting;
+	int limit_match;
+	regex_t *limit_regex;
+	struct commit_queue *limit_commits;
 };
 
 struct tog_log_view_state {
-	struct commit_queue commits;
+	struct commit_queue *commits;
 	struct commit_queue_entry *first_displayed_entry;
 	struct commit_queue_entry *last_displayed_entry;
 	struct commit_queue_entry *selected_entry;
+	struct commit_queue real_commits;
 	int selected;
 	char *in_repo_path;
 	char *head_ref_name;
@@ -381,6 +386,9 @@ struct tog_log_view_state {
 	struct commit_queue_entry *search_entry;
 	struct tog_colors colors;
 	int use_committer;
+	int limit_view;
+	regex_t limit_regex;
+	struct commit_queue limit_commits;
 };
 
 #define TOG_COLOR_DIFF_MINUS		1
@@ -940,8 +948,8 @@ resize_log_view(struct tog_view *view, int increase)
 	 * Request commits to account for the increased
 	 * height so we have enough to populate the view.
 	 */
-	if (s->commits.ncommits < n) {
-		view->nscrolled = n - s->commits.ncommits + increase + 1;
+	if (s->commits->ncommits < n) {
+		view->nscrolled = n - s->commits->ncommits + increase + 1;
 		err = request_log_commits(view);
 	}
 
@@ -2179,6 +2187,7 @@ queue_commits(struct tog_log_thread_args *a)
 		struct got_object_id id;
 		struct got_commit_object *commit;
 		struct commit_queue_entry *entry;
+		int limit_match = 0;
 		int errcode;
 
 		err = got_commit_graph_iter_next(&id, a->graph, a->repo,
@@ -2202,9 +2211,45 @@ queue_commits(struct tog_log_thread_args *a)
 			break;
 		}
 
-		entry->idx = a->commits->ncommits;
-		TAILQ_INSERT_TAIL(&a->commits->head, entry, entry);
-		a->commits->ncommits++;
+		entry->idx = a->real_commits->ncommits;
+		TAILQ_INSERT_TAIL(&a->real_commits->head, entry, entry);
+		a->real_commits->ncommits++;
+
+		if (*a->limiting) {
+			err = match_commit(&limit_match, &id, commit,
+			    a->limit_regex);
+			if (err)
+				break;
+
+			if (limit_match) {
+				struct commit_queue_entry *matched;
+
+				matched = alloc_commit_queue_entry(
+				    entry->commit, entry->id);
+				if (matched == NULL) {
+					err = got_error_from_errno(
+					    "alloc_commit_queue_entry");
+					break;
+				}
+
+				err = got_object_commit_dup(&matched->commit,
+				    entry->commit);
+				if (err)
+					break;
+
+				matched->idx = a->limit_commits->ncommits;
+				TAILQ_INSERT_TAIL(&a->limit_commits->head,
+				    matched, entry);
+				a->limit_commits->ncommits++;
+			}
+
+			/*
+			 * This is how we signal log_thread() that we
+			 * have found a match, and that it should be
+			 * counted as a new entry for the view.
+			 */
+			a->limit_match = limit_match;
+		}
 
 		if (*a->searching == TOG_SEARCH_FORWARD &&
 		    !*a->search_next_done) {
@@ -2212,7 +2257,12 @@ queue_commits(struct tog_log_thread_args *a)
 			err = match_commit(&have_match, &id, commit, a->regex);
 			if (err)
 				break;
-			if (have_match)
+
+			if (*a->limiting) {
+				if (limit_match && have_match)
+					*a->search_next_done =
+					    TOG_SEARCH_HAVE_MORE;
+			} else if (have_match)
 				*a->search_next_done = TOG_SEARCH_HAVE_MORE;
 		}
 
@@ -2283,7 +2333,7 @@ draw_commits(struct tog_view *view)
 
 	if (s->thread_args.commits_needed > 0 || s->thread_args.load_all) {
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
-		    entry ? entry->idx + 1 : 0, s->commits.ncommits,
+		    entry ? entry->idx + 1 : 0, s->commits->ncommits,
 		    (view->searching && !view->search_next_done) ?
 		    "searching..." : "loading...") == -1) {
 			err = got_error_from_errno("asprintf");
@@ -2291,6 +2341,7 @@ draw_commits(struct tog_view *view)
 		}
 	} else {
 		const char *search_str = NULL;
+		const char *limit_str = NULL;
 
 		if (view->searching) {
 			if (view->search_next_done == TOG_SEARCH_NO_MORE)
@@ -2301,10 +2352,13 @@ draw_commits(struct tog_view *view)
 				search_str = "searching...";
 		}
 
-		if (asprintf(&ncommits_str, " [%d/%d] %s",
-		    entry ? entry->idx + 1 : 0, s->commits.ncommits,
-		    search_str ? search_str :
-		    (refs_str ? refs_str : "")) == -1) {
+		if (s->limit_view && s->commits->ncommits == 0)
+			limit_str = "no matches found";
+
+		if (asprintf(&ncommits_str, " [%d/%d] %s %s",
+		    entry ? entry->idx + 1 : 0, s->commits->ncommits,
+		    search_str ? search_str : (refs_str ? refs_str : ""),
+		    limit_str ? limit_str : "") == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2429,7 +2483,7 @@ log_scroll_up(struct tog_log_view_state *s, int maxscroll)
 	struct commit_queue_entry *entry;
 	int nscrolled = 0;
 
-	entry = TAILQ_FIRST(&s->commits.head);
+	entry = TAILQ_FIRST(&s->commits->head);
 	if (s->first_displayed_entry == entry)
 		return;
 
@@ -2514,13 +2568,13 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 		return NULL;
 
 	ncommits_needed = s->last_displayed_entry->idx + 1 + maxscroll;
-	if (s->commits.ncommits < ncommits_needed &&
+	if (s->commits->ncommits < ncommits_needed &&
 	    !s->thread_args.log_complete) {
 		/*
 		 * Ask the log thread for required amount of commits.
 		 */
 		s->thread_args.commits_needed +=
-		    ncommits_needed - s->commits.ncommits;
+		    ncommits_needed - s->commits->ncommits;
 		err = trigger_log_thread(view, 1);
 		if (err)
 			return err;
@@ -2760,8 +2814,13 @@ log_thread(void *arg)
 				goto done;
 			err = NULL;
 			done = 1;
-		} else if (a->commits_needed > 0 && !a->load_all)
-			a->commits_needed--;
+		} else if (a->commits_needed > 0 && !a->load_all) {
+			if (*a->limiting) {
+				if (a->limit_match)
+					a->commits_needed--;
+			} else
+				a->commits_needed--;
+		}
 
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode) {
@@ -2770,9 +2829,13 @@ log_thread(void *arg)
 			goto done;
 		} else if (*a->quit)
 			done = 1;
-		else if (*a->first_displayed_entry == NULL) {
+		else if (*a->limiting && *a->first_displayed_entry == NULL) {
 			*a->first_displayed_entry =
-			    TAILQ_FIRST(&a->commits->head);
+			    TAILQ_FIRST(&a->limit_commits->head);
+			*a->selected_entry = *a->first_displayed_entry;
+		} else if (*a->first_displayed_entry == NULL) {
+			*a->first_displayed_entry =
+			    TAILQ_FIRST(&a->real_commits->head);
 			*a->selected_entry = *a->first_displayed_entry;
 		}
 
@@ -2877,7 +2940,8 @@ close_log_view(struct tog_view *view)
 	if (errcode && err == NULL)
 		err = got_error_set_errno(errcode, "pthread_cond_destroy");
 
-	free_commits(&s->commits);
+	free_commits(&s->limit_commits);
+	free_commits(&s->real_commits);
 	free(s->in_repo_path);
 	s->in_repo_path = NULL;
 	free(s->start_id);
@@ -2885,6 +2949,133 @@ close_log_view(struct tog_view *view)
 	free(s->head_ref_name);
 	s->head_ref_name = NULL;
 	return err;
+}
+
+/*
+ * We use two queues to implement the limit feature: first consists of
+ * commits matching the current limit_regex; second is the real queue
+ * of all known commits (real_commits). When the user starts limiting,
+ * we swap queues such that all movement and displaying functionality
+ * works with very slight change.
+ */
+static const struct got_error *
+limit_log_view(struct tog_view *view)
+{
+	struct tog_log_view_state *s = &view->state.log;
+	struct commit_queue_entry *entry;
+	struct tog_view	*v = view;
+	const struct got_error *err = NULL;
+	char pattern[1024];
+	int ret;
+
+	if (view_is_hsplit_top(view))
+		v = view->child;
+	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
+		v = view->parent;
+
+	/* Get the pattern */
+	wmove(v->window, v->nlines - 1, 0);
+	wclrtoeol(v->window);
+	mvwaddstr(v->window, v->nlines - 1, 0, "&/");
+	nodelay(v->window, FALSE);
+	nocbreak();
+	echo();
+	ret = wgetnstr(v->window, pattern, sizeof(pattern));
+	cbreak();
+	noecho();
+	nodelay(v->window, TRUE);
+	if (ret == ERR)
+		return NULL;
+
+	if (*pattern == '\0') {
+		/*
+		 * Safety measure for the situation where the user
+		 * resets limit without previously limiting anything.
+		 */
+		if (!s->limit_view)
+			return NULL;
+
+		/*
+		 * User could have pressed Ctrl+L, which refreshed the
+		 * commit queues, it means we can't save previously
+		 * (before limit took place) displayed entries,
+		 * because they would point to already free'ed memory,
+		 * so we are forced to always select first entry of
+		 * the queue.
+		 */
+		s->commits = &s->real_commits;
+		s->first_displayed_entry = TAILQ_FIRST(&s->real_commits.head);
+		s->selected_entry = s->first_displayed_entry;
+		s->selected = 0;
+		s->limit_view = 0;
+
+		return NULL;
+	}
+
+	if (regcomp(&s->limit_regex, pattern, REG_EXTENDED | REG_NEWLINE))
+		return NULL;
+
+	s->limit_view = 1;
+
+	/* Clear the screen while loading limit view */
+	s->first_displayed_entry = NULL;
+	s->last_displayed_entry = NULL;
+	s->selected_entry = NULL;
+	s->commits = &s->limit_commits;
+
+	/* Prepare limit queue for new search */
+	free_commits(&s->limit_commits);
+	s->limit_commits.ncommits = 0;
+
+	/* First process commits, which are in queue already */
+	TAILQ_FOREACH(entry, &s->real_commits.head, entry) {
+		int have_match = 0;
+
+		err = match_commit(&have_match, entry->id,
+		    entry->commit, &s->limit_regex);
+		if (err)
+			return err;
+
+		if (have_match) {
+			struct commit_queue_entry *matched;
+
+			matched = alloc_commit_queue_entry(entry->commit,
+			    entry->id);
+			if (matched == NULL) {
+				err = got_error_from_errno(
+				    "alloc_commit_queue_entry");
+				break;
+			}
+
+			err = got_object_commit_dup(&matched->commit,
+			    entry->commit);
+			if (err) {
+				free(matched);
+				return err;
+			}
+
+			matched->idx = s->limit_commits.ncommits;
+			TAILQ_INSERT_TAIL(&s->limit_commits.head,
+			    matched, entry);
+			s->limit_commits.ncommits++;
+		}
+	}
+
+	/* Second process all the commits, until we fill the screen */
+	if (s->limit_commits.ncommits < view->nlines - 1 &&
+	    !s->thread_args.log_complete) {
+		s->thread_args.commits_needed +=
+		    view->nlines - s->limit_commits.ncommits - 1;
+		err = trigger_log_thread(view, 1);
+		if (err)
+			return err;
+	}
+
+	s->first_displayed_entry = TAILQ_FIRST(&s->commits->head);
+	s->selected_entry = TAILQ_FIRST(&s->commits->head);
+	s->selected = 0;
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -3033,8 +3224,13 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	}
 
 	/* The commit queue only contains commits being displayed. */
-	TAILQ_INIT(&s->commits.head);
-	s->commits.ncommits = 0;
+	TAILQ_INIT(&s->real_commits.head);
+	s->real_commits.ncommits = 0;
+	s->commits = &s->real_commits;
+
+	TAILQ_INIT(&s->limit_commits.head);
+	s->limit_view = 0;
+	s->limit_commits.ncommits = 0;
 
 	s->repo = repo;
 	if (head_ref_name) {
@@ -3109,7 +3305,8 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 
 	s->thread_args.commits_needed = view->nlines;
 	s->thread_args.graph = thread_graph;
-	s->thread_args.commits = &s->commits;
+	s->thread_args.real_commits = &s->real_commits;
+	s->thread_args.limit_commits = &s->limit_commits;
 	s->thread_args.in_repo_path = s->in_repo_path;
 	s->thread_args.start_id = s->start_id;
 	s->thread_args.repo = thread_repo;
@@ -3120,6 +3317,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.searching = &view->searching;
 	s->thread_args.search_next_done = &view->search_next_done;
 	s->thread_args.regex = &view->regex;
+	s->thread_args.limiting = &s->limit_view;
+	s->thread_args.limit_regex = &s->limit_regex;
+	s->thread_args.limit_commits = &s->limit_commits;
 done:
 	if (err)
 		close_log_view(view);
@@ -3152,19 +3352,19 @@ log_move_cursor_up(struct tog_view *view, int page, int home)
 {
 	struct tog_log_view_state *s = &view->state.log;
 
-	if (s->selected_entry->idx == 0)
-		view->count = 0;
 	if (s->first_displayed_entry == NULL)
 		return;
+	if (s->selected_entry->idx == 0)
+		view->count = 0;
 
-	if ((page && TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
+	if ((page && TAILQ_FIRST(&s->commits->head) == s->first_displayed_entry)
 	    || home)
 		s->selected = home ? 0 : MAX(0, s->selected - page - 1);
 
 	if (!page && !home && s->selected > 0)
 		--s->selected;
 	else
-		log_scroll_up(s, home ? s->commits.ncommits : MAX(page, 1));
+		log_scroll_up(s, home ? s->commits->ncommits : MAX(page, 1));
 
 	select_commit(s);
 	return;
@@ -3177,15 +3377,18 @@ log_move_cursor_down(struct tog_view *view, int page)
 	const struct got_error		*err = NULL;
 	int				 eos = view->nlines - 2;
 
+	if (s->first_displayed_entry == NULL)
+		return NULL;
+
 	if (s->thread_args.log_complete &&
-	    s->selected_entry->idx >= s->commits.ncommits - 1)
+	    s->selected_entry->idx >= s->commits->ncommits - 1)
 		return NULL;
 
 	if (view_is_hsplit_top(view))
 		--eos;  /* border consumes the last line */
 
 	if (!page) {
-		if (s->selected < MIN(eos, s->commits.ncommits - 1))
+		if (s->selected < MIN(eos, s->commits->ncommits - 1))
 			++s->selected;
 		else
 			err = log_scroll_down(view, 1);
@@ -3194,7 +3397,7 @@ log_move_cursor_down(struct tog_view *view, int page)
 		int n;
 
 		s->selected = 0;
-		entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
+		entry = TAILQ_LAST(&s->commits->head, commit_queue_head);
 		s->last_displayed_entry = entry;
 		for (n = 0; n <= eos; n++) {
 			if (entry == NULL)
@@ -3205,10 +3408,10 @@ log_move_cursor_down(struct tog_view *view, int page)
 		if (n > 0)
 			s->selected = n - 1;
 	} else {
-		if (s->last_displayed_entry->idx == s->commits.ncommits - 1 &&
+		if (s->last_displayed_entry->idx == s->commits->ncommits - 1 &&
 		    s->thread_args.log_complete)
 			s->selected += MIN(page,
-			    s->commits.ncommits - s->selected_entry->idx - 1);
+			    s->commits->ncommits - s->selected_entry->idx - 1);
 		else
 			err = log_scroll_down(view, page);
 	}
@@ -3228,7 +3431,7 @@ log_move_cursor_down(struct tog_view *view, int page)
 	select_commit(s);
 
 	if (s->thread_args.log_complete &&
-	    s->selected_entry->idx == s->commits.ncommits - 1)
+	    s->selected_entry->idx == s->commits->ncommits - 1)
 		view->count = 0;
 
 	return NULL;
@@ -3324,7 +3527,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
 			s->thread_args.load_all = 0;
 		else if (s->thread_args.log_complete) {
-			err = log_move_cursor_down(view, s->commits.ncommits);
+			err = log_move_cursor_down(view, s->commits->ncommits);
 			s->thread_args.load_all = 0;
 		}
 		if (err)
@@ -3339,6 +3542,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		return log_goto_line(view, eos);
 
 	switch (ch) {
+	case '&':
+		err = limit_log_view(view);
+		break;
 	case 'q':
 		s->quit = 1;
 		break;
@@ -3401,7 +3607,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->thread_args.load_all = 1;
 		if (!s->thread_args.log_complete)
 			return trigger_log_thread(view, 0);
-		err = log_move_cursor_down(view, s->commits.ncommits);
+		err = log_move_cursor_down(view, s->commits->ncommits);
 		s->thread_args.load_all = 0;
 		break;
 	}
@@ -3418,13 +3624,13 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_RESIZE:
 		if (s->selected > view->nlines - 2)
 			s->selected = view->nlines - 2;
-		if (s->selected > s->commits.ncommits - 1)
-			s->selected = s->commits.ncommits - 1;
+		if (s->selected > s->commits->ncommits - 1)
+			s->selected = s->commits->ncommits - 1;
 		select_commit(s);
-		if (s->commits.ncommits < view->nlines - 1 &&
+		if (s->commits->ncommits < view->nlines - 1 &&
 		    !s->thread_args.log_complete) {
 			s->thread_args.commits_needed += (view->nlines - 1) -
-			    s->commits.ncommits;
+			    s->commits->ncommits;
 			err = trigger_log_thread(view, 1);
 		}
 		break;
@@ -3494,7 +3700,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    s->start_id, s->repo, NULL, NULL);
 		if (err)
 			return err;
-		free_commits(&s->commits);
+		free_commits(&s->real_commits);
+		free_commits(&s->limit_commits);
 		s->first_displayed_entry = NULL;
 		s->last_displayed_entry = NULL;
 		s->selected_entry = NULL;

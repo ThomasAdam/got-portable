@@ -189,6 +189,11 @@ against a commit's author name, committer name, log message, and
 commit ID SHA1 hash.
 Regular expression syntax is documented in
 .Xr re_format 7 .
+.It Cm &
+Like
+.Cm /
+but hides the non-matching commits.
+Use the empty string as a pattern to display all commits.
 .It Cm n
 Find the Nth next commit which matches the current search pattern (default: 1).
 .br

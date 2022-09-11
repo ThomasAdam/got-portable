@@ -352,3 +352,6 @@ const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
 const struct got_error *got_object_tag_create(struct got_object_id **,
     const char *, struct got_object_id *, const char *,
     time_t, const char *, const char *, struct got_repository *, int verbosity);
+
+const struct got_error *got_object_commit_dup(struct got_commit_object **,
+    struct got_commit_object *);
