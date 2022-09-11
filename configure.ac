@@ -514,7 +514,10 @@ if test "$PLATFORM" = "linux"; then
 			found_libbsd=yes
 			AC_DEFINE(HAVE_LIBBSD)
 		],
-		[]
+		[
+			AC_MSG_ERROR("*** couldn't find libbsd-overlay via pkg-config")
+		]
+
 	)
 fi
 
@@ -540,9 +543,11 @@ AC_CHECK_DECL(
 )
 
 if test "x$found_queue_h" = xyes; then
-	AC_MSG_NOTICE([Using sys/queue.h - not compat])
 	AC_DEFINE(HAVE_QUEUE_H)
+else
+	AC_MSG_ERROR("*** sys/queue.h missing key defines ***)
 fi
+
 
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)

@@ -21,7 +21,6 @@ libopenbsd_compat_a_SOURCES =  \
 	strsep.c \
 	strtonum.c \
 	imsg.h \
-	queue.h \
 	tree.h
 
 # For MacOS, don't build the compat versions of strl{cat,cpy}, but do for all
@@ -57,6 +56,5 @@ endif
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \
-	queue.h \
 	tree.h \
 	bsd-poll.h
