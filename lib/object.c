@@ -2353,3 +2353,12 @@ done:
 	free(path_packfile);
 	return err;
 }
+
+const struct got_error *
+got_object_commit_dup(struct got_commit_object **ret,
+    struct got_commit_object *commit)
+{
+	*ret = commit;
+	commit->refcnt++;
+	return NULL;
+}
