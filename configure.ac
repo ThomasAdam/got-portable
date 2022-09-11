@@ -234,27 +234,87 @@ if test x"$PLATFORM" = "xdarwin"; then
 	# onward, this changed to a different path.
 	#
 	# Rather than hardcode this, check for HOMEBREW_PREFIX in the
-	# environment if it's already set, and use it.  Otherwise, chec for
+	# environment if it's already set, and use it.  Otherwise, check for
 	# brew(1) and use that.  If that fails, default to /usr/local
 	#
 	# This also means that MacPorts should continue to work.
-	if test -z "$HOMEBREW_PREFIX"; then
+	#
+	# But with MacPorts, we should also check --prefix, and use that if it
+	# has been supplied.
+	#
+	# In both cases, the variable HOMEBREW_PREFIX is used for both.
+	HB_PREFIX=""
+	FOUND_BISON="no"
+	GNUBISON=""
+	if test -z "$HOMEBREW_PREFIX" -o "$HOMEBREW_PREFIX" = "NONE"; then
 		# HOMEBREW_PREFIX not set, check for brew(1)
-		if test -x command -v brew >/dev/null 2>&1; then
+		if command -v brew >/dev/null 2>&1; then
+			AC_MSG_NOTICE("HOMEBREW_PREFIX set via 'brew --prefix'")
 			export HOMEBREW_PREFIX="$(brew --prefix)"
-		else
+		fi
+
+		if test -z "$HOMEBREW_PREFIX" -o "$HOMEBREW_PREFIX" = "NONE"
+		then
 			# Default.
-			export HOMEBREW_PREFIX="/usr/local"
+			if test -z "${prefix}" -o "${prefix}" = "NONE"; then
+				export HOMEBREW_PREFIX="/usr/local"
+				HB_PREFIX="/usr/local"
+				AC_MSG_NOTICE("HOMEBREW_PREFIX defaulting to $HB_PREFIX")
+			else
+				HB_PREFIX="$(eval echo ${prefix})"
+				if test "$HB_PREFIX" = "NONE"; then
+					HB_PREFIX="/opt/local"
+				else
+					AC_MSG_NOTICE("HOMEBREW_PREFIX using --prefix")
+				fi
+				export HOMEBREW_PREFIX="$HB_PREFIX"
+			fi
 		fi
 	fi
 
+	AC_MSG_NOTICE("HOMEBREW_PREFIX determined as: $HOMEBREW_PREFIX")
+
 	if ! test -x "${HOMEBREW_PREFIX}/opt/bison/bin/bison"; then
-		AC_MSG_ERROR("GNU Bison not found")
+		AC_MSG_WARN([
+			     "***********************************************************
+			     GNU Bison not found: ${HOMEBREW_PREFIX}/opt/bison/bin/bison
+			     ***********************************************************
+
+			     Falling back to checking either /usr/local or \${prefix}"
+		])
+
+		FOUND_BISON="no"
+		AC_MSG_WARN("Trying ${HB_PREFIX}/opt/bison/bin/bison")
+		if test -x "${HB_PREFIX}/opt/bison/bin/bison"; then
+			export HOMEBREW_PREFIX="/usr/local"
+			FOUND_BISON="yes"
+			GNUBISON="${HB_PREFIX}/opt/bison/bin/bison"
+		fi
+
+		if test "$FOUND_BISON" = "no"; then
+			HB_PREFIX="/opt/local"
+			AC_MSG_WARN("Trying ${HB_PREFIX}/bin/bison")
+
+			if test -x "${HB_PREFIX}/bin/bison"; then
+				export HOMEBREW_PREFIX="${HB_PREFIX}"
+				GNUBISON="${HB_PREFIX}/bin/bison"
+				FOUND_BISON="yes"
+			fi
+		fi
+	else
+		FOUND_BISON="yes"
+		GNUBISON="${HOMEBREW_PREFIX}/opt/bison/bin/bison"
 	fi
 
+	if test "$FOUND_BISON" = "no"; then
+		AC_MSG_ERROR("*** Couldn't find GNU BISON ***")
+	fi
+
+	AC_MSG_NOTICE("Found GNU Bison as: $GNUBISON")
+
 	# Override YACC here to point to the GNU version of bison.
-	export YACC="${HOMEBREW_PREFIX}/opt/bison/bin/bison -y"
-	export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFI}/opt/openssl@3/lib $LDFLAGS"
+	export YACC="${GNUBISON} -y"
+	export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFIX}/opt/openssl@3/lib $LDFLAGS"
 	export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/ncurses/include -I${HOMEBREW_PREFIX}/opt/openssl@3/include $CPPFLAGS"
 	export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/ncurses/lib/pkgconfig"
 	export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${HOMEBREW_PREFIX}/opt/openssl@3/lib/pkgconfig"
