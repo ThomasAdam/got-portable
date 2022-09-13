@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# got-portable-ver: emits the version of b-em which is building.
+# got-portable-ver: emits the version of got which is building.
 #		    If this is a release build, then the tag name is chomped
 #		    to remove extraneous git information.
 #
@@ -8,7 +8,7 @@
 #
 # Intended to be called from configure.ac (via autogen.sh)
 GOT_RELEASE=no
-GOT_PORTABLE_VER=0.76
+GOT_PORTABLE_VER=0.75.1
 
 [ -d ".git" -a "$GOT_RELEASE" = "no" ] || { echo "$GOT_PORTABLE_VER" ; exit ; }
 

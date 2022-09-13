@@ -6,6 +6,16 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable-0.75.1 (2022-09-13)
+
+This is a bug-fix -portable release to address the following:
+
+* portable: macos: look for GNU Bison in more places, based on whether brew or
+  MacPorts is in use, and failing to find Bison that way, look in a few
+  hard-coded but likely locations.
+* portable: remove compat sys/queue.h -- this now makes libbsd a core
+  dependency on those systems which require it.
+
 # got-portable 0.75 (2022-09-10)
 
 * portable: import gotwebd
