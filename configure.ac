@@ -58,7 +58,6 @@ AC_CHECK_HEADERS([ \
 	sys/queue.h \
 	sys/socket.h \
 	sys/time.h \
-	sys/tree.h \
 	util.h \
 	unistd.h \
 	wchar.h \
@@ -548,6 +547,18 @@ else
 	AC_MSG_ERROR("*** sys/queue.h missing key defines ***)
 fi
 
+# Look for sys/tree.h  This should come from libbsd.
+AC_CHECK_DECL(
+	RB_INIT,
+	found_tree_h=yes,
+	found_tree_h=no,
+	[#include <sys/tree.h>]
+)
+if test "x$found_tree_h" = xyes; then
+	AC_DEFINE(HAVE_TREE_H)
+else
+	AC_MSG_ERROR("*** sys/tree.h missing RB_INIT ***)
+fi
 
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)

@@ -20,8 +20,7 @@ libopenbsd_compat_a_SOURCES =  \
 	strnlen.c \
 	strsep.c \
 	strtonum.c \
-	imsg.h \
-	tree.h
+	imsg.h
 
 # For MacOS, don't build the compat versions of strl{cat,cpy}, but do for all
 # other systems.
@@ -56,5 +55,4 @@ endif
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \
-	tree.h \
 	bsd-poll.h

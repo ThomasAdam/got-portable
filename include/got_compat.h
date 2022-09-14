@@ -150,8 +150,6 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 
 #ifdef HAVE_TREE_H
 #include <sys/tree.h>
-#else
-#include "compat/tree.h"
 #endif
 
 #ifdef HAVE_UTIL_H
