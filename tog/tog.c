@@ -108,6 +108,19 @@ enum tog_view_type {
 	TOG_VIEW_BLAME,
 	TOG_VIEW_TREE,
 	TOG_VIEW_REF,
+	TOG_VIEW_HELP
+};
+
+/* Match _DIFF to _HELP with enum tog_view_type TOG_VIEW_* counterparts. */
+enum tog_keymap_type {
+	TOG_KEYMAP_KEYS = -2,
+	TOG_KEYMAP_GLOBAL,
+	TOG_KEYMAP_DIFF,
+	TOG_KEYMAP_LOG,
+	TOG_KEYMAP_BLAME,
+	TOG_KEYMAP_TREE,
+	TOG_KEYMAP_REF,
+	TOG_KEYMAP_HELP
 };
 
 enum tog_view_mode {
@@ -502,6 +515,104 @@ struct tog_ref_view_state {
 	struct tog_colors colors;
 };
 
+struct tog_help_view_state {
+	FILE			*f;
+	off_t			*line_offsets;
+	size_t			 nlines;
+	int			 lineno;
+	int			 first_displayed_line;
+	int			 last_displayed_line;
+	int			 eof;
+	int			 matched_line;
+	int			 selected_line;
+	int			 all;
+	enum tog_keymap_type	 type;
+};
+
+#define GENERATE_HELP \
+	KEYMAP_("Global", TOG_KEYMAP_GLOBAL), \
+	KEY_("H F1", "Open view-specific help (double tap for all help)"), \
+	KEY_("k C-p Up", "Move cursor or page up one line"), \
+	KEY_("j C-n Down", "Move cursor or page down one line"), \
+	KEY_("C-b b PgUp", "Scroll the view up one page"), \
+	KEY_("C-f f PgDn Space", "Scroll the view down one page"), \
+	KEY_("C-u u", "Scroll the view up one half page"), \
+	KEY_("C-d d", "Scroll the view down one half page"), \
+	KEY_("g Home", "Go to line N (default: first line)"), \
+	KEY_("G End", "Go to line N (default: last line)"), \
+	KEY_("l Right", "Scroll the view right"), \
+	KEY_("h Left", "Scroll the view left"), \
+	KEY_("$", "Scroll view to the rightmost position"), \
+	KEY_("0", "Scroll view to the leftmost position"), \
+	KEY_("-", "Decrease size of the focussed split"), \
+	KEY_("+", "Increase size of the focussed split"), \
+	KEY_("Tab", "Switch focus between views"), \
+	KEY_("F", "Toggle fullscreen mode"), \
+	KEY_("/", "Open prompt to enter search term"), \
+	KEY_("n", "Find next line/token matching the current search term"), \
+	KEY_("N", "Find previous line/token matching the current search term"),\
+	KEY_("q", "Quit the focussed view"), \
+	KEY_("Q", "Quit tog"), \
+	\
+	KEYMAP_("Log", TOG_KEYMAP_LOG), \
+	KEY_("< ,", "Move cursor up one commit"), \
+	KEY_("> .", "Move cursor down one commit"), \
+	KEY_("Enter", "Open diff view of the selected commit"), \
+	KEY_("B", "Reload the log view and toggle display of merged commits"), \
+	KEY_("R", "Open ref view of all repository references"), \
+	KEY_("T", "Display tree view of the repository from the selected" \
+	    " commit"), \
+	KEY_("@", "Toggle between displaying author and committer name"), \
+	KEY_("&", "Open prompt to enter term to limit commits displayed"), \
+	KEY_("C-g Backspace", "Cancel current search or log operation"), \
+	KEY_("C-l", "Reload the log view with new commits in the repository"), \
+	\
+	KEYMAP_("Diff", TOG_KEYMAP_DIFF), \
+	KEY_("K < ,", "Display diff of next line in the file/log entry"), \
+	KEY_("J > .", "Display diff of previous line in the file/log entry"), \
+	KEY_("A", "Toggle between Myers and Patience diff algorithm"), \
+	KEY_("a", "Toggle treatment of file as ASCII irrespective of binary" \
+	    " data"), \
+	KEY_("(", "Go to the previous file in the diff"), \
+	KEY_(")", "Go to the next file in the diff"), \
+	KEY_("{", "Go to the previous hunk in the diff"), \
+	KEY_("}", "Go to the next hunk in the diff"), \
+	KEY_("[", "Decrease the number of context lines"), \
+	KEY_("]", "Increase the number of context lines"), \
+	KEY_("w", "Toggle ignore whitespace-only changes in the diff"), \
+	\
+	KEYMAP_("Blame", TOG_KEYMAP_BLAME), \
+	KEY_("Enter", "Display diff view of the selected line's commit"), \
+	KEY_("A", "Toggle diff algorithm between Myers and Patience"), \
+	KEY_("L", "Open log view for the currently selected annotated line"), \
+	KEY_("C", "Reload view with the previously blamed commit"), \
+	KEY_("c", "Reload view with the version of the file found in the" \
+	    " selected line's commit"), \
+	KEY_("p", "Reload view with the version of the file found in the" \
+	    " selected line's parent commit"), \
+	\
+	KEYMAP_("Tree", TOG_KEYMAP_TREE), \
+	KEY_("Enter", "Enter selected directory or open blame view of the" \
+	    " selected file"), \
+	KEY_("L", "Open log view for the selected entry"), \
+	KEY_("R", "Open ref view of all repository references"), \
+	KEY_("i", "Show object IDs for all tree entries"), \
+	KEY_("Backspace", "Return to the parent directory"), \
+	\
+	KEYMAP_("Ref", TOG_KEYMAP_REF), \
+	KEY_("Enter", "Display log view of the selected reference"), \
+	KEY_("T", "Display tree view of the selected reference"), \
+	KEY_("i", "Toggle display of IDs for all non-symbolic references"), \
+	KEY_("m", "Toggle display of last modified date for each reference"), \
+	KEY_("o", "Toggle reference sort order (name -> timestamp)"), \
+	KEY_("C-l", "Reload view with all repository references")
+
+struct tog_key_map {
+	const char		*keys;
+	const char		*info;
+	enum tog_keymap_type	 type;
+};
+
 /*
  * We implement two types of views: parent views and child views.
  *
@@ -558,6 +669,7 @@ struct tog_view {
 		struct tog_blame_view_state blame;
 		struct tog_tree_view_state tree;
 		struct tog_ref_view_state ref;
+		struct tog_help_view_state help;
 	} state;
 
 	const struct got_error *(*show)(struct tog_view *);
@@ -591,7 +703,7 @@ static const struct got_error *input_diff_view(struct tog_view **,
 static const struct got_error *reset_diff_view(struct tog_view *);
 static const struct got_error* close_diff_view(struct tog_view *);
 static const struct got_error *search_start_diff_view(struct tog_view *);
-static const struct got_error *search_next_diff_view(struct tog_view *);
+static const struct got_error *search_next_view_match(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *,
@@ -612,7 +724,6 @@ static const struct got_error *input_blame_view(struct tog_view **,
 static const struct got_error *reset_blame_view(struct tog_view *);
 static const struct got_error *close_blame_view(struct tog_view *);
 static const struct got_error *search_start_blame_view(struct tog_view *);
-static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
     struct got_object_id *, const char *, struct got_repository *);
@@ -1415,6 +1526,14 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	}
 
 	switch (ch) {
+	case '?':
+	case 'H':
+	case KEY_F(1):
+		if (view->type == TOG_VIEW_HELP)
+			err = view->reset(view);
+		else
+			err = view_request_new(new, view, TOG_VIEW_HELP);
+		break;
 	case '\t':
 		view->count = 0;
 		if (view->child) {
@@ -4103,6 +4222,13 @@ gotoline(struct tog_view *view, int *lineno, int *nprinted)
 		selected = first;
 		eof = &s->eof;
 		f = s->f;
+	} else if (view->type == TOG_VIEW_HELP) {
+		struct tog_help_view_state *s = &view->state.help;
+
+		first = &s->first_displayed_line;
+		selected = first;
+		eof = &s->eof;
+		f = s->f;
 	} else if (view->type == TOG_VIEW_BLAME) {
 		struct tog_blame_view_state *s = &view->state.blame;
 
@@ -4650,33 +4776,93 @@ search_start_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
-search_next_diff_view(struct tog_view *view)
+search_set_view(struct tog_view *view, FILE **f, off_t **line_offsets,
+    size_t *nlines, int **first, int **last, int **match, int **selected)
 {
-	struct tog_diff_view_state *s = &view->state.diff;
+	*f = NULL;
+	*first = *last = *match = *selected = NULL;
+	*line_offsets = NULL;
+
+	switch (view->type) {
+	case (TOG_VIEW_DIFF): {
+		struct tog_diff_view_state *s = &view->state.diff;
+
+		*f = s->f;
+		*nlines = s->nlines;
+		*match = &s->matched_line;
+		*first = &s->first_displayed_line;
+		*last = &s->last_displayed_line;
+		*selected = &s->selected_line;
+		break;
+	}
+	case (TOG_VIEW_BLAME): {
+		struct tog_blame_view_state *s = &view->state.blame;
+
+		*f = s->blame.f;
+		*nlines = s->blame.nlines;
+		*line_offsets = s->blame.line_offsets;
+		*match = &s->matched_line;
+		*first = &s->first_displayed_line;
+		*last = &s->last_displayed_line;
+		*selected = &s->selected_line;
+		break;
+	}
+	case (TOG_VIEW_HELP): {
+		struct tog_help_view_state *s = &view->state.help;
+
+		*f = s->f;
+		*nlines = s->nlines;
+		*line_offsets = s->line_offsets;
+		*match = &s->matched_line;
+		*first = &s->first_displayed_line;
+		*last = &s->last_displayed_line;
+		*selected = &s->selected_line;
+		break;
+	}
+	default:
+		return got_error_msg(GOT_ERR_NOT_IMPL,
+		    "view search not supported");
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+search_next_view_match(struct tog_view *view)
+{
 	const struct got_error *err = NULL;
+	FILE *f;
 	int lineno;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
+	off_t *line_offsets;
+	size_t nlines = 0;
+	int *first, *last, *match, *selected;
+
+	err = search_set_view(view, &f, &line_offsets, &nlines, &first, &last,
+	    &match, &selected);
+	if (err)
+		return err;
 
 	if (!view->searching) {
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
 		return NULL;
 	}
 
-	if (s->matched_line) {
+	if (*match) {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = s->matched_line + 1;
+			lineno = *match + 1;
 		else
-			lineno = s->matched_line - 1;
+			lineno = *match - 1;
 	} else
-		lineno = s->first_displayed_line;
+		lineno = *first - 1 + *selected;
 
 	while (1) {
 		off_t offset;
 
-		if (lineno <= 0 || lineno > s->nlines) {
-			if (s->matched_line == 0) {
+		if (lineno <= 0 || lineno > nlines) {
+			if (*match == 0) {
 				view->search_next_done = TOG_SEARCH_HAVE_MORE;
 				break;
 			}
@@ -4684,15 +4870,17 @@ search_next_diff_view(struct tog_view *view)
 			if (view->searching == TOG_SEARCH_FORWARD)
 				lineno = 1;
 			else
-				lineno = s->nlines;
+				lineno = nlines;
 		}
 
-		offset = s->lines[lineno - 1].offset;
-		if (fseeko(s->f, offset, SEEK_SET) != 0) {
+		offset = view->type == TOG_VIEW_DIFF ?
+		    view->state.diff.lines[lineno - 1].offset :
+		    line_offsets[lineno - 1];
+		if (fseeko(f, offset, SEEK_SET) != 0) {
 			free(line);
 			return got_error_from_errno("fseeko");
 		}
-		linelen = getline(&line, &linesize, s->f);
+		linelen = getline(&line, &linesize, f);
 		if (linelen != -1) {
 			char *exstr;
 			err = expand_tab(&exstr, line);
@@ -4701,7 +4889,7 @@ search_next_diff_view(struct tog_view *view)
 			if (match_line(exstr, &view->regex, 1,
 			    &view->regmatch)) {
 				view->search_next_done = TOG_SEARCH_HAVE_MORE;
-				s->matched_line = lineno;
+				*match = lineno;
 				free(exstr);
 				break;
 			}
@@ -4714,9 +4902,9 @@ search_next_diff_view(struct tog_view *view)
 	}
 	free(line);
 
-	if (s->matched_line) {
-		s->first_displayed_line = s->matched_line;
-		s->selected_line = 1;
+	if (*match) {
+		*first = *match;
+		*selected = 1;
 	}
 
 	return err;
@@ -4879,7 +5067,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->reset = reset_diff_view;
 	view->close = close_diff_view;
 	view->search_start = search_start_diff_view;
-	view->search_next = search_next_diff_view;
+	view->search_next = search_next_view_match;
 done:
 	if (err)
 		close_diff_view(view);
@@ -5922,7 +6110,7 @@ open_blame_view(struct tog_view *view, char *path,
 	view->reset = reset_blame_view;
 	view->close = close_blame_view;
 	view->search_start = search_start_blame_view;
-	view->search_next = search_next_blame_view;
+	view->search_next = search_next_view_match;
 
 	return run_blame(view);
 }
@@ -5955,79 +6143,6 @@ search_start_blame_view(struct tog_view *view)
 
 	s->matched_line = 0;
 	return NULL;
-}
-
-static const struct got_error *
-search_next_blame_view(struct tog_view *view)
-{
-	struct tog_blame_view_state *s = &view->state.blame;
-	const struct got_error *err = NULL;
-	int lineno;
-	char *line = NULL;
-	size_t linesize = 0;
-	ssize_t linelen;
-
-	if (!view->searching) {
-		view->search_next_done = TOG_SEARCH_HAVE_MORE;
-		return NULL;
-	}
-
-	if (s->matched_line) {
-		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = s->matched_line + 1;
-		else
-			lineno = s->matched_line - 1;
-	} else
-		lineno = s->first_displayed_line - 1 + s->selected_line;
-
-	while (1) {
-		off_t offset;
-
-		if (lineno <= 0 || lineno > s->blame.nlines) {
-			if (s->matched_line == 0) {
-				view->search_next_done = TOG_SEARCH_HAVE_MORE;
-				break;
-			}
-
-			if (view->searching == TOG_SEARCH_FORWARD)
-				lineno = 1;
-			else
-				lineno = s->blame.nlines;
-		}
-
-		offset = s->blame.line_offsets[lineno - 1];
-		if (fseeko(s->blame.f, offset, SEEK_SET) != 0) {
-			free(line);
-			return got_error_from_errno("fseeko");
-		}
-		linelen = getline(&line, &linesize, s->blame.f);
-		if (linelen != -1) {
-			char *exstr;
-			err = expand_tab(&exstr, line);
-			if (err)
-				break;
-			if (match_line(exstr, &view->regex, 1,
-			    &view->regmatch)) {
-				view->search_next_done = TOG_SEARCH_HAVE_MORE;
-				s->matched_line = lineno;
-				free(exstr);
-				break;
-			}
-			free(exstr);
-		}
-		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno++;
-		else
-			lineno--;
-	}
-	free(line);
-
-	if (s->matched_line) {
-		s->first_displayed_line = s->matched_line;
-		s->selected_line = 1;
-	}
-
-	return err;
 }
 
 static const struct got_error *
@@ -8306,6 +8421,500 @@ done:
 	return error;
 }
 
+static const struct got_error*
+win_draw_center(WINDOW *win, size_t y, size_t x, size_t maxx, int focus,
+    const char *str)
+{
+	size_t len;
+
+	if (win == NULL)
+		win = stdscr;
+
+	len = strlen(str);
+	x = x ? x : maxx > len ? (maxx - len) / 2 : 0;
+
+	if (focus)
+		wstandout(win);
+	if (mvwprintw(win, y, x, "%s", str) == ERR)
+		return got_error_msg(GOT_ERR_RANGE, "mvwprintw");
+	if (focus)
+		wstandend(win);
+
+	return NULL;
+}
+
+static const struct got_error *
+add_line_offset(off_t **line_offsets, size_t *nlines, off_t off)
+{
+	off_t *p;
+
+	p = reallocarray(*line_offsets, *nlines + 1, sizeof(off_t));
+	if (p == NULL) {
+		free(*line_offsets);
+		*line_offsets = NULL;
+		return got_error_from_errno("reallocarray");
+	}
+
+	*line_offsets = p;
+	(*line_offsets)[*nlines] = off;
+	++(*nlines);
+	return NULL;
+}
+
+static const struct got_error *
+max_key_str(int *ret, const struct tog_key_map *km, size_t n)
+{
+	*ret = 0;
+
+	for (;n > 0; --n, ++km) {
+		char	*t0, *t, *k;
+		size_t	 len = 1;
+
+		if (km->keys == NULL)
+			continue;
+
+		t = t0 = strdup(km->keys);
+		if (t0 == NULL)
+			return got_error_from_errno("strdup");
+
+		len += strlen(t);
+		while ((k = strsep(&t, " ")) != NULL)
+			len += strlen(k) > 1 ? 2 : 0;
+		free(t0);
+		*ret = MAX(*ret, len);
+	}
+
+	return NULL;
+}
+
+/*
+ * Write keymap section headers, keys, and key info in km to f.
+ * Save line offset to *off. If terminal has UTF8 encoding enabled,
+ * wrap control and symbolic keys in guillemets, else use <>.
+ * For example (top=UTF8, bottom=ASCII):
+ * Global
+ *   k ❬C-p❭ ❬Up❭               Move cursor or page up one line
+ * Global
+ *   k <C-p> <Up>               Move cursor or page up one line
+ */
+static const struct got_error *
+format_help_line(off_t *off, FILE *f, const struct tog_key_map *km, int width)
+{
+	int n, len = width;
+
+	if (km->keys) {
+		char	*t0, *t, *k;
+		int	 cs, s, first = 1;
+
+		cs = got_locale_is_utf8();
+
+		t = t0 = strdup(km->keys);
+		if (t0 == NULL)
+			return got_error_from_errno("strdup");
+
+		len = strlen(km->keys);
+		while ((k = strsep(&t, " ")) != NULL) {
+			s = strlen(k) > 1;  /* control or symbolic key */
+			n = fprintf(f, "%s%s%s%s%s", first ? "  " : "",
+			    cs && s ? "❬" : s ? "<" : "", k,
+			    cs && s ? "❭" : s ? ">" : "", t ? " " : "");
+			if (n < 0) {
+				free(t0);
+				return got_error_from_errno("fprintf");
+			}
+			first = 0;
+			len += s ? 2 : 0;
+			*off += n;
+		}
+		free(t0);
+	}
+	n = fprintf(f, "%*s%s\n", width - len, width - len ? " " : "", km->info);
+	if (n < 0)
+		return got_error_from_errno("fprintf");
+	*off += n;
+
+	return NULL;
+}
+
+static const struct got_error *
+format_help(struct tog_help_view_state *s)
+{
+	const struct got_error		*err = NULL;
+	off_t				 off = 0;
+	int				 i, max, n, show = s->all;
+	static const struct tog_key_map	 km[] = {
+#define KEYMAP_(info, type)	{ NULL, (info), type }
+#define KEY_(keys, info)	{ (keys), (info), TOG_KEYMAP_KEYS }
+		GENERATE_HELP
+#undef KEYMAP_
+#undef KEY_
+	};
+
+	err = add_line_offset(&s->line_offsets, &s->nlines, 0);
+	if (err)
+		return err;
+
+	n = nitems(km);
+	err = max_key_str(&max, km, n);
+	if (err)
+		return err;
+
+	for (i = 0; i < n; ++i) {
+		if (km[i].keys == NULL) {
+			show = s->all;
+			if (km[i].type == TOG_KEYMAP_GLOBAL ||
+			    km[i].type == s->type || s->all)
+				show = 1;
+		}
+		if (show) {
+			err = format_help_line(&off, s->f, &km[i], max);
+			if (err)
+				return err;
+			err = add_line_offset(&s->line_offsets, &s->nlines, off);
+			if (err)
+				return err;
+		}
+	}
+	fputc('\n', s->f);
+	++off;
+	err = add_line_offset(&s->line_offsets, &s->nlines, off);
+	return err;
+}
+
+static const struct got_error *
+create_help(struct tog_help_view_state *s)
+{
+	FILE			*f;
+	const struct got_error	*err;
+
+	free(s->line_offsets);
+	s->line_offsets = NULL;
+	s->nlines = 0;
+
+	f = got_opentemp();
+	if (f == NULL)
+		return got_error_from_errno("got_opentemp");
+	s->f = f;
+
+	err = format_help(s);
+	if (err)
+		return err;
+
+	if (s->f && fflush(s->f) != 0)
+		return got_error_from_errno("fflush");
+
+	return NULL;
+}
+
+static const struct got_error *
+search_start_help_view(struct tog_view *view)
+{
+	view->state.help.matched_line = 0;
+	return NULL;
+}
+
+static const struct got_error *
+show_help_view(struct tog_view *view)
+{
+	struct tog_help_view_state	*s = &view->state.help;
+	const struct got_error		*err;
+	regmatch_t			*regmatch = &view->regmatch;
+	wchar_t				*wline;
+	char				*line;
+	ssize_t				 linelen;
+	size_t				 linesz = 0;
+	int				 width, nprinted = 0, rc = 0;
+	int				 eos = view->nlines;
+
+	if (view_is_hsplit_top(view))
+		--eos;  /* account for border */
+
+	s->lineno = 0;
+	rewind(s->f);
+	werase(view->window);
+
+	if (view->gline > s->nlines - 1)
+		view->gline = s->nlines - 1;
+
+	err = win_draw_center(view->window, 0, 0, view->ncols,
+	    view_needs_focus_indication(view), "tog help");
+	if (err)
+		return err;
+	if (eos <= 1)
+		return NULL;
+	waddstr(view->window, "\n\n");
+	eos -= 2;
+
+	s->eof = 0;
+	view->maxx = 0;
+	line = NULL;
+	while (eos > 0 && nprinted < eos) {
+		attr_t attr = 0;
+
+		linelen = getline(&line, &linesz, s->f);
+		if (linelen == -1) {
+			if (!feof(s->f)) {
+				free(line);
+				return got_ferror(s->f, GOT_ERR_IO);
+			}
+			s->eof = 1;
+			break;
+		}
+		if (++s->lineno < s->first_displayed_line)
+			continue;
+		if (view->gline && !gotoline(view, &s->lineno, &nprinted))
+			continue;
+		if (s->lineno == view->hiline)
+			attr = A_STANDOUT;
+
+		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 0,
+		    view->x ? 1 : 0);
+		if (err) {
+			free(line);
+			return err;
+		}
+		view->maxx = MAX(view->maxx, width);
+		free(wline);
+		wline = NULL;
+
+		if (attr)
+			wattron(view->window, attr);
+		if (s->first_displayed_line + nprinted == s->matched_line &&
+		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
+			err = add_matched_line(&width, line, view->ncols - 1, 0,
+			    view->window, view->x, regmatch);
+			if (err) {
+				free(line);
+				return err;
+			}
+		} else {
+			int skip;
+
+			err = format_line(&wline, &width, &skip, line,
+			    view->x, view->ncols - 1, 0, view->x ? 1 : 0);
+			if (err) {
+				free(line);
+				return err;
+			}
+			rc = waddwstr(view->window, &wline[skip]);
+			free(wline);
+			wline = NULL;
+			if (rc == ERR)
+				return got_error_msg(GOT_ERR_IO, "waddwstr");
+		}
+		if (s->lineno == view->hiline) {
+			while (width++ < view->ncols)
+				waddch(view->window, ' ');
+		} else {
+			if (width <= view->ncols)
+				waddch(view->window, '\n');
+		}
+		if (attr)
+			wattroff(view->window, attr);
+		if (++nprinted == 1)
+			s->first_displayed_line = s->lineno;
+	}
+	free(line);
+	if (nprinted > 0)
+		s->last_displayed_line = s->first_displayed_line + nprinted - 1;
+	else
+		s->last_displayed_line = s->first_displayed_line;
+
+	view_border(view);
+
+	if (s->eof) {
+		rc = waddnstr(view->window,
+		    "See the tog(1) manual page for full documentation",
+		    view->ncols - 1);
+		if (rc == ERR)
+			return got_error_msg(GOT_ERR_RANGE, "waddnstr");
+	} else {
+		wmove(view->window, view->nlines - 1, 0);
+		wclrtoeol(view->window);
+		wstandout(view->window);
+		rc = waddnstr(view->window, "scroll down for more...",
+		    view->ncols - 1);
+		if (rc == ERR)
+			return got_error_msg(GOT_ERR_RANGE, "waddnstr");
+		if (getcurx(view->window) < view->ncols - 6) {
+			rc = wprintw(view->window, "[%.0f%%]",
+			    100.00 * s->last_displayed_line / s->nlines);
+			if (rc == ERR)
+				return got_error_msg(GOT_ERR_IO, "wprintw");
+		}
+		wstandend(view->window);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+input_help_view(struct tog_view **new_view, struct tog_view *view, int ch)
+{
+	struct tog_help_view_state	*s = &view->state.help;
+	const struct got_error		*err = NULL;
+	char				*line = NULL;
+	ssize_t				 linelen;
+	size_t				 linesz = 0;
+	int				 eos, nscroll;
+
+	eos = nscroll = view->nlines;
+	if (view_is_hsplit_top(view))
+		--eos;  /* border */
+
+	s->lineno = s->first_displayed_line - 1 + s->selected_line;
+
+	switch (ch) {
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 3, 0);
+		view->count = 0;
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 3 < view->maxx)
+			view->x += 2;
+		else
+			view->count = 0;
+		break;
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);
+		if (view->x <= 0)
+			view->count = 0;
+		break;
+	case 'g':
+	case KEY_HOME:
+		s->first_displayed_line = 1;
+		view->count = 0;
+		break;
+	case 'G':
+	case KEY_END:
+		view->count = 0;
+		if (s->eof)
+			break;
+		s->first_displayed_line = (s->nlines - eos) + 3;
+		s->eof = 1;
+		break;
+	case 'k':
+	case KEY_UP:
+		if (s->first_displayed_line > 1)
+			--s->first_displayed_line;
+		else
+			view->count = 0;
+		break;
+	case CTRL('u'):
+	case 'u':
+		nscroll /= 2;
+		/* FALL THROUGH */
+	case KEY_PPAGE:
+	case CTRL('b'):
+	case 'b':
+		if (s->first_displayed_line == 1) {
+			view->count = 0;
+			break;
+		}
+		while (--nscroll > 0 && s->first_displayed_line > 1)
+			s->first_displayed_line--;
+		break;
+	case 'j':
+	case KEY_DOWN:
+	case CTRL('n'):
+		if (!s->eof)
+			++s->first_displayed_line;
+		else
+			view->count = 0;
+		break;
+	case CTRL('d'):
+	case 'd':
+		nscroll /= 2;
+		/* FALL THROUGH */
+	case KEY_NPAGE:
+	case CTRL('f'):
+	case 'f':
+	case ' ':
+		if (s->eof) {
+			view->count = 0;
+			break;
+		}
+		while (!s->eof && --nscroll > 0) {
+			linelen = getline(&line, &linesz, s->f);
+			s->first_displayed_line++;
+			if (linelen == -1) {
+				if (feof(s->f))
+					s->eof = 1;
+				else
+					err = got_ferror(s->f, GOT_ERR_IO);
+				break;
+			}
+		}
+		free(line);
+		break;
+	default:
+		view->count = 0;
+		break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+close_help_view(struct tog_view *view)
+{
+	struct tog_help_view_state *s = &view->state.help;
+
+	free(s->line_offsets);
+	s->line_offsets = NULL;
+	if (fclose(s->f) == EOF)
+		return got_error_from_errno("fclose");
+
+	return NULL;
+}
+
+static const struct got_error *
+reset_help_view(struct tog_view *view)
+{
+	struct tog_help_view_state *s = &view->state.help;
+
+
+	if (s->f && fclose(s->f) == EOF)
+		return got_error_from_errno("fclose");
+
+	wclear(view->window);
+	view->count = 0;
+	view->x = 0;
+	s->all = !s->all;
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->matched_line = 0;
+
+	return create_help(s);
+}
+
+static const struct got_error *
+open_help_view(struct tog_view *view, struct tog_view *parent)
+{
+	const struct got_error		*err = NULL;
+	struct tog_help_view_state	*s = &view->state.help;
+
+	s->type = (enum tog_keymap_type)parent->type;
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->selected_line = 1;
+
+	view->show = show_help_view;
+	view->input = input_help_view;
+	view->reset = reset_help_view;
+	view->close = close_help_view;
+	view->search_start = search_start_help_view;
+	view->search_next = search_next_view_match;
+
+	err = create_help(s);
+	return err;
+}
+
 static const struct got_error *
 view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
     enum tog_view_type request, int y, int x)
@@ -8378,6 +8987,14 @@ view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
 		else
 			err = got_error_msg(GOT_ERR_NOT_IMPL,
 			    "parent/child view pair not supported");
+		if (err)
+			view_close(*new_view);
+		break;
+	case TOG_VIEW_HELP:
+		*new_view = view_open(0, 0, y, x, TOG_VIEW_HELP);
+		if (*new_view == NULL)
+			return got_error_from_errno("view_open");
+		err = open_help_view(*new_view, view);
 		if (err)
 			view_close(*new_view);
 		break;
