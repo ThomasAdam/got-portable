@@ -681,6 +681,8 @@ struct tog_view {
 
 	const struct got_error *(*search_start)(struct tog_view *);
 	const struct got_error *(*search_next)(struct tog_view *);
+	void (*search_setup)(struct tog_view *, FILE **, off_t **, size_t *,
+	    int **, int **, int **, int **);
 	int search_started;
 	int searching;
 #define TOG_SEARCH_FORWARD	1
@@ -703,6 +705,8 @@ static const struct got_error *input_diff_view(struct tog_view **,
 static const struct got_error *reset_diff_view(struct tog_view *);
 static const struct got_error* close_diff_view(struct tog_view *);
 static const struct got_error *search_start_diff_view(struct tog_view *);
+static void search_setup_diff_view(struct tog_view *, FILE **, off_t **,
+    size_t *, int **, int **, int **, int **);
 static const struct got_error *search_next_view_match(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
@@ -724,6 +728,8 @@ static const struct got_error *input_blame_view(struct tog_view **,
 static const struct got_error *reset_blame_view(struct tog_view *);
 static const struct got_error *close_blame_view(struct tog_view *);
 static const struct got_error *search_start_blame_view(struct tog_view *);
+static void search_setup_blame_view(struct tog_view *, FILE **, off_t **,
+    size_t *, int **, int **, int **, int **);
 
 static const struct got_error *open_tree_view(struct tog_view *,
     struct got_object_id *, const char *, struct got_repository *);
@@ -742,6 +748,17 @@ static const struct got_error *input_ref_view(struct tog_view **,
 static const struct got_error *close_ref_view(struct tog_view *);
 static const struct got_error *search_start_ref_view(struct tog_view *);
 static const struct got_error *search_next_ref_view(struct tog_view *);
+
+static const struct got_error *open_help_view(struct tog_view *,
+    struct tog_view *);
+static const struct got_error *show_help_view(struct tog_view *);
+static const struct got_error *input_help_view(struct tog_view **,
+    struct tog_view *, int);
+static const struct got_error *reset_help_view(struct tog_view *);
+static const struct got_error* close_help_view(struct tog_view *);
+static const struct got_error *search_start_help_view(struct tog_view *);
+static void search_setup_help_view(struct tog_view *, FILE **, off_t **,
+    size_t *, int **, int **, int **, int **);
 
 static volatile sig_atomic_t tog_sigwinch_received;
 static volatile sig_atomic_t tog_sigpipe_received;
@@ -4775,56 +4792,19 @@ search_start_diff_view(struct tog_view *view)
 	return NULL;
 }
 
-static const struct got_error *
-search_set_view(struct tog_view *view, FILE **f, off_t **line_offsets,
+static void
+search_setup_diff_view(struct tog_view *view, FILE **f, off_t **line_offsets,
     size_t *nlines, int **first, int **last, int **match, int **selected)
 {
-	*f = NULL;
-	*first = *last = *match = *selected = NULL;
+	struct tog_diff_view_state *s = &view->state.diff;
+
+	*f = s->f;
+	*nlines = s->nlines;
 	*line_offsets = NULL;
-
-	switch (view->type) {
-	case (TOG_VIEW_DIFF): {
-		struct tog_diff_view_state *s = &view->state.diff;
-
-		*f = s->f;
-		*nlines = s->nlines;
-		*match = &s->matched_line;
-		*first = &s->first_displayed_line;
-		*last = &s->last_displayed_line;
-		*selected = &s->selected_line;
-		break;
-	}
-	case (TOG_VIEW_BLAME): {
-		struct tog_blame_view_state *s = &view->state.blame;
-
-		*f = s->blame.f;
-		*nlines = s->blame.nlines;
-		*line_offsets = s->blame.line_offsets;
-		*match = &s->matched_line;
-		*first = &s->first_displayed_line;
-		*last = &s->last_displayed_line;
-		*selected = &s->selected_line;
-		break;
-	}
-	case (TOG_VIEW_HELP): {
-		struct tog_help_view_state *s = &view->state.help;
-
-		*f = s->f;
-		*nlines = s->nlines;
-		*line_offsets = s->line_offsets;
-		*match = &s->matched_line;
-		*first = &s->first_displayed_line;
-		*last = &s->last_displayed_line;
-		*selected = &s->selected_line;
-		break;
-	}
-	default:
-		return got_error_msg(GOT_ERR_NOT_IMPL,
-		    "view search not supported");
-	}
-
-	return NULL;
+	*match = &s->matched_line;
+	*first = &s->first_displayed_line;
+	*last = &s->last_displayed_line;
+	*selected = &s->selected_line;
 }
 
 static const struct got_error *
@@ -4840,10 +4820,11 @@ search_next_view_match(struct tog_view *view)
 	size_t nlines = 0;
 	int *first, *last, *match, *selected;
 
-	err = search_set_view(view, &f, &line_offsets, &nlines, &first, &last,
+	if (!view->search_setup)
+		return got_error_msg(GOT_ERR_NOT_IMPL,
+		    "view search not supported");
+	view->search_setup(view, &f, &line_offsets, &nlines, &first, &last,
 	    &match, &selected);
-	if (err)
-		return err;
 
 	if (!view->searching) {
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
@@ -5067,6 +5048,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->reset = reset_diff_view;
 	view->close = close_diff_view;
 	view->search_start = search_start_diff_view;
+	view->search_setup = search_setup_diff_view;
 	view->search_next = search_next_view_match;
 done:
 	if (err)
@@ -6110,6 +6092,7 @@ open_blame_view(struct tog_view *view, char *path,
 	view->reset = reset_blame_view;
 	view->close = close_blame_view;
 	view->search_start = search_start_blame_view;
+	view->search_setup = search_setup_blame_view;
 	view->search_next = search_next_view_match;
 
 	return run_blame(view);
@@ -6143,6 +6126,21 @@ search_start_blame_view(struct tog_view *view)
 
 	s->matched_line = 0;
 	return NULL;
+}
+
+static void
+search_setup_blame_view(struct tog_view *view, FILE **f, off_t **line_offsets,
+    size_t *nlines, int **first, int **last, int **match, int **selected)
+{
+	struct tog_blame_view_state *s = &view->state.blame;
+
+	*f = s->blame.f;
+	*nlines = s->blame.nlines;
+	*line_offsets = s->blame.line_offsets;
+	*match = &s->matched_line;
+	*first = &s->first_displayed_line;
+	*last = &s->last_displayed_line;
+	*selected = &s->selected_line;
 }
 
 static const struct got_error *
@@ -8613,6 +8611,21 @@ search_start_help_view(struct tog_view *view)
 	return NULL;
 }
 
+static void
+search_setup_help_view(struct tog_view *view, FILE **f, off_t **line_offsets,
+    size_t *nlines, int **first, int **last, int **match, int **selected)
+{
+	struct tog_help_view_state *s = &view->state.help;
+
+	*f = s->f;
+	*nlines = s->nlines;
+	*line_offsets = s->line_offsets;
+	*match = &s->matched_line;
+	*first = &s->first_displayed_line;
+	*last = &s->last_displayed_line;
+	*selected = &s->selected_line;
+}
+
 static const struct got_error *
 show_help_view(struct tog_view *view)
 {
@@ -8909,6 +8922,7 @@ open_help_view(struct tog_view *view, struct tog_view *parent)
 	view->reset = reset_help_view;
 	view->close = close_help_view;
 	view->search_start = search_start_help_view;
+	view->search_setup = search_setup_help_view;
 	view->search_next = search_next_view_match;
 
 	err = create_help(s);
