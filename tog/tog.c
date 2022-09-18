@@ -2367,11 +2367,8 @@ queue_commits(struct tog_log_thread_args *a)
 					    "alloc_commit_queue_entry");
 					break;
 				}
-
-				err = got_object_commit_dup(&matched->commit,
-				    entry->commit);
-				if (err)
-					break;
+				matched->commit = entry->commit;
+				got_object_commit_retain(entry->commit);
 
 				matched->idx = a->limit_commits->ncommits;
 				TAILQ_INSERT_TAIL(&a->limit_commits->head,
@@ -3182,13 +3179,8 @@ limit_log_view(struct tog_view *view)
 				    "alloc_commit_queue_entry");
 				break;
 			}
-
-			err = got_object_commit_dup(&matched->commit,
-			    entry->commit);
-			if (err) {
-				free(matched);
-				return err;
-			}
+			matched->commit = entry->commit;
+			got_object_commit_retain(entry->commit);
 
 			matched->idx = s->limit_commits.ncommits;
 			TAILQ_INSERT_TAIL(&s->limit_commits.head,
