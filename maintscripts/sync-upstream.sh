@@ -17,7 +17,7 @@ nproc()
 {
 	NPROCCMD="nproc"
 
-	command -v "$NPROCCMD" >/dev/null 2>&1 || {
+	command "$NPROCCMD" >/dev/null 2>&1 || {
 		NPROCCMD="sysctl -n hw.ncpu"
 	}
 
