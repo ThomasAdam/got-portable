@@ -8484,11 +8484,6 @@ max_key_str(int *ret, const struct tog_key_map *km, size_t n)
  * Write keymap section headers, keys, and key info in km to f.
  * Save line offset to *off. If terminal has UTF8 encoding enabled,
  * wrap control and symbolic keys in guillemets, else use <>.
- * For example (top=UTF8, bottom=ASCII):
- * Global
- *   k ❬C-p❭ ❬Up❭               Move cursor or page up one line
- * Global
- *   k <C-p> <Up>               Move cursor or page up one line
  */
 static const struct got_error *
 format_help_line(off_t *off, FILE *f, const struct tog_key_map *km, int width)
@@ -8496,6 +8491,10 @@ format_help_line(off_t *off, FILE *f, const struct tog_key_map *km, int width)
 	int n, len = width;
 
 	if (km->keys) {
+		static const char *u8_glyph[] = {
+			"\xe2\x80\xb9", /* U+2039  (utf8 <) */
+			"\xe2\x80\xba"  /* U+203A  (utf8 >) */
+		};
 		char	*t0, *t, *k;
 		int	 cs, s, first = 1;
 
@@ -8509,8 +8508,8 @@ format_help_line(off_t *off, FILE *f, const struct tog_key_map *km, int width)
 		while ((k = strsep(&t, " ")) != NULL) {
 			s = strlen(k) > 1;  /* control or symbolic key */
 			n = fprintf(f, "%s%s%s%s%s", first ? "  " : "",
-			    cs && s ? "❬" : s ? "<" : "", k,
-			    cs && s ? "❭" : s ? ">" : "", t ? " " : "");
+			    cs && s ? u8_glyph[0] : s ? "<" : "", k,
+			    cs && s ? u8_glyph[1] : s ? ">" : "", t ? " " : "");
 			if (n < 0) {
 				free(t0);
 				return got_error_from_errno("fprintf");
