@@ -2354,11 +2354,8 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_object_commit_dup(struct got_commit_object **ret,
-    struct got_commit_object *commit)
+void
+got_object_commit_retain(struct got_commit_object *commit)
 {
-	*ret = commit;
 	commit->refcnt++;
-	return NULL;
 }
