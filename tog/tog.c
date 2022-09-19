@@ -546,7 +546,7 @@ struct tog_help_view_state {
 	KEY_("/", "Open prompt to enter search term"), \
 	KEY_("n", "Find next line/token matching the current search term"), \
 	KEY_("N", "Find previous line/token matching the current search term"),\
-	KEY_("q", "Quit the focussed view"), \
+	KEY_("q", "Quit the focussed view; Quit help screen"), \
 	KEY_("Q", "Quit tog"), \
 	\
 	KEYMAP_("Log", TOG_KEYMAP_LOG), \
@@ -8638,7 +8638,8 @@ show_help_view(struct tog_view *view)
 		view->gline = s->nlines - 1;
 
 	err = win_draw_center(view->window, 0, 0, view->ncols,
-	    view_needs_focus_indication(view), "tog help");
+	    view_needs_focus_indication(view),
+	        "tog help (press q to return to tog)");
 	if (err)
 		return err;
 	if (eos <= 1)
