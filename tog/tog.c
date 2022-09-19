@@ -1233,14 +1233,15 @@ view_request_new(struct tog_view **requested, struct tog_view *view,
 
 	*requested = NULL;
 
-	if (view_is_parent_view(view))
+	if (view_is_parent_view(view) && request != TOG_VIEW_HELP)
 		view_get_split(view, &y, &x);
 
 	err = view_dispatch_request(&new_view, view, request, y, x);
 	if (err)
 		return err;
 
-	if (view_is_parent_view(view) && view->mode == TOG_VIEW_SPLIT_HRZN) {
+	if (view_is_parent_view(view) && view->mode == TOG_VIEW_SPLIT_HRZN &&
+	    request != TOG_VIEW_HELP) {
 		err = view_init_hsplit(view, y);
 		if (err)
 			return err;
@@ -1249,9 +1250,10 @@ view_request_new(struct tog_view **requested, struct tog_view *view,
 	view->focussed = 0;
 	new_view->focussed = 1;
 	new_view->mode = view->mode;
-	new_view->nlines = view->lines - y;
+	new_view->nlines = request == TOG_VIEW_HELP ?
+	    view->lines : view->lines - y;
 
-	if (view_is_parent_view(view)) {
+	if (view_is_parent_view(view) && request != TOG_VIEW_HELP) {
 		view_transfer_size(new_view, view);
 		err = view_close_child(view);
 		if (err)
@@ -8991,7 +8993,7 @@ view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
 			view_close(*new_view);
 		break;
 	case TOG_VIEW_HELP:
-		*new_view = view_open(0, 0, y, x, TOG_VIEW_HELP);
+		*new_view = view_open(0, 0, 0, 0, TOG_VIEW_HELP);
 		if (*new_view == NULL)
 			return got_error_from_errno("view_open");
 		err = open_help_view(*new_view, view);
