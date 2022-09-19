@@ -8639,7 +8639,7 @@ show_help_view(struct tog_view *view)
 
 	err = win_draw_center(view->window, 0, 0, view->ncols,
 	    view_needs_focus_indication(view),
-	        "tog help (press q to return to tog)");
+	    "tog help (press q to return to tog)");
 	if (err)
 		return err;
 	if (eos <= 1)
