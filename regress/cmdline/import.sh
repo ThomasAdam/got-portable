@@ -140,6 +140,199 @@ test_import_basic() {
 	test_done "$testroot" "$ret"
 }
 
+test_import_specified_head() {
+	local testname=import_specified_head
+	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local headref=trunk
+
+	gotadmin init -b $headref $testroot/repo
+
+	mkdir $testroot/tree
+	make_test_tree $testroot/tree
+
+	got import -m init -r $testroot/repo $testroot/tree > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local head_commit=`git_show_head $testroot/repo`
+	echo "A  $testroot/tree/gamma/delta" > $testroot/stdout.expected
+	echo "A  $testroot/tree/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/tree/alpha" >> $testroot/stdout.expected
+	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
+	echo "Created branch refs/heads/$headref with commit $head_commit" \
+	    >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && got log -p | grep -v ^date: > $testroot/stdout)
+
+	id_alpha=`get_blob_id $testroot/repo "" alpha`
+	id_beta=`get_blob_id $testroot/repo "" beta`
+	id_zeta=`get_blob_id $testroot/repo epsilon zeta`
+	id_delta=`get_blob_id $testroot/repo gamma delta`
+	tree_id=`(cd $testroot/repo && got cat $head_commit | \
+	    grep ^tree | cut -d ' ' -f 2)`
+
+	echo "-----------------------------------------------" \
+	    > $testroot/stdout.expected
+	echo "commit $head_commit ($headref)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " init" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo "diff /dev/null $head_commit" >> $testroot/stdout.expected
+	echo "commit - /dev/null" >> $testroot/stdout.expected
+	echo "commit + $head_commit" >> $testroot/stdout.expected
+	echo "blob - /dev/null" >> $testroot/stdout.expected
+	echo "blob + $id_alpha (mode 644)" >> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
+	echo "+++ alpha" >> $testroot/stdout.expected
+	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
+	echo "+alpha" >> $testroot/stdout.expected
+	echo "blob - /dev/null" >> $testroot/stdout.expected
+	echo "blob + $id_beta (mode 644)" >> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
+	echo "+++ beta" >> $testroot/stdout.expected
+	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
+	echo "+beta" >> $testroot/stdout.expected
+	echo "blob - /dev/null" >> $testroot/stdout.expected
+	echo "blob + $id_zeta (mode 644)" >> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
+	echo "+++ epsilon/zeta" >> $testroot/stdout.expected
+	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
+	echo "+zeta" >> $testroot/stdout.expected
+	echo "blob - /dev/null" >> $testroot/stdout.expected
+	echo "blob + $id_delta (mode 644)" >> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
+	echo "+++ gamma/delta" >> $testroot/stdout.expected
+	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
+	echo "+delta" >> $testroot/stdout.expected
+	echo "" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/$headref: $head_commit" \
+	    >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_import_detached_head() {
+	local testroot=`test_init import_detached_head`
+
+	# mute verbose 'detached HEAD' warning
+	(cd $testroot/repo && git config --local advice.detachedHead false)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# enter detached HEAD state
+	local head_commit=`git_show_head $testroot/repo | cut -c1-7`
+	(cd $testroot/repo && \
+	    git checkout $head_commit > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD is now at $head_commit adding the test tree" >> \
+	    $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir $testroot/import
+	make_test_tree $testroot/import
+
+	# detached HEAD (i.e., not symbolic) so import should fallback to "main"
+	got import -r $testroot/repo -m init $testroot/import > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local main_commit=`(cd $testroot/repo && \
+	    git show-ref main | cut -d ' ' -f 1)`
+	echo "A  $testroot/import/gamma/delta" > $testroot/stdout.expected
+	echo "A  $testroot/import/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/import/alpha" >> $testroot/stdout.expected
+	echo "A  $testroot/import/beta" >> $testroot/stdout.expected
+	echo "Created branch refs/heads/main with commit $main_commit" \
+	    >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_import_requires_new_branch() {
 	local testroot=`test_init import_requires_new_branch`
 
@@ -297,6 +490,8 @@ test_import_symlink() {
 
 test_parseargs "$@"
 run_test test_import_basic
+run_test test_import_specified_head
+run_test test_import_detached_head
 run_test test_import_requires_new_branch
 run_test test_import_ignores
 run_test test_import_empty_dir

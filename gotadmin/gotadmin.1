@@ -53,7 +53,7 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width checkout
-.It Cm init Ar repository-path
+.It Cm init Oo Fl b Ar branch Oc Ar repository-path
 Create a new empty repository at the specified
 .Ar repository-path .
 .Pp
@@ -64,6 +64,17 @@ the
 command must be used to populate the empty repository before
 .Cm got checkout
 can be used.
+.Pp
+The options for
+.Cm gotadmin init
+are as follows:
+.Bl -tag -width Ds
+.It Fl b Ar branch
+Make the repository's HEAD reference point to the specified
+.Ar branch
+instead of the default branch
+.Dq main .
+.El
 .It Cm info Op Fl r Ar repository-path
 Display information about a repository.
 This includes some configuration settings from
