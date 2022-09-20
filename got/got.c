@@ -759,12 +759,13 @@ cmd_import(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
-	const char *branch_name = "main";
-	char *refname = NULL, *id_str = NULL, *logmsg_path = NULL;
+	const char *branch_name = NULL;
+	char *id_str = NULL, *logmsg_path = NULL;
+	char refname[PATH_MAX] = "refs/heads/";
 	struct got_repository *repo = NULL;
 	struct got_reference *branch_ref = NULL, *head_ref = NULL;
 	struct got_object_id *new_commit_id = NULL;
-	int ch;
+	int ch, n = 0;
 	struct got_pathlist_head ignores;
 	struct got_pathlist_entry *pe;
 	int preserve_logmsg = 0;
@@ -843,11 +844,22 @@ cmd_import(int argc, char *argv[])
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (branch_name[0] == '-')
+	if (branch_name && branch_name[0] == '-')
 		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
 
-	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
-		error = got_error_from_errno("asprintf");
+	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+	if (error && error->code != GOT_ERR_NOT_REF)
+		goto done;
+
+	if (branch_name)
+		n = strlcat(refname, branch_name, sizeof(refname));
+	else if (head_ref && got_ref_is_symbolic(head_ref))
+		n = strlcpy(refname, got_ref_get_symref_target(head_ref),
+		    sizeof(refname));
+	else
+		n = strlcat(refname, "main", sizeof(refname));
+	if (n >= sizeof(refname)) {
+		error = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
 
@@ -972,7 +984,6 @@ done:
 	free(logmsg_path);
 	free(repo_path);
 	free(editor);
-	free(refname);
 	free(new_commit_id);
 	free(id_str);
 	free(author);
@@ -1689,7 +1700,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	if (!list_refs_only) {
-		error = got_repo_init(repo_path);
+		error = got_repo_init(repo_path, NULL);
 		if (error)
 			goto done;
 		error = got_repo_pack_fds_open(&pack_fds);

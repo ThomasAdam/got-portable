@@ -271,7 +271,8 @@ done:
 __dead static void
 usage_init(void)
 {
-	fprintf(stderr, "usage: %s init repository-path\n", getprogname());
+	fprintf(stderr, "usage: %s init [-b branch] repository-path\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -279,11 +280,15 @@ static const struct got_error *
 cmd_init(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
+	const char *head_name = NULL;
 	char *repo_path = NULL;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "b:")) != -1) {
 		switch (ch) {
+		case 'b':
+			head_name = optarg;
+			break;
 		default:
 			usage_init();
 			/* NOTREACHED */
@@ -315,7 +320,7 @@ cmd_init(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_init(repo_path);
+	error = got_repo_init(repo_path, head_name);
 done:
 	free(repo_path);
 	return error;

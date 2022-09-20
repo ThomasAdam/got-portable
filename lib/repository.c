@@ -1552,7 +1552,7 @@ got_repo_unpin_pack(struct got_repository *repo)
 }
 
 const struct got_error *
-got_repo_init(const char *repo_path)
+got_repo_init(const char *repo_path, const char *head_name)
 {
 	const struct got_error *err = NULL;
 	const char *dirnames[] = {
@@ -1562,12 +1562,12 @@ got_repo_init(const char *repo_path)
 	};
 	const char *description_str = "Unnamed repository; "
 	    "edit this file 'description' to name the repository.";
-	const char *headref_str = "ref: refs/heads/main";
+	const char *headref = "ref: refs/heads/";
 	const char *gitconfig_str = "[core]\n"
 	    "\trepositoryformatversion = 0\n"
 	    "\tfilemode = true\n"
 	    "\tbare = true\n";
-	char *path;
+	char *headref_str, *path;
 	size_t i;
 
 	if (!got_path_dir_is_empty(repo_path))
@@ -1592,7 +1592,13 @@ got_repo_init(const char *repo_path)
 
 	if (asprintf(&path, "%s/%s", repo_path, GOT_HEAD_FILE) == -1)
 		return got_error_from_errno("asprintf");
+	if (asprintf(&headref_str, "%s%s", headref,
+	    head_name ? head_name : "main") == -1) {
+		free(path);
+		return got_error_from_errno("asprintf");
+	}
 	err = got_path_create_file(path, headref_str);
+	free(headref_str);
 	free(path);
 	if (err)
 		return err;

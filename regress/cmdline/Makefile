@@ -1,5 +1,5 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
-	ref commit revert cherrypick backout rebase import histedit \
+	ref commit revert cherrypick backout rebase init import histedit \
 	integrate merge stage unstage cat clone fetch send tree patch pack \
 	cleanup
 NOOBJ=Yes
@@ -53,6 +53,9 @@ backout:
 
 rebase:
 	./rebase.sh -q -r "$(GOT_TEST_ROOT)"
+
+init:
+	./init.sh -q -r "$(GOT_TEST_ROOT)"
 
 import:
 	./import.sh -q -r "$(GOT_TEST_ROOT)"

@@ -130,8 +130,11 @@ int got_repo_is_bare(struct got_repository *);
 const struct got_error *got_repo_map_path(char **, struct got_repository *,
     const char *);
 
-/* Create a new repository in an empty directory at a specified path. */
-const struct got_error *got_repo_init(const char *);
+/*
+ * Create a new repository with optional specified
+ * HEAD ref in an empty directory at a specified path.
+ */
+const struct got_error *got_repo_init(const char *, const char *);
 
 /* Attempt to find a unique object ID for a given ID string prefix. */
 const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
