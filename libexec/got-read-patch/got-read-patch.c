@@ -62,7 +62,7 @@ struct imsgbuf ibuf;
 
 static const struct got_error *
 send_patch(const char *oldname, const char *newname, const char *commitid,
-    const char *blob, int git)
+    const char *blob, const int xbit, int git)
 {
 	struct got_imsg_patch p;
 
@@ -80,6 +80,7 @@ send_patch(const char *oldname, const char *newname, const char *commitid,
 	if (blob != NULL)
 		strlcpy(p.blob, blob, sizeof(p.blob));
 
+	p.xbit = xbit;
 	p.git = git;
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH, 0, 0, -1, &p, sizeof(p)) == -1)
 		return got_error_from_errno("imsg_compose GOT_IMSG_PATCH");
@@ -125,6 +126,18 @@ filename(const char *at, char **name)
 	if (*name == NULL)
 		return got_error_from_errno("strdup");
 	return NULL;
+}
+
+static int
+filexbit(const char *line)
+{
+	char *m;
+
+	m = strchr(line, '(');
+	if (m && !strncmp(m + 1, "mode ", 5))
+		return strncmp(m + 6, "755", 3) == 0;
+
+	return 0;
 }
 
 static const struct got_error *
@@ -199,7 +212,7 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
-	int	 create, rename = 0;
+	int	 create, rename = 0, xbit = 0;
 
 	*done = 0;
 	*next = 0;
@@ -218,6 +231,8 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 		} else if (!strncmp(line, "+++ ", 4)) {
 			free(new);
 			err = filename(line+4, &new);
+		} else if (!strncmp(line, "blob + ", 7)) {
+			xbit = filexbit(line);
 		} else if (!git && !strncmp(line, "blob - ", 7)) {
 			free(blob);
 			err = blobid(line + 7, &blob, git);
@@ -226,6 +241,8 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 			err = filename(line + 10, &new);
 		} else if (git && !strncmp(line, "similarity index 100%", 21))
 			rename = 1;
+		else if (git && !strncmp(line, "new file mode 100", 17))
+			xbit = strncmp(line + 17, "755", 3) == 0;
 		else if (git && !strncmp(line, "index ", 6)) {
 			free(blob);
 			err = blobid(line + 6, &blob, git);
@@ -248,7 +265,7 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 		if (rename && old != NULL && new != NULL) {
 			*done = 1;
 			err = send_patch(old, new, commitid,
-			    blob, git);
+			    blob, xbit, git);
 			break;
 		}
 
@@ -259,7 +276,7 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 				err = got_error(GOT_ERR_PATCH_MALFORMED);
 			else
 				err = send_patch(old, new, commitid,
-				    blob, git);
+				    blob, xbit, git);
 
 			if (err)
 				break;

@@ -72,6 +72,7 @@ struct got_patch_hunk {
 
 STAILQ_HEAD(got_patch_hunk_head, got_patch_hunk);
 struct got_patch {
+	int	 xbit;
 	char	*old;
 	char	*new;
 	char	 cid[41];
@@ -193,6 +194,8 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 
 	if (*patch.blob != '\0')
 		strlcpy(p->blob, patch.blob, sizeof(p->blob));
+
+	p->xbit = patch.xbit;
 
 	/* automatically set strip=1 for git-style diffs */
 	if (strip == -1 && patch.git &&
@@ -831,7 +834,8 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			goto done;
 		}
 		mode = sb.st_mode;
-	}
+	} else if (p->xbit)
+		mode |= (S_IXUSR | S_IXGRP | S_IXOTH);
 
 	err = got_opentemp_named(&tmppath, &tmpfile, template);
 	if (err)

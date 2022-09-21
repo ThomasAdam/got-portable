@@ -1763,6 +1763,93 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_newfile_xbit_got_diff() {
+	local testroot=`test_init patch_newfile_xbit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+blob - /dev/null
+blob + abcdef0123456789abcdef012345678901234567 (mode 755)
+--- /dev/null
++++ xfile
+@@ -0,0 +1,1 @@
++xfile
+EOF
+
+	(cd $testroot/wt && got patch patch) > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ ! -x $testroot/wt/xfile ]; then
+		echo "failed to set xbit on newfile" >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	echo xfile > $testroot/wt/xfile.expected
+	cmp -s $testroot/wt/xfile $testroot/wt/xfile.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/wt/xfile $testroot/wt/xfile.expected
+	fi
+
+	test_done $testroot $ret
+}
+
+test_patch_newfile_xbit_git_diff() {
+	local testroot=`test_init patch_newfile_xbit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	cat <<EOF > $testroot/wt/patch
+diff --git a/xfile b/xfile
+new file mode 100755
+index 00000000..abcdef01
+--- /dev/null
++++ b/xfile
+@@ -0,0 +1,1 @@
++xfile
+EOF
+
+	(cd $testroot/wt && got patch patch) > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	if [ ! -x $testroot/wt/xfile ]; then
+		echo "failed to set xbit on newfile" >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	echo xfile > $testroot/wt/xfile.expected
+	cmp -s $testroot/wt/xfile $testroot/wt/xfile.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "fail"
+		diff -u $testroot/wt/xfile $testroot/wt/xfile.expected
+	fi
+
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_basic
 run_test test_patch_dont_apply
@@ -1789,3 +1876,5 @@ run_test test_patch_merge_base_provided
 run_test test_patch_merge_conflict
 run_test test_patch_merge_unknown_blob
 run_test test_patch_merge_reverse
+run_test test_patch_newfile_xbit_got_diff
+run_test test_patch_newfile_xbit_git_diff
