@@ -1053,6 +1053,113 @@ test_rebase_forward() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_forward_path_prefix() {
+	local testroot=`test_init rebase_forward_path_prefix`
+	local commit0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt-full > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "change alpha 1" > $testroot/wt-full/alpha
+	(cd $testroot/wt-full && got commit -m 'test rebase_forward' \
+		> /dev/null)
+	local commit1=`git_show_head $testroot/repo`
+
+	echo "change alpha 2" > $testroot/wt-full/alpha
+	(cd $testroot/wt-full && got commit -m 'test rebase_forward' \
+		> /dev/null)
+	local commit2=`git_show_head $testroot/repo`
+
+	# Simulate a situation where fast-forward is required.
+	# We want to fast-forward master to origin/master:
+	# commit 3907e11dceaae2ca7f8db79c2af31794673945ad (origin/master)
+	# commit ffcffcd102cf1af6572fbdbb4cf07a0f1fd2d840 (master)
+	# commit 87a6a8a2263a15b61c016ff1720b24741d455eb5
+	(cd $testroot/repo && got ref -d master >/dev/null)
+	(cd $testroot/repo && got ref -c $commit1 refs/heads/master)
+	(cd $testroot/repo && got ref -c $commit2 refs/remotes/origin/master)
+
+	# Work tree which uses a path-prefix and will be used for rebasing
+	got checkout -p epsilon -b origin/master $testroot/repo $testroot/wt \
+		> /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && /usr/local/bin/got rebase master \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	echo "Forwarding refs/heads/master to commit $commit2" \
+		> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Ensure that rebase operation was completed correctly
+	(cd $testroot/wt && got rebase -a \
+		> $testroot/stdout 2> $testroot/stderr)
+	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "got: rebase operation not in progress" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch -n > $testroot/stdout)
+	echo "master" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $commit2 (master, origin/master)" > $testroot/stdout.expected
+	echo "commit $commit1" >> $testroot/stdout.expected
+	echo "commit $commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Forward-only rebase operations should not be backed up
+	(cd $testroot/repo && got rebase -l > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_rebase_out_of_date() {
 	local testroot=`test_init rebase_out_of_date`
 	local initial_commit=`git_show_head $testroot/repo`
@@ -1697,6 +1804,7 @@ run_test test_rebase_path_prefix
 run_test test_rebase_preserves_logmsg
 run_test test_rebase_no_commits_to_rebase
 run_test test_rebase_forward
+run_test test_rebase_forward_path_prefix
 run_test test_rebase_out_of_date
 run_test test_rebase_trims_empty_dir
 run_test test_rebase_delete_missing_file
