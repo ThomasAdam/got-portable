@@ -641,6 +641,7 @@ struct got_imsg_remotes {
  */
 struct got_imsg_patch {
 	int	git;
+	int	xbit;
 	char	old[PATH_MAX];
 	char	new[PATH_MAX];
 	char	cid[41];
