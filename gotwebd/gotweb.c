@@ -742,59 +742,57 @@ gotweb_render_header(struct request *c)
 	if (r == -1)
 		goto done;
 
-	if (qs != NULL) {
-		if (qs->path != NULL) {
-			char *epath;
+	if (qs->path != NULL) {
+		char *epath;
 
-			if (fcgi_printf(c, " / ") == -1)
-				goto done;
+		if (fcgi_printf(c, " / ") == -1)
+			goto done;
 
-			err = gotweb_escape_html(&epath, qs->path);
-			if (err)
-				return err;
-			r = gotweb_link(c, &(struct gotweb_url){
-				.action = SUMMARY,
-				.index_page = -1,
-				.page = -1,
-				.path = qs->path,
-			    }, "%s", epath);
-			free(epath);
-			if (r == -1)
-				goto done;
+		err = gotweb_escape_html(&epath, qs->path);
+		if (err)
+			return err;
+		r = gotweb_link(c, &(struct gotweb_url){
+			    .action = SUMMARY,
+			    .index_page = -1,
+			    .page = -1,
+			    .path = qs->path,
+		    }, "%s", epath);
+		free(epath);
+		if (r == -1)
+			goto done;
+	}
+	if (qs->action != INDEX) {
+		const char *action = "";
+
+		switch (qs->action) {
+		case BLAME:
+			action = "blame";
+			break;
+		case BRIEFS:
+			action = "briefs";
+			break;
+		case COMMITS:
+			action = "commits";
+			break;
+		case DIFF:
+			action = "diff";
+			break;
+		case SUMMARY:
+			action = "summary";
+			break;
+		case TAG:
+			action = "tag";
+			break;
+		case TAGS:
+			action = "tags";
+			break;
+		case TREE:
+			action = "tree";
+			break;
 		}
-		if (qs->action != INDEX) {
-			const char *action = "";
 
-			switch (qs->action) {
-			case BLAME:
-				action = "blame";
-				break;
-			case BRIEFS:
-				action = "briefs";
-				break;
-			case COMMITS:
-				action = "commits";
-				break;
-			case DIFF:
-				action = "diff";
-				break;
-			case SUMMARY:
-				action = "summary";
-				break;
-			case TAG:
-				action = "tag";
-				break;
-			case TAGS:
-				action = "tags";
-				break;
-			case TREE:
-				action = "tree";
-				break;
-			}
-
-			if (fcgi_printf(c, " / %s", action) == -1)
-				goto done;
-		}
+		if (fcgi_printf(c, " / %s", action) == -1)
+			goto done;
 	}
 
 	fcgi_printf(c, "</div>\n"	/* #site_path */
