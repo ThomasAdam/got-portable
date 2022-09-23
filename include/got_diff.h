@@ -74,7 +74,7 @@ const struct got_error *got_diff_blob(struct got_diff_line **, size_t *,
  * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
-    off_t, const char *, FILE *, int, size_t, const char *,
+    off_t, const char *, FILE *, int, struct stat *, const char *,
     enum got_diff_algorithm, int, int, int, FILE *);
 
 /*
