@@ -197,10 +197,22 @@ commit ID SHA1 hash.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm &
-Like
+Prompt for a pattern and limit the log view's list of commits to those
+which match the pattern.
+If no pattern is specified, i.e. the
+.Cm &
+prompt is immediately closed with the Enter key, then the pattern is
+cleared.
+Until the pattern is cleared, the limited list of commits replaces the
+full list of commits for all operations supported by the log view.
+For example, a search started with
 .Cm /
-but hides the non-matching commits.
-Use the empty string as a pattern to display all commits.
+will search the limited list of commits, rather than searching all commits.
+The pattern is an extended regular expression which is matched
+against a commit's author name, committer name, log message, and
+commit ID SHA1 hash.
+Regular expression syntax is documented in
+.Xr re_format 7 .
 .It Cm n
 Find the Nth next commit which matches the current search pattern (default: 1).
 .br
