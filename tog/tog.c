@@ -554,7 +554,7 @@ struct tog_help_view_state {
 	KEY_("q", "Quit the focussed view; Quit help screen"), \
 	KEY_("Q", "Quit tog"), \
 	\
-	KEYMAP_("Log", TOG_KEYMAP_LOG), \
+	KEYMAP_("Log view", TOG_KEYMAP_LOG), \
 	KEY_("< ,", "Move cursor up one commit"), \
 	KEY_("> .", "Move cursor down one commit"), \
 	KEY_("Enter", "Open diff view of the selected commit"), \
@@ -567,7 +567,7 @@ struct tog_help_view_state {
 	KEY_("C-g Backspace", "Cancel current search or log operation"), \
 	KEY_("C-l", "Reload the log view with new commits in the repository"), \
 	\
-	KEYMAP_("Diff", TOG_KEYMAP_DIFF), \
+	KEYMAP_("Diff view", TOG_KEYMAP_DIFF), \
 	KEY_("K < ,", "Display diff of next line in the file/log entry"), \
 	KEY_("J > .", "Display diff of previous line in the file/log entry"), \
 	KEY_("A", "Toggle between Myers and Patience diff algorithm"), \
@@ -581,7 +581,7 @@ struct tog_help_view_state {
 	KEY_("]", "Increase the number of context lines"), \
 	KEY_("w", "Toggle ignore whitespace-only changes in the diff"), \
 	\
-	KEYMAP_("Blame", TOG_KEYMAP_BLAME), \
+	KEYMAP_("Blame view", TOG_KEYMAP_BLAME), \
 	KEY_("Enter", "Display diff view of the selected line's commit"), \
 	KEY_("A", "Toggle diff algorithm between Myers and Patience"), \
 	KEY_("L", "Open log view for the currently selected annotated line"), \
@@ -591,7 +591,7 @@ struct tog_help_view_state {
 	KEY_("p", "Reload view with the version of the file found in the" \
 	    " selected line's parent commit"), \
 	\
-	KEYMAP_("Tree", TOG_KEYMAP_TREE), \
+	KEYMAP_("Tree view", TOG_KEYMAP_TREE), \
 	KEY_("Enter", "Enter selected directory or open blame view of the" \
 	    " selected file"), \
 	KEY_("L", "Open log view for the selected entry"), \
@@ -599,7 +599,7 @@ struct tog_help_view_state {
 	KEY_("i", "Show object IDs for all tree entries"), \
 	KEY_("Backspace", "Return to the parent directory"), \
 	\
-	KEYMAP_("Ref", TOG_KEYMAP_REF), \
+	KEYMAP_("Ref view", TOG_KEYMAP_REF), \
 	KEY_("Enter", "Display log view of the selected reference"), \
 	KEY_("T", "Display tree view of the selected reference"), \
 	KEY_("i", "Toggle display of IDs for all non-symbolic references"), \
