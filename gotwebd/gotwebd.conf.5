@@ -97,6 +97,14 @@ argument may be number or a service name defined in
 May be specified multiple times to build up a list of listening sockets.
 However, a given combination of address and port may only be used by
 one server.
+.Pp
+If a network interface name is given as
+.Ar address
+argument then
+.Xr gotwebd 8
+will obtain the list of addresses on this interface only on startup.
+Any future changes to the address configuration of the interface will
+be ignored.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
 .It Ic logo_url Ar url
