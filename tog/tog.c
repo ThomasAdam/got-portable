@@ -2464,8 +2464,8 @@ draw_commits(struct tog_view *view)
 	if (s->thread_args.commits_needed > 0 || s->thread_args.load_all) {
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
 		    entry ? entry->idx + 1 : 0, s->commits->ncommits,
-		    (view->searching && !view->search_next_done) ||
-		    s->limit_view ?  "searching..." : "loading...") == -1) {
+		    (view->searching && !view->search_next_done) ?
+		    "searching..." : "loading...") == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
