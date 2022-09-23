@@ -189,10 +189,10 @@ were an out-of-band release to `-portable`.  In such cases, that would take
 the form:
 
 ```
-0.75a
+0.75.1
 ```
 
-Where the suffix of `a`, `b`, etc., can be used to denote any sub-releases
+Where the suffix of `1`, `2`, etc., can be used to denote any sub-releases
 from the `0.75` version.
 
 The variable `GOT_RELEASE` needs be changed to `yes` so that the
@@ -211,6 +211,19 @@ If this succeeds, the tarball is in the CWD, as: `got-portable-VERSION.tar.gz`
 This can then be copied to the `got-www` repository and uploaded, along with
 changing a couple of HTML pages therein to represent the new released version.
 Additionally, the CHANGELOG file can be copied to the `got-www` and committed.
+
+Once all of that has been done, the repository should be tagged to indicate
+the release, hence:
+
+```
+git tag -a 0.75
+```
+
+This can then be pushed out to `gh` and `origin`.
+
+After that point, the version of `GOT_PORTABLE_VER` in
+`util/got-portable-ver.sh` should be changed to the next version, and
+`GOT_RELEASE` should be setg back to `no`.
 
 TODO
 ====
