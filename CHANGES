@@ -1,4 +1,4 @@
-* got 0.76; 2022-09-08
+* got 0.76; 2022-09-23
 - gotwebd documentation fixes
 - tog: extend log view author highlight colour to full field width (jamsek)
 - tog: make headline highlight extend the full view width (jamsek)
