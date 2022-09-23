@@ -6,7 +6,11 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
-# got-portable-0.75.1 (2022-09-13)
+# got-portable 0.76 (2022-09-23)
+
+* Changes from got-0.76; no -portable specific changes worth mentioning.
+
+# got-portable 0.75.1 (2022-09-13)
 
 This is a bug-fix -portable release to address the following:
 
