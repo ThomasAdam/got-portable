@@ -730,7 +730,7 @@ test_unstage_patch_added() {
 	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + epsilon/new' >> $testroot/stdout.expected
+	echo 'file + epsilon/new (mode 644)' >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ epsilon/new" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
