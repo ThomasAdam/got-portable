@@ -1,3 +1,17 @@
+* got 0.76; 2022-09-08
+- gotwebd documentation fixes
+- tog: extend log view author highlight colour to full field width (jamsek)
+- tog: make headline highlight extend the full view width (jamsek)
+- make got_commit_graph_iter_next use caller-provided storage for the id (op)
+- tog: add new log view limit feature to filter commits (patch by Mikhail + op)
+- tog: respect current cursor position during log search (patch by Mikhail)
+- tog: implement runtime help accessible via H,F1 keymaps (jamsek)
+- add gotadmin init -b <branch> to specify repo head ref (jamsek)
+- ensure got patch respects x-bit perms for new files (jamsek)
+- gotwebd: drop needless NULL check (op)
+- show file mode for new added files in work tree diffs (jamsek)
+- fix wrong function prototypes shown in diff hunk headers (thj@freebsd, jamsek)
+
 * got 0.75; 2022-09-07
   too many changes to list all here; see git repository history for more
 - unlink temporary files created during ssh signature verification
