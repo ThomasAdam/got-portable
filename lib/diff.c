@@ -222,7 +222,7 @@ got_diff_blob(struct got_diff_line **lines, size_t*nlines,
 static const struct got_error *
 diff_blob_file(struct got_diffreg_result **resultp,
     struct got_blob_object *blob1, FILE *f1, off_t size1, const char *label1,
-    FILE *f2, int f2_exists, size_t size2, const char *label2,
+    FILE *f2, int f2_exists, struct stat *sb2, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
     int force_text_diff, FILE *outfile)
 {
@@ -240,9 +240,22 @@ diff_blob_file(struct got_diffreg_result **resultp,
 		idstr1 = "/dev/null";
 
 	if (outfile) {
+		char	*mode = NULL;
+
+		/* display file mode for new added files only */
+		if (f2_exists && blob1 == NULL) {
+			int mmask = (S_IRWXU | S_IRWXG | S_IRWXO);
+
+			if (S_ISLNK(sb2->st_mode))
+				mmask = S_IFLNK;
+			if (asprintf(&mode, " (mode %o)",
+			    sb2->st_mode & mmask) == -1)
+				return got_error_from_errno("asprintf");
+		}
 		fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
-		fprintf(outfile, "file + %s\n",
-		    f2_exists ? label2 : "/dev/null");
+		fprintf(outfile, "file + %s%s\n",
+		    f2_exists ? label2 : "/dev/null", mode ? mode : "");
+		free(mode);
 	}
 
 	err = got_diffreg(&result, f1, f2, diff_algo, ignore_whitespace,
@@ -273,13 +286,13 @@ done:
 
 const struct got_error *
 got_diff_blob_file(struct got_blob_object *blob1, FILE *f1, off_t size1,
-    const char *label1, FILE *f2, int f2_exists, size_t size2,
+    const char *label1, FILE *f2, int f2_exists, struct stat *sb2,
     const char *label2, enum got_diff_algorithm diff_algo, int diff_context,
     int ignore_whitespace, int force_text_diff, FILE *outfile)
 {
 	return diff_blob_file(NULL, blob1, f1, size1, label1, f2, f2_exists,
-	    size2, label2, diff_algo, diff_context, ignore_whitespace,
-	    force_text_diff, outfile );
+	    sb2, label2, diff_algo, diff_context, ignore_whitespace,
+	    force_text_diff, outfile);
 }
 
 static const struct got_error *

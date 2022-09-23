@@ -231,7 +231,8 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 		} else if (!strncmp(line, "+++ ", 4)) {
 			free(new);
 			err = filename(line+4, &new);
-		} else if (!strncmp(line, "blob + ", 7)) {
+		} else if (!strncmp(line, "blob + ", 7) ||
+		    !strncmp(line, "file + ", 7)) {
 			xbit = filexbit(line);
 		} else if (!git && !strncmp(line, "blob - ", 7)) {
 			free(blob);

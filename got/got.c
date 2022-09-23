@@ -4717,7 +4717,9 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
 	off_t size1 = 0;
-	int f2_exists = 1;
+	int f2_exists = 0;
+
+	memset(&sb, 0, sizeof(sb));
 
 	if (a->diff_staged) {
 		if (staged_status != GOT_STATUS_MODIFY &&
@@ -4850,8 +4852,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 					goto done;
 			}
 		}
-		if (fstat(fd, &sb) == -1) {
-			err = got_error_from_errno2("fstat", abspath);
+		if (fstatat(fd, abspath, &sb, AT_SYMLINK_NOFOLLOW) == -1) {
+			err = got_error_from_errno2("fstatat", abspath);
 			goto done;
 		}
 		f2 = fdopen(fd, "r");
@@ -4860,9 +4862,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			goto done;
 		}
 		fd = -1;
-	} else {
-		sb.st_size = 0;
-		f2_exists = 0;
+		f2_exists = 1;
 	}
 
 	if (blob1) {
@@ -4873,8 +4873,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	err = got_diff_blob_file(blob1, a->f1, size1, label1, f2 ? f2 : a->f2,
-	    f2_exists, sb.st_size, path, GOT_DIFF_ALGORITHM_PATIENCE,
-	    a->diff_context, a->ignore_whitespace, a->force_text_diff, stdout);
+	    f2_exists, &sb, path, GOT_DIFF_ALGORITHM_PATIENCE, a->diff_context,
+	    a->ignore_whitespace, a->force_text_diff, stdout);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");

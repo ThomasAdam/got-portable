@@ -54,7 +54,7 @@ test_diff_basic() {
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -148,7 +148,7 @@ test_diff_basic() {
 	echo '-zeta' >> $testroot/stdout.expected
 	echo '+modified zeta' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -269,13 +269,13 @@ test_diff_basic() {
 	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + master' >> $testroot/stdout.expected
+	echo 'file + master (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ master' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+master' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -311,7 +311,7 @@ test_diff_basic() {
 	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -365,7 +365,7 @@ test_diff_basic() {
 	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -798,7 +798,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '-nonexistent' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + zeta.link' >> $testroot/stdout.expected
+	echo 'file + zeta.link (mode 120000)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ zeta.link' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -950,7 +950,7 @@ test_diff_binary_files() {
 	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + foo' >> $testroot/stdout.expected
+	echo 'file + foo (mode 644)' >> $testroot/stdout.expected
 	echo "Binary files /dev/null and foo differ" \
 		>> $testroot/stdout.expected
 
@@ -967,7 +967,7 @@ test_diff_binary_files() {
 	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + foo' >> $testroot/stdout.expected
+	echo 'file + foo (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
@@ -1327,6 +1327,53 @@ EOF
 	test_done "$testroot" $ret
 }
 
+test_diff_worktree_newfile_xbit() {
+	local testroot=`test_init diff_worktree_newfile_xbit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo xfile > $testroot/wt/xfile
+	chmod +x $testroot/wt/xfile
+	(cd $testroot/wt && got add xfile) > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+	(cd $testroot/wt && got diff) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	cat <<EOF > $testroot/stdout.expected
+diff $testroot/wt
+commit - $commit_id
+path + $testroot/wt
+blob - /dev/null
+file + xfile (mode 755)
+--- /dev/null
++++ xfile
+@@ -0,0 +1 @@
++xfile
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "failed to record mode 755"
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1340,3 +1387,4 @@ run_test test_diff_binary_files
 run_test test_diff_commits
 run_test test_diff_ignored_file
 run_test test_diff_crlf
+run_test test_diff_worktree_newfile_xbit
