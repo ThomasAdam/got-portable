@@ -231,6 +231,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_COMMIT_REDUNDANT_AUTHOR, "specified author is equal to the "
 	    "default one"},
 	{ GOT_ERR_BAD_QUERYSTRING, "invalid query string" },
+	{ GOT_ERR_INTEGRATE_BRANCH, "will not integrate into a reference "
+	    "outside the \"refs/heads/\" reference namespace" },
 };
 
 static struct got_custom_error {

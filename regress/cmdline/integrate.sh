@@ -499,6 +499,51 @@ test_integrate_replace_file_with_symlink() {
 	test_done "$testroot" "$ret"
 }
 
+test_integrate_into_nonbranch() {
+	local testroot=`test_init test_integrate_into_nonbranch`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local commit=`git_show_head $testroot/repo`
+	(cd $testroot/repo && got ref -c $commit refs/remotes/origin/master)
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+
+	(cd $testroot/wt && got up -b origin/master > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got branch failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got integrate master \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got integrate succeeded unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: will not integrate into a reference outside the " \
+		> $testroot/stderr.expected
+	echo "\"refs/heads/\" reference namespace" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_integrate_basic
 run_test test_integrate_requires_rebase_first
@@ -506,3 +551,4 @@ run_test test_integrate_path_prefix
 run_test test_integrate_backwards_in_time
 run_test test_integrate_replace_symlink_with_file
 run_test test_integrate_replace_file_with_symlink
+run_test test_integrate_into_nonbranch
