@@ -11961,6 +11961,12 @@ cmd_integrate(int argc, char *argv[])
 		    branch_ref, base_branch_ref);
 		goto done;
 	}
+	if (strncmp(base_refname, "refs/heads/", 11) != 0) {
+		error = got_error(GOT_ERR_INTEGRATE_BRANCH);
+		got_worktree_integrate_abort(worktree, fileindex, repo,
+		    branch_ref, base_branch_ref);
+		goto done;
+	}
 
 	error = got_ref_resolve(&commit_id, repo, branch_ref);
 	if (error)

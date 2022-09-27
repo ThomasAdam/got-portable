@@ -174,6 +174,7 @@
 #define GOT_ERR_SIGNING_TAG	156
 #define GOT_ERR_COMMIT_REDUNDANT_AUTHOR 157
 #define GOT_ERR_BAD_QUERYSTRING	158
+#define GOT_ERR_INTEGRATE_BRANCH 159
 
 struct got_error {
         int code;
