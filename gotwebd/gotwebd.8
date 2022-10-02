@@ -22,7 +22,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dnv
-.Op Fl D Ar macro=value
+.Op Fl D Ar macro Ns = Ns Ar value
 .Op Fl f Ar file
 .Sh DESCRIPTION
 .Nm
@@ -38,8 +38,14 @@ provides the following options:
 .Bl -tag -width tenletters
 .It Fl d
 Do not daemonize and log to stderr.
-.It Fl D Ar macro=value
-Override the value of a macro used in the configuration file.
+.It Fl D Ar macro Ns = Ns Ar value
+Define
+.Ar macro
+to be set to
+.Ar value .
+Overrides the definition of
+.Ar macro
+in the configuration file.
 .It Fl f Ar file
 Set the path to the configuration file.
 If not specified, the file
