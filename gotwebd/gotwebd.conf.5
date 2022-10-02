@@ -29,6 +29,16 @@ Any lines beginning with a
 .Sq #
 are treated as comments and ignored.
 .Pp
+Macros can be defined that are later expanded in context.
+Macro names must start with a letter, digit, or underscore, and may
+contain any of those characters, but may not be reserved words.
+Macros are not expanded inside quotes.
+For example:
+.Bd -literal -offset indent
+lan_addr = "192.168.0.1"
+listen on $lan_addr
+.Ed
+.Pp
 Paths mentioned in
 .Nm
 must be relative to
