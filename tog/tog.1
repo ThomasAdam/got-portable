@@ -67,6 +67,14 @@ Once a compound command is executed, the operation can be cancelled with
 or
 .Cm Backspace .
 .Pp
+Global options must precede the command name, and are as follows:
+.Bl -tag -width tenletters
+.It Fl h
+Display usage information.
+.It Fl V , -version
+Display program version and exit immediately.
+.El
+.Pp
 The global key bindings are:
 .Bl -tag -width Ds
 .It Cm H, F1
@@ -104,14 +112,6 @@ N increments (default: 1).
 Go to line N in the view (default: last line).
 .It Cm g
 Go to line N in the view (default: first line).
-.El
-.Pp
-Global options must precede the command name, and are as follows:
-.Bl -tag -width tenletters
-.It Fl h
-Display usage information.
-.It Fl V , -version
-Display program version and exit immediately.
 .El
 .Pp
 The commands for
