@@ -9132,7 +9132,7 @@ usage(int hflag, int status)
 {
 	FILE *fp = (status == 0) ? stdout : stderr;
 
-	fprintf(fp, "usage: %s [-h] [-V | --version] [command] [arg ...]\n",
+	fprintf(fp, "usage: %s [-hV] command [arg ...]\n",
 	    getprogname());
 	if (hflag) {
 		fprintf(fp, "lazy usage: %s path\n", getprogname());
