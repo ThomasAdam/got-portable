@@ -58,8 +58,6 @@ dump_atom(const struct diff_data *left, const struct diff_data *right,
 			int i;
 			r = fread(buf, 1, MIN(remain, sizeof(buf)),
 			    atom->root->f);
-			if (r == -1)
-				abort(); /* cannot return error */
 			if (r == 0)
 				break;
 			remain -= r;

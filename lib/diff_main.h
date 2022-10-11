@@ -251,3 +251,4 @@ struct diff_result *diff_main(const struct diff_config *config,
 			      struct diff_data *left,
 			      struct diff_data *right);
 void diff_result_free(struct diff_result *result);
+int diff_result_contains_printable_chunks(struct diff_result *result);

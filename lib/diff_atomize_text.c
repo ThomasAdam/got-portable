@@ -64,7 +64,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 		while (eol == 0 && line_end < end) {
 			r = fread(buf, sizeof(char), sizeof(buf), d->root->f);
 			if (r == 0 && ferror(d->root->f))
-				return errno;
+				return EIO;
 			i = 0;
 			while (eol == 0 && i < r) {
 				if (buf[i] != '\r' && buf[i] != '\n') {
@@ -91,7 +91,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 				return errno;
 			r = fread(buf, sizeof(char), sizeof(buf), d->root->f);
 			if (r == 0 && ferror(d->root->f))
-				return errno;
+				return EIO;
 			if (r > 0 && buf[0] == '\n')
 				line_end++;
 		}
