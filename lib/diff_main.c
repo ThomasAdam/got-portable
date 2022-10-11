@@ -43,7 +43,7 @@ read_at(FILE *f, off_t at_pos, unsigned char *buf, size_t len)
 		return errno;
 	r = fread(buf, sizeof(char), len, f);
 	if ((r == 0 || r < len) && ferror(f))
-		return errno;
+		return EIO;
 	if (r != len)
 		return EIO;
 	return 0;
@@ -627,4 +627,20 @@ diff_result_free(struct diff_result *result)
 		return;
 	ARRAYLIST_FREE(result->chunks);
 	free(result);
+}
+
+int
+diff_result_contains_printable_chunks(struct diff_result *result)
+{
+	struct diff_chunk *c;
+	enum diff_chunk_type t;
+
+	for (int i = 0; i < result->chunks.len; i++) {
+		c = &result->chunks.head[i];
+		t = diff_chunk_type(c);
+		if (t == CHUNK_MINUS || t == CHUNK_PLUS)
+			return 1;
+	}
+
+	return 0;
 }

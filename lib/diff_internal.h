@@ -51,11 +51,6 @@ diff_range_len(const struct diff_range *r)
 	return r->end - r->start;
 }
 
-/* List of all possible return codes of a diff invocation. */
-#define DIFF_RC_USE_DIFF_ALGO_FALLBACK	-1
-#define DIFF_RC_OK			0
-/* Any positive return values are errno values from sys/errno.h */
-
 /* Indicate whether two given diff atoms match. */
 int
 diff_atom_same(bool *same,

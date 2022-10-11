@@ -391,6 +391,11 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 				  cc->left.end - chunk_end_line);
 		if (rc)
 			return rc;
+
+		rc = diff_output_trailing_newline_msg(outinfo, dest,
+				&result->chunks.head[result->chunks.len - 1]);
+		if (rc != DIFF_RC_OK)
+			return rc;
 	}
 
 	return DIFF_RC_OK;
