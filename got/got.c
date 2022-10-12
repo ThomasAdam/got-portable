@@ -2180,6 +2180,7 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 		}
 	}
 done:
+	got_ref_list_free(&my_refs);
 	free(remote_namespace);
 	free(local_refname);
 	return err;
