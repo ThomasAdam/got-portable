@@ -78,12 +78,6 @@
 #define GOT_PATH_PROG_INDEX_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_INDEX_PACK)
 
-struct got_privsep_child {
-	int imsg_fd;
-	pid_t pid;
-	struct imsgbuf *ibuf;
-};
-
 enum got_imsg_type {
 	/* An error occured while processing a request. */
 	GOT_IMSG_ERROR,

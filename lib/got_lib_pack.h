@@ -14,13 +14,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_pack_privsep_child {
+	int imsg_fd;
+	pid_t pid;
+	struct imsgbuf *ibuf;
+};
+
 /* An open pack file. */
 struct got_pack {
 	char *path_packfile;
 	int fd;
 	uint8_t *map;
 	size_t filesize;
-	struct got_privsep_child *privsep_child;
+	struct got_pack_privsep_child *privsep_child;
 	int basefd;
 	int accumfd;
 	int child_has_tempfiles;

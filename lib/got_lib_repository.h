@@ -46,6 +46,12 @@ got_packidx_bloom_filter_cmp(const struct got_packidx_bloom_filter *f1,
 	return got_path_cmp(f1->path, f2->path, f1->path_len, f2->path_len);
 }
 
+struct got_repo_privsep_child {
+	int imsg_fd;
+	pid_t pid;
+	struct imsgbuf *ibuf;
+};
+
 struct got_repository {
 	char *path;
 	char *path_git_dir;
@@ -84,7 +90,7 @@ struct got_repository {
 	int pinned_packidx;
 
 	/* Handles to child processes for reading loose objects. */
-	struct got_privsep_child privsep_children[5];
+	struct got_repo_privsep_child privsep_children[5];
 #define GOT_REPO_PRIVSEP_CHILD_OBJECT	0
 #define GOT_REPO_PRIVSEP_CHILD_COMMIT	1
 #define GOT_REPO_PRIVSEP_CHILD_TREE	2
