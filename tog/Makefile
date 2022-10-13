@@ -12,7 +12,8 @@ SRCS=		tog.c blame.c commit_graph.c delta.c diff.c \
 		gotconfig.c diff_main.c diff_atomize_text.c \
 		diff_myers.c diff_output.c diff_output_plain.c \
 		diff_output_unidiff.c diff_output_edscript.c \
-		diff_patience.c bloom.c murmurhash2.c sigs.c date.c
+		diff_patience.c bloom.c murmurhash2.c sigs.c date.c \
+		object_open_privsep.c
 MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
