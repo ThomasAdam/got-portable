@@ -74,6 +74,7 @@ regress-deltify:
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/murmurhash2.c \
 		$(top_srcdir)/lib/object_open_privsep.c \
+		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/deltify/deltify_test
 
@@ -101,6 +102,7 @@ regress-fetch:
 		$(top_srcdir)/lib/object_idset.c \
 		$(top_srcdir)/lib/object_create.c \
 		$(top_srcdir)/lib/object_open_privsep.c \
+		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/fetch.c \
 		$(top_srcdir)/lib/gotconfig.c \
 		$(top_srcdir)/lib/dial.c \
@@ -122,6 +124,7 @@ regress-idset:
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/object_parse.c \
+		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/idset/idset_test
 
@@ -133,5 +136,6 @@ regress-path:
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/object_open_privsep.c \
+		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/path/path_test

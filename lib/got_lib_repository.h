@@ -152,3 +152,6 @@ const struct got_error *got_repo_pin_pack(struct got_repository *,
 struct got_pack *got_repo_get_pinned_pack(struct got_repository *);
 void got_repo_unpin_pack(struct got_repository *);
 
+const struct got_error *got_repo_read_gitconfig(int *, char **, char **,
+    struct got_remote_repo **, int *, char **, char ***, int *,
+    const char *);
