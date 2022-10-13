@@ -15,6 +15,7 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/object_cache.c \
        $(top_srcdir)/lib/object_create.c \
        $(top_srcdir)/lib/object_idset.c \
+       $(top_srcdir)/lib/object_open_privsep.c \
        $(top_srcdir)/lib/object_parse.c \
        $(top_srcdir)/lib/opentemp.c \
        $(top_srcdir)/lib/pack.c \

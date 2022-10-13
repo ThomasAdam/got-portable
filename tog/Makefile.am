@@ -13,6 +13,7 @@ tog_SOURCES = tog.c \
 	$(top_srcdir)/lib/object.c \
 	$(top_srcdir)/lib/object_cache.c \
 	$(top_srcdir)/lib/object_idset.c \
+	$(top_srcdir)/lib/object_open_privsep.c \
 	$(top_srcdir)/lib/object_parse.c \
 	$(top_srcdir)/lib/opentemp.c \
 	$(top_srcdir)/lib/path.c \
