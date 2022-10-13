@@ -49,7 +49,6 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_pack.h"
-#include "got_lib_privsep.h"
 #include "got_lib_repository.h"
 
 #ifndef nitems
