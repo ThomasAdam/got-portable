@@ -548,6 +548,18 @@ else
 	AC_MSG_ERROR("*** sys/queue.h missing key defines ***)
 fi
 
+AC_CHECK_DECL(
+	RB_GENERATE_STATIC,
+	found_sys_tree_h=yes,
+	found_sys_tree_h=no,
+	[#include <sys/tree.h>]
+)
+
+if test "x$found_sys_tree_h" = xyes; then
+	AC_DEFINE(HAVE_TREE_H)
+else
+	AC_MSG_NOTICE("Using compat/tree.h")
+fi
 
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)
