@@ -10,7 +10,7 @@ SRCS=		gotadmin.c \
 		path.c privsep.c reference.c repository.c repository_admin.c \
 		worktree_open.c sha1.c bloom.c murmurhash2.c ratelimit.c \
 		sigs.c buf.c date.c object_open_privsep.c \
-		read_gitconfig_privsep.c
+		read_gitconfig_privsep.c read_gotconfig_privsep.c
 MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib

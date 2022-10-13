@@ -16,7 +16,7 @@ SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
 		diff_output_plain.c diff_output_unidiff.c \
 		diff_output_edscript.c diff_patience.c \
 		bloom.c murmurhash2.c sigs.c date.c object_open_privsep.c \
-		read_gitconfig_privsep.c
+		read_gitconfig_privsep.c read_gotconfig_privsep.c
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \
