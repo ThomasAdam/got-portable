@@ -1320,7 +1320,7 @@ done:
 	free(path_refs);
 	free(path);
 	if (tmppath) {
-		if (unlink(tmppath) != 0 && err == NULL)
+		if (unlink(tmppath) == -1 && err == NULL)
 			err = got_error_from_errno2("unlink", tmppath);
 		free(tmppath);
 	}
@@ -1501,7 +1501,7 @@ delete_loose_ref(struct got_reference *ref, struct got_repository *repo)
 
 	/* XXX: check if old content matches our expectations? */
 
-	if (unlink(path) != 0)
+	if (unlink(path) == -1)
 		err = got_error_from_errno2("unlink", path);
 done:
 	if (ref->lf == NULL && lf)
