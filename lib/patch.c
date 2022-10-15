@@ -789,11 +789,10 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 	int do_merge = 0, file_renamed = 0;
 	char *oldlabel = NULL, *newlabel = NULL, *anclabel = NULL;
 	char *oldpath = NULL, *newpath = NULL;
-	char *tmppath = NULL, *template = NULL, *parent = NULL;
+	char *tmppath = NULL, *template = NULL;
 	char *apath = NULL, *mergepath = NULL;
 	FILE *oldfile = NULL, *tmpfile = NULL, *afile = NULL, *mergefile = NULL;
 	int outfd;
-	const char *outpath;
 	mode_t mode = GOT_DEFAULT_FILE_MODE;
 
 	*overlapcnt = 0;
@@ -842,7 +841,6 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 	err = got_opentemp_named(&tmppath, &tmpfile, template);
 	if (err)
 		goto done;
-	outpath = tmppath;
 	outfd = fileno(tmpfile);
 	err = patch_file(p, afile != NULL ? afile : oldfile, tmpfile);
 	if (err)
@@ -900,7 +898,6 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		err = got_opentemp_named(&mergepath, &mergefile, template);
 		if (err)
 			goto done;
-		outpath = mergepath;
 		outfd = fileno(mergefile);
 
 		err = got_merge_diff3(overlapcnt, outfd, tmpfile, afile,
@@ -924,24 +921,18 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		goto done;
 	}
 
-	if (rename(outpath, newpath) == -1) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno3("rename", outpath,
-			    newpath);
+	if (mergepath) {
+		err = got_path_move_file(mergepath, newpath);
+		if (err)
 			goto done;
-		}
-
-		err = got_path_dirname(&parent, newpath);
-		if (err != NULL)
+		free(mergepath);
+		mergepath = NULL;
+	} else {
+		err = got_path_move_file(tmppath, newpath);
+		if (err)
 			goto done;
-		err = got_path_mkdir(parent);
-		if (err != NULL)
-			goto done;
-		if (rename(outpath, newpath) == -1) {
-			err = got_error_from_errno3("rename", outpath,
-			    newpath);
-			goto done;
-		}
+		free(tmppath);
+		tmppath = NULL;
 	}
 
 	if (file_renamed) {
@@ -966,11 +957,10 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		err = report_progress(pa, old, new, GOT_STATUS_MODIFY, NULL);
 
 done:
-	free(parent);
 	free(template);
 
-	if (tmppath != NULL)
-		unlink(tmppath);
+	if (tmppath != NULL && unlink(tmppath) == -1 && err == NULL)
+		err = got_error_from_errno("unlink");
 	if (tmpfile != NULL && fclose(tmpfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(tmppath);
@@ -979,14 +969,14 @@ done:
 	if (oldfile != NULL && fclose(oldfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 
-	if (apath != NULL)
-		unlink(apath);
+	if (apath != NULL && unlink(apath) == -1 && err == NULL)
+		err = got_error_from_errno("unlink");
 	if (afile != NULL && fclose(afile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(apath);
 
-	if (mergepath != NULL)
-		unlink(mergepath);
+	if (mergepath != NULL && unlink(mergepath) == -1 && err == NULL)
+		err = got_error_from_errno("unlink");
 	if (mergefile != NULL && fclose(mergefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(mergepath);
