@@ -132,3 +132,10 @@ const struct got_error *got_path_find_prog(char **, const char *);
 
 /* Create a new file at a specified path, with optional content. */
 const struct got_error *got_path_create_file(const char *, const char *);
+
+/*
+ * Attempt to move an existing file to a new path, creating missing parent
+ * directories at the destination path if necessary.
+ * (Cross-mount-point moves are not yet implemented.)
+ */
+const struct got_error *got_path_move_file(const char *, const char *);
