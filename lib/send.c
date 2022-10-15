@@ -341,6 +341,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	struct pack_progress_arg ppa;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
 	int packfd = -1;
+	FILE *delta_cache = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&have_refs);
@@ -434,6 +435,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	packfd = got_opentempfd();
 	if (packfd == -1) {
 		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	delta_cache = got_opentemp();
+	if (delta_cache == NULL) {
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
@@ -631,9 +638,9 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		memset(&ppa, 0, sizeof(ppa));
 		ppa.progress_cb = progress_cb;
 		ppa.progress_arg = progress_arg;
-		err = got_pack_create(packsha1, packfd, their_ids, ntheirs,
-		    our_ids, nours, repo, 0, 1, pack_progress, &ppa,
-		    cancel_cb, cancel_arg);
+		err = got_pack_create(packsha1, packfd, delta_cache,
+		    their_ids, ntheirs, our_ids, nours, repo, 0, 1,
+		    pack_progress, &ppa, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 
@@ -703,6 +710,8 @@ done:
 	}
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (nsendfd != -1 && close(nsendfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)

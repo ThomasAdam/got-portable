@@ -43,7 +43,6 @@
 #include "got_path.h"
 #include "got_reference.h"
 #include "got_repository_admin.h"
-#include "got_opentemp.h"
 
 #include "got_lib_deltify.h"
 #include "got_lib_delta.h"
@@ -2510,7 +2509,7 @@ add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
 }
 
 const struct got_error *
-got_pack_create(uint8_t *packsha1, int packfd,
+got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
@@ -2519,7 +2518,6 @@ got_pack_create(uint8_t *packsha1, int packfd,
 {
 	const struct got_error *err;
 	int delta_cache_fd = -1;
-	FILE *delta_cache = NULL;
 	struct got_object_idset *idset;
 	struct got_ratelimit rl;
 	struct got_pack_metavec deltify, reuse;
@@ -2556,9 +2554,9 @@ got_pack_create(uint8_t *packsha1, int packfd,
 		goto done;
 	}
 
-	delta_cache_fd = got_opentempfd();
+	delta_cache_fd = dup(fileno(delta_cache));
 	if (delta_cache_fd == -1) {
-		err = got_error_from_errno("got_opentemp");
+		err = got_error_from_errno("dup");
 		goto done;
 	}
 
@@ -2575,13 +2573,6 @@ got_pack_create(uint8_t *packsha1, int packfd,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
-
-	delta_cache = fdopen(delta_cache_fd, "a+");
-	if (delta_cache == NULL) {
-		err = got_error_from_errno("fdopen");
-		goto done;
-	}
-	delta_cache_fd = -1;
 
 	if (fseeko(delta_cache, 0L, SEEK_END) == -1) {
 		err = got_error_from_errno("fseeko");
@@ -2627,7 +2618,5 @@ done:
 	got_object_idset_free(idset);
 	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	return err;
 }
