@@ -4135,12 +4135,12 @@ schedule_for_deletion(void *arg, unsigned char status,
 		size_t root_len;
 
 		if (dirfd != -1) {
-			if (unlinkat(dirfd, de_name, 0) != 0) {
+			if (unlinkat(dirfd, de_name, 0) == -1) {
 				err = got_error_from_errno2("unlinkat",
 				    ondisk_path);
 				goto done;
 			}
-		} else if (unlink(ondisk_path) != 0) {
+		} else if (unlink(ondisk_path) == -1) {
 			err = got_error_from_errno2("unlink", ondisk_path);
 			goto done;
 		}
