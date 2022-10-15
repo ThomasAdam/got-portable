@@ -87,7 +87,7 @@ test_patch_basic() {
 +103
 EOF
 
-	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	(cd $testroot/wt && got patch < patch) > $testroot/stdout
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" $ret
 		return 1
