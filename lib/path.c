@@ -537,3 +537,24 @@ done:
 		err = got_error_from_errno("close");
 	return err;
 }
+
+const struct got_error *
+got_path_move_file(const char *oldpath, const char *newpath)
+{
+	const struct got_error *err;
+
+	if (rename(oldpath, newpath) != -1)
+		return NULL;
+
+	if (errno != ENOENT)
+		return got_error_from_errno3("rename", oldpath, newpath);
+
+	err = make_parent_dirs(newpath);
+	if (err)
+		return err;
+
+	if (rename(oldpath, newpath) == -1)
+		return got_error_from_errno3("rename", oldpath, newpath);
+
+	return NULL;
+}
