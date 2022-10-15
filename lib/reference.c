@@ -1454,6 +1454,8 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			    packed_refs_path);
 			goto done;
 		}
+		free(tmppath);
+		tmppath = NULL;
 	}
 done:
 	if (delref->lf == NULL && lf)
@@ -1462,11 +1464,10 @@ done:
 		if (fclose(f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
-	if (tmpf) {
-		unlink(tmppath);
-		if (fclose(tmpf) == EOF && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
+	if (tmppath && unlink(tmppath) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tmppath);
+	if (tmpf && fclose(tmpf) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(tmppath);
 	free(packed_refs_path);
 	free(line);
