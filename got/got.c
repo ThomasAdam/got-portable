@@ -7862,15 +7862,12 @@ patch_from_stdin(int *patchfd)
 {
 	const struct got_error *err = NULL;
 	ssize_t r;
-	char *path, buf[BUFSIZ];
+	char buf[BUFSIZ];
 	sig_t sighup, sigint, sigquit;
 
-	err = got_opentemp_named_fd(&path, patchfd,
-	    GOT_TMPDIR_STR "/got-patch");
-	if (err)
-		return err;
-	unlink(path);
-	free(path);
+	*patchfd = got_opentempfd();
+	if (*patchfd == -1)
+		return got_error_from_errno("got_opentempfd");
 
 	sighup = signal(SIGHUP, SIG_DFL);
 	sigint = signal(SIGINT, SIG_DFL);
