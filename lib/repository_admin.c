@@ -154,6 +154,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	int nours = 0, ntheirs = 0, packfd = -1, i;
 	char *tmpfile_path = NULL, *path = NULL, *packfile_path = NULL;
 	char *sha1_str = NULL;
+	FILE *delta_cache = NULL;
 
 	*packfile = NULL;
 	*pack_hash = NULL;
@@ -169,6 +170,12 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 
 	if (fchmod(packfd, GOT_DEFAULT_FILE_MODE) != 0) {
 		err = got_error_from_errno2("fchmod", tmpfile_path);
+		goto done;
+	}
+
+	delta_cache = got_opentemp();
+	if (delta_cache == NULL) {
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
@@ -198,9 +205,9 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	err = got_pack_create((*pack_hash)->sha1, packfd, theirs, ntheirs,
-	    ours, nours, repo, loose_obj_only, 0, progress_cb, progress_arg,
-	    cancel_cb, cancel_arg);
+	err = got_pack_create((*pack_hash)->sha1, packfd, delta_cache,
+	    theirs, ntheirs, ours, nours, repo, loose_obj_only, 0,
+	    progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -241,6 +248,8 @@ done:
 	free(theirs);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", packfile_path);
+	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (tmpfile_path && unlink(tmpfile_path) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", tmpfile_path);
 	free(tmpfile_path);
