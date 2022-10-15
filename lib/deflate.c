@@ -234,6 +234,88 @@ got_deflate_end(struct got_deflate_buf *zb)
 }
 
 const struct got_error *
+got_deflate_to_fd(off_t *outlen, FILE *infile, off_t len, int outfd,
+    struct got_deflate_checksum *csum)
+{
+	const struct got_error *err;
+	size_t avail;
+	off_t consumed;
+	struct got_deflate_buf zb;
+
+	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+
+	do {
+		err = got_deflate_read(&zb, infile, len, &avail, &consumed);
+		if (err)
+			goto done;
+		len -= consumed;
+		if (avail > 0) {
+			ssize_t w;
+			w = write(outfd, zb.outbuf, avail);
+			if (w == -1) {
+				err = got_error_from_errno("write");
+				goto done;
+			} else if (w != avail) {
+				err = got_error(GOT_ERR_IO);
+				goto done;
+			}
+			if (csum)
+				csum_output(csum, zb.outbuf, avail);
+			*outlen += avail;
+		}
+	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
+
+done:
+	got_deflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_deflate_to_fd_mmap(off_t *outlen, uint8_t *map, size_t offset,
+    size_t len, int outfd, struct got_deflate_checksum *csum)
+{
+	const struct got_error *err;
+	size_t avail, consumed;
+	struct got_deflate_buf zb;
+
+	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+	do {
+		err = got_deflate_read_mmap(&zb, map, offset, len, &avail,
+		    &consumed);
+		if (err)
+			goto done;
+		offset += consumed;
+		len -= consumed;
+		if (avail > 0) {
+			ssize_t w;
+			w = write(outfd, zb.outbuf, avail);
+			if (w == -1) {
+				err = got_error_from_errno("write");
+				goto done;
+			} else if (w != avail) {
+				err = got_error(GOT_ERR_IO);
+				goto done;
+			}
+			if (csum)
+				csum_output(csum, zb.outbuf, avail);
+			*outlen += avail;
+		}
+	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
+
+done:
+	got_deflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
 got_deflate_to_file(off_t *outlen, FILE *infile, off_t len,
     FILE *outfile, struct got_deflate_checksum *csum)
 {

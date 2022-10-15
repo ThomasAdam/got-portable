@@ -2106,23 +2106,26 @@ done:
 }
 
 static const struct got_error *
-hwrite(FILE *f, const void *buf, off_t len, SHA1_CTX *ctx)
+hwrite(int fd, const void *buf, off_t len, SHA1_CTX *ctx)
 {
-	size_t n;
+	ssize_t w;
 
 	SHA1Update(ctx, buf, len);
-	n = fwrite(buf, 1, len, f);
-	if (n != len)
-		return got_ferror(f, GOT_ERR_IO);
+	w = write(fd, buf, len);
+	if (w == -1)
+		return got_error_from_errno("write");
+	else if (w != len)
+		return got_error(GOT_ERR_IO);
 	return NULL;
 }
 
 static const struct got_error *
-hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
+hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
 {
 	unsigned char buf[65536];
 	off_t remain = len;
 	size_t n;
+	ssize_t w;
 
 	while (remain > 0) {
 		size_t copylen = MIN(sizeof(buf), remain);
@@ -2130,9 +2133,11 @@ hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
 		if (n != copylen)
 			return got_ferror(fsrc, GOT_ERR_IO);
 		SHA1Update(ctx, buf, copylen);
-		n = fwrite(buf, 1, copylen, fdst);
-		if (n != copylen)
-			return got_ferror(fdst, GOT_ERR_IO);
+		w = write(fd_dst, buf, copylen);
+		if (w == -1)
+			return got_error_from_errno("write");
+		else if (w != copylen)
+			return got_error(GOT_ERR_IO);
 		remain -= copylen;
 	}
 
@@ -2141,18 +2146,19 @@ hcopy(FILE *fsrc, FILE *fdst, off_t len, SHA1_CTX *ctx)
 
 static const struct got_error *
 hcopy_mmap(uint8_t *src, off_t src_offset, size_t src_size,
-    FILE *fdst, off_t len, SHA1_CTX *ctx)
+    int fd, off_t len, SHA1_CTX *ctx)
 {
-	size_t n;
+	ssize_t w;
 
 	if (src_offset + len > src_size)
 		return got_error(GOT_ERR_RANGE);
 
 	SHA1Update(ctx, src + src_offset, len);
-	n = fwrite(src + src_offset, 1, len, fdst);
-	if (n != len)
-		return got_ferror(fdst, GOT_ERR_IO);
-
+	w = write(fd, src + src_offset, len);
+	if (w == -1)
+		return got_error_from_errno("write");
+	else if (w != len)
+		return got_error(GOT_ERR_IO);
 	return NULL;
 }
 
@@ -2247,7 +2253,7 @@ packoff(char *hdr, off_t off)
 }
 
 static const struct got_error *
-deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
+deltahdr(off_t *packfile_size, SHA1_CTX *ctx, int packfd,
     struct got_pack_meta *m)
 {
 	const struct got_error *err;
@@ -2260,7 +2266,7 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
 		if (err)
 			return err;
 		nh += packoff(buf + nh, m->off - m->prev->off);
-		err = hwrite(packfile, buf, nh, ctx);
+		err = hwrite(packfd, buf, nh, ctx);
 		if (err)
 			return err;
 		*packfile_size += nh;
@@ -2269,11 +2275,11 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
 		    GOT_OBJ_TYPE_REF_DELTA, m->delta_len);
 		if (err)
 			return err;
-		err = hwrite(packfile, buf, nh, ctx);
+		err = hwrite(packfd, buf, nh, ctx);
 		if (err)
 			return err;
 		*packfile_size += nh;
-		err = hwrite(packfile, m->prev->id.sha1,
+		err = hwrite(packfd, m->prev->id.sha1,
 		    sizeof(m->prev->id.sha1), ctx);
 		if (err)
 			return err;
@@ -2284,7 +2290,7 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, FILE *packfile,
 }
 
 static const struct got_error *
-write_packed_object(off_t *packfile_size, FILE *packfile,
+write_packed_object(off_t *packfile_size, int packfd,
     FILE *delta_cache, uint8_t *delta_cache_map, size_t delta_cache_size,
     struct got_pack_meta *m, int *outfd, SHA1_CTX *ctx,
     struct got_repository *repo)
@@ -2299,7 +2305,7 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 	csum.output_sha1 = ctx;
 	csum.output_crc = NULL;
 
-	m->off = ftello(packfile);
+	m->off = *packfile_size;
 	if (m->delta_len == 0) {
 		err = got_object_raw_open(&raw, outfd, repo, &m->id);
 		if (err)
@@ -2308,14 +2314,14 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		    m->obj_type, raw->size);
 		if (err)
 			goto done;
-		err = hwrite(packfile, buf, nh, ctx);
+		err = hwrite(packfd, buf, nh, ctx);
 		if (err)
 			goto done;
 		*packfile_size += nh;
 		if (raw->f == NULL) {
-			err = got_deflate_to_file_mmap(&outlen,
+			err = got_deflate_to_fd_mmap(&outlen,
 			    raw->data + raw->hdrlen, 0, raw->size,
-			    packfile, &csum);
+			    packfd, &csum);
 			if (err)
 				goto done;
 		} else {
@@ -2324,8 +2330,8 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
-			err = got_deflate_to_file(&outlen, raw->f,
-			    raw->size, packfile, &csum);
+			err = got_deflate_to_fd(&outlen, raw->f,
+			    raw->size, packfd, &csum);
 			if (err)
 				goto done;
 		}
@@ -2333,10 +2339,10 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		got_object_raw_close(raw);
 		raw = NULL;
 	} else if (m->delta_buf) {
-		err = deltahdr(packfile_size, ctx, packfile, m);
+		err = deltahdr(packfile_size, ctx, packfd, m);
 		if (err)
 			goto done;
-		err = hwrite(packfile, m->delta_buf,
+		err = hwrite(packfd, m->delta_buf,
 		    m->delta_compressed_len, ctx);
 		if (err)
 			goto done;
@@ -2344,11 +2350,11 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 		free(m->delta_buf);
 		m->delta_buf = NULL;
 	} else if (delta_cache_map) {
-		err = deltahdr(packfile_size, ctx, packfile, m);
+		err = deltahdr(packfile_size, ctx, packfd, m);
 		if (err)
 			goto done;
 		err = hcopy_mmap(delta_cache_map, m->delta_offset,
-		    delta_cache_size, packfile, m->delta_compressed_len,
+		    delta_cache_size, packfd, m->delta_compressed_len,
 		    ctx);
 		if (err)
 			goto done;
@@ -2359,10 +2365,10 @@ write_packed_object(off_t *packfile_size, FILE *packfile,
 			err = got_error_from_errno("fseeko");
 			goto done;
 		}
-		err = deltahdr(packfile_size, ctx, packfile, m);
+		err = deltahdr(packfile_size, ctx, packfd, m);
 		if (err)
 			goto done;
-		err = hcopy(delta_cache, packfile,
+		err = hcopy(delta_cache, packfd,
 		    m->delta_compressed_len, ctx);
 		if (err)
 			goto done;
@@ -2375,7 +2381,7 @@ done:
 }
 
 static const struct got_error *
-genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
+genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
     struct got_pack_meta **deltify, int ndeltify,
     struct got_pack_meta **reuse, int nreuse,
     int ncolored, int nfound, int ntrees, int nours,
@@ -2389,7 +2395,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
 	char buf[32];
-	size_t n;
+	ssize_t w;
 	off_t packfile_size = 0;
 	int outfd = -1;
 	int delta_cache_fd = -1;
@@ -2420,15 +2426,15 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		}
 	}
 #endif
-	err = hwrite(packfile, "PACK", 4, &ctx);
+	err = hwrite(packfd, "PACK", 4, &ctx);
 	if (err)
 		goto done;
 	putbe32(buf, GOT_PACKFILE_VERSION);
-	err = hwrite(packfile, buf, 4, &ctx);
+	err = hwrite(packfd, buf, 4, &ctx);
 	if (err)
 		goto done;
 	putbe32(buf, ndeltify + nreuse);
-	err = hwrite(packfile, buf, 4, &ctx);
+	err = hwrite(packfd, buf, 4, &ctx);
 	if (err)
 		goto done;
 
@@ -2441,7 +2447,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		if (err)
 			goto done;
 		m = deltify[i];
-		err = write_packed_object(&packfile_size, packfile,
+		err = write_packed_object(&packfile_size, packfd,
 		    delta_cache, delta_cache_map, delta_cache_size,
 		    m, &outfd, &ctx, repo);
 		if (err)
@@ -2457,7 +2463,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		if (err)
 			goto done;
 		m = reuse[i];
-		err = write_packed_object(&packfile_size, packfile,
+		err = write_packed_object(&packfile_size, packfd,
 		    delta_cache, delta_cache_map, delta_cache_size,
 		    m, &outfd, &ctx, repo);
 		if (err)
@@ -2465,9 +2471,13 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 	}
 
 	SHA1Final(pack_sha1, &ctx);
-	n = fwrite(pack_sha1, 1, SHA1_DIGEST_LENGTH, packfile);
-	if (n != SHA1_DIGEST_LENGTH)
-		err = got_ferror(packfile, GOT_ERR_IO);
+	w = write(packfd, pack_sha1, SHA1_DIGEST_LENGTH);
+	if (w == -1)
+		err = got_error_from_errno("write");
+	else if (w != SHA1_DIGEST_LENGTH)
+		err = got_error(GOT_ERR_IO);
+	if (err)
+		goto done;
 	packfile_size += SHA1_DIGEST_LENGTH;
 	packfile_size += sizeof(struct got_packfile_hdr);
 	if (progress_cb) {
@@ -2500,7 +2510,7 @@ add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
 }
 
 const struct got_error *
-got_pack_create(uint8_t *packsha1, FILE *packfile,
+got_pack_create(uint8_t *packsha1, int packfd,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
@@ -2605,7 +2615,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		err = got_error_from_errno("fflush");
 		goto done;
 	}
-	err = genpack(packsha1, packfile, delta_cache, deltify.meta,
+	err = genpack(packsha1, packfd, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, progress_cb, progress_arg, &rl,
 	    cancel_cb, cancel_arg);

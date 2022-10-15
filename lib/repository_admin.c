@@ -168,13 +168,6 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	*packfile = fdopen(packfd, "w");
-	if (*packfile == NULL) {
-		err = got_error_from_errno2("fdopen", tmpfile_path);
-		goto done;
-	}
-	packfd = -1;
-
 	err = get_reflist_object_ids(&ours, &nours,
 	    (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
 	    include_refs, repo, cancel_cb, cancel_arg);
@@ -201,7 +194,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	err = got_pack_create((*pack_hash)->sha1, *packfile, theirs, ntheirs,
+	err = got_pack_create((*pack_hash)->sha1, packfd, theirs, ntheirs,
 	    ours, nours, repo, loose_obj_only, 0, progress_cb, progress_arg,
 	    cancel_cb, cancel_arg);
 	if (err)
@@ -217,12 +210,8 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	if (fflush(*packfile) == -1) {
-		err = got_error_from_errno("fflush");
-		goto done;
-	}
-	if (fseek(*packfile, 0L, SEEK_SET) == -1) {
-		err = got_error_from_errno("fseek");
+	if (lseek(packfd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
 		goto done;
 	}
 	if (rename(tmpfile_path, packfile_path) == -1) {
@@ -232,6 +221,13 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	}
 	free(tmpfile_path);
 	tmpfile_path = NULL;
+
+	*packfile = fdopen(packfd, "w");
+	if (*packfile == NULL) {
+		err = got_error_from_errno2("fdopen", tmpfile_path);
+		goto done;
+	}
+	packfd = -1;
 done:
 	for (i = 0; i < nours; i++)
 		free(ours[i]);

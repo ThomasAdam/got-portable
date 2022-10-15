@@ -21,7 +21,7 @@
  * Return the SHA1 digest of the resulting pack file in pack_sha1 which must
  * be pre-allocated by the caller with at least SHA1_DIGEST_LENGTH bytes.
  */
-const struct got_error *got_pack_create(uint8_t *pack_sha1, FILE *packfile,
+const struct got_error *got_pack_create(uint8_t *pack_sha1, int packfd,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,

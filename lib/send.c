@@ -340,7 +340,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	off_t bytes_sent = 0, bytes_sent_cur = 0;
 	struct pack_progress_arg ppa;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
-	FILE *packfile = NULL;
+	int packfd = -1;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&have_refs);
@@ -431,9 +431,9 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		}
 	}
 
-	packfile = got_opentemp();
-	if (packfile == NULL) {
-		err = got_error_from_errno("got_opentemp");
+	packfd = got_opentempfd();
+	if (packfd == -1) {
+		err = got_error_from_errno("got_opentempfd");
 		goto done;
 	}
 
@@ -631,18 +631,13 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		memset(&ppa, 0, sizeof(ppa));
 		ppa.progress_cb = progress_cb;
 		ppa.progress_arg = progress_arg;
-		err = got_pack_create(packsha1, packfile, their_ids, ntheirs,
+		err = got_pack_create(packsha1, packfd, their_ids, ntheirs,
 		    our_ids, nours, repo, 0, 1, pack_progress, &ppa,
 		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 
-		if (fflush(packfile) == -1) {
-			err = got_error_from_errno("fflush");
-			goto done;
-		}
-
-		npackfd = dup(fileno(packfile));
+		npackfd = dup(packfd);
 		if (npackfd == -1) {
 			err = got_error_from_errno("dup");
 			goto done;
@@ -706,8 +701,8 @@ done:
 		if (waitpid(sendpid, &sendstatus, 0) == -1 && err == NULL)
 			err = got_error_from_errno("waitpid");
 	}
-	if (packfile && fclose(packfile) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
+	if (packfd != -1 && close(packfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (nsendfd != -1 && close(nsendfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)
