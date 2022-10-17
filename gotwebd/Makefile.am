@@ -3,14 +3,6 @@ sbin_PROGRAMS = gotwebd
 include $(top_builddir)/Makefile.common
 
 gotwebd_SOURCES = config.c \
-		  fcgi.c \
-		  got_operations.c \
-		  gotweb.c \
-		  gotwebd.c \
-		  log.c \
-		  proc.c \
-		  sockets.c \
-		  parse.y \
 		  $(top_srcdir)/lib/blame.c \
 		  $(top_srcdir)/lib/bloom.c \
 		  $(top_srcdir)/lib/buf.c \
@@ -56,7 +48,15 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/sigs.c \
 		  $(top_srcdir)/lib/utf8.c \
 		  $(top_srcdir)/lib/worktree.c \
-		  $(top_srcdir)/lib/worktree_open.c
+		  $(top_srcdir)/lib/worktree_open.c \
+		  fcgi.c \
+		  got_operations.c \
+		  gotweb.c \
+		  gotwebd.c \
+		  log.c \
+		  parse.y \
+		  proc.c \
+		  sockets.c
 if HOST_LINUX
 nodist_gotwebd_SOURCES = $(top_srcdir)/compat/sockaddr-@PLATFORM@.c
 else

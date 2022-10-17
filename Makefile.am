@@ -55,7 +55,6 @@ regress-cmdline:
 regress-delta:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-o $(top_builddir)/regress/delta/delta_test \
-		$(top_srcdir)/lib/murmurhash2.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/buf.c \
 		$(top_srcdir)/lib/date.c \
@@ -65,26 +64,27 @@ regress-delta:
 		$(top_srcdir)/lib/deltify.c \
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/gotconfig.c \
-		$(top_srcdir)/lib/opentemp.c \
-		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
-		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/lib/murmurhash2.c \
 		$(top_srcdir)/lib/object.c \
 		$(top_srcdir)/lib/object_cache.c \
 		$(top_srcdir)/lib/object_create.c \
 		$(top_srcdir)/lib/object_idset.c \
 		$(top_srcdir)/lib/object_open_privsep.c \
 		$(top_srcdir)/lib/object_parse.c \
+		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/pack.c \
 		$(top_srcdir)/lib/pack_create.c \
 		$(top_srcdir)/lib/pack_create_privsep.c \
+		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
 		$(top_srcdir)/lib/ratelimit.c \
-		$(top_srcdir)/lib/reference.c \
-		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/read_gotconfig_privsep.c \
+		$(top_srcdir)/lib/reference.c \
+		$(top_srcdir)/lib/repository.c \
+		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/delta/delta_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
@@ -93,7 +93,6 @@ regress-delta:
 regress-deltify:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-o $(top_builddir)/regress/deltify/deltify_test \
-		$(top_srcdir)/regress/deltify/deltify_test.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/buf.c \
 		$(top_srcdir)/lib/date.c \
@@ -119,19 +118,19 @@ regress-deltify:
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
 		$(top_srcdir)/lib/ratelimit.c \
-		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
+		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
+		$(top_srcdir)/regress/deltify/deltify_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/deltify/deltify_test
 
 regress-fetch:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-o $(top_builddir)/regress/fetch/fetch_test \
-		$(top_srcdir)/regress/fetch/fetch_test.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/buf.c \
 		$(top_srcdir)/lib/date.c \
@@ -165,13 +164,13 @@ regress-fetch:
 		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
+		$(top_srcdir)/regress/fetch/fetch_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) -lm && \
 			$(top_builddir)/regress/fetch/fetch_test
 
 regress-idset:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-o $(top_builddir)/regress/idset/idset_test \
-		$(top_srcdir)/regress/idset/idset_test.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/buf.c \
 		$(top_srcdir)/lib/date.c \
@@ -205,13 +204,13 @@ regress-idset:
 		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
+		$(top_srcdir)/regress/idset/idset_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/idset/idset_test
 
 regress-path:
 	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-o $(top_builddir)/regress/path/path_test \
-		$(top_srcdir)/regress/path/path_test.c \
 		$(top_srcdir)/lib/bloom.c \
 		$(top_srcdir)/lib/buf.c \
 		$(top_srcdir)/lib/date.c \
@@ -245,5 +244,6 @@ regress-path:
 		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
+		$(top_srcdir)/regress/path/path_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/path/path_test
