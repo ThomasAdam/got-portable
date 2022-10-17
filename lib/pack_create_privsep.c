@@ -17,10 +17,8 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/uio.h>
 
-#include <sha1.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
