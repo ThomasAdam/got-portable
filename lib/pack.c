@@ -1282,18 +1282,22 @@ got_pack_get_delta_chain_max_size(uint64_t *max_size,
 		    delta->type != GOT_OBJ_TYPE_BLOB &&
 		    delta->type != GOT_OBJ_TYPE_TAG) {
 			const struct got_error *err;
-			uint8_t *delta_buf;
+			uint8_t *delta_buf = NULL;
 			size_t delta_len;
 			int cached = 1;
 
-			got_delta_cache_get(&delta_buf, &delta_len,
-			    pack->delta_cache, delta->data_offset);
+			if (pack->delta_cache) {
+				got_delta_cache_get(&delta_buf, &delta_len,
+				    pack->delta_cache, delta->data_offset);
+			}
 			if (delta_buf == NULL) {
 				cached = 0;
 				err = read_delta_data(&delta_buf, &delta_len,
 				    NULL, delta->data_offset, pack);
 				if (err)
 					return err;
+			}
+			if (pack->delta_cache && !cached) {
 				err = got_delta_cache_add(pack->delta_cache,
 				    delta->data_offset, delta_buf, delta_len);
 				if (err == NULL)
@@ -1337,7 +1341,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	uint8_t *base_buf = NULL, *accum_buf = NULL, *delta_buf;
+	uint8_t *base_buf = NULL, *accum_buf = NULL;
 	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0, delta_len;
 	/* We process small enough files entirely in memory for speed. */
 	const size_t max_bufsize = GOT_DELTA_RESULT_SIZE_CACHED_MAX;
@@ -1356,6 +1360,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 	/* Deltas are ordered in ascending order. */
 	STAILQ_FOREACH(delta, &deltas->entries, entry) {
+		uint8_t *delta_buf = NULL;
 		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
@@ -1422,14 +1427,18 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			continue;
 		}
 
-		got_delta_cache_get(&delta_buf, &delta_len,
-		    pack->delta_cache, delta->data_offset);
+		if (pack->delta_cache) {
+			got_delta_cache_get(&delta_buf, &delta_len,
+			    pack->delta_cache, delta->data_offset);
+		}
 		if (delta_buf == NULL) {
 			cached = 0;
 			err = read_delta_data(&delta_buf, &delta_len, NULL,
 			    delta->data_offset, pack);
 			if (err)
 				goto done;
+		}
+		if (pack->delta_cache && !cached) {
 			err = got_delta_cache_add(pack->delta_cache,
 			    delta->data_offset, delta_buf, delta_len);
 			if (err == NULL)
@@ -1539,7 +1548,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	uint8_t *base_buf = NULL, *accum_buf = NULL, *delta_buf;
+	uint8_t *base_buf = NULL, *accum_buf = NULL;
 	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0, delta_len;
 	uint64_t max_size = 0;
 	int n = 0;
@@ -1552,6 +1561,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 
 	/* Deltas are ordered in ascending order. */
 	STAILQ_FOREACH(delta, &deltas->entries, entry) {
+		uint8_t *delta_buf = NULL;
 		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
@@ -1596,14 +1606,18 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			continue;
 		}
 
-		got_delta_cache_get(&delta_buf, &delta_len,
-		    pack->delta_cache, delta->data_offset);
+		if (pack->delta_cache) {
+			got_delta_cache_get(&delta_buf, &delta_len,
+			    pack->delta_cache, delta->data_offset);
+		}
 		if (delta_buf == NULL) {
 			cached = 0;
 			err = read_delta_data(&delta_buf, &delta_len, NULL,
 			    delta->data_offset, pack);
 			if (err)
 				goto done;
+		}
+		if (pack->delta_cache && !cached) {
 			err = got_delta_cache_add(pack->delta_cache,
 			    delta->data_offset, delta_buf, delta_len);
 			if (err == NULL)
