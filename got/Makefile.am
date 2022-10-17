@@ -53,7 +53,8 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/dial.c \
 	$(top_srcdir)/lib/bloom.c \
 	$(top_srcdir)/lib/murmurhash2.c \
-	$(top_srcdir)/lib/sigs.c
+	$(top_srcdir)/lib/sigs.c \
+	$(top_srcdir)/lib/pack_create_privsep.c
 
 EXTRA_DIST = $(top_srcdir)/compat/*.[ch] \
 	     $(top_srcdir)/lib/*.[ch] \

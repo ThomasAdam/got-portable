@@ -34,7 +34,8 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/worktree_open.c \
        $(top_srcdir)/lib/date.c \
        $(top_srcdir)/lib/buf.c \
-       $(top_srcdir)/lib/sigs.c
+       $(top_srcdir)/lib/sigs.c \
+       $(top_srcdir)/lib/pack_create_privsep.c
 
 gotadmin_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = gotadmin.1

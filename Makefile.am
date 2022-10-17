@@ -62,6 +62,7 @@ regress-delta:
 		$(top_srcdir)/lib/deflate.c \
 		$(top_srcdir)/lib/delta.c \
 		$(top_srcdir)/lib/delta_cache.c \
+		$(top_srcdir)/lib/deltify.c \
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/gotconfig.c \
 		$(top_srcdir)/lib/opentemp.c \
@@ -76,7 +77,10 @@ regress-delta:
 		$(top_srcdir)/lib/object_open_privsep.c \
 		$(top_srcdir)/lib/object_parse.c \
 		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/pack_create.c \
+		$(top_srcdir)/lib/pack_create_privsep.c \
 		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/ratelimit.c \
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/repository.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
@@ -110,8 +114,11 @@ regress-deltify:
 		$(top_srcdir)/lib/object_parse.c \
 		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/pack_create.c \
+		$(top_srcdir)/lib/pack_create_privsep.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/ratelimit.c \
 		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/reference.c \
@@ -147,8 +154,11 @@ regress-fetch:
 		$(top_srcdir)/lib/object_parse.c \
 		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/pack_create.c \
+		$(top_srcdir)/lib/pack_create_privsep.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/ratelimit.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/reference.c \
@@ -184,8 +194,11 @@ regress-idset:
 		$(top_srcdir)/lib/object_parse.c \
 		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/pack_create.c \
+		$(top_srcdir)/lib/pack_create_privsep.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/ratelimit.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/reference.c \
@@ -221,8 +234,11 @@ regress-path:
 		$(top_srcdir)/lib/object_parse.c \
 		$(top_srcdir)/lib/opentemp.c \
 		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/pack_create.c \
+		$(top_srcdir)/lib/pack_create_privsep.c \
 		$(top_srcdir)/lib/path.c \
 		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/ratelimit.c \
 		$(top_srcdir)/lib/read_gitconfig_privsep.c \
 		$(top_srcdir)/lib/read_gotconfig_privsep.c \
 		$(top_srcdir)/lib/reference.c \
