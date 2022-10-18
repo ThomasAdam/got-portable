@@ -712,11 +712,11 @@ pte_cmp(const void *pa, const void *pb)
 }
 
 const struct got_error *
-got_object_parse_tree(struct got_parsed_tree_entry **entries, int *nentries,
-    uint8_t *buf, size_t len)
+got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
+    size_t *nentries_alloc, uint8_t *buf, size_t len)
 {
 	const struct got_error *err = NULL;
-	size_t remain = len, totalloc;
+	size_t remain = len;
 	const size_t nalloc = 16;
 	struct got_parsed_tree_entry *pte;
 	int i;
@@ -725,23 +725,18 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, int *nentries,
 	if (remain == 0)
 		return NULL; /* tree is empty */
 
-	*entries = calloc(nalloc, sizeof(**entries));
-	if (*entries == NULL)
-		return got_error_from_errno("calloc");
-	totalloc = nalloc;
-
 	while (remain > 0) {
 		size_t elen;
 
-		if (*nentries >= totalloc) {
-			pte = recallocarray(*entries, totalloc,
-			    totalloc + nalloc, sizeof(**entries));
+		if (*nentries >= *nentries_alloc) {
+			pte = recallocarray(*entries, *nentries_alloc,
+			    *nentries_alloc + nalloc, sizeof(**entries));
 			if (pte == NULL) {
 				err = got_error_from_errno("recallocarray");
 				goto done;
 			}
 			*entries = pte;
-			totalloc += nalloc;
+			*nentries_alloc += nalloc;
 		}
 
 		pte = &(*entries)[*nentries];
@@ -772,11 +767,8 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, int *nentries,
 		}
 	}
 done:
-	if (err) {
-		free(*entries);
-		*entries = NULL;
+	if (err)
 		*nentries = 0;
-	}
 	return err;
 }
 
