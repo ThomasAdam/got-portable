@@ -50,8 +50,8 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
-read_tree_object(struct got_parsed_tree_entry **entries, int *nentries,
-    uint8_t **p, FILE *f, struct got_object_id *expected_id)
+read_tree_object(struct got_parsed_tree_entry **entries, size_t *nentries,
+    size_t *nentries_alloc, uint8_t **p, FILE *f, struct got_object_id *expected_id)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -89,7 +89,8 @@ read_tree_object(struct got_parsed_tree_entry **entries, int *nentries,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = got_object_parse_tree(entries, nentries, *p + obj->hdrlen, len);
+	err = got_object_parse_tree(entries, nentries, nentries_alloc,
+	    *p + obj->hdrlen, len);
 done:
 	if (obj)
 		got_object_close(obj);
@@ -102,6 +103,8 @@ main(int argc, char *argv[])
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 	size_t datalen;
+	struct got_parsed_tree_entry *entries = NULL;
+	size_t nentries = 0, nentries_alloc = 0;
 
 	signal(SIGINT, catch_sigint);
 
@@ -119,8 +122,6 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg imsg;
 		FILE *f = NULL;
-		struct got_parsed_tree_entry *entries = NULL;
-		int nentries = 0;
 		uint8_t *buf = NULL;
 		struct got_object_id expected_id;
 
@@ -163,14 +164,13 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		err = read_tree_object(&entries, &nentries, &buf, f,
-		    &expected_id);
+		err = read_tree_object(&entries, &nentries, &nentries_alloc,
+		    &buf, f, &expected_id);
 		if (err)
 			goto done;
 
 		err = got_privsep_send_tree(&ibuf, entries, nentries);
 done:
-		free(entries);
 		free(buf);
 		if (f) {
 			if (fclose(f) == EOF && err == NULL)
@@ -184,6 +184,7 @@ done:
 			break;
 	}
 
+	free(entries);
 	imsg_clear(&ibuf);
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {

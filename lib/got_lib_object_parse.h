@@ -30,7 +30,7 @@ struct got_parsed_tree_entry {
 	uint8_t *id; /* Points to ID in parsed tree buffer. */
 };
 const struct got_error *got_object_parse_tree(struct got_parsed_tree_entry **,
-    int *, uint8_t *, size_t);
+    size_t *, size_t *, uint8_t *, size_t);
 
 const struct got_error *got_object_parse_tag(struct got_tag_object **,
     uint8_t *, size_t);
