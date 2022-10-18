@@ -50,10 +50,10 @@
 #include "got_lib_object_idset.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_deflate.h"
+#include "got_lib_ratelimit.h"
 #include "got_lib_pack.h"
 #include "got_lib_pack_create.h"
 #include "got_lib_repository.h"
-#include "got_lib_ratelimit.h"
 #include "got_lib_inflate.h"
 
 #include "murmurhash2.h"
@@ -1826,12 +1826,11 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
     got_pack_progress_cb progress_cb, void *progress_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	int delta_cache_fd = -1;
 	struct got_object_idset *idset;
-	struct got_ratelimit rl;
 	struct got_pack_metavec deltify, reuse;
 	int ncolored = 0, nfound = 0, ntrees = 0;
 	size_t ndeltify;
@@ -1842,15 +1841,13 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 	memset(&deltify, 0, sizeof(deltify));
 	memset(&reuse, 0, sizeof(reuse));
 
-	got_ratelimit_init(&rl, 0, 500);
-
 	idset = got_object_idset_alloc();
 	if (idset == NULL)
 		return got_error_from_errno("got_object_idset_alloc");
 
 	err = load_object_ids(&ncolored, &nfound, &ntrees, idset, theirs,
 	    ntheirs, ours, nours, repo, seed, loose_obj_only,
-	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	    progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -1882,7 +1879,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 
 	err = got_pack_search_deltas(&reuse, idset, delta_cache_fd,
 	    ncolored, nfound, ntrees, nours,
-	    repo, progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
+	    repo, progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -1907,7 +1904,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 		if (deltify.nmeta > 0) {
 			err = pick_deltas(deltify.meta, deltify.nmeta,
 			    ncolored, nfound, ntrees, nours, reuse.nmeta,
-			    delta_cache, repo, progress_cb, progress_arg, &rl,
+			    delta_cache, repo, progress_cb, progress_arg, rl,
 			    cancel_cb, cancel_arg);
 			if (err)
 				goto done;
@@ -1920,7 +1917,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 	}
 	err = genpack(packsha1, packfd, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
-	    nours, repo, progress_cb, progress_arg, &rl,
+	    nours, repo, progress_cb, progress_arg, rl,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;

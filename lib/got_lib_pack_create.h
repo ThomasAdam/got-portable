@@ -26,7 +26,7 @@ const struct got_error *got_pack_create(uint8_t *pack_sha1, int packfd,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
     got_pack_progress_cb progress_cb, void *progress_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg);
+    struct got_ratelimit *, got_cancel_cb cancel_cb, void *cancel_arg);
 
 const struct got_error *
 got_pack_cache_pack_for_packidx(struct got_pack **pack,

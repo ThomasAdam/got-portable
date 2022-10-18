@@ -51,10 +51,10 @@
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
 #include "got_lib_repository.h"
+#include "got_lib_ratelimit.h"
 #include "got_lib_pack_create.h"
 #include "got_lib_sha1.h"
 #include "got_lib_lockfile.h"
-#include "got_lib_ratelimit.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -155,9 +155,12 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	char *tmpfile_path = NULL, *path = NULL, *packfile_path = NULL;
 	char *sha1_str = NULL;
 	FILE *delta_cache = NULL;
+	struct got_ratelimit rl;
 
 	*packfile = NULL;
 	*pack_hash = NULL;
+
+	got_ratelimit_init(&rl, 0, 500);
 
 	if (asprintf(&path, "%s/%s/packing.pack",
 	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR) == -1) {
@@ -207,7 +210,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 
 	err = got_pack_create((*pack_hash)->sha1, packfd, delta_cache,
 	    theirs, ntheirs, ours, nours, repo, loose_obj_only, 0,
-	    progress_cb, progress_arg, cancel_cb, cancel_arg);
+	    progress_cb, progress_arg, &rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
