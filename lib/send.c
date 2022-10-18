@@ -59,6 +59,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
+#include "got_lib_ratelimit.h"
 #include "got_lib_pack_create.h"
 #include "got_lib_dial.h"
 
@@ -635,12 +636,14 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	}
 
 	if (refs_to_send > 0) {
+		struct got_ratelimit rl;
+		got_ratelimit_init(&rl, 0, 500);
 		memset(&ppa, 0, sizeof(ppa));
 		ppa.progress_cb = progress_cb;
 		ppa.progress_arg = progress_arg;
 		err = got_pack_create(packsha1, packfd, delta_cache,
 		    their_ids, ntheirs, our_ids, nours, repo, 0, 1,
-		    pack_progress, &ppa, cancel_cb, cancel_arg);
+		    pack_progress, &ppa, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 

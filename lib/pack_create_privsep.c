@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <imsg.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -40,6 +41,7 @@
 #include "got_lib_object_cache.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_privsep.h"
+#include "got_lib_ratelimit.h"
 #include "got_lib_pack.h"
 #include "got_lib_pack_create.h"
 #include "got_lib_repository.h"
