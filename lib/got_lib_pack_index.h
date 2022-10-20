@@ -15,7 +15,8 @@
  */
 
 typedef const struct got_error *(got_pack_index_progress_cb)(void *,
-    int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved);
+    uint32_t nobj_total, uint32_t nobj_indexed, uint32_t nobj_loose,
+    uint32_t nobj_resolved);
 
 const struct got_error *
 got_pack_index(struct got_pack *pack, int idxfd,
