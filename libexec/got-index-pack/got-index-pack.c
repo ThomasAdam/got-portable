@@ -85,11 +85,14 @@ main(int argc, char **argv)
 	struct got_pack pack;
 	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
 	off_t packfile_size;
+	struct got_ratelimit rl;
 #if 0
 	static int attached;
 	while (!attached)
 		sleep(1);
 #endif
+
+	got_ratelimit_init(&rl, 0, 500);
 
 	for (i = 0; i < nitems(tmpfiles); i++)
 		tmpfiles[i] = NULL;
@@ -185,8 +188,8 @@ main(int argc, char **argv)
 	if (pack.map == MAP_FAILED)
 		pack.map = NULL; /* fall back to read(2) */
 #endif
-	err = got_pack_index(&pack, idxfd, tmpfiles[0], tmpfiles[1], tmpfiles[2],
-	    pack_hash, send_index_pack_progress, &ibuf);
+	err = got_pack_index(&pack, idxfd, tmpfiles[0], tmpfiles[1],
+	    tmpfiles[2], pack_hash, send_index_pack_progress, &ibuf, &rl);
 done:
 	close_err = got_pack_close(&pack);
 	if (close_err && err == NULL)
