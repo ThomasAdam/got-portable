@@ -546,7 +546,7 @@ indexed_obj_cmp(const void *pa, const void *pb)
 }
 
 static void
-make_packidx(struct got_packidx *packidx, int nobj,
+make_packidx(struct got_packidx *packidx, uint32_t nobj,
     struct got_indexed_object *objects)
 {
 	struct got_indexed_object *obj;
@@ -568,7 +568,7 @@ make_packidx(struct got_packidx *packidx, int nobj,
 }
 
 static void
-update_packidx(struct got_packidx *packidx, int nobj,
+update_packidx(struct got_packidx *packidx, uint32_t nobj,
     struct got_indexed_object *obj)
 {
 	int idx;
@@ -591,8 +591,8 @@ update_packidx(struct got_packidx *packidx, int nobj,
 }
 
 static const struct got_error *
-report_progress(int nobj_total, int nobj_indexed, int nobj_loose,
-    int nobj_resolved, struct got_ratelimit *rl,
+report_progress(uint32_t nobj_total, uint32_t nobj_indexed, uint32_t nobj_loose,
+    uint32_t nobj_resolved, struct got_ratelimit *rl,
     got_pack_index_progress_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err;
@@ -619,7 +619,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	struct got_packidx packidx;
 	char buf[8];
 	char pack_sha1[SHA1_DIGEST_LENGTH];
-	int nobj, nvalid, nloose, nresolved = 0, i;
+	uint32_t nobj, nvalid, nloose, nresolved = 0, i;
 	struct got_indexed_object *objects = NULL, *obj;
 	SHA1_CTX ctx;
 	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];

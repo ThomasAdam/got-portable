@@ -46,8 +46,8 @@
 #endif
 
 static const struct got_error *
-send_index_pack_progress(void *arg, int nobj_total, int nobj_indexed,
-    int nobj_loose, int nobj_resolved)
+send_index_pack_progress(void *arg, uint32_t nobj_total, uint32_t nobj_indexed,
+    uint32_t nobj_loose, uint32_t nobj_resolved)
 {
 	struct imsgbuf *ibuf = arg;
 	struct got_imsg_index_pack_progress iprogress;
