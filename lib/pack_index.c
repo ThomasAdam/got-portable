@@ -611,7 +611,8 @@ report_progress(int nobj_total, int nobj_indexed, int nobj_loose,
 const struct got_error *
 got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
     FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_sha1_expected,
-    got_pack_index_progress_cb progress_cb, void *progress_arg)
+    got_pack_index_progress_cb progress_cb, void *progress_arg,
+    struct got_ratelimit *rl)
 {
 	const struct got_error *err;
 	struct got_packfile_hdr hdr;
@@ -627,7 +628,6 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	size_t mapoff = 0;
 	int p_indexed = 0, last_p_indexed = -1;
 	int p_resolved = 0, last_p_resolved = -1;
-	struct got_ratelimit rl;
 
 	/* Require that pack file header and SHA1 trailer are present. */
 	if (pack->filesize < sizeof(hdr) + SHA1_DIGEST_LENGTH)
@@ -715,8 +715,6 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	if (objects == NULL)
 		return got_error_from_errno("calloc");
 
-	got_ratelimit_init(&rl, 0, 500);
-
 	/*
 	 * First pass: locate all objects and identify un-deltified objects.
 	 *
@@ -731,7 +729,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		p_indexed = ((i + 1) * 100) / nobj;
 		if (p_indexed != last_p_indexed) {
 			err = report_progress(nobj, i + 1, nloose, 0,
-			    &rl, progress_cb, progress_arg);
+			    rl, progress_cb, progress_arg);
 			if (err)
 				goto done;
 			last_p_indexed = p_indexed;
@@ -876,7 +874,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			p_resolved = ((nresolved + n) * 100) / nobj;
 			if (p_resolved != last_p_resolved) {
 				err = report_progress(nobj, nobj,
-				    nloose, nresolved + n, &rl,
+				    nloose, nresolved + n, rl,
 				    progress_cb, progress_arg);
 				if (err)
 					goto done;
