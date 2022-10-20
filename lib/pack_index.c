@@ -31,8 +31,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <sha1.h>
-#include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
