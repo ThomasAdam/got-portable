@@ -10,6 +10,7 @@ got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/delta_cache.c \
 	$(top_srcdir)/lib/delta.c \
 	$(top_srcdir)/lib/pack.c \
+	$(top_srcdir)/lib/pack_index.c \
 	$(top_srcdir)/lib/path.c \
 	$(top_srcdir)/lib/privsep.c \
 	$(top_srcdir)/lib/sha1.c \
