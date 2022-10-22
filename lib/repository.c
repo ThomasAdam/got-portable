@@ -1029,6 +1029,46 @@ add_packidx_bloom_filter(struct got_repository *repo,
 	return NULL;
 }
 
+static void
+purge_packidx_paths(struct got_pathlist_head *packidx_paths)
+{
+	struct got_pathlist_entry *pe;
+
+	while (!TAILQ_EMPTY(packidx_paths)) {
+		pe = TAILQ_FIRST(packidx_paths);
+		TAILQ_REMOVE(packidx_paths, pe, entry);
+		free((char *)pe->path);
+		free(pe);
+	}
+}
+
+static const struct got_error *
+refresh_packidx_paths(struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *objects_pack_dir = NULL;
+	struct stat sb;
+
+	objects_pack_dir = got_repo_get_path_objects_pack(repo);
+	if (objects_pack_dir == NULL)
+		return got_error_from_errno("got_repo_get_path_objects_pack");
+
+	if (stat(objects_pack_dir, &sb) == -1) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno2("stat", objects_pack_dir);
+			goto done;
+		}
+	} else if (sb.st_mtime != repo->pack_path_mtime) {
+		purge_packidx_paths(&repo->packidx_paths);
+		err = got_repo_list_packidx(&repo->packidx_paths, repo);
+		if (err)
+			goto done;
+	}
+done:
+	free(objects_pack_dir);
+	return err;
+}
+
 const struct got_error *
 got_repo_search_packidx(struct got_packidx **packidx, int *idx,
     struct got_repository *repo, struct got_object_id *id)
@@ -1066,6 +1106,10 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 		}
 	}
 	/* No luck. Search the filesystem. */
+
+	err = refresh_packidx_paths(repo);
+	if (err)
+		return err;
 
 	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
 		const char *path_packidx = pe->path;
@@ -1461,46 +1505,19 @@ got_repo_init(const char *repo_path, const char *head_name)
 	return NULL;
 }
 
-static void
-purge_packidx_paths(struct got_pathlist_head *packidx_paths)
-{
-	struct got_pathlist_entry *pe;
-
-	while (!TAILQ_EMPTY(packidx_paths)) {
-		pe = TAILQ_FIRST(packidx_paths);
-		TAILQ_REMOVE(packidx_paths, pe, entry);
-		free((char *)pe->path);
-		free(pe);
-	}
-}
-
 static const struct got_error *
 match_packed_object(struct got_object_id **unique_id,
     struct got_repository *repo, const char *id_str_prefix, int obj_type)
 {
 	const struct got_error *err = NULL;
-	char *objects_pack_dir = NULL;
 	struct got_object_id_queue matched_ids;
 	struct got_pathlist_entry *pe;
-	struct stat sb;
 
 	STAILQ_INIT(&matched_ids);
 
-	objects_pack_dir = got_repo_get_path_objects_pack(repo);
-	if (objects_pack_dir == NULL)
-		return got_error_from_errno("got_repo_get_path_objects_pack");
-
-	if (stat(objects_pack_dir, &sb) == -1) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno2("stat", objects_pack_dir);
-			goto done;
-		}
-	} else if (sb.st_mtime != repo->pack_path_mtime) {
-		purge_packidx_paths(&repo->packidx_paths);
-		err = got_repo_list_packidx(&repo->packidx_paths, repo);
-		if (err)
-			goto done;
-	}
+	err = refresh_packidx_paths(repo);
+	if (err)
+		return err;
 
 	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
 		const char *path_packidx = pe->path;
@@ -1548,7 +1565,6 @@ match_packed_object(struct got_object_id **unique_id,
 		}
 	}
 done:
-	free(objects_pack_dir);
 	got_object_id_queue_free(&matched_ids);
 	if (err) {
 		free(*unique_id);
