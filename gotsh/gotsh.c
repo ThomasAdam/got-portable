@@ -67,18 +67,29 @@ main(int argc, char *argv[])
 	char *unix_socket_path_env = getenv("GOTD_UNIX_SOCKET");
 	int gotd_sock = -1;
 	struct sockaddr_un	 sun;
+	char *gitcmd = NULL;
 
 #ifndef PROFILE
 	if (pledge("stdio recvfd unix unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc != 3 ||
-	    strcmp(argv[1], "-c") != 0 ||
-	    (strncmp(argv[2], GOT_SERVE_CMD_SEND,
-	    strlen(GOT_SERVE_CMD_SEND)) != 0 &&
-	    (strncmp(argv[2], GOT_SERVE_CMD_FETCH,
-	    strlen(GOT_SERVE_CMD_FETCH)) != 0)))
-		usage();
+	if (strcmp(argv[0], GOT_SERVE_CMD_SEND) == 0 ||
+	    strcmp(argv[0], GOT_SERVE_CMD_FETCH) == 0) {
+		if (argc != 2)
+			usage();
+		if (asprintf(&gitcmd, "%s %s", argv[0], argv[1]) == -1)
+			err(1, "asprintf");
+	} else {
+		if (argc != 3 || strcmp(argv[1], "-c") != 0 ||
+		    (strncmp(argv[2], GOT_SERVE_CMD_SEND,
+		    strlen(GOT_SERVE_CMD_SEND)) != 0 &&
+		    (strncmp(argv[2], GOT_SERVE_CMD_FETCH,
+		    strlen(GOT_SERVE_CMD_FETCH)) != 0)))
+			usage();
+		gitcmd = strdup(argv[2]);
+		if (gitcmd == NULL)
+			err(1, "strdup");
+	}
 
 	if (unix_socket_path_env) {
 		if (strlcpy(unix_socket_path, unix_socket_path_env,
@@ -112,9 +123,10 @@ main(int argc, char *argv[])
 	if (pledge("stdio recvfd", NULL) == -1)
 		err(1, "pledge");
 #endif
-	error = got_serve(STDIN_FILENO, STDOUT_FILENO, argv[2], gotd_sock,
+	error = got_serve(STDIN_FILENO, STDOUT_FILENO, gitcmd, gotd_sock,
 	    chattygot);
 done:
+	free(gitcmd);
 	if (gotd_sock != -1)
 		close(gotd_sock);
 	if (error) {

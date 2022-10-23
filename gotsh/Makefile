@@ -2,9 +2,6 @@
 
 .include "../got-version.mk"
 
-PREFIX ?=	/usr/local
-BINDIR ?=	${PREFIX}/bin
-
 PROG=		gotsh
 SRCS=		gotsh.c error.c pkt.c sha1.c serve.c path.c gitproto.c \
 		imsg.c pollfd.c reference_parse.c
@@ -24,8 +21,12 @@ DPADD = ${LIBZ} ${LIBUTIL}
 NOMAN = Yes
 .endif
 
+.if "${GOT_RELEASE}" != "Yes"
 realinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
 	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}
+	-ln -s ${PROG} ${BINDIR}/git-receive-pack
+	-ln -s ${PROG} ${BINDIR}/git-upload-pack
+.endif
 
 .include <bsd.prog.mk>
