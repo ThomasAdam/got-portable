@@ -7,6 +7,7 @@ got_read_commit_SOURCES = got-read-commit.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/object_parse.c \
 	$(top_srcdir)/lib/path.c \
+	$(top_srcdir)/lib/pollfd.c \
 	$(top_srcdir)/lib/privsep.c \
 	$(top_srcdir)/lib/sha1.c
 
