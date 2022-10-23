@@ -1,6 +1,10 @@
 SUBDIRS = compat libexec got tog gotadmin template gotwebd cvg
 # TODO: gotd gotsh template
 
+if GOTD_ENABLED
+SUBDIRS += gotd
+endif
+
 include $(top_builddir)/Makefile.common
 
 EXTRA_DIST = CHANGES CHANGELOG LICENCE util/got-portable-ver.sh

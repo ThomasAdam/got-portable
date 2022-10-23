@@ -30,6 +30,8 @@ cvg/cvg
 etc/*
 got/got
 gotadmin/gotadmin
+gotd/gotd
+gotd/parse.c
 gotwebd/gotwebd
 gotwebd/pages.c
 gotwebd/parse.c

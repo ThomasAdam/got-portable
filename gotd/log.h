@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 void	log_init(int, int);
 void	log_procinit(const char *);
 void	log_setverbose(int);
