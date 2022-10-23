@@ -33,7 +33,6 @@
 #include <sha1.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <time.h>
 
 #include "got_object.h"
 #include "got_error.h"
@@ -47,6 +46,7 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
+#include "got_lib_poll.h"
 
 #include "got_privsep.h"
 
@@ -59,46 +59,17 @@
 #endif
 
 static const struct got_error *
-poll_fd(int fd, int events, int timeout)
-{
-	struct pollfd pfd[1];
-	struct timespec ts;
-	sigset_t sigset;
-	int n;
-
-	pfd[0].fd = fd;
-	pfd[0].events = events;
-
-	ts.tv_sec = timeout;
-	ts.tv_nsec = 0;
-
-	if (sigemptyset(&sigset) == -1)
-		return got_error_from_errno("sigemptyset");
-	if (sigaddset(&sigset, SIGWINCH) == -1)
-		return got_error_from_errno("sigaddset");
-
-	n = ppoll(pfd, 1, timeout == INFTIM ? NULL : &ts, &sigset);
-	if (n == -1)
-		return got_error_from_errno("ppoll");
-	if (n == 0)
-		return got_error(GOT_ERR_TIMEOUT);
-	if (pfd[0].revents & (POLLERR | POLLNVAL))
-		return got_error_from_errno("poll error");
-	if (pfd[0].revents & (events | POLLHUP))
-		return NULL;
-
-	return got_error(GOT_ERR_INTERRUPT);
-}
-
-static const struct got_error *
 read_imsg(struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
 	size_t n;
 
-	err = poll_fd(ibuf->fd, POLLIN, INFTIM);
-	if (err)
+	err = got_poll_fd(ibuf->fd, POLLIN, INFTIM);
+	if (err) {
+		if (err->code == GOT_ERR_EOF)
+			return got_error(GOT_ERR_PRIVSEP_PIPE);
 		return err;
+	}
 
 	n = imsg_read(ibuf);
 	if (n == -1) {
@@ -199,7 +170,7 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 		return;
 	}
 
-	poll_err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
+	poll_err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
 	if (poll_err) {
 		fprintf(stderr, "%s: error %d \"%s\": poll: %s\n",
 		    getprogname(), err->code, err->msg, poll_err->msg);
@@ -220,7 +191,7 @@ flush_imsg(struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
 
-	err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
+	err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
 	if (err)
 		return err;
 

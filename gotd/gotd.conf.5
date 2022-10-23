@@ -1,0 +1,133 @@
+.\"
+.\" Copyright (c) 2022 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTD.CONF 5
+.Os
+.Sh NAME
+.Nm gotd.conf
+.Nd gotd configuration file
+.Sh DESCRIPTION
+.Nm
+is the run-time configuration file for
+.Xr gotd 8 .
+.Pp
+The file format is line-based, with one configuration directive per line.
+Any lines beginning with a
+.Sq #
+are treated as comments and ignored.
+.Sh GLOBAL CONFIGURATION
+The available global configuration directives are as follows:
+.Bl -tag -width Ds
+.It Ic unix_socket Ar path
+Set the path to the unix socket which
+.Xr gotd 8
+should listen on.
+If not specified, the path
+.Pa /var/run/gotd.sock
+will be used.
+.It Ic unix_group Ar group
+Set the
+.Ar group ,
+defined in the
+.Xr group 5
+file, which is allowed to access
+.Xr gotd 8
+via
+.Xr gotsh 1 .
+The
+.Xr gotd 8
+user must be a secondary member of this group.
+If not specified, the group _gotsh will be used.
+.It Ic user Ar user
+Set the
+.Ar user
+which will run
+.Xr gotd 8 .
+Initially,
+.Xr gotd 8
+requires root privileges in order to create its unix socket and start
+child processes in a
+.Xr chroot 2
+environment.
+Afterwards,
+.Xr gotd 8
+drops privileges to the specified
+.Ar user .
+If not specified, the user _gotd will be used.
+.El
+.Sh REPOSITORY CONFIGURATION
+At least one repository context must exist for
+.Xr gotd 8
+to function.
+.Pp
+A repository context is declared with a unique
+.Ar name ,
+followed by repository-specific configuration directives inside curly braces:
+.Pp
+.Ic repository Ar name Brq ...
+.Pp
+.Xr got 1
+and
+.Xr git 1
+clients can connect to a repository by including the repository's unique
+.Ar name
+in the request URL.
+Clients appending the string
+.Dq .git
+to the
+.Ar name
+will also be accepted.
+.Pp
+If desired, the
+.Ar name
+may contain path-separators,
+.Dq / ,
+to expose repositories as part of a virtual client-visible directory hierarchy.
+.Pp
+The available repository configuration directives are as follows:
+.Bl -tag -width Ds
+.It Ic path Ar path
+Set the path to the Git repository.
+.EL
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /etc/gotd.conf
+Location of the
+.Nm
+configuration file.
+.El
+.Sh EXAMPLES
+.Bd -literal -offset indent
+# Default unix_group and user values:
+unix_group _gotsh
+user _gotd
+
+# This repository can be accessed via ssh://user@example.com/src
+repository "src" {
+	path "/var/git/src.git"
+}
+
+# This repository can be accessed via
+# ssh://user@example.com/openbsd/ports
+repository "openbsd/ports" {
+	path "/var/git/ports.git"
+}
+.Ed
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr gotsh 1 ,
+.Xr group 5 ,
+.Xr gotd 8

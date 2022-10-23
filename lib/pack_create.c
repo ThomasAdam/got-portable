@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <imsg.h>
 #include <inttypes.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,6 +56,7 @@
 #include "got_lib_pack_create.h"
 #include "got_lib_repository.h"
 #include "got_lib_inflate.h"
+#include "got_lib_poll.h"
 
 #include "murmurhash2.h"
 
@@ -1419,24 +1421,17 @@ done:
 static const struct got_error *
 hwrite(int fd, const void *buf, off_t len, SHA1_CTX *ctx)
 {
-	ssize_t w;
-
 	SHA1Update(ctx, buf, len);
-	w = write(fd, buf, len);
-	if (w == -1)
-		return got_error_from_errno("write");
-	else if (w != len)
-		return got_error(GOT_ERR_IO);
-	return NULL;
+	return got_poll_write_full(fd, buf, len);
 }
 
 static const struct got_error *
 hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
 {
+	const struct got_error *err;
 	unsigned char buf[65536];
 	off_t remain = len;
 	size_t n;
-	ssize_t w;
 
 	while (remain > 0) {
 		size_t copylen = MIN(sizeof(buf), remain);
@@ -1444,11 +1439,9 @@ hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
 		if (n != copylen)
 			return got_ferror(fsrc, GOT_ERR_IO);
 		SHA1Update(ctx, buf, copylen);
-		w = write(fd_dst, buf, copylen);
-		if (w == -1)
-			return got_error_from_errno("write");
-		else if (w != copylen)
-			return got_error(GOT_ERR_IO);
+		err = got_poll_write_full(fd_dst, buf, copylen);
+		if (err)
+			return err;
 		remain -= copylen;
 	}
 
@@ -1459,18 +1452,11 @@ static const struct got_error *
 hcopy_mmap(uint8_t *src, off_t src_offset, size_t src_size,
     int fd, off_t len, SHA1_CTX *ctx)
 {
-	ssize_t w;
-
 	if (src_offset + len > src_size)
 		return got_error(GOT_ERR_RANGE);
 
 	SHA1Update(ctx, src + src_offset, len);
-	w = write(fd, src + src_offset, len);
-	if (w == -1)
-		return got_error_from_errno("write");
-	else if (w != len)
-		return got_error(GOT_ERR_IO);
-	return NULL;
+	return got_poll_write_full(fd, src + src_offset, len);
 }
 
 static void
@@ -1706,7 +1692,6 @@ genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
 	char buf[32];
-	ssize_t w;
 	off_t packfile_size = 0;
 	int outfd = -1;
 	int delta_cache_fd = -1;
@@ -1782,11 +1767,7 @@ genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
 	}
 
 	SHA1Final(pack_sha1, &ctx);
-	w = write(packfd, pack_sha1, SHA1_DIGEST_LENGTH);
-	if (w == -1)
-		err = got_error_from_errno("write");
-	else if (w != SHA1_DIGEST_LENGTH)
-		err = got_error(GOT_ERR_IO);
+	err = got_poll_write_full(packfd, pack_sha1, SHA1_DIGEST_LENGTH);
 	if (err)
 		goto done;
 	packfile_size += SHA1_DIGEST_LENGTH;
@@ -1915,6 +1896,20 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 		err = got_error_from_errno("fflush");
 		goto done;
 	}
+
+	if (progress_cb) {
+		/*
+		 * Report a 1-byte packfile write to indicate we are about
+		 * to start sending packfile data. gotd(8) needs this.
+		 */
+		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
+		    1 /* packfile_size */, nours,
+		    got_object_idset_num_elements(idset),
+		    deltify.nmeta + reuse.nmeta, 0);
+		if (err)
+			goto done;
+	}
+
 	err = genpack(packsha1, packfd, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, progress_cb, progress_arg, rl,

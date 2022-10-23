@@ -56,6 +56,7 @@ void		 buf_free(BUF *);
 void		*buf_release(BUF *);
 u_char		 buf_getc(BUF *, size_t);
 void		 buf_empty(BUF *);
+const struct got_error *buf_discard(BUF *, size_t);
 const struct got_error *buf_append(size_t *, BUF *, const void *, size_t);
 const struct got_error *buf_putc(BUF *, int);
 const struct got_error *buf_puts(size_t *, BUF *b, const char *str);

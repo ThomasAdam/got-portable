@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sha1.h>
+#include <poll.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <time.h>
@@ -30,6 +31,7 @@
 #include "got_path.h"
 
 #include "got_lib_inflate.h"
+#include "got_lib_poll.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -167,6 +169,7 @@ const struct got_error *
 got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
     size_t *consumed)
 {
+	const struct got_error *err = NULL;
 	size_t last_total_out = zb->z.total_out;
 	size_t last_total_in = zb->z.total_in;
 	z_stream *z = &zb->z;
@@ -183,7 +186,16 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
 		size_t csum_avail_in = 0, csum_avail_out = 0;
 
 		if (z->avail_in == 0) {
-			ssize_t n = read(fd, zb->inbuf, zb->inlen);
+			ssize_t n;
+			err = got_poll_fd(fd, POLLIN, INFTIM);
+			if (err) {
+				if (err->code == GOT_ERR_EOF) {
+					ret = Z_STREAM_END;
+					break;
+				}
+				return err;
+			}
+			n = read(fd, zb->inbuf, zb->inlen);
 			if (n < 0)
 				return got_error_from_errno("read");
 			else if (n == 0) {

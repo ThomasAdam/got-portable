@@ -15,7 +15,8 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		diff_patience.c send.c deltify.c pack_create.c dial.c \
 		bloom.c murmurhash2.c ratelimit.c patch.c sigs.c date.c \
 		object_open_privsep.c read_gitconfig_privsep.c \
-		read_gotconfig_privsep.c pack_create_privsep.c
+		read_gotconfig_privsep.c pack_create_privsep.c pollfd.c \
+		reference_parse.c
 
 MAN =		${PROG}.1 got-worktree.5 git-repository.5 got.conf.5
 

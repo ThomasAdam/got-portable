@@ -5,7 +5,7 @@
 PROG=		got-index-pack
 SRCS=		got-index-pack.c error.c inflate.c object_parse.c object_idset.c \
 		delta_cache.c delta.c pack.c path.c privsep.c sha1.c ratelimit.c \
-		pack_index.c
+		pack_index.c pollfd.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 

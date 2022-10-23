@@ -22,6 +22,8 @@ struct got_tree_entry *got_alloc_tree_entry_partial(void);
 
 const struct got_error *got_object_parse_commit(struct got_commit_object **,
     char *, size_t);
+const struct got_error *got_object_read_commit(struct got_commit_object **, int,
+    struct got_object_id *, size_t);
 
 struct got_parsed_tree_entry {
 	const char *name; /* Points to name in parsed buffer */
@@ -31,9 +33,13 @@ struct got_parsed_tree_entry {
 };
 const struct got_error *got_object_parse_tree(struct got_parsed_tree_entry **,
     size_t *, size_t *, uint8_t *, size_t);
+const struct got_error *got_object_read_tree(struct got_parsed_tree_entry **,
+    size_t *, size_t *, uint8_t **, int, struct got_object_id *);
 
 const struct got_error *got_object_parse_tag(struct got_tag_object **,
     uint8_t *, size_t);
+const struct got_error *got_object_read_tag(struct got_tag_object **, int, 
+    struct got_object_id *, size_t);
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
 
 struct got_pack;
@@ -43,3 +49,5 @@ struct got_inflate_checksum;
 const struct got_error *got_object_parse_header(struct got_object **, char *,
     size_t);
 const struct got_error *got_object_read_header(struct got_object **, int);
+const struct got_error *got_object_read_raw(uint8_t **, off_t *,
+    size_t *, size_t, int, struct got_object_id *, int);

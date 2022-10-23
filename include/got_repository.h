@@ -186,3 +186,8 @@ const struct got_error *got_repo_pack_fds_open(int **);
 
 /* Close the array of file descriptors handed over to got_repo_open for pack */
 const struct got_error *got_repo_pack_fds_close(int *);
+
+/* Open/set/close temporary files for internal use. Needed by gotd(8). */
+const struct got_error *got_repo_temp_fds_open(int **);
+void got_repo_temp_fds_set(struct got_repository *, int *);
+const struct got_error *got_repo_temp_fds_close(int *);

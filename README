@@ -11,7 +11,7 @@ for any functionality which has not yet been implemented in Got.
 It will always remain possible to work with both Got and Git on
 the same repository.
 
-To compile the Got tool suite on OpenBSD, run:
+To compile the Got client tool suite on OpenBSD, run:
 
  $ make obj
  $ make
@@ -55,6 +55,24 @@ Man page files in the Got source tree can be viewed with 'man -l':
  $ man -l tog/tog.1
 
 EXAMPLES in got.1 contains a quick-start guide for OpenBSD developers.
+
+
+To compile the Got server tool suite on OpenBSD, run:
+
+ $ make obj
+ $ make server
+ $ make server-install
+
+This will install the following commands:
+
+ gotd, the repository server program
+ gotsh, the login shell for users accessing the server via the network
+
+See the following manual page files for information about server setup:
+
+ $ man -l gotd/gotd.8
+ $ man -l gotd/gotd.conf.5
+ $ man -l gotsh/gotsh.1
 
 
 Game of Trees Web (Gotweb) is a CGI program which displays repository data

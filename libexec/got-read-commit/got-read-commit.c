@@ -48,60 +48,6 @@ catch_sigint(int signo)
 	sigint_received = 1;
 }
 
-static const struct got_error *
-read_commit_object(struct got_commit_object **commit, FILE *f,
-    struct got_object_id *expected_id)
-{
-	struct got_object *obj = NULL;
-	const struct got_error *err = NULL;
-	size_t len;
-	uint8_t *p;
-	struct got_inflate_checksum csum;
-	SHA1_CTX sha1_ctx;
-	struct got_object_id id;
-
-	SHA1Init(&sha1_ctx);
-	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
-
-	err = got_inflate_to_mem(&p, &len, NULL, &csum, f);
-	if (err)
-		return err;
-
-	SHA1Final(id.sha1, &sha1_ctx);
-	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
-		goto done;
-	}
-
-	err = got_object_parse_header(&obj, p, len);
-	if (err)
-		goto done;
-
-	if (len < obj->hdrlen + obj->size) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-
-	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	/* Skip object header. */
-	len -= obj->hdrlen;
-	err = got_object_parse_commit(commit, p + obj->hdrlen, len);
-done:
-	free(p);
-	if (obj)
-		got_object_close(obj);
-	return err;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -124,7 +70,6 @@ main(int argc, char *argv[])
 
 	for (;;) {
 		struct imsg imsg;
-		FILE *f = NULL;
 		struct got_commit_object *commit = NULL;
 		struct got_object_id expected_id;
 
@@ -160,27 +105,15 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		/* Always assume file offset zero. */
-		f = fdopen(imsg.fd, "rb");
-		if (f == NULL) {
-			err = got_error_from_errno("fdopen");
-			goto done;
-		}
-
-		err = read_commit_object(&commit, f, &expected_id);
+		err = got_object_read_commit(&commit, imsg.fd, &expected_id, 0);
 		if (err)
 			goto done;
 
 		err = got_privsep_send_commit(&ibuf, commit);
 		got_object_commit_close(commit);
 done:
-		if (f) {
-			if (fclose(f) == EOF && err == NULL)
-				err = got_error_from_errno("fclose");
-		} else if (imsg.fd != -1) {
-			if (close(imsg.fd) == -1 && err == NULL)
-				err = got_error_from_errno("close");
-		}
+		if (imsg.fd != -1 && close(imsg.fd) == -1 && err == NULL)
+			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (err)
 			break;

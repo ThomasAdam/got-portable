@@ -7,7 +7,7 @@ SUBDIR += regress
 .endif
 
 .if make(clean) || make(obj) || make(release)
-SUBDIR += gotweb gotwebd
+SUBDIR += gotweb gotwebd gotd gotsh
 .endif
 
 .if make(tags) || make(cleandir)
@@ -44,5 +44,13 @@ webd:
 
 webd-install:
 	${MAKE} -C gotwebd install
+
+server:
+	${MAKE} -C gotd
+	${MAKE} -C gotsh
+
+server-install:
+	${MAKE} -C gotd install
+	${MAKE} -C gotsh install
 
 .include <bsd.subdir.mk>

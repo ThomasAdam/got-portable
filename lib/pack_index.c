@@ -354,8 +354,8 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	return err;
 }
 
-static const struct got_error *
-hwrite(int fd, void *buf, int len, SHA1_CTX *ctx)
+const struct got_error *
+got_pack_hwrite(int fd, void *buf, int len, SHA1_CTX *ctx)
 {
 	ssize_t w;
 
@@ -783,9 +783,9 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	 * verify its checksum.
 	 */
 	SHA1Final(pack_sha1, &ctx);
+
 	if (memcmp(pack_sha1_expected, pack_sha1, SHA1_DIGEST_LENGTH) != 0) {
-		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
-		    "pack file checksum mismatch");
+		err = got_error(GOT_ERR_PACKFILE_CSUM);
 		goto done;
 	}
 
@@ -913,31 +913,32 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	SHA1Init(&ctx);
 	putbe32(buf, GOT_PACKIDX_V2_MAGIC);
 	putbe32(buf + 4, GOT_PACKIDX_VERSION);
-	err = hwrite(idxfd, buf, 8, &ctx);
+	err = got_pack_hwrite(idxfd, buf, 8, &ctx);
 	if (err)
 		goto done;
-	err = hwrite(idxfd, packidx.hdr.fanout_table,
+	err = got_pack_hwrite(idxfd, packidx.hdr.fanout_table,
 	    GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS * sizeof(uint32_t), &ctx);
 	if (err)
 		goto done;
-	err = hwrite(idxfd, packidx.hdr.sorted_ids,
+	err = got_pack_hwrite(idxfd, packidx.hdr.sorted_ids,
 	    nobj * SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
-	err = hwrite(idxfd, packidx.hdr.crc32, nobj * sizeof(uint32_t), &ctx);
+	err = got_pack_hwrite(idxfd, packidx.hdr.crc32,
+	    nobj * sizeof(uint32_t), &ctx);
 	if (err)
 		goto done;
-	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t),
-	    &ctx);
+	err = got_pack_hwrite(idxfd, packidx.hdr.offsets,
+	    nobj * sizeof(uint32_t), &ctx);
 	if (err)
 		goto done;
 	if (packidx.nlargeobj > 0) {
-		err = hwrite(idxfd, packidx.hdr.large_offsets,
+		err = got_pack_hwrite(idxfd, packidx.hdr.large_offsets,
 		    packidx.nlargeobj * sizeof(uint64_t), &ctx);
 		if (err)
 			goto done;
 	}
-	err = hwrite(idxfd, pack_sha1, SHA1_DIGEST_LENGTH, &ctx);
+	err = got_pack_hwrite(idxfd, pack_sha1, SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
 

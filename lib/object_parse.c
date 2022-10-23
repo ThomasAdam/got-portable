@@ -134,6 +134,9 @@ got_object_raw_close(struct got_raw_object *obj)
 			return NULL;
 	}
 
+	if (obj->close_cb)
+		obj->close_cb(obj);
+
 	if (obj->f == NULL) {
 		if (obj->fd != -1) {
 			if (munmap(obj->data, obj->hdrlen + obj->size) == -1)
@@ -269,6 +272,85 @@ got_object_read_header(struct got_object **obj, int fd)
 done:
 	free(buf);
 	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
+    size_t max_in_mem_size, int outfd, struct got_object_id *expected_id,
+    int infd)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj;
+	struct got_inflate_checksum csum;
+	uint8_t sha1[SHA1_DIGEST_LENGTH];
+	SHA1_CTX sha1_ctx;
+	size_t len, consumed;
+	FILE *f = NULL;
+
+	*outbuf = NULL;
+	*size = 0;
+	*hdrlen = 0;
+
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
+
+	if (lseek(infd, SEEK_SET, 0) == -1)
+		return got_error_from_errno("lseek");
+
+	err = got_object_read_header(&obj, infd);
+	if (err)
+		return err;
+
+	if (lseek(infd, SEEK_SET, 0) == -1)
+		return got_error_from_errno("lseek");
+
+	if (obj->size + obj->hdrlen <= max_in_mem_size) {
+		err = got_inflate_to_mem_fd(outbuf, &len, &consumed, &csum,
+		    obj->size + obj->hdrlen, infd);
+	} else {
+		int fd;
+		/*
+		 * XXX This uses an extra file descriptor for no good reason.
+		 * We should have got_inflate_fd_to_fd().
+		 */
+		fd = dup(infd);
+		if (fd == -1)
+			return got_error_from_errno("dup");
+		f = fdopen(fd, "r");
+		if (f == NULL) {
+			err = got_error_from_errno("fdopen");
+			abort();
+			close(fd);
+			goto done;
+		}
+		err = got_inflate_to_fd(&len, f, &csum, outfd);
+	}
+	if (err)
+		goto done;
+
+	if (len < obj->hdrlen || len != obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_HDR);
+		goto done;
+	}
+
+	SHA1Final(sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
+
+	*size = obj->size;
+	*hdrlen = obj->hdrlen;
+done:
+	got_object_close(obj);
+	if (f && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -654,6 +736,60 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_object_read_commit(struct got_commit_object **commit, int fd,
+    struct got_object_id *expected_id, size_t expected_size)
+{
+	struct got_object *obj = NULL;
+	const struct got_error *err = NULL;
+	size_t len;
+	uint8_t *p;
+	struct got_inflate_checksum csum;
+	SHA1_CTX sha1_ctx;
+	struct got_object_id id;
+
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
+
+	err = got_inflate_to_mem_fd(&p, &len, NULL, &csum, expected_size, fd);
+	if (err)
+		return err;
+
+	SHA1Final(id.sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
+
+	err = got_object_parse_header(&obj, p, len);
+	if (err)
+		goto done;
+
+	if (len < obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	/* Skip object header. */
+	len -= obj->hdrlen;
+	err = got_object_parse_commit(commit, p + obj->hdrlen, len);
+done:
+	free(p);
+	if (obj)
+		got_object_close(obj);
+	return err;
+}
+
 void
 got_object_tree_close(struct got_tree_object *tree)
 {
@@ -770,6 +906,55 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 done:
 	if (err)
 		*nentries = 0;
+	return err;
+}
+
+const struct got_error *
+got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
+    size_t *nentries_alloc, uint8_t **p, int fd,
+    struct got_object_id *expected_id)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	size_t len;
+	struct got_inflate_checksum csum;
+	SHA1_CTX sha1_ctx;
+	struct got_object_id id;
+
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
+
+	err = got_inflate_to_mem_fd(p, &len, NULL, &csum, 0, fd);
+	if (err)
+		return err;
+
+	SHA1Final(id.sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
+
+	err = got_object_parse_header(&obj, *p, len);
+	if (err)
+		goto done;
+
+	if (len < obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	/* Skip object header. */
+	len -= obj->hdrlen;
+	err = got_object_parse_tree(entries, nentries, nentries_alloc,
+	    *p + obj->hdrlen, len);
+done:
+	if (obj)
+		got_object_close(obj);
 	return err;
 }
 
@@ -964,6 +1149,56 @@ done:
 		got_object_tag_close(*tag);
 		*tag = NULL;
 	}
+	return err;
+}
+
+const struct got_error *
+got_object_read_tag(struct got_tag_object **tag, int fd, 
+    struct got_object_id *expected_id, size_t expected_size)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	size_t len;
+	uint8_t *p;
+	struct got_inflate_checksum csum;
+	SHA1_CTX sha1_ctx;
+	struct got_object_id id;
+
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
+
+	err = got_inflate_to_mem_fd(&p, &len, NULL, &csum,
+	    expected_size, fd);
+	if (err)
+		return err;
+
+	SHA1Final(id.sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
+
+	err = got_object_parse_header(&obj, p, len);
+	if (err)
+		goto done;
+
+	if (len < obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	/* Skip object header. */
+	len -= obj->hdrlen;
+	err = got_object_parse_tag(tag, p + obj->hdrlen, len);
+done:
+	free(p);
+	if (obj)
+		got_object_close(obj);
 	return err;
 }
 

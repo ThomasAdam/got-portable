@@ -30,6 +30,13 @@
 
 #define GOT_PACK_CACHE_SIZE	32
 
+/*
+ * While in gotd(8) chroot, a repository needs this many temporary files.
+ * This limit sets an upper bound on how many raw objects or blobs can
+ * be kept open in parallel.
+ */
+#define GOT_REPO_NUM_TEMPFILES 32
+
 struct got_packidx_bloom_filter {
 	RB_ENTRY(got_packidx_bloom_filter) entry;
 	char path[PATH_MAX]; /* on-disk path */
@@ -72,6 +79,10 @@ struct got_repository {
 
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
+
+	/* Open file handles for storing temporary data in gotd(8) chroot. */
+	int tempfiles[GOT_REPO_NUM_TEMPFILES];
+	uint32_t tempfile_use_mask;
 
 	/*
 	 * The cache size limit may be lower than GOT_PACK_CACHE_SIZE,
@@ -161,3 +172,7 @@ void got_repo_unpin_pack(struct got_repository *);
 const struct got_error *got_repo_read_gitconfig(int *, char **, char **,
     struct got_remote_repo **, int *, char **, char ***, int *,
     const char *);
+
+const struct got_error *got_repo_temp_fds_get(int *, int *,
+    struct got_repository *);
+void got_repo_temp_fds_put(int, struct got_repository *);

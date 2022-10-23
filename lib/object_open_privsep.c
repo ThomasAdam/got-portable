@@ -509,53 +509,10 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 			goto done;
 	}
 
-	*obj = calloc(1, sizeof(**obj));
-	if (*obj == NULL) {
-		err = got_error_from_errno("calloc");
+	err = got_object_raw_alloc(obj, outbuf, outfd, hdrlen, size);
+	if (err)
 		goto done;
-	}
-	(*obj)->fd = -1;
 
-	if (outbuf) {
-		(*obj)->data = outbuf;
-	} else {
-		struct stat sb;
-		if (fstat(*outfd, &sb) == -1) {
-			err = got_error_from_errno("fstat");
-			goto done;
-		}
-
-		if (sb.st_size != hdrlen + size) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-#ifndef GOT_PACK_NO_MMAP
-		if (hdrlen + size > 0) {
-			(*obj)->data = mmap(NULL, hdrlen + size, PROT_READ,
-			    MAP_PRIVATE, *outfd, 0);
-			if ((*obj)->data == MAP_FAILED) {
-				if (errno != ENOMEM) {
-					err = got_error_from_errno("mmap");
-					goto done;
-				}
-				(*obj)->data = NULL;
-			} else {
-				(*obj)->fd = *outfd;
-				*outfd = -1;
-			}
-		}
-#endif
-		if (*outfd != -1) {
-			(*obj)->f = fdopen(*outfd, "r");
-			if ((*obj)->f == NULL) {
-				err = got_error_from_errno("fdopen");
-				goto done;
-			}
-			*outfd = -1;
-		}
-	}
-	(*obj)->hdrlen = hdrlen;
-	(*obj)->size = size;
 	err = got_repo_cache_raw_object(repo, id, *obj);
 done:
 	free(path_packfile);

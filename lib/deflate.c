@@ -29,6 +29,7 @@
 #include "got_path.h"
 
 #include "got_lib_deflate.h"
+#include "got_lib_poll.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -255,15 +256,9 @@ got_deflate_to_fd(off_t *outlen, FILE *infile, off_t len, int outfd,
 			goto done;
 		len -= consumed;
 		if (avail > 0) {
-			ssize_t w;
-			w = write(outfd, zb.outbuf, avail);
-			if (w == -1) {
-				err = got_error_from_errno("write");
+			err = got_poll_write_full(outfd, zb.outbuf, avail);
+			if (err)
 				goto done;
-			} else if (w != avail) {
-				err = got_error(GOT_ERR_IO);
-				goto done;
-			}
 			if (csum)
 				csum_output(csum, zb.outbuf, avail);
 			*outlen += avail;
@@ -296,15 +291,9 @@ got_deflate_to_fd_mmap(off_t *outlen, uint8_t *map, size_t offset,
 		offset += consumed;
 		len -= consumed;
 		if (avail > 0) {
-			ssize_t w;
-			w = write(outfd, zb.outbuf, avail);
-			if (w == -1) {
-				err = got_error_from_errno("write");
+			err = got_poll_write_full(outfd, zb.outbuf, avail);
+			if (err)
 				goto done;
-			} else if (w != avail) {
-				err = got_error(GOT_ERR_IO);
-				goto done;
-			}
 			if (csum)
 				csum_output(csum, zb.outbuf, avail);
 			*outlen += avail;

@@ -113,7 +113,7 @@
 #define GOT_ERR_HISTEDIT_BUSY	96
 #define GOT_ERR_HISTEDIT_CMD	97
 #define GOT_ERR_HISTEDIT_PATH	98
-/* 99 is currently unused */
+#define GOT_ERR_PACKFILE_CSUM	99
 #define GOT_ERR_COMMIT_BRANCH	100
 #define GOT_ERR_FILE_STAGED	101
 #define GOT_ERR_STAGE_NO_CHANGE	102
@@ -175,11 +175,19 @@
 #define GOT_ERR_COMMIT_REDUNDANT_AUTHOR 157
 #define GOT_ERR_BAD_QUERYSTRING	158
 #define GOT_ERR_INTEGRATE_BRANCH 159
+#define GOT_ERR_BAD_REQUEST	160
+#define GOT_ERR_CLIENT_ID	161
+#define GOT_ERR_REPO_TEMPFILE	162
+#define GOT_ERR_REFS_PROTECTED	163
+#define GOT_ERR_REF_PROTECTED	164
+#define GOT_ERR_REF_BUSY	165
 
 struct got_error {
         int code;
         const char *msg;
 };
+
+#define GOT_ERR_MAX_MSG_SIZE	4080 /* includes '\0' */
 
 /*
  * Get an error object from the above list, for a given error code.

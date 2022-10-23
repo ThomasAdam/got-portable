@@ -920,3 +920,68 @@ got_object_commit_retain(struct got_commit_object *commit)
 {
 	commit->refcnt++;
 }
+
+const struct got_error *
+got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
+    size_t hdrlen, off_t size)
+{
+	const struct got_error *err = NULL;
+
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	(*obj)->fd = -1;
+	(*obj)->tempfile_idx = -1;
+
+	if (outbuf) {
+		(*obj)->data = outbuf;
+	} else {
+		struct stat sb;
+		if (fstat(*outfd, &sb) == -1) {
+			err = got_error_from_errno("fstat");
+			goto done;
+		}
+
+		if (sb.st_size != hdrlen + size) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+#ifndef GOT_PACK_NO_MMAP
+		if (hdrlen + size > 0) {
+			(*obj)->data = mmap(NULL, hdrlen + size, PROT_READ,
+			    MAP_PRIVATE, *outfd, 0);
+			if ((*obj)->data == MAP_FAILED) {
+				if (errno != ENOMEM) {
+					err = got_error_from_errno("mmap");
+					goto done;
+				}
+				(*obj)->data = NULL;
+			} else {
+				(*obj)->fd = *outfd;
+				*outfd = -1;
+			}
+		}
+#endif
+		if (*outfd != -1) {
+			(*obj)->f = fdopen(*outfd, "r");
+			if ((*obj)->f == NULL) {
+				err = got_error_from_errno("fdopen");
+				goto done;
+			}
+			*outfd = -1;
+		}
+	}
+	(*obj)->hdrlen = hdrlen;
+	(*obj)->size = size;
+done:
+	if (err) {
+		if (*obj) {
+			got_object_raw_close(*obj);
+			*obj = NULL;
+		}
+	} else
+		(*obj)->refcnt++;
+	return err;
+}

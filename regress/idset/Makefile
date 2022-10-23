@@ -2,7 +2,7 @@
 
 PROG = idset_test
 SRCS = error.c sha1.c object_idset.c inflate.c path.c object_parse.c \
-	idset_test.c
+	idset_test.c pollfd.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz

@@ -537,6 +537,9 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			err = got_error_msg(GOT_ERR_BAD_PACKET,
 			    "unexpected message from server");
 			goto done;
+		} else if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
+			err = send_error(&buf[4], n - 4);
+			goto done;
 		} else if (strncmp(buf, "ok ", 3) == 0) {
 			err = send_ref_status(ibuf, buf + 3, 1,
 			    refs, delete_refs);
