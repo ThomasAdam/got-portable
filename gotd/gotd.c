@@ -30,7 +30,6 @@
 #include <pwd.h>
 #include <imsg.h>
 #include <signal.h>
-#include <siphash.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,8 +128,13 @@ unix_socket_listen(const char *unix_socket_path, uid_t uid, gid_t gid)
 	struct sockaddr_un sun;
 	int fd = -1;
 	mode_t old_umask, mode;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
 
-	fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK| SOCK_CLOEXEC, 0);
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
+
+	fd = socket(AF_UNIX, sock_flags, 0);
 	if (fd == -1) {
 		log_warn("socket");
 		return -1;

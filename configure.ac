@@ -21,6 +21,8 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 
 AC_CONFIG_SUBDIRS([template])
+AC_ARG_ENABLE([gotd],
+	AS_HELP_STRING([--enable gotd], [build gotd and gotsh]))
 
 # When CFLAGS isn't set at this stage and gcc is detected by the macro below,
 # autoconf will automatically use CFLAGS="-O2 -g". Prevent that by using an
@@ -873,6 +875,8 @@ LIBS=""
 
 AH_BOTTOM([#include "got_compat2.h"])
 
+AM_CONDITIONAL([GOTD_ENABLED], [test "x$enable_gotd" = xyes])
+
 AC_CONFIG_FILES([Makefile
 		 compat/Makefile
 		 cvg/Makefile
@@ -894,11 +898,20 @@ AC_CONFIG_FILES([Makefile
 		 gotwebd/Makefile
 		 tog/Makefile
 		 Makefile.common:Makefile.common.in])
+
+if test "x$enable_gotd" = "xyes"; then
+	AC_CONFIG_FILES([gotd/Makefile])
+fi
+
 AC_OUTPUT
 
 executables="$(eval echo ${exec_prefix}/bin)"
 helpers="$(eval echo ${libexecdir})"
 manpages="$(eval echo ${mandir})"
+
+if test -z "$enable_gotd"; then
+	enable_gotd="no"
+fi
 
 echo "
 Configured got-portable with:
@@ -909,6 +922,7 @@ Configured got-portable with:
  Executables:  ${executables}
  Bison:        $YACC
  CFlags:       $CFLAGS
+ Gotd:         ${enable_gotd}
  Helpers:      ${helpers}
  Man pages:    ${manpages}
 "

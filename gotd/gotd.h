@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
 
 #define GOTD_UNIX_SOCKET "/var/run/gotd.sock"
 #define GOTD_UNIX_SOCKET_BACKLOG 10
