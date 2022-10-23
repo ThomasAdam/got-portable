@@ -64,59 +64,24 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj,
 {
 	const struct got_error *err = NULL;
 	uint8_t *data = NULL;
-	size_t len = 0, consumed;
-	FILE *f;
-	struct got_object_id id;
-	struct got_inflate_checksum csum;
-	SHA1_CTX sha1_ctx;
-
-	SHA1Init(&sha1_ctx);
-	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
+	off_t size;
+	size_t hdrlen;
 
 	if (lseek(fd, SEEK_SET, 0) == -1) {
 		err = got_error_from_errno("lseek");
-		close(fd);
-		return err;
+		goto done;
 	}
 
-	f = fdopen(fd, "r");
-	if (f == NULL) {
-		err = got_error_from_errno("fdopen");
-		close(fd);
-		return err;
-	}
-
-	if (obj->size + obj->hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
-		err = got_inflate_to_mem(&data, &len, &consumed, &csum, f);
-	else
-		err = got_inflate_to_fd(&len, f, &csum, outfd);
+	err = got_object_read_raw(&data, &size, &hdrlen,
+	    GOT_PRIVSEP_INLINE_BLOB_DATA_MAX, outfd, expected_id, fd);
 	if (err)
 		goto done;
 
-	if (len < obj->hdrlen || len != obj->hdrlen + obj->size) {
-		err = got_error(GOT_ERR_BAD_OBJ_HDR);
-		goto done;
-	}
-
-	SHA1Final(id.sha1, &sha1_ctx);
-	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
-		goto done;
-	}
-
-
-	err = got_privsep_send_raw_obj(ibuf, obj->size, obj->hdrlen, data);
-
+	err = got_privsep_send_raw_obj(ibuf, size, hdrlen, data);
 done:
 	free(data);
-	if (fclose(f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-
+	if (close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	return err;
 }
 

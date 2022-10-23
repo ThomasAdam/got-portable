@@ -31,13 +31,22 @@ struct got_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+
+/* A callback function which is invoked when a raw object is closed. */
+struct got_raw_object;
+typedef void (got_object_raw_close_cb)(struct got_raw_object *);
+
 struct got_raw_object {
 	FILE *f;		/* NULL if data buffer is being used */
 	int fd;			/* -1 unless data buffer is memory-mapped */
+	int tempfile_idx;	/* -1 unless using a repository-tempfile */
 	uint8_t *data;
 	off_t size;
 	size_t hdrlen;
 	int refcnt;		/* > 0 if open and/or cached */
+
+	got_object_raw_close_cb *close_cb;
+	void *close_arg;
 };
 
 struct got_commit_object {
@@ -144,3 +153,6 @@ const struct got_error *got_object_enumerate(int *,
     got_object_enumerate_commit_cb, got_object_enumerate_tree_cb, void *,
     struct got_object_id **, int, struct got_object_id **, int,
     struct got_packidx *, struct got_repository *);
+
+const struct got_error *got_object_raw_alloc(struct got_raw_object **,
+    uint8_t *, int *, size_t, off_t);

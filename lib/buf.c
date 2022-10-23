@@ -192,6 +192,23 @@ buf_empty(BUF *b)
 	b->cb_len = 0;
 }
 
+/* Discard the leading <n> bytes from the buffer. */
+const struct got_error *
+buf_discard(BUF *b, size_t n)
+{
+	if (n > b->cb_len)
+		return got_error(GOT_ERR_RANGE);
+
+	if (n == b->cb_len)
+		buf_empty(b);
+	else {
+		memmove(b->cb_buf, b->cb_buf + n, b->cb_len - n);
+		b->cb_len -= n;
+	}
+
+	return NULL;
+}
+
 /*
  * Append a single character <c> to the end of the buffer <b>.
  */

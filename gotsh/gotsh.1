@@ -1,0 +1,113 @@
+.\"
+.\" Copyright (c) 2022 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTSH 1
+.Os
+.Sh NAME
+.Nm gotsh
+.Nd Game of Trees Shell
+.Sh SYNOPSIS
+.Nm Fl c Sq Cm git-receive-pack Ar repository-path
+.Nm Fl c Sq Cm git-upload-pack Ar repository-path
+.Sh DESCRIPTION
+.Nm
+is the network-facing interface to
+.Xr gotd 8 .
+It implements the server-side part of the Git network protocol used by
+.Xr git 1
+and
+.Xr got 1 .
+.Pp
+.Nm
+is not an interactive shell.
+.Nm
+is intended to be configured as the login shell of Git repository
+user accounts on servers running
+.Xr gotd 8 .
+The users can then interact with
+.Xr gotd 8
+over the network.
+When users invoke commands such as
+.Cm got send
+and
+.Cm got fetch
+on client machines,
+.Xr got 1
+will connect to the server with
+.Xr ssh 1 .
+.Nm
+will facilitate communication between
+.Xr gotd 8
+running on the server machine and the
+.Xr got 1
+or
+.Xr git 1
+program running on the client machine.
+.Pp
+Users running
+.Nm
+must be members of the group which has read/write permission to the
+.Xr gotd 8
+unix socket.
+The group used for this purpose can be configured in
+.Xr gotd.conf 5 .
+Users running
+.Nm
+should not have access to Git repositories by means other than
+accessing the unix socket of
+.Xr gotd 8
+via
+.Nm .
+.Pp
+It is recommended to restrict
+.Xr ssh 1
+features available to users of
+.Nm .
+See the EXAMPLES section for details.
+.Sh ENVIRONMENT
+.Bl -tag -width GOTD_UNIX_SOCKET
+.It Ev GOTD_UNIX_SOCKET
+Set the path to the unix socket which
+.Xr gotd 8
+is listening on.
+If not specified, the default path
+.Pa /var/run/gotd.sock
+will be used.
+.El
+.Sh EXAMPLES
+The following
+.Xr sshd_config 5
+directives are recommended to protect the server machine and any systems
+reachable from it via
+.Xr ssh 1
+forwarding features.
+This example assumes the group called
+.Dq _gotsh
+has read/write access to the
+.Xr gotd 8
+unix socket.
+.Bd -literal -offset indent
+Match Group _gotsh
+    DisableForwarding
+    PermitTTY no
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr ssh 1 ,
+.Xr gotd.conf 5 ,
+.Xr sshd_config 5 ,
+.Xr gotd 8
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

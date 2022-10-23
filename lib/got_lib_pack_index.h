@@ -18,6 +18,8 @@ typedef const struct got_error *(got_pack_index_progress_cb)(void *,
     uint32_t nobj_total, uint32_t nobj_indexed, uint32_t nobj_loose,
     uint32_t nobj_resolved);
 
+const struct got_error *got_pack_hwrite(int, void *, int, SHA1_CTX *);
+
 const struct got_error *
 got_pack_index(struct got_pack *pack, int idxfd,
     FILE *tmpfile, FILE *delta_base_file, FILE *delta_accum_file,

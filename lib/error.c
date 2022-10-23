@@ -155,7 +155,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_HISTEDIT_CMD, "bad histedit command" },
 	{ GOT_ERR_HISTEDIT_PATH, "cannot edit branch history which contains "
 	    "changes outside of this work tree's path prefix" },
-	{ 99, "unused error code" },
+	{ GOT_ERR_PACKFILE_CSUM, "pack file checksum error" },
 	{ GOT_ERR_COMMIT_BRANCH, "will not commit to a branch outside the "
 	    "\"refs/heads/\" reference namespace" },
 	{ GOT_ERR_FILE_STAGED, "file is staged" },
@@ -233,11 +233,17 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_BAD_QUERYSTRING, "invalid query string" },
 	{ GOT_ERR_INTEGRATE_BRANCH, "will not integrate into a reference "
 	    "outside the \"refs/heads/\" reference namespace" },
+	{ GOT_ERR_BAD_REQUEST, "unexpected request received" },
+	{ GOT_ERR_CLIENT_ID, "unknown client identifier" },
+	{ GOT_ERR_REPO_TEMPFILE, "no repository tempfile available" },
+	{ GOT_ERR_REFS_PROTECTED, "reference namespace may not be modified" },
+	{ GOT_ERR_REF_PROTECTED," reference may not be modified" },
+	{ GOT_ERR_REF_BUSY, "reference cannot be updated; please try again" },
 };
 
 static struct got_custom_error {
 	struct got_error err;
-	char msg[4080];
+	char msg[GOT_ERR_MAX_MSG_SIZE];
 } custom_errors[16];
 
 static struct got_custom_error *

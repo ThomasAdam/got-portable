@@ -1,0 +1,74 @@
+.\"
+.\" Copyright (c) 2022 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTD 8
+.Os
+.Sh NAME
+.Nm gotd
+.Nd Game of Trees Daemon
+.Sh SYNOPSIS
+.Nm
+.Op Fl dv
+.Op Fl f Ar config-file
+.Sh DESCRIPTION
+.Nm
+is a Git repository server which listens on a
+.Xr unix 4
+socket and relies on its companion tool
+.Xr gotsh 1
+to handle Git-protocol communication over the network, via
+.Xr ssh 1 .
+.Pp
+The Git repository format is described in
+.Xr git-repository 5 .
+.Pp
+.Nm
+requires a configuration file in order to run.
+The configuration file format is described in
+.Xr gotd.conf 5 .
+.Pp
+The options for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl d
+Do not daemonize and log to stderr.
+.It Fl f Ar config-file
+Set the path to the configuration file.
+If not specified, the file
+.Pa /etc/gotd.conf
+will be used.
+.It Fl v
+Verbose mode.
+Verbosity increases if this option is used multiple times.
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /etc/gotd.conf
+Default location of the configuration file.
+.It Pa /var/run/gotd.sock
+Default location of the unix socket which
+.Nm
+is listening on.
+This path can be configured in
+.Xr gotd.conf 5 .
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr gotsh 1 ,
+.Xr git-repository 5 ,
+.Xr gotd.conf 5
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

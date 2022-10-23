@@ -48,6 +48,7 @@
 #include "got_opentemp.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_delta_cache.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
@@ -243,31 +244,43 @@ done:
 
 }
 
-const struct got_error *
-got_repo_pack_fds_open(int **pack_fds)
+static const struct got_error *
+close_tempfiles(int *fds, size_t nfds)
 {
 	const struct got_error *err = NULL;
 	int i;
 
-	*pack_fds = calloc(GOT_PACK_NUM_TEMPFILES, sizeof(**pack_fds));
-	if (*pack_fds == NULL)
+	for (i = 0; i < nfds; i++) {
+		if (fds[i] == -1)
+			continue;
+		if (close(fds[i]) == -1) {
+			err = got_error_from_errno("close");
+			break;
+		}
+	}
+	free(fds);
+	return err;
+}
+
+static const struct got_error *
+open_tempfiles(int **fds, size_t nfds)
+{
+	const struct got_error *err = NULL;
+	int i;
+
+	*fds = calloc(nfds, sizeof(**fds));
+	if (*fds == NULL)
 		return got_error_from_errno("calloc");
 
-	/*
-	 * got_repo_pack_fds_close will try to close all of the
-	 * GOT_PACK_NUM_TEMPFILES fds, even the ones that didn't manage to get
-	 * a value from got_opentempfd(), which would result in a close(0) if
-	 * we do not initialize to -1 here.
-	 */
-	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++)
-		(*pack_fds)[i] = -1;
+	for (i = 0; i < nfds; i++)
+		(*fds)[i] = -1;
 
-	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
-		(*pack_fds)[i] = got_opentempfd();
-		if ((*pack_fds)[i] == -1) {
+	for (i = 0; i < nfds; i++) {
+		(*fds)[i] = got_opentempfd();
+		if ((*fds)[i] == -1) {
 			err = got_error_from_errno("got_opentempfd");
-			got_repo_pack_fds_close(*pack_fds);
-			*pack_fds = NULL;
+			close_tempfiles(*fds, nfds);
+			*fds = NULL;
 			return err;
 		}
 	}
@@ -276,21 +289,66 @@ got_repo_pack_fds_open(int **pack_fds)
 }
 
 const struct got_error *
+got_repo_pack_fds_open(int **pack_fds)
+{
+	return open_tempfiles(pack_fds, GOT_PACK_NUM_TEMPFILES);
+}
+
+const struct got_error *
 got_repo_pack_fds_close(int *pack_fds)
 {
-	const struct got_error *err = NULL;
+	return close_tempfiles(pack_fds, GOT_PACK_NUM_TEMPFILES);
+}
+
+const struct got_error *
+got_repo_temp_fds_open(int **temp_fds) 
+{
+	return open_tempfiles(temp_fds, GOT_REPO_NUM_TEMPFILES);
+}
+
+void
+got_repo_temp_fds_set(struct got_repository *repo, int *temp_fds) 
+{
 	int i;
 
-	for (i = 0; i < GOT_PACK_NUM_TEMPFILES; i++) {
-		if (pack_fds[i] == -1)
+	for (i = 0; i < GOT_REPO_NUM_TEMPFILES; i++)
+		repo->tempfiles[i] = temp_fds[i];
+}
+
+const struct got_error *
+got_repo_temp_fds_get(int *fd, int *idx, struct got_repository *repo)
+{
+	int i;
+
+	*fd = -1;
+	*idx = -1;
+
+	for (i = 0; i < nitems(repo->tempfiles); i++) {
+		if (repo->tempfile_use_mask & (1 << i))
 			continue;
-		if (close(pack_fds[i]) == -1) {
-			err = got_error_from_errno("close");
-			break;
+		if (repo->tempfiles[i] != -1) {
+			if (ftruncate(repo->tempfiles[i], 0L) == -1)
+				return got_error_from_errno("ftruncate");
+			*fd = repo->tempfiles[i];
+			*idx = i;
+			repo->tempfile_use_mask |= (1 << i);
+			return NULL;
 		}
 	}
-	free(pack_fds);
-	return err;
+
+	return got_error(GOT_ERR_REPO_TEMPFILE);
+}
+
+void
+got_repo_temp_fds_put(int idx, struct got_repository *repo)
+{
+	repo->tempfile_use_mask &= ~(1 << idx);
+}
+
+const struct got_error *
+got_repo_temp_fds_close(int *temp_fds)
+{
+	return close_tempfiles(temp_fds, GOT_REPO_NUM_TEMPFILES);
 }
 
 const struct got_error *
@@ -620,7 +678,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 	if (repo->pack_cache_size > rl.rlim_cur / 8)
 		repo->pack_cache_size = rl.rlim_cur / 8;
 	for (i = 0; i < nitems(repo->packs); i++) {
-		if (i < repo->pack_cache_size) {
+		if (pack_fds != NULL && i < repo->pack_cache_size) {
 			repo->packs[i].basefd = pack_fds[j++];
 			repo->packs[i].accumfd = pack_fds[j++];
 		} else {
@@ -628,6 +686,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 			repo->packs[i].accumfd = -1;
 		}
 	}
+	for (i = 0; i < nitems(repo->tempfiles); i++)
+		repo->tempfiles[i] = -1;
 	repo->pinned_pack = -1;
 	repo->pinned_packidx = -1;
 	repo->pinned_pid = 0;
@@ -1359,6 +1419,10 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 
 	pack->privsep_child = NULL;
 
+	err = got_delta_cache_alloc(&pack->delta_cache);
+	if (err)
+		goto done;
+
 #ifndef GOT_PACK_NO_MMAP
 	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
 	    pack->fd, 0);
@@ -1372,10 +1436,8 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 #endif
 done:
 	if (err) {
-		if (pack) {
-			free(pack->path_packfile);
-			memset(pack, 0, sizeof(*pack));
-		}
+		if (pack)
+			got_pack_close(pack);
 	} else if (packp)
 		*packp = pack;
 	return err;
