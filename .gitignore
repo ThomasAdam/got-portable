@@ -32,6 +32,7 @@ got/got
 gotadmin/gotadmin
 gotd/gotd
 gotd/parse.c
+gotsh/gotsh
 gotwebd/gotwebd
 gotwebd/pages.c
 gotwebd/parse.c
