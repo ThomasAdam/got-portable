@@ -30,6 +30,7 @@
 #include "got_error.h"
 #include "got_serve.h"
 #include "got_path.h"
+#include "got_compat.h"
 
 #include "got_lib_dial.h"
 
