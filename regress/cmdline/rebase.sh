@@ -1089,7 +1089,7 @@ test_rebase_forward_path_prefix() {
 		return 1
 	fi
 
-	(cd $testroot/wt && /usr/local/bin/got rebase master \
+	(cd $testroot/wt && got rebase master \
 		> $testroot/stdout 2> $testroot/stderr)
 
 	echo "Forwarding refs/heads/master to commit $commit2" \
