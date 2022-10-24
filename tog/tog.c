@@ -795,7 +795,7 @@ static int
 tog_fatal_signal_received(void)
 {
 	return (tog_sigpipe_received ||
-	    tog_sigint_received || tog_sigint_received);
+	    tog_sigint_received || tog_sigterm_received);
 }
 
 static const struct got_error *
