@@ -1,3 +1,20 @@
+* got 0.77; 2022-10-24
+- disallow integrating into references outside refs/heads/ (jrick)
+- gotwebd.conf: add syntax for defining macros and document them (op)
+- simplify the way 'got patch' opens a tempfile when reading from stdin
+- lots of refactoring to allow gotd(8) code to run without libexec helpers
+- more refactoring to allow gotd(8) to stream packfile data on network sockets
+- add missing error checking around some unlink(2) syscalls
+- don't crash if delta cache is missing while combining deltas; for dev builds
+- allow got_object_parse_tree() to reuse entries buffer allocations for speed
+- show a more useful error if the size of a packed object won't fit in 64 bits
+- switch integers used for counting objects while indexing packs to unsigned
+- refresh cached list of pack index paths while searching a packed object 
+- introduce gotd(8) and gotsh(1); WIP and not yet provided in binary packages
+- close parent's end of imsg pipe before waiting for a child process to exit
+- fix detection of SIGTERM in tog; this signal was accidentally being ignored
+- avoid printing harmless errors that can occur when tog exits due to Ctrl-C
+
 * got 0.76; 2022-09-23
 - gotwebd documentation fixes
 - tog: extend log view author highlight colour to full field width (jamsek)
