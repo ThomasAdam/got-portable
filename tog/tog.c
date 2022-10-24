@@ -9378,7 +9378,11 @@ main(int argc, char *argv[])
 		free(cmd_argv);
 	}
 
-	if (error && error->code != GOT_ERR_CANCELLED)
+	if (error && error->code != GOT_ERR_CANCELLED &&
+	    error->code != GOT_ERR_EOF &&
+	    error->code != GOT_ERR_PRIVSEP_EXIT &&
+	    error->code != GOT_ERR_PRIVSEP_PIPE &&
+	    !(error->code == GOT_ERR_ERRNO && errno == EINTR))
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 	return 0;
 }
