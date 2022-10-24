@@ -1778,8 +1778,10 @@ read_raw_delta_data(uint8_t **delta_buf, size_t *delta_len,
 		goto done;
 	}
 	if (pack->map) {
-		if (delta_data_offset >= pack->filesize)
+		if (delta_data_offset >= pack->filesize) {
 			err = got_error(GOT_ERR_PACK_OFFSET);
+			goto done;
+		}
 		memcpy(*delta_buf, pack->map + delta_data_offset,
 		    *delta_len_compressed);
 	} else {
