@@ -738,7 +738,8 @@ test_blame_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	# Attempt a (nonsensical) blame of a submodule.

@@ -1725,7 +1725,8 @@ test_update_modified_submodules() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1764,7 +1765,8 @@ test_update_adds_submodule() {
 	echo "modified foo" > $testroot/repo2/foo
 	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	echo "A  .gitmodules" > $testroot/stdout.expected
@@ -1800,7 +1802,8 @@ test_update_conflict_wt_file_vs_repo_submodule() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	# Modify the clashing file such that any modifications brought

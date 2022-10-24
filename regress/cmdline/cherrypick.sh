@@ -330,7 +330,8 @@ test_cherrypick_modified_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -367,7 +368,8 @@ test_cherrypick_added_submodule() {
 
 	# Add the repo/repo2 submodule on newbranch
 	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -403,7 +405,8 @@ test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 
 	# Add the repo/repo2 submodule on newbranch
 	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 	local commit_id=`git_show_head $testroot/repo`
 

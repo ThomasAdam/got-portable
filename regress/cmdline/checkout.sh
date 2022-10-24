@@ -278,7 +278,8 @@ test_checkout_ignores_submodules() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 	local commit_id=`git_show_head $testroot/repo`
 
