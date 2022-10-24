@@ -99,8 +99,8 @@ void gotd_sighdlr(int sig, short event, void *arg);
 __dead static void
 usage()
 {
-	fprintf(stderr, "%s: [-dv] [-f config-file]\n", getprogname());
-	exit (1);
+	fprintf(stderr, "usage: %s [-dv] [-f config-file]\n", getprogname());
+	exit(1);
 }
 
 static int
