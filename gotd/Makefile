@@ -2,8 +2,9 @@
 
 .include "../got-version.mk"
 
-PREFIX ?=	/usr/local
+.if ${GOT_RELEASE} == "Yes"
 BINDIR ?=	${PREFIX}/sbin
+.endif
 
 PROG=		gotd
 SRCS=		gotd.c repo_read.c repo_write.c log.c privsep_stub.c imsg.c \
