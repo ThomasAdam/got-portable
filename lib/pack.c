@@ -791,7 +791,7 @@ done:
 static const struct got_error *
 pack_stop_privsep_child(struct got_pack *pack)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *close_err = NULL;
 
 	if (pack->privsep_child == NULL)
 		return NULL;
@@ -799,9 +799,12 @@ pack_stop_privsep_child(struct got_pack *pack)
 	err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
 	if (err)
 		return err;
+	if (close(pack->privsep_child->imsg_fd) == -1)
+		close_err = got_error_from_errno("close");
 	err = got_privsep_wait_for_child(pack->privsep_child->pid);
-	if (close(pack->privsep_child->imsg_fd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
+	if (close_err && err == NULL)
+		err = close_err;
+	imsg_clear(pack->privsep_child->ibuf);
 	free(pack->privsep_child->ibuf);
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;
