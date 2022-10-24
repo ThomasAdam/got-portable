@@ -678,7 +678,8 @@ test_diff_submodule_of_same_repo() {
 	local testroot=`test_init diff_submodule_of_same_repo`
 
 	(cd $testroot && git clone -q repo repo2 >/dev/null)
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	epsilon_id=$(got tree -r $testroot/repo -i | grep 'epsilon/$' | \

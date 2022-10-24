@@ -207,7 +207,8 @@ test_cat_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	got cat -r $testroot/repo repo2 > $testroot/stdout \
@@ -237,7 +238,8 @@ test_cat_submodule_of_same_repo() {
 	local gmtoff=`date +%z`
 
 	(cd $testroot && git clone -q repo repo2 >/dev/null)
-	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git -c protocol.file.allow=always \
+		submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	# 'got cat' shows the commit object which the submodule points to
