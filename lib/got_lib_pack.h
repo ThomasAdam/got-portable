@@ -41,7 +41,7 @@ const struct got_error *got_pack_start_privsep_child(struct got_pack *,
 const struct got_error *got_pack_close(struct got_pack *);
 
 const struct got_error *got_pack_parse_offset_delta(off_t *, size_t *,
-    struct got_pack *, off_t, int);
+    struct got_pack *, off_t, size_t);
 const struct got_error *got_pack_parse_ref_delta(struct got_object_id *,
     struct got_pack *, off_t, int);
 const struct got_error *got_pack_resolve_delta_chain(struct got_delta_chain *,
