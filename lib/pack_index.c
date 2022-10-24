@@ -314,6 +314,12 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			break;
 
 		if (pack->map) {
+			if (mapoff + obj->delta.ofs.base_offsetlen >=
+			    pack->filesize) {
+				err = got_error(GOT_ERR_BAD_PACKFILE);
+				break;
+			}
+
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    obj->delta.ofs.base_offsetlen);
 			SHA1Update(pack_sha1_ctx, pack->map + mapoff,
