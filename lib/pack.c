@@ -861,7 +861,7 @@ got_pack_parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 		/* We do not support size values which don't fit in 64 bit. */
 		if (i > 9)
 			return got_error_fmt(GOT_ERR_OBJ_TOO_LARGE,
-			    "packfile offset %llu", offset);
+			    "packfile offset %lld", (long long)offset);
 
 		if (pack->map) {
 			if (mapoff + sizeof(sizeN) >= pack->filesize)
