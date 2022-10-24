@@ -963,7 +963,7 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 
 const struct got_error *
 got_pack_parse_offset_delta(off_t *base_offset, size_t *len,
-    struct got_pack *pack, off_t offset, int tslen)
+    struct got_pack *pack, off_t offset, size_t tslen)
 {
 	const struct got_error *err;
 	int64_t negoffset;
