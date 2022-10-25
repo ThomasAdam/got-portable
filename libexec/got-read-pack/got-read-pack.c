@@ -1146,9 +1146,11 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	}
 
 #ifndef GOT_PACK_NO_MMAP
-	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
-	if (p->map == MAP_FAILED)
-		p->map = NULL; /* fall back to read(2) */
+	if (p->len > 0 && p->len <= SIZE_MAX) {
+		p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
+		if (p->map == MAP_FAILED)
+			p->map = NULL; /* fall back to read(2) */
+	}
 #endif
 	err = got_packidx_init_hdr(p, 1, ipackidx.packfile_size);
 done:
@@ -1874,10 +1876,12 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 		goto done;
 
 #ifndef GOT_PACK_NO_MMAP
-	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
-	    pack->fd, 0);
-	if (pack->map == MAP_FAILED)
-		pack->map = NULL; /* fall back to read(2) */
+	if (pack->filesize > 0 && pack->filesize <= SIZE_MAX) {
+		pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
+		    pack->fd, 0);
+		if (pack->map == MAP_FAILED)
+			pack->map = NULL; /* fall back to read(2) */
+	}
 #endif
 done:
 	if (err) {

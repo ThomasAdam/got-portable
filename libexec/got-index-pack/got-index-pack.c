@@ -183,10 +183,12 @@ main(int argc, char **argv)
 	}
 
 #ifndef GOT_PACK_NO_MMAP
-	pack.map = mmap(NULL, pack.filesize, PROT_READ, MAP_PRIVATE,
-	    pack.fd, 0);
-	if (pack.map == MAP_FAILED)
-		pack.map = NULL; /* fall back to read(2) */
+	if (pack.filesize > 0 && pack.filesize <= SIZE_MAX) {
+		pack.map = mmap(NULL, pack.filesize, PROT_READ, MAP_PRIVATE,
+		    pack.fd, 0);
+		if (pack.map == MAP_FAILED)
+			pack.map = NULL; /* fall back to read(2) */
+	}
 #endif
 	err = got_pack_index(&pack, idxfd, tmpfiles[0], tmpfiles[1],
 	    tmpfiles[2], pack_hash, send_index_pack_progress, &ibuf, &rl);
