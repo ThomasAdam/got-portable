@@ -524,7 +524,7 @@ copy_object_type_and_size(uint8_t *type, uint64_t *size, int infd, int outfd,
 		/* We do not support size values which don't fit in 64 bit. */
 		if (i > 9)
 			return got_error_fmt(GOT_ERR_OBJ_TOO_LARGE,
-			    "packfile offset %llu", obj_offset);
+			    "packfile offset %lld", (long long)obj_offset);
 
 		if (buf_len(buf) - *buf_pos < sizeof(sizebuf[0])) {
 			err = read_more_pack_stream(infd, buf,
@@ -595,7 +595,7 @@ copy_offset_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos
 		/* We do not support offset values which don't fit in 64 bit. */
 		if (i > 8)
 			return got_error_fmt(GOT_ERR_OBJ_TOO_LARGE,
-			    "packfile offset %llu", obj_offset);
+			    "packfile offset %lld", (long long)obj_offset);
 
 		if (buf_len(buf) - *buf_pos < sizeof(offbuf[0])) {
 			err = read_more_pack_stream(infd, buf,
@@ -674,7 +674,8 @@ copy_zstream(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
 			if (zret != Z_OK && zret != Z_BUF_ERROR &&
 			    zret != Z_STREAM_END) {
 				err = got_error_fmt(GOT_ERR_DECOMPRESSION,
-				    "packfile offset %llu", zstream_offset);
+				    "packfile offset %lld",
+				    (long long)zstream_offset);
 				goto done;
 			}
 			consumed = z.total_in - last_total_in;
