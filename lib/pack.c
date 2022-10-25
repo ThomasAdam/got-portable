@@ -389,13 +389,15 @@ got_packidx_open(struct got_packidx **packidx,
 	}
 
 #ifndef GOT_PACK_NO_MMAP
-	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
-	if (p->map == MAP_FAILED) {
-		if (errno != ENOMEM) {
-			err = got_error_from_errno("mmap");
-			goto done;
+	if (p->len > 0 && p->len <= SIZE_MAX) {
+		p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
+		if (p->map == MAP_FAILED) {
+			if (errno != ENOMEM) {
+				err = got_error_from_errno("mmap");
+				goto done;
+			}
+			p->map = NULL; /* fall back to read(2) */
 		}
-		p->map = NULL; /* fall back to read(2) */
 	}
 #endif
 
@@ -1033,7 +1035,6 @@ static const struct got_error *
 resolve_offset_delta(struct got_delta_chain *deltas,
     struct got_packidx *packidx, struct got_pack *pack, off_t delta_offset,
     size_t tslen, int delta_type, size_t delta_size, unsigned int recursion)
-
 {
 	const struct got_error *err;
 	off_t base_offset;

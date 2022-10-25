@@ -926,6 +926,9 @@ got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
     size_t hdrlen, off_t size)
 {
 	const struct got_error *err = NULL;
+	off_t tot;
+
+	tot = hdrlen + size;
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL) {
@@ -944,13 +947,13 @@ got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
 			goto done;
 		}
 
-		if (sb.st_size != hdrlen + size) {
+		if (sb.st_size != tot) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
 #ifndef GOT_PACK_NO_MMAP
-		if (hdrlen + size > 0) {
-			(*obj)->data = mmap(NULL, hdrlen + size, PROT_READ,
+		if (tot > 0 && tot <= SIZE_MAX) {
+			(*obj)->data = mmap(NULL, tot, PROT_READ,
 			    MAP_PRIVATE, *outfd, 0);
 			if ((*obj)->data == MAP_FAILED) {
 				if (errno != ENOMEM) {
