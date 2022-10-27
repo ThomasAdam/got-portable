@@ -22,7 +22,7 @@ fromaddr_arg=
 force=0
 testroot="/tmp"
 
-args=`getopt b:fw:r:R: $*`
+args=`getopt b:fR:r:w: $*`
 if [ $? -ne 0 ]
 then
 	echo "usage: $usage" >&2

@@ -706,10 +706,13 @@ cmd_pack(int argc, char *argv[])
 	TAILQ_INIT(&exclude_refs);
 	TAILQ_INIT(&include_refs);
 
-	while ((ch = getopt(argc, argv, "ar:x:q")) != -1) {
+	while ((ch = getopt(argc, argv, "aqr:x:")) != -1) {
 		switch (ch) {
 		case 'a':
 			loose_obj_only = 0;
+			break;
+		case 'q':
+			verbosity = -1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -724,9 +727,6 @@ cmd_pack(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
-			break;
-		case 'q':
-			verbosity = -1;
 			break;
 		default:
 			usage_pack();
@@ -763,7 +763,6 @@ cmd_pack(int argc, char *argv[])
 		error = add_ref(&new, &exclude_refs, refname, repo);
 		if (error)
 			goto done;
-
 	}
 
 	if (argc == 0) {
@@ -1223,13 +1222,19 @@ cmd_cleanup(int argc, char *argv[])
 	int nextensions, i;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "apr:nq")) != -1) {
+	while ((ch = getopt(argc, argv, "anpqr:")) != -1) {
 		switch (ch) {
 		case 'a':
 			ignore_mtime = 1;
 			break;
+		case 'n':
+			dry_run = 1;
+			break;
 		case 'p':
 			remove_lonely_packidx = 1;
+			break;
+		case 'q':
+			verbosity = -1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -1237,12 +1242,6 @@ cmd_cleanup(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'n':
-			dry_run = 1;
-			break;
-		case 'q':
-			verbosity = -1;
 			break;
 		default:
 			usage_cleanup();
