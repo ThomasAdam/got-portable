@@ -1887,7 +1887,7 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "df:nvRWP:")) != -1) {
+	while ((ch = getopt(argc, argv, "df:nP:RvW")) != -1) {
 		switch (ch) {
 		case 'd':
 			daemonize = 0;
@@ -1898,20 +1898,20 @@ main(int argc, char **argv)
 		case 'n':
 			noaction = 1;
 			break;
-		case 'v':
-			if (verbosity < 3)
-				verbosity++;
-			break;
-		case 'R':
-			proc_id = PROC_REPO_READ;
-			break;
-		case 'W':
-			proc_id = PROC_REPO_WRITE;
-			break;
 		case 'P':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				fatal("realpath '%s'", optarg);
+			break;
+		case 'R':
+			proc_id = PROC_REPO_READ;
+			break;
+		case 'v':
+			if (verbosity < 3)
+				verbosity++;
+			break;
+		case 'W':
+			proc_id = PROC_REPO_WRITE;
 			break;
 		default:
 			usage();

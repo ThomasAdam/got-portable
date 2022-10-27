@@ -131,7 +131,7 @@ main(int argc, char **argv)
 		fatal("%s: calloc", __func__);
 
 	/* XXX: add s and S for both sockets */
-	while ((ch = getopt(argc, argv, "D:P:I:df:vn")) != -1) {
+	while ((ch = getopt(argc, argv, "D:df:I:nP:v")) != -1) {
 		switch (ch) {
 		case 'D':
 			if (cmdline_symset(optarg) < 0)
@@ -144,8 +144,11 @@ main(int argc, char **argv)
 		case 'f':
 			conffile = optarg;
 			break;
-		case 'v':
-			env->gotwebd_verbose++;
+		case 'I':
+			proc_instance = strtonum(optarg, 0,
+			    PROC_MAX_INSTANCES, &errp);
+			if (errp)
+				fatalx("invalid process instance");
 			break;
 		case 'n':
 			env->gotwebd_debug = 2;
@@ -157,11 +160,8 @@ main(int argc, char **argv)
 			if (proc_id == PROC_MAX)
 				fatalx("invalid process name");
 			break;
-		case 'I':
-			proc_instance = strtonum(optarg, 0,
-			    PROC_MAX_INSTANCES, &errp);
-			if (errp)
-				fatalx("invalid process instance");
+		case 'v':
+			env->gotwebd_verbose++;
 			break;
 		default:
 			usage();

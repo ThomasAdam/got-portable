@@ -265,15 +265,15 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "vq")) != -1) {
+	while ((ch = getopt(argc, argv, "qv")) != -1) {
 		switch (ch) {
-		case 'v':
-			verbose = 1;
-			quiet = 0;
-			break;
 		case 'q':
 			quiet = 1;
 			verbose = 0;
+			break;
+		case 'v':
+			verbose = 1;
+			quiet = 0;
 			break;
 		default:
 			usage();

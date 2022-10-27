@@ -773,10 +773,18 @@ cmd_import(int argc, char *argv[])
 
 	TAILQ_INIT(&ignores);
 
-	while ((ch = getopt(argc, argv, "b:m:r:I:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:I:m:r:")) != -1) {
 		switch (ch) {
 		case 'b':
 			branch_name = optarg;
+			break;
+		case 'I':
+			if (optarg[0] == '\0')
+				break;
+			error = got_pathlist_insert(&pe, &ignores, optarg,
+			    NULL);
+			if (error)
+				goto done;
 			break;
 		case 'm':
 			logmsg = strdup(optarg);
@@ -792,14 +800,6 @@ cmd_import(int argc, char *argv[])
 				    optarg);
 				goto done;
 			}
-			break;
-		case 'I':
-			if (optarg[0] == '\0')
-				break;
-			error = got_pathlist_insert(&pe, &ignores, optarg,
-			    NULL);
-			if (error)
-				goto done;
 			break;
 		default:
 			usage_import();
@@ -1565,7 +1565,7 @@ cmd_clone(int argc, char *argv[])
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:lmvqR:")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:lmqR:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1582,12 +1582,6 @@ cmd_clone(int argc, char *argv[])
 		case 'm':
 			mirror_references = 1;
 			break;
-		case 'v':
-			if (verbosity < 0)
-				verbosity = 0;
-			else if (verbosity < 3)
-				verbosity++;
-			break;
 		case 'q':
 			verbosity = -1;
 			break;
@@ -1596,6 +1590,12 @@ cmd_clone(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			break;
+		case 'v':
+			if (verbosity < 0)
+				verbosity = 0;
+			else if (verbosity < 3)
+				verbosity++;
 			break;
 		default:
 			usage_clone();
@@ -2303,7 +2303,7 @@ cmd_fetch(int argc, char *argv[])
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:dlr:tvqR:X")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dlqR:r:tvX")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -2320,6 +2320,15 @@ cmd_fetch(int argc, char *argv[])
 		case 'l':
 			list_refs_only = 1;
 			break;
+		case 'q':
+			verbosity = -1;
+			break;
+		case 'R':
+			error = got_pathlist_append(&wanted_refs,
+			    optarg, NULL);
+			if (error)
+				return error;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
@@ -2335,15 +2344,6 @@ cmd_fetch(int argc, char *argv[])
 				verbosity = 0;
 			else if (verbosity < 3)
 				verbosity++;
-			break;
-		case 'q':
-			verbosity = -1;
-			break;
-		case 'R':
-			error = got_pathlist_append(&wanted_refs,
-			    optarg, NULL);
-			if (error)
-				return error;
 			break;
 		case 'X':
 			delete_remote = 1;
@@ -4415,16 +4415,10 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bpPc:C:l:r:RsS:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "bC:c:l:PpRr:S:sx:")) != -1) {
 		switch (ch) {
-		case 'p':
-			show_patch = 1;
-			break;
-		case 'P':
-			show_changed_paths = 1;
-			break;
-		case 'c':
-			start_commit = optarg;
+		case 'b':
+			log_branches = 1;
 			break;
 		case 'C':
 			diff_context = strtonum(optarg, 0, GOT_DIFF_MAX_CONTEXT,
@@ -4433,14 +4427,23 @@ cmd_log(int argc, char *argv[])
 				errx(1, "number of context lines is %s: %s",
 				    errstr, optarg);
 			break;
+		case 'c':
+			start_commit = optarg;
+			break;
 		case 'l':
 			limit = strtonum(optarg, 0, INT_MAX, &errstr);
 			if (errstr != NULL)
 				errx(1, "number of commits is %s: %s",
 				    errstr, optarg);
 			break;
-		case 'b':
-			log_branches = 1;
+		case 'P':
+			show_changed_paths = 1;
+			break;
+		case 'p':
+			show_patch = 1;
+			break;
+		case 'R':
+			reverse_display_order = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -4449,14 +4452,11 @@ cmd_log(int argc, char *argv[])
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
-		case 'R':
-			reverse_display_order = 1;
+		case 'S':
+			search_pattern = optarg;
 			break;
 		case 's':
 			one_line = 1;
-			break;
-		case 'S':
-			search_pattern = optarg;
 			break;
 		case 'x':
 			end_commit = optarg;
@@ -4922,15 +4922,10 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "ac:C:r:swP")) != -1) {
+	while ((ch = getopt(argc, argv, "aC:c:Pr:sw")) != -1) {
 		switch (ch) {
 		case 'a':
 			force_text_diff = 1;
-			break;
-		case 'c':
-			if (ncommit_args >= 2)
-				errx(1, "too many -c options used");
-			commit_args[ncommit_args++] = optarg;
 			break;
 		case 'C':
 			diff_context = strtonum(optarg, 0, GOT_DIFF_MAX_CONTEXT,
@@ -4938,6 +4933,14 @@ cmd_diff(int argc, char *argv[])
 			if (errstr != NULL)
 				errx(1, "number of context lines is %s: %s",
 				    errstr, optarg);
+			break;
+		case 'c':
+			if (ncommit_args >= 2)
+				errx(1, "too many -c options used");
+			commit_args[ncommit_args++] = optarg;
+			break;
+		case 'P':
+			force_path = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -4952,9 +4955,6 @@ cmd_diff(int argc, char *argv[])
 			break;
 		case 'w':
 			ignore_whitespace = 1;
-			break;
-		case 'P':
-			force_path = 1;
 			break;
 		default:
 			usage_diff();
@@ -5824,10 +5824,16 @@ cmd_tree(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:r:iR")) != -1) {
+	while ((ch = getopt(argc, argv, "c:iRr:")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
+			break;
+		case 'i':
+			show_ids = 1;
+			break;
+		case 'R':
+			recurse = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -5835,12 +5841,6 @@ cmd_tree(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'i':
-			show_ids = 1;
-			break;
-		case 'R':
-			recurse = 1;
 			break;
 		default:
 			usage_tree();
@@ -6058,7 +6058,7 @@ cmd_status(int argc, char *argv[])
 	st.status_codes = NULL;
 	st.suppress = 0;
 
-	while ((ch = getopt(argc, argv, "Is:S:")) != -1) {
+	while ((ch = getopt(argc, argv, "IS:s:")) != -1) {
 		switch (ch) {
 		case 'I':
 			no_ignores = 1;
@@ -6286,7 +6286,7 @@ cmd_ref(int argc, char *argv[])
 	char *refname = NULL;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "c:dr:ls:t")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dlr:s:t")) != -1) {
 		switch (ch) {
 		case 'c':
 			obj_arg = optarg;
@@ -6294,15 +6294,15 @@ cmd_ref(int argc, char *argv[])
 		case 'd':
 			do_delete = 1;
 			break;
+		case 'l':
+			do_list = 1;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'l':
-			do_list = 1;
 			break;
 		case 's':
 			symref_target = optarg;
@@ -6688,7 +6688,7 @@ cmd_branch(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "c:d:r:lnt")) != -1) {
+	while ((ch = getopt(argc, argv, "c:d:lnr:t")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -6696,18 +6696,18 @@ cmd_branch(int argc, char *argv[])
 		case 'd':
 			delref = optarg;
 			break;
+		case 'l':
+			do_list = 1;
+			break;
+		case 'n':
+			do_update = 0;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'l':
-			do_list = 1;
-			break;
-		case 'n':
-			do_update = 0;
 			break;
 		case 't':
 			sort_by_time = 1;
@@ -7322,10 +7322,13 @@ cmd_tag(int argc, char *argv[])
 	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "c:m:r:ls:Vv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lm:r:s:Vv")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
+			break;
+		case 'l':
+			do_list = 1;
 			break;
 		case 'm':
 			tagmsg = optarg;
@@ -7338,9 +7341,6 @@ cmd_tag(int argc, char *argv[])
 				goto done;
 			}
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'l':
-			do_list = 1;
 			break;
 		case 's':
 			signer_id = strdup(optarg);
@@ -8219,13 +8219,13 @@ cmd_revert(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "pF:R")) != -1) {
+	while ((ch = getopt(argc, argv, "F:pR")) != -1) {
 		switch (ch) {
-		case 'p':
-			pflag = 1;
-			break;
 		case 'F':
 			patch_script_path = optarg;
+			break;
+		case 'p':
+			pflag = 1;
 			break;
 		case 'R':
 			can_recurse = 1;
@@ -8925,7 +8925,7 @@ cmd_send(int argc, char *argv[])
 	TAILQ_INIT(&delete_args);
 	TAILQ_INIT(&delete_branches);
 
-	while ((ch = getopt(argc, argv, "ab:d:fr:t:Tvq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:d:fqr:Tt:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			send_all_branches = 1;
@@ -8944,6 +8944,9 @@ cmd_send(int argc, char *argv[])
 		case 'f':
 			overwrite_refs = 1;
 			break;
+		case 'q':
+			verbosity = -1;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
@@ -8951,22 +8954,19 @@ cmd_send(int argc, char *argv[])
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
+		case 'T':
+			send_all_tags = 1;
+			break;
 		case 't':
 			error = got_pathlist_append(&tags, optarg, NULL);
 			if (error)
 				return error;
-			break;
-		case 'T':
-			send_all_tags = 1;
 			break;
 		case 'v':
 			if (verbosity < 0)
 				verbosity = 0;
 			else if (verbosity < 3)
 				verbosity++;
-			break;
-		case 'q':
-			verbosity = -1;
 			break;
 		default:
 			usage_send();
@@ -11318,7 +11318,7 @@ cmd_histedit(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
-	while ((ch = getopt(argc, argv, "acefF:mlX")) != -1) {
+	while ((ch = getopt(argc, argv, "aceF:flmX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_edit = 1;
@@ -11329,17 +11329,17 @@ cmd_histedit(int argc, char *argv[])
 		case 'e':
 			edit_only = 1;
 			break;
-		case 'f':
-			fold_only = 1;
-			break;
 		case 'F':
 			edit_script_path = optarg;
 			break;
-		case 'm':
-			edit_logmsg_only = 1;
+		case 'f':
+			fold_only = 1;
 			break;
 		case 'l':
 			list_backups = 1;
+			break;
+		case 'm':
+			edit_logmsg_only = 1;
 			break;
 		case 'X':
 			delete_backups = 1;
@@ -12350,16 +12350,16 @@ cmd_stage(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "lpF:S")) != -1) {
+	while ((ch = getopt(argc, argv, "F:lpS")) != -1) {
 		switch (ch) {
+		case 'F':
+			patch_script_path = optarg;
+			break;
 		case 'l':
 			list_stage = 1;
 			break;
 		case 'p':
 			pflag = 1;
-			break;
-		case 'F':
-			patch_script_path = optarg;
 			break;
 		case 'S':
 			allow_bad_symlinks = 1;
@@ -12488,13 +12488,13 @@ cmd_unstage(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "pF:")) != -1) {
+	while ((ch = getopt(argc, argv, "F:p")) != -1) {
 		switch (ch) {
-		case 'p':
-			pflag = 1;
-			break;
 		case 'F':
 			patch_script_path = optarg;
+			break;
+		case 'p':
+			pflag = 1;
 			break;
 		default:
 			usage_unstage();
@@ -12782,10 +12782,13 @@ cmd_cat(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:r:P")) != -1) {
+	while ((ch = getopt(argc, argv, "c:Pr:")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
+			break;
+		case 'P':
+			force_path = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -12793,9 +12796,6 @@ cmd_cat(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 'P':
-			force_path = 1;
 			break;
 		default:
 			usage_cat();
