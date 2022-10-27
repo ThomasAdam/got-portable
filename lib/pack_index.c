@@ -269,6 +269,12 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
 			}
+			if (mapoff + SHA1_DIGEST_LENGTH > SIZE_MAX) {
+				err = got_error_fmt(GOT_ERR_RANGE,
+				    "mapoff %lld would overflow size_t",
+				    (long long)mapoff + SHA1_DIGEST_LENGTH);
+				break;
+			}
 			memcpy(obj->delta.ref.ref_id.sha1, pack->map + mapoff,
 			    SHA1_DIGEST_LENGTH);
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
@@ -316,6 +322,14 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			    pack->filesize) {
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
+			}
+
+			if (mapoff + obj->delta.ofs.base_offsetlen >
+			    SIZE_MAX) {
+				err = got_error_fmt(GOT_ERR_RANGE,
+				    "mapoff %lld would overflow size_t",
+				    (long long)mapoff
+				    + obj->delta.ofs.base_offsetlen);
 			}
 
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
@@ -795,6 +809,13 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 
 	/* Verify the SHA1 checksum stored at the end of the pack file. */
 	if (pack->map) {
+		if (pack->filesize > SIZE_MAX) {
+			err = got_error_fmt(GOT_ERR_RANGE,
+			    "filesize %lld overflows size_t",
+			    (long long)pack->filesize);
+			goto done;
+		}
+
 		memcpy(pack_sha1_expected, pack->map +
 		    pack->filesize - SHA1_DIGEST_LENGTH,
 		    SHA1_DIGEST_LENGTH);

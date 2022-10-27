@@ -25,7 +25,7 @@ struct got_pack {
 	char *path_packfile;
 	int fd;
 	uint8_t *map;
-	size_t filesize;
+	off_t filesize;
 	struct got_pack_privsep_child *privsep_child;
 	int basefd;
 	int accumfd;
