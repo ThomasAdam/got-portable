@@ -47,7 +47,7 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	int fd = -1;
 	int imsg_fds[2] = { -1, -1 };
 	pid_t pid;
-	struct imsgbuf *ibuf;
+	struct imsgbuf *ibuf = NULL;
 
 	*conf = calloc(1, sizeof(**conf));
 	if (*conf == NULL)
@@ -57,7 +57,8 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 	if (fd == -1) {
 		if (errno == ENOENT)
 			return NULL;
-		return got_error_from_errno2("open", gotconfig_path);
+		err = got_error_from_errno2("open", gotconfig_path);
+		goto done;
 	}
 
 	ibuf = calloc(1, sizeof(*ibuf));
