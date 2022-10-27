@@ -104,7 +104,17 @@ can be used to refer to the remote repository on the command line of
 and
 .Cm got send .
 .Pp
-Information about this repository is declared in a block of options
+When repositories are shared between multiple users on the system, it is
+recommended that users configure their trusted remote repositories in each
+of their work-trees'
+.Nm
+files, overriding corresponding repository-wide settings.
+This can avoid potentially undesirable connections to remote repositories
+placed into the shared repository's
+.Nm
+file by other users.
+.Pp
+Information about a repository is declared in a block of options
 enclosed in curly brackets:
 .Bl -tag -width Ds
 .It Ic server Ar hostname
