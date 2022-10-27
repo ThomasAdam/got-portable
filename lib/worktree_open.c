@@ -216,6 +216,8 @@ open_worktree(struct got_worktree **worktree, const char *path)
 
 	err = got_gotconfig_read(&(*worktree)->gotconfig,
 	    (*worktree)->gotconfig_path);
+	if (err)
+		goto done;
 
 	(*worktree)->root_fd = open((*worktree)->root_path,
 	    O_DIRECTORY | O_CLOEXEC);
