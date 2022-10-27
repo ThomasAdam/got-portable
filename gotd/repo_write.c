@@ -1000,15 +1000,10 @@ recv_packfile(struct repo_write_client **client, struct imsg *imsg)
 
 	log_debug("pack data received");
 
-	/* XXX size_t vs off_t, both should be off_t */
-	if (pack_filesize >= SIZE_MAX) {
-		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
-		    "pack file too large");
-		goto done;
-	}
 	pack->filesize = pack_filesize;
 
-	log_debug("begin indexing pack (%zu bytes in size)", pack->filesize);
+	log_debug("begin indexing pack (%lld bytes in size)",
+	    (long long)pack->filesize);
 	err = got_pack_index(pack, (*client)->packidx_fd,
 	    tempfiles[0], tempfiles[1], tempfiles[2], (*client)->pack_sha1,
 	    pack_index_progress, NULL, &rl);

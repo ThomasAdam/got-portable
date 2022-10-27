@@ -175,7 +175,7 @@ main(int argc, char **argv)
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
-	pack.filesize = packfile_size; /* XXX off_t vs size_t */
+	pack.filesize = packfile_size;
 
 	if (lseek(pack.fd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");

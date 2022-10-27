@@ -856,6 +856,12 @@ got_pack_parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 		return got_error(GOT_ERR_PACK_OFFSET);
 
 	if (pack->map) {
+		if (offset > SIZE_MAX) {
+			return got_error_fmt(GOT_ERR_PACK_OFFSET,
+			    "offset %lld overflows size_t",
+			    (long long)offset);
+		}
+
 		mapoff = (size_t)offset;
 	} else {
 		if (lseek(pack->fd, offset, SEEK_SET) == -1)
@@ -935,6 +941,13 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 
 		if (pack->map) {
 			size_t mapoff;
+
+			if (delta_offset + *len > SIZE_MAX) {
+				return got_error_fmt(GOT_ERR_PACK_OFFSET,
+				    "mapoff %lld would overflow size_t",
+				    (long long)delta_offset + *len);
+			}
+
 			mapoff = (size_t)delta_offset + *len;
 			if (mapoff + sizeof(offN) >= pack->filesize)
 				return got_error(GOT_ERR_PACK_OFFSET);
@@ -1063,7 +1076,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset);
+	    delta_data_offset);	/* XXX: off_t vs size_t! */
 	if (err)
 		return err;
 
@@ -1085,7 +1098,15 @@ got_pack_parse_ref_delta(struct got_object_id *id,
     struct got_pack *pack, off_t delta_offset, int tslen)
 {
 	if (pack->map) {
-		size_t mapoff = delta_offset + tslen;
+		size_t mapoff;
+
+		if (delta_offset + tslen > SIZE_MAX) {
+			return got_error_fmt(GOT_ERR_PACK_OFFSET,
+			    "mapoff %lld would overflow size_t",
+			    (long long)delta_offset + tslen);
+		}
+
+		mapoff = delta_offset + tslen;
 		if (mapoff + sizeof(*id) >= pack->filesize)
 			return got_error(GOT_ERR_PACK_OFFSET);
 		memcpy(id, pack->map + mapoff, sizeof(*id));
@@ -1130,7 +1151,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset);
+	    delta_data_offset);	/* XXX: off_t vs size_t */
 	if (err)
 		return err;
 
@@ -1397,7 +1418,16 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 				max_size = delta->size;
 			if (max_size > max_bufsize) {
 				if (pack->map) {
-					mapoff = (size_t)delta_data_offset;
+					if (delta_data_offset > SIZE_MAX) {
+						return got_error_fmt(
+						    GOT_ERR_RANGE,
+						    "delta offset %lld "
+						    "overflows size_t",
+						    (long long)
+						    delta_data_offset);
+					}
+
+					mapoff = delta_data_offset;
 					err = got_inflate_to_file_mmap(
 					    &base_bufsz, NULL, NULL, pack->map,
 					    mapoff, pack->filesize - mapoff,
@@ -1414,7 +1444,16 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 				}
 				accum_bufsz = max_size;
 				if (pack->map) {
-					mapoff = (size_t)delta_data_offset;
+					if (delta_data_offset > SIZE_MAX) {
+						return got_error_fmt(
+						    GOT_ERR_RANGE,
+						    "delta offset %lld "
+						    "overflows size_t",
+						    (long long)
+						    delta_data_offset);
+					}
+
+					mapoff = delta_data_offset;
 					err = got_inflate_to_mem_mmap(&base_buf,
 					    &base_bufsz, NULL, NULL,
 					    pack->map, mapoff,
@@ -1570,7 +1609,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
-			size_t delta_data_offset;
+			off_t delta_data_offset;
 
 			/* Plain object types are the delta base. */
 			if (delta->type != GOT_OBJ_TYPE_COMMIT &&
@@ -1591,7 +1630,16 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				max_size = delta->size;
 
 			if (pack->map) {
-				size_t mapoff = (size_t)delta_data_offset;
+				size_t mapoff;
+
+				if (delta_data_offset > SIZE_MAX) {
+					return got_error_fmt(GOT_ERR_RANGE,
+					    "delta %lld offset would "
+					    "overflow size_t",
+					    (long long)delta_data_offset);
+				}
+
+				mapoff = delta_data_offset;
 				err = got_inflate_to_mem_mmap(&base_buf,
 				    &base_bufsz, NULL, NULL, pack->map,
 				    mapoff, pack->filesize - mapoff);
@@ -1709,7 +1757,15 @@ got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
 			return got_error(GOT_ERR_PACK_OFFSET);
 
 		if (pack->map) {
-			size_t mapoff = (size_t)obj->pack_offset;
+			size_t mapoff;
+
+			if (obj->pack_offset > SIZE_MAX) {
+				return got_error_fmt(GOT_ERR_RANGE,
+				    "pack offset %lld would overflow size_t",
+				    (long long)obj->pack_offset);
+			}
+
+			mapoff = obj->pack_offset;
 			err = got_inflate_to_file_mmap(&obj->size, NULL, NULL,
 			    pack->map, mapoff, pack->filesize - mapoff,
 			    outfile);
@@ -1739,7 +1795,15 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 		if (obj->pack_offset >= pack->filesize)
 			return got_error(GOT_ERR_PACK_OFFSET);
 		if (pack->map) {
-			size_t mapoff = (size_t)obj->pack_offset;
+			size_t mapoff;
+
+			if (obj->pack_offset > SIZE_MAX) {
+				return got_error_fmt(GOT_ERR_RANGE,
+				    "pack offset %lld would overflow size_t",
+				    (long long)obj->pack_offset);
+			}
+
+			mapoff = obj->pack_offset;
 			err = got_inflate_to_mem_mmap(buf, len, NULL, NULL,
 			    pack->map, mapoff, pack->filesize - mapoff);
 		} else {
