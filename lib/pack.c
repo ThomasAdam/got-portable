@@ -1033,7 +1033,7 @@ read_delta_data(uint8_t **delta_buf, size_t *delta_len,
 
 static const struct got_error *
 add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
-    int delta_type, size_t delta_size, size_t delta_data_offset)
+    int delta_type, size_t delta_size, off_t delta_data_offset)
 {
 	struct got_delta *delta;
 
@@ -1076,7 +1076,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset);	/* XXX: off_t vs size_t! */
+	    delta_data_offset);
 	if (err)
 		return err;
 
@@ -1151,7 +1151,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset);	/* XXX: off_t vs size_t */
+	    delta_data_offset);
 	if (err)
 		return err;
 
