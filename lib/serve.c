@@ -1381,7 +1381,7 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 		case GOTD_IMSG_ERROR:
 			err = gotd_imsg_recv_error(NULL, &imsg);
 			goto done;
-		case GOTD_IMSG_RECV_PACKFILE:
+		case GOTD_IMSG_PACKFILE_PIPE:
 			err = recv_packfile(&imsg, infd);
 			if (err) {
 				if (err->code != GOT_ERR_EOF)

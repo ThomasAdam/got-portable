@@ -720,6 +720,7 @@ recv_packfile(struct gotd_client *client)
 	memset(&ipipe, 0, sizeof(ipipe));
 	ipipe.client_id = client->id;
 
+	/* Send pack pipe end 0 to repo_write. */
 	if (gotd_imsg_compose_event(&client->repo_write->iev,
 	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0],
 	        &ipipe, sizeof(ipipe)) == -1) {
@@ -729,9 +730,9 @@ recv_packfile(struct gotd_client *client)
 	}
 	pipe[0] = -1;
 
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1],
-	        &ipipe, sizeof(ipipe)) == -1)
+	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
+	if (gotd_imsg_compose_event(&client->iev,
+	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1], NULL, 0) == -1)
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 	pipe[1] = -1;
 
@@ -2041,7 +2042,7 @@ main(int argc, char **argv)
 		exit(0);
 	case PROC_REPO_WRITE:
 #ifndef PROFILE
-		if (pledge("stdio rpath sendfd recvfd", NULL) == -1)
+		if (pledge("stdio rpath recvfd", NULL) == -1)
 			err(1, "pledge");
 #endif
 		repo_write_main(title, pack_fds, temp_fds);

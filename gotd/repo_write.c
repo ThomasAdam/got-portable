@@ -82,7 +82,7 @@ struct repo_write_client {
 	STAILQ_ENTRY(repo_write_client)	 entry;
 	uint32_t			 id;
 	int				 fd;
-	int				 pack_pipe[2];
+	int				 pack_pipe;
 	struct got_pack			 pack;
 	uint8_t				 pack_sha1[SHA1_DIGEST_LENGTH];
 	int				 packidx_fd;
@@ -107,8 +107,7 @@ add_client(struct repo_write_client *client, uint32_t client_id, int fd)
 
 	client->id = client_id;
 	client->fd = fd;
-	client->pack_pipe[0] = -1;
-	client->pack_pipe[1] = -1;
+	client->pack_pipe = -1;
 	client->packidx_fd = -1;
 	STAILQ_INIT(&client->ref_updates);
 	client->nref_updates = 0;
@@ -929,8 +928,7 @@ recv_packfile(struct repo_write_client **client, struct imsg *imsg)
 	if (*client == NULL || STAILQ_EMPTY(&(*client)->ref_updates))
 		return got_error(GOT_ERR_CLIENT_ID);
 
-	if ((*client)->pack_pipe[0] == -1 ||
-	    (*client)->pack_pipe[1] == -1 ||
+	if ((*client)->pack_pipe == -1 ||
 	    (*client)->packidx_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
@@ -969,22 +967,13 @@ recv_packfile(struct repo_write_client **client, struct imsg *imsg)
 		tempfiles[i] = f;
 	}
 
-	/* Send pack file pipe to gotsh(1). */
-	if (imsg_compose(&ibuf, GOTD_IMSG_RECV_PACKFILE, PROC_REPO_WRITE,
-	    repo_write.pid, (*client)->pack_pipe[1], NULL, 0) == -1) {
-		(*client)->pack_pipe[1] = -1;
-		err = got_error_from_errno("imsg_compose ACK");
-		if (err)	
-			goto done;
-	}
-	(*client)->pack_pipe[1] = -1;
 	err = gotd_imsg_flush(&ibuf);
 	if (err)
 		goto done;
 
 	log_debug("receiving pack data");
 	unpack_err = recv_packdata(&pack_filesize, (*client)->pack_sha1,
-	    (*client)->pack_pipe[0], pack->fd);
+	    (*client)->pack_pipe, pack->fd);
 	if (ireq.report_status) {
 		err = report_pack_status(*client, unpack_err);
 		if (err) {
@@ -1018,9 +1007,9 @@ recv_packfile(struct repo_write_client **client, struct imsg *imsg)
 	if (lseek((*client)->packidx_fd, 0L, SEEK_SET) == -1)
 		err = got_error_from_errno("lseek");
 done:
-	if (close((*client)->pack_pipe[0]) == -1 && err == NULL)
+	if (close((*client)->pack_pipe) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	(*client)->pack_pipe[0] = -1;
+	(*client)->pack_pipe = -1;
 	for (i = 0; i < nitems(repo_tempfiles); i++) {
 		struct repo_tempfile *t = &repo_tempfiles[i];
 		if (t->idx != -1)
@@ -1192,7 +1181,7 @@ recv_disconnect(struct imsg *imsg)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_disconnect idisconnect;
 	size_t datalen;
-	int client_fd = -1, pipe0 = -1, pipe1 = - 1, idxfd = -1;
+	int client_fd = -1, pack_pipe = -1, idxfd = -1;
 	struct repo_write_client *client = NULL;
 	uint64_t slot;
 
@@ -1219,15 +1208,12 @@ recv_disconnect(struct imsg *imsg)
 	}
 	err = got_pack_close(&client->pack);
 	client_fd = client->fd;
-	pipe0 = client->pack_pipe[0];
-	pipe1 = client->pack_pipe[1];
+	pack_pipe = client->pack_pipe;
 	idxfd = client->packidx_fd;
 	free(client);
 	if (client_fd != -1 && close(client_fd) == -1)
 		err = got_error_from_errno("close");
-	if (pipe0 != -1 && close(pipe0) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (pipe1 != -1 && close(pipe1) == -1 && err == NULL)
+	if (pack_pipe != -1 && close(pack_pipe) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -1254,14 +1240,10 @@ receive_pack_pipe(struct repo_write_client **client, struct imsg *imsg,
 	*client = find_client(ireq.client_id);
 	if (*client == NULL)
 		return got_error(GOT_ERR_CLIENT_ID);
-	if ((*client)->pack_pipe[1] != -1)
+	if ((*client)->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	if ((*client)->pack_pipe[0] == -1)
-		(*client)->pack_pipe[0] = imsg->fd;
-	else
-		(*client)->pack_pipe[1] = imsg->fd;
-
+	(*client)->pack_pipe = imsg->fd;
 	return NULL;
 }
 
