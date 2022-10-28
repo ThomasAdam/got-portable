@@ -777,20 +777,29 @@ recv_done(int *packfd, int outfd, struct imsgbuf *ibuf, int chattygot)
 	if (err)
 		return err;
 
-	err = gotd_imsg_poll_recv(&imsg, ibuf, 0);
-	if (err)
-		return err;
+	while (*packfd == -1 && err == NULL) {
+		err = gotd_imsg_poll_recv(&imsg, ibuf, 0);
+		if (err)
+			break;
 
-	if (imsg.hdr.type == GOTD_IMSG_ERROR)
-		err = gotd_imsg_recv_error(NULL, &imsg);
-	else if (imsg.hdr.type != GOTD_IMSG_PACKFILE_PIPE)
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-	else if (imsg.fd == -1)
-		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-	if (err == NULL)
-		*packfd = imsg.fd;
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			err = gotd_imsg_recv_error(NULL, &imsg);
+			break;
+		case GOTD_IMSG_PACKFILE_PIPE:
+			if (imsg.fd != -1)
+				*packfd = imsg.fd;
+			else
+				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
 
-	imsg_free(&imsg);
+		imsg_free(&imsg);
+	}
+
 	return err;
 }
 

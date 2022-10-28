@@ -68,7 +68,7 @@ struct repo_read_client {
 	int				 fd;
 	int				 delta_cache_fd;
 	int				 report_progress;
-	int				 pack_pipe[2];
+	int				 pack_pipe;
 	struct gotd_object_id_array	 want_ids;
 	struct gotd_object_id_array	 have_ids;
 };
@@ -91,8 +91,7 @@ add_client(struct repo_read_client *client, uint32_t client_id, int fd)
 	client->id = client_id;
 	client->fd = fd;
 	client->delta_cache_fd = -1;
-	client->pack_pipe[0] = -1;
-	client->pack_pipe[1] = -1;
+	client->pack_pipe = -1;
 	slot = client_hash(client->id) % nitems(repo_read_clients);
 	STAILQ_INSERT_HEAD(&repo_read_clients[slot], client, entry);
 }
@@ -641,14 +640,10 @@ receive_pack_pipe(struct repo_read_client **client, struct imsg *imsg,
 	*client = find_client(ireq.client_id);
 	if (*client == NULL)
 		return got_error(GOT_ERR_CLIENT_ID);
-	if ((*client)->pack_pipe[1] != -1)
+	if ((*client)->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	if ((*client)->pack_pipe[0] == -1)
-		(*client)->pack_pipe[0] = imsg->fd;
-	else
-		(*client)->pack_pipe[1] = imsg->fd;
-
+	(*client)->pack_pipe = imsg->fd;
 	return NULL;
 }
 
@@ -669,24 +664,10 @@ send_packfile(struct repo_read_client *client, struct imsg *imsg,
 
 	got_ratelimit_init(&rl, 2, 0);
 
-	if (client->delta_cache_fd == -1 ||
-	    client->pack_pipe[0] == -1 ||
-	    client->pack_pipe[1] == -1)
+	if (client->delta_cache_fd == -1 || client->pack_pipe == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	imsg_init(&ibuf, client->fd);
-
-	/* Send pack file pipe to gotsh(1). */
-	if (imsg_compose(&ibuf, GOTD_IMSG_PACKFILE_PIPE, PROC_REPO_READ,
-	    repo_read.pid, client->pack_pipe[1], NULL, 0) == -1) {
-		err = got_error_from_errno("imsg_compose ACK");
-		if (err)	
-			goto done;
-	}
-	client->pack_pipe[1] = -1;
-	err = gotd_imsg_flush(&ibuf);
-	if (err)
-		goto done;
 
 	delta_cache = fdopen(client->delta_cache_fd, "w+");
 	if (delta_cache == NULL) {
@@ -699,7 +680,7 @@ send_packfile(struct repo_read_client *client, struct imsg *imsg,
 	pa.ibuf = &ibuf;
 	pa.report_progress = client->report_progress;
 
-	err = got_pack_create(packsha1, client->pack_pipe[0], delta_cache,
+	err = got_pack_create(packsha1, client->pack_pipe, delta_cache,
 	    client->have_ids.ids, client->have_ids.nids,
 	    client->want_ids.ids, client->want_ids.nids,
 	    repo_read.repo, 0, 1, pack_progress, &pa, &rl,
@@ -729,7 +710,7 @@ recv_disconnect(struct imsg *imsg)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_disconnect idisconnect;
 	size_t datalen;
-	int client_fd, delta_cache_fd, pipe[2];
+	int client_fd, delta_cache_fd, pack_pipe;
 	struct repo_read_client *client = NULL;
 	uint64_t slot;
 
@@ -751,16 +732,13 @@ recv_disconnect(struct imsg *imsg)
 	free_object_ids(&client->want_ids);
 	client_fd = client->fd;
 	delta_cache_fd = client->delta_cache_fd;
-	pipe[0] = client->pack_pipe[0];
-	pipe[1] = client->pack_pipe[1];
+	pack_pipe = client->pack_pipe;
 	free(client);
 	if (close(client_fd) == -1)
 		err = got_error_from_errno("close");
 	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
 		return got_error_from_errno("close");
-	if (pipe[0] != -1 && close(pipe[0]) == -1 && err == NULL)
-		return got_error_from_errno("close");
-	if (pipe[1] != -1 && close(pipe[1]) == -1 && err == NULL)
+	if (pack_pipe != -1 && close(pack_pipe) == -1 && err == NULL)
 		return got_error_from_errno("close");
 	return err;
 }
@@ -830,7 +808,7 @@ repo_read_dispatch(int fd, short event, void *arg)
 				    repo_read.title, err->msg);
 				break;
 			}
-			if (client->pack_pipe[1] == -1)
+			if (client->pack_pipe == -1)
 				break;
 			err = send_packfile(client, &imsg, iev);
 			if (err)
