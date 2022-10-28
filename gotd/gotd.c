@@ -682,6 +682,7 @@ send_packfile(struct gotd_client *client)
 
 	ipipe.client_id = client->id;
 
+	/* Send pack pipe end 0 to repo_read. */
 	if (gotd_imsg_compose_event(&client->repo_read->iev,
 	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0],
 	        &ipipe, sizeof(ipipe)) == -1) {
@@ -690,9 +691,9 @@ send_packfile(struct gotd_client *client)
 		return err;
 	}
 
-	if (gotd_imsg_compose_event(&client->repo_read->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1],
-	        &ipipe, sizeof(ipipe)) == -1)
+	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
+	if (gotd_imsg_compose_event(&client->iev,
+	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1], NULL, 0) == -1)
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 
 	return err;
@@ -2033,7 +2034,7 @@ main(int argc, char **argv)
 		break;
 	case PROC_REPO_READ:
 #ifndef PROFILE
-		if (pledge("stdio rpath sendfd recvfd", NULL) == -1)
+		if (pledge("stdio rpath recvfd", NULL) == -1)
 			err(1, "pledge");
 #endif
 		repo_read_main(title, pack_fds, temp_fds);
