@@ -21,12 +21,8 @@ DPADD = ${LIBZ} ${LIBUTIL}
 NOMAN = Yes
 .endif
 
-.if "${GOT_RELEASE}" != "Yes"
 realinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
 	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}
-	-ln -s ${PROG} ${BINDIR}/git-receive-pack
-	-ln -s ${PROG} ${BINDIR}/git-upload-pack
-.endif
 
 .include <bsd.prog.mk>
