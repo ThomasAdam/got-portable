@@ -30,6 +30,7 @@ cvg/cvg
 etc/*
 got/got
 gotadmin/gotadmin
+gotctl/gotctl
 gotd/gotd
 gotd/parse.c
 gotsh/gotsh
