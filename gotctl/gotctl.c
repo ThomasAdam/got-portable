@@ -341,20 +341,10 @@ static int
 connect_gotd(const char *socket_path)
 {
 	const struct got_error *error = NULL;
-	char unix_socket_path[PATH_MAX];
 	int gotd_sock = -1;
 	struct sockaddr_un sun;
 
-	if (socket_path) {
-		if (strlcpy(unix_socket_path, socket_path,
-		    sizeof(unix_socket_path)) >= sizeof(unix_socket_path)) 
-			errx(1, "gotd socket path too long");
-	} else {
-		strlcpy(unix_socket_path, GOTD_UNIX_SOCKET,
-		    sizeof(unix_socket_path));
-	}
-
-	error = apply_unveil(unix_socket_path);
+	error = apply_unveil(socket_path);
 	if (error)
 		errx(1, "%s", error->msg);
 
@@ -367,11 +357,11 @@ connect_gotd(const char *socket_path)
 
 	memset(&sun, 0, sizeof(sun));
 	sun.sun_family = AF_UNIX;
-	if (strlcpy(sun.sun_path, unix_socket_path,
-	    sizeof(sun.sun_path)) >= sizeof(sun.sun_path))
+	if (strlcpy(sun.sun_path, socket_path, sizeof(sun.sun_path)) >=
+	    sizeof(sun.sun_path))
 		errx(1, "gotd socket path too long");
 	if (connect(gotd_sock, (struct sockaddr *)&sun, sizeof(sun)) == -1)
-		err(1, "connect: %s", unix_socket_path);
+		err(1, "connect: %s", socket_path);
 
 #ifndef PROFILE
 	if (pledge("stdio", NULL) == -1)
@@ -392,7 +382,7 @@ main(int argc, char *argv[])
 	    { "version", no_argument, NULL, 'V' },
 	    { NULL, 0, NULL, 0 }
 	};
-	const char *socket_path = NULL;
+	const char *socket_path = GOTD_UNIX_SOCKET;
 
 	setlocale(LC_CTYPE, "");
 
