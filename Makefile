@@ -46,10 +46,12 @@ webd-install:
 	${MAKE} -C gotwebd install
 
 server:
+	${MAKE} -C gotctl
 	${MAKE} -C gotd
 	${MAKE} -C gotsh
 
 server-install:
+	${MAKE} -C gotctl install
 	${MAKE} -C gotd install
 	${MAKE} -C gotsh install
 

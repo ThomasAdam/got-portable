@@ -103,6 +103,12 @@ enum gotd_imsg_type {
 	/* An error occured while processing a request. */
 	GOTD_IMSG_ERROR,
 
+	/* Commands used by gotctl(8). */
+	GOTD_IMSG_INFO,
+	GOTD_IMSG_INFO_REPO,
+	GOTD_IMSG_INFO_CLIENT,
+	GOTD_IMSG_STOP,
+
 	/* Request a list of references. */
 	GOTD_IMSG_LIST_REFS,
 	GOTD_IMSG_LIST_REFS_INTERNAL,
@@ -154,6 +160,35 @@ struct gotd_imsg_error {
 	uint32_t client_id;
 	char msg[GOT_ERR_MAX_MSG_SIZE];
 } __attribute__((__packed__));
+
+/* Structure for GOTD_IMSG_INFO. */
+struct gotd_imsg_info {
+	pid_t pid;
+	int verbosity;
+	int nrepos;
+	int nclients;
+
+	/* Followed by nrepos GOTD_IMSG_INFO_REPO messages. */
+	/* Followed by nclients GOTD_IMSG_INFO_CLIENT messages. */
+};
+
+/* Structure for GOTD_IMSG_INFO_REPO. */
+struct gotd_imsg_info_repo {
+	char repo_name[NAME_MAX];
+	char repo_path[PATH_MAX];
+};
+
+/* Structure for GOTD_IMSG_INFO_CLIENT */
+struct gotd_imsg_info_client {
+	uid_t euid;
+	gid_t egid;
+	char repo_name[NAME_MAX];
+	int is_writing;
+	enum gotd_client_state state;
+	size_t ncapabilities;
+
+	/* Followed by ncapabilities GOTD_IMSG_CAPABILITY. */
+};
 
 /* Structure for GOTD_IMSG_LIST_REFS. */
 struct gotd_imsg_list_refs {

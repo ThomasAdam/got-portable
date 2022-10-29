@@ -66,12 +66,14 @@ To compile the Got server tool suite on OpenBSD, run:
 This will install the following commands:
 
  gotd, the repository server program
+ gotctl, the server control utility
  gotsh, the login shell for users accessing the server via the network
 
 See the following manual page files for information about server setup:
 
  $ man -l gotd/gotd.8
  $ man -l gotd/gotd.conf.5
+ $ man -l gotctl/gotctl.8
  $ man -l gotsh/gotsh.1
 
 
