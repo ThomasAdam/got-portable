@@ -3010,6 +3010,70 @@ test_update_binary_file() {
 	test_done "$testroot" "0"
 }
 
+test_update_umask() {
+	local testroot=`test_init update_binary_file`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm "$testroot/wt/alpha"
+
+	# using a subshell to avoid clobbering global umask
+	(umask 022 && cd "$testroot/wt" && got update alpha) \
+		>/dev/null 2>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-r--r--; then
+		echo "alpha is not 0644" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	rm "$testroot/wt/alpha"
+
+	# using a subshell to avoid clobbering global umask
+	(umask 044 && cd "$testroot/wt" && got update alpha) \
+		>/dev/null 2>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-------; then
+		echo "alpha is not 0600" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	rm "$testroot/wt/alpha"
+
+	# using a subshell to avoid clobbering global umask
+	(umask 222 && cd "$testroot/wt" && got update alpha) \
+		>/dev/null 2>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-r--r--r--; then
+		echo "alpha is not 0444" >&2
+		test_done "$testroot" 1
+		return 1;
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_update_basic
 run_test test_update_adds_file
@@ -3054,3 +3118,4 @@ run_test test_update_file_skipped_due_to_conflict
 run_test test_update_file_skipped_due_to_obstruction
 run_test test_update_quiet
 run_test test_update_binary_file
+run_test test_update_umask

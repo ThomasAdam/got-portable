@@ -1692,6 +1692,39 @@ test_cherrypick_binary_file() {
 	test_done "$testroot" "0"
 }
 
+test_cherrypick_umask() {
+	local testroot=`test_init cherrypick_umask`
+
+	got checkout $testroot/repo $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	(cd "$testroot/wt" && got branch newbranch) >/dev/null
+	echo "modified alpha on branch" > $testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'edit alpha') >/dev/null
+	(cd "$testroot/wt" && got update -b master) >/dev/null
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got cherrypick newbranch) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-------; then
+		echo "alpha is not 0600 after cherrypick!" >&2
+		ls -l "$testroot/wt/alpha" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -1709,3 +1742,4 @@ run_test test_cherrypick_unrelated_changes
 run_test test_cherrypick_same_branch
 run_test test_cherrypick_dot_on_a_line_by_itself
 run_test test_cherrypick_binary_file
+run_test test_cherrypick_umask

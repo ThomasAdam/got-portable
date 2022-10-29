@@ -64,6 +64,8 @@
 #define GOT_MERGE_LABEL_MERGED	"merged change"
 #define GOT_MERGE_LABEL_BASE	"3-way merge base"
 
+static mode_t		 apply_umask(mode_t);
+
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)
 {
@@ -703,7 +705,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 			goto done;
 	}
 
-	if (fchmod(fileno(f_merged), st_mode) != 0) {
+	if (fchmod(fileno(f_merged), apply_umask(st_mode)) != 0) {
 		err = got_error_from_errno2("fchmod", merged_path);
 		goto done;
 	}
@@ -776,7 +778,7 @@ install_symlink_conflict(const char *deriv_target,
 	if (err)
 		goto done;
 
-	if (fchmod(fileno(f), GOT_DEFAULT_FILE_MODE) == -1) {
+	if (fchmod(fileno(f), apply_umask(GOT_DEFAULT_FILE_MODE)) == -1) {
 		err = got_error_from_errno2("fchmod", path);
 		goto done;
 	}
@@ -1124,7 +1126,17 @@ get_ondisk_perms(int executable, mode_t st_mode)
 		return st_mode | xbits;
 	}
 
-	return (st_mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
+	return st_mode;
+}
+
+static mode_t
+apply_umask(mode_t mode)
+{
+	mode_t um;
+
+	um = umask(000);
+	umask(um);
+	return mode & ~um;
 }
 
 /* forward declaration */
@@ -1388,9 +1400,11 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
+	mode_t mode;
 
+	mode = get_ondisk_perms(te_mode & S_IXUSR, GOT_DEFAULT_FILE_MODE);
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW |
-	    O_CLOEXEC, GOT_DEFAULT_FILE_MODE);
+	    O_CLOEXEC, mode);
 	if (fd == -1) {
 		if (errno == ENOENT) {
 			char *parent;
@@ -1403,7 +1417,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				return err;
 			fd = open(ondisk_path,
 			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-			    GOT_DEFAULT_FILE_MODE);
+			    mode);
 			if (fd == -1)
 				return got_error_from_errno2("open",
 				    ondisk_path);
@@ -1425,15 +1439,15 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				if (err)
 					goto done;
 				update = 1;
+
+				if (fchmod(fd, apply_umask(mode)) == -1) {
+					err = got_error_from_errno2("fchmod",
+					    tmppath);
+					goto done;
+				}
 			}
 		} else
 			return got_error_from_errno2("open", ondisk_path);
-	}
-
-	if (fchmod(fd, get_ondisk_perms(te_mode & S_IXUSR, st_mode)) == -1) {
-		err = got_error_from_errno2("fchmod",
-		    update ? tmppath : ondisk_path);
-		goto done;
 	}
 
 	if (progress_cb) {
@@ -4590,7 +4604,10 @@ create_patched_content(char **path_outfile, int reverse_patch,
 			goto done;
 
 		if (!S_ISLNK(sb2.st_mode)) {
-			if (fchmod(fileno(outfile), sb2.st_mode) == -1) {
+			mode_t mode;
+
+			mode = apply_umask(sb2.st_mode);
+			if (fchmod(fileno(outfile), mode) == -1) {
 				err = got_error_from_errno2("fchmod", path2);
 				goto done;
 			}

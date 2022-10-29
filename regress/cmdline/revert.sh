@@ -1489,6 +1489,30 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_revert_umask() {
+	local testroot=`test_init revert_umask`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+	echo "edit alpha" > $testroot/wt/alpha
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got revert alpha) \
+		>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-------; then
+		echo "alpha is not 0600 after revert" >&2
+		ls -l "$testroot/wt/alpha" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_revert_basic
 run_test test_revert_rm
@@ -1506,3 +1530,4 @@ run_test test_revert_added_subtree
 run_test test_revert_deleted_subtree
 run_test test_revert_symlink
 run_test test_revert_patch_symlink
+run_test test_revert_umask

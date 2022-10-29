@@ -1850,6 +1850,37 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_umask() {
+	local testroot=`test_init patch_umask`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+
+	cat <<EOF >$testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++modified alpha
+EOF
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got patch <patch) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-------; then
+		echo "alpha is not 0600 after patch" >&2
+		ls -l "$testroot/wt/alpha" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_patch_basic
 run_test test_patch_dont_apply
@@ -1878,3 +1909,4 @@ run_test test_patch_merge_unknown_blob
 run_test test_patch_merge_reverse
 run_test test_patch_newfile_xbit_got_diff
 run_test test_patch_newfile_xbit_git_diff
+run_test test_patch_umask

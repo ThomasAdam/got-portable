@@ -854,6 +854,41 @@ test_checkout_quiet() {
 	test_done "$testroot" "$ret"
 }
 
+test_checkout_umask() {
+	local testroot=`test_init checkout_umask`
+
+	# using a subshell to avoid clobbering global umask
+	(umask 044 && got checkout "$testroot/repo" "$testroot/wt") \
+		>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	for f in alpha beta epsilon/zeta gamma/delta; do
+		ls -l "$testroot/wt/$f" | grep -q ^-rw-------
+		if [ $? -ne 0 ]; then
+			echo "$f is not 0600 after checkout" >&2
+			ls -l "$testroot/wt/$f" >&2
+			test_done "$testroot" 1
+			return 1
+		fi
+	done
+
+	for d in epsilon gamma; do
+		ls -ld "$testroot/wt/$d" | grep -q ^drwx--x--x
+		if [ $? -ne 0 ]; then
+			echo "$d is not 711 after checkout" >&2
+			ls -ld "$testroot/wt/$d" >&2
+			test_done "$testroot" 1
+			return 1
+		fi
+	done
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
@@ -868,3 +903,4 @@ run_test test_checkout_symlink
 run_test test_checkout_symlink_relative_wtpath
 run_test test_checkout_repo_with_unknown_extension
 run_test test_checkout_quiet
+run_test test_checkout_umask

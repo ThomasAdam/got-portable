@@ -1394,6 +1394,37 @@ test_merge_interrupt() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_umask() {
+	local testroot=`test_init merge_umask`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" >$testroot/repo/alpha
+	git_commit "$testroot/repo" -m "committing alpha on newbranch"
+	echo "modified delta on branch" >$testroot/repo/gamma/delta
+	git_commit "$testroot/repo" -m "committing delta on newbranch"
+
+	# diverge from newbranch
+	(cd "$testroot/repo" && git checkout -q master)
+	echo "modified beta on master" >$testroot/repo/beta
+	git_commit "$testroot/repo" -m "committing zeto no master"
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got merge newbranch) >/dev/null
+
+	for f in alpha gamma/delta; do
+		ls -l "$testroot/wt/$f" | grep -q ^-rw-------
+		if [ $? -ne 0 ]; then
+			echo "$f is not 0600 after merge" >&2
+			ls -l "$testroot/wt/$f" >&2
+			test_done "$testroot" 1
+		fi
+	done
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
@@ -1404,3 +1435,4 @@ run_test test_merge_missing_file
 run_test test_merge_no_op
 run_test test_merge_imported_branch
 run_test test_merge_interrupt
+run_test test_merge_umask
