@@ -95,6 +95,7 @@ static int inflight;
 static struct gotd gotd;
 
 void gotd_sighdlr(int sig, short event, void *arg);
+static void gotd_shutdown(void);
 
 __dead static void
 usage()
@@ -264,10 +265,7 @@ get_client_proc(struct gotd_client *client)
 		return client->repo_read;
 	else if (client->repo_write)
 		return client->repo_write;
-	else {
-		fatal("uid %d is neither reading nor writing", client->euid);
-		/* NOTREACHED */
-	}
+
 	return NULL;
 }
 
@@ -341,11 +339,12 @@ disconnect(struct gotd_client *client)
 	log_debug("uid %d: disconnecting", client->euid);
 
 	idisconnect.client_id = client->id;
-	if (gotd_imsg_compose_event(&proc->iev,
-	    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
-	    &idisconnect, sizeof(idisconnect)) == -1)
-		log_warn("imsg compose DISCONNECT");
-
+	if (proc) {
+		if (gotd_imsg_compose_event(&proc->iev,
+		    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
+		    &idisconnect, sizeof(idisconnect)) == -1)
+			log_warn("imsg compose DISCONNECT");
+	}
 	slot = client_hash(client->id) % nitems(gotd_clients);
 	STAILQ_REMOVE(&gotd_clients[slot], client, gotd_client, entry);
 	imsg_clear(&client->iev.ibuf);
@@ -382,6 +381,167 @@ disconnect_on_error(struct gotd_client *client, const struct got_error *err)
 		imsg_clear(&ibuf);
 	}
 	disconnect(client);
+}
+
+static const struct got_error *
+send_repo_info(struct gotd_imsgev *iev, struct gotd_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_info_repo irepo;
+
+	memset(&irepo, 0, sizeof(irepo));
+
+	if (strlcpy(irepo.repo_name, repo->name, sizeof(irepo.repo_name))
+	    >= sizeof(irepo.repo_name))
+		return got_error_msg(GOT_ERR_NO_SPACE, "repo name too long");
+	if (strlcpy(irepo.repo_path, repo->path, sizeof(irepo.repo_path))
+	    >= sizeof(irepo.repo_path))
+		return got_error_msg(GOT_ERR_NO_SPACE, "repo path too long");
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_REPO, PROC_GOTD, -1,
+	    &irepo, sizeof(irepo)) == -1) {
+		err = got_error_from_errno("imsg compose INFO_REPO");
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+send_capability(struct gotd_client_capability *capa, struct gotd_imsgev* iev)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_capability icapa;
+	size_t len;
+	struct ibuf *wbuf;
+
+	memset(&icapa, 0, sizeof(icapa));
+
+	icapa.key_len = strlen(capa->key);
+	len = sizeof(icapa) + icapa.key_len;
+	if (capa->value) {
+		icapa.value_len = strlen(capa->value);
+		len += icapa.value_len;
+	}
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_CAPABILITY, 0, 0, len);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create CAPABILITY");
+		return err;
+	}
+
+	if (imsg_add(wbuf, &icapa, sizeof(icapa)) == -1)
+		return got_error_from_errno("imsg_add CAPABILITY");
+	if (imsg_add(wbuf, capa->key, icapa.key_len) == -1)
+		return got_error_from_errno("imsg_add CAPABILITY");
+	if (capa->value) {
+		if (imsg_add(wbuf, capa->value, icapa.value_len) == -1)
+			return got_error_from_errno("imsg_add CAPABILITY");
+	}
+
+	wbuf->fd = -1;
+	imsg_close(&iev->ibuf, wbuf);
+
+	gotd_imsg_event_add(iev);
+
+	return NULL;
+}
+
+static const struct got_error *
+send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_info_client iclient;
+	struct gotd_child_proc *proc;
+	size_t i;
+
+	memset(&iclient, 0, sizeof(iclient));
+	iclient.euid = client->euid;
+	iclient.egid = client->egid;
+
+	proc = get_client_proc(client);
+	if (proc) {
+		if (strlcpy(iclient.repo_name, proc->chroot_path,
+		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "repo name too long");
+		}
+		if (client_is_writing(client))
+			iclient.is_writing = 1;
+	}
+
+	iclient.state = client->state;
+	iclient.ncapabilities = client->ncapabilities;
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT, PROC_GOTD, -1,
+	    &iclient, sizeof(iclient)) == -1) {
+		err = got_error_from_errno("imsg compose INFO_CLIENT");
+		if (err)
+			return err;
+	}
+
+	for (i = 0; i < client->ncapabilities; i++) {
+		struct gotd_client_capability *capa;
+		capa = &client->capabilities[i];
+		err = send_capability(capa, iev);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+send_info(struct gotd_client *client)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_info info;
+	uint64_t slot;
+	struct gotd_repo *repo;
+
+	info.pid = gotd.pid;
+	info.verbosity = gotd.verbosity;
+	info.nrepos = gotd.nrepos;
+	info.nclients = client_cnt - 1;
+
+	if (gotd_imsg_compose_event(&client->iev, GOTD_IMSG_INFO, PROC_GOTD, -1,
+	    &info, sizeof(info)) == -1) {
+		err = got_error_from_errno("imsg compose INFO");
+		if (err)
+			return err;
+	}
+
+	TAILQ_FOREACH(repo, &gotd.repos, entry) {
+		err = send_repo_info(&client->iev, repo);
+		if (err)
+			return err;
+	}
+
+	for (slot = 0; slot < nitems(gotd_clients); slot++) {
+		struct gotd_client *c;
+		STAILQ_FOREACH(c, &gotd_clients[slot], entry) {
+			if (c->id == client->id)
+				continue;
+			err = send_client_info(&client->iev, c);
+			if (err)
+				return err;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+stop_gotd(struct gotd_client *client)
+{
+
+	if (client->euid != 0)
+		return got_error_set_errno(EPERM, "stop");
+
+	gotd_shutdown();
+	/* NOTREACHED */
+	return NULL;
 }
 
 static struct gotd_child_proc *
@@ -465,6 +625,8 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		return got_error_from_errno("dup");
 
 	proc = get_client_proc(client);
+	if (proc == NULL)
+		fatalx("no process found for uid %d", client->euid);
 	if (gotd_imsg_compose_event(&proc->iev,
 	    GOTD_IMSG_LIST_REFS_INTERNAL, PROC_GOTD, fd,
 	    &ilref, sizeof(ilref)) == -1) {
@@ -837,6 +999,12 @@ gotd_request(int fd, short events, void *arg)
 				return;
 			}
 		}
+
+		/* Disconnect gotctl(8) now that messages have been sent. */
+		if (!client_is_reading(client) && !client_is_writing(client)) {
+			disconnect(client);
+			return;
+		}
 	}
 
 	if ((events & EV_READ) == 0)
@@ -855,6 +1023,12 @@ gotd_request(int fd, short events, void *arg)
 		evtimer_del(&client->tmo);
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_INFO:
+			err = send_info(client);
+			break;
+		case GOTD_IMSG_STOP:
+			err = stop_gotd(client);
+			break;
 		case GOTD_IMSG_LIST_REFS:
 			if (client->state != GOTD_STATE_EXPECT_LIST_REFS) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
@@ -1245,6 +1419,9 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	int ret = 0;
 
 	client_proc = get_client_proc(client);
+	if (client_proc == NULL)
+		fatalx("no process found for uid %d", client->euid);
+
 	if (proc->pid != client_proc->pid) {
 		kill_proc(proc, 1);
 		log_warnx("received message from PID %d for uid %d, while "
