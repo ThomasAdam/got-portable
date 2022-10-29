@@ -208,7 +208,42 @@ test_backout_next_commit() {
 	test_done "$testroot" "$ret"
 }
 
+test_backout_umask() {
+	local testroot=`test_init backout_umask`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+	echo "edit alpha" >$testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'edit alpha') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	local commit=`git_show_head "$testroot/repo"`
+
+	(cd "$testroot/wt" && got update) >/dev/null
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got backout $commit) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	if ! ls -l "$testroot/wt/alpha" | grep -q ^-rw-------; then
+		echo "alpha is not 0600 after backout" >&2
+		ls -l "$testroot/wt/alpha" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_backout_basic
 run_test test_backout_edits_for_file_since_deleted
 run_test test_backout_next_commit
+run_test test_backout_umask

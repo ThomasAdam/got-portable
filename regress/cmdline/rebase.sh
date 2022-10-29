@@ -1793,6 +1793,50 @@ test_rebase_nonbranch() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_umask() {
+	local testroot=`test_init rebase_umask`
+	local commit0=`git_show_head "$testroot/repo"`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+	(cd "$testroot/wt" && got branch newbranch) >/dev/null
+
+	echo "modified alpha on branch" >$testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'modified alpha on newbranch') \
+		>/dev/null
+
+	(cd "$testroot/wt" && got update -b master) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed!" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo "modified beta on master" >$testroot/wt/beta
+	(cd "$testroot/wt" && got commit -m 'modified beta on master') \
+		>/dev/null
+	(cd "$testroot/wt" && got update) >/dev/null
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && got rebase newbranch) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got rebase failed" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	ls -l "$testroot/wt/alpha" | grep -q ^-rw-------
+	if [ $? -ne 0 ]; then
+		echo "alpha is not 0600 after rebase" >&2
+		ls -l "$testroot/wt/alpha" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -1812,3 +1856,4 @@ run_test test_rebase_rm_add_rm_file
 run_test test_rebase_resets_committer
 run_test test_rebase_no_author_info
 run_test test_rebase_nonbranch
+run_test test_rebase_umask

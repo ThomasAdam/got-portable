@@ -86,6 +86,16 @@ struct patch_args {
 	struct got_patch_hunk_head *head;
 };
 
+static mode_t
+apply_umask(mode_t mode)
+{
+	mode_t um;
+
+	um = umask(000);
+	umask(um);
+	return mode & ~um;
+}
+
 static const struct got_error *
 send_patch(struct imsgbuf *ibuf, int fd)
 {
@@ -914,7 +924,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 		goto done;
 	}
 
-	if (fchmod(outfd, mode) == -1) {
+	if (fchmod(outfd, apply_umask(mode)) == -1) {
 		err = got_error_from_errno2("chmod", tmppath);
 		goto done;
 	}

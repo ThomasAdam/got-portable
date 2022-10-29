@@ -2165,6 +2165,62 @@ test_histedit_resets_committer() {
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_umask() {
+	local testroot=`test_init histedit_umask`
+	local orig_commit=`git_show_head "$testroot/repo"`
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'edit #1') >/dev/null
+	local commit1=`git_show_head "$testroot/repo"`
+
+	echo "modified again" > $testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'edit #2') >/dev/null
+	local commit2=`git_show_head "$testroot/repo"`
+
+	echo "modified again!" > $testroot/wt/alpha
+	echo "modify beta too!" > $testroot/wt/beta
+	(cd "$testroot/wt" && got commit -m 'edit #3') >/dev/null
+	local commit3=`git_show_head "$testroot/repo"`
+
+	(cd "$testroot/wt" && got update -c "$orig_commit") >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update to $orig_commit failed!" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo fold $commit1 >$testroot/histedit-script
+	echo fold $commit2 >>$testroot/histedit-script
+	echo pick $commit3 >>$testroot/histedit-script
+	echo mesg folding changes >>$testroot/histedit-script
+
+	# using a subshell to avoid clobbering global umask
+	(umask 077 && cd "$testroot/wt" && \
+		got histedit -F "$testroot/histedit-script") >/dev/null
+	ret=$?
+
+	if [ $ret -ne 0 ]; then
+		echo "histedit operation failed" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	for f in alpha beta; do
+		ls -l "$testroot/wt/$f" | grep -q ^-rw-------
+		if [ $? -ne 0 ]; then
+			echo "$f is not 0600 after histedi" >&2
+			ls -l "$testroot/wt/$f" >&2
+			test_done "$testroot" 1
+			return 1
+		fi
+	done
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2187,3 +2243,4 @@ run_test test_histedit_edit_only
 run_test test_histedit_prepend_line
 run_test test_histedit_mesg_invalid
 run_test test_histedit_resets_committer
+run_test test_histedit_umask
