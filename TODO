@@ -13,9 +13,6 @@ got:
   This must require an up-to-date and clean work tree to avoid unrelated
   changes from getting mixed in. Perform an implicit work tree base-commit
   bump after committing, like 'got rebase' and 'got histedit' do it.
-- Respect the current umask when creating or changing files and directories
-  in the work tree. This behaviour is already documented in got-worktree(5)
-  but not actually implemented.
 - When a clone fails the HEAD symref will always point to "refs/heads/main"
   (ie. the internal default HEAD symref of Got). Resuming a failed clone with
   'got fetch' is supposed to work. To make this easier, if the HEAD symref
