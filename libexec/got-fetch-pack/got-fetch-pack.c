@@ -688,7 +688,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				while (sha1_buf_len > 0 &&
 				    sha1_buf_len + r > SHA1_DIGEST_LENGTH) {
 					SHA1Update(&sha1_ctx, sha1_buf, 1);
-					memmove(sha1_buf, sha1_buf + 1, 1);
+					memmove(sha1_buf, sha1_buf + 1,
+					    sha1_buf_len - 1);
 					sha1_buf_len--;
 				}
 
