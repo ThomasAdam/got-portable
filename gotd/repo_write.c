@@ -1447,6 +1447,6 @@ repo_write_shutdown(void)
 	if (repo_write.repo)
 		got_repo_close(repo_write.repo);
 	got_repo_pack_fds_close(repo_write.pack_fds);
-	got_repo_temp_fds_close(repo_write.pack_fds);
+	got_repo_temp_fds_close(repo_write.temp_fds);
 	exit(0);
 }
