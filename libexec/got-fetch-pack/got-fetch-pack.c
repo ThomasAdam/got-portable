@@ -52,6 +52,10 @@
 #include "got_lib_gitproto.h"
 #include "got_lib_ratelimit.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
@@ -685,12 +689,14 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				 * amount of bytes out at the front to make
 				 * room, mixing those bytes into the checksum.
 				 */
-				while (sha1_buf_len > 0 &&
+				if (sha1_buf_len > 0 &&
 				    sha1_buf_len + r > SHA1_DIGEST_LENGTH) {
-					SHA1Update(&sha1_ctx, sha1_buf, 1);
-					memmove(sha1_buf, sha1_buf + 1,
-					    sha1_buf_len - 1);
-					sha1_buf_len--;
+					size_t nshift = MIN(sha1_buf_len + r -
+					    SHA1_DIGEST_LENGTH, sha1_buf_len);
+					SHA1Update(&sha1_ctx, sha1_buf, nshift);
+					memmove(sha1_buf, sha1_buf + nshift,
+					    sha1_buf_len - nshift);
+					sha1_buf_len -= nshift;
 				}
 
 				/* Buffer potential checksum bytes. */
