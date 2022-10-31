@@ -900,10 +900,9 @@ test_checkout_ulimit_n() {
 	# This tests our down-scaling of caches which store open file handles.
 	# Checkout should still work; if it does not, then either there is
 	# a bug or the fixed limit used by this test case is no longer valid
-	# and must be raised.
-	ulimit -n 20
-
-	got checkout -q $testroot/repo $testroot/wt > $testroot/stdout
+	# and must be raised. Use a subshell to avoid changing global ulimit.
+	(ulimit -n 20; got checkout -q $testroot/repo $testroot/wt \
+		> $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
@@ -932,7 +931,6 @@ test_checkout_ulimit_n() {
 	fi
 	test_done "$testroot" "$ret"
 }
-
 
 test_parseargs "$@"
 run_test test_checkout_basic
