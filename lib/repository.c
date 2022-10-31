@@ -263,16 +263,16 @@ close_tempfiles(int *fds, size_t nfds)
 }
 
 static const struct got_error *
-open_tempfiles(int **fds, size_t nfds)
+open_tempfiles(int **fds, size_t array_size, size_t nfds)
 {
 	const struct got_error *err = NULL;
 	int i;
 
-	*fds = calloc(nfds, sizeof(**fds));
+	*fds = calloc(array_size, sizeof(**fds));
 	if (*fds == NULL)
 		return got_error_from_errno("calloc");
 
-	for (i = 0; i < nfds; i++)
+	for (i = 0; i < array_size; i++)
 		(*fds)[i] = -1;
 
 	for (i = 0; i < nfds; i++) {
@@ -288,10 +288,40 @@ open_tempfiles(int **fds, size_t nfds)
 	return NULL;
 }
 
+static const struct got_error *
+get_pack_cache_size(int *pack_cache_size)
+{
+	struct rlimit rl;
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+		return got_error_from_errno("getrlimit");
+
+	*pack_cache_size = GOT_PACK_CACHE_SIZE;
+	if (*pack_cache_size > rl.rlim_cur / 8)
+		*pack_cache_size = rl.rlim_cur / 8;
+
+	return NULL;
+}
+
 const struct got_error *
 got_repo_pack_fds_open(int **pack_fds)
 {
-	return open_tempfiles(pack_fds, GOT_PACK_NUM_TEMPFILES);
+	const struct got_error *err;
+	int nfds;
+
+	err = get_pack_cache_size(&nfds);
+	if (err)
+		return err;
+
+	/*
+	 * We need one basefd and one accumfd per cached pack.
+	 * Our constants should be set up in a way such that
+	 * this error never triggers.
+	 */
+	if (nfds * 2 > GOT_PACK_NUM_TEMPFILES)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	return open_tempfiles(pack_fds, GOT_PACK_NUM_TEMPFILES, nfds * 2);
 }
 
 const struct got_error *
@@ -303,7 +333,8 @@ got_repo_pack_fds_close(int *pack_fds)
 const struct got_error *
 got_repo_temp_fds_open(int **temp_fds) 
 {
-	return open_tempfiles(temp_fds, GOT_REPO_NUM_TEMPFILES);
+	return open_tempfiles(temp_fds, GOT_REPO_NUM_TEMPFILES,
+	    GOT_REPO_NUM_TEMPFILES);
 }
 
 void
@@ -633,12 +664,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 	const struct got_error *err = NULL;
 	char *repo_path = NULL;
 	size_t i, j = 0;
-	struct rlimit rl;
 
 	*repop = NULL;
-
-	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
-		return got_error_from_errno("getrlimit");
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL)
@@ -674,9 +701,9 @@ got_repo_open(struct got_repository **repop, const char *path,
 	if (err)
 		goto done;
 
-	repo->pack_cache_size = GOT_PACK_CACHE_SIZE;
-	if (repo->pack_cache_size > rl.rlim_cur / 8)
-		repo->pack_cache_size = rl.rlim_cur / 8;
+	err = get_pack_cache_size(&repo->pack_cache_size);
+	if (err)
+		goto done;
 	for (i = 0; i < nitems(repo->packs); i++) {
 		if (pack_fds != NULL && i < repo->pack_cache_size) {
 			repo->packs[i].basefd = pack_fds[j++];

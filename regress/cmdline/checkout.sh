@@ -889,6 +889,51 @@ test_checkout_umask() {
 	test_done "$testroot" 0
 }
 
+test_checkout_ulimit_n() {
+	local testroot=`test_init checkout_ulimit_n`
+
+	echo -n "Checked out refs/heads/master: " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	printf "\nNow shut up and hack\n" >> $testroot/stdout.expected
+
+	# Drastically reduce the number of files we are allowed to use.
+	# This tests our down-scaling of caches which store open file handles.
+	# Checkout should still work; if it does not, then either there is
+	# a bug or the fixed limit used by this test case is no longer valid
+	# and must be raised.
+	ulimit -n 20
+
+	got checkout -q $testroot/repo $testroot/wt > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
@@ -904,3 +949,4 @@ run_test test_checkout_symlink_relative_wtpath
 run_test test_checkout_repo_with_unknown_extension
 run_test test_checkout_quiet
 run_test test_checkout_umask
+run_test test_checkout_ulimit_n
