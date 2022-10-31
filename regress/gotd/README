@@ -1,0 +1,57 @@
+Running server regression tests requires some manual system preparation.
+
+Two dedicated user accounts and a group must be created. Password login
+for these users should be disabled by passing a blank password to useradd
+and confirming useradd's question about disabling passwords with 'yes'.
+
+ $ doas adduser got
+ $ doas adduser gotdev
+ $ doas addgroup gotsh
+
+The above user and group names correspond to defaults used by the test suite.
+If needed, the defaults can be overridden on by passing values for the
+following variables to make(1): GOTD_USER, GOTD_DEVUSER, GOTD_GROUP
+
+An SSH key must be added to ~gotdev/.ssh/authorized_keys, such that the
+following command succeeds non-interactively:
+
+ $ ssh gotdev@127.0.0.1
+
+The login shell of the gotdev user should be set to gotsh(1).
+It is recommended to run the test suite using a locally built gotsh binary,
+rather than /usr/local/bin/gotsh (which might be using messages in an
+out-of-date format on the gotd socket).
+For this to work, $HOME/bin/gotsh must be added to /etc/shells first.
+
+ $ doas usermod -s $HOME/bin/gotsh gotdev
+
+If adding this file to /etc/shells is a problem, a locally built gotsh
+binary can be made available in the command search path of the gotdev
+user under the names git-receive-pack and git-upload-pack. When made
+available in a non-standard PATH directory such as ~gotdev/bin, the
+gotdev user's PATH must be set appropriately in sshd_config (see below).
+
+Tests will run the locally built gotd binary found in gotd/obj/gotd.
+The test suite creates the corresponding gotd socket in ~gotdev/gotd.sock.
+To make this work, the GOTD_UNIX_SOCKET variable must be set by sshd
+when the gotdev user logs in. The following should be added to the file
+/etc/ssh/sshd_config:
+
+ Match User gotdev
+    SetEnv GOTD_UNIX_SOCKET=/home/gotdev/gotd.sock
+    # The following line is not needed when gotsh is used as login shell:
+    SetEnv PATH=/home/gotdev/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+    DisableForwarding yes
+    PermitTTY no
+
+sshd must be restarted for configuration changes to take effect:
+
+ $ doas rcctl restart sshd
+
+The server test suite can now be run from the top-level directory:
+
+ $ doas pkg_add git  # if not already done
+ $ doas make server-regress
+
+The suite must be started as root in order to be able to start and stop gotd.
+The test suite switches to non-root users as appropriate.
