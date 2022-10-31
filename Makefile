@@ -55,4 +55,7 @@ server-install:
 	${MAKE} -C gotd install
 	${MAKE} -C gotsh install
 
+server-regress:
+	${MAKE} -C regress/gotd
+
 .include <bsd.subdir.mk>

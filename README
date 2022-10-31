@@ -76,6 +76,8 @@ See the following manual page files for information about server setup:
  $ man -l gotctl/gotctl.8
  $ man -l gotsh/gotsh.1
 
+See regress/gotd/README for information about running the server test suite.
+
 
 Game of Trees Web (Gotweb) is a CGI program which displays repository data
 and is designed to work with httpd(8) and slowcgi(8). It requires the Kristaps
