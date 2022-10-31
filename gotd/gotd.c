@@ -1931,9 +1931,9 @@ done:
 
 static pid_t
 start_child(enum gotd_procid proc_id, const char *chroot_path,
-    char *argv0, int fd, int daemonize, int verbosity)
+    char *argv0, const char *confpath, int fd, int daemonize, int verbosity)
 {
-	char	*argv[9];
+	char	*argv[11];
 	int	 argc = 0;
 	pid_t	 pid;
 
@@ -1965,6 +1965,9 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 		fatalx("invalid process id %d", proc_id);
 	}
 
+	argv[argc++] = (char *)"-f";
+	argv[argc++] = (char *)confpath;
+
 	argv[argc++] = (char *)"-P";
 	argv[argc++] = (char *)chroot_path;
 
@@ -1981,8 +1984,8 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 }
 
 static void
-start_repo_children(struct gotd *gotd, char *argv0, int daemonize,
-    int verbosity)
+start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
+    int daemonize, int verbosity)
 {
 	struct gotd_repo *repo = NULL;
 	struct gotd_child_proc *proc;
@@ -2014,7 +2017,7 @@ start_repo_children(struct gotd *gotd, char *argv0, int daemonize,
 		    PF_UNSPEC, proc->pipe) == -1)
 			fatal("socketpair");
 		proc->pid = start_child(proc->type, proc->chroot_path, argv0,
-		    proc->pipe[1], daemonize, verbosity);
+		    confpath, proc->pipe[1], daemonize, verbosity);
 		imsg_init(&proc->iev.ibuf, proc->pipe[0]);
 		log_debug("proc %s %s is on fd %d",
 		    gotd_proc_names[proc->type], proc->chroot_path,
@@ -2166,7 +2169,8 @@ main(int argc, char **argv)
 	if (proc_id == PROC_GOTD) {
 		gotd.pid = getpid();
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		start_repo_children(&gotd, argv0, daemonize, verbosity);
+		start_repo_children(&gotd, argv0, confpath, daemonize,
+		    verbosity);
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		if (daemonize && daemon(0, 0) == -1)
 			fatal("daemon");
