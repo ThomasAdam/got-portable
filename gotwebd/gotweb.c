@@ -282,7 +282,7 @@ render:
 err:
 	if (html && fcgi_printf(c, "<div id='err_content'>") == -1)
 		return;
-	if (fcgi_printf(c, "%s", err) == -1)
+	if (fcgi_printf(c, "\n%s", err) == -1)
 		return;
 	if (error) {
 		if (fcgi_printf(c, "%s", error->msg) == -1)
