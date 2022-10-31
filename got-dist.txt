@@ -17,6 +17,10 @@
 /gotadmin/Makefile
 /gotadmin/gotadmin.1
 /gotadmin/gotadmin.c
+/gotctl
+/gotctl/Makefile
+/gotctl/gotctl.8
+/gotctl/gotctl.c
 /gotd
 /gotd/Makefile
 /gotd/gotd.8
@@ -361,6 +365,14 @@
 /regress/fetch
 /regress/fetch/Makefile
 /regress/fetch/fetch_test.c
+/regress/gotd
+/regress/gotd/Makefile
+/regress/gotd/README
+/regress/gotd/check_test_repo.sh
+/regress/gotd/common.sh
+/regress/gotd/prepare_test_repo.sh
+/regress/gotd/repo_read.sh
+/regress/gotd/repo_write.sh
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
