@@ -901,7 +901,7 @@ test_checkout_ulimit_n() {
 	# Checkout should still work; if it does not, then either there is
 	# a bug or the fixed limit used by this test case is no longer valid
 	# and must be raised. Use a subshell to avoid changing global ulimit.
-	(ulimit -n 20; got checkout -q $testroot/repo $testroot/wt \
+	(ulimit -n 32; got checkout -q $testroot/repo $testroot/wt \
 		> $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
