@@ -121,7 +121,7 @@ typedef struct {
 %token	LISTEN WWW_PATH MAX_REPOS SITE_NAME SITE_OWNER SITE_LINK LOGO
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
-%token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK
+%token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
 %token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS
 
 %token	<v.string>	STRING
@@ -358,6 +358,9 @@ serveropts1	: REPOS_PATH STRING {
 		| SHOW_REPO_CLONEURL boolean {
 			new_srv->show_repo_cloneurl = $2;
 		}
+		| RESPECT_EXPORTOK boolean {
+			new_srv->respect_exportok = $2;
+		}
 		| MAX_REPOS_DISPLAY NUMBER {
 				new_srv->max_repos_display = $2;
 		}
@@ -441,6 +444,7 @@ lookup(char *s)
 		{ "port",			PORT },
 		{ "prefork",			PREFORK },
 		{ "repos_path",			REPOS_PATH },
+		{ "respect_exportok",		RESPECT_EXPORTOK },
 		{ "server",			SERVER },
 		{ "show_repo_age",		SHOW_REPO_AGE },
 		{ "show_repo_cloneurl",		SHOW_REPO_CLONEURL },
@@ -877,6 +881,7 @@ conf_new_server(const char *name)
 	srv->show_repo_age = D_SHOWAGE;
 	srv->show_repo_description = D_SHOWDESC;
 	srv->show_repo_cloneurl = D_SHOWURL;
+	srv->respect_exportok = D_RESPECTEXPORTOK;
 
 	srv->max_repos_display = D_MAXREPODISP;
 	srv->max_commits_display = D_MAXCOMMITDISP;

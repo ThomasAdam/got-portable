@@ -71,6 +71,7 @@
 #define D_SHOWAGE		 1
 #define D_SHOWDESC		 1
 #define D_SHOWURL		 1
+#define D_RESPECTEXPORTOK	 0
 #define D_MAXREPO		 0
 #define D_MAXREPODISP		 25
 #define D_MAXSLCOMMDISP		 10
@@ -278,6 +279,7 @@ struct server {
 	int		 show_repo_age;
 	int		 show_repo_description;
 	int		 show_repo_cloneurl;
+	int		 respect_exportok;
 
 	int		 unix_socket;
 	char		 unix_socket_name[PATH_MAX];

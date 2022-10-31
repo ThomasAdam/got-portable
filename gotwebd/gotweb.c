@@ -2439,6 +2439,13 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	}
 
 done:
+	if (srv->respect_exportok &&
+	    faccessat(dirfd(dt), "git-daemon-export-ok", F_OK, 0) == -1) {
+		error = got_error_path(repo_dir->name, GOT_ERR_NOT_GIT_REPO);
+		goto err;
+	}
+
+
 	repo = find_cached_repo(srv, repo_dir->path);
 	if (repo == NULL) {
 		error = cache_repo(&repo, srv, repo_dir, sock);
