@@ -50,6 +50,7 @@
 #include "got_lib_pkt.h"
 #include "got_lib_gitproto.h"
 #include "got_lib_ratelimit.h"
+#include "got_lib_poll.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -144,7 +145,7 @@ send_pack_file(int sendfd, int packfd, struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
 	unsigned char buf[8192];
-	ssize_t r, w;
+	ssize_t r;
 	off_t wtotal = 0;
 	struct got_ratelimit rl;
 
@@ -159,12 +160,10 @@ send_pack_file(int sendfd, int packfd, struct imsgbuf *ibuf)
 			return got_error_from_errno("read");
 		if (r == 0)
 			break;
-		w = write(sendfd, buf, r);
-		if (w == -1)
-			return got_error_from_errno("write");
-		if (w != r)
-			return got_error(GOT_ERR_IO);
-		wtotal += w;
+		err = got_poll_write_full(sendfd, buf, r);
+		if (err)
+			return NULL;
+		wtotal += r;
 		err = send_upload_progress(ibuf, wtotal, &rl);
 		if (err)
 			return err;
