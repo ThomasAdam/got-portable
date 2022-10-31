@@ -1681,6 +1681,43 @@ test_commit_gitignore() {
 	test_done "$testroot" "$ret"
 }
 
+test_commit_bad_author() {
+	local testroot=`test_init commit_bad_author`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit \
+		-A "${GIT_AUTHOR_NAME}<${GIT_AUTHOR_EMAIL}>" -m 'edit alpha') \
+		> /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo -n "got: ${GIT_AUTHOR_NAME}<${GIT_AUTHOR_EMAIL}>: " \
+	     > $testroot/stderr.expected
+	echo -n 'space between author name and email required: ' \
+	     >> $testroot/stderr.expected
+	echo 'commit author formatting would make Git unhappy' \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
 
 test_parseargs "$@"
 run_test test_commit_basic
@@ -1711,3 +1748,4 @@ run_test test_commit_fix_bad_symlink
 run_test test_commit_prepared_logmsg
 run_test test_commit_large_file
 run_test test_commit_gitignore
+run_test test_commit_bad_author

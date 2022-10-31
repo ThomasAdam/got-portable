@@ -562,6 +562,9 @@ valid_author(const char *author)
 
 	while (*author && *author != '\n' && *author != '<' && *author != '>')
 		author++;
+	if (author != email && *author == '<' && *(author - 1) != ' ')
+		return got_error_fmt(GOT_ERR_COMMIT_BAD_AUTHOR, "%s: space "
+		    "between author name and email required", email);
 	if (*author++ != '<')
 		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
 	while (*author && *author != '\n' && *author != '<' && *author != '>')

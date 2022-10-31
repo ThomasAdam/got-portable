@@ -231,6 +231,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_REFS_PROTECTED, "reference namespace may not be modified" },
 	{ GOT_ERR_REF_PROTECTED," reference may not be modified" },
 	{ GOT_ERR_REF_BUSY, "reference cannot be updated; please try again" },
+	{ GOT_ERR_COMMIT_BAD_AUTHOR, "commit author formatting would "
+	    "make Git unhappy" },
 };
 
 static struct got_custom_error {
