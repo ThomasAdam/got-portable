@@ -130,6 +130,10 @@ Set the maximum amount of repositories displayed on the index screen.
 .It Ic repos_path Ar path
 Set the path to the directory which contains Git repositories that
 the server should publish.
+.It Ic respect_exportok Ar on | off
+Set whether to display the repository only if it contains the magic
+.Pa git-daemon-export-ok
+file.
 .It Ic show_repo_age Ar on | off
 Toggle display of last repository modification date.
 .It Ic show_repo_cloneurl Ar on | off
@@ -196,6 +200,8 @@ server "localhost-unix" {
 	#show_repo_age  false
 	#show_repo_description no
 	#show_repo_cloneurl  off
+	# off by default
+	#respect_exportok  on
 
 	#max_repos   100
 	#max_repos_display  25
