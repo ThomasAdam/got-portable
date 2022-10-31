@@ -971,7 +971,7 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 		pack_chunksize = sizeof(buf);
 
 	for (;;) {
-		ssize_t r, w;
+		ssize_t r;
 
 		r = read(packfd, use_sidebands ? &buf[1] : buf,
 		    pack_chunksize);
@@ -989,12 +989,10 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 			if (err)
 				break;
 		} else {
-			w = write(outfd, buf, r);
-			if (w == -1) {
-				err = got_error_from_errno("write");
-				break;
-			} else if (w != r) {
-				err = got_error(GOT_ERR_IO);
+			err = got_poll_write_full(outfd, buf, r);
+			if (err) {
+				if (err->code == GOT_ERR_EOF)
+					err = NULL;
 				break;
 			}
 		}
