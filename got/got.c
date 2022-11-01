@@ -8416,8 +8416,8 @@ done:
 }
 
 static const struct got_error *
-collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
-    void *arg)
+collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
+    const char *diff_path, char **logmsg, void *arg)
 {
 	char *initial_content = NULL;
 	struct got_pathlist_entry *pe;
@@ -8479,6 +8479,11 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		    got_commitable_get_path(ct));
 	}
 
+	if (diff_path) {
+		dprintf(fd, "# detailed changes can be viewed in %s\n",
+		    diff_path);
+	}
+
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content,
 	    initial_content_len, a->prepared_log ? 0 : 1);
 done:
@@ -8513,13 +8518,14 @@ cmd_commit(int argc, char *argv[])
 	char *gitconfig_path = NULL, *editor = NULL, *committer = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
 	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
+	int show_diff = 1;
 	struct got_pathlist_head paths;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
-	while ((ch = getopt(argc, argv, "A:F:m:NS")) != -1) {
+	while ((ch = getopt(argc, argv, "A:F:m:NnS")) != -1) {
 		switch (ch) {
 		case 'A':
 			author = optarg;
@@ -8542,6 +8548,9 @@ cmd_commit(int argc, char *argv[])
 			break;
 		case 'N':
 			non_interactive = 1;
+			break;
+		case 'n':
+			show_diff = 0;
 			break;
 		case 'S':
 			allow_bad_symlinks = 1;
@@ -8649,7 +8658,7 @@ cmd_commit(int argc, char *argv[])
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
 	error = got_worktree_commit(&id, worktree, &paths, author, committer,
-	    allow_bad_symlinks, collect_commit_logmsg, &cl_arg,
+	    allow_bad_symlinks, show_diff, collect_commit_logmsg, &cl_arg,
 	    print_status, NULL, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&

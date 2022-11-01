@@ -1621,7 +1621,7 @@ is a directory.
 .Tg ci
 .It Xo
 .Cm commit
-.Op Fl NS
+.Op Fl NnS
 .Op Fl A Ar author
 .Op Fl F Ar path
 .Op Fl m Ar message
@@ -1732,6 +1732,11 @@ from opening the commit message in an editor.
 It has no effect unless it is used together with the
 .Fl F
 option and is intended for non-interactive use such as scripting.
+.It Fl n
+This option prevents
+.Cm got commit
+from generating a diff of the to-be-committed changes in a temporary file
+which can be viewed while editing a commit message.
 .It Fl S
 Allow the addition of symbolic links which point outside of the path space
 that is under version control.

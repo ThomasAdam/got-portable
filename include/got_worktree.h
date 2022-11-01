@@ -220,12 +220,13 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
 /*
  * A callback function which is invoked when a commit message is requested.
  * Passes a pathlist with a struct got_commitable * in the data pointer of
- * each element, a pointer to the log message that must be set by the
- * callback and will be freed after committing, and an argument passed
- * through to the callback.
+ * each element, the path to a file which contains a diff of changes to be
+ * committed (may be NULL), and a pointer to the log message that must be
+ * set by the callback and will be freed after committing, and an argument
+ * passed through to the callback.
  */
 typedef const struct got_error *(*got_worktree_commit_msg_cb)(
-    struct got_pathlist_head *, char **, void *);
+    struct got_pathlist_head *, const char *, char **, void *);
 
 /*
  * Create a new commit from changes in the work tree.
@@ -241,7 +242,7 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, struct got_pathlist_head *, const char *,
-    const char *, int, got_worktree_commit_msg_cb, void *,
+    const char *, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
 /* Get the path of a commitable worktree item. */
