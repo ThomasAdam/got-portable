@@ -4952,7 +4952,209 @@ struct collect_commitables_arg {
 	struct got_fileindex *fileindex;
 	int have_staged_files;
 	int allow_bad_symlinks;
+	int diff_header_shown;
+	FILE *diff_outfile;
+	FILE *f1;
+	FILE *f2;
 };
+
+/*
+ * Create a file which contains the target path of a symlink so we can feed
+ * it as content to the diff engine.
+ */
+static const struct got_error *
+get_symlink_target_file(int *fd, int dirfd, const char *de_name,
+    const char *abspath)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	ssize_t target_len, outlen;
+
+	*fd = -1;
+
+	if (dirfd != -1) {
+		target_len = readlinkat(dirfd, de_name, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlinkat", abspath);
+	} else {
+		target_len = readlink(abspath, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlink", abspath);
+	}
+
+	*fd = got_opentempfd();
+	if (*fd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	outlen = write(*fd, target_path, target_len);
+	if (outlen == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	if (lseek(*fd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", abspath);
+		goto done;
+	}
+done:
+	if (err) {
+		close(*fd);
+		*fd = -1;
+	}
+	return err;
+}
+
+static const struct got_error *
+append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
+    FILE *diff_outfile, FILE *f1, FILE *f2, int dirfd, const char *de_name,
+    struct got_repository *repo, struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+	struct got_blob_object *blob1 = NULL;
+	int fd = -1, fd1 = -1, fd2 = -1;
+	FILE *ondisk_file = NULL;
+	char *label1 = NULL;
+	struct stat sb;
+	off_t size1 = 0;
+	int f2_exists = 0;
+	int diff_staged = (ct->staged_status != GOT_STATUS_NO_CHANGE);
+	char *id_str = NULL;
+
+	memset(&sb, 0, sizeof(sb));
+
+	err = got_opentemp_truncate(f1);
+	if (err)
+		return got_error_from_errno("got_opentemp_truncate");
+	err = got_opentemp_truncate(f2);
+	if (err)
+		return got_error_from_errno("got_opentemp_truncate");
+
+	if (!*diff_header_shown) {
+		err = got_object_id_str(&id_str, worktree->base_commit_id);
+		if (err)
+			return err;
+		fprintf(diff_outfile, "diff %s%s\n", diff_staged ? "-s " : "",
+		    got_worktree_get_root_path(worktree));
+		fprintf(diff_outfile, "commit - %s\n", id_str);
+		fprintf(diff_outfile, "path + %s%s\n",
+		    got_worktree_get_root_path(worktree),
+		    diff_staged ? " (staged changes)" : "");
+		*diff_header_shown = 1;
+	}
+
+	if (diff_staged) {
+		const char *label1 = NULL, *label2 = NULL;
+		switch (ct->staged_status) {
+		case GOT_STATUS_MODIFY:
+			label1 = ct->path;
+			label2 = ct->path;
+			break;
+		case GOT_STATUS_ADD:
+			label2 = ct->path;
+			break;
+		case GOT_STATUS_DELETE:
+			label1 = ct->path;
+			break;
+		default:
+			return got_error(GOT_ERR_FILE_STATUS);
+		}
+		fd1 = got_opentempfd();
+		if (fd1 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+		fd2 = got_opentempfd();
+		if (fd2 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+		err = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
+		    fd1, fd2, ct->base_blob_id, ct->staged_blob_id,
+		    label1, label2, GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0,
+		    repo, diff_outfile);
+		goto done;
+	}
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	if (ct->status != GOT_STATUS_ADD) {
+		err = got_object_open_as_blob(&blob1, repo, ct->base_blob_id,
+		    8192, fd1);
+		if (err)
+			goto done;
+	}
+
+	if (ct->status != GOT_STATUS_DELETE) {
+		if (dirfd != -1) {
+			fd = openat(dirfd, de_name,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+			if (fd == -1) {
+				if (!got_err_open_nofollow_on_symlink()) {
+					err = got_error_from_errno2("openat",
+					    ct->ondisk_path);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd, dirfd,
+				    de_name, ct->ondisk_path);
+				if (err)
+					goto done;
+			}
+		} else {
+			fd = open(ct->ondisk_path,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+			if (fd == -1) {
+				if (!got_err_open_nofollow_on_symlink()) {
+					err = got_error_from_errno2("open",
+					    ct->ondisk_path);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd, dirfd,
+				    de_name, ct->ondisk_path);
+				if (err)
+					goto done;
+			}
+		}
+		if (fstatat(fd, ct->ondisk_path, &sb,
+		    AT_SYMLINK_NOFOLLOW) == -1) {
+			err = got_error_from_errno2("fstatat", ct->ondisk_path);
+			goto done;
+		}
+		ondisk_file = fdopen(fd, "r");
+		if (ondisk_file == NULL) {
+			err = got_error_from_errno2("fdopen", ct->ondisk_path);
+			goto done;
+		}
+		fd = -1;
+		f2_exists = 1;
+	}
+
+	if (blob1) {
+		err = got_object_blob_dump_to_file(&size1, NULL, NULL,
+		    f1, blob1);
+		if (err)
+			goto done;
+	}
+
+	err = got_diff_blob_file(blob1, f1, size1, label1,
+	    ondisk_file ? ondisk_file : f2, f2_exists, &sb, ct->path,
+	    GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, diff_outfile);
+done:
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (blob1)
+		got_object_blob_close(blob1);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (ondisk_file && fclose(ondisk_file) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	return err;
+}
 
 static const struct got_error *
 collect_commitables(void *arg, unsigned char status,
@@ -5103,6 +5305,16 @@ collect_commitables(void *arg, unsigned char status,
 		goto done;
 	}
 	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
+	if (err)
+		goto done;
+
+	if (a->diff_outfile && ct && new != NULL) {
+		err = append_ct_diff(ct, &a->diff_header_shown,
+		    a->diff_outfile, a->f1, a->f2, dirfd, de_name,
+		    a->repo, a->worktree);
+		if (err)
+			goto done;
+	}
 done:
 	if (ct && (err || new == NULL))
 		free_commitable(ct);
@@ -5681,7 +5893,7 @@ commit_worktree(struct got_object_id **new_commit_id,
     struct got_object_id *head_commit_id,
     struct got_object_id *parent_id2,
     struct got_worktree *worktree,
-    const char *author, const char *committer,
+    const char *author, const char *committer, char *diff_path,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
@@ -5713,7 +5925,8 @@ commit_worktree(struct got_object_id **new_commit_id,
 		goto done;
 
 	if (commit_msg_cb != NULL) {
-		err = commit_msg_cb(commitable_paths, &logmsg, commit_arg);
+		err = commit_msg_cb(commitable_paths, diff_path,
+		    &logmsg, commit_arg);
 		if (err)
 			goto done;
 	}
@@ -5886,7 +6099,7 @@ const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
     const char *author, const char *committer, int allow_bad_symlinks,
-    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
+    int show_diff, got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -5898,10 +6111,12 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_pathlist_entry *pe;
 	struct got_reference *head_ref = NULL;
 	struct got_object_id *head_commit_id = NULL;
+	char *diff_path = NULL;
 	int have_staged_files = 0;
 
 	*new_commit_id = NULL;
 
+	memset(&cc_arg, 0, sizeof(cc_arg));
 	TAILQ_INIT(&commitable_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
@@ -5936,11 +6151,36 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = have_staged_files;
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
+	cc_arg.diff_header_shown = 0;
+	if (show_diff) {
+		err = got_opentemp_named(&diff_path, &cc_arg.diff_outfile,
+		    GOT_TMPDIR_STR "/got-diff");
+		if (err)
+			goto done;
+		cc_arg.f1 = got_opentemp();
+		if (cc_arg.f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+		cc_arg.f2 = got_opentemp();
+		if (cc_arg.f2 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+	}
+
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
+	}
+
+	if (show_diff) {
+		if (fflush(cc_arg.diff_outfile) == EOF) {
+			err = got_error_from_errno("fflush");
+			goto done;
+		}
 	}
 
 	if (TAILQ_EMPTY(&commitable_paths)) {
@@ -5969,7 +6209,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, NULL, worktree, author, committer,
+	    head_commit_id, NULL, worktree, author, committer, diff_path,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
@@ -5991,6 +6231,12 @@ done:
 		free_commitable(ct);
 	}
 	got_pathlist_free(&commitable_paths);
+	if (diff_path && unlink(diff_path) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", diff_path);
+	free(diff_path);
+	if (cc_arg.diff_outfile && fclose(cc_arg.diff_outfile) == EOF &&
+	    err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -6284,7 +6530,7 @@ got_worktree_rebase_in_progress(int *in_progress, struct got_worktree *worktree)
 
 static const struct got_error *
 collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
-    char **logmsg, void *arg)
+    const char *diff_path, char **logmsg, void *arg)
 {
 	*logmsg = arg;
 	return NULL;
@@ -6481,6 +6727,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	struct got_object_id *head_commit_id = NULL;
 	char *logmsg = NULL;
 
+	memset(&cc_arg, 0, sizeof(cc_arg));
 	TAILQ_INIT(&commitable_paths);
 	*new_commit_id = NULL;
 
@@ -6554,7 +6801,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    NULL, worktree, got_object_commit_get_author(orig_commit),
 	    committer ? committer :
-	    got_object_commit_get_committer(orig_commit),
+	    got_object_commit_get_committer(orig_commit), NULL,
 	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
 	if (err)
 		goto done;
@@ -7563,8 +7810,8 @@ struct merge_commit_msg_arg {
 };
 
 static const struct got_error *
-merge_commit_msg_cb(struct got_pathlist_head *commitable_paths, char **logmsg,
-    void *arg)
+merge_commit_msg_cb(struct got_pathlist_head *commitable_paths,
+    const char *diff_path, char **logmsg, void *arg)
 {
 	struct merge_commit_msg_arg *a = arg;
 
@@ -7623,6 +7870,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	struct merge_commit_msg_arg mcm_arg;
 	char *fileindex_path = NULL;
 
+	memset(&cc_arg, 0, sizeof(cc_arg));
 	*new_commit_id = NULL;
 
 	TAILQ_INIT(&commitable_paths);
@@ -7682,7 +7930,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	mcm_arg.worktree = worktree;
 	mcm_arg.branch_name = branch_name;
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, branch_tip, worktree, author, committer,
+	    head_commit_id, branch_tip, worktree, author, committer, NULL,
 	    merge_commit_msg_cb, &mcm_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
