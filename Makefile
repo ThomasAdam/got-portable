@@ -7,7 +7,7 @@ SUBDIR += regress
 .endif
 
 .if make(clean) || make(obj) || make(release)
-SUBDIR += gotweb gotwebd gotd gotsh
+SUBDIR += gotweb gotwebd gotd gotsh gotctl
 .endif
 
 .if make(tags) || make(cleandir)
