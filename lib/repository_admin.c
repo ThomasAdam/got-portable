@@ -167,7 +167,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	err = got_opentemp_named_fd(&tmpfile_path, &packfd, path);
+	err = got_opentemp_named_fd(&tmpfile_path, &packfd, path, "");
 	if (err)
 		goto done;
 
@@ -297,7 +297,7 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path);
+	err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path, "");
 	free(path);
 	if (err)
 		goto done;

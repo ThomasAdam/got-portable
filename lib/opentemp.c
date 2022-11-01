@@ -63,21 +63,22 @@ got_opentemp(void)
 }
 
 const struct got_error *
-got_opentemp_named(char **path, FILE **outfile, const char *basepath)
+got_opentemp_named(char **path, FILE **outfile, const char *basepath,
+    const char *suffix)
 {
 	const struct got_error *err = NULL;
 	int fd;
 
 	*outfile = NULL;
 
-	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
+	if (asprintf(path, "%s-XXXXXX%s", basepath, suffix) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}
 
-	fd = mkstemp(*path);
+	fd = mkstemps(*path, strlen(suffix));
 	if (fd == -1) {
-		err = got_error_from_errno2("mkstemp", *path);
+		err = got_error_from_errno2("mkstemps", *path);
 		free(*path);
 		*path = NULL;
 		return err;
@@ -94,19 +95,20 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 }
 
 const struct got_error *
-got_opentemp_named_fd(char **path, int *outfd, const char *basepath)
+got_opentemp_named_fd(char **path, int *outfd, const char *basepath,
+    const char *suffix)
 {
 	const struct got_error *err = NULL;
 	int fd;
 
 	*outfd = -1;
 
-	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
+	if (asprintf(path, "%s-XXXXXX%s", basepath, suffix) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}
 
-	fd = mkstemp(*path);
+	fd = mkstemps(*path, strlen(suffix));
 	if (fd == -1) {
 		err = got_error_from_errno("mkstemp");
 		free(*path);

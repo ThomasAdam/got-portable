@@ -94,7 +94,7 @@ update_meta_file(const char *path_got, const char *name, const char *content)
 		goto done;
 	}
 
-	err = got_opentemp_named(&tmppath, &tmpfile, path);
+	err = got_opentemp_named(&tmppath, &tmpfile, path, "");
 	if (err)
 		goto done;
 
@@ -556,15 +556,15 @@ merge_binary_file(int *overlapcnt, int merged_fd,
 			goto done;
 		}
 		err = got_opentemp_named_fd(&path_orig, &fd_orig,
-		    base_path_orig);
+		    base_path_orig, "");
 		if (err)
 			goto done;
 		err = got_opentemp_named_fd(&path_deriv, &fd_deriv,
-		    base_path_deriv);
+		    base_path_deriv, "");
 		if (err)
 			goto done;
 		err = got_opentemp_named_fd(&path_deriv2, &fd_deriv2,
-		    base_path_deriv2);
+		    base_path_deriv2, "");
 		if (err)
 			goto done;
 		err = copy_file_to_fd(&size_orig, f_orig, fd_orig);
@@ -664,7 +664,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_opentemp_named_fd(&merged_path, &merged_fd, base_path);
+	err = got_opentemp_named_fd(&merged_path, &merged_fd, base_path, "");
 	if (err)
 		goto done;
 
@@ -774,7 +774,7 @@ install_symlink_conflict(const char *deriv_target,
 		goto done;
 	}
 
-	err = got_opentemp_named(&path, &f, "got-symlink-conflict");
+	err = got_opentemp_named(&path, &f, "got-symlink-conflict", "");
 	if (err)
 		goto done;
 
@@ -992,7 +992,8 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 			goto done;
 		}
 
-		err = got_opentemp_named(&blob_orig_path, &f_orig, base_path);
+		err = got_opentemp_named(&blob_orig_path, &f_orig,
+		    base_path, "");
 		if (err)
 			goto done;
 		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_orig,
@@ -1019,7 +1020,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_opentemp_named(&blob_deriv_path, &f_deriv, base_path);
+	err = got_opentemp_named(&blob_deriv_path, &f_deriv, base_path, "");
 	if (err)
 		goto done;
 	err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_deriv,
@@ -1435,7 +1436,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				goto done;
 			} else {
 				err = got_opentemp_named_fd(&tmppath, &fd,
-				    ondisk_path);
+				    ondisk_path, "");
 				if (err)
 					goto done;
 				update = 1;
@@ -2469,7 +2470,7 @@ sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
 	struct timespec timeout;
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
+	    fileindex_path, "");
 	if (err)
 		goto done;
 
@@ -4552,7 +4553,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(&path1, &f1, "got-patched-blob");
+	err = got_opentemp_named(&path1, &f1, "got-patched-blob", "");
 	if (err)
 		goto done;
 
@@ -4565,7 +4566,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(path_outfile, &outfile, "got-patched-content");
+	err = got_opentemp_named(path_outfile, &outfile, "got-patched-content",
+	    "");
 	if (err)
 		goto done;
 
@@ -6154,7 +6156,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.diff_header_shown = 0;
 	if (show_diff) {
 		err = got_opentemp_named(&diff_path, &cc_arg.diff_outfile,
-		    GOT_TMPDIR_STR "/got-diff");
+		    GOT_TMPDIR_STR "/got", ".diff");
 		if (err)
 			goto done;
 		cc_arg.f1 = got_opentemp();
@@ -8611,7 +8613,7 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(&path1, &f1, "got-unstage-blob-base");
+	err = got_opentemp_named(&path1, &f1, "got-unstage-blob-base", "");
 	if (err)
 		goto done;
 
@@ -8624,7 +8626,7 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(&path2, &f2, "got-unstage-blob-staged");
+	err = got_opentemp_named(&path2, &f2, "got-unstage-blob-staged", "");
 	if (err)
 		goto done;
 
@@ -8638,11 +8640,11 @@ create_unstaged_content(char **path_unstaged_content,
 		goto done;
 
 	err = got_opentemp_named(path_unstaged_content, &outfile,
-	    "got-unstaged-content");
+	    "got-unstaged-content", "");
 	if (err)
 		goto done;
 	err = got_opentemp_named(path_new_staged_content, &rejectfile,
-	    "got-new-staged-content");
+	    "got-new-staged-content", "");
 	if (err)
 		goto done;
 
@@ -8801,7 +8803,8 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 			goto done;
 		}
 
-		err = got_opentemp_named(&blob_base_path, &f_base, base_path);
+		err = got_opentemp_named(&blob_base_path, &f_base,
+		    base_path, "");
 		if (err)
 			goto done;
 		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_base,

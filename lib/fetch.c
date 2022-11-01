@@ -191,7 +191,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
-		err = got_opentemp_named_fd(&tmppackpath, &packfd, path);
+		err = got_opentemp_named_fd(&tmppackpath, &packfd, path, "");
 		free(path);
 		if (err)
 			goto done;
@@ -212,7 +212,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
-		err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path);
+		err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path, "");
 		free(path);
 		if (err)
 			goto done;

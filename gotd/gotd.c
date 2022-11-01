@@ -906,7 +906,7 @@ recv_packfile(struct gotd_client *client)
 		goto done;
 	}
 
-	err = got_opentemp_named_fd(&pack_path, &packfd, basepath);
+	err = got_opentemp_named_fd(&pack_path, &packfd, basepath, "");
 	if (err)
 		goto done;
 
@@ -918,7 +918,7 @@ recv_packfile(struct gotd_client *client)
 		basepath = NULL;
 		goto done;
 	}
-	err = got_opentemp_named_fd(&idx_path, &idxfd, basepath);
+	err = got_opentemp_named_fd(&idx_path, &idxfd, basepath, "");
 	if (err)
 		goto done;
 
