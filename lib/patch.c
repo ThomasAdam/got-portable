@@ -714,7 +714,8 @@ open_blob(char **path, FILE **fp, const char *blobid,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(path, fp, GOT_TMPDIR_STR "/got-patch-blob");
+	err = got_opentemp_named(path, fp, GOT_TMPDIR_STR "/got-patch-blob",
+	    "");
 	if (err)
 		goto done;
 
@@ -846,7 +847,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 	} else if (p->xbit)
 		mode |= (S_IXUSR | S_IXGRP | S_IXOTH);
 
-	err = got_opentemp_named(&tmppath, &tmpfile, template);
+	err = got_opentemp_named(&tmppath, &tmpfile, template, "");
 	if (err)
 		goto done;
 	outfd = fileno(tmpfile);
@@ -903,7 +904,7 @@ apply_patch(int *overlapcnt, struct got_worktree *worktree,
 			tmpfile = t;
 		}
 
-		err = got_opentemp_named(&mergepath, &mergefile, template);
+		err = got_opentemp_named(&mergepath, &mergefile, template, "");
 		if (err)
 			goto done;
 		outfd = fileno(mergefile);

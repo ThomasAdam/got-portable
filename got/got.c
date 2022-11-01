@@ -518,7 +518,7 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(logmsg_path, &fd,
-	    GOT_TMPDIR_STR "/got-importmsg");
+	    GOT_TMPDIR_STR "/got-importmsg", "");
 	if (err)
 		goto done;
 
@@ -7166,7 +7166,7 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 		goto done;
 	}
 
-	err = got_opentemp_named_fd(tagmsg_path, &fd, template);
+	err = got_opentemp_named_fd(tagmsg_path, &fd, template, "");
 	if (err)
 		goto done;
 
@@ -8442,7 +8442,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
+	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template, "");
 	if (err)
 		goto done;
 
@@ -10732,7 +10732,7 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 		goto done;
 
 	err = got_opentemp_named_fd(&logmsg_path, &fd,
-	    GOT_TMPDIR_STR "/got-logmsg");
+	    GOT_TMPDIR_STR "/got-logmsg", "");
 	if (err)
 		goto done;
 
@@ -10978,7 +10978,7 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 	FILE *f = NULL;
 	char *path = NULL;
 
-	err = got_opentemp_named(&path, &f, "got-histedit");
+	err = got_opentemp_named(&path, &f, "got-histedit", "");
 	if (err)
 		return err;
 

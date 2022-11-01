@@ -1188,7 +1188,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		goto done;
 	}
 
-	err = got_opentemp_named(&tmppath, &f, path);
+	err = got_opentemp_named(&tmppath, &f, path, "");
 	if (err) {
 		char *parent;
 		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
@@ -1200,7 +1200,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		free(parent);
 		if (err)
 			goto done;
-		err = got_opentemp_named(&tmppath, &f, path);
+		err = got_opentemp_named(&tmppath, &f, path, "");
 		if (err)
 			goto done;
 	}
@@ -1296,7 +1296,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	if (packed_refs_path == NULL)
 		return got_error_from_errno("got_repo_get_path_packed_refs");
 
-	err = got_opentemp_named(&tmppath, &tmpf, packed_refs_path);
+	err = got_opentemp_named(&tmppath, &tmpf, packed_refs_path, "");
 	if (err)
 		goto done;
 

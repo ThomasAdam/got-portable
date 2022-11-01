@@ -221,7 +221,7 @@ diffreg(BUF **d, const char *path1, const char *path2,
 	}
 
 	err = got_opentemp_named(&outpath, &outfile,
-	    GOT_TMPDIR_STR "/got-diffreg");
+	    GOT_TMPDIR_STR "/got-diffreg", "");
 	if (err)
 		goto done;
 

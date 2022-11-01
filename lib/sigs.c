@@ -273,7 +273,7 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 	*msg = NULL;
 
 	error = got_opentemp_named(&tmppath, &tmpsig,
-	    GOT_TMPDIR_STR "/got-tagsig");
+	    GOT_TMPDIR_STR "/got-tagsig", "");
 	if (error)
 		goto done;
 

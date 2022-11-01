@@ -68,7 +68,7 @@ create_object_file(struct got_object_id *id, FILE *content,
 	if (err)
 		return err;
 
-	err = got_opentemp_named(&tmppath, &tmpfile, objpath);
+	err = got_opentemp_named(&tmppath, &tmpfile, objpath, "");
 	if (err) {
 		char *parent_path;
 		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
@@ -80,7 +80,7 @@ create_object_file(struct got_object_id *id, FILE *content,
 		free(parent_path);
 		if (err)
 			goto done;
-		err = got_opentemp_named(&tmppath, &tmpfile, objpath);
+		err = got_opentemp_named(&tmppath, &tmpfile, objpath, "");
 		if (err)
 			goto done;
 	}
