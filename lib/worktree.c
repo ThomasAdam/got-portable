@@ -6220,7 +6220,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, NULL, worktree, author, committer, diff_path,
+	    head_commit_id, NULL, worktree, author, committer,
+	    (diff_path && cc_arg.diff_header_shown) ? diff_path : NULL,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
