@@ -5021,6 +5021,18 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 
 	memset(&sb, 0, sizeof(sb));
 
+	if (diff_staged) {
+		if (ct->staged_status != GOT_STATUS_MODIFY &&
+		    ct->staged_status != GOT_STATUS_ADD &&
+		    ct->staged_status != GOT_STATUS_DELETE)
+			return NULL;
+	} else {
+		if (ct->status != GOT_STATUS_MODIFY &&
+		    ct->status != GOT_STATUS_ADD &&
+		    ct->status != GOT_STATUS_DELETE)
+			return NULL;
+	}
+
 	err = got_opentemp_truncate(f1);
 	if (err)
 		return got_error_from_errno("got_opentemp_truncate");
