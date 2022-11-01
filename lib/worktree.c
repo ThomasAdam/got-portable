@@ -5009,7 +5009,7 @@ done:
 static const struct got_error *
 append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
     FILE *diff_outfile, FILE *f1, FILE *f2, int dirfd, const char *de_name,
-    struct got_repository *repo, struct got_worktree *worktree)
+    int diff_staged, struct got_repository *repo, struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
@@ -5019,7 +5019,6 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 	struct stat sb;
 	off_t size1 = 0;
 	int f2_exists = 0;
-	int diff_staged = (ct->staged_status != GOT_STATUS_NO_CHANGE);
 	char *id_str = NULL;
 
 	memset(&sb, 0, sizeof(sb));
@@ -5313,7 +5312,7 @@ collect_commitables(void *arg, unsigned char status,
 	if (a->diff_outfile && ct && new != NULL) {
 		err = append_ct_diff(ct, &a->diff_header_shown,
 		    a->diff_outfile, a->f1, a->f2, dirfd, de_name,
-		    a->repo, a->worktree);
+		    a->have_staged_files, a->repo, a->worktree);
 		if (err)
 			goto done;
 	}
