@@ -26,7 +26,7 @@
 - gotwebd: add respect_exportok flag, defaulting to off (landry)
 - respect open files resource limit when sizing pack cache; regression from 0.71
 - provide a diff of changes in a temp file while editing a commit log message
-- fix memory and file descriptor leak for raw objects (regression from 0.77)
+- fix memory and file descriptor leak for raw objects; regression from 0.77
 - remove casts which made older gcc versions unhappy
 - fix free of wrong address on error in gotweb's parse.y
 
