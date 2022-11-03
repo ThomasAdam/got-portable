@@ -38,20 +38,19 @@ const struct diff_algo_config myers_then_myers_divide;
 const struct diff_algo_config patience;
 const struct diff_algo_config myers_divide;
 
-const struct diff_algo_config myers_then_patience = (struct diff_algo_config){
+const struct diff_algo_config myers_then_patience = {
 	.impl = diff_algo_myers,
 	.permitted_state_size = 1024 * 1024 * sizeof(int),
 	.fallback_algo = &patience,
 };
 
-const struct diff_algo_config myers_then_myers_divide =
-	(struct diff_algo_config){
+const struct diff_algo_config myers_then_myers_divide = {
 	.impl = diff_algo_myers,
 	.permitted_state_size = 1024 * 1024 * sizeof(int),
 	.fallback_algo = &myers_divide,
 };
 
-const struct diff_algo_config patience = (struct diff_algo_config){
+const struct diff_algo_config patience = {
 	.impl = diff_algo_patience,
 	/* After subdivision, do Patience again: */
 	.inner_algo = &patience,
@@ -59,7 +58,7 @@ const struct diff_algo_config patience = (struct diff_algo_config){
 	.fallback_algo = &myers_then_myers_divide,
 };
 
-const struct diff_algo_config myers_divide = (struct diff_algo_config){
+const struct diff_algo_config myers_divide = {
 	.impl = diff_algo_myers_divide,
 	/* When division succeeded, start from the top: */
 	.inner_algo = &myers_then_myers_divide,
