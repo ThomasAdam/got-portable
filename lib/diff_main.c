@@ -634,8 +634,9 @@ diff_result_contains_printable_chunks(struct diff_result *result)
 {
 	struct diff_chunk *c;
 	enum diff_chunk_type t;
+	int i;
 
-	for (int i = 0; i < result->chunks.len; i++) {
+	for (i = 0; i < result->chunks.len; i++) {
 		c = &result->chunks.head[i];
 		t = diff_chunk_type(c);
 		if (t == CHUNK_MINUS || t == CHUNK_PLUS)
