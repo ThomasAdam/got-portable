@@ -522,8 +522,7 @@ done:
 			*obj = NULL;
 		}
 		free(outbuf);
-	} else
-		(*obj)->refcnt++;
+	}
 	return err;
 }
 
