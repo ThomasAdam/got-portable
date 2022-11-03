@@ -501,7 +501,7 @@ pushfile(struct file **nfile, const char *name)
 	if (((*nfile) = calloc(1, sizeof(struct file))) == NULL)
 		return got_error_from_errno2(__func__, "calloc");
 	if (((*nfile)->name = strdup(name)) == NULL) {
-		free(nfile);
+		free(*nfile);
 		return got_error_from_errno2(__func__, "strdup");
 	}
 	if (((*nfile)->stream = fopen((*nfile)->name, "re")) == NULL) {
