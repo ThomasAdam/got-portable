@@ -1,3 +1,35 @@
+* got 0.78; 2022-11-03
+- gotsh.1: Use Sx for referencing EXAMPLES (patch by Josiah Frentsos)
+- change got_pack_parse_offset_delta tslen argument to size_t (op)
+- fix regression test failures with Git 2.30.5 / 2.38.1 or later installed
+- fix gotd(8) usage() string (patch by Josiah Frentsos)
+- regress/rebase.sh: remove accidentally included absolute path to "got" (naddy)
+- fix off_t type mismatches in printf format string arguments (naddy, op)
+- fix spelling of "FastCGI" (patch by Josiah Frentsos)
+- add missing `goto done;' on error path of read_raw_delta_data() (op)
+- add bounds check when reading a delta offset from a packed object (op)
+- check size before calling mmap(2) (op)
+- sort getopt() option lists and switch statements (patch by Josiah Frentsos)
+- make got.conf(5) warn about remotes configured in locally-shared repositories
+- add missing check for errors from got_gotconfig_read() in open_worktree()
+- plug a memory leak on error in got_gotconfig_read()
+- convert pack filesize variables to off_t for large packs on 32-bit arch (op)
+- remove sendfd pledge promise from gotd repo_read and repo_write processes
+- add gotctl(8); initially supported commands are 'info' and 'stop'
+- respect umask when creating or changing files and directories (op)
+- fix typo which caused a double-free in gotd repo_write_shutdown()
+- got-fetch-pack: fix wrong memmove length leading to dubious checksum failures
+- avoid incomplete writes of pack file data in gotsh and got-send-pack
+- add a test suite for gotd(8); check basic clone and send functionality
+- require space between commit author name and email, for Git compatibility
+- gotwebd: avoid 500 error code if erroring out in plaintext mode (landry)
+- gotwebd: add respect_exportok flag, defaulting to off (landry)
+- respect open files resource limit when sizing pack cache; regression from 0.71
+- provide a diff of changes in a temp file while editing a commit log message
+- fix memory and file descriptor leak for raw objects (regression from 0.77)
+- remove casts which made older gcc versions unhappy
+- fix free of wrong address on error in gotweb's parse.y
+
 * got 0.77; 2022-10-24
 - disallow integrating into references outside refs/heads/ (jrick)
 - gotwebd.conf: add syntax for defining macros and document them (op)
