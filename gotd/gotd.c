@@ -1908,15 +1908,18 @@ gotd_dispatch(int fd, short event, void *arg)
 				disconnect_on_error(client, err);
 			else
 				disconnect(client);
-		} else if (do_packfile_install)
-			err = install_pack(client, proc->chroot_path, &imsg);
-		else if (do_ref_updates)
-			err = begin_ref_updates(client, &imsg);
-		else if (do_ref_update)
-			err = update_ref(client, proc->chroot_path, &imsg);
-
-		if (err)
-			log_warnx("uid %d: %s", client->euid, err->msg);
+		} else {
+			if (do_packfile_install)
+				err = install_pack(client, proc->chroot_path,
+				    &imsg);
+			else if (do_ref_updates)
+				err = begin_ref_updates(client, &imsg);
+			else if (do_ref_update)
+				err = update_ref(client, proc->chroot_path,
+				    &imsg);
+			if (err)
+				log_warnx("uid %d: %s", client->euid, err->msg);
+		}
 		imsg_free(&imsg);
 	}
 done:
