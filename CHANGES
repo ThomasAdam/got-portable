@@ -41,7 +41,7 @@
 - allow got_object_parse_tree() to reuse entries buffer allocations for speed
 - show a more useful error if the size of a packed object won't fit in 64 bits
 - switch integers used for counting objects while indexing packs to unsigned
-- refresh cached list of pack index paths while searching a packed object 
+- refresh cached list of pack index paths while searching a packed object
 - introduce gotd(8) and gotsh(1); WIP and not yet provided in binary packages
 - close parent's end of imsg pipe before waiting for a child process to exit
 - fix detection of SIGTERM in tog; this signal was accidentally being ignored

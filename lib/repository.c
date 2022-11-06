@@ -331,14 +331,14 @@ got_repo_pack_fds_close(int *pack_fds)
 }
 
 const struct got_error *
-got_repo_temp_fds_open(int **temp_fds) 
+got_repo_temp_fds_open(int **temp_fds)
 {
 	return open_tempfiles(temp_fds, GOT_REPO_NUM_TEMPFILES,
 	    GOT_REPO_NUM_TEMPFILES);
 }
 
 void
-got_repo_temp_fds_set(struct got_repository *repo, int *temp_fds) 
+got_repo_temp_fds_set(struct got_repository *repo, int *temp_fds)
 {
 	int i;
 

@@ -189,7 +189,7 @@ send_ref(int outfd, uint8_t *id, const char *refname, int send_capabilities,
 	char buf[GOT_PKT_MAX];
 	size_t len, capalen = 0;
 
-	if (got_sha1_digest_to_str(id, hex, sizeof(hex)) == NULL) 
+	if (got_sha1_digest_to_str(id, hex, sizeof(hex)) == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_ID);
 
 	len = snprintf(buf, sizeof(buf), "%s %s", hex, refname);
@@ -230,7 +230,7 @@ send_zero_refs(int outfd, int chattygot)
 
 	memset(&zero, 0, sizeof(zero));
 
-	if (got_sha1_digest_to_str(zero, hex, sizeof(hex)) == NULL) 
+	if (got_sha1_digest_to_str(zero, hex, sizeof(hex)) == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_ID);
 
 	len = snprintf(buf, sizeof(buf), "%s capabilities^{}", hex);
@@ -673,7 +673,7 @@ send_ack(int outfd, uint8_t *id, int chattygot)
 	char buf[GOT_PKT_MAX];
 	int len;
 
-	if (got_sha1_digest_to_str(id, hex, sizeof(hex)) == NULL) 
+	if (got_sha1_digest_to_str(id, hex, sizeof(hex)) == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_ID);
 
 	len = snprintf(buf, sizeof(buf), "ACK %s\n", hex);
@@ -846,8 +846,8 @@ relay_progress_reports(struct imsgbuf *ibuf, int outfd, int chattygot)
 			    "%d commits colored, "
 			    "%d objects found, "
 			    "deltify %d%%%s",
-			    iprog.ncolored, 
-			    iprog.nfound, 
+			    iprog.ncolored,
+			    iprog.nfound,
 			    p_deltify, eol);
 			if (n >= sizeof(buf) - 1)
 				break;
