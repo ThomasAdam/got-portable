@@ -93,7 +93,7 @@ main(int argc, char *argv[])
 
 	if (unix_socket_path_env) {
 		if (strlcpy(unix_socket_path, unix_socket_path_env,
-		    sizeof(unix_socket_path)) >= sizeof(unix_socket_path)) 
+		    sizeof(unix_socket_path)) >= sizeof(unix_socket_path))
 			errx(1, "gotd socket path too long");
 	} else {
 		strlcpy(unix_socket_path, GOTD_UNIX_SOCKET,

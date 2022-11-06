@@ -38,7 +38,7 @@ const struct got_error *got_object_read_tree(struct got_parsed_tree_entry **,
 
 const struct got_error *got_object_parse_tag(struct got_tag_object **,
     uint8_t *, size_t);
-const struct got_error *got_object_read_tag(struct got_tag_object **, int, 
+const struct got_error *got_object_read_tag(struct got_tag_object **, int,
     struct got_object_id *, size_t);
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
 

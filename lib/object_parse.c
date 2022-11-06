@@ -1153,7 +1153,7 @@ done:
 }
 
 const struct got_error *
-got_object_read_tag(struct got_tag_object **tag, int fd, 
+got_object_read_tag(struct got_tag_object **tag, int fd,
     struct got_object_id *expected_id, size_t expected_size)
 {
 	const struct got_error *err = NULL;
