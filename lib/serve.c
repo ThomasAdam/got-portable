@@ -242,7 +242,7 @@ send_zero_refs(int outfd, int chattygot)
 	if (err)
 		return err;
 
-	return got_pkt_writepkt(outfd, buf, len, chattygot);
+	return got_pkt_writepkt(outfd, buf, len + capalen, chattygot);
 }
 
 static void
