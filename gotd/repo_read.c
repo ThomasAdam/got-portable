@@ -136,7 +136,8 @@ check_cancelled(void *arg)
 }
 
 static const struct got_error *
-send_symref(struct got_reference *symref, struct imsgbuf *ibuf)
+send_symref(struct got_reference *symref, struct got_object_id *target_id,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsg_symref isymref;
@@ -144,11 +145,6 @@ send_symref(struct got_reference *symref, struct imsgbuf *ibuf)
 	const char *target = got_ref_get_symref_target(symref);
 	size_t len;
 	struct ibuf *wbuf;
-	struct got_object_id *target_id;
-
-	err = got_ref_resolve(&target_id, repo_read.repo, symref);
-	if (err)
-		return err;
 
 	memset(&isymref, 0, sizeof(isymref));
 	isymref.name_len = strlen(refname);
@@ -306,6 +302,7 @@ list_refs(struct repo_read_client **client, struct imsg *imsg)
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
 	int client_fd = imsg->fd;
+	struct got_object_id *head_target_id = NULL;
 
 	TAILQ_INIT(&refs);
 
@@ -340,7 +337,21 @@ list_refs(struct repo_read_client **client, struct imsg *imsg)
 
 		if (got_ref_is_symbolic(re->ref)) {
 			const char *refname = got_ref_get_name(re->ref);
-			if (strcmp(refname, GOT_REF_HEAD) == 0)
+			if (strcmp(refname, GOT_REF_HEAD) != 0)
+				continue;
+			err = got_ref_resolve(&head_target_id, repo_read.repo,
+			    re->ref);
+			if (err) {
+				if (err->code != GOT_ERR_NOT_REF)
+					return err;
+				/*
+				 * HEAD points to a non-existent branch.
+				 * Do not advertise it.
+				 * Matches git-daemon's behaviour.
+				 */
+				head_target_id = NULL;
+				err = NULL;
+			} else
 				irefs.nrefs++;
 			continue;
 		}
@@ -373,9 +384,10 @@ list_refs(struct repo_read_client **client, struct imsg *imsg)
 	 */
 	TAILQ_FOREACH(re, &refs, entry) {
 		if (!got_ref_is_symbolic(re->ref) ||
-		    strcmp(got_ref_get_name(re->ref), GOT_REF_HEAD) != 0)
+		    strcmp(got_ref_get_name(re->ref), GOT_REF_HEAD) != 0 ||
+		    head_target_id == NULL)
 			continue;
-		err = send_symref(re->ref, &ibuf);
+		err = send_symref(re->ref, head_target_id, &ibuf);
 		if (err)
 			goto done;
 		break;
