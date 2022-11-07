@@ -351,6 +351,13 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		if (err)
 			goto done;
 		if (is_firstpkt) {
+			if (server_capabilities == NULL) {
+				server_capabilities = strdup("");
+				if (server_capabilities == NULL) {
+					err = got_error_from_errno("strdup");
+					goto done;
+				}
+			}
 			if (chattygot && server_capabilities[0] != '\0')
 				fprintf(stderr, "%s: server capabilities: %s\n",
 				    getprogname(), server_capabilities);
@@ -361,7 +368,8 @@ send_pack(int fd, struct got_pathlist_head *refs,
 				goto done;
 			if (chattygot)
 				fprintf(stderr, "%s: my capabilities:%s\n",
-				    getprogname(), my_capabilities);
+				    getprogname(),
+				    my_capabilities ? my_capabilities : "");
 			is_firstpkt = 0;
 		}
 		if (strstr(refname, "^{}")) {
