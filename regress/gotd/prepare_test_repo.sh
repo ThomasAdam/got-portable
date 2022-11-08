@@ -16,14 +16,27 @@
 
 . ../cmdline/common.sh
 
+make_repo()
+{
+	local repo_path="$1"
+	local no_tree="$2"
+
+	gotadmin init "${repo_path}"
+
+	if [ -n "$no_tree" ]; then
+		return
+	fi
+
+	test_tree=`mktemp -d "${GOTD_TEST_ROOT}/gotd-test-tree-XXXXXXXXX"`
+	make_test_tree "$test_tree"
+	got import -m "import the test tree" -r "${GOTD_TEST_REPO}" "$test_tree" \
+		> /dev/null
+	rm -r "$test_tree" # TODO: trap
+}
+
+
 if [ -e "${GOTD_TEST_REPO}" ]; then
 	rm -rf "${GOTD_TEST_REPO}"
 fi
 
-gotadmin init "${GOTD_TEST_REPO}"
-
-test_tree=`mktemp -d "${GOTD_TEST_ROOT}/gotd-test-tree-XXXXXXXXX"`
-make_test_tree "$test_tree"
-got import -m "import the test tree" -r "${GOTD_TEST_REPO}" "$test_tree" \
-	> /dev/null
-rm -r "$test_tree" # TODO: trap
+make_repo "${GOTD_TEST_REPO}" "$1"
