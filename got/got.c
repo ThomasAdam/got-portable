@@ -1881,6 +1881,20 @@ cmd_clone(int argc, char *argv[])
 				goto done;
 			break;
 		}
+
+		if (!fpa.configs_created && pe != NULL) {
+			error = create_config_files(fpa.config_info.proto,
+			    fpa.config_info.host, fpa.config_info.port,
+			    fpa.config_info.remote_repo_path,
+			    fpa.config_info.git_url,
+			    fpa.config_info.fetch_all_branches,
+			    fpa.config_info.mirror_references,
+			    fpa.config_info.symrefs,
+			    fpa.config_info.wanted_branches,
+			    fpa.config_info.wanted_refs, fpa.repo);
+			if (error)
+				goto done;
+		}
 	}
 
 	if (verbosity >= 0)

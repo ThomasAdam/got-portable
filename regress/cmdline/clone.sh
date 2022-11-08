@@ -754,6 +754,87 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_clone_dangling_headref() {
+	local testroot=`test_init clone_dangling_headref`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -d master > /dev/null
+	got branch -r $testroot/repo -c $commit_id foo
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	# refs/heads/master is missing because it was deleted above
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got clone -q -b foo $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+	branch { "foo" }
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = refs/heads/foo:refs/remotes/origin/foo
+	fetch = refs/tags/*:refs/tags/*
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_clone_basic
 run_test test_clone_list
@@ -765,3 +846,4 @@ run_test test_clone_reference
 run_test test_clone_branch_and_reference
 run_test test_clone_reference_mirror
 run_test test_clone_multiple_branches
+run_test test_clone_dangling_headref
