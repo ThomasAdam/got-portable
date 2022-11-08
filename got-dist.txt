@@ -373,6 +373,7 @@
 /regress/gotd/prepare_test_repo.sh
 /regress/gotd/repo_read.sh
 /regress/gotd/repo_write.sh
+/regress/gotd/repo_write_empty.sh
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
