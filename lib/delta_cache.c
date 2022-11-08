@@ -158,8 +158,10 @@ delta_cache_resize(struct got_delta_cache *cache, unsigned int nbuckets)
 				new_delta = &head->entries[head->nchain];
 				memcpy(new_delta, delta, sizeof(*new_delta));
 				head->nchain++;
-			} else
+			} else {
 				free(delta->data);
+				cache->totelem--;
+			}
 		}
 	}
 
@@ -217,6 +219,8 @@ got_delta_cache_add(struct got_delta_cache *cache,
 		free(delta->data);
 		memset(delta, 0, sizeof(*delta));
 		head->nchain--;
+		cache->totelem--;
+		cache->cache_evict++;
 	}
 
 	delta = &head->entries[head->nchain];
