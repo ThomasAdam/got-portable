@@ -373,7 +373,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					break;
 				}
 			}
-			continue;
+			if (default_branch)
+				continue;
 		}
 		if (strstr(refname, "^{}")) {
 			if (chattygot) {
