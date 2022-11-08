@@ -38,7 +38,7 @@ test_send_empty() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got checkout failed unexpectedly" >&2
-		test_done "$testroot" "1"
+		test_done "$testroot" 1
 		return 1
 	fi
 
@@ -54,7 +54,7 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send failed unexpectedly" >&2
-		test_done "$testroot" "1"
+		test_done "$testroot" 1
 		return 1
 	fi
 
@@ -78,7 +78,7 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got clone failed unexpectedly" >&2
-		test_done "$testroot" "1"
+		test_done "$testroot" 1
 		return 1
 	fi
 
@@ -104,14 +104,14 @@ EOF
 	diff -u $testroot/repo-list.before $testroot/repo-list.after \
 		> $testroot/repo-list.diff
 	grep '^+[^+]' < $testroot/repo-list.diff > $testroot/repo-list.newlines
-	nplus=`wc -l < $testroot/repo-list.newlines | tr -d ' '`
+	nplus=`awk '/^\+[^+]/{c++} END{print c}' $testroot/repo-list.diff`
 	if [ "$nplus" != "4" ]; then
-		echo "$nplus new files created:"
+		echo "$nplus new files created:" >&2
 		cat $testroot/repo-list.diff
-		test_done "$testroot" "1"
+		test_done "$testroot" 1
 		return 1
 	fi
-	egrep -q '\+\.\/objects\/pack\/pack-[a-f0-9]{40}.pack' $testroot/repo-list.newlines
+	egrep -q '\+\./objects/pack/pack-[a-f0-9]{40}\.pack' $testroot/repo-list.newlines
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "new pack file not found in ${GOTD_TEST_REPO}"
@@ -119,26 +119,26 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	egrep -q '\+\.\/objects\/pack\/pack-[a-f0-9]{40}.idx' $testroot/repo-list.newlines
+	egrep -q '\+\./objects/pack/pack-[a-f0-9]{40}\.idx' $testroot/repo-list.newlines
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "new pack index not found in ${GOTD_TEST_REPO}"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	egrep -q '\+\.\/refs\/heads' $testroot/repo-list.newlines
+	fgrep -q '+./refs/heads' $testroot/repo-list.newlines
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "new refs/heads directory not found"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	if ! [ -d ${GOTD_TEST_REPO}/refs/heads ]; then
+	if [ ! -d ${GOTD_TEST_REPO}/refs/heads ]; then
 		echo "new refs/heads is not a directory"
-		test_done "$testroot" "1"
+		test_done "$testroot" 1
 		return 1
 	fi
-	egrep -q '\+\.\/refs\/heads\/master' $testroot/repo-list.newlines
+	fgrep -q '+./refs/heads/master' $testroot/repo-list.newlines
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "new refs/heads/master not found"
