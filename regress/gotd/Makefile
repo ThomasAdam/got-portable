@@ -1,4 +1,4 @@
-REGRESS_TARGETS=test_repo_read test_repo_write
+REGRESS_TARGETS=test_repo_read test_repo_write test_repo_write_empty
 NOOBJ=Yes
 
 .PHONY: ensure_root prepare_test_repo check_test_repo start_gotd
@@ -25,6 +25,7 @@ GOTD_TEST_ENV=GOTD_TEST_ROOT=$(GOTD_TEST_ROOT) \
 	GOTD_TEST_REPO_URL=$(GOTD_TEST_REPO_URL) \
 	GOTD_TEST_REPO=$(GOTD_TEST_REPO) \
 	GOTD_SOCK=$(GOTD_SOCK) \
+	GOTD_DEVUSER=$(GOTD_DEVUSER) \
 	HOME=$(GOTD_TEST_USER_HOME) \
 	PATH=$(GOTD_TEST_USER_HOME)/bin:$(PATH)
 
@@ -48,6 +49,10 @@ prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
 
+prepare_test_repo_empty: ensure_root
+	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh 1'
+
 test_repo_read: prepare_test_repo start_gotd
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_read.sh'
@@ -57,6 +62,12 @@ test_repo_read: prepare_test_repo start_gotd
 test_repo_write: prepare_test_repo start_gotd
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_write.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
+
+test_repo_write_empty: prepare_test_repo_empty start_gotd
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./repo_write_empty.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 	
