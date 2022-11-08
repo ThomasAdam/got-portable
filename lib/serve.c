@@ -220,7 +220,7 @@ send_ref(int outfd, uint8_t *id, const char *refname, int send_capabilities,
 }
 
 static const struct got_error *
-send_zero_refs(int outfd, int chattygot)
+send_zero_refs(int outfd, int client_is_reading, int chattygot)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKT_MAX];
@@ -237,10 +237,18 @@ send_zero_refs(int outfd, int chattygot)
 	if (len >= sizeof(buf))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	err = got_gitproto_append_capabilities(&capalen, buf, len,
-	    sizeof(buf), read_capabilities, nitems(read_capabilities));
-	if (err)
-		return err;
+	if (client_is_reading) {
+		err = got_gitproto_append_capabilities(&capalen, buf, len,
+		    sizeof(buf), read_capabilities, nitems(read_capabilities));
+		if (err)
+			return err;
+	} else {
+		err = got_gitproto_append_capabilities(&capalen, buf, len,
+		    sizeof(buf), write_capabilities,
+		    nitems(write_capabilities));
+		if (err)
+			return err;
+	}
 
 	return got_pkt_writepkt(outfd, buf, len + capalen, chattygot);
 }
@@ -315,7 +323,8 @@ announce_refs(int outfd, struct imsgbuf *ibuf, int client_is_reading,
 			nrefs = ireflist.nrefs;
 			have_nrefs = 1;
 			if (nrefs == 0)
-				err = send_zero_refs(outfd, chattygot);
+				err = send_zero_refs(outfd, client_is_reading,
+				    chattygot);
 			break;
 		case GOTD_IMSG_REF:
 			if (!have_nrefs || nrefs == 0) {
