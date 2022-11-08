@@ -41,7 +41,7 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	const struct got_error *err = NULL;
 	int zerr;
 
-	memset(&zb->z, 0, sizeof(zb->z));
+	memset(zb, 0, sizeof(*zb));
 
 	zb->z.zalloc = Z_NULL;
 	zb->z.zfree = Z_NULL;
