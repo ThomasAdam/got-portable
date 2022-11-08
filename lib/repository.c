@@ -1150,7 +1150,9 @@ refresh_packidx_paths(struct got_repository *repo)
 			err = got_error_from_errno2("stat", objects_pack_dir);
 			goto done;
 		}
-	} else if (sb.st_mtime != repo->pack_path_mtime) {
+	} else if (TAILQ_EMPTY(&repo->packidx_paths) ||
+	    sb.st_mtim.tv_sec != repo->pack_path_mtime.tv_sec ||
+	    sb.st_mtim.tv_nsec != repo->pack_path_mtime.tv_nsec) {
 		purge_packidx_paths(&repo->packidx_paths);
 		err = got_repo_list_packidx(&repo->packidx_paths, repo);
 		if (err)
@@ -1277,7 +1279,8 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 		err = got_error_from_errno("fstat");
 		goto done;
 	}
-	repo->pack_path_mtime = sb.st_mtime;
+	repo->pack_path_mtime.tv_sec = sb.st_mtim.tv_sec;
+	repo->pack_path_mtime.tv_nsec = sb.st_mtim.tv_nsec;
 
 	while ((dent = readdir(packdir)) != NULL) {
 		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))

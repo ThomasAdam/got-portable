@@ -65,7 +65,7 @@ struct got_repository {
 	int gitdir_fd;
 
 	struct got_pathlist_head packidx_paths;
-	time_t pack_path_mtime;
+	struct timespec pack_path_mtime;
 
 	/* The pack index cache speeds up search for packed objects. */
 	struct got_packidx *packidx_cache[GOT_PACK_CACHE_SIZE];
