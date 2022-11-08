@@ -126,7 +126,7 @@ delta_cache_hash(struct got_delta_cache *cache, off_t delta_offset)
 	return SipHash24(&cache->key, &delta_offset, sizeof(delta_offset));
 }
 
-#ifndef GOT_NO_OBJ_CACHE
+#ifndef GOT_NO_DELTA_CACHE
 static const struct got_error *
 delta_cache_resize(struct got_delta_cache *cache, unsigned int nbuckets)
 {
@@ -191,7 +191,7 @@ const struct got_error *
 got_delta_cache_add(struct got_delta_cache *cache,
     off_t delta_data_offset, uint8_t *delta_data, size_t delta_len)
 {
-#ifdef GOT_NO_OBJ_CACHE
+#ifdef GOT_NO_DELTA_CACHE
 	return got_error(GOT_ERR_NO_SPACE);
 #else
 	const struct got_error *err = NULL;
