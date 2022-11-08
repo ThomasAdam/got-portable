@@ -507,7 +507,6 @@ got_path_find_prog(char **filename, const char *prog)
 			break;
 		free(*filename);
 		*filename = NULL;
-		continue;
 	}
 	free(dup);
 	return err;
