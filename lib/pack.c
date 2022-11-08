@@ -1495,8 +1495,11 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 		err = got_delta_get_sizes(&base_size, &result_size,
 		    delta_buf, delta_len);
-		if (err)
+		if (err) {
+			if (!cached)
+				free(delta_buf);
 			goto done;
+		}
 		if (base_size > max_size)
 			max_size = base_size;
 		if (result_size > max_size)
@@ -1508,6 +1511,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			    base_file);
 			if (w != base_bufsz) {
 				err = got_ferror(outfile, GOT_ERR_IO);
+				if (!cached)
+					free(delta_buf);
 				goto done;
 			}
 			free(base_buf);
@@ -1520,6 +1525,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			uint8_t *p = realloc(base_buf, max_size);
 			if (p == NULL) {
 				err = got_error_from_errno("realloc");
+				if (!cached)
+					free(delta_buf);
 				goto done;
 			}
 			base_buf = p;
@@ -1530,6 +1537,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			uint8_t *p = realloc(accum_buf, max_size);
 			if (p == NULL) {
 				err = got_error_from_errno("realloc");
+				if (!cached)
+					free(delta_buf);
 				goto done;
 			}
 			accum_buf = p;
@@ -1683,8 +1692,11 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 
 		err = got_delta_get_sizes(&base_size, &result_size,
 		    delta_buf, delta_len);
-		if (err)
+		if (err) {
+			if (!cached)
+				free(delta_buf);
 			goto done;
+		}
 		if (base_size > max_size)
 			max_size = base_size;
 		if (result_size > max_size)
@@ -1694,6 +1706,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			uint8_t *p = realloc(base_buf, max_size);
 			if (p == NULL) {
 				err = got_error_from_errno("realloc");
+				if (!cached)
+					free(delta_buf);
 				goto done;
 			}
 			base_buf = p;
@@ -1704,6 +1718,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			uint8_t *p = realloc(accum_buf, max_size);
 			if (p == NULL) {
 				err = got_error_from_errno("realloc");
+				if (!cached)
+					free(delta_buf);
 				goto done;
 			}
 			accum_buf = p;
