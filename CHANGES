@@ -1,3 +1,15 @@
+* got 0.79; 2022-11-08
+- repair build on OpenBSD/sparc64 (patch by Ted Bullock)
+- fix crash in gotd if client gets disconnected on error (reported by Mikhail)
+- fix crash in got-send-pack when server does not announce any capabilities
+- make gotd work as intended on an empty repository
+- prevent freeing of bogus pointers in got_inflate_end() and got_deflate_end()
+- reduce delta cache size to avoid running out of memory on large pack files
+- add missing free of delta buffers in several error paths
+- make 'got clone -b' work for repositories which lack a valid HEAD reference
+- use sub-second precision when checking for objects/pack/ modification
+- fix capabilities announced by gotsh when no references exist in repository
+
 * got 0.78; 2022-11-03
 - gotsh.1: Use Sx for referencing EXAMPLES (patch by Josiah Frentsos)
 - change got_pack_parse_offset_delta tslen argument to size_t (op)
