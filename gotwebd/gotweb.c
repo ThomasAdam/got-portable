@@ -1020,7 +1020,7 @@ gotweb_render_index(struct request *c)
 		if (asprintf(&c_path, "%s/%s", srv->repos_path,
 		    sd_dent[d_i]->d_name) == -1) {
 			error = got_error_from_errno("asprintf");
-			return error;
+			goto done;
 		}
 
 		if (lstat(c_path, &st) == 0 && S_ISDIR(st.st_mode) &&
