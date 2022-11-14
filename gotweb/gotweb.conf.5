@@ -91,6 +91,13 @@ Toggle display of the site owner.
 .It Ic got_www_path Ar string
 Set the public gotweb httpd path.
 .El
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /var/www/etc/gotweb.conf
+Location of the
+.Nm
+configuration file.
+.El
 .Sh EXAMPLES
 These are the currently configurable items for
 .Xr gotweb 8
@@ -123,13 +130,6 @@ got_logo_url			"https://gameoftrees.org"
 #got_show_repo_description	no
 #got_show_repo_cloneurl		off
 .Ed
-.Sh FILES
-.Bl -tag -width Ds -compact
-.It Pa /var/www/etc/gotweb.conf
-Location of the
-.Nm
-configuration file.
-.El
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr gotweb 8
