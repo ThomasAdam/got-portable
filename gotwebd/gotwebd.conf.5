@@ -171,6 +171,13 @@ Enable or disable use of unix sockets.
 .It Ic unix_socket_name Ar path
 Set the path to the unix socket used by the server.
 .El
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /etc/gotwebd.conf
+Default location of the
+.Nm
+configuration file.
+.El
 .Sh EXAMPLES
 These are the currently configurable items for
 .Xr gotwebd 8
@@ -216,13 +223,6 @@ server "localhost-unix" {
 #	listen on ::1 port 9000
 #}
 .Ed
-.Sh FILES
-.Bl -tag -width Ds -compact
-.It Pa /etc/gotwebd.conf
-Default location of the
-.Nm
-configuration file.
-.El
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr httpd.conf 5 ,

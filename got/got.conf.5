@@ -265,6 +265,29 @@ block.
 .El
 .El
 .El
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa got.conf
+If present,
+.Nm
+located in the root directory of a Git repository supersedes any relevant
+settings in Git's
+.Pa config
+file.
+.Pp
+.It Pa .got/got.conf
+If present,
+.Nm
+located in the
+.Pa .got
+meta-data directory of a
+.Xr got 1
+work tree supersedes any relevant settings in the repository's
+.Nm
+configuration file and Git's
+.Pa config
+file.
+.El
 .Sh EXAMPLES
 Configure author information:
 .Bd -literal -offset indent
@@ -305,29 +328,6 @@ remote "origin" {
 	}
 }
 .Ed
-.Sh FILES
-.Bl -tag -width Ds -compact
-.It Pa got.conf
-If present,
-.Nm
-located in the root directory of a Git repository supersedes any relevant
-settings in Git's
-.Pa config
-file.
-.Pp
-.It Pa .got/got.conf
-If present,
-.Nm
-located in the
-.Pa .got
-meta-data directory of a
-.Xr got 1
-work tree supersedes any relevant settings in the repository's
-.Nm
-configuration file and Git's
-.Pa config
-file.
-.El
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr git-repository 5 ,
