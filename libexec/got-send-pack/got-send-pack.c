@@ -223,10 +223,11 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
     struct got_pathlist_head *refs, struct got_pathlist_head *delete_refs)
 {
 	struct ibuf *wbuf;
-	size_t len, reflen = strlen(refname);
+	size_t i, len, reflen, errmsglen = 0;
 	struct got_pathlist_entry *pe;
 	int ref_valid = 0;
-	char *eol;
+	char *eol, *sp;
+	const char *errmsg = "";
 
 	eol = strchr(refname, '\n');
 	if (eol == NULL) {
@@ -234,6 +235,27 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 		    "unexpected message from server");
 	}
 	*eol = '\0';
+
+	sp = strchr(refname, ' ');
+	if (sp != NULL) {
+		*sp++ = '\0';
+		errmsg = sp;
+		errmsglen = strlen(errmsg);
+
+		for (i = 0; i < errmsglen; ++i) {
+			if (!isprint((unsigned char)errmsg[i])) {
+				return got_error_msg(GOT_ERR_BAD_PACKET,
+				    "non-printable error message received "
+				    "from the server");
+			}
+		}
+	}
+
+	reflen = strlen(refname);
+	if (!got_ref_name_is_valid(refname)) {
+		return got_error_msg(GOT_ERR_BAD_PACKET,
+		    "unexpected message from server");
+	}
 
 	TAILQ_FOREACH(pe, refs, entry) {
 		if (strcmp(refname, pe->path) == 0) {
@@ -254,7 +276,7 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 		    "unexpected message from server");
 	}
 
-	len = sizeof(struct got_imsg_send_ref_status) + reflen;
+	len = sizeof(struct got_imsg_send_ref_status) + reflen + errmsglen;
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
 		return got_error(GOT_ERR_NO_SPACE);
 
@@ -268,7 +290,11 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 		return got_error_from_errno("imsg_add SEND_REF_STATUS");
 	if (imsg_add(wbuf, &reflen, sizeof(reflen)) == -1)
 		return got_error_from_errno("imsg_add SEND_REF_STATUS");
+	if (imsg_add(wbuf, &errmsglen, sizeof(errmsglen)) == -1)
+		return got_error_from_errno("imsg_add SEND_REF_STATUS");
 	if (imsg_add(wbuf, refname, reflen) == -1)
+		return got_error_from_errno("imsg_add SEND_REF_STATUS");
+	if (imsg_add(wbuf, errmsg, errmsglen) == -1)
 		return got_error_from_errno("imsg_add SEND_REF_STATUS");
 
 	wbuf->fd = -1;

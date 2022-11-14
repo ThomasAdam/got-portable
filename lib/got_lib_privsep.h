@@ -481,7 +481,9 @@ struct got_imsg_send_remote_ref {
 struct got_imsg_send_ref_status {
 	int success;
 	size_t name_len;
+	size_t errmsg_len;
 	/* Followed by name_len data bytes. */
+	/* Followed by errmsg_len data bytes. */
 } __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_IDXPACK_REQUEST data. */
@@ -702,7 +704,7 @@ const struct got_error *got_privsep_recv_send_remote_refs(
     struct got_pathlist_head *, struct imsgbuf *);
 const struct got_error *got_privsep_send_packfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_send_progress(int *, off_t *,
-    int *, char **, struct imsgbuf *);
+    int *, char **, char **, struct imsgbuf *);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,

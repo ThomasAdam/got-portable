@@ -5,7 +5,7 @@
 PROG=		got-send-pack
 SRCS=		got-send-pack.c error.c inflate.c object_parse.c \
 		path.c privsep.c sha1.c pkt.c gitproto.c ratelimit.c \
-		pollfd.c
+		pollfd.c reference_parse.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 

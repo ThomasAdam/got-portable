@@ -126,7 +126,7 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 
 	err = a->progress_cb(a->progress_arg, ncolored, nfound, ntrees,
 	    packfile_size, ncommits, nobj_total, nobj_deltify,
-	    nobj_written, 0, NULL, 0);
+	    nobj_written, 0, NULL, NULL, 0);
 	if (err)
 		return err;
 
@@ -670,13 +670,15 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	while (!done) {
 		int success = 0;
 		char *refname = NULL;
+		char *errmsg = NULL;
+
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
 				goto done;
 		}
 		err = got_privsep_recv_send_progress(&done, &bytes_sent,
-		    &success, &refname, &sendibuf);
+		    &success, &refname, &errmsg, &sendibuf);
 		if (err)
 			goto done;
 		if (refname && got_ref_name_is_valid(refname) && success &&
@@ -700,14 +702,16 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			    ppa.nfound, ppa.ntrees, ppa.packfile_size,
 			    ppa.ncommits, ppa.nobj_total, ppa.nobj_deltify,
 			    ppa.nobj_written, bytes_sent,
-			    refname, success);
+			    refname, errmsg, success);
 			if (err) {
 				free(refname);
+				free(errmsg);
 				goto done;
 			}
 			bytes_sent_cur = bytes_sent;
 		}
 		free(refname);
+		free(errmsg);
 	}
 done:
 	if (sendpid != -1) {
