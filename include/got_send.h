@@ -38,7 +38,7 @@ const struct got_error *got_send_connect(pid_t *, int *, const char *,
 typedef const struct got_error *(*got_send_progress_cb)(void *,
     int ncolored, int nfound, int ntrees, off_t packfile_size, int ncommits,
     int nobj_total, int nobj_deltify, int nobj_written, off_t bytes_sent,
-    const char *refname, int success);
+    const char *refname, const char *, int success);
 
 /*
  * Attempt to generate a pack file and sent it to a server.

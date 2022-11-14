@@ -964,7 +964,7 @@ got_privsep_send_packfd(struct imsgbuf *ibuf, int fd)
 
 const struct got_error *
 got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
-    int *success, char **refname, struct imsgbuf *ibuf)
+    int *success, char **refname, char **errmsg, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -975,6 +975,7 @@ got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
 	*done = 0;
 	*success = 0;
 	*refname = NULL;
+	*errmsg = NULL;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
@@ -995,13 +996,18 @@ got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
 			break;
 		}
 		memcpy(&iref_status, imsg.data, sizeof(iref_status));
-		if (datalen != sizeof(iref_status) + iref_status.name_len) {
+		if (datalen != sizeof(iref_status) + iref_status.name_len +
+		    iref_status.errmsg_len) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
 		*success = iref_status.success;
 		*refname = strndup(imsg.data + sizeof(iref_status),
 		    iref_status.name_len);
+
+		if (iref_status.errmsg_len != 0)
+			*errmsg = strndup(imsg.data + sizeof(iref_status) +
+			    iref_status.name_len, iref_status.errmsg_len);
 		break;
 	case GOT_IMSG_SEND_DONE:
 		if (datalen != 0) {

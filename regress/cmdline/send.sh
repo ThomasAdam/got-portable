@@ -1513,6 +1513,69 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_rejected() {
+	local testroot=`test_init send_rejected`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	if ! got clone -q "$testurl/repo" "$testroot/repo-clone"; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	mkdir "$testroot/repo-clone/hooks"
+	cat <<'EOF' >$testroot/repo-clone/hooks/update
+case "$1" in
+*master*)
+	echo "rejecting push on master branch"
+	exit 1
+	;;
+esac
+exit 0
+EOF
+	chmod +x "$testroot/repo-clone/hooks/update"
+
+	cat > $testroot/repo/.git/got.conf <<EOF
+remote "origin" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/repo-clone"
+}
+EOF
+
+	echo "modified alpha" >$testroot/repo/alpha
+	git_commit "$testroot/repo" -m "modified alpha"
+
+	got send -q -r "$testroot/repo" >$testroot/stdout 2>$testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	touch "$testroot/stdout.expected"
+	if ! cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stderr.expected
+rejecting push on master branch
+error: hook declined to update refs/heads/master
+EOF
+
+	if ! cmp -s "$testroot/stderr.expected" "$testroot/stderr"; then
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_send_rebase_required
@@ -1526,3 +1589,4 @@ run_test test_send_all_branches
 run_test test_send_to_empty_repo
 run_test test_send_and_fetch_config
 run_test test_send_config
+run_test test_send_rejected

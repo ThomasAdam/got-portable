@@ -8763,7 +8763,8 @@ struct got_send_progress_arg {
 static const struct got_error *
 send_progress(void *arg, int ncolored, int nfound, int ntrees,
     off_t packfile_size, int ncommits, int nobj_total, int nobj_deltify,
-    int nobj_written, off_t bytes_sent, const char *refname, int success)
+    int nobj_written, off_t bytes_sent, const char *refname,
+    const char *errmsg, int success)
 {
 	struct got_send_progress_arg *a = arg;
 	char scaled_packsize[FMT_SCALED_STRSIZE];
@@ -8795,6 +8796,8 @@ send_progress(void *arg, int ncolored, int nfound, int ntrees,
 		if (a->printed_something)
 			putchar('\n');
 		printf("Server has %s %s", status, refname);
+		if (errmsg)
+			printf(": %s", errmsg);
 		a->printed_something = 1;
 		return NULL;
 	}
