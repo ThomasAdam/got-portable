@@ -35,12 +35,24 @@ ensure_root:
 		false; \
 	fi
 
-start_gotd: ensure_root
+start_gotd_ro: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit ro $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
+start_gotd_rw: ensure_root
+	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
@@ -53,19 +65,19 @@ prepare_test_repo_empty: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh 1'
 
-test_repo_read: prepare_test_repo start_gotd
+test_repo_read: prepare_test_repo start_gotd_ro
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_read.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 
-test_repo_write: prepare_test_repo start_gotd
+test_repo_write: prepare_test_repo start_gotd_rw
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_write.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 
-test_repo_write_empty: prepare_test_repo_empty start_gotd
+test_repo_write_empty: prepare_test_repo_empty start_gotd_rw
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_write_empty.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null

@@ -98,7 +98,7 @@ typedef struct {
 
 %}
 
-%token	PATH ERROR ON UNIX_SOCKET UNIX_GROUP USER REPOSITORY
+%token	PATH ERROR ON UNIX_SOCKET UNIX_GROUP USER REPOSITORY PERMIT DENY
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -221,6 +221,25 @@ repoopts1	: PATH STRING {
 			}
 			free($2);
 		}
+		| PERMIT RO STRING {
+			if (gotd_proc_id == PROC_GOTD) {
+				conf_new_access_rule(new_repo,
+				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
+			}
+		}
+		| PERMIT RW STRING {
+			if (gotd_proc_id == PROC_GOTD) {
+				conf_new_access_rule(new_repo,
+				    GOTD_ACCESS_PERMITTED,
+				    GOTD_AUTH_READ | GOTD_AUTH_WRITE, $3);
+			}
+		}
+		| DENY STRING {
+			if (gotd_proc_id == PROC_GOTD) {
+				conf_new_access_rule(new_repo,
+				    GOTD_ACCESS_DENIED, 0, $2);
+			}
+		}
 		;
 
 repoopts2	: repoopts2 repoopts1 nl
@@ -268,9 +287,13 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{ "deny",			DENY },
 		{ "on",				ON },
 		{ "path",			PATH },
+		{ "permit",			PERMIT },
 		{ "repository",			REPOSITORY },
+		{ "ro",				RO },
+		{ "rw",				RW },
 		{ "unix_group",			UNIX_GROUP },
 		{ "unix_socket",		UNIX_SOCKET },
 		{ "user",			USER },
@@ -667,6 +690,8 @@ conf_new_repo(const char *name)
 	if (repo == NULL)
 		fatalx("%s: calloc", __func__);
 
+	STAILQ_INIT(&repo->rules);
+
 	if (strlcpy(repo->name, name, sizeof(repo->name)) >=
 	    sizeof(repo->name))
 		fatalx("%s: strlcpy", __func__);
@@ -676,6 +701,23 @@ conf_new_repo(const char *name)
 
 	return repo;
 };
+
+static void
+conf_new_access_rule(struct gotd_repo *repo, enum gotd_access access,
+    int authorization, char *identifier)
+{
+	struct gotd_access_rule *rule;
+
+	rule = calloc(1, sizeof(*rule));
+	if (rule == NULL)
+		fatal("calloc");
+
+	rule->access = access;
+	rule->authorization = authorization;
+	rule->identifier = identifier;
+
+	STAILQ_INSERT_TAIL(&repo->rules, rule, entry);
+}
 
 int
 symset(const char *nam, const char *val, int persist)
