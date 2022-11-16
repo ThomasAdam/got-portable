@@ -99,6 +99,7 @@ typedef struct {
 %}
 
 %token	PATH ERROR ON UNIX_SOCKET UNIX_GROUP USER REPOSITORY PERMIT DENY
+%token	RO RW
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
