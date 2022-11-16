@@ -70,5 +70,52 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_to_read_only_repo() {
+	local testroot=`test_init send_to_read_only_repo 1`
+
+	ls -R ${GOTD_TEST_REPO} > $testroot/repo-list.before
+
+	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	mkdir $testroot/wt/psi
+	echo "new" > $testroot/wt/psi/new
+	(cd $testroot/wt && got add psi/new > /dev/null)
+	echo "more alpha" >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
+
+	got send -q -r $testroot/repo-clone 2>$testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo 'got-send-pack: test-repo: Permission denied' \
+		> $testroot/stderr.expected
+	echo 'got: could not send pack file' >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_clone_basic
+run_test test_send_to_read_only_repo

@@ -72,6 +72,14 @@ If not specified, the user _gotd will be used.
 At least one repository context must exist for
 .Xr gotd 8
 to function.
+For each repository, access rules must be configured using the
+.Ic permit
+and
+.Ic deny
+configuration directives.
+Multiple access rules can be specified, and the last matching rule
+determines the action taken.
+If no rule matches, access to the repository is denied.
 .Pp
 A repository context is declared with a unique
 .Ar name ,
@@ -99,8 +107,32 @@ to expose repositories as part of a virtual client-visible directory hierarchy.
 .Pp
 The available repository configuration directives are as follows:
 .Bl -tag -width Ds
+.It Ic deny Ar identity
+Deny repository access to users with the username
+.Ar identity .
+Group names may be matched by prepending a colon
+.Pq Sq \&:
+to
+.Ar identity .
+Numeric IDs are also accepted.
 .It Ic path Ar path
 Set the path to the Git repository.
+.It Ic permit Ar mode Ar identity
+Permit repository access to users with the username
+.Ar identity .
+The
+.Ar mode
+argument must be set to either
+.Ic ro
+for read-only access,
+or
+.Ic rw
+for read-write access.
+Group names may be matched by prepending a colon
+.Pq Sq \&:
+to
+.Ar identity .
+Numeric IDs are also accepted.
 .El
 .Sh FILES
 .Bl -tag -width Ds -compact
@@ -118,12 +150,18 @@ user _gotd
 # This repository can be accessed via ssh://user@example.com/src
 repository "src" {
 	path "/var/git/src.git"
+	permit rw flan_hacker
+	permit rw :developers
+	permit ro anonymous
 }
 
 # This repository can be accessed via
 # ssh://user@example.com/openbsd/ports
 repository "openbsd/ports" {
 	path "/var/git/ports.git"
+	permit rw :porters
+	permit ro anonymous
+	deny flan_hacker
 }
 .Ed
 .Sh SEE ALSO

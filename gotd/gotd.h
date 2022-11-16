@@ -54,11 +54,31 @@ struct gotd_child_proc {
 	size_t nhelpers;
 };
 
+enum gotd_access {
+	GOTD_ACCESS_PERMITTED = 1,
+	GOTD_ACCESS_DENIED
+};
+
+struct gotd_access_rule {
+	STAILQ_ENTRY(gotd_access_rule) entry;
+
+	enum gotd_access access;
+
+	int authorization;
+#define GOTD_AUTH_READ		0x1
+#define GOTD_AUTH_WRITE		0x2
+
+	char *identifier;
+};
+STAILQ_HEAD(gotd_access_rule_list, gotd_access_rule);
+
 struct gotd_repo {
 	TAILQ_ENTRY(gotd_repo)	 entry;
 
 	char name[NAME_MAX];
 	char path[PATH_MAX];
+
+	struct gotd_access_rule_list rules;
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
 
@@ -97,6 +117,8 @@ struct gotd {
 	struct event pause;
 	struct gotd_child_proc *procs;
 	int nprocs;
+	gid_t groups[NGROUPS_MAX];
+	int ngroups;
 };
 
 enum gotd_imsg_type {

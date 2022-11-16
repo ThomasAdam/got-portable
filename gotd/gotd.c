@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2022 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,6 +59,7 @@
 
 #include "gotd.h"
 #include "log.h"
+#include "auth.h"
 #include "repo_read.h"
 #include "repo_write.h"
 
@@ -543,6 +545,24 @@ stop_gotd(struct gotd_client *client)
 	return NULL;
 }
 
+static struct gotd_repo *
+find_repo_by_name(const char *repo_name)
+{
+	struct gotd_repo *repo;
+	size_t namelen;
+
+	TAILQ_FOREACH(repo, &gotd.repos, entry) {
+		namelen = strlen(repo->name);
+		if (strncmp(repo->name, repo_name, namelen) != 0)
+			continue;
+		if (repo_name[namelen] == '\0' ||
+		    strcmp(&repo_name[namelen], ".git") == 0)
+			return repo;
+	}
+
+	return NULL;
+}
+
 static struct gotd_child_proc *
 find_proc_by_repo_name(enum gotd_procid proc_id, const char *repo_name)
 {
@@ -586,6 +606,7 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 	const struct got_error *err;
 	struct gotd_imsg_list_refs ireq;
 	struct gotd_imsg_list_refs_internal ilref;
+	struct gotd_repo *repo = NULL;
 	struct gotd_child_proc *proc = NULL;
 	size_t datalen;
 	int fd = -1;
@@ -605,12 +626,28 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		err = ensure_client_is_not_writing(client);
 		if (err)
 			return err;
+		repo = find_repo_by_name(ireq.repo_name);
+		if (repo == NULL)
+			return got_error(GOT_ERR_NOT_GIT_REPO);
+		err = gotd_auth_check(&repo->rules, repo->name,
+		    gotd.groups, gotd.ngroups, client->euid, client->egid,
+		    GOTD_AUTH_READ);
+		if (err)
+			return err;
 		client->repo_read = find_proc_by_repo_name(PROC_REPO_READ,
 		    ireq.repo_name);
 		if (client->repo_read == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 	} else {
 		err = ensure_client_is_not_reading(client);
+		if (err)
+			return err;
+		repo = find_repo_by_name(ireq.repo_name);
+		if (repo == NULL)
+			return got_error(GOT_ERR_NOT_GIT_REPO);
+		err = gotd_auth_check(&repo->rules, repo->name,
+		    gotd.groups, gotd.ngroups, client->euid, client->egid,
+		    GOTD_AUTH_READ | GOTD_AUTH_WRITE);
 		if (err)
 			return err;
 		client->repo_write = find_proc_by_repo_name(PROC_REPO_WRITE,
@@ -2059,8 +2096,7 @@ main(int argc, char **argv)
 	const char *confpath = GOTD_CONF_PATH;
 	char *argv0 = argv[0];
 	char title[2048];
-	gid_t groups[NGROUPS_MAX + 1];
-	int ngroups = NGROUPS_MAX + 1;
+	int ngroups = NGROUPS_MAX;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
 	char *repo_path = NULL;
@@ -2130,10 +2166,11 @@ main(int argc, char **argv)
 		    getprogname(), pw->pw_name, getprogname());
 	}
 
-	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
+	if (getgrouplist(pw->pw_name, pw->pw_gid, gotd.groups, &ngroups) == -1)
 		log_warnx("group membership list truncated");
+	gotd.ngroups = ngroups;
 
-	gr = match_group(groups, ngroups, gotd.unix_group_name);
+	gr = match_group(gotd.groups, ngroups, gotd.unix_group_name);
 	if (gr == NULL) {
 		fatalx("cannot start %s: the user running %s "
 		    "must be a secondary member of group %s",
