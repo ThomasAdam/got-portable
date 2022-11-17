@@ -1983,8 +1983,8 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 		return pid;
 	}
 
-	if (fd != GOTD_SOCK_FILENO) {
-		if (dup2(fd, GOTD_SOCK_FILENO) == -1)
+	if (fd != GOTD_FILENO_MSG_PIPE) {
+		if (dup2(fd, GOTD_FILENO_MSG_PIPE) == -1)
 			fatal("cannot setup imsg fd");
 	} else if (fcntl(fd, F_SETFD, 0) == -1)
 		fatal("cannot setup imsg fd");
