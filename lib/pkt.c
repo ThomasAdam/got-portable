@@ -144,7 +144,7 @@ got_pkt_readpkt(int *outlen, int fd, char *buf, int buflen, int chattygot)
 	if (chattygot > 1) {
 		fprintf(stderr, "%s: readpkt: %zd:\t", getprogname(), n);
 		for (i = 0; i < n; i++) {
-			if (isprint(buf[i]))
+			if (isprint((unsigned char)buf[i]))
 				fputc(buf[i], stderr);
 			else
 				fprintf(stderr, "[0x%.2x]", buf[i]);
@@ -179,7 +179,7 @@ got_pkt_writepkt(int fd, char *buf, int nbuf, int chattygot)
 	if (chattygot > 1) {
 		fprintf(stderr, "%s: writepkt: %s:\t", getprogname(), len);
 		for (i = 0; i < nbuf; i++) {
-			if (isprint(buf[i]))
+			if (isprint((unsigned char)buf[i]))
 				fputc(buf[i], stderr);
 			else
 				fprintf(stderr, "[0x%.2x]", buf[i]);
