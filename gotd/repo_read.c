@@ -890,7 +890,7 @@ repo_read_main(const char *title, int *pack_fds, int *temp_fds)
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
 
-	imsg_init(&iev.ibuf, GOTD_SOCK_FILENO);
+	imsg_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE);
 	iev.handler = repo_read_dispatch;
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;

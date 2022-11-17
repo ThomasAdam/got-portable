@@ -24,7 +24,7 @@
 #define GOTD_MAXCLIENTS		1024
 #define GOTD_FD_RESERVE		5
 #define GOTD_FD_NEEDED		6
-#define GOTD_SOCK_FILENO	3
+#define GOTD_FILENO_MSG_PIPE	3
 
 /* Client hash tables need some extra room. */
 #define GOTD_CLIENT_TABLE_SIZE (GOTD_MAXCLIENTS * 4)
