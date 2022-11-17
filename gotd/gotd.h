@@ -117,8 +117,6 @@ struct gotd {
 	struct event pause;
 	struct gotd_child_proc *procs;
 	int nprocs;
-	gid_t groups[NGROUPS_MAX];
-	int ngroups;
 };
 
 enum gotd_imsg_type {

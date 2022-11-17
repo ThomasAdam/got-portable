@@ -16,4 +16,4 @@
 
 const struct got_error *
 gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
-    gid_t *groups, int ngroups, uid_t euid, gid_t egid, int required_auth);
+    uid_t euid, gid_t egid, int required_auth);
