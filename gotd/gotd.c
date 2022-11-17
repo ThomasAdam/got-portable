@@ -630,8 +630,7 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 		err = gotd_auth_check(&repo->rules, repo->name,
-		    gotd.groups, gotd.ngroups, client->euid, client->egid,
-		    GOTD_AUTH_READ);
+		    client->euid, client->egid, GOTD_AUTH_READ);
 		if (err)
 			return err;
 		client->repo_read = find_proc_by_repo_name(PROC_REPO_READ,
@@ -645,9 +644,8 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		repo = find_repo_by_name(ireq.repo_name);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
-		err = gotd_auth_check(&repo->rules, repo->name,
-		    gotd.groups, gotd.ngroups, client->euid, client->egid,
-		    GOTD_AUTH_READ | GOTD_AUTH_WRITE);
+		err = gotd_auth_check(&repo->rules, repo->name, client->euid,
+		    client->egid, GOTD_AUTH_READ | GOTD_AUTH_WRITE);
 		if (err)
 			return err;
 		client->repo_write = find_proc_by_repo_name(PROC_REPO_WRITE,
@@ -2096,6 +2094,7 @@ main(int argc, char **argv)
 	const char *confpath = GOTD_CONF_PATH;
 	char *argv0 = argv[0];
 	char title[2048];
+	gid_t groups[NGROUPS_MAX];
 	int ngroups = NGROUPS_MAX;
 	struct passwd *pw = NULL;
 	struct group *gr = NULL;
@@ -2166,11 +2165,10 @@ main(int argc, char **argv)
 		    getprogname(), pw->pw_name, getprogname());
 	}
 
-	if (getgrouplist(pw->pw_name, pw->pw_gid, gotd.groups, &ngroups) == -1)
+	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
 		log_warnx("group membership list truncated");
-	gotd.ngroups = ngroups;
 
-	gr = match_group(gotd.groups, ngroups, gotd.unix_group_name);
+	gr = match_group(groups, ngroups, gotd.unix_group_name);
 	if (gr == NULL) {
 		fatalx("cannot start %s: the user running %s "
 		    "must be a secondary member of group %s",

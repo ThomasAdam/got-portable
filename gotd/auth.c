@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <event.h>
+#include <grp.h>
 #include <limits.h>
 #include <pwd.h>
 #include <grp.h>
@@ -29,10 +30,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <imsg.h>
+#include <unistd.h>
 
 #include "got_error.h"
 
 #include "gotd.h"
+#include "log.h"
 #include "auth.h"
 
 static int
@@ -93,8 +96,10 @@ match_identifier(const char *identifier, gid_t *groups, int ngroups,
 		gid_t rgid;
 		if (parsegid(identifier + 1, &rgid) == -1)
 			return 0;
+		if (rgid == egid)
+			return 1;
 		for (i = 0; i < ngroups; i++) {
-			if (rgid == groups[i] && egid == rgid)
+			if (rgid == groups[i])
 				break;
 		}
 		if (i == ngroups)
@@ -107,11 +112,20 @@ match_identifier(const char *identifier, gid_t *groups, int ngroups,
 
 const struct got_error *
 gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
-    gid_t *groups, int ngroups, uid_t euid, gid_t egid,
-    int required_auth)
+    uid_t euid, gid_t egid, int required_auth)
 {
 	struct gotd_access_rule *rule;
 	enum gotd_access access = GOTD_ACCESS_DENIED;
+	struct passwd *pw;
+	gid_t groups[NGROUPS_MAX];
+	int ngroups = NGROUPS_MAX;
+
+	pw = getpwuid(euid);
+	if (pw == NULL)
+		return got_error_from_errno("getpwuid");
+
+	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
+		log_warnx("group membership list truncated");
 
 	STAILQ_FOREACH(rule, rules, entry) {
 		if (!match_identifier(rule->identifier, groups, ngroups,
