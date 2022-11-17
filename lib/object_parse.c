@@ -410,12 +410,14 @@ parse_gmtoff(time_t *gmtoff, const char *tzstr)
 	else if (*p != '+')
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	p++;
-	if (!isdigit(*p) && !isdigit(*(p + 1)))
+	if (!isdigit((unsigned char)*p) &&
+	    !isdigit((unsigned char)*(p + 1)))
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	h = (((*p - '0') * 10) + (*(p + 1) - '0'));
 
 	p += 2;
-	if (!isdigit(*p) && !isdigit(*(p + 1)))
+	if (!isdigit((unsigned char)*p) &&
+	    !isdigit((unsigned char)*(p + 1)))
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	m = ((*p - '0') * 10) + (*(p + 1) - '0');
 

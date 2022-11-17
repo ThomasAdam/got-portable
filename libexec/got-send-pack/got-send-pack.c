@@ -181,7 +181,7 @@ send_error(const char *buf, size_t len)
 	size_t i;
 
 	for (i = 0; i < len && i < sizeof(msg) - 1; i++) {
-		if (!isprint(buf[i]))
+		if (!isprint((unsigned char)buf[i]))
 			return got_error_msg(GOT_ERR_BAD_PACKET,
 			    "non-printable error message received from server");
 		msg[i] = buf[i];
