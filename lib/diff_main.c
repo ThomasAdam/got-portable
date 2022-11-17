@@ -64,11 +64,11 @@ buf_cmp(const unsigned char *left, size_t left_len,
 			unsigned char cl = left[il];
 			unsigned char cr = right[ir];
 
-			if (isspace(cl) && il < left_len) {
+			if (isspace((unsigned char)cl) && il < left_len) {
 				il++;
 				continue;
 			}
-			if (isspace(cr) && ir < right_len) {
+			if (isspace((unsigned char)cr) && ir < right_len) {
 				ir++;
 				continue;
 			}
@@ -82,12 +82,12 @@ buf_cmp(const unsigned char *left, size_t left_len,
 		}
 		while (il < left_len) {
 			unsigned char cl = left[il++];
-			if (!isspace(cl))
+			if (!isspace((unsigned char)cl))
 				return 1;
 		}
 		while (ir < right_len) {
 			unsigned char cr = right[ir++];
-			if (!isspace(cr))
+			if (!isspace((unsigned char)cr))
 				return -1;
 		}
 

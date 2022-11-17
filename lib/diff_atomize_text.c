@@ -69,7 +69,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 			while (eol == 0 && i < r) {
 				if (buf[i] != '\r' && buf[i] != '\n') {
 					if (!ignore_whitespace
-					    || !isspace(buf[i]))
+					    || !isspace((unsigned char)buf[i]))
 						hash = diff_atom_hash_update(
 						    hash, buf[i]);
 					if (buf[i] == '\0')
@@ -142,7 +142,7 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 
 		while (line_end < end && *line_end != '\r' && *line_end != '\n') {
 			if (!ignore_whitespace
-			    || !isspace(*line_end))
+			    || !isspace((unsigned char)*line_end))
 				hash = diff_atom_hash_update(hash, *line_end);
 			if (*line_end == '\0')
 				embedded_nul = true;

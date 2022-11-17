@@ -262,7 +262,7 @@ diff_output_trailing_newline_msg(struct diff_output_info *outinfo, FILE *dest,
 static bool
 is_function_prototype(unsigned char ch)
 {
-	return (isalpha(ch) || ch == '_' || ch == '$');
+	return (isalpha((unsigned char)ch) || ch == '_' || ch == '$');
 }
 
 #define begins_with(s, pre) (strncmp(s, pre, sizeof(pre)-1) == 0)
