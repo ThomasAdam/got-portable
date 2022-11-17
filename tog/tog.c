@@ -3784,8 +3784,19 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			err = got_repo_match_object_id(&start_id, NULL,
 			    s->head_ref_name ? s->head_ref_name : GOT_REF_HEAD,
 			    GOT_OBJ_TYPE_COMMIT, &tog_refs, s->repo);
-			if (err)
-				return err;
+			if (err) {
+				if (s->head_ref_name == NULL ||
+				    err->code != GOT_ERR_NOT_REF)
+					return err;
+				/* Try to cope with deleted references. */
+				free(s->head_ref_name);
+				s->head_ref_name = NULL;
+				err = got_repo_match_object_id(&start_id,
+				    NULL, GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT,
+				    &tog_refs, s->repo);
+				if (err)
+					return err;
+			}
 			free(s->start_id);
 			s->start_id = start_id;
 			s->thread_args.start_id = s->start_id;
