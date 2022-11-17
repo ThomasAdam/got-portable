@@ -13,6 +13,7 @@ got_send_pack_SOURCES = \
 	$(top_srcdir)/lib/pollfd.c \
 	$(top_srcdir)/lib/privsep.c \
 	$(top_srcdir)/lib/ratelimit.c \
+	$(top_srcdir)/lib/reference_parse.c \
 	$(top_srcdir)/lib/sha1.c
 
 got_send_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
