@@ -1,5 +1,5 @@
 REGRESS_TARGETS=test_repo_read test_repo_read_group \
-	test_repo_read_denied_user \
+	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
 	test_repo_write test_repo_write_empty
 NOOBJ=Yes
@@ -73,6 +73,19 @@ start_gotd_ro_denied_user: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+# try a permit rule followed by a deny rule; last matched rule wins
+start_gotd_ro_denied_group: ensure_root
+	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit ro $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo '    deny :$(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 # $GOTD_DEVUSER should not equal $GOTD_USER
 start_gotd_ro_bad_user: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
@@ -129,6 +142,12 @@ test_repo_read_group: prepare_test_repo start_gotd_ro_group
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 
 test_repo_read_denied_user: prepare_test_repo start_gotd_ro_denied_user
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./repo_read_access_denied.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
+
+test_repo_read_denied_group: prepare_test_repo start_gotd_ro_denied_group
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_read_access_denied.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
