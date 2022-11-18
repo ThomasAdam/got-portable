@@ -86,6 +86,8 @@ static int		 errors;
 static struct gotd		*gotd;
 static struct gotd_repo		*new_repo;
 static struct gotd_repo		*conf_new_repo(const char *);
+static void			 conf_new_access_rule(struct gotd_repo *,
+				    enum gotd_access, int, char *);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
