@@ -1694,8 +1694,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	if (verbosity >= 0)
-		printf("Connecting to %s%s%s\n", host,
-		    port ? ":" : "", port ? port : "");
+		printf("Connecting to %s\n", git_url);
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
 	    server_path, verbosity);
@@ -2538,9 +2537,12 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (verbosity >= 0)
-		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
-		    port ? ":" : "", port ? port : "");
+	if (verbosity >= 0) {
+		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
+		    remote->name, proto, host,
+		    port ? ":" : "", port ? port : "",
+		    *server_path == '/' ? "" : "/", server_path);
+	}
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
 	    server_path, verbosity);
@@ -9215,9 +9217,12 @@ cmd_send(int argc, char *argv[])
 		nbranches++;
 	}
 
-	if (verbosity >= 0)
-		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
-		    port ? ":" : "", port ? port : "");
+	if (verbosity >= 0) {
+		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
+		    remote->name, proto, host,
+		    port ? ":" : "", port ? port : "",
+		    *server_path == '/' ? "" : "/", server_path);
+	}
 
 	error = got_send_connect(&sendpid, &sendfd, proto, host, port,
 	    server_path, verbosity);

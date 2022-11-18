@@ -132,7 +132,7 @@ EOF
 
 test_clone_list() {
 	local testroot=`test_init clone_list`
-	local testurl=ssh://127.0.0.1/$testroot
+	local testurl=ssh://127.0.0.1$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
@@ -147,7 +147,7 @@ test_clone_list() {
 		return 1
 	fi
 
-	echo "Connecting to 127.0.0.1" > $testroot/stdout.expected
+	echo "Connecting to $testurl/repo" > $testroot/stdout.expected
 	got ref -l -r $testroot/repo >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected

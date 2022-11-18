@@ -129,7 +129,8 @@ EOF
 		return 1
 	fi
 
-	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo-clone" \
+		> $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -398,7 +399,8 @@ EOF
 		return 1
 	fi
 
-	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo-clone" \
+		> $testroot/stdout.expected
 	echo "Server has deleted refs/heads/branch2" \
 		>> $testroot/stdout.expected
 
@@ -1291,7 +1293,8 @@ EOF
 		return 1
 	fi
 
-	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo2" \
+		> $testroot/stdout.expected
 	echo "Already up-to-date" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
