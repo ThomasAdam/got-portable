@@ -1922,7 +1922,7 @@ test_histedit_prepend_line() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 
-	ed "$testroot/wt/alpha" <<EOF >/dev/null 2>&1
+	ed -s "$testroot/wt/alpha" <<EOF
 1i
 first line
 .
