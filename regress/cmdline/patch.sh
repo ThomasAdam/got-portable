@@ -773,7 +773,7 @@ test_patch_with_offset() {
 EOF
 
 	jot 100 > $testroot/wt/numbers
-	ed $testroot/wt/numbers <<EOF > /dev/null 2> /dev/null
+	ed -s "$testroot/wt/numbers" <<EOF
 1,10d
 50r !jot 20
 w
