@@ -3,6 +3,7 @@ sbin_PROGRAMS = gotd
 include $(top_builddir)/Makefile.common
 
 gotd_SOURCES = gotd.c \
+	auth.c \
 	imsg.c \
 	log.c \
 	parse.y \
