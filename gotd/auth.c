@@ -21,7 +21,6 @@
 
 #include <errno.h>
 #include <event.h>
-#include <grp.h>
 #include <limits.h>
 #include <pwd.h>
 #include <grp.h>
