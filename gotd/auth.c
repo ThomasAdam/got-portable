@@ -120,8 +120,12 @@ gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
 	int ngroups = NGROUPS_MAX;
 
 	pw = getpwuid(euid);
-	if (pw == NULL)
-		return got_error_from_errno("getpwuid");
+	if (pw == NULL) {
+		if (errno)
+			return got_error_from_errno("getpwuid");
+		else
+			return got_error_set_errno(EACCES, repo_name);
+	}
 
 	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
 		log_warnx("group membership list truncated");
