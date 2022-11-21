@@ -27,6 +27,6 @@ got_freebsd_task:
 
 got_macos_task:
   macos_instance:
-    image: monterey-xcode
+    image: ghcr.io/cirruslabs/macos-ventura-base:latest
   before_build_script: .github/ci/before-install.sh
   build:script: .github/ci/build.sh
