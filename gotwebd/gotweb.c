@@ -28,6 +28,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <event.h>
+#include <fcntl.h>
 #include <imsg.h>
 #include <sha1.h>
 #include <stdio.h>
@@ -93,9 +94,9 @@ static const struct got_error *gotweb_init_repo_dir(struct repo_dir **,
 static const struct got_error *gotweb_load_got_path(struct request *c,
     struct repo_dir *);
 static const struct got_error *gotweb_get_repo_description(char **,
-    struct server *, char *);
+    struct server *, const char *, int);
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
-    char *);
+    const char *, int);
 static const struct got_error *gotweb_render_navs(struct request *);
 static const struct got_error *gotweb_render_blame(struct request *);
 static const struct got_error *gotweb_render_briefs(struct request *);
@@ -2438,7 +2439,7 @@ done:
 	}
 	t->repo = repo;
 	error = gotweb_get_repo_description(&repo_dir->description, srv,
-	    repo_dir->path);
+	    repo_dir->path, dirfd(dt));
 	if (error)
 		goto err;
 	error = got_get_repo_owner(&repo_dir->owner, c);
@@ -2447,7 +2448,8 @@ done:
 	error = got_get_repo_age(&repo_dir->age, c, NULL, TM_DIFF);
 	if (error)
 		goto err;
-	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path);
+	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path,
+	    dirfd(dt));
 err:
 	free(dir_test);
 	if (dt != NULL && closedir(dt) == EOF && error == NULL)
@@ -2480,105 +2482,82 @@ gotweb_init_repo_dir(struct repo_dir **repo_dir, const char *dir)
 }
 
 static const struct got_error *
-gotweb_get_repo_description(char **description, struct server *srv, char *dir)
+gotweb_get_repo_description(char **description, struct server *srv,
+    const char *dirpath, int dir)
 {
 	const struct got_error *error = NULL;
-	FILE *f = NULL;
-	char *d_file = NULL;
-	unsigned int len;
-	size_t n;
+	struct stat sb;
+	int fd = -1;
+	off_t len;
 
 	*description = NULL;
 	if (srv->show_repo_description == 0)
 		return NULL;
 
-	if (asprintf(&d_file, "%s/description", dir) == -1)
-		return got_error_from_errno("asprintf");
-
-	f = fopen(d_file, "r");
-	if (f == NULL) {
-		if (errno != ENOENT && errno != EACCES)
-			error = got_error_from_errno2("fopen", d_file);
+	fd = openat(dir, "description", O_RDONLY);
+	if (fd == -1) {
+		if (errno != ENOENT && errno != EACCES) {
+			error = got_error_from_errno_fmt("openat %s/%s",
+			    dirpath, "description");
+		}
 		goto done;
 	}
 
-	if (fseek(f, 0, SEEK_END) == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
-	len = ftell(f);
-	if (len == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
+	if (fstat(fd, &sb) == -1) {
+		error = got_error_from_errno_fmt("fstat %s/%s",
+		    dirpath, "description");
 		goto done;
 	}
 
-	if (len == 0) {
-		*description = strdup("");
-		if (*description == NULL)
-			error = got_error_from_errno("strdup");
-		goto done;
-	}
+	len = sb.st_size;
+	if (len > SIZE_MAX - 1)
+		len = SIZE_MAX - 1;
 
-	if (fseek(f, 0, SEEK_SET) == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
 	*description = calloc(len + 1, sizeof(**description));
 	if (*description == NULL) {
 		error = got_error_from_errno("calloc");
 		goto done;
 	}
 
-	n = fread(*description, 1, len, f);
-	if (n == 0 && ferror(f))
-		error = got_ferror(f, GOT_ERR_IO);
+	if (read(fd, *description, len) == -1)
+		error = got_error_from_errno("read");
 done:
-	if (f != NULL && fclose(f) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
-	free(d_file);
+	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	return error;
 }
 
 static const struct got_error *
-gotweb_get_clone_url(char **url, struct server *srv, char *dir)
+gotweb_get_clone_url(char **url, struct server *srv, const char *dirpath,
+    int dir)
 {
 	const struct got_error *error = NULL;
-	FILE *f;
-	char *d_file = NULL;
-	unsigned int len;
-	size_t n;
+	struct stat sb;
+	int fd = -1;
+	off_t len;
 
 	*url = NULL;
-
 	if (srv->show_repo_cloneurl == 0)
 		return NULL;
 
-	if (asprintf(&d_file, "%s/cloneurl", dir) == -1)
-		return got_error_from_errno("asprintf");
-
-	f = fopen(d_file, "r");
-	if (f == NULL) {
-		if (errno != ENOENT && errno != EACCES)
-			error = got_error_from_errno2("fopen", d_file);
+	fd = openat(dir, "cloneurl", O_RDONLY);
+	if (fd == -1) {
+		if (errno != ENOENT && errno != EACCES) {
+			error = got_error_from_errno_fmt("openat %s/%s",
+			    dirpath, "cloneurl");
+		}
 		goto done;
 	}
 
-	if (fseek(f, 0, SEEK_END) == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
+	if (fstat(fd, &sb) == -1) {
+		error = got_error_from_errno_fmt("fstat %s/%s",
+		    dirpath, "cloneurl");
 		goto done;
 	}
-	len = ftell(f);
-	if (len == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
-	if (len == 0)
-		goto done;
 
-	if (fseek(f, 0, SEEK_SET) == -1) {
-		error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
+	len = sb.st_size;
+	if (len > SIZE_MAX - 1)
+		len = SIZE_MAX - 1;
 
 	*url = calloc(len + 1, sizeof(**url));
 	if (*url == NULL) {
@@ -2586,13 +2565,11 @@ gotweb_get_clone_url(char **url, struct server *srv, char *dir)
 		goto done;
 	}
 
-	n = fread(*url, 1, len, f);
-	if (n == 0 && ferror(f))
-		error = got_ferror(f, GOT_ERR_IO);
+	if (read(fd, *url, len) == -1)
+		error = got_error_from_errno("read");
 done:
-	if (f != NULL && fclose(f) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
-	free(d_file);
+	if (fd != -1 && close(fd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	return error;
 }
 
