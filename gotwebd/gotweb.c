@@ -1051,8 +1051,8 @@ gotweb_render_index(struct request *c)
 		goto done;
 
 	for (d_i = 0; d_i < d_cnt; d_i++) {
-		if (srv->max_repos > 0 && (d_i - 2) == srv->max_repos)
-			break; /* account for parent and self */
+		if (srv->max_repos > 0 && t->prev_disp == srv->max_repos)
+			break;
 
 		if (strcmp(sd_dent[d_i]->d_name, ".") == 0 ||
 		    strcmp(sd_dent[d_i]->d_name, "..") == 0)
