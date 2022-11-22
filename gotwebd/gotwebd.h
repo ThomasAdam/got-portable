@@ -455,8 +455,8 @@ int fcgi_printf(struct request *, const char *, ...)
 int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 
 /* got_operations.c */
-const struct got_error *got_get_repo_owner(char **, struct request *, char *);
-const struct got_error *got_get_repo_age(char **, struct request *, char *,
+const struct got_error *got_get_repo_owner(char **, struct request *);
+const struct got_error *got_get_repo_age(char **, struct request *,
     const char *, int);
 const struct got_error *got_get_repo_commits(struct request *, int);
 const struct got_error *got_get_repo_tags(struct request *, int);

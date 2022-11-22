@@ -1545,8 +1545,7 @@ gotweb_render_branches(struct request *c)
 		if (strncmp(refname, "refs/heads/", 11) != 0)
 			continue;
 
-		error = got_get_repo_age(&age, c, qs->path, refname,
-		    TM_DIFF);
+		error = got_get_repo_age(&age, c, refname, TM_DIFF);
 		if (error)
 			goto done;
 
@@ -2431,7 +2430,6 @@ done:
 		goto err;
 	}
 
-
 	repo = find_cached_repo(srv, repo_dir->path);
 	if (repo == NULL) {
 		error = cache_repo(&repo, srv, repo_dir, sock);
@@ -2443,11 +2441,10 @@ done:
 	    repo_dir->path);
 	if (error)
 		goto err;
-	error = got_get_repo_owner(&repo_dir->owner, c, repo_dir->path);
+	error = got_get_repo_owner(&repo_dir->owner, c);
 	if (error)
 		goto err;
-	error = got_get_repo_age(&repo_dir->age, c, repo_dir->path,
-	    NULL, TM_DIFF);
+	error = got_get_repo_age(&repo_dir->age, c, NULL, TM_DIFF);
 	if (error)
 		goto err;
 	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path);

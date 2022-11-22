@@ -108,7 +108,7 @@ got_gotweb_dupfd(int *priv_fd, int *fd)
 }
 
 const struct got_error *
-got_get_repo_owner(char **owner, struct request *c, char *dir)
+got_get_repo_owner(char **owner, struct request *c)
 {
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
@@ -134,7 +134,7 @@ got_get_repo_owner(char **owner, struct request *c, char *dir)
 }
 
 const struct got_error *
-got_get_repo_age(char **repo_age, struct request *c, char *dir,
+got_get_repo_age(char **repo_age, struct request *c,
     const char *refname, int ref_tm)
 {
 	const struct got_error *error = NULL;
