@@ -993,10 +993,9 @@ gotweb_render_index(struct request *c)
 	struct repo_dir *repo_dir = NULL;
 	DIR *d;
 	struct dirent **sd_dent = NULL;
-	char *c_path = NULL;
-	struct stat st;
 	unsigned int d_cnt, d_i, d_disp = 0;
-	int r;
+	unsigned int d_skipped = 0;
+	int r, type;
 
 	d = opendir(srv->repos_path);
 	if (d == NULL) {
@@ -1009,25 +1008,6 @@ gotweb_render_index(struct request *c)
 		sd_dent = NULL;
 		error = got_error_from_errno2("scandir", srv->repos_path);
 		goto done;
-	}
-
-	/* get total count of repos */
-	for (d_i = 0; d_i < d_cnt; d_i++) {
-		if (strcmp(sd_dent[d_i]->d_name, ".") == 0 ||
-		    strcmp(sd_dent[d_i]->d_name, "..") == 0)
-			continue;
-
-		if (asprintf(&c_path, "%s/%s", srv->repos_path,
-		    sd_dent[d_i]->d_name) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if (lstat(c_path, &st) == 0 && S_ISDIR(st.st_mode) &&
-		    !got_path_dir_is_empty(c_path))
-			t->repos_total++;
-		free(c_path);
-		c_path = NULL;
 	}
 
 	r = fcgi_printf(c, "<div id='index_header'>\n"
@@ -1055,8 +1035,19 @@ gotweb_render_index(struct request *c)
 			break;
 
 		if (strcmp(sd_dent[d_i]->d_name, ".") == 0 ||
-		    strcmp(sd_dent[d_i]->d_name, "..") == 0)
+		    strcmp(sd_dent[d_i]->d_name, "..") == 0) {
+			d_skipped++;
 			continue;
+		}
+
+		error = got_path_dirent_type(&type, srv->repos_path,
+		    sd_dent[d_i]);
+		if (error)
+			goto done;
+		if (type != DT_DIR) {
+			d_skipped++;
+			continue;
+		}
 
 		if (qs->index_page > 0 && (qs->index_page *
 		    srv->max_repos_display) > t->prev_disp) {
@@ -1071,21 +1062,14 @@ gotweb_render_index(struct request *c)
 		error = gotweb_load_got_path(c, repo_dir);
 		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
 			error = NULL;
-			continue;
-		}
-		else if (error && error->code != GOT_ERR_LONELY_PACKIDX)
-			goto done;
-
-		if (lstat(repo_dir->path, &st) == 0 &&
-		    S_ISDIR(st.st_mode) &&
-		    !got_path_dir_is_empty(repo_dir->path))
-			goto render;
-		else {
 			gotweb_free_repo_dir(repo_dir);
 			repo_dir = NULL;
+			d_skipped++;
 			continue;
 		}
-render:
+		if (error && error->code != GOT_ERR_LONELY_PACKIDX)
+			goto done;
+
 		d_disp++;
 		t->prev_disp++;
 
@@ -1201,6 +1185,8 @@ render:
 		if (d_disp == srv->max_repos_display)
 			break;
 	}
+	t->repos_total = d_cnt - d_skipped;
+
 	if (srv->max_repos_display == 0)
 		goto done;
 	if (srv->max_repos > 0 && srv->max_repos < srv->max_repos_display)
