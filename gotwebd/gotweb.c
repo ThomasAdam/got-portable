@@ -2510,8 +2510,8 @@ gotweb_get_repo_description(char **description, struct server *srv,
 	}
 
 	len = sb.st_size;
-	if (len > SIZE_MAX - 1)
-		len = SIZE_MAX - 1;
+	if (len > GOTWEBD_MAXDESCRSZ - 1)
+		len = GOTWEBD_MAXDESCRSZ - 1;
 
 	*description = calloc(len + 1, sizeof(**description));
 	if (*description == NULL) {
@@ -2556,8 +2556,8 @@ gotweb_get_clone_url(char **url, struct server *srv, const char *dirpath,
 	}
 
 	len = sb.st_size;
-	if (len > SIZE_MAX - 1)
-		len = SIZE_MAX - 1;
+	if (len > GOTWEBD_MAXCLONEURLSZ - 1)
+		len = GOTWEBD_MAXCLONEURLSZ - 1;
 
 	*url = calloc(len + 1, sizeof(**url));
 	if (*url == NULL) {
