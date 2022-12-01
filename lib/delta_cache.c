@@ -101,7 +101,7 @@ got_delta_cache_free(struct got_delta_cache *cache)
 	struct got_cached_delta *delta;
 	unsigned int i;
 
-#ifdef GOT_OBJ_CACHE_DEBUG
+#ifdef GOT_DELTA_CACHE_DEBUG
 	fprintf(stderr, "%s: delta cache: %u elements, %d searches, %d hits, "
 	    "%d missed, %d evicted, %d too large\n", getprogname(),
 	    cache->totelem, cache->cache_search, cache->cache_hit,
