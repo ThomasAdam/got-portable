@@ -57,18 +57,23 @@ gotd_imsg_recv_error(uint32_t *client_id, struct imsg *imsg)
 const struct got_error *
 gotd_imsg_flush(struct imsgbuf *ibuf)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 
-	err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
-	if (err)
-		return err;
+	while (ibuf->w.queued > 0) {
+		err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
+		if (err)
+			break;
 
-	if (imsg_flush(ibuf) == -1) {
-		imsg_clear(ibuf);
-		return got_error_from_errno("imsg_flush");
-	}
+		if (imsg_flush(ibuf) == -1) {
+			if (errno != EAGAIN) {
+				imsg_clear(ibuf);
+				err = got_error_from_errno("imsg_flush");
+				break;
+			}
+		}
+	}	
 
-	return NULL;
+	return err;
 }
 
 const struct got_error *
