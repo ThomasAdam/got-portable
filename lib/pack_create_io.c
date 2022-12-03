@@ -68,7 +68,6 @@ struct search_deltas_arg {
 	struct got_packidx *packidx;
 	struct got_pack *pack;
 	struct got_object_idset *idset;
-	int delta_cache_fd;
 	int ncolored, nfound, ntrees, ncommits;
 	got_pack_progress_cb progress_cb;
 	void *progress_arg;
@@ -86,7 +85,7 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 	uint8_t *delta_buf = NULL;
 	uint64_t base_size, result_size;
 	size_t delta_size, delta_compressed_size;
-	off_t delta_offset, base_offset;
+	off_t delta_offset, delta_data_offset, base_offset;
 	struct got_object_id base_id;
 
 	if (a->cancel_cb) {
@@ -100,8 +99,9 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 		return NULL; /* object not present in our pack file */
 
 	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
-	    &delta_compressed_size, &delta_offset, &base_offset, &base_id,
-	    &base_size, &result_size, a->pack, a->packidx, obj_idx);
+	    &delta_compressed_size, &delta_offset, &delta_data_offset,
+	    &base_offset, &base_id, &base_size, &result_size,
+	    a->pack, a->packidx, obj_idx);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_TYPE)
 			return NULL; /* object not stored as a delta */
@@ -120,19 +120,6 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 
 	if (got_object_idset_contains(a->idset, &base_id)) {
 		struct got_pack_meta *m, *base;
-		off_t delta_out_offset;
-		ssize_t w;
-
-		delta_out_offset = lseek(a->delta_cache_fd, 0, SEEK_CUR);
-		if (delta_out_offset == -1) {
-			err = got_error_from_errno("lseek");
-			goto done;
-		}
-		w = write(a->delta_cache_fd, delta_buf, delta_compressed_size);
-		if (w != delta_compressed_size) {
-			err = got_error_from_errno("write");
-			goto done;
-		}
 
 		m = got_object_idset_get(a->idset, id);
 		if (m == NULL) {
@@ -158,8 +145,8 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 		m->size = result_size;
 		m->delta_len = delta_size;
 		m->delta_compressed_len = delta_compressed_size;
-		m->reused_delta_offset = delta_offset;
-		m->delta_offset = delta_out_offset;
+		m->reused_delta_offset = delta_data_offset;
+		m->delta_offset = 0;
 
 		err = got_pack_add_meta(m, a->v);
 		if (err)
@@ -177,35 +164,35 @@ done:
 }
 
 const struct got_error *
-got_pack_search_deltas(struct got_pack_metavec *v,
-    struct got_object_idset *idset, int delta_cache_fd,
+got_pack_search_deltas(struct got_packidx **packidx, struct got_pack **pack,
+    struct got_pack_metavec *v, struct got_object_idset *idset,
     int ncolored, int nfound, int ntrees, int ncommits,
     struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_packidx *packidx;
-	struct got_pack *pack;
 	struct search_deltas_arg sda;
 
-	err = got_pack_find_pack_for_reuse(&packidx, repo);
+	*packidx = NULL;
+	*pack = NULL;
+
+	err = got_pack_find_pack_for_reuse(packidx, repo);
 	if (err)
 		return err;
 
-	if (packidx == NULL)
+	if (*packidx == NULL)
 		return NULL;
 
-	err = got_pack_cache_pack_for_packidx(&pack, packidx, repo);
+	err = got_pack_cache_pack_for_packidx(pack, *packidx, repo);
 	if (err)
 		return err;
 
 	memset(&sda, 0, sizeof(sda));
 	sda.v = v;
 	sda.idset = idset;
-	sda.pack = pack;
-	sda.packidx = packidx;
-	sda.delta_cache_fd = delta_cache_fd;
+	sda.pack = *pack;
+	sda.packidx = *packidx;
 	sda.ncolored = ncolored;
 	sda.nfound = nfound;
 	sda.ntrees = ntrees;

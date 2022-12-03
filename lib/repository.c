@@ -1515,7 +1515,8 @@ got_repo_pin_pack(struct got_repository *repo, struct got_packidx *packidx,
 
 	repo->pinned_pack = pinned_pack;
 	repo->pinned_packidx = pinned_packidx;
-	repo->pinned_pid = repo->packs[pinned_pack].privsep_child->pid;
+	if (repo->packs[pinned_pack].privsep_child)
+		repo->pinned_pid = repo->packs[pinned_pack].privsep_child->pid;
 	return NULL;
 }
 
