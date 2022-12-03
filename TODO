@@ -42,7 +42,6 @@ gotwebd:
   having to monitor interfaces for dynamic address changes.
 
 gotd:
-- authentication should not rely on gotd.sock path permissions alone
 - fork+exec needs to occur per session, not just once at startup
 - chroot is unnecessary on OpenBSD and requires root
   (for details: https://marc.gameoftrees.org/mail/1666525253.10787_0.html)
