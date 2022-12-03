@@ -869,7 +869,7 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	const struct got_error *err = NULL;
 	struct got_imsg_raw_delta_request req;
 	size_t datalen, delta_size, delta_compressed_size;
-	off_t delta_offset;
+	off_t delta_offset, delta_data_offset;
 	uint8_t *delta_buf = NULL;
 	struct got_object_id id, base_id;
 	off_t base_offset, delta_out_offset = 0;
@@ -885,8 +885,9 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	imsg->fd = -1;
 
 	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
-	    &delta_compressed_size, &delta_offset, &base_offset, &base_id,
-	    &base_size, &result_size, pack, packidx, req.idx);
+	    &delta_compressed_size, &delta_offset, &delta_data_offset,
+	    &base_offset, &base_id, &base_size, &result_size,
+	    pack, packidx, req.idx);
 	if (err)
 		goto done;
 
@@ -924,7 +925,6 @@ struct search_deltas_arg {
 	struct got_packidx *packidx;
 	struct got_pack *pack;
 	struct got_object_idset *idset;
-	FILE *delta_outfile;
 	struct got_imsg_reused_delta deltas[GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS];
 	size_t ndeltas;
 };
@@ -938,7 +938,7 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 	uint8_t *delta_buf = NULL;
 	uint64_t base_size, result_size;
 	size_t delta_size, delta_compressed_size;
-	off_t delta_offset, base_offset;
+	off_t delta_offset, delta_data_offset, base_offset;
 	struct got_object_id base_id;
 
 	if (sigint_received)
@@ -949,8 +949,9 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 		return NULL; /* object not present in our pack file */
 
 	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
-	    &delta_compressed_size, &delta_offset, &base_offset, &base_id,
-	    &base_size, &result_size, a->pack, a->packidx, obj_idx);
+	    &delta_compressed_size, &delta_offset, &delta_data_offset,
+	    &base_offset, &base_id, &base_size, &result_size,
+	    a->pack, a->packidx, obj_idx);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_TYPE)
 			return NULL; /* object not stored as a delta */
@@ -969,15 +970,6 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 
 	if (got_object_idset_contains(a->idset, &base_id)) {
 		struct got_imsg_reused_delta *delta;
-		off_t delta_out_offset = ftello(a->delta_outfile);
-		size_t w;
-
-		w = fwrite(delta_buf, 1, delta_compressed_size,
-		    a->delta_outfile);
-		if (w != delta_compressed_size) {
-			err = got_ferror(a->delta_outfile, GOT_ERR_IO);
-			goto done;
-		}
 
 		delta = &a->deltas[a->ndeltas++];
 		memcpy(&delta->id, id, sizeof(delta->id));
@@ -986,8 +978,7 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 		delta->result_size = result_size;
 		delta->delta_size = delta_size;
 		delta->delta_compressed_size = delta_compressed_size;
-		delta->delta_offset = delta_offset;
-		delta->delta_out_offset = delta_out_offset;
+		delta->delta_offset = delta_data_offset;
 
 		if (a->ndeltas >= GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS) {
 			err = got_privsep_send_reused_deltas(a->ibuf,
@@ -1054,7 +1045,7 @@ recv_object_id_queue(struct got_object_id_queue *queue, struct imsgbuf *ibuf)
 
 static const struct got_error *
 delta_reuse_request(struct imsg *imsg, struct imsgbuf *ibuf,
-    FILE *delta_outfile, struct got_pack *pack, struct got_packidx *packidx)
+    struct got_pack *pack, struct got_packidx *packidx)
 {
 	const struct got_error *err = NULL;
 	struct got_object_idset *idset;
@@ -1073,7 +1064,6 @@ delta_reuse_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	sda.idset = idset;
 	sda.pack = pack;
 	sda.packidx = packidx;
-	sda.delta_outfile = delta_outfile;
 	err = got_object_idset_for_each(idset, search_delta_for_object, &sda);
 	if (err)
 		goto done;
@@ -1083,11 +1073,6 @@ delta_reuse_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		    sda.ndeltas);
 		if (err)
 			goto done;
-	}
-
-	if (fflush(delta_outfile) == -1) {
-		err = got_error_from_errno("fflush");
-		goto done;
 	}
 
 	err = got_privsep_send_reused_deltas_done(ibuf);
@@ -2001,12 +1986,7 @@ main(int argc, char *argv[])
 			    pack, packidx);
 			break;
 		case GOT_IMSG_DELTA_REUSE_REQUEST:
-			if (delta_outfile == NULL) {
-				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-				break;
-			}
-			err = delta_reuse_request(&imsg, &ibuf,
-			    delta_outfile, pack, packidx);
+			err = delta_reuse_request(&imsg, &ibuf, pack, packidx);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,

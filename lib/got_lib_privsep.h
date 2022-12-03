@@ -327,12 +327,6 @@ struct got_imsg_reused_delta {
 	off_t delta_size;
 	off_t delta_compressed_size;
 	off_t delta_offset;
-	off_t delta_out_offset;
-
-	/*
-	 * Delta data has been written at delta_out_offset to the file
-	 * descriptor passed via the GOT_IMSG_RAW_DELTA_OUTFD imsg.
-	 */
 };
 struct got_imsg_reused_deltas {
 	size_t ndeltas;

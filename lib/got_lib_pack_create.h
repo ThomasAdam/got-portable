@@ -95,8 +95,8 @@ const struct got_error *got_pack_add_meta(struct got_pack_meta *m,
     struct got_pack_metavec *v);
 
 const struct got_error *
-got_pack_search_deltas(struct got_pack_metavec *v,
-    struct got_object_idset *idset, int delta_cache_fd,
+got_pack_search_deltas(struct got_packidx **packidx, struct got_pack **pack,
+    struct got_pack_metavec *v, struct got_object_idset *idset,
     int ncolored, int nfound, int ntrees, int ncommits,
     struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,

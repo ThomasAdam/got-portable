@@ -1597,10 +1597,15 @@ write_packed_object(off_t *packfile_size, int packfd,
 	char buf[32];
 	int nh;
 	struct got_raw_object *raw = NULL;
-	off_t outlen;
+	off_t outlen, delta_offset;
 
 	csum.output_sha1 = ctx;
 	csum.output_crc = NULL;
+
+	if (m->reused_delta_offset)
+		delta_offset = m->reused_delta_offset;
+	else
+		delta_offset = m->delta_offset;
 
 	m->off = *packfile_size;
 	if (m->delta_len == 0) {
@@ -1650,15 +1655,14 @@ write_packed_object(off_t *packfile_size, int packfd,
 		err = deltahdr(packfile_size, ctx, packfd, m);
 		if (err)
 			goto done;
-		err = hcopy_mmap(delta_cache_map, m->delta_offset,
+		err = hcopy_mmap(delta_cache_map, delta_offset,
 		    delta_cache_size, packfd, m->delta_compressed_len,
 		    ctx);
 		if (err)
 			goto done;
 		*packfile_size += m->delta_compressed_len;
 	} else {
-		if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
-		    == -1) {
+		if (fseeko(delta_cache, delta_offset, SEEK_SET) == -1) {
 			err = got_error_from_errno("fseeko");
 			goto done;
 		}
@@ -1678,8 +1682,8 @@ done:
 }
 
 static const struct got_error *
-genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
-    struct got_pack_meta **deltify, int ndeltify,
+genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
+    FILE *delta_cache, struct got_pack_meta **deltify, int ndeltify,
     struct got_pack_meta **reuse, int nreuse,
     int ncolored, int nfound, int ntrees, int nours,
     struct got_repository *repo,
@@ -1697,6 +1701,7 @@ genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
 	int delta_cache_fd = -1;
 	uint8_t *delta_cache_map = NULL;
 	size_t delta_cache_size = 0;
+	FILE *packfile = NULL;
 
 	SHA1Init(&ctx);
 
@@ -1752,6 +1757,19 @@ genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
 
 	qsort(reuse, nreuse, sizeof(struct got_pack_meta *),
 	    reuse_write_order_cmp);
+	if (nreuse > 0 && reuse_pack->map == NULL) {
+		int fd = dup(reuse_pack->fd);
+		if (fd == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
+		packfile = fdopen(fd, "r");
+		if (packfile == NULL) {
+			err = got_error_from_errno("fdopen");
+			close(fd);
+			goto done;
+		}
+	}
 	for (i = 0; i < nreuse; i++) {
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
 		    ncolored, nfound, ntrees, packfile_size, nours,
@@ -1760,7 +1778,7 @@ genpack(uint8_t *pack_sha1, int packfd, FILE *delta_cache,
 			goto done;
 		m = reuse[i];
 		err = write_packed_object(&packfile_size, packfd,
-		    delta_cache, delta_cache_map, delta_cache_size,
+		    packfile, reuse_pack->map, reuse_pack->filesize,
 		    m, &outfd, &ctx, repo);
 		if (err)
 			goto done;
@@ -1786,6 +1804,8 @@ done:
 		err = got_error_from_errno("munmap");
 	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (packfile && fclose(packfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -1810,8 +1830,9 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
-	int delta_cache_fd = -1;
 	struct got_object_idset *idset;
+	struct got_packidx *reuse_packidx = NULL;
+	struct got_pack *reuse_pack = NULL;
 	struct got_pack_metavec deltify, reuse;
 	int ncolored = 0, nfound = 0, ntrees = 0;
 	size_t ndeltify;
@@ -1844,12 +1865,6 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 		goto done;
 	}
 
-	delta_cache_fd = dup(fileno(delta_cache));
-	if (delta_cache_fd == -1) {
-		err = got_error_from_errno("dup");
-		goto done;
-	}
-
 	reuse.metasz = 64;
 	reuse.meta = calloc(reuse.metasz,
 	    sizeof(struct got_pack_meta *));
@@ -1858,11 +1873,17 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 		goto done;
 	}
 
-	err = got_pack_search_deltas(&reuse, idset, delta_cache_fd,
-	    ncolored, nfound, ntrees, nours,
+	err = got_pack_search_deltas(&reuse_packidx, &reuse_pack,
+	    &reuse, idset, ncolored, nfound, ntrees, nours,
 	    repo, progress_cb, progress_arg, rl, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
+
+	if (reuse_packidx && reuse_pack) {
+		err = got_repo_pin_pack(repo, reuse_packidx, reuse_pack);
+		if (err)
+			goto done;
+	}
 
 	if (fseeko(delta_cache, 0L, SEEK_END) == -1) {
 		err = got_error_from_errno("fseeko");
@@ -1910,7 +1931,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 			goto done;
 	}
 
-	err = genpack(packsha1, packfd, delta_cache, deltify.meta,
+	err = genpack(packsha1, packfd, reuse_pack, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, progress_cb, progress_arg, rl,
 	    cancel_cb, cancel_arg);
@@ -1920,7 +1941,6 @@ done:
 	free_nmeta(deltify.meta, deltify.nmeta);
 	free_nmeta(reuse.meta, reuse.nmeta);
 	got_object_idset_free(idset);
-	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
+	got_repo_unpin_pack(repo);
 	return err;
 }

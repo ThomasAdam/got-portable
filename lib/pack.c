@@ -1897,7 +1897,8 @@ done:
 
 const struct got_error *
 got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
-    size_t *delta_compressed_size, off_t *delta_offset, off_t *base_offset,
+    size_t *delta_compressed_size, off_t *delta_offset,
+    off_t *delta_data_offset, off_t *base_offset,
     struct got_object_id *base_id, uint64_t *base_size, uint64_t *result_size,
     struct got_pack *pack, struct got_packidx *packidx, int idx)
 {
@@ -1906,12 +1907,12 @@ got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
 	uint8_t type;
 	uint64_t size;
 	size_t tslen, delta_hdrlen;
-	off_t delta_data_offset;
 
 	*delta_buf = NULL;
 	*delta_size = 0;
 	*delta_compressed_size = 0;
 	*delta_offset = 0;
+	*delta_data_offset = 0;
 	*base_offset = 0;
 	*base_size = 0;
 	*result_size = 0;
@@ -1955,9 +1956,9 @@ got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
 	    offset + delta_hdrlen < delta_hdrlen)
 		return got_error(GOT_ERR_BAD_DELTA);
 
-	delta_data_offset = offset + tslen + delta_hdrlen;
+	*delta_data_offset = offset + tslen + delta_hdrlen;
 	err = read_raw_delta_data(delta_buf, delta_size, delta_compressed_size,
-	    base_size, result_size, delta_data_offset, pack, packidx);
+	    base_size, result_size, *delta_data_offset, pack, packidx);
 	if (err)
 		return err;
 

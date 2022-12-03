@@ -114,7 +114,7 @@ recv_reused_delta(struct got_imsg_reused_delta *delta,
 
 	m->delta_len = delta->delta_size;
 	m->delta_compressed_len = delta->delta_compressed_size;
-	m->delta_offset = delta->delta_out_offset;
+	m->delta_offset = 0;
 	m->prev = base;
 	m->size = delta->result_size;
 	m->reused_delta_offset = delta->delta_offset;
@@ -125,69 +125,45 @@ recv_reused_delta(struct got_imsg_reused_delta *delta,
 	return got_pack_add_meta(m, v);
 }
 
-static const struct got_error *
-prepare_delta_reuse(struct got_pack *pack, struct got_packidx *packidx,
-    int delta_outfd, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-
-	if (!pack->child_has_delta_outfd) {
-		int outfd_child;
-		outfd_child = dup(delta_outfd);
-		if (outfd_child == -1) {
-			err = got_error_from_errno("dup");
-			goto done;
-		}
-		err = got_privsep_send_raw_delta_outfd(
-		    pack->privsep_child->ibuf, outfd_child);
-		if (err)
-			goto done;
-		pack->child_has_delta_outfd = 1;
-	}
-
-	err = got_privsep_send_delta_reuse_req(pack->privsep_child->ibuf);
-done:
-	return err;
-}
-
 const struct got_error *
-got_pack_search_deltas(struct got_pack_metavec *v,
-    struct got_object_idset *idset, int delta_cache_fd,
+got_pack_search_deltas(struct got_packidx **packidx, struct got_pack **pack,
+    struct got_pack_metavec *v, struct got_object_idset *idset,
     int ncolored, int nfound, int ntrees, int ncommits,
     struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_packidx *packidx;
-	struct got_pack *pack;
 	struct got_imsg_reused_delta deltas[GOT_IMSG_REUSED_DELTAS_MAX_NDELTAS];
 	size_t ndeltas, i;
 
-	err = got_pack_find_pack_for_reuse(&packidx, repo);
+	*packidx = NULL;
+	*pack = NULL;
+
+	err = got_pack_find_pack_for_reuse(packidx, repo);
 	if (err)
 		return err;
 
-	if (packidx == NULL)
+	if (*packidx == NULL)
 		return NULL;
 
-	err = got_pack_cache_pack_for_packidx(&pack, packidx, repo);
+	err = got_pack_cache_pack_for_packidx(pack, *packidx, repo);
 	if (err)
-		return err;
+		goto done;
 
-	if (pack->privsep_child == NULL) {
-		err = got_pack_start_privsep_child(pack, packidx);
+	if ((*pack)->privsep_child == NULL) {
+		err = got_pack_start_privsep_child(*pack, *packidx);
 		if (err)
-			return err;
+			goto done;
 	}
 
-	err = prepare_delta_reuse(pack, packidx, delta_cache_fd, repo);
+	err = got_privsep_send_delta_reuse_req((*pack)->privsep_child->ibuf);
 	if (err)
-		return err;
+		goto done;
 
-	err = send_idset(pack->privsep_child->ibuf, idset);
+	err = send_idset((*pack)->privsep_child->ibuf, idset);
 	if (err)
-		return err;
+		goto done;
 
 	for (;;) {
 		int done = 0;
@@ -199,7 +175,7 @@ got_pack_search_deltas(struct got_pack_metavec *v,
 		}
 
 		err = got_privsep_recv_reused_deltas(&done, deltas, &ndeltas,
-		    pack->privsep_child->ibuf);
+		    (*pack)->privsep_child->ibuf);
 		if (err || done)
 			break;
 
