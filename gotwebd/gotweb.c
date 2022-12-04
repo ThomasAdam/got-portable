@@ -185,15 +185,15 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		goto done;
-	} else {
-render:
-		error = gotweb_render_content_type(c, "text/html");
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
-		}
-		html = 1;
 	}
+
+render:
+	error = gotweb_render_content_type(c, "text/html");
+	if (error) {
+		log_warnx("%s: %s", __func__, error->msg);
+		goto err;
+	}
+	html = 1;
 
 	error = gotweb_render_header(c);
 	if (error) {
