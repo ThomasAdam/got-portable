@@ -2189,10 +2189,12 @@ main(int argc, char **argv)
 	if (noaction)
 		return 0;
 
-	if (proc_id == PROC_GOTD && verbosity) {
-		log_info("socket: %s", gotd.unix_socket_path);
-		log_info("user: %s", pw->pw_name);
-		log_info("secondary group: %s", gr->gr_name);
+	if (proc_id == PROC_GOTD) {
+		if (verbosity) {
+			log_info("socket: %s", gotd.unix_socket_path);
+			log_info("user: %s", pw->pw_name);
+			log_info("secondary group: %s", gr->gr_name);
+		}
 
 		fd = unix_socket_listen(gotd.unix_socket_path, pw->pw_uid,
 		    gr->gr_gid);
