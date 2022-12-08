@@ -265,8 +265,7 @@ echo_error(const struct got_error *err, int outfd, int chattygot)
 	 */
 	buf[0] = 'E'; buf[1] = 'R'; buf[2] = 'R'; buf[3] = ' '; buf[4] = '\0';
 	len = strlcat(buf, err->msg, sizeof(buf));
-	err = got_pkt_writepkt(outfd, buf, len, chattygot);
-	abort();
+	got_pkt_writepkt(outfd, buf, len, chattygot);
 }
 
 static const struct got_error *
