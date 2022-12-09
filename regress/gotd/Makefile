@@ -12,7 +12,13 @@ GOTD_DEVUSER_HOME!=userinfo $(GOTD_DEVUSER) | awk '/^dir/ {print $$2}'
 GOTD_TEST_REPO!?=mktemp -d "$(GOTD_TEST_ROOT)/gotd-test-repo-XXXXXXXXX"
 GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/test-repo
 
-GOTD_TEST_USER?=${USERNAME}
+GOTD_TEST_USER?=${DOAS_USER}
+.if empty(GOTD_TEST_USER)
+GOTD_TEST_USER=${SUDO_USER}
+.endif
+.if empty(GOTD_TEST_USER)
+GOTD_TEST_USER=${USER}
+.endif
 GOTD_TEST_USER_HOME!=userinfo $(GOTD_TEST_USER) | awk '/^dir/ {print $$2}'
 
 # gotd.conf parameters
