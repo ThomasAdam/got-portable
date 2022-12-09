@@ -97,13 +97,14 @@ test_send_to_read_only_repo() {
 	echo "more alpha" >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
 
-	got send -q -r $testroot/repo-clone 2>$testroot/stderr
+	got send -q -r $testroot/repo-clone 2>$testroot/stderr.raw
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
+	grep -v ^gotsh: $testroot/stderr.raw > $testroot/stderr
 
 	echo 'got-send-pack: test-repo: Permission denied' \
 		> $testroot/stderr.expected
