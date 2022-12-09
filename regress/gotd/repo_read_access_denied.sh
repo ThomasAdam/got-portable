@@ -23,13 +23,14 @@ test_clone_basic_access_denied() {
 	cp -r ${GOTD_TEST_REPO} $testroot/repo-copy
 
 	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone \
-		2> $testroot/stderr
+		2> $testroot/stderr.raw
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got clone succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
+	grep -v ^gotsh: $testroot/stderr.raw > $testroot/stderr
 
 	# Verify that the clone operation failed.
 	echo 'got-fetch-pack: test-repo: Permission denied' \
