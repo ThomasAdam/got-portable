@@ -45,3 +45,9 @@ gotd:
 - fork+exec needs to occur per session, not just once at startup
 - chroot is unnecessary on OpenBSD and requires root
   (for details: https://marc.gameoftrees.org/mail/1666525253.10787_0.html)
+
+gotadmin:
+- add repack command which combines small pack files into a larger one
+- teach 'gotadmin cleanup' to remove redundant pack files
+- add support for generating git-fast-export streams from a repository
+- add support for importing git-fast-export streams into a repository
