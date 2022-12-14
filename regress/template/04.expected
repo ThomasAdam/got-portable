@@ -1,0 +1,2 @@
+<!doctype html><html><head><title> *hello* </title></head><body><h1> *hello* </h1><p>" *hello* " has a '*' in it</p><p>tautology!</p></body></html>
+<!doctype html><html><head><title>&lt;hello&gt;</title></head><body><h1>&lt;hello&gt;</h1><p>"&lt;hello&gt;" doesn't have a '*' in it</p></body></html>

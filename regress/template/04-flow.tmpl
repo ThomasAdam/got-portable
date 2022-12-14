@@ -1,0 +1,33 @@
+{!
+#include <stdlib.h>
+#include <string.h>
+
+#include "tmpl.h"
+
+int base(struct template *, const char *);
+!}
+
+{{ define base(struct template *tp, const char *title) }}
+{! char *foo = NULL; !}
+<!doctype html>
+<html>
+	<head>
+		<title>{{ title }}</title>
+	</head>
+	<body>
+		<h1>{{ title }}</h1>
+		{{ if strchr(title, '*') != NULL }}
+			<p>"{{ title }}" has a '*' in it</p>
+			{{ if 1 }}
+				<p>tautology!</p>
+			{{ end }}
+		{{ else if strchr(title, '=') != NULL }}
+			<p>"{{ title }}" has a '=' in it!</p>
+		{{ else }}
+			<p>"{{ title }}" doesn't have a '*' in it</p>
+		{{ end }}
+	</body>
+</html>
+{{ finally }}
+{! free(foo); !}
+{{ end }}

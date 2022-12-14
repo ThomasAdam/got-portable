@@ -7,7 +7,7 @@ SUBDIR += regress
 .endif
 
 .if make(clean) || make(obj) || make(release)
-SUBDIR += gotweb gotwebd gotd gotsh gotctl
+SUBDIR += gotweb gotwebd gotd gotsh gotctl template
 .endif
 
 .if make(tags) || make(cleandir)
@@ -33,13 +33,19 @@ dist: clean
 	diff -u got-dist.txt got-dist.txt.new
 	rm got-dist.txt.new
 
+tmpl:
+	${MAKE} -C template
+
+tmpl-regress:
+	${MAKE} -C regress/template
+
 web:
 	${MAKE} -C gotweb
 
 web-install:
 	${MAKE} -C gotweb install
 
-webd:
+webd: tmpl
 	${MAKE} -C gotwebd
 
 webd-install:

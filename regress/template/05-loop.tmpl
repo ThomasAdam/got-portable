@@ -1,0 +1,43 @@
+{!
+#include <sys/queue.h>
+#include <string.h>
+#include "lists.h"
+#include "tmpl.h"
+
+int	list(struct template *, struct tailhead *);
+int	base(struct template *, struct tailhead *);
+
+!}
+
+{{ define base(struct template *tp, struct tailhead *head) }}
+<!doctype html>
+<html>
+	<body>
+		{{ render list(tp, head) }}
+	</body>
+</html>
+{{ end }}
+
+{{ define list(struct template *tp, struct tailhead *head) }}
+{!
+	struct entry *np;
+	int i;
+!}
+	{{ if !TAILQ_EMPTY(head) }}
+		<p>items:</p>
+		<ul>
+			{{ tailq-foreach np head entries }}
+				<li>{{ np->text }}</li>
+			{{ end }}
+		</ul>
+	{{ else }}
+		<p>no items</p>
+	{{ end }}
+
+	<p>
+		{{ for i = 0; i < 3; ++i }}
+			hello{{ " " }}
+		{{ end }}
+		world!
+	</p>
+{{ end }}
