@@ -50,7 +50,7 @@ struct gotd_child_proc {
 	pid_t pid;
 	enum gotd_procid type;
 	char repo_name[NAME_MAX];
-	char chroot_path[PATH_MAX];
+	char repo_path[PATH_MAX];
 	int pipe[2];
 	struct gotd_imsgev iev;
 	size_t nhelpers;
