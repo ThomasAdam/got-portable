@@ -1,4 +1,5 @@
 .PATH:${.CURDIR}/../lib
+.PATH:${.CURDIR}/../template
 
 SUBDIR = libexec
 
@@ -7,7 +8,7 @@ SUBDIR = libexec
 
 PROG =		gotwebd
 SRCS =		config.c sockets.c log.c gotwebd.c parse.y proc.c \
-		fcgi.c gotweb.c got_operations.c
+		fcgi.c gotweb.c got_operations.c tmpl.c pages.c
 SRCS +=		blame.c commit_graph.c delta.c diff.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
@@ -21,9 +22,20 @@ SRCS +=		blame.c commit_graph.c delta.c diff.c \
 		object_open_privsep.c read_gitconfig_privsep.c \
 		read_gotconfig_privsep.c pollfd.c reference_parse.c
 
+.if exists(${.CURDIR}/../template/obj/template)
+TEMPLATE = ${.CURDIR}/../template/obj/template
+.else
+TEMPLATE = ${.CURDIR}/../template/template
+.endif
+
+.SUFFIXES: .tmpl
+.tmpl.c:
+	${TEMPLATE} -o $@ $<
+
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}
+CPPFLAGS +=	-I${.CURDIR}/../template
 LDADD +=	-lz -levent -lutil -lm
 YFLAGS =
 DPADD =		${LIBEVENT} ${LIBUTIL}

@@ -36,6 +36,7 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+#include "tmpl.h"
 
 size_t	 fcgi_parse_record(uint8_t *, size_t, struct request *);
 void	 fcgi_parse_begin_request(uint8_t *, uint16_t, struct request *,
@@ -288,6 +289,21 @@ fcgi_timeout(int fd, short events, void *arg)
 }
 
 int
+fcgi_puts(struct template *tp, const char *str)
+{
+	if (str == NULL)
+		return 0;
+	return fcgi_gen_binary_response(tp->tp_arg, str, strlen(str));
+}
+
+int
+fcgi_putc(struct template *tp, int ch)
+{
+	uint8_t c = ch;
+	return fcgi_gen_binary_response(tp->tp_arg, &c, 1);
+}
+
+int
 fcgi_vprintf(struct request *c, const char *fmt, va_list ap)
 {
 	char *str;
@@ -483,6 +499,7 @@ fcgi_cleanup_request(struct request *c)
 		event_del(&c->ev);
 
 	close(c->fd);
+	template_free(c->tp);
 	gotweb_free_transport(c->t);
 	free(c);
 }

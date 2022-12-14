@@ -1,0 +1,302 @@
+{!
+/*
+ * Copyright (c) 2022 Omar Polo <op@openbsd.org>
+ * Copyright (c) 2016, 2019, 2020-2022 Tracey Emery <tracey@traceyemery.net>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include <sys/types.h>
+#include <sys/queue.h>
+
+#include <event.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <imsg.h>
+
+#include "proc.h"
+
+#include "gotwebd.h"
+#include "tmpl.h"
+
+const struct got_error	*gotweb_render_navs(struct request *);
+
+static int
+gotweb_render_age(struct template *tp, time_t time, int ref_tm)
+{
+	const struct got_error *err;
+	char *age;
+	int r;
+
+	err = gotweb_get_time_str(&age, time, ref_tm);
+	if (err)
+		return 0;
+	r = tp->tp_puts(tp, age);
+	free(age);
+	return r;
+}
+
+!}
+
+{{ define gotweb_render_header(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct server		*srv = c->srv;
+	struct querystring	*qs = c->t->qs;
+	struct gotweb_url	 u_path;
+	const char		*prfx = c->script_name;
+	const char		*css = srv->custom_css;
+
+	memset(&u_path, 0, sizeof(u_path));
+	u_path.index_page = -1;
+	u_path.page = -1;
+	u_path.action = SUMMARY;
+!}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ srv->site_name }}</title>
+    <meta name="viewport" content="initial-scale=.75" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff"/>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ prfx }}apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ prfx }}favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ prfx }}favicon-16x16.png" />
+    <link rel="manifest" href="{{ prfx }}site.webmanifest"/>
+    <link rel="mask-icon" href="{{ prfx }}safari-pinned-tab.svg" />
+    <link rel="stylesheet" type="text/css" href="{{ prfx }}{{ css }}" />
+  </head>
+  <body>
+    <div id="gw_body">
+      <div id="header">
+        <div id="got_link">
+          <a href="{{ srv->logo_url }}" target="_blank">
+            <img src="{{ prfx }}{{ srv->logo }}" />
+          </a>
+        </div>
+      </div>
+      <div id="site_path">
+        <div id="site_link">
+          <a href="?index_page={{ printf "%d", qs->index_page }}">
+            {{ srv->site_link }}
+          </a>
+          {{ if qs->path }}
+            {! u_path.path = qs->path; !}
+            {{ " / " }}
+            <a href="{{ render gotweb_render_url(tp->tp_arg, &u_path)}}">
+              {{ qs->path }}
+            </a>
+          {{ end }}
+          {{ if qs->action != INDEX }}
+            {{ " / " }}{{ gotweb_action_name(qs->action) }}
+          {{ end }}
+        </div>
+      </div>
+      <div id="content">
+{{ end }}
+
+{{ define gotweb_render_footer(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct server		*srv = c->srv;
+!}
+        <div id="site_owner_wrapper">
+          <div id="site_owner">
+            {{ if srv->show_site_owner }}
+              {{ srv->site_owner }}
+            {{ end }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+{{ end }}
+
+{{ define gotweb_render_repo_table_hdr(struct template *tp) }}
+{!
+	struct request *c = tp->tp_arg;
+	struct server *srv = c->srv;
+!}
+<div id="index_header">
+  <div id="index_header_project">
+    Project
+  </div>
+  {{ if srv->show_repo_description }}
+    <div id="index_header_description">
+      Description
+    </div>
+  {{ end }}
+  {{ if srv->show_repo_owner }}
+    <div id="index_header_owner">
+      Owner
+    </div>
+  {{ end }}
+  {{ if srv->show_repo_age }}
+    <div id="index_header_age">
+      Last Change
+    </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define gotweb_render_repo_fragment(struct template *tp, struct repo_dir *repo_dir) }}
+{!
+	struct request *c = tp->tp_arg;
+	struct server *srv = c->srv;
+	struct gotweb_url summary = {
+		.action = SUMMARY,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	}, briefs = {
+		.action = BRIEFS,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	}, commits = {
+		.action = COMMITS,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	}, tags = {
+		.action = TAGS,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	}, tree = {
+		.action = TREE,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	};
+!}
+<div class="index_wrapper">
+  <div class="index_project">
+    <a href="{{ render gotweb_render_url(tp->tp_arg, &summary) }}">{{ repo_dir->name }}</a>
+  </div>
+  {{ if srv->show_repo_description }}
+    <div class="index_project_description">
+      {{ repo_dir->description }}
+    </div>
+  {{ end }}
+  {{ if srv->show_repo_owner }}
+    <div class="index_project_owner">
+      {{ repo_dir->owner }}
+    </div>
+  {{ end }}
+  {{ if srv->show_repo_age }}
+    <div class="index_project_age">
+      {{ repo_dir->age }}
+    </div>
+  {{ end }}
+  <div class="navs_wrapper">
+    <div class="navs">
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &summary) }}">summary</a>
+      {{ " | " }}
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &briefs) }}">briefs</a>
+      {{ " | " }}
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &commits) }}">commits</a>
+      {{ " | " }}
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &tags) }}">tags</a>
+      {{ " | " }}
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &tree) }}">tree</a>
+    </div>
+    <div class="dotted_line"></div>
+  </div>
+</div>
+{{ end }}
+
+{{ define gotweb_render_briefs(struct template *tp) }}
+{!
+	const struct got_error	*error;
+	struct request		*c = tp->tp_arg;
+	struct server		*srv = c->srv;
+	struct transport	*t = c->t;
+	struct querystring	*qs = c->t->qs;
+	struct repo_commit	*rc;
+	struct repo_dir		*repo_dir = t->repo_dir;
+	struct gotweb_url	 diff_url, tree_url;
+	char			*tmp;
+
+	diff_url = (struct gotweb_url){
+		.action = DIFF,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+		.headref = qs->headref,
+	};
+	tree_url = (struct gotweb_url){
+		.action = TREE,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+		.headref = qs->headref,
+	};
+
+	if (qs->action == SUMMARY) {
+		qs->action = BRIEFS;
+		error = got_get_repo_commits(c, D_MAXSLCOMMDISP);
+	} else
+		error = got_get_repo_commits(c, srv->max_commits_display);
+	if (error)
+		return -1;
+!}
+<div id="briefs_title_wrapper">
+  <div id="briefs_title">Commit Briefs</div>
+</div>
+<div id="briefs_content">
+  {{ tailq-foreach rc &t->repo_commits entry }}
+    {!
+	diff_url.commit = rc->commit_id;
+	tree_url.commit = rc->commit_id;
+
+	tmp = strchr(rc->author, '<');
+	if (tmp)
+		*tmp = '\0';
+
+	tmp = strchr(rc->commit_msg, '\n');
+	if (tmp)
+		*tmp = '\0';
+    !}
+    <div class="briefs_age">
+      {{ render gotweb_render_age(tp, rc->committer_time, TM_DIFF) }}
+    </div>
+    <div class="briefs_author">
+      {{ rc->author }}
+    </div>
+    <div class="briefs_log">
+      <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
+        {{ rc->commit_msg }}
+      </a>
+      {{ if rc->refs_str }}
+        {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
+      {{ end }}
+      </a>
+    </div>
+    <div class="navs_wrapper">
+      <div class="navs">
+        <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">diff</a>
+	{{ " | " }}
+	<a href="{{ render gotweb_render_url(tp->tp_arg, &tree_url) }}">tree</a>
+      </div>
+    </div>
+    <div class="dotted_line"></div>
+  {{ end }}
+  {{ if t->next_id || t->prev_id }}
+    {! gotweb_render_navs(c); !}
+  {{ end }}
+</div>
+{{ end }}

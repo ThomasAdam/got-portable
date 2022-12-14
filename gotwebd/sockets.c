@@ -55,6 +55,7 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+#include "tmpl.h"
 
 #define SOCKS_BACKLOG 5
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
@@ -616,6 +617,15 @@ sockets_socket_accept(int fd, short event, void *arg)
 		log_warn("%s", __func__);
 		close(s);
 		cgi_inflight--;
+		return;
+	}
+
+	c->tp = template(c, fcgi_puts, fcgi_putc);
+	if (c->tp == NULL) {
+		log_warn("%s", __func__);
+		close(s);
+		cgi_inflight--;
+		free(c);
 		return;
 	}
 
