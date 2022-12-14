@@ -202,10 +202,12 @@ enum socket_priv_fds {
 	PRIV_FDS__MAX,
 };
 
+struct template;
 struct request {
 	struct socket			*sock;
 	struct server			*srv;
 	struct transport		*t;
+	struct template			*tp;
 	struct event			 ev;
 	struct event			 tmo;
 
@@ -415,6 +417,11 @@ enum query_actions {
 	ACTIONS__MAX,
 };
 
+enum gotweb_ref_tm {
+	TM_DIFF,
+	TM_LONG,
+};
+
 extern struct gotwebd	*gotwebd_env;
 
 /* sockets.c */
@@ -432,6 +439,8 @@ const struct got_error
 const struct got_error *gotweb_get_time_str(char **, time_t, int);
 const struct got_error *gotweb_init_transport(struct transport **);
 const struct got_error *gotweb_escape_html(char **, const char *);
+const char *gotweb_action_name(int);
+int gotweb_render_url(struct request *, struct gotweb_url *);
 int gotweb_link(struct request *, struct gotweb_url *, const char *, ...)
 	__attribute__((__format__(printf, 3, 4)))
 	__attribute__((__nonnull__(3)));
@@ -439,6 +448,13 @@ void gotweb_free_repo_commit(struct repo_commit *);
 void gotweb_free_repo_tag(struct repo_tag *);
 void gotweb_process_request(struct request *);
 void gotweb_free_transport(struct transport *);
+
+/* pages.tmpl */
+int	gotweb_render_header(struct template *);
+int	gotweb_render_footer(struct template *);
+int	gotweb_render_repo_table_hdr(struct template *);
+int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
+int	gotweb_render_briefs(struct template *);
 
 /* parse.y */
 int parse_config(const char *, struct gotwebd *);
@@ -450,6 +466,8 @@ void fcgi_timeout(int, short, void *);
 void fcgi_cleanup_request(struct request *);
 void fcgi_create_end_record(struct request *);
 void dump_fcgi_record(const char *, struct fcgi_record_header *);
+int fcgi_puts(struct template *, const char *);
+int fcgi_putc(struct template *, int);
 int fcgi_vprintf(struct request *, const char *, va_list);
 int fcgi_printf(struct request *, const char *, ...)
 	__attribute__((__format__(printf, 2, 3)))

@@ -53,6 +53,7 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+#include "tmpl.h"
 
 #include "got_compat.h"
 
@@ -626,6 +627,15 @@ sockets_socket_accept(int fd, short event, void *arg)
 		log_warn("%s", __func__);
 		close(s);
 		cgi_inflight--;
+		return;
+	}
+
+	c->tp = template(c, fcgi_puts, fcgi_putc);
+	if (c->tp == NULL) {
+		log_warn("%s", __func__);
+		close(s);
+		cgi_inflight--;
+		free(c);
 		return;
 	}
 
