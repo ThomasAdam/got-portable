@@ -136,7 +136,7 @@ boolean		: STRING {
 		;
 
 main		: UNIX_SOCKET STRING {
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_LISTEN) {
 				if (strlcpy(gotd->unix_socket_path, $2,
 				    sizeof(gotd->unix_socket_path)) >=
 				    sizeof(gotd->unix_socket_path)) {

@@ -20,6 +20,7 @@
 #define GOTD_UNIX_GROUP	"_gotsh"
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
+#define GOTD_EMPTY_PATH	"/var/empty"
 
 #define GOTD_MAXCLIENTS		1024
 #define GOTD_FD_RESERVE		5
@@ -31,6 +32,7 @@
 
 enum gotd_procid {
 	PROC_GOTD	= 0,
+	PROC_LISTEN,
 	PROC_REPO_READ,
 	PROC_REPO_WRITE,
 	PROC_MAX,
@@ -113,8 +115,6 @@ struct gotd {
 	struct gotd_repolist repos;
 	int nrepos;
 	int verbosity;
-	struct event ev;
-	struct event pause;
 	struct gotd_child_proc *procs;
 	int nprocs;
 };
@@ -169,8 +169,9 @@ enum gotd_imsg_type {
 	GOTD_IMSG_REF_UPDATE_NG, /* Update was not good. */
 	GOTD_IMSG_REFS_UPDATED, /* The server proccessed all ref updates. */
 
-	/* Client is disconnecting. */
+	/* Client connections. */
 	GOTD_IMSG_DISCONNECT,
+	GOTD_IMSG_CONNECT,
 };
 
 /* Structure for GOTD_IMSG_ERROR. */
@@ -396,6 +397,11 @@ struct gotd_imsg_packfile_done {
 
 /* Structure for GOTD_IMSG_DISCONNECT data. */
 struct gotd_imsg_disconnect {
+	uint32_t client_id;
+};
+
+/* Structure for GOTD_IMSG_CONNECT. */
+struct gotd_imsg_connect {
 	uint32_t client_id;
 };
 

@@ -58,6 +58,7 @@
 
 #include "gotd.h"
 #include "log.h"
+#include "listen.h"
 #include "auth.h"
 #include "repo_read.h"
 #include "repo_write.h"
@@ -91,7 +92,6 @@ static struct gotd_clients gotd_clients[GOTD_CLIENT_TABLE_SIZE];
 static SIPHASH_KEY clients_hash_key;
 volatile int client_cnt;
 static struct timeval timeout = { 3600, 0 };
-static int inflight;
 static struct gotd gotd;
 
 void gotd_sighdlr(int sig, short event, void *arg);
@@ -188,27 +188,6 @@ match_group(gid_t *groups, int ngroups, const char *unix_group_name)
 	return NULL;
 }
 
-static int
-accept_reserve(int fd, struct sockaddr *addr, socklen_t *addrlen,
-    int reserve, volatile int *counter)
-{
-	int ret;
-
-	if (getdtablecount() + reserve +
-	    ((*counter + 1) * GOTD_FD_NEEDED) >= getdtablesize()) {
-		log_debug("inflight fds exceeded");
-		errno = EMFILE;
-		return -1;
-	}
-
-	if ((ret = accept4(fd, addr, addrlen,
-	    SOCK_NONBLOCK | SOCK_CLOEXEC)) > -1) {
-		(*counter)++;
-	}
-
-	return ret;
-}
-
 static uint64_t
 client_hash(uint32_t client_id)
 {
@@ -236,20 +215,6 @@ find_client(uint32_t client_id)
 	}
 
 	return NULL;
-}
-
-static uint32_t
-get_client_id(void)
-{
-	int duplicate = 0;
-	uint32_t id;
-
-	do {
-		id = arc4random();
-		duplicate = (find_client(id) != NULL);
-	} while (duplicate || id == 0);
-
-	return id;
 }
 
 static struct gotd_child_proc *
@@ -334,6 +299,7 @@ disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
 	struct gotd_child_proc *proc = get_client_proc(client);
+	struct gotd_child_proc *listen_proc = &gotd.procs[0];
 	uint64_t slot;
 
 	log_debug("uid %d: disconnecting", client->euid);
@@ -345,6 +311,12 @@ disconnect(struct gotd_client *client)
 		    &idisconnect, sizeof(idisconnect)) == -1)
 			log_warn("imsg compose DISCONNECT");
 	}
+
+	if (gotd_imsg_compose_event(&listen_proc->iev,
+	    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
+	    &idisconnect, sizeof(idisconnect)) == -1)
+		log_warn("imsg compose DISCONNECT");
+
 	slot = client_hash(client->id) % nitems(gotd_clients);
 	STAILQ_REMOVE(&gotd_clients[slot], client, gotd_client, entry);
 	imsg_clear(&client->iev.ibuf);
@@ -365,7 +337,6 @@ disconnect(struct gotd_client *client)
 	}
 	free(client->capabilities);
 	free(client);
-	inflight--;
 	client_cnt--;
 }
 
@@ -1231,65 +1202,50 @@ gotd_request_timeout(int fd, short events, void *arg)
 	disconnect(client);
 }
 
-static void
-gotd_accept(int fd, short event, void *arg)
+static const struct got_error *
+recv_connect(uint32_t *client_id, struct imsg *imsg)
 {
-	struct sockaddr_storage ss;
-	struct timeval backoff;
-	socklen_t len;
+	const struct got_error *err = NULL;
+	struct gotd_imsg_connect iconnect;
+	size_t datalen;
 	int s = -1;
 	struct gotd_client *client = NULL;
 	uid_t euid;
 	gid_t egid;
 
-	backoff.tv_sec = 1;
-	backoff.tv_usec = 0;
+	*client_id = 0;
 
-	if (event_add(&gotd.ev, NULL) == -1) {
-		log_warn("event_add");
-		return;
-	}
-	if (event & EV_TIMEOUT)
-		return;
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iconnect))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iconnect, imsg->data, sizeof(iconnect));
 
-	len = sizeof(ss);
-
-	s = accept_reserve(fd, (struct sockaddr *)&ss, &len, GOTD_FD_RESERVE,
-	    &inflight);
-
+	s = imsg->fd;
 	if (s == -1) {
-		switch (errno) {
-		case EINTR:
-		case EWOULDBLOCK:
-		case ECONNABORTED:
-			return;
-		case EMFILE:
-		case ENFILE:
-			event_del(&gotd.ev);
-			evtimer_add(&gotd.pause, &backoff);
-			return;
-		default:
-			log_warn("%s: accept", __func__);
-			return;
-		}
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
 	}
 
-	if (client_cnt >= GOTD_MAXCLIENTS)
-		goto err;
+	if (find_client(iconnect.client_id)) {
+		err = got_error_msg(GOT_ERR_CLIENT_ID, "duplicate client ID");
+		goto done;
+	}
 
 	if (getpeereid(s, &euid, &egid) == -1) {
-		log_warn("%s: getpeereid", __func__);
-		goto err;
+		err = got_error_from_errno("getpeerid");
+		goto done;
 	}
 
 	client = calloc(1, sizeof(*client));
 	if (client == NULL) {
-		log_warn("%s: calloc", __func__);
-		goto err;
+		err = got_error_from_errno("calloc");
+		goto done;
 	}
 
+	*client_id = iconnect.client_id;
+
 	client->state = GOTD_STATE_EXPECT_LIST_REFS;
-	client->id = get_client_id();
+	client->id = iconnect.client_id;
 	client->fd = s;
 	s = -1;
 	client->delta_cache_fd = -1;
@@ -1311,22 +1267,27 @@ gotd_accept(int fd, short event, void *arg)
 	add_client(client);
 	log_debug("%s: new client uid %d connected on fd %d", __func__,
 	    client->euid, client->fd);
-	return;
-err:
-	inflight--;
-	if (s != -1)
-		close(s);
-	free(client);
-}
+done:
+	if (err) {
+		struct gotd_child_proc *listen_proc = &gotd.procs[0];
+		struct gotd_imsg_disconnect idisconnect;
 
-static void
-gotd_accept_paused(int fd, short event, void *arg)
-{
-	event_add(&gotd.ev, NULL);
+		idisconnect.client_id = client->id;
+		if (gotd_imsg_compose_event(&listen_proc->iev,
+		    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
+		    &idisconnect, sizeof(idisconnect)) == -1)
+			log_warn("imsg compose DISCONNECT");
+
+		if (s != -1)
+			close(s);
+	}
+
+	return err;
 }
 
 static const char *gotd_proc_names[PROC_MAX] = {
 	"parent",
+	"listen",
 	"repo_read",
 	"repo_write"
 };
@@ -1452,21 +1413,31 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	struct gotd_child_proc *client_proc;
 	int ret = 0;
 
-	client_proc = get_client_proc(client);
-	if (client_proc == NULL)
-		fatalx("no process found for uid %d", client->euid);
-
-	if (proc->pid != client_proc->pid) {
-		kill_proc(proc, 1);
-		log_warnx("received message from PID %d for uid %d, while "
-		    "PID %d is the process serving this user",
-		    proc->pid, client->euid, client_proc->pid);
-		return 0;
+	if (proc->type == PROC_REPO_READ || proc->type == PROC_REPO_WRITE) {
+		client_proc = get_client_proc(client);
+		if (client_proc == NULL)
+			fatalx("no process found for uid %d", client->euid);
+		if (proc->pid != client_proc->pid) {
+			kill_proc(proc, 1);
+			log_warnx("received message from PID %d for uid %d, "
+			    "while PID %d is the process serving this user",
+			    proc->pid, client->euid, client_proc->pid);
+			return 0;
+		}
 	}
 
 	switch (imsg->hdr.type) {
 	case GOTD_IMSG_ERROR:
 		ret = 1;
+		break;
+	case GOTD_IMSG_CONNECT:
+		if (proc->type != PROC_LISTEN) {
+			err = got_error_fmt(GOT_ERR_BAD_PACKET,
+			    "new connection for uid %d from PID %d "
+			    "which is not the listen process",
+			    proc->pid, client->euid);
+		} else
+			ret = 1;
 		break;
 	case GOTD_IMSG_PACKFILE_DONE:
 		err = ensure_proc_is_reading(client, proc);
@@ -1897,6 +1868,9 @@ gotd_dispatch(int fd, short event, void *arg)
 			do_disconnect = 1;
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
+		case GOTD_IMSG_CONNECT:
+			err = recv_connect(&client_id, &imsg);
+			break;
 		case GOTD_IMSG_PACKFILE_DONE:
 			do_disconnect = 1;
 			err = recv_packfile_done(&client_id, &imsg);
@@ -1992,6 +1966,9 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 
 	argv[argc++] = argv0;
 	switch (proc_id) {
+	case PROC_LISTEN:
+		argv[argc++] = (char *)"-L";
+		break;
 	case PROC_REPO_READ:
 		argv[argc++] = (char *)"-R";
 		break;
@@ -2005,8 +1982,10 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 	argv[argc++] = (char *)"-f";
 	argv[argc++] = (char *)confpath;
 
-	argv[argc++] = (char *)"-P";
-	argv[argc++] = (char *)chroot_path;
+	if (chroot_path) {
+		argv[argc++] = (char *)"-P";
+		argv[argc++] = (char *)chroot_path;
+	}
 
 	if (!daemonize)
 		argv[argc++] = (char *)"-d";
@@ -2021,6 +2000,25 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 }
 
 static void
+start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
+{
+	struct gotd_child_proc *proc = &gotd.procs[0];
+
+	proc->type = PROC_LISTEN;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1)
+		fatal("socketpair");
+
+	proc->pid = start_child(proc->type, NULL, argv0, confpath,
+	    proc->pipe[1], daemonize, verbosity);
+	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	proc->iev.handler = gotd_dispatch;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+}
+
+static void
 start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
     int daemonize, int verbosity)
 {
@@ -2028,19 +2026,11 @@ start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
 	struct gotd_child_proc *proc;
 	int i;
 
-	/*
-	 * XXX For now, use one reader and one writer per repository.
-	 * This should be changed to N readers + M writers.
-	 */
-	gotd->nprocs = gotd->nrepos * 2;
-	gotd->procs = calloc(gotd->nprocs, sizeof(*gotd->procs));
-	if (gotd->procs == NULL)
-		fatal("calloc");
-	for (i = 0; i < gotd->nprocs; i++) {
+	for (i = 1; i < gotd->nprocs; i++) {
 		if (repo == NULL)
 			repo = TAILQ_FIRST(&gotd->repos);
 		proc = &gotd->procs[i];
-		if (i < gotd->nrepos)
+		if (i - 1 < gotd->nrepos)
 			proc->type = PROC_REPO_READ;
 		else
 			proc->type = PROC_REPO_WRITE;
@@ -2105,13 +2095,16 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "df:nP:RvW")) != -1) {
+	while ((ch = getopt(argc, argv, "df:LnP:RvW")) != -1) {
 		switch (ch) {
 		case 'd':
 			daemonize = 0;
 			break;
 		case 'f':
 			confpath = optarg;
+			break;
+		case 'L':
+			proc_id = PROC_LISTEN;
 			break;
 		case 'n':
 			noaction = 1;
@@ -2182,7 +2175,7 @@ main(int argc, char **argv)
 		    gotd.unix_group_name);
 	}
 
-	if (proc_id == PROC_GOTD &&
+	if (proc_id == PROC_LISTEN &&
 	    !got_path_is_absolute(gotd.unix_socket_path))
 		fatalx("bad unix socket path \"%s\": must be an absolute path",
 		    gotd.unix_socket_path);
@@ -2191,6 +2184,25 @@ main(int argc, char **argv)
 		return 0;
 
 	if (proc_id == PROC_GOTD) {
+		gotd.pid = getpid();
+		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
+		/*
+		 * Start a listener and repository readers/writers.
+		 * XXX For now, use one reader and one writer per repository.
+		 * This should be changed to N readers + M writers.
+		 */
+		gotd.nprocs = 1 + gotd.nrepos * 2;
+		gotd.procs = calloc(gotd.nprocs, sizeof(*gotd.procs));
+		if (gotd.procs == NULL)
+			fatal("calloc");
+		start_listener(argv0, confpath, daemonize, verbosity);
+		start_repo_children(&gotd, argv0, confpath, daemonize,
+		    verbosity);
+		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+		if (daemonize && daemon(1, 0) == -1)
+			fatal("daemon");
+	} else if (proc_id == PROC_LISTEN) {
+		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		if (verbosity) {
 			log_info("socket: %s", gotd.unix_socket_path);
 			log_info("user: %s", pw->pw_name);
@@ -2203,15 +2215,11 @@ main(int argc, char **argv)
 			fatal("cannot listen on unix socket %s",
 			    gotd.unix_socket_path);
 		}
-	}
-
-	if (proc_id == PROC_GOTD) {
-		gotd.pid = getpid();
-		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		start_repo_children(&gotd, argv0, confpath, daemonize,
-		    verbosity);
-		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
-		if (daemonize && daemon(0, 0) == -1)
+		if (chroot(GOTD_EMPTY_PATH) == -1)
+			fatal("chroot");
+		if (chdir("/") == -1)
+			fatal("chdir(\"/\")");
+		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
 	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE) {
 		error = got_repo_pack_fds_open(&pack_fds);
@@ -2252,6 +2260,14 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		break;
+	case PROC_LISTEN:
+#ifndef PROFILE
+		if (pledge("stdio sendfd unix", NULL) == -1)
+			err(1, "pledge");
+#endif
+		listen_main(title, fd);
+		/* NOTREACHED */
+		break;
 	case PROC_REPO_READ:
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd", NULL) == -1)
@@ -2288,15 +2304,10 @@ main(int argc, char **argv)
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	event_set(&gotd.ev, fd, EV_READ | EV_PERSIST, gotd_accept, NULL);
-	if (event_add(&gotd.ev, NULL))
-		fatalx("event add");
-	evtimer_set(&gotd.pause, gotd_accept_paused, NULL);
+	gotd_imsg_event_add(&gotd.procs[0].iev);
 
 	event_dispatch();
 
-	if (fd != -1)
-		close(fd);
 	if (pack_fds)
 		got_repo_pack_fds_close(pack_fds);
 	free(repo_path);
