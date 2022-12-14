@@ -1409,7 +1409,8 @@ repo_write_dispatch(int fd, short event, void *arg)
 }
 
 void
-repo_write_main(const char *title, int *pack_fds, int *temp_fds)
+repo_write_main(const char *title, const char *repo_path,
+    int *pack_fds, int *temp_fds)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsgev iev;
@@ -1421,11 +1422,7 @@ repo_write_main(const char *title, int *pack_fds, int *temp_fds)
 
 	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 
-	/*
-	 * Open a repository in the root directory.
-	 * We are already in chroot at this point.
-	 */
-	err = got_repo_open(&repo_write.repo, "/", NULL, pack_fds);
+	err = got_repo_open(&repo_write.repo, repo_path, NULL, pack_fds);
 	if (err)
 		goto done;
 	if (!got_repo_is_bare(repo_write.repo)) {

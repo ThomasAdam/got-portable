@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void repo_write_main(const char *, int *, int *);
+void repo_write_main(const char *, const char *, int *, int *);
 void repo_write_shutdown(void);

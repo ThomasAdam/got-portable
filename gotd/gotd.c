@@ -433,7 +433,7 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 
 	proc = get_client_proc(client);
 	if (proc) {
-		if (strlcpy(iclient.repo_name, proc->chroot_path,
+		if (strlcpy(iclient.repo_name, proc->repo_path,
 		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
 			return got_error_msg(GOT_ERR_NO_SPACE,
 			    "repo name too long");
@@ -903,7 +903,7 @@ recv_packfile(struct gotd_client *client)
 	pipe[1] = -1;
 
 	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.pack",
-	    client->repo_write->chroot_path, GOT_OBJECTS_PACK_DIR,
+	    client->repo_write->repo_path, GOT_OBJECTS_PACK_DIR,
 	    client->euid) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -915,7 +915,7 @@ recv_packfile(struct gotd_client *client)
 
 	free(basepath);
 	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.idx",
-	    client->repo_write->chroot_path, GOT_OBJECTS_PACK_DIR,
+	    client->repo_write->repo_path, GOT_OBJECTS_PACK_DIR,
 	    client->euid) == -1) {
 		err = got_error_from_errno("asprintf");
 		basepath = NULL;
@@ -1340,7 +1340,7 @@ gotd_shutdown(void)
 			proc = get_proc_for_pid(pid);
 			log_warnx("%s %s child process terminated; signal %d",
 			    proc ? gotd_proc_names[proc->type] : "",
-			    proc ? proc->chroot_path : "", WTERMSIG(status));
+			    proc ? proc->repo_path : "", WTERMSIG(status));
 		}	
 	} while (pid != -1 || (pid == -1 && errno == EINTR));
 
@@ -1917,12 +1917,12 @@ gotd_dispatch(int fd, short event, void *arg)
 				disconnect(client);
 		} else {
 			if (do_packfile_install)
-				err = install_pack(client, proc->chroot_path,
+				err = install_pack(client, proc->repo_path,
 				    &imsg);
 			else if (do_ref_updates)
 				err = begin_ref_updates(client, &imsg);
 			else if (do_ref_update)
-				err = update_ref(client, proc->chroot_path,
+				err = update_ref(client, proc->repo_path,
 				    &imsg);
 			if (err)
 				log_warnx("uid %d: %s", client->euid, err->msg);
@@ -1940,7 +1940,7 @@ done:
 }
 
 static pid_t
-start_child(enum gotd_procid proc_id, const char *chroot_path,
+start_child(enum gotd_procid proc_id, const char *repo_path,
     char *argv0, const char *confpath, int fd, int daemonize, int verbosity)
 {
 	char	*argv[11];
@@ -1981,9 +1981,9 @@ start_child(enum gotd_procid proc_id, const char *chroot_path,
 	argv[argc++] = (char *)"-f";
 	argv[argc++] = (char *)confpath;
 
-	if (chroot_path) {
+	if (repo_path) {
 		argv[argc++] = (char *)"-P";
-		argv[argc++] = (char *)chroot_path;
+		argv[argc++] = (char *)repo_path;
 	}
 
 	if (!daemonize)
@@ -2037,16 +2037,16 @@ start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
 		    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 			fatalx("repository name too long: %s", repo->name);
 		log_debug("adding repository %s", repo->name);
-		if (realpath(repo->path, proc->chroot_path) == NULL)
+		if (realpath(repo->path, proc->repo_path) == NULL)
 			fatal("%s", repo->path);
 		if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
 		    PF_UNSPEC, proc->pipe) == -1)
 			fatal("socketpair");
-		proc->pid = start_child(proc->type, proc->chroot_path, argv0,
+		proc->pid = start_child(proc->type, proc->repo_path, argv0,
 		    confpath, proc->pipe[1], daemonize, verbosity);
 		imsg_init(&proc->iev.ibuf, proc->pipe[0]);
 		log_debug("proc %s %s is on fd %d",
-		    gotd_proc_names[proc->type], proc->chroot_path,
+		    gotd_proc_names[proc->type], proc->repo_path,
 		    proc->pipe[0]);
 		proc->iev.handler = gotd_dispatch;
 		proc->iev.events = EV_READ;
@@ -2056,6 +2056,16 @@ start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
 
 		repo = TAILQ_NEXT(repo, entry);
 	}
+}
+
+static void
+apply_unveil_repo_readonly(const char *repo_path)
+{
+	if (unveil(repo_path, "r") == -1)
+		fatal("unveil %s", repo_path);
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
 }
 
 static void
@@ -2214,11 +2224,7 @@ main(int argc, char **argv)
 			fatal("cannot listen on unix socket %s",
 			    gotd.unix_socket_path);
 		}
-		if (chroot(GOTD_EMPTY_PATH) == -1)
-			fatal("chroot");
-		if (chdir("/") == -1)
-			fatal("chdir(\"/\")");
-		if (daemonize && daemon(1, 0) == -1)
+		if (daemonize && daemon(0, 0) == -1)
 			fatal("daemon");
 	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE) {
 		error = got_repo_pack_fds_open(&pack_fds);
@@ -2231,11 +2237,7 @@ main(int argc, char **argv)
 			fatalx("repository path not specified");
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
-		if (chroot(repo_path) == -1)
-			fatal("chroot");
-		if (chdir("/") == -1)
-			fatal("chdir(\"/\")");
-		if (daemonize && daemon(1, 0) == -1)
+		if (daemonize && daemon(0, 0) == -1)
 			fatal("daemon");
 	} else
 		fatal("invalid process id %d", proc_id);
@@ -2269,18 +2271,20 @@ main(int argc, char **argv)
 		break;
 	case PROC_REPO_READ:
 #ifndef PROFILE
-		if (pledge("stdio rpath recvfd", NULL) == -1)
+		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		repo_read_main(title, pack_fds, temp_fds);
+		apply_unveil_repo_readonly(repo_path);
+		repo_read_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		exit(0);
 	case PROC_REPO_WRITE:
 #ifndef PROFILE
-		if (pledge("stdio rpath sendfd recvfd", NULL) == -1)
+		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		repo_write_main(title, pack_fds, temp_fds);
+		apply_unveil_repo_readonly(repo_path);
+		repo_write_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		exit(0);
 	default:
