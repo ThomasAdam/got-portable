@@ -1,0 +1,125 @@
+.\" Copyright (c) 2022 Omar Polo <op@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 25, 2022
+.Dt TEMPLATE 7
+.Os
+.Sh NAME
+.Nm template
+.Nd templating language
+.Sh DESCRIPTION
+.Nm
+is a language used to define programs that output data in some way.
+These programs are called
+.Dq templates .
+A
+.Nm
+file is assumed to be compiled using the
+.Xr template 1
+utility into C code, to be further compiled as part of a bigger
+application.
+The language itself is format-agnostic and can thus be used to produce
+various type of outputs.
+.Pp
+There are two special sequences:
+.Bl -tag -width 9m
+.It Cm {{ Ar ... Cm }}
+used for
+.Nm
+special syntax.
+.It Cm {! Ar ... Cm !}
+used to include literal C code.
+This is the only special syntax permitted as top-level, except for block
+definition and includes.
+.El
+.Pp
+The basic unit of a
+.Nm
+file is the block.
+Each block is turned into a C function that output its content via some
+provided functions.
+Here's an example of a block:
+.Bd -literal -offset indent
+{{ define tp_base(struct template *tp, const char *title) }}
+<!doctype html>
+<html>
+	<head>
+		<title>{{ title }}</title>
+	</head>
+	<body>
+		{{ render tp->tp_body(tp) }}
+	</body>
+</html>
+{{ end }}
+.Ed
+.Ss SPECIAL SYNTAX
+This section is a reference for all the special syntaxes supported.
+.Bl -tag -indent Ds
+.It Cm {{ Ic include Ar file Cm }}
+Include additional template files.
+.It Cm {{ Ic define Ar name Ns ( Ar arguments ... ) Cm }} Ar body Cm {{ Ic end Cm }}
+Defines the block
+.Ar name
+with the given
+.Ar arguments .
+.Ar body
+will be outputted as-is via the provided functions
+.Pq i.e.\& is still escaped eventually
+and can contain all the special syntaxes documented here except
+.Ic include
+and
+.Ic define .
+.It Cm {{ Ic render Ar expression() Cm }}
+Executes
+.Ar expression()
+and terminate the template if it returns -1.
+It's used to render (call) another template.
+.It Cm {{ Ic printf Ar fmt , Ar arguments ... Cm }}
+Outputs the string that would be produced by calling
+.Xr printf 3
+with the given
+.Ar fmt
+format string and the given
+.Ar arguments .
+.It Cm {{ Ic if Ar expr Cm }} Ar ... Cm {{ Ic elseif Ar expr Cm }} Ar ... Cm {{ Ic else Cm }} Ar ... Cm {{ Ic end Cm }}
+Conditional evaluation.
+.Ic elseif
+can be provided zero or more times,
+.Ic else
+only zero or one time and always for last.
+.It Cm {{ Ic for Ar ... ; Ar ... ; Ar ... Cm  }} Ar ... Cm {{ Ic end Cm }}
+Looping construct similar to the C loop.
+.It Cm {{ Ic tailq-foreach Ar var head fieldname Cm }} Ar .. Cm {{ Ic end Cm }}
+Looping construct similar to the queue.h macro TAILQ_FOREACH.
+.It Cm {{ Ar expression Cm | Ic unsafe Cm }}
+Output
+.Ar expression
+as-is.
+.It Cm {{ Ar expression Cm | Ic urlescape Cm }}
+Output
+.Ar expression
+escaped in a way that can be made part of an URL.
+.It Cm {{ Ar expression Cm }}
+Output
+.Ar expression
+with the default escaping.
+.El
+.Sh SEE ALSO
+.Xr template 1
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+reference was written by
+.Ar Omar Polo Aq Mt op@openbsd.org .

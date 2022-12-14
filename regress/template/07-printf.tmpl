@@ -1,0 +1,13 @@
+{!
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "tmpl.h"
+
+int base(struct template *, const char *);
+
+!}
+
+{{ define base(struct template *tp, const char *title) }}
+{{ printf "%.2s:\t%d\n", title, 42 }}
+{{ end }}

@@ -1,0 +1,19 @@
+{!
+#include <stdlib.h>
+
+#include "tmpl.h"
+
+int base(struct template *, const char *);
+!}
+
+{{ define base(struct template *tp, const char *title) }}
+<!doctype html>
+<html>
+	<head>
+		<title>{{ title | urlescape }}</title>
+	</head>
+	<body>
+		<h1>{{ title | unsafe }}</h1>
+	</body>
+</html>
+{{ end }}

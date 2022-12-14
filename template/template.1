@@ -1,0 +1,85 @@
+.\" Copyright (c) 2022 Omar Polo <op@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd November 25, 2022
+.Dt TEMPLATE 1
+.Os
+.Sh NAME
+.Nm template
+.Nd templating system compiler
+.Sh SYNOPSIS
+.Nm
+.Op Fl G
+.Op Fl o Ar out
+.Op Ar
+.Sh DESCRIPTION
+.Nm
+is an utility that converts files written in the
+.Xr template 7
+format format to a set of routine writtens in the C programming
+language.
+.Nm
+converts the files given as arguments or from standard input, and
+writes to standard output.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl G
+Do not emit debug info in the generated source.
+It's disabled by default, unless
+.Nm
+is reading from standard input.
+.It Fl o Ar out
+Write output to file.
+.Ar out
+will be created or truncated if exists and will be removed if
+.Nm
+encounters any error.
+.El
+.Sh EXIT STATUS
+.Ex
+.Sh SEE ALSO
+.Xr template 7
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was written by
+.An Omar Polo Aq Mt op@openbsd.org .
+.Sh CAVEATS
+The compiler is very naive, so there are quite a few shortcomings:
+.Bl -bullet -compact
+.It
+No attempt is made to validate the C code provided inline, nor the
+validity of the arguments to many constructs.
+.It
+The generated code assumes that a variable called
+.Va tp
+of type
+.Vt struct template *
+is in scope inside each block.
+.It
+Each block may have additional variables used for the template
+generation implicitly defined: to avoid clashes, don't name variables
+or arguments with the
+.Sq tp_
+prefix.
+.It
+Blanks are, in most cases, trimmed.
+Normally this is not a problem, but a workaround is needed in case
+they need to be preserved, for e.g.:
+.Bd -literal -offset indent
+Name: {{ " " }} {{ render name_field(tp) }}
+.Ed
+.El
