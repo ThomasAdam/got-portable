@@ -30,8 +30,6 @@
 #include "gotwebd.h"
 #include "tmpl.h"
 
-const struct got_error	*gotweb_render_navs(struct request *);
-
 static int
 gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 {
@@ -296,7 +294,41 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
     <div class="dotted_line"></div>
   {{ end }}
   {{ if t->next_id || t->prev_id }}
-    {! gotweb_render_navs(c); !}
+    {{ render gotweb_render_navs(tp) }}
   {{ end }}
 </div>
+{{ end }}
+
+{{ define gotweb_render_navs(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct gotweb_url	 prev, next;
+	int			 have_prev, have_next;
+
+	gotweb_get_navs(c, &prev, &have_prev, &next, &have_next);
+!}
+<div id="np_wrapper">
+  <div id="nav_prev">
+    {{ if have_prev }}
+      <a href="{{ render gotweb_render_url(c, &prev) }}">
+        Previous
+      </a>
+    {{ end }}
+  </div>
+  <div id="nav_next">
+    {{ if have_next }}
+      <a href="{{ render gotweb_render_url(c, &next) }}">
+        Next
+      </a>
+    {{ end }}
+  </div>
+</div>
+{{ finally }}
+{!
+	free(t->next_id);
+	t->next_id = NULL;
+	free(t->prev_id);
+	t->prev_id = NULL;
+!}
 {{ end }}

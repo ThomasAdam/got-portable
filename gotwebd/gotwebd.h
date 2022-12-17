@@ -434,6 +434,8 @@ const struct got_error *gotweb_render_content_type(struct request *,
     const uint8_t *);
 const struct got_error
     *gotweb_render_content_type_file(struct request *, const uint8_t *, char *);
+void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
+    struct gotweb_url *, int *);
 const struct got_error *gotweb_get_time_str(char **, time_t, int);
 const struct got_error *gotweb_init_transport(struct transport **);
 const struct got_error *gotweb_escape_html(char **, const char *);
@@ -453,6 +455,7 @@ int	gotweb_render_footer(struct template *);
 int	gotweb_render_repo_table_hdr(struct template *);
 int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);
+int	gotweb_render_navs(struct template *);
 
 /* parse.y */
 int parse_config(const char *, struct gotwebd *);

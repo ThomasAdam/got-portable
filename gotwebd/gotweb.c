@@ -99,8 +99,6 @@ static const struct got_error *gotweb_render_tags(struct request *);
 static const struct got_error *gotweb_render_tree(struct request *);
 static const struct got_error *gotweb_render_branches(struct request *);
 
-const struct got_error *gotweb_render_navs(struct request *);
-
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
 
@@ -660,105 +658,53 @@ gotweb_render_content_type_file(struct request *c, const uint8_t *type,
 	return NULL;
 }
 
-const struct got_error *
-gotweb_render_navs(struct request *c)
+void
+gotweb_get_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
+    struct gotweb_url *next, int *have_next)
 {
-	const struct got_error *error = NULL;
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct server *srv = c->srv;
-	int r;
 
-	r = fcgi_printf(c, "<div id='np_wrapper'>\n<div id='nav_prev'>\n");
-	if (r == -1)
-		goto done;
+	*have_prev = *have_next = 0;
 
 	switch(qs->action) {
 	case INDEX:
 		if (qs->index_page > 0) {
-			struct gotweb_url url = {
+			*have_prev = 1;
+			*prev = (struct gotweb_url){
 				.action = -1,
 				.index_page = qs->index_page - 1,
 				.page = -1,
 			};
-
-			r = gotweb_link(c, &url, "Previous");
 		}
-		break;
-	case BRIEFS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			struct gotweb_url url = {
-				.action = BRIEFS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-			};
-
-			r = gotweb_link(c, &url, "Previous");
-		}
-		break;
-	case COMMITS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			struct gotweb_url url = {
-				.action = COMMITS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-				.folder = qs->folder,
-				.file = qs->file,
-			};
-
-			r = gotweb_link(c, &url, "Previous");
-		}
-		break;
-	case TAGS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			struct gotweb_url url = {
-				.action = TAGS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-			};
-
-			r = gotweb_link(c, &url, "Previous");
-		}
-		break;
-	}
-
-	if (r == -1)
-		goto done;
-
-	r = fcgi_printf(c, "</div>\n"	/* #nav_prev */
-	    "<div id='nav_next'>");
-	if (r == -1)
-		goto done;
-
-	switch(qs->action) {
-	case INDEX:
 		if (t->next_disp == srv->max_repos_display &&
 		    t->repos_total != (qs->index_page + 1) *
 		    srv->max_repos_display) {
-			struct gotweb_url url = {
+			*have_next = 1;
+			*next = (struct gotweb_url){
 				.action = -1,
 				.index_page = qs->index_page + 1,
 				.page = -1,
 			};
-
-			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case BRIEFS:
+		if (t->prev_id && qs->commit != NULL &&
+		    strcmp(qs->commit, t->prev_id) != 0) {
+			*have_prev = 1;
+			*prev = (struct gotweb_url){
+				.action = BRIEFS,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+			};
+		}
 		if (t->next_id) {
-			struct gotweb_url url = {
+			*have_next = 1;
+			*next = (struct gotweb_url){
 				.action = BRIEFS,
 				.index_page = -1,
 				.page = qs->page + 1,
@@ -766,13 +712,26 @@ gotweb_render_navs(struct request *c)
 				.commit = t->next_id,
 				.headref = qs->headref,
 			};
-
-			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case COMMITS:
+		if (t->prev_id && qs->commit != NULL &&
+		    strcmp(qs->commit, t->prev_id) != 0) {
+			*have_prev = 1;
+			*prev = (struct gotweb_url){
+				.action = COMMITS,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+				.folder = qs->folder,
+				.file = qs->file,
+			};
+		}
 		if (t->next_id) {
-			struct gotweb_url url = {
+			*have_next = 1;
+			*next = (struct gotweb_url){
 				.action = COMMITS,
 				.index_page = -1,
 				.page = qs->page + 1,
@@ -782,13 +741,24 @@ gotweb_render_navs(struct request *c)
 				.folder = qs->folder,
 				.file = qs->file,
 			};
-
-			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	case TAGS:
+		if (t->prev_id && qs->commit != NULL &&
+		    strcmp(qs->commit, t->prev_id) != 0) {
+			*have_prev = 1;
+			*prev = (struct gotweb_url){
+				.action = TAGS,
+				.index_page = -1,
+				.page = qs->page - 1,
+				.path = qs->path,
+				.commit = t->prev_id,
+				.headref = qs->headref,
+			};
+		}
 		if (t->next_id) {
-			struct gotweb_url url = {
+			*have_next = 1;
+			*next = (struct gotweb_url){
 				.action = TAGS,
 				.index_page = -1,
 				.page = qs->page + 1,
@@ -796,22 +766,9 @@ gotweb_render_navs(struct request *c)
 				.commit = t->next_id,
 				.headref = qs->headref,
 			};
-
-			r = gotweb_link(c, &url, "Next");
 		}
 		break;
 	}
-	if (r == -1)
-		goto done;
-
-	fcgi_printf(c, "</div>\n"); /* #nav_next */
-	fcgi_printf(c, "</div>\n"); /* #np_wrapper */
-done:
-	free(t->next_id);
-	t->next_id = NULL;
-	free(t->prev_id);
-	t->prev_id = NULL;
-	return error;
 }
 
 static const struct got_error *
@@ -906,8 +863,7 @@ gotweb_render_index(struct request *c)
 	    t->repos_total <= srv->max_repos_display)
 		goto done;
 
-	error = gotweb_render_navs(c);
-	if (error)
+	if (gotweb_render_navs(c->tp) == -1)
 		goto done;
 done:
 	if (sd_dent) {
@@ -1066,8 +1022,7 @@ gotweb_render_commits(struct request *c)
 	}
 
 	if (t->next_id || t->prev_id) {
-		error = gotweb_render_navs(c);
-		if (error)
+		if (gotweb_render_navs(c->tp) == -1)
 			goto done;
 	}
 	fcgi_printf(c, "</div>\n"); /* .commits_content */
@@ -1603,8 +1558,7 @@ gotweb_render_tags(struct request *c)
 		msg = NULL;
 	}
 	if (t->next_id || t->prev_id) {
-		error = gotweb_render_navs(c);
-		if (error)
+		if (gotweb_render_navs(c->tp) == -1)
 			goto done;
 	}
 	fcgi_printf(c, "</div>\n"); /* #tags_content */
