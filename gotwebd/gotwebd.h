@@ -456,6 +456,7 @@ int	gotweb_render_repo_table_hdr(struct template *);
 int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);
 int	gotweb_render_navs(struct template *);
+int	gotweb_render_commits(struct template *);
 
 /* parse.y */
 int parse_config(const char *, struct gotwebd *);
