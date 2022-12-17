@@ -354,7 +354,6 @@ gotweb_init_querystring(struct querystring **qs)
 	(*qs)->file = NULL;
 	(*qs)->folder = NULL;
 	(*qs)->index_page = 0;
-	(*qs)->index_page_str = NULL;
 	(*qs)->path = NULL;
 
 	return error;
@@ -521,12 +520,6 @@ qa_found:
 		case INDEX_PAGE:
 			if (strlen(value) == 0)
 				break;
-			(*qs)->index_page_str = strdup(value);
-			if ((*qs)->index_page_str == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
-				goto done;
-			}
 			(*qs)->index_page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
 			if (errstr) {
@@ -534,10 +527,8 @@ qa_found:
 				    __func__, errstr);
 				goto done;
 			}
-			if ((*qs)->index_page < 0) {
+			if ((*qs)->index_page < 0)
 				(*qs)->index_page = 0;
-				sprintf((*qs)->index_page_str, "%d", 0);
-			}
 			break;
 		case PATH:
 			(*qs)->path = strdup(value);
@@ -550,12 +541,6 @@ qa_found:
 		case PAGE:
 			if (strlen(value) == 0)
 				break;
-			(*qs)->page_str = strdup(value);
-			if ((*qs)->page_str == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
-				goto done;
-			}
 			(*qs)->page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
 			if (errstr) {
@@ -563,10 +548,8 @@ qa_found:
 				    __func__, errstr);
 				goto done;
 			}
-			if ((*qs)->page < 0) {
+			if ((*qs)->page < 0)
 				(*qs)->page = 0;
-				sprintf((*qs)->page_str, "%d", 0);
-			}
 			break;
 		default:
 			break;
@@ -613,9 +596,7 @@ gotweb_free_querystring(struct querystring *qs)
 		free(qs->file);
 		free(qs->folder);
 		free(qs->headref);
-		free(qs->index_page_str);
 		free(qs->path);
-		free(qs->page_str);
 	}
 	free(qs);
 }
