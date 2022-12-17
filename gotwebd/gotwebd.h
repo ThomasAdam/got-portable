@@ -373,10 +373,8 @@ struct querystring {
 	char		*folder;
 	char		*headref;
 	int		 index_page;
-	char		*index_page_str;
 	char		*path;
 	int		 page;
-	char		*page_str;
 };
 
 struct querystring_keys {
