@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Omar Polo <op@omarpolo.com>
+ * Copyright (c) 2022 Omar Polo <op@openbsd.org>
  * Copyright (c) 2007-2016 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2004, 2005 Esben Norby <norby@openbsd.org>
  * Copyright (c) 2004 Ryan McBride <mcbride@openbsd.org>
