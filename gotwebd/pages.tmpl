@@ -332,3 +332,60 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 	t->prev_id = NULL;
 !}
 {{ end }}
+
+{{ define gotweb_render_commits(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_dir		*repo_dir = t->repo_dir;
+	struct repo_commit	*rc;
+	struct gotweb_url	 diff, tree;
+
+	diff = (struct gotweb_url){
+		.action = DIFF,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	};
+	tree = (struct gotweb_url){
+		.action = TREE,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	};
+!}
+<div class="commits_title_wrapper">
+  <div class="commits_title">Commits</div>
+</div>
+<div class="commits_content">
+  {{ tailq-foreach rc &t->repo_commits entry }}
+    {!
+	diff.commit = rc->commit_id;
+	tree.commit = rc->commit_id;
+    !}
+    <div class="commits_header_wrapper">
+      <div class="commits_header">
+        <div class="header_commit_title">Commit:</div>
+        <div class="header_commit">{{ rc->commit_id }}</div>
+        <div class="header_author_title">Author:</div>
+        <div class="header_author">{{ rc->author }}</div>
+        <div class="header_age_title">Date:</div>
+        <div class="header_age">
+          {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+        </div>
+      </div>
+    </div>
+    <div class="navs_wrapper">
+      <div class="navs">
+        <a href="{{ render gotweb_render_url(c, &diff) }}">diff</a>
+	{{ " | " }}
+        <a href="{{ render gotweb_render_url(c, &tree) }}">tree</a>
+      </div>
+    </div>
+    <div class="dotted_line"></div>
+  {{ end }}
+  {{ if t->next_id || t->prev_id }}
+    {{ render gotweb_render_navs(tp) }}
+  {{ end }}
+</div>
+{{ end }}

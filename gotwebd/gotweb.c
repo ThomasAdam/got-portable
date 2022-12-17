@@ -91,7 +91,6 @@ static const struct got_error *gotweb_get_repo_description(char **,
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
     const char *, int);
 static const struct got_error *gotweb_render_blame(struct request *);
-static const struct got_error *gotweb_render_commits(struct request *);
 static const struct got_error *gotweb_render_diff(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
 static const struct got_error *gotweb_render_tag(struct request *);
@@ -207,11 +206,13 @@ render:
 			goto err;
 		break;
 	case COMMITS:
-		error = gotweb_render_commits(c);
+		error = got_get_repo_commits(c, srv->max_commits_display);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		if (gotweb_render_commits(c->tp) == -1)
+			goto err;
 		break;
 	case DIFF:
 		error = gotweb_render_diff(c);
@@ -925,110 +926,6 @@ gotweb_render_blame(struct request *c)
 	    "</div>\n");		/* #blame_content */
 done:
 	free(age);
-	free(msg);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_commits(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct repo_commit *rc = NULL;
-	struct server *srv = c->srv;
-	struct transport *t = c->t;
-	struct repo_dir *repo_dir = t->repo_dir;
-	char *age = NULL, *author = NULL, *msg = NULL;
-	int r;
-
-	r = fcgi_printf(c, "<div class='commits_title_wrapper'>\n"
-	    "<div class='commits_title'>Commits</div>\n"
-	    "</div>\n"		/* .commits_title_wrapper */
-	    "<div class='commits_content'>\n");
-	if (r == -1)
-		goto done;
-
-	error = got_get_repo_commits(c, srv->max_commits_display);
-	if (error)
-		goto done;
-
-	TAILQ_FOREACH(rc, &t->repo_commits, entry) {
-		error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
-		if (error)
-			goto done;
-		error = gotweb_escape_html(&author, rc->author);
-		if (error)
-			goto done;
-		error = gotweb_escape_html(&msg, rc->commit_msg);
-		if (error)
-			goto done;
-
-		r = fcgi_printf(c, "<div class='commits_header_wrapper'>\n"
-		    "<div class='commits_header'>\n"
-		    "<div class='header_commit_title'>Commit:</div>\n"
-		    "<div class='header_commit'>%s</div>\n"
-		    "<div class='header_author_title'>Author:</div>\n"
-		    "<div class='header_author'>%s</div>\n"
-		    "<div class='header_age_title'>Date:</div>\n"
-		    "<div class='header_age'>%s</div>\n"
-		    "</div>\n"	/* .commits_header */
-		    "</div>\n"	/* .commits_header_wrapper */
-		    "<div class='dotted_line'></div>\n"
-		    "<div class='commit'>\n%s</div>\n",
-		    rc->commit_id,
-		    author,
-		    age,
-		    msg);
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = DIFF,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rc->commit_id,
-		    }, "diff");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, " | ") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = TREE,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rc->commit_id,
-		    }, "tree");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, "</div>\n"	/* .navs */
-		    "</div>\n"	/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n") == -1)
-			goto done;
-
-		free(age);
-		age = NULL;
-		free(author);
-		author = NULL;
-		free(msg);
-		msg = NULL;
-	}
-
-	if (t->next_id || t->prev_id) {
-		if (gotweb_render_navs(c->tp) == -1)
-			goto done;
-	}
-	fcgi_printf(c, "</div>\n"); /* .commits_content */
-done:
-	free(age);
-	free(author);
 	free(msg);
 	return error;
 }
