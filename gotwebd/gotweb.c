@@ -722,7 +722,7 @@ gotweb_render_navs(struct request *c)
 		if (t->prev_id && qs->commit != NULL &&
 		    strcmp(qs->commit, t->prev_id) != 0) {
 			struct gotweb_url url = {
-				.action = COMMIT,
+				.action = COMMITS,
 				.index_page = -1,
 				.page = qs->page - 1,
 				.path = qs->path,
@@ -791,7 +791,7 @@ gotweb_render_navs(struct request *c)
 	case COMMITS:
 		if (t->next_id) {
 			struct gotweb_url url = {
-				.action = COMMIT,
+				.action = COMMITS,
 				.index_page = -1,
 				.page = qs->page + 1,
 				.path = qs->path,
