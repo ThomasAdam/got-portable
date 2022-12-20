@@ -53,7 +53,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 	struct server		*srv = c->srv;
 	struct querystring	*qs = c->t->qs;
 	struct gotweb_url	 u_path;
-	const char		*prfx = c->script_name;
+	const char		*prfx = c->document_uri;
 	const char		*css = srv->custom_css;
 
 	memset(&u_path, 0, sizeof(u_path));

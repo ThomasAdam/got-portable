@@ -261,12 +261,12 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 				*sd = '\0';
 		}
 
-		if (c->script_name[0] == '\0' &&
-		    val_len < MAX_SCRIPT_NAME &&
-		    name_len == 11 &&
-		    strncmp(buf, "SCRIPT_NAME", 11) == 0) {
-			memcpy(c->script_name, val, val_len);
-			c->script_name[val_len] = '\0';
+		if (c->document_uri[0] == '\0' &&
+		    val_len < MAX_DOCUMENT_URI &&
+		    name_len == 12 &&
+		    strncmp(buf, "DOCUMENT_URI", 12) == 0) {
+			memcpy(c->document_uri, val, val_len);
+			c->document_uri[val_len] = '\0';
 		}
 
 		if (c->server_name[0] == '\0' &&
