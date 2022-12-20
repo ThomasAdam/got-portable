@@ -189,7 +189,7 @@ test_repo_write_empty: prepare_test_repo_empty start_gotd_rw
 	
 test_req_wrong_commit: prepare_test_repo_empty start_gotd_ro
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
-		'env $(GOTD_TEST_ENV) sh ./repo_req_wrong_commit.sh'
+		'env $(GOTD_TEST_ENV) sh ./req_wrong_commit.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 
 .include <bsd.regress.mk>
