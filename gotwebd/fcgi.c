@@ -279,6 +279,10 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 			c->server_name[val_len] = '\0';
 		}
 
+		if (name_len == 5 &&
+		    strncmp(buf, "HTTPS", 5) == 0)
+			c->https = 1;
+
 		buf += name_len + val_len;
 		n -= name_len - val_len;
 	}
