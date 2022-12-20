@@ -50,6 +50,7 @@
 
 #include "proc.h"
 #include "gotwebd.h"
+#include "tmpl.h"
 
 static const struct querystring_keys querystring_keys[] = {
 	{ "action",		ACTION },
@@ -74,6 +75,7 @@ static const struct action_keys action_keys[] = {
 	{ "tag",	TAG },
 	{ "tags",	TAGS },
 	{ "tree",	TREE },
+	{ "rss",	RSS },
 };
 
 static const struct got_error *gotweb_init_querystring(struct querystring **);
@@ -174,6 +176,24 @@ gotweb_process_request(struct request *c)
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		goto done;
+	}
+
+	if (qs->action == RSS) {
+		error = gotweb_render_content_type(c,
+		    "application/rss+xml;charset=utf-8");
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+
+		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+		if (gotweb_render_rss(c->tp) == -1)
+			goto err;
 		goto done;
 	}
 
@@ -1624,6 +1644,8 @@ gotweb_action_name(int action)
 		return "tags";
 	case TREE:
 		return "tree";
+	case RSS:
+		return "rss";
 	default:
 		return NULL;
 	}
@@ -1719,6 +1741,21 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 	}
 
 	return 0;
+}
+
+int
+gotweb_render_absolute_url(struct request *c, struct gotweb_url *url)
+{
+	struct template	*tp = c->tp;
+	const char	*proto = c->https ? "https" : "http";
+
+	if (fcgi_puts(tp, proto) == -1 ||
+	    fcgi_puts(tp, "://") == -1 ||
+	    tp_htmlescape(tp, c->server_name) == -1 ||
+	    tp_htmlescape(tp, c->document_uri) == -1)
+		return -1;
+
+	return gotweb_render_url(c, url);
 }
 
 int
@@ -2004,7 +2041,8 @@ gotweb_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 	const char *hours = "hours ago",  *minutes = "minutes ago";
 	const char *seconds = "seconds ago", *now = "right now";
 	char *s;
-	char datebuf[29];
+	char datebuf[64];
+	size_t r;
 
 	*repo_age = NULL;
 
@@ -2054,6 +2092,19 @@ gotweb_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 			return got_error_from_errno("asctime_r");
 
 		if (asprintf(repo_age, "%s UTC", datebuf) == -1)
+			return got_error_from_errno("asprintf");
+		break;
+	case TM_RFC822:
+		if (gmtime_r(&committer_time, &tm) == NULL)
+			return got_error_from_errno("gmtime_r");
+
+		r = strftime(datebuf, sizeof(datebuf),
+		    "%a, %d %b %Y %H:%M:%S GMT", &tm);
+		if (r == 0)
+			return got_error(GOT_ERR_NO_SPACE);
+
+		*repo_age = strdup(datebuf);
+		if (*repo_age == NULL)
 			return got_error_from_errno("asprintf");
 		break;
 	}

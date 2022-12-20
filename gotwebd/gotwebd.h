@@ -226,6 +226,7 @@ struct request {
 	char				 http_host[GOTWEBD_MAXTEXT];
 	char				 document_uri[MAX_DOCUMENT_URI];
 	char				 server_name[MAX_SERVER_NAME];
+	int				 https;
 
 	uint8_t				 request_started;
 };
@@ -412,12 +413,14 @@ enum query_actions {
 	TAG,
 	TAGS,
 	TREE,
+	RSS,
 	ACTIONS__MAX,
 };
 
 enum gotweb_ref_tm {
 	TM_DIFF,
 	TM_LONG,
+	TM_RFC822,
 };
 
 extern struct gotwebd	*gotwebd_env;
@@ -441,6 +444,7 @@ const struct got_error *gotweb_init_transport(struct transport **);
 const struct got_error *gotweb_escape_html(char **, const char *);
 const char *gotweb_action_name(int);
 int gotweb_render_url(struct request *, struct gotweb_url *);
+int gotweb_render_absolute_url(struct request *, struct gotweb_url *);
 int gotweb_link(struct request *, struct gotweb_url *, const char *, ...)
 	__attribute__((__format__(printf, 3, 4)))
 	__attribute__((__nonnull__(3)));
@@ -457,6 +461,7 @@ int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);
 int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
+int	gotweb_render_rss(struct template *);
 
 /* parse.y */
 int parse_config(const char *, struct gotwebd *);

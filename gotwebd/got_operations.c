@@ -572,7 +572,7 @@ got_get_repo_tags(struct request *c, int limit)
 	    repo_dir->name) == -1)
 		return got_error_from_errno("asprintf");
 
-	if (qs->commit == NULL && qs->action == TAGS) {
+	if (qs->commit == NULL && (qs->action == TAGS || qs->action == RSS)) {
 		error = got_ref_open(&ref, repo, qs->headref, 0);
 		if (error)
 			goto err;
