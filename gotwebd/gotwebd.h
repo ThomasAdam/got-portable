@@ -52,7 +52,7 @@
 
 /* GOTWEB DEFAULTS */
 #define MAX_QUERYSTRING		 2048
-#define MAX_SCRIPT_NAME		 255
+#define MAX_DOCUMENT_URI	 255
 #define MAX_SERVER_NAME		 255
 
 #define GOTWEB_GIT_DIR		 ".git"
@@ -224,7 +224,7 @@ struct request {
 
 	char				 querystring[MAX_QUERYSTRING];
 	char				 http_host[GOTWEBD_MAXTEXT];
-	char				 script_name[MAX_SCRIPT_NAME];
+	char				 document_uri[MAX_DOCUMENT_URI];
 	char				 server_name[MAX_SERVER_NAME];
 
 	uint8_t				 request_started;
