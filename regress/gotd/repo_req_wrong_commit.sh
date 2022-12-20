@@ -17,8 +17,8 @@
 . ../cmdline/common.sh
 . ./common.sh
 
-test_wrong_commit() {
-	local testroot=`test_init wrong_commit`
+test_req_wrong_commit() {
+	local testroot=`test_init req_wrong_commit`
 
 	echo "0054want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
 side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
@@ -51,4 +51,4 @@ not found" > $testroot/stderr.expected
 }
 
 test_parseargs "$@"
-run_test test_wrong_commit
+run_test test_req_wrong_commit

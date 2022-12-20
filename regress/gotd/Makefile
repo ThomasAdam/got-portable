@@ -1,7 +1,7 @@
 REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
-	test_repo_write test_repo_write_empty repo_req_wrong_commit
+	test_repo_write test_repo_write_empty test_req_wrong_commit
 NOOBJ=Yes
 
 .PHONY: ensure_root prepare_test_repo check_test_repo start_gotd
@@ -187,7 +187,7 @@ test_repo_write_empty: prepare_test_repo_empty start_gotd_rw
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 	
-repo_req_wrong_commit: prepare_test_repo_empty start_gotd_ro
+test_req_wrong_commit: prepare_test_repo_empty start_gotd_ro
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_req_wrong_commit.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
