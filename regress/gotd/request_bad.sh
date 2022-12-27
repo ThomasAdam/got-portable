@@ -17,23 +17,23 @@
 . ../cmdline/common.sh
 . ./common.sh
 
+dummy_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 # Non-existent commit
 test_request_bad_commit() {
 	local testroot=`test_init request_bad_commit`
 
-	echo "0054want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
-side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0054want $dummy_commit multi_ack side-band-64k ofs-delta" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "0041ERR object aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-not found" > $testroot/stdout.expected
+	echo -n "0041ERR object $dummy_commit not found" \
+		> $testroot/stdout.expected
 
-	echo "gotsh: object aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-not found" > $testroot/stderr.expected
+	echo "gotsh: object $dummy_commit not found" \
+		> $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 112 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 112
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -41,10 +41,11 @@ not found" > $testroot/stderr.expected
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -55,10 +56,9 @@ not found" > $testroot/stderr.expected
 test_request_bad_length_zero() {
 	local testroot=`test_init test_request_bad_length_zero`
 
-	echo "0000want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
-side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0000want $dummy_commit multi_ack side-band-64k ofs-delta" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
 	echo -n "00000028ERR unexpected flush packet received" \
 		> $testroot/stdout.expected
@@ -66,8 +66,7 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 	echo "gotsh: unexpected flush packet received" \
 		> $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 108 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -79,6 +78,7 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -89,18 +89,16 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 test_request_bad_length_empty() {
 	local testroot=`test_init test_request_bad_length_empty`
 
-	echo "0004want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
-side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0004want $dummy_commit multi_ack side-band-64k ofs-delta" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "00000008NAK\n0021ERR read: Bad file descriptor" \
+	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
 		> $testroot/stdout.expected
 
 	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 108 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -108,10 +106,11 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -122,18 +121,16 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 test_request_bad_length_small() {
 	local testroot=`test_init test_request_bad_length_small`
 
-	echo "0002want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
-side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0002want $dummy_commit multi_ack side-band-64k ofs-delta" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "00000008NAK\n0021ERR read: Bad file descriptor" \
+	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
 		> $testroot/stdout.expected
 
 	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 108 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -141,31 +138,31 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
 	test_done "$testroot" "$ret"
 }
+
 # Pkt-len too large
 test_request_bad_length_large() {
 	local testroot=`test_init test_request_bad_length_large`
 
-	echo "ffffwant aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa multi_ack \
-side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "ffffwant $dummy_commit multi_ack side-band-64k ofs-delta" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "00000008NAK\n0021ERR read: Bad file descriptor" \
+	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
 		> $testroot/stdout.expected
 
 	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 108 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -173,10 +170,11 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -187,18 +185,16 @@ side-band-64k ofs-delta" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 test_request_bad_capabilities() {
 	local testroot=`test_init test_request_bad_capabilities`
 
-	echo "0054want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaa \
-bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/test-repo' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0054want $dummy_commit aaaaaaaaa bbbbbbbbbbbbb ccccccccc" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
+		> $testroot/stdout 2>$testroot/stderr
 
 	echo -n "00000025ERR unexpected want-line received" \
 		> $testroot/stdout.expected
 
 	echo "gotsh: unexpected want-line received" > $testroot/stderr.expected
 
-	# We use OpenBSD cmp(1) offset extension
-	cmp -s $testroot/stdout $testroot/stdout.expected 108 0
+	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -206,10 +202,11 @@ bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -220,16 +217,15 @@ bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 test_request_bad_repository() {
 	local testroot=`test_init test_request_bad_repository`
 
-	echo "0054want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaa \
-bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/XXXX-XXXX' > $testroot/stdout \
-		2>$testroot/stderr
+	echo "0054want $dummy_commit aaaaaaaaa bbbbbbbbbbbbb ccccccccc" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/XXXX-XXXX' \
+		> $testroot/stdout 2>$testroot/stderr
 
 	echo -n "001fERR no git repository found" > $testroot/stdout.expected
 
 	echo "gotsh: no git repository found" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -237,10 +233,11 @@ bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -252,16 +249,19 @@ bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 test_request_bad_large_repo_name() {
 	local testroot=`test_init test_request_bad_large_repo_name`
 
-	echo "0054want aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaa \
-bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
-		git-upload-pack '/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > $testroot/stdout \
-		2>$testroot/stderr
+	# build a string of 255 "A": 63 "A" four times plus tree more "A"
+	local a=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	local repo_name="AAA$a$a$a$a"
+
+	echo "0054want $dummy_commit aaaaaaaaa bbbbbbbbbbbbb ccccccccc" \
+		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack "/$repo_name" \
+		> $testroot/stdout 2>$testroot/stderr
 
 	echo -n "0018ERR buffer too small" > $testroot/stdout.expected
 
 	echo "gotsh: buffer too small" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -269,16 +269,17 @@ bbbbbbbbbbbbb ccccccccc" | ssh ${GOTD_DEVUSER}@127.0.0.1 \
 		return 1
 	fi
 
-	cmp -s $testroot/stderr $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stderr" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
 	fi
 	test_done "$testroot" "$ret"
-
 }
+
 test_parseargs "$@"
 run_test test_request_bad_commit
 run_test test_request_bad_length_zero
