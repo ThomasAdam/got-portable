@@ -1308,14 +1308,14 @@ view_search_start(struct tog_view *view)
 	mvwaddstr(v->window, v->nlines - 1, 0, "/");
 	wclrtoeol(v->window);
 
-	nodelay(view->window, FALSE);  /* block for search term input */
+	nodelay(v->window, FALSE);  /* block for search term input */
 	nocbreak();
 	echo();
 	ret = wgetnstr(v->window, pattern, sizeof(pattern));
 	wrefresh(v->window);
 	cbreak();
 	noecho();
-	nodelay(view->window, TRUE);
+	nodelay(v->window, TRUE);
 	if (ret == ERR)
 		return NULL;
 
