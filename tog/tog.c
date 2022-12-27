@@ -1304,6 +1304,8 @@ view_search_start(struct tog_view *view)
 
 	if (view_is_hsplit_top(view))
 		v = view->child;
+	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
+		v = view->parent;
 
 	mvwaddstr(v->window, v->nlines - 1, 0, "/");
 	wclrtoeol(v->window);
