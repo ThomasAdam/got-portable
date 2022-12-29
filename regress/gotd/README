@@ -30,7 +30,10 @@ user under the names git-receive-pack and git-upload-pack. When made
 available in a non-standard PATH directory such as ~gotdev/bin, the
 gotdev user's PATH must be set appropriately in sshd_config (see below).
 
-Tests will run the locally built gotd binary found in gotd/obj/gotd.
+By default, tests will run the gotd binary found in ~/bin.
+If sources were unpacked from a Got release tarball then tests will run
+/usr/local/bin/gotd by default instead.
+
 The test suite creates the corresponding gotd socket in ~gotdev/gotd.sock.
 To make this work, the GOTD_UNIX_SOCKET variable must be set by sshd
 when the gotdev user logs in. The following should be added to the file

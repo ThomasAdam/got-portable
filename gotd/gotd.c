@@ -96,6 +96,9 @@ static struct gotd gotd;
 
 void gotd_sighdlr(int sig, short event, void *arg);
 static void gotd_shutdown(void);
+static const struct got_error *start_repo_child(struct gotd_client *,
+    enum gotd_procid, struct gotd_repo *, char *, const char *, int, int);
+static void kill_proc(struct gotd_child_proc *, int);
 
 __dead static void
 usage()
@@ -234,6 +237,24 @@ get_client_proc(struct gotd_client *client)
 	return NULL;
 }
 
+static struct gotd_client *
+find_client_by_proc_fd(int fd)
+{
+	uint64_t slot;
+
+	for (slot = 0; slot < nitems(gotd_clients); slot++) {
+		struct gotd_client *c;
+
+		STAILQ_FOREACH(c, &gotd_clients[slot], entry) {
+			struct gotd_child_proc *proc = get_client_proc(c);
+			if (proc && proc->iev.ibuf.fd == fd)
+				return c;
+		}
+	}
+
+	return NULL;
+}
+
 static int
 client_is_reading(struct gotd_client *client)
 {
@@ -295,11 +316,35 @@ ensure_client_is_not_reading(struct gotd_client *client)
 }
 
 static void
+wait_for_children(pid_t child_pid)
+{
+	pid_t pid;
+	int status;
+
+	if (child_pid == 0)
+		log_debug("waiting for children to terminate");
+	else
+		log_debug("waiting for child PID %ld to terminate",
+		    (long)child_pid);
+
+	do {
+		pid = wait(&status);
+		if (pid == -1) {
+			if (errno != EINTR && errno != ECHILD)
+				fatal("wait");
+		} else if (WIFSIGNALED(status)) {
+			log_warnx("child PID %ld terminated; signal %d",
+			    (long)pid, WTERMSIG(status));
+		}	
+	} while (pid != -1 || (pid == -1 && errno == EINTR));
+}
+
+static void
 disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
 	struct gotd_child_proc *proc = get_client_proc(client);
-	struct gotd_child_proc *listen_proc = &gotd.procs[0];
+	struct gotd_child_proc *listen_proc = &gotd.listen_proc;
 	uint64_t slot;
 
 	log_debug("uid %d: disconnecting", client->euid);
@@ -310,6 +355,13 @@ disconnect(struct gotd_client *client)
 		    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
 		    &idisconnect, sizeof(idisconnect)) == -1)
 			log_warn("imsg compose DISCONNECT");
+
+		msgbuf_clear(&proc->iev.ibuf.w);
+		close(proc->iev.ibuf.fd);
+		kill_proc(proc, 0);
+		wait_for_children(proc->pid);
+		free(proc);
+		proc = NULL;
 	}
 
 	if (gotd_imsg_compose_event(&listen_proc->iev,
@@ -533,53 +585,13 @@ find_repo_by_name(const char *repo_name)
 	return NULL;
 }
 
-static struct gotd_child_proc *
-find_proc_by_repo_name(enum gotd_procid proc_id, const char *repo_name)
-{
-	struct gotd_child_proc *proc;
-	int i;
-	size_t namelen;
-
-	for (i = 0; i < gotd.nprocs; i++) {
-		proc = &gotd.procs[i];
-		if (proc->type != proc_id)
-			continue;
-		namelen = strlen(proc->repo_name);
-		if (strncmp(proc->repo_name, repo_name, namelen) != 0)
-			continue;
-		if (repo_name[namelen] == '\0' ||
-		    strcmp(&repo_name[namelen], ".git") == 0)
-			return proc;
-	}
-
-	return NULL;
-}
-
-static struct gotd_child_proc *
-find_proc_by_fd(int fd)
-{
-	struct gotd_child_proc *proc;
-	int i;
-
-	for (i = 0; i < gotd.nprocs; i++) {
-		proc = &gotd.procs[i];
-		if (proc->iev.ibuf.fd == fd)
-			return proc;
-	}
-
-	return NULL;
-}
-
 static const struct got_error *
-forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
+start_client_session(struct gotd_client *client, struct imsg *imsg)
 {
 	const struct got_error *err;
 	struct gotd_imsg_list_refs ireq;
-	struct gotd_imsg_list_refs_internal ilref;
 	struct gotd_repo *repo = NULL;
-	struct gotd_child_proc *proc = NULL;
 	size_t datalen;
-	int fd = -1;
 
 	log_debug("list-refs request from uid %d", client->euid);
 
@@ -588,9 +600,6 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	memcpy(&ireq, imsg->data, datalen);
-
-	memset(&ilref, 0, sizeof(ilref));
-	ilref.client_id = client->id;
 
 	if (ireq.client_is_reading) {
 		err = ensure_client_is_not_writing(client);
@@ -603,10 +612,11 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		    client->euid, client->egid, GOTD_AUTH_READ);
 		if (err)
 			return err;
-		client->repo_read = find_proc_by_repo_name(PROC_REPO_READ,
-		    ireq.repo_name);
-		if (client->repo_read == NULL)
-			return got_error(GOT_ERR_NOT_GIT_REPO);
+		err = start_repo_child(client, PROC_REPO_READ, repo,
+		    gotd.argv0, gotd.confpath, gotd.daemonize,
+		    gotd.verbosity);
+		if (err)
+			return err;
 	} else {
 		err = ensure_client_is_not_reading(client);
 		if (err)
@@ -618,27 +628,14 @@ forward_list_refs_request(struct gotd_client *client, struct imsg *imsg)
 		    client->egid, GOTD_AUTH_READ | GOTD_AUTH_WRITE);
 		if (err)
 			return err;
-		client->repo_write = find_proc_by_repo_name(PROC_REPO_WRITE,
-		    ireq.repo_name);
-		if (client->repo_write == NULL)
-			return got_error(GOT_ERR_NOT_GIT_REPO);
+		err = start_repo_child(client, PROC_REPO_WRITE, repo,
+		    gotd.argv0, gotd.confpath, gotd.daemonize,
+		    gotd.verbosity);
+		if (err)
+			return err;
 	}
 
-	fd = dup(client->fd);
-	if (fd == -1)
-		return got_error_from_errno("dup");
-
-	proc = get_client_proc(client);
-	if (proc == NULL)
-		fatalx("no process found for uid %d", client->euid);
-	if (gotd_imsg_compose_event(&proc->iev,
-	    GOTD_IMSG_LIST_REFS_INTERNAL, PROC_GOTD, fd,
-	    &ilref, sizeof(ilref)) == -1) {
-		err = got_error_from_errno("imsg compose WANT");
-		close(fd);
-		return err;
-	}
-
+	/* List-refs request will be forwarded once the child is ready. */
 	return NULL;
 }
 
@@ -1039,12 +1036,9 @@ gotd_request(int fd, short events, void *arg)
 				    "unexpected list-refs request received");
 				break;
 			}
-			err = forward_list_refs_request(client, &imsg);
+			err = start_client_session(client, &imsg);
 			if (err)
 				break;
-			client->state = GOTD_STATE_EXPECT_CAPABILITIES;
-			log_debug("uid %d: expecting capabilities",
-			    client->euid);
 			break;
 		case GOTD_IMSG_CAPABILITIES:
 			if (client->state != GOTD_STATE_EXPECT_CAPABILITIES) {
@@ -1268,7 +1262,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	    client->euid, client->fd);
 done:
 	if (err) {
-		struct gotd_child_proc *listen_proc = &gotd.procs[0];
+		struct gotd_child_proc *listen_proc = &gotd.listen_proc;
 		struct gotd_imsg_disconnect idisconnect;
 
 		idisconnect.client_id = client->id;
@@ -1291,21 +1285,6 @@ static const char *gotd_proc_names[PROC_MAX] = {
 	"repo_write"
 };
 
-static struct gotd_child_proc *
-get_proc_for_pid(pid_t pid)
-{
-	struct gotd_child_proc *proc;
-	int i;
-
-	for (i = 0; i < gotd.nprocs; i++) {
-		proc = &gotd.procs[i];
-		if (proc->pid == pid)
-			return proc;
-	}
-
-	return NULL;
-}
-
 static void
 kill_proc(struct gotd_child_proc *proc, int fatal)
 {
@@ -1319,30 +1298,21 @@ kill_proc(struct gotd_child_proc *proc, int fatal)
 static void
 gotd_shutdown(void)
 {
-	pid_t	 pid;
-	int	 status, i;
 	struct gotd_child_proc *proc;
+	uint64_t slot;
 
-	for (i = 0; i < gotd.nprocs; i++) {
-		proc = &gotd.procs[i];
-		msgbuf_clear(&proc->iev.ibuf.w);
-		close(proc->iev.ibuf.fd);
-		kill_proc(proc, 0);
+	for (slot = 0; slot < nitems(gotd_clients); slot++) {
+		struct gotd_client *c, *tmp;
+
+		STAILQ_FOREACH_SAFE(c, &gotd_clients[slot], entry, tmp)
+			disconnect(c);
 	}
 
-	log_debug("waiting for children to terminate");
-	do {
-		pid = wait(&status);
-		if (pid == -1) {
-			if (errno != EINTR && errno != ECHILD)
-				fatal("wait");
-		} else if (WIFSIGNALED(status)) {
-			proc = get_proc_for_pid(pid);
-			log_warnx("%s %s child process terminated; signal %d",
-			    proc ? gotd_proc_names[proc->type] : "",
-			    proc ? proc->repo_path : "", WTERMSIG(status));
-		}	
-	} while (pid != -1 || (pid == -1 && errno == EINTR));
+	proc = &gotd.listen_proc;
+	msgbuf_clear(&proc->iev.ibuf.w);
+	close(proc->iev.ibuf.fd);
+	kill_proc(proc, 0);
+	wait_for_children(proc->pid);
 
 	log_info("terminating");
 	exit(0);
@@ -1438,6 +1408,15 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 		} else
 			ret = 1;
 		break;
+	case GOTD_IMSG_REPO_CHILD_READY:
+		if (proc->type != PROC_REPO_READ &&
+		    proc->type != PROC_REPO_WRITE) {
+			err = got_error_fmt(GOT_ERR_BAD_PACKET,
+			    "unexpected \"ready\" signal from PID %d",
+			    proc->pid);
+		} else
+			ret = 1;
+		break;
 	case GOTD_IMSG_PACKFILE_DONE:
 		err = ensure_proc_is_reading(client, proc);
 		if (err)
@@ -1460,6 +1439,32 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	}
 
 	return ret;
+}
+
+static const struct got_error *
+list_refs_request(struct gotd_client *client, struct gotd_imsgev *iev)
+{
+	static const struct got_error *err;
+	struct gotd_imsg_list_refs_internal ilref;
+	int fd;
+
+	memset(&ilref, 0, sizeof(ilref));
+	ilref.client_id = client->id;
+
+	fd = dup(client->fd);
+	if (fd == -1)
+		return got_error_from_errno("dup");
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LIST_REFS_INTERNAL,
+	    PROC_GOTD, fd, &ilref, sizeof(ilref)) == -1) {
+		err = got_error_from_errno("imsg compose WANT");
+		close(fd);
+		return err;
+	}
+
+	client->state = GOTD_STATE_EXPECT_CAPABILITIES;
+	log_debug("uid %d: expecting capabilities", client->euid);
+	return NULL;
 }
 
 static const struct got_error *
@@ -1815,11 +1820,99 @@ done:
 }
 
 static void
-gotd_dispatch(int fd, short event, void *arg)
+gotd_dispatch_listener(int fd, short event, void *arg)
+{
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_child_proc *proc = &gotd.listen_proc;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
+	if (proc->iev.ibuf.fd != fd)
+		fatalx("%s: unexpected fd %d", __func__, fd);
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	for (;;) {
+		const struct got_error *err = NULL;
+		struct gotd_client *client = NULL;
+		uint32_t client_id = 0;
+		int do_disconnect = 0;
+
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			do_disconnect = 1;
+			err = gotd_imsg_recv_error(&client_id, &imsg);
+			break;
+		case GOTD_IMSG_CONNECT:
+			err = recv_connect(&client_id, &imsg);
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		client = find_client(client_id);
+		if (client == NULL) {
+			log_warnx("%s: client not found", __func__);
+			imsg_free(&imsg);
+			continue;
+		}
+
+		if (err)
+			log_warnx("uid %d: %s", client->euid, err->msg);
+
+		if (do_disconnect) {
+			if (err)
+				disconnect_on_error(client, err);
+			else
+				disconnect(client);
+		}
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
+static void
+gotd_dispatch_repo_child(int fd, short event, void *arg)
 {
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_child_proc *proc = NULL;
+	struct gotd_client *client = NULL;
 	ssize_t n;
 	int shut = 0;
 	struct imsg imsg;
@@ -1845,16 +1938,19 @@ gotd_dispatch(int fd, short event, void *arg)
 		}
 	}
 
-	proc = find_proc_by_fd(fd);
+	client = find_client_by_proc_fd(fd);
+	if (client == NULL)
+		fatalx("cannot find client for fd %d", fd);
+
+	proc = get_client_proc(client);
 	if (proc == NULL)
 		fatalx("cannot find child process for fd %d", fd);
 
 	for (;;) {
 		const struct got_error *err = NULL;
-		struct gotd_client *client = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0;
-		int do_ref_updates = 0, do_ref_update = 0;
+		int do_list_refs = 0, do_ref_updates = 0, do_ref_update = 0;
 		int do_packfile_install = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
@@ -1867,8 +1963,8 @@ gotd_dispatch(int fd, short event, void *arg)
 			do_disconnect = 1;
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
-		case GOTD_IMSG_CONNECT:
-			err = recv_connect(&client_id, &imsg);
+		case GOTD_IMSG_REPO_CHILD_READY:
+			do_list_refs = 1;
 			break;
 		case GOTD_IMSG_PACKFILE_DONE:
 			do_disconnect = 1;
@@ -1894,13 +1990,6 @@ gotd_dispatch(int fd, short event, void *arg)
 			break;
 		}
 
-		client = find_client(client_id);
-		if (client == NULL) {
-			log_warnx("%s: client not found", __func__);
-			imsg_free(&imsg);
-			continue;
-		}
-
 		if (!verify_imsg_src(client, proc, &imsg)) {
 			log_debug("dropping imsg type %d from PID %d",
 			    imsg.hdr.type, proc->pid);
@@ -1916,7 +2005,9 @@ gotd_dispatch(int fd, short event, void *arg)
 			else
 				disconnect(client);
 		} else {
-			if (do_packfile_install)
+			if (do_list_refs)
+				err = list_refs_request(client, iev);
+			else if (do_packfile_install)
 				err = install_pack(client, proc->repo_path,
 				    &imsg);
 			else if (do_ref_updates)
@@ -2001,7 +2092,7 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 static void
 start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 {
-	struct gotd_child_proc *proc = &gotd.procs[0];
+	struct gotd_child_proc *proc = &gotd.listen_proc;
 
 	proc->type = PROC_LISTEN;
 
@@ -2012,50 +2103,55 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	proc->pid = start_child(proc->type, NULL, argv0, confpath,
 	    proc->pipe[1], daemonize, verbosity);
 	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
-	proc->iev.handler = gotd_dispatch;
+	proc->iev.handler = gotd_dispatch_listener;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
 }
 
-static void
-start_repo_children(struct gotd *gotd, char *argv0, const char *confpath,
+static const struct got_error *
+start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
+    struct gotd_repo *repo, char *argv0, const char *confpath,
     int daemonize, int verbosity)
 {
-	struct gotd_repo *repo = NULL;
 	struct gotd_child_proc *proc;
-	int i;
 
-	for (i = 1; i < gotd->nprocs; i++) {
-		if (repo == NULL)
-			repo = TAILQ_FIRST(&gotd->repos);
-		proc = &gotd->procs[i];
-		if (i - 1 < gotd->nrepos)
-			proc->type = PROC_REPO_READ;
-		else
-			proc->type = PROC_REPO_WRITE;
-		if (strlcpy(proc->repo_name, repo->name,
-		    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
-			fatalx("repository name too long: %s", repo->name);
-		log_debug("adding repository %s", repo->name);
-		if (realpath(repo->path, proc->repo_path) == NULL)
-			fatal("%s", repo->path);
-		if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
-		    PF_UNSPEC, proc->pipe) == -1)
-			fatal("socketpair");
-		proc->pid = start_child(proc->type, proc->repo_path, argv0,
-		    confpath, proc->pipe[1], daemonize, verbosity);
-		imsg_init(&proc->iev.ibuf, proc->pipe[0]);
-		log_debug("proc %s %s is on fd %d",
-		    gotd_proc_names[proc->type], proc->repo_path,
-		    proc->pipe[0]);
-		proc->iev.handler = gotd_dispatch;
-		proc->iev.events = EV_READ;
-		proc->iev.handler_arg = NULL;
-		event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
-		    gotd_dispatch, &proc->iev);
+	if (proc_type != PROC_REPO_READ && proc_type != PROC_REPO_WRITE)
+		return got_error_msg(GOT_ERR_NOT_IMPL, "bad process type");
+		
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL)
+		return got_error_from_errno("calloc");
 
-		repo = TAILQ_NEXT(repo, entry);
-	}
+	proc->type = proc_type;
+	if (strlcpy(proc->repo_name, repo->name,
+	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
+		fatalx("repository name too long: %s", repo->name);
+	log_debug("starting %s for repository %s",
+	    proc->type == PROC_REPO_READ ? "reader" : "writer", repo->name);
+	if (realpath(repo->path, proc->repo_path) == NULL)
+		fatal("%s", repo->path);
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1)
+		fatal("socketpair");
+	proc->pid = start_child(proc->type, proc->repo_path, argv0,
+	    confpath, proc->pipe[1], daemonize, verbosity);
+	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	log_debug("proc %s %s is on fd %d",
+	    gotd_proc_names[proc->type], proc->repo_path,
+	    proc->pipe[0]);
+	proc->iev.handler = gotd_dispatch_repo_child;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
+	    gotd_dispatch_repo_child, &proc->iev);
+	gotd_imsg_event_add(&proc->iev);
+
+	if (proc->type == PROC_REPO_READ)
+		client->repo_read = proc;
+	else
+		client->repo_write = proc;
+
+	return NULL;
 }
 
 static void
@@ -2072,6 +2168,9 @@ static void
 apply_unveil(void)
 {
 	struct gotd_repo *repo;
+
+	if (unveil(gotd.argv0, "x") == -1)
+		fatal("unveil %s", gotd.argv0);
 
 	TAILQ_FOREACH(repo, &gotd.repos, entry) {
 		if (unveil(repo->path, "rwc") == -1)
@@ -2144,7 +2243,11 @@ main(int argc, char **argv)
 	if (argc != 0)
 		usage();
 
-	if (geteuid())
+	/* Require an absolute path in argv[0] for reliable re-exec. */
+	if (!got_path_is_absolute(argv0))
+		fatalx("bad path \"%s\": must be an absolute path", argv0);
+
+	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
 		fatalx("need root privileges");
 
 	log_init(daemonize ? 0 : 1, LOG_DAEMON);
@@ -2152,6 +2255,11 @@ main(int argc, char **argv)
 
 	if (parse_config(confpath, proc_id, &gotd) != 0)
 		return 1;
+
+	gotd.argv0 = argv0;
+	gotd.daemonize = daemonize;
+	gotd.verbosity = verbosity;
+	gotd.confpath = confpath;
 
 	if (proc_id == PROC_GOTD &&
 	    (gotd.nrepos == 0 || TAILQ_EMPTY(&gotd.repos)))
@@ -2195,18 +2303,7 @@ main(int argc, char **argv)
 	if (proc_id == PROC_GOTD) {
 		gotd.pid = getpid();
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		/*
-		 * Start a listener and repository readers/writers.
-		 * XXX For now, use one reader and one writer per repository.
-		 * This should be changed to N readers + M writers.
-		 */
-		gotd.nprocs = 1 + gotd.nrepos * 2;
-		gotd.procs = calloc(gotd.nprocs, sizeof(*gotd.procs));
-		if (gotd.procs == NULL)
-			fatal("calloc");
 		start_listener(argv0, confpath, daemonize, verbosity);
-		start_repo_children(&gotd, argv0, confpath, daemonize,
-		    verbosity);
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
@@ -2256,8 +2353,8 @@ main(int argc, char **argv)
 	switch (proc_id) {
 	case PROC_GOTD:
 #ifndef PROFILE
-		if (pledge("stdio rpath wpath cpath proc getpw sendfd recvfd "
-		    "fattr flock unix unveil", NULL) == -1)
+		if (pledge("stdio rpath wpath cpath proc exec getpw "
+		    "sendfd recvfd fattr flock unix unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
 		break;
@@ -2307,7 +2404,7 @@ main(int argc, char **argv)
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	gotd_imsg_event_add(&gotd.procs[0].iev);
+	gotd_imsg_event_add(&gotd.listen_proc.iev);
 
 	event_dispatch();
 

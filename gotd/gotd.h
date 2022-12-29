@@ -114,9 +114,12 @@ struct gotd {
 	char user_name[32];
 	struct gotd_repolist repos;
 	int nrepos;
+	struct gotd_child_proc listen_proc;
+
+	char *argv0;
+	const char *confpath;
+	int daemonize;
 	int verbosity;
-	struct gotd_child_proc *procs;
-	int nprocs;
 };
 
 enum gotd_imsg_type {
@@ -172,6 +175,9 @@ enum gotd_imsg_type {
 	/* Client connections. */
 	GOTD_IMSG_DISCONNECT,
 	GOTD_IMSG_CONNECT,
+
+	/* Child process management. */
+	GOTD_IMSG_REPO_CHILD_READY,
 };
 
 /* Structure for GOTD_IMSG_ERROR. */

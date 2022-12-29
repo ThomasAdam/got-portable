@@ -1443,8 +1443,9 @@ repo_write_main(const char *title, const char *repo_path,
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;
 	event_set(&iev.ev, iev.ibuf.fd, EV_READ, repo_write_dispatch, &iev);
-	if (event_add(&iev.ev, NULL) == -1) {
-		err = got_error_from_errno("event_add");
+	if (gotd_imsg_compose_event(&iev, GOTD_IMSG_REPO_CHILD_READY,
+	    PROC_REPO_WRITE, -1, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose REPO_CHILD_READY");
 		goto done;
 	}
 
