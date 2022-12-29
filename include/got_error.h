@@ -182,6 +182,8 @@
 #define GOT_ERR_REF_PROTECTED	164
 #define GOT_ERR_REF_BUSY	165
 #define GOT_ERR_COMMIT_BAD_AUTHOR 166
+#define GOT_ERR_UID		167
+#define GOT_ERR_GID		168
 
 struct got_error {
         int code;

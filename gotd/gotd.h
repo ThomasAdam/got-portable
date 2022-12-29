@@ -414,6 +414,8 @@ struct gotd_imsg_disconnect {
 /* Structure for GOTD_IMSG_CONNECT. */
 struct gotd_imsg_connect {
 	uint32_t client_id;
+	uid_t euid;
+	gid_t egid;
 };
 
 /* Structure for GOTD_IMSG_AUTHENTICATE. */

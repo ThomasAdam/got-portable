@@ -233,6 +233,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_REF_BUSY, "reference cannot be updated; please try again" },
 	{ GOT_ERR_COMMIT_BAD_AUTHOR, "commit author formatting would "
 	    "make Git unhappy" },
+	{ GOT_ERR_UID, "bad user ID" },
+	{ GOT_ERR_GID, "bad group ID" },
 };
 
 static struct got_custom_error {

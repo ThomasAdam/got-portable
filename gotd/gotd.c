@@ -1225,8 +1225,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	size_t datalen;
 	int s = -1;
 	struct gotd_client *client = NULL;
-	uid_t euid;
-	gid_t egid;
 
 	*client_id = 0;
 
@@ -1246,11 +1244,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 		goto done;
 	}
 
-	if (getpeereid(s, &euid, &egid) == -1) {
-		err = got_error_from_errno("getpeerid");
-		goto done;
-	}
-
 	client = calloc(1, sizeof(*client));
 	if (client == NULL) {
 		err = got_error_from_errno("calloc");
@@ -1264,8 +1257,9 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	client->fd = s;
 	s = -1;
 	client->delta_cache_fd = -1;
-	client->euid = euid;
-	client->egid = egid;
+	/* The auth process will verify UID/GID for us. */
+	client->euid = iconnect.euid;
+	client->egid = iconnect.egid;
 	client->nref_updates = -1;
 
 	imsg_init(&client->iev.ibuf, client->fd);
@@ -2308,14 +2302,23 @@ start_auth_child(struct gotd_client *client, int required_auth,
     struct gotd_repo *repo, char *argv0, const char *confpath,
     int daemonize, int verbosity)
 {
+	const struct got_error *err = NULL;
 	struct gotd_child_proc *proc;
 	struct gotd_imsg_auth iauth;
+	int fd;
 
 	memset(&iauth, 0, sizeof(iauth));
 
+	fd = dup(client->fd);
+	if (fd == -1)
+		return got_error_from_errno("dup");
+
 	proc = calloc(1, sizeof(*proc));
-	if (proc == NULL)
-		return got_error_from_errno("calloc");
+	if (proc == NULL) {
+		err = got_error_from_errno("calloc");
+		close(fd);
+		return err;
+	}
 
 	proc->type = PROC_AUTH;
 	if (strlcpy(proc->repo_name, repo->name,
@@ -2346,8 +2349,11 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	iauth.required_auth = required_auth;
 	iauth.client_id = client->id;
 	if (gotd_imsg_compose_event(&proc->iev, GOTD_IMSG_AUTHENTICATE,
-	    PROC_GOTD, -1, &iauth, sizeof(iauth)) == -1)
+	    PROC_GOTD, fd, &iauth, sizeof(iauth)) == -1) {
 		log_warn("imsg compose AUTHENTICATE");
+		close(fd);
+		/* Let the auth_timeout handler tidy up. */
+	}
 
 	client->auth = proc;
 	client->required_auth = required_auth;
@@ -2562,7 +2568,7 @@ main(int argc, char **argv)
 	case PROC_GOTD:
 #ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath proc exec "
-		    "sendfd recvfd fattr flock unix unveil", NULL) == -1)
+		    "sendfd recvfd fattr flock unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
 		break;
@@ -2576,7 +2582,7 @@ main(int argc, char **argv)
 		break;
 	case PROC_AUTH:
 #ifndef PROFILE
-		if (pledge("stdio getpw", NULL) == -1)
+		if (pledge("stdio getpw recvfd unix", NULL) == -1)
 			err(1, "pledge");
 #endif
 		auth_main(title, &gotd.repos, repo_path);

@@ -16,6 +16,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
 
@@ -192,6 +193,8 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_imsg_auth iauth;
 	size_t datalen;
+	uid_t euid;
+	gid_t egid;
 
 	log_debug("authentication request received");
 
@@ -200,6 +203,19 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	memcpy(&iauth, imsg->data, datalen);
+
+	if (imsg->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	if (getpeereid(imsg->fd, &euid, &egid) == -1)
+		return got_error_from_errno("getpeerid");
+
+	if (iauth.euid != euid)
+		return got_error(GOT_ERR_UID);
+	if (iauth.egid != egid)
+		return got_error(GOT_ERR_GID);
+
+	log_debug("authenticating uid %d gid %d", euid, egid);
 
 	err = auth_check(&gotd_auth.repo->rules, gotd_auth.repo->name,
 	    iauth.euid, iauth.egid, iauth.required_auth);

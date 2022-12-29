@@ -190,6 +190,8 @@ gotd_accept(int fd, short event, void *arg)
 	int s = -1;
 	struct gotd_listen_client *client = NULL;
 	struct gotd_imsg_connect iconn;
+	uid_t euid;
+	gid_t egid;
 
 	backoff.tv_sec = 1;
 	backoff.tv_usec = 0;
@@ -226,6 +228,11 @@ gotd_accept(int fd, short event, void *arg)
 	if (listen_client_cnt >= GOTD_MAXCLIENTS)
 		goto err;
 
+	if (getpeereid(s, &euid, &egid) == -1) {
+		log_warn("getpeerid");
+		goto err;
+	}
+
 	client = calloc(1, sizeof(*client));
 	if (client == NULL) {
 		log_warn("%s: calloc", __func__);
@@ -235,10 +242,13 @@ gotd_accept(int fd, short event, void *arg)
 	client->fd = s;
 	s = -1;
 	add_client(client);
-	log_debug("%s: new client connected on fd %d", __func__, client->fd);
+	log_debug("%s: new client connected on fd %d uid %d gid %d", __func__,
+	    client->fd, euid, egid);
 
 	memset(&iconn, 0, sizeof(iconn));
 	iconn.client_id = client->id;
+	iconn.euid = euid;
+	iconn.egid = egid;
 	s = dup(client->fd);
 	if (s == -1) {
 		log_warn("%s: dup", __func__);
