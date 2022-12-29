@@ -1,3 +1,5 @@
+.include "../../got-version.mk"
+
 REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
@@ -26,8 +28,16 @@ GOTD_USER?=got
 GOTD_GROUP?=gotsh
 GOTD_SOCK=${GOTD_DEVUSER_HOME}/gotd.sock
 
-GOTD_START_CMD=../../gotd/obj/gotd -vv -f $(PWD)/gotd.conf
-GOTD_STOP_CMD=../../gotctl/obj/gotctl -f $(GOTD_SOCK) stop
+.if "${GOT_RELEASE}" == "Yes"
+PREFIX ?= /usr/local
+BINDIR ?= ${PREFIX}/bin
+.else
+PREFIX ?= ${GOTD_TEST_USER_HOME}
+BINDIR ?= ${PREFIX}/bin
+.endif
+
+GOTD_START_CMD?=$(BINDIR)/gotd -vv -f $(PWD)/gotd.conf
+GOTD_STOP_CMD?=$(BINDIR)/gotctl -f $(GOTD_SOCK) stop
 GOTD_TRAP=trap "$(GOTD_STOP_CMD)" HUP INT QUIT PIPE TERM
 
 GOTD_TEST_ENV=GOTD_TEST_ROOT=$(GOTD_TEST_ROOT) \
