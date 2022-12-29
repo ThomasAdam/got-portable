@@ -33,6 +33,7 @@
 enum gotd_procid {
 	PROC_GOTD	= 0,
 	PROC_LISTEN,
+	PROC_AUTH,
 	PROC_REPO_READ,
 	PROC_REPO_WRITE,
 	PROC_MAX,
@@ -178,6 +179,10 @@ enum gotd_imsg_type {
 
 	/* Child process management. */
 	GOTD_IMSG_REPO_CHILD_READY,
+
+	/* Auth child process. */
+	GOTD_IMSG_AUTHENTICATE,
+	GOTD_IMSG_ACCESS_GRANTED,
 };
 
 /* Structure for GOTD_IMSG_ERROR. */
@@ -408,6 +413,14 @@ struct gotd_imsg_disconnect {
 
 /* Structure for GOTD_IMSG_CONNECT. */
 struct gotd_imsg_connect {
+	uint32_t client_id;
+};
+
+/* Structure for GOTD_IMSG_AUTHENTICATE. */
+struct gotd_imsg_auth {
+	uid_t euid;
+	gid_t egid;
+	int required_auth;
 	uint32_t client_id;
 };
 

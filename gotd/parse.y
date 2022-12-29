@@ -182,7 +182,8 @@ repository	: REPOSITORY STRING {
 				}
 			}
 
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_AUTH) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -198,7 +199,8 @@ repository	: REPOSITORY STRING {
 				}
 			}
 
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_AUTH) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -207,7 +209,8 @@ repository	: REPOSITORY STRING {
 		;
 
 repoopts1	: PATH STRING {
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_AUTH) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -225,20 +228,20 @@ repoopts1	: PATH STRING {
 			free($2);
 		}
 		| PERMIT RO STRING {
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
 			}
 		}
 		| PERMIT RW STRING {
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED,
 				    GOTD_AUTH_READ | GOTD_AUTH_WRITE, $3);
 			}
 		}
 		| DENY STRING {
-			if (gotd_proc_id == PROC_GOTD) {
+			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_DENIED, 0, $2);
 			}
