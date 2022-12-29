@@ -94,6 +94,7 @@ static struct gotd_clients gotd_clients[GOTD_CLIENT_TABLE_SIZE];
 static SIPHASH_KEY clients_hash_key;
 volatile int client_cnt;
 static struct timeval timeout = { 3600, 0 };
+static struct timeval auth_timeout = { 5, 0 };
 static struct gotd gotd;
 
 void gotd_sighdlr(int sig, short event, void *arg);
@@ -1200,7 +1201,10 @@ gotd_request(int fd, short events, void *arg)
 			disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(&client->iev);
-		evtimer_add(&client->tmo, &timeout);
+		if (client->state == GOTD_STATE_EXPECT_LIST_REFS)
+			evtimer_add(&client->tmo, &auth_timeout);
+		else
+			evtimer_add(&client->tmo, &timeout);
 	}
 }
 
@@ -2306,7 +2310,6 @@ start_auth_child(struct gotd_client *client, int required_auth,
 {
 	struct gotd_child_proc *proc;
 	struct gotd_imsg_auth iauth;
-	struct timeval auth_timeout = { 5, 0 };
 
 	memset(&iauth, 0, sizeof(iauth));
 
@@ -2348,7 +2351,6 @@ start_auth_child(struct gotd_client *client, int required_auth,
 
 	client->auth = proc;
 	client->required_auth = required_auth;
-	evtimer_add(&client->tmo, &auth_timeout);
 	return NULL;
 }
 
