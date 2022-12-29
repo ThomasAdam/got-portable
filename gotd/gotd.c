@@ -2159,7 +2159,7 @@ main(int argc, char **argv)
 
 	pw = getpwnam(gotd.user_name);
 	if (pw == NULL)
-		fatal("getpwuid: user %s not found", gotd.user_name);
+		fatalx("user %s not found", gotd.user_name);
 
 	if (pw->pw_uid == 0) {
 		fatalx("cannot run %s as %s: the user running %s "
