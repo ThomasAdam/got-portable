@@ -14,6 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-const struct got_error *
-gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
-    uid_t euid, gid_t egid, int required_auth);
+void
+auth_main(const char *title, struct gotd_repolist *repos,
+    const char *repo_path);

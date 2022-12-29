@@ -25,17 +25,51 @@
 #include <pwd.h>
 #include <grp.h>
 #include <sha1.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <imsg.h>
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_path.h"
 
 #include "gotd.h"
 #include "log.h"
 #include "auth.h"
+
+static struct gotd_auth {
+	pid_t pid;
+	const char *title;
+	struct gotd_repo *repo;
+} gotd_auth;
+
+static void auth_shutdown(void);
+
+static void
+auth_sighdlr(int sig, short event, void *arg)
+{
+	/*
+	 * Normal signal handler rules don't apply because libevent
+	 * decouples for us.
+	 */
+
+	switch (sig) {
+	case SIGHUP:
+		break;
+	case SIGUSR1:
+		break;
+	case SIGTERM:
+	case SIGINT:
+		auth_shutdown();
+		/* NOTREACHED */
+		break;
+	default:
+		fatalx("unexpected signal");
+	}
+}
 
 static int
 parseuid(const char *s, uid_t *uid)
@@ -109,8 +143,8 @@ match_identifier(const char *identifier, gid_t *groups, int ngroups,
 	return 1;
 }
 
-const struct got_error *
-gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
+static const struct got_error *
+auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
     uid_t euid, gid_t egid, int required_auth)
 {
 	struct gotd_access_rule *rule;
@@ -149,4 +183,139 @@ gotd_auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
 
 	/* should not happen, this would be a bug */
 	return got_error_msg(GOT_ERR_NOT_IMPL, "bad access rule");
+}
+
+static const struct got_error *
+recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
+{
+	const struct got_error *err;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_imsg_auth iauth;
+	size_t datalen;
+
+	log_debug("authentication request received");
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iauth))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&iauth, imsg->data, datalen);
+
+	err = auth_check(&gotd_auth.repo->rules, gotd_auth.repo->name,
+	    iauth.euid, iauth.egid, iauth.required_auth);
+	if (err) {
+		gotd_imsg_send_error(ibuf, PROC_AUTH, iauth.client_id, err);
+		return err;
+	}
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_ACCESS_GRANTED,
+	    PROC_AUTH, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg compose ACCESS_GRANTED");
+
+	return NULL;
+}
+
+static void
+auth_dispatch(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct imsg imsg;
+	ssize_t n;
+	int shut = 0;
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0)	/* Connection closed. */
+			shut = 1;
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0)	/* Connection closed. */
+			shut = 1;
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_AUTHENTICATE:
+			err = recv_authreq(&imsg, iev);
+			if (err)
+				log_warnx("%s: %s", gotd_auth.title, err->msg);
+			break;
+		default:
+			log_debug("%s: unexpected imsg %d", gotd_auth.title,
+			    imsg.hdr.type);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
+void
+auth_main(const char *title, struct gotd_repolist *repos,
+    const char *repo_path)
+{
+	struct gotd_repo *repo = NULL;
+	struct gotd_imsgev iev;
+	struct event evsigint, evsigterm, evsighup, evsigusr1;
+
+	gotd_auth.title = title;
+	gotd_auth.pid = getpid();
+	TAILQ_FOREACH(repo, repos, entry) {
+		if (got_path_cmp(repo->path, repo_path,
+		    strlen(repo->path), strlen(repo_path)) == 0)
+			break;
+	}
+	if (repo == NULL)
+		fatalx("repository %s not found in config", repo_path);
+	gotd_auth.repo = repo;
+
+	signal_set(&evsigint, SIGINT, auth_sighdlr, NULL);
+	signal_set(&evsigterm, SIGTERM, auth_sighdlr, NULL);
+	signal_set(&evsighup, SIGHUP, auth_sighdlr, NULL);
+	signal_set(&evsigusr1, SIGUSR1, auth_sighdlr, NULL);
+	signal(SIGPIPE, SIG_IGN);
+
+	signal_add(&evsigint, NULL);
+	signal_add(&evsigterm, NULL);
+	signal_add(&evsighup, NULL);
+	signal_add(&evsigusr1, NULL);
+
+	imsg_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	iev.handler = auth_dispatch;
+	iev.events = EV_READ;
+	iev.handler_arg = NULL;
+	event_set(&iev.ev, iev.ibuf.fd, EV_READ, auth_dispatch, &iev);
+	if (event_add(&iev.ev, NULL) == -1)
+		fatalx("event add");
+
+	event_dispatch();
+
+	auth_shutdown();
+}
+
+static void
+auth_shutdown(void)
+{
+	log_debug("%s: shutting down", gotd_auth.title);
+	exit(0);
 }
