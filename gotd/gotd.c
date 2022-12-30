@@ -2371,6 +2371,16 @@ apply_unveil_repo_readonly(const char *repo_path)
 }
 
 static void
+apply_unveil_none(void)
+{
+	if (unveil("/", "") == -1)
+		fatal("unveil");
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
+}
+
+static void
 apply_unveil(void)
 {
 	struct gotd_repo *repo;
@@ -2582,9 +2592,17 @@ main(int argc, char **argv)
 		break;
 	case PROC_AUTH:
 #ifndef PROFILE
-		if (pledge("stdio getpw recvfd unix", NULL) == -1)
+		if (pledge("stdio getpw recvfd unix unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
+		/*
+		 * We need the "unix" pledge promise for getpeername(2) only.
+		 * Ensure that AF_UNIX bind(2) cannot be used by revoking all
+		 * filesystem access via unveil(2). Access to password database
+		 * files will still work since "getpw" bypasses unveil(2).
+		 */
+		apply_unveil_none();
+
 		auth_main(title, &gotd.repos, repo_path);
 		/* NOTREACHED */
 		break;
