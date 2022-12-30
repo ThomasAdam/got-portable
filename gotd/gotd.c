@@ -1003,7 +1003,7 @@ gotd_request(int fd, short events, void *arg)
 				 * The client has closed its socket.
 				 * This can happen when Git clients are
 				 * done sending pack file data.
-				*/
+				 */
 				msgbuf_clear(&ibuf->w);
 				continue;
 			} else if (n == -1 && errno != EAGAIN) {
