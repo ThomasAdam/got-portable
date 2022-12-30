@@ -85,7 +85,7 @@ STAILQ_HEAD(gotd_ref_updates, gotd_ref_update);
 static struct repo_write_client {
 	uint32_t			 id;
 	int				 fd;
-	int				 pack_pipe[2];
+	int				 pack_pipe;
 	struct got_pack			 pack;
 	uint8_t				 pack_sha1[SHA1_DIGEST_LENGTH];
 	int				 packidx_fd;
@@ -1258,15 +1258,6 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 		tempfiles[i] = f;
 	}
 
-	/* Send pack file pipe to gotsh(1). */
-	if (imsg_compose(&ibuf, GOTD_IMSG_RECV_PACKFILE, PROC_REPO_WRITE,
-	    repo_write.pid, (*client)->pack_pipe[1], NULL, 0) == -1) {
-		(*client)->pack_pipe[1] = -1;
-		err = got_error_from_errno("imsg_compose ACK");
-		if (err)	
-			goto done;
-	}
-	(*client)->pack_pipe[1] = -1;
 	err = gotd_imsg_flush(&ibuf);
 	if (err)
 		goto done;
