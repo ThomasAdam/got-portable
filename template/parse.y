@@ -34,6 +34,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "got_compat.h"
+
 #ifndef nitems
 #define nitems(_a) (sizeof((_a)) / sizeof((_a)[0]))
 #endif

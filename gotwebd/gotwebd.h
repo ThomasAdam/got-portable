@@ -24,6 +24,8 @@
 #include <limits.h>
 #include <stdio.h>
 
+#include "tmpl.h"
+
 #ifdef DEBUG
 #define dprintf(x...)   do { log_debug(x); } while(0)
 #else

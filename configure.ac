@@ -685,6 +685,7 @@ AC_CONFIG_FILES([Makefile
 		 got/Makefile
 		 gotadmin/Makefile
 		 gotwebd/Makefile
+		 template/Makefile
 		 tog/Makefile
 		 Makefile.common:Makefile.common.in])
 AC_OUTPUT

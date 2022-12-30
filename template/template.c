@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "got_compat.h"
+
 int	 parse(FILE *, const char *);
 
 int	 nodebug;

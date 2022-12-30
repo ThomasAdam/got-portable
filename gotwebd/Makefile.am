@@ -2,6 +2,12 @@ sbin_PROGRAMS = gotwebd
 
 include $(top_builddir)/Makefile.common
 
+# /home/n6tadam/projects/got/gotwebd/../template/template -o pages.c pages.tmpl
+
+SUFFIXES: .tmpl
+.tmpl.c:
+	$(top_srcdir)/template/template -o pages.c pages.tmpl
+
 gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/blame.c \
 		  $(top_srcdir)/lib/bloom.c \
@@ -51,11 +57,13 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/utf8.c \
 		  $(top_srcdir)/lib/worktree.c \
 		  $(top_srcdir)/lib/worktree_open.c \
+		  $(top_srcdir)/template/tmpl.c \
 		  fcgi.c \
 		  got_operations.c \
 		  gotweb.c \
 		  gotwebd.c \
 		  log.c \
+		  pages.tmpl \
 		  parse.y \
 		  proc.c \
 		  sockets.c
@@ -72,7 +80,8 @@ EXTRA_DIST = $(top_srcdir)/gotwebd/*.h \
 man5_MANS = gotwebd.conf.5
 man8_MANS = gotwebd.8
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
+LDADD = -L$(top_builddir)/compat -L$(top_builddir)/template \
+	-lopenbsd-compat -lm
 if HOST_FREEBSD
 LDADD += -lmd
 endif
