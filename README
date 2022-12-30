@@ -79,8 +79,8 @@ See the following manual page files for information about server setup:
 See regress/gotd/README for information about running the server test suite.
 
 
-Game of Trees Daemon (gotwebd) is a FastCGI program which displays repository
-data and is designed to work with httpd(8).
+Game of Trees Web Daemon (gotwebd) is a FastCGI program which displays
+repository data and is designed to work with httpd(8).
 
 To compile gotwebd on OpenBSD, run:
 
