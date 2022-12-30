@@ -109,7 +109,7 @@ if [ "$build_status" != "0" ]; then
 	exit 0
 fi
 log_cmd build.log make install
-log_cmd build.log make -j $ncpu web
+log_cmd build.log make -j $ncpu webd
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
@@ -149,7 +149,7 @@ printf "\n\n\tTesting a release build\n\n" >> build.log
 log_cmd build.log make clean
 log_cmd build.log make obj
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes
-log_cmd build.log make -j $ncpu GOT_RELEASE=Yes web
+log_cmd build.log make -j $ncpu GOT_RELEASE=Yes webd
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog release mode build failure" $recipients < build.log

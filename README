@@ -79,28 +79,24 @@ See the following manual page files for information about server setup:
 See regress/gotd/README for information about running the server test suite.
 
 
-Game of Trees Web (Gotweb) is a CGI program which displays repository data
-and is designed to work with httpd(8) and slowcgi(8). It requires the Kristaps
-Dzonsons kcgi library, version 0.12.0 or greater.
+Game of Trees Daemon (gotwebd) is a FastCGI program which displays repository
+data and is designed to work with httpd(8).
 
-To compile gotweb on OpenBSD, run:
+To compile gotwebd on OpenBSD, run:
 
- # pkg_add kcgi
- $ make web
- # make web-install
+ $ make webd
+ # make webd-install
 
 This will create the following files:
-  the CGI program /var/www/cgi-bin/gotweb/gotweb
-  helper programs from the libexec directory in /var/www/cgi-bin/gotweb/libexec
-  several template files in /var/www/cgi-bin/gw_tmpl/
-  html, css, and image files in /var/www/htdocs/gotweb/
-  the directory /var/www/got/tmp/
+  the daemon program /usr/local/sbin/gotwebd
+  css and image files in /var/www/htdocs/gotwebd
+  the gotwebd init script in /etc/rc.d
   man pages (only installed if building sources from a Got release tarball)
 
 Documentation is available in manual pages:
 
- $ man -l gotweb/gotweb.8
- $ man -l gotweb/gotweb.conf.5
+ $ man -l gotwebd/gotwebd.8
+ $ man -l gotwebd/gotwebd.conf.5
 
 
 Got can be built with profiling enabled to debug performance issues.
@@ -122,25 +118,6 @@ The gprof2dot program can be used to generate a profile graph:
 
   $ doas pkg_add gprof2dot graphviz
   $ gprof ~/bin/got-read-pack gmon.out | gprof2dot | dot -T png > profile.png
-
-As another example, to compile gotweb with profiling enabled:
-
-  $ cd gotweb
-  $ make clean
-  $ make PROFILE=1 gotweb
-  $ make # compile remaining gotweb binaries as usual
-  $ doas make install
-  $ doas chown www /var/www/cgi-bin/gotweb/
-
-After loading a gotweb page in the browser, there should now
-be a gmon.out file next to the gotweb binary:
-
-$ ls -l /var/www/cgi-bin/gotweb/
-total 6088
--rw-r--r--  1 www   daemon   427642 Jun 17 22:04 gmon.out
--rwxr-xr-x  1 www   www     2630488 Jun 17 22:03 gotweb
-drwxr-xr-x  2 root  daemon      512 Jun 17 22:03 gw_tmpl
-drwxr-xr-x  2 root  daemon      512 Jun 17 22:03 libexec
 
 
 Guidelines for reporting problems:

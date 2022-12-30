@@ -7,7 +7,7 @@ SUBDIR += regress
 .endif
 
 .if make(clean) || make(obj) || make(release)
-SUBDIR += gotweb gotwebd gotd gotsh gotctl template
+SUBDIR += gotwebd gotd gotsh gotctl template
 .endif
 
 .if make(tags) || make(cleandir)
@@ -38,12 +38,6 @@ tmpl:
 
 tmpl-regress:
 	${MAKE} -C regress/template
-
-web:
-	${MAKE} -C gotweb
-
-web-install:
-	${MAKE} -C gotweb install
 
 webd: tmpl
 	${MAKE} -C gotwebd
