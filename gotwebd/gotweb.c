@@ -167,7 +167,7 @@ gotweb_process_request(struct request *c)
 			goto err;
 	}
 
-	if (qs != NULL && qs->action == BLOB) {
+	if (qs->action == BLOB) {
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto done;
