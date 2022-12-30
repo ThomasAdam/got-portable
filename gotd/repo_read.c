@@ -62,8 +62,7 @@ static struct repo_read {
 	int *temp_fds;
 } repo_read;
 
-struct repo_read_client {
-	STAILQ_ENTRY(repo_read_client)	 entry;
+static struct repo_read_client {
 	uint32_t			 id;
 	int				 fd;
 	int				 delta_cache_fd;
@@ -71,45 +70,7 @@ struct repo_read_client {
 	int				 pack_pipe;
 	struct gotd_object_id_array	 want_ids;
 	struct gotd_object_id_array	 have_ids;
-};
-STAILQ_HEAD(repo_read_clients, repo_read_client);
-
-static struct repo_read_clients repo_read_clients[GOTD_CLIENT_TABLE_SIZE];
-static SIPHASH_KEY clients_hash_key;
-
-static uint64_t
-client_hash(uint32_t client_id)
-{
-	return SipHash24(&clients_hash_key, &client_id, sizeof(client_id));
-}
-
-static void
-add_client(struct repo_read_client *client, uint32_t client_id, int fd)
-{
-	uint64_t slot;
-
-	client->id = client_id;
-	client->fd = fd;
-	client->delta_cache_fd = -1;
-	client->pack_pipe = -1;
-	slot = client_hash(client->id) % nitems(repo_read_clients);
-	STAILQ_INSERT_HEAD(&repo_read_clients[slot], client, entry);
-}
-
-static struct repo_read_client *
-find_client(uint32_t client_id)
-{
-	uint64_t slot;
-	struct repo_read_client *c;
-
-	slot = client_hash(client_id) % nitems(repo_read_clients);
-	STAILQ_FOREACH(c, &repo_read_clients[slot], entry) {
-		if (c->id == client_id)
-			return c;
-	}
-
-	return NULL;
-}
+} repo_read_client;
 
 static volatile sig_atomic_t sigint_received;
 static volatile sig_atomic_t sigterm_received;
@@ -292,9 +253,10 @@ done:
 }
 
 static const struct got_error *
-list_refs(struct repo_read_client **client, struct imsg *imsg)
+list_refs(struct imsg *imsg)
 {
 	const struct got_error *err;
+	struct repo_read_client *client = &repo_read_client;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct gotd_imsg_list_refs_internal ireq;
@@ -314,14 +276,16 @@ list_refs(struct repo_read_client **client, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	*client = find_client(ireq.client_id);
-	if (*client)
-		return got_error_msg(GOT_ERR_CLIENT_ID, "duplicate client ID");
-
-	*client = calloc(1, sizeof(**client));
-	if (*client == NULL)
-		return got_error_from_errno("calloc");
-	add_client(*client, ireq.client_id, client_fd);
+	if (ireq.client_id == 0)
+		return got_error(GOT_ERR_CLIENT_ID);
+	if (client->id != 0) {
+		return got_error_msg(GOT_ERR_CLIENT_ID,
+		    "duplicate list-refs request");
+	}
+	client->id = ireq.client_id;
+	client->fd = client_fd;
+	client->delta_cache_fd = -1;
+	client->pack_pipe = -1;
 
 	imsg_init(&ibuf, client_fd);
 
@@ -451,9 +415,10 @@ free_object_ids(struct gotd_object_id_array *array)
 }
 
 static const struct got_error *
-recv_want(struct repo_read_client **client, struct imsg *imsg)
+recv_want(struct imsg *imsg)
 {
 	const struct got_error *err;
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsg_want iwant;
 	size_t datalen;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
@@ -473,11 +438,7 @@ recv_want(struct repo_read_client **client, struct imsg *imsg)
 	    got_sha1_digest_to_str(id.sha1, hex, sizeof(hex)))
 		log_debug("client wants %s", hex);
 
-	*client = find_client(iwant.client_id);
-	if (*client == NULL)
-		return got_error(GOT_ERR_CLIENT_ID);
-
-	imsg_init(&ibuf, (*client)->fd);
+	imsg_init(&ibuf, client->fd);
 
 	err = got_object_get_type(&obj_type, repo_read.repo, &id);
 	if (err)
@@ -487,7 +448,7 @@ recv_want(struct repo_read_client **client, struct imsg *imsg)
 	    obj_type != GOT_OBJ_TYPE_TAG)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = record_object_id(&(*client)->want_ids, &id);
+	err = record_object_id(&client->want_ids, &id);
 	if (err)
 		return err;
 
@@ -497,9 +458,10 @@ recv_want(struct repo_read_client **client, struct imsg *imsg)
 }
 
 static const struct got_error *
-recv_have(struct repo_read_client **client, struct imsg *imsg)
+recv_have(struct imsg *imsg)
 {
 	const struct got_error *err;
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsg_have ihave;
 	size_t datalen;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
@@ -519,11 +481,7 @@ recv_have(struct repo_read_client **client, struct imsg *imsg)
 	    got_sha1_digest_to_str(id.sha1, hex, sizeof(hex)))
 		log_debug("client has %s", hex);
 
-	*client = find_client(ihave.client_id);
-	if (*client == NULL)
-		return got_error(GOT_ERR_CLIENT_ID);
-
-	imsg_init(&ibuf, (*client)->fd);
+	imsg_init(&ibuf, client->fd);
 
 	err = got_object_get_type(&obj_type, repo_read.repo, &id);
 	if (err) {
@@ -542,7 +500,7 @@ recv_have(struct repo_read_client **client, struct imsg *imsg)
 		goto done;
 	}
 
-	err = record_object_id(&(*client)->have_ids, &id);
+	err = record_object_id(&client->have_ids, &id);
 	if (err)
 		return err;
 
@@ -604,9 +562,10 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 }
 
 static const struct got_error *
-receive_delta_cache_fd(struct repo_read_client **client, struct imsg *imsg,
+receive_delta_cache_fd(struct imsg *imsg,
     struct gotd_imsgev *iev)
 {
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsg_send_packfile ireq;
 	size_t datalen;
 
@@ -620,22 +579,18 @@ receive_delta_cache_fd(struct repo_read_client **client, struct imsg *imsg,
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	*client = find_client(ireq.client_id);
-	if (*client == NULL)
-		return got_error(GOT_ERR_CLIENT_ID);
-
-	if ((*client)->delta_cache_fd != -1)
+	if (client->delta_cache_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	(*client)->delta_cache_fd = imsg->fd;
-	(*client)->report_progress = ireq.report_progress;
+	client->delta_cache_fd = imsg->fd;
+	client->report_progress = ireq.report_progress;
 	return NULL;
 }
 
 static const struct got_error *
-receive_pack_pipe(struct repo_read_client **client, struct imsg *imsg,
-    struct gotd_imsgev *iev)
+receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 {
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsg_packfile_pipe ireq;
 	size_t datalen;
 
@@ -649,21 +604,18 @@ receive_pack_pipe(struct repo_read_client **client, struct imsg *imsg,
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	*client = find_client(ireq.client_id);
-	if (*client == NULL)
-		return got_error(GOT_ERR_CLIENT_ID);
-	if ((*client)->pack_pipe != -1)
+	if (client->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	(*client)->pack_pipe = imsg->fd;
+	client->pack_pipe = imsg->fd;
 	return NULL;
 }
 
 static const struct got_error *
-send_packfile(struct repo_read_client *client, struct imsg *imsg,
-    struct gotd_imsgev *iev)
+send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	const struct got_error *err = NULL;
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsg_packfile_done idone;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
 	char hex[SHA1_DIGEST_STRING_LENGTH];
@@ -722,9 +674,8 @@ recv_disconnect(struct imsg *imsg)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_disconnect idisconnect;
 	size_t datalen;
-	int client_fd, delta_cache_fd, pack_pipe;
-	struct repo_read_client *client = NULL;
-	uint64_t slot;
+	int delta_cache_fd, pack_pipe;
+	struct repo_read_client *client = &repo_read_client;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(idisconnect))
@@ -733,23 +684,14 @@ recv_disconnect(struct imsg *imsg)
 
 	log_debug("client disconnecting");
 
-	client = find_client(idisconnect.client_id);
-	if (client == NULL)
-		return got_error(GOT_ERR_CLIENT_ID);
-
-	slot = client_hash(client->id) % nitems(repo_read_clients);
-	STAILQ_REMOVE(&repo_read_clients[slot], client, repo_read_client,
-	    entry);
 	free_object_ids(&client->have_ids);
 	free_object_ids(&client->want_ids);
-	client_fd = client->fd;
-	delta_cache_fd = client->delta_cache_fd;
-	pack_pipe = client->pack_pipe;
-	free(client);
-	if (close(client_fd) == -1)
+	if (close(client->fd) == -1)
 		err = got_error_from_errno("close");
+	delta_cache_fd = client->delta_cache_fd;
 	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
 		return got_error_from_errno("close");
+	pack_pipe = client->pack_pipe;
 	if (pack_pipe != -1 && close(pack_pipe) == -1 && err == NULL)
 		return got_error_from_errno("close");
 	return err;
@@ -764,7 +706,7 @@ repo_read_dispatch(int fd, short event, void *arg)
 	struct imsg imsg;
 	ssize_t n;
 	int shut = 0;
-	struct repo_read_client *client = NULL;
+	struct repo_read_client *client = &repo_read_client;
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
@@ -782,47 +724,50 @@ repo_read_dispatch(int fd, short event, void *arg)
 	}
 
 	while (err == NULL && check_cancelled(NULL) == NULL) {
-		client = NULL;
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get", __func__);
 		if (n == 0)	/* No more messages. */
 			break;
 
+		if (imsg.hdr.type != GOTD_IMSG_LIST_REFS_INTERNAL &&
+		    client->id == 0) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
 		switch (imsg.hdr.type) {
 		case GOTD_IMSG_LIST_REFS_INTERNAL:
-			err = list_refs(&client, &imsg);
+			err = list_refs(&imsg);
 			if (err)
 				log_warnx("%s: ls-refs: %s", repo_read.title,
 				    err->msg);
 			break;
 		case GOTD_IMSG_WANT:
-			err = recv_want(&client, &imsg);
+			err = recv_want(&imsg);
 			if (err)
 				log_warnx("%s: want-line: %s", repo_read.title,
 				    err->msg);
 			break;
 		case GOTD_IMSG_HAVE:
-			err = recv_have(&client, &imsg);
+			err = recv_have(&imsg);
 			if (err)
 				log_warnx("%s: have-line: %s", repo_read.title,
 				    err->msg);
 			break;
 		case GOTD_IMSG_SEND_PACKFILE:
-			err = receive_delta_cache_fd(&client, &imsg, iev);
+			err = receive_delta_cache_fd(&imsg, iev);
 			if (err)
 				log_warnx("%s: receiving delta cache: %s",
 				    repo_read.title, err->msg);
 			break;
 		case GOTD_IMSG_PACKFILE_PIPE:
-			err = receive_pack_pipe(&client, &imsg, iev);
+			err = receive_pack_pipe(&imsg, iev);
 			if (err) {
 				log_warnx("%s: receiving pack pipe: %s",
 				    repo_read.title, err->msg);
 				break;
 			}
-			if (client->pack_pipe == -1)
-				break;
-			err = send_packfile(client, &imsg, iev);
+			err = send_packfile(&imsg, iev);
 			if (err)
 				log_warnx("%s: sending packfile: %s",
 				    repo_read.title, err->msg);
@@ -832,6 +777,7 @@ repo_read_dispatch(int fd, short event, void *arg)
 			if (err)
 				log_warnx("%s: disconnect: %s",
 				    repo_read.title, err->msg);
+			shut = 1;
 			break;
 		default:
 			log_debug("%s: unexpected imsg %d", repo_read.title,
@@ -845,7 +791,7 @@ repo_read_dispatch(int fd, short event, void *arg)
 	if (!shut && check_cancelled(NULL) == NULL) {
 		if (err &&
 		    gotd_imsg_send_error_event(iev, PROC_REPO_READ,
-		        client ? client->id : 0, err) == -1) {
+		        client->id, err) == -1) {
 			log_warnx("could not send error to parent: %s",
 			    err->msg);
 		}
@@ -868,8 +814,6 @@ repo_read_main(const char *title, const char *repo_path,
 	repo_read.pid = getpid();
 	repo_read.pack_fds = pack_fds;
 	repo_read.temp_fds = temp_fds;
-
-	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 
 	err = got_repo_open(&repo_read.repo, repo_path, NULL, pack_fds);
 	if (err)
