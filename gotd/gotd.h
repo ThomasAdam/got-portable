@@ -23,6 +23,7 @@
 #define GOTD_EMPTY_PATH	"/var/empty"
 
 #define GOTD_MAXCLIENTS		1024
+#define GOTD_MAX_CONN_PER_UID	4
 #define GOTD_FD_RESERVE		5
 #define GOTD_FD_NEEDED		6
 #define GOTD_FILENO_MSG_PIPE	3
