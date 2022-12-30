@@ -352,6 +352,8 @@ listen_main(const char *title, int gotd_socket)
 	struct gotd_imsgev iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 
+	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+
 	gotd_listen.title = title;
 	gotd_listen.pid = getpid();
 	gotd_listen.fd = gotd_socket;
