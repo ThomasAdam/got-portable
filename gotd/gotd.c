@@ -339,7 +339,7 @@ wait_for_child(pid_t child_pid)
 		} else if (WIFSIGNALED(status)) {
 			log_warnx("child PID %ld terminated; signal %d",
 			    (long)pid, WTERMSIG(status));
-		}	
+		}
 	} while (pid != -1 || (pid == -1 && errno == EINTR));
 }
 
@@ -2028,9 +2028,8 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	else
 		proc_type = PROC_REPO_READ;
 
-	err = start_repo_child(client, proc_type, repo,
-		gotd.argv0, gotd.confpath, gotd.daemonize,
-		gotd.verbosity);
+	err = start_repo_child(client, proc_type, repo, gotd.argv0,
+	    gotd.confpath, gotd.daemonize, gotd.verbosity);
 done:
 	if (err)
 		log_warnx("uid %d: %s", client->euid, err->msg);
@@ -2260,7 +2259,7 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 
 	if (proc_type != PROC_REPO_READ && proc_type != PROC_REPO_WRITE)
 		return got_error_msg(GOT_ERR_NOT_IMPL, "bad process type");
-		
+
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
 		return got_error_from_errno("calloc");
