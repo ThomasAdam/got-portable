@@ -21,7 +21,6 @@
 
 #include <errno.h>
 #include <event.h>
-#include <siphash.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +32,8 @@
 
 #include "got_error.h"
 #include "got_path.h"
+
+#include "got_compat.h"
 
 #include "gotd.h"
 #include "log.h"
@@ -218,6 +219,11 @@ accept_reserve(int fd, struct sockaddr *addr, socklen_t *addrlen,
     int reserve, volatile int *counter)
 {
 	int ret;
+	int sock_flags = SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	if (getdtablecount() + reserve +
 	    ((*counter + 1) * GOTD_FD_NEEDED) >= getdtablesize()) {
@@ -225,9 +231,15 @@ accept_reserve(int fd, struct sockaddr *addr, socklen_t *addrlen,
 		errno = EMFILE;
 		return -1;
 	}
+#ifdef __APPLE__
+	/* TA:  silence warning from GCC. */
+	(void)sock_flags;
+	ret = accept(fd, addr, addrlen);
+#else
+	ret = accept4(fd, addr, addrlen, sock_flags);
+#endif
 
-	if ((ret = accept4(fd, addr, addrlen,
-	    SOCK_NONBLOCK | SOCK_CLOEXEC)) > -1) {
+	if (ret > -1) {
 		(*counter)++;
 	}
 

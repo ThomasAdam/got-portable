@@ -993,13 +993,17 @@ connect_repo_child(struct gotd_client *client,
 	struct gotd_imsgev *session_iev = &client->session->iev;
 	struct gotd_imsg_connect_repo_child ireq;
 	int pipe[2];
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED)
 		return got_error_msg(GOT_ERR_BAD_REQUEST,
 		    "unexpected repo child ready signal received");
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
-	    PF_UNSPEC, pipe) == -1)
+	if (socketpair(AF_UNIX, sock_flags, PF_UNSPEC, pipe) == -1)
 		fatal("socketpair");
 
 	memset(&ireq, 0, sizeof(ireq));
@@ -1571,7 +1575,7 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	proc->type = PROC_LISTEN;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 
@@ -1590,6 +1594,11 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
     char *argv0, const char *confpath, int daemonize, int verbosity)
 {
 	struct gotd_child_proc *proc;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
@@ -1610,8 +1619,7 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
 	    sizeof(proc->repo_path))
 		fatalx("repository path too long: %s", repo->path);
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
-	    PF_UNSPEC, proc->pipe) == -1)
+	if (socketpair(AF_UNIX, sock_flags, PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
 	    confpath, proc->pipe[1], daemonize, verbosity);
@@ -1636,6 +1644,11 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
     int daemonize, int verbosity)
 {
 	struct gotd_child_proc *proc;
+	int sock_flags = SOCK_STREAM|SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	if (proc_type != PROC_REPO_READ && proc_type != PROC_REPO_WRITE)
 		return got_error_msg(GOT_ERR_NOT_IMPL, "bad process type");
@@ -1653,10 +1666,13 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 		fatalx("repository name too long: %s", repo->name);
 	log_debug("starting %s for repository %s",
 	    proc->type == PROC_REPO_READ ? "reader" : "writer", repo->name);
+
 	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
 	    sizeof(proc->repo_path))
 		fatalx("repository path too long: %s", repo->path);
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	if (realpath(repo->path, proc->repo_path) == NULL)
+		fatal("%s", repo->path);
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
@@ -1685,6 +1701,11 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	struct gotd_child_proc *proc;
 	struct gotd_imsg_auth iauth;
 	int fd;
+	int sock_flags = SOCK_STREAM|SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	memset(&iauth, 0, sizeof(iauth));
 
@@ -1711,7 +1732,9 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
 	    sizeof(proc->repo_path))
 		fatalx("repository path too long: %s", repo->path);
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	if (realpath(repo->path, proc->repo_path) == NULL)
+		fatal("%s", repo->path);
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,

@@ -5,12 +5,14 @@ include $(top_builddir)/Makefile.common
 gotd_SOURCES = gotd.c \
 	auth.c \
 	imsg.c \
+	listen.c \
 	log.c \
 	parse.y \
 	privsep_stub.c \
 	repo_imsg.c \
 	repo_read.c \
 	repo_write.c \
+	session.c \
 	$(top_srcdir)/lib/bloom.c \
 	$(top_srcdir)/lib/buf.c \
 	$(top_srcdir)/lib/date.c \
