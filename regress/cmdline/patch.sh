@@ -1881,6 +1881,78 @@ EOF
 	test_done "$testroot" 0
 }
 
+test_patch_remove_binary_file() {
+	local testroot=`test_init patch_remove_binary_file`
+
+	if ! got checkout $testroot/repo $testroot/wt >/dev/null; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	dd if=/dev/zero of=$testroot/wt/x bs=1 count=16 2>/dev/null >&2
+	(cd $testroot/wt && got add x && got commit -m +x) >/dev/null
+
+	(cd $testroot/wt && \
+		got branch demo && \
+		got rm x && \
+		got ci -m -x &&
+		got up -b master) >/dev/null
+
+	echo 'D  x' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -c demo -l 1 -p >patch)
+
+	(cd $testroot/wt && got patch <patch) > $testroot/stdout
+	if [ $? -ne 0 ]; then
+		echo 'patch failed' >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot 1
+		return 1
+	fi
+
+	# try again using a git produced diff
+	(cd $testroot/wt && got revert x) >/dev/null
+
+	(cd $testroot/repo && git show demo) >$testroot/wt/patch
+
+	(cd $testroot/wt && got patch <patch) > $testroot/stdout
+	if [ $? -ne 0 ]; then
+		echo 'patch failed' >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot 1
+		return 1
+	fi
+
+	# try again using a diff(1) style patch
+	(cd $testroot/wt && got revert x) >/dev/null
+
+	echo "Binary files x and /dev/null differ" >$testroot/wt/patch
+	(cd $testroot/wt && got patch <patch) >$testroot/stdout
+	if [ $? -ne 0 ]; then
+		echo 'patch failed' >&2
+		test_done $testroot 1
+		return 1
+	fi
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot 1
+		return 1
+	fi
+
+	test_done $testroot 0
+}
+
 test_parseargs "$@"
 run_test test_patch_basic
 run_test test_patch_dont_apply
@@ -1910,3 +1982,4 @@ run_test test_patch_merge_reverse
 run_test test_patch_newfile_xbit_got_diff
 run_test test_patch_newfile_xbit_git_diff
 run_test test_patch_umask
+run_test test_patch_remove_binary_file

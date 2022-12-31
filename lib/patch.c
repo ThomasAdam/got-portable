@@ -585,6 +585,10 @@ patch_file(struct got_patch *p, FILE *orig, FILE *tmp)
 		return apply_hunk(orig, tmp, h, &lineno, 0);
 	}
 
+	/* When deleting binary files there are no hunks to apply. */
+	if (p->new == NULL && STAILQ_EMPTY(&p->head))
+		return NULL;
+
 	if (fstat(fileno(orig), &sb) == -1)
 		return got_error_from_errno("fstat");
 
