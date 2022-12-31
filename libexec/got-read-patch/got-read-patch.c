@@ -152,6 +152,8 @@ binaryfilename(const char *at, char **name)
 	const char *suffix = " and /dev/null differ\n";
 	size_t len, d;
 
+	*name = NULL;
+
 	len = strlen(at);
 	if (len <= strlen(suffix))
 		return NULL;
