@@ -129,6 +129,44 @@ filename(const char *at, char **name)
 }
 
 static int
+binary_deleted(const char *line)
+{
+	const char *prefix = "Binary files ";
+	const char *suffix = " and /dev/null differ\n";
+	size_t len, d;
+
+	if (strncmp(line, prefix, strlen(prefix)) != 0)
+		return 0;
+	line += strlen(prefix);
+
+	len = strlen(line);
+	if (len <= strlen(suffix))
+		return 0;
+	d = len - strlen(suffix);
+	return (strcmp(line + d, suffix) == 0);
+}
+
+static const struct got_error *
+binaryfilename(const char *at, char **name)
+{
+	const char *suffix = " and /dev/null differ\n";
+	size_t len, d;
+
+	len = strlen(at);
+	if (len <= strlen(suffix))
+		return NULL;
+
+	d = len - strlen(suffix);
+	if (strcmp(at + d, suffix) != 0)
+		return NULL;
+
+	*name = strndup(at, d);
+	if (*name == NULL)
+		return got_error_from_errno("strndup");
+	return NULL;
+}
+
+static int
 filexbit(const char *line)
 {
 	char *m;
@@ -187,7 +225,8 @@ patch_start(int *git, char **cid, FILE *fp)
 				break;
 		} else if (!strncmp(line, "--- ", 4) ||
 		    !strncmp(line, "+++ ", 4) ||
-		    !strncmp(line, "blob - ", 7)) {
+		    !strncmp(line, "blob - ", 7) ||
+		    binary_deleted(line)) {
 			/* rewind to previous line */
 			if (fseeko(fp, -linelen, SEEK_CUR) == -1)
 				err = got_error_from_errno("fseeko");
@@ -212,7 +251,7 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 	char	*line = NULL;
 	size_t	 linesize = 0;
 	ssize_t	 linelen;
-	int	 create, rename = 0, xbit = 0;
+	int	 create, delete_binary = 0, rename = 0, xbit = 0;
 
 	*done = 0;
 	*next = 0;
@@ -237,6 +276,10 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 		} else if (!git && !strncmp(line, "blob - ", 7)) {
 			free(blob);
 			err = blobid(line + 7, &blob, git);
+		} else if (!strncmp(line, "Binary files ", 13)) {
+			delete_binary = 1;
+			free(old);
+			err = binaryfilename(line + 13, &old);
 		} else if (rename && !strncmp(line, "rename to ", 10)) {
 			free(new);
 			err = filename(line + 10, &new);
@@ -264,6 +307,16 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 		 * line.
 		 */
 		if (rename && old != NULL && new != NULL) {
+			*done = 1;
+			err = send_patch(old, new, commitid,
+			    blob, xbit, git);
+			break;
+		}
+
+		/*
+		 * Diffs that remove binary files have no hunks.
+		 */
+		if (delete_binary && old != NULL) {
 			*done = 1;
 			err = send_patch(old, new, commitid,
 			    blob, xbit, git);
