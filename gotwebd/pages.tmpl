@@ -386,6 +386,11 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
         </div>
       </div>
     </div>
+    <div class="dotted_line"></div>
+    <div class="commit">
+      {{ "\n" }}
+      {{ rc->commit_msg }}
+    </div>
     <div class="navs_wrapper">
       <div class="navs">
         <a href="{{ render gotweb_render_url(c, &diff) }}">diff</a>
