@@ -145,7 +145,7 @@ Example configuration for
         listen on * port 80
         root "/htdocs/gotwebd"
         location "/" {
-              fastcgi socket tcp localhost 9000
+              fastcgi socket "/run/gotweb.sock"
         }
   }
 
