@@ -3367,6 +3367,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		goto done;
 	}
 	s->log_branches = log_branches;
+	s->use_committer = 1;
 
 	STAILQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
