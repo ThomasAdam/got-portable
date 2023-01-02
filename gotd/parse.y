@@ -670,6 +670,11 @@ conf_new_repo(const char *name)
 {
 	struct gotd_repo *repo;
 
+	if (name[0] == '\0') {
+		fatalx("syntax error: empty repository name found in %s",
+		    file->name);
+	}
+
 	if (strchr(name, '\n') != NULL) {
 		fatalx("%s: repository names must not contain linefeeds: %s",
 		    getprogname(), name);
