@@ -435,7 +435,7 @@ lookup(char *s)
 		{ "custom_css",			CUSTOM_CSS },
 		{ "listen",			LISTEN },
 		{ "logo",			LOGO },
-		{ "logo_url"	,		LOGO_URL },
+		{ "logo_url",			LOGO_URL },
 		{ "max_commits_display",	MAX_COMMITS_DISPLAY },
 		{ "max_repos",			MAX_REPOS },
 		{ "max_repos_display",		MAX_REPOS_DISPLAY },
