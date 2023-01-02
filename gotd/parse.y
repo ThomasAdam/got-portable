@@ -665,8 +665,8 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 
 	TAILQ_FOREACH(repo, &gotd->repos, entry) {
 		if (repo->path[0] == '\0') {
-			log_warnx("%s: repository \"%s\": no path provided in "
-			    "configuration file", getprogname(), repo->name);
+			log_warnx("repository \"%s\": no path provided in "
+			    "configuration file", repo->name);
 			return (-1);
 		}
 	}
@@ -684,10 +684,8 @@ conf_new_repo(const char *name)
 		    file->name);
 	}
 
-	if (strchr(name, '\n') != NULL) {
-		fatalx("%s: repository names must not contain linefeeds: %s",
-		    getprogname(), name);
-	}
+	if (strchr(name, '\n') != NULL)
+		fatalx("repository names must not contain linefeeds: %s", name);
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL)
