@@ -187,23 +187,6 @@ repository	: REPOSITORY STRING {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
-		}
-		| REPOSITORY STRING {
-			struct gotd_repo *repo;
-
-			TAILQ_FOREACH(repo, &gotd->repos, entry) {
-				if (strcmp(repo->name, $2) == 0) {
-					yyerror("duplicate repository '%s'", $2);
-					free($2);
-					YYERROR;
-				}
-			}
-
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_AUTH) {
-				new_repo = conf_new_repo($2);
-			}
-			free($2);
 		} '{' optnl repoopts2 '}' {
 		}
 		;
