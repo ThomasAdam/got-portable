@@ -612,6 +612,7 @@ parse_config(const char *filename, enum gotd_procid proc_id,
     struct gotd *env)
 {
 	struct sym *sym, *next;
+	struct gotd_repo *repo;
 
 	memset(env, 0, sizeof(*env));
 
@@ -661,6 +662,14 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 
 	if (errors)
 		return (-1);
+
+	TAILQ_FOREACH(repo, &gotd->repos, entry) {
+		if (repo->path[0] == '\0') {
+			log_warnx("%s: repository \"%s\": no path provided in "
+			    "configuration file", getprogname(), repo->name);
+			return (-1);
+		}
+	}
 
 	return (0);
 }
