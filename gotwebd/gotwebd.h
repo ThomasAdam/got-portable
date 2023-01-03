@@ -436,7 +436,7 @@ int sockets_privinit(struct gotwebd *, struct socket *);
 
 /* gotweb.c */
 const struct got_error *gotweb_render_content_type(struct request *,
-    const uint8_t *);
+    const char *);
 const struct got_error
     *gotweb_render_content_type_file(struct request *, const char *,
     const char *, const char *);
