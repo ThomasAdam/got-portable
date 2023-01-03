@@ -31,6 +31,48 @@ are treated as comments and ignored.
 .Sh GLOBAL CONFIGURATION
 The available global configuration directives are as follows:
 .Bl -tag -width Ds
+.It Ic connection Ar option
+Set the specified options and limits for connections to the
+.Xr gotd 8
+unix socket.
+.Pp
+The
+.Ic connection
+directive may be specified multiple times, and multiple
+.Ar option
+arguments may be specified within curly braces:
+.Pp
+.Ic connection Brq Ar ...
+.Pp
+Each option should only be specified once.
+If a given option is listed multiple times, the last line which sets this
+option wins.
+.Pp
+Valid connection options are:
+.Bl -tag -width Ds
+.It Ic request timeout Ar seconds
+Specify the inactivity timeout for operations between client and server.
+If this timeout is exceeded while a Git protocol request is being processed,
+the request will be aborted and the connection will be terminated.
+.Pp
+The default timeout is 3600 seconds (1 hour).
+This should only be changed if legitimate requests are exceeding the default
+timeout for some reason, such as the server spending an extraordinary
+amount of time generating a pack file.
+.It Ic limit Ic user Ar identity Ar number
+Limit the maximum amount of concurrent connections by the user with
+the username
+.Ar identity
+to
+.Ar number .
+Numeric user IDs are also accepted.
+.Pp
+The default per-user limit is 4.
+This should only be changed if concurrent connections from a given user are
+expected to exceed the default limit, for example if an anonymous user
+is granted read access and many concurrent connections will share this
+anonymous user identity.
+.El
 .It Ic unix_socket Ar path
 Set the path to the unix socket which
 .Xr gotd 8
@@ -160,6 +202,15 @@ repository "openbsd/ports" {
 	permit rw :porters
 	permit ro anonymous
 	deny flan_hacker
+}
+
+# Use a larger request timeout value:
+connection request timeout 7200  # 2 hours
+
+# Some users are granted a higher concurrent connection limit:
+connection {
+	limit user flan_hacker 16
+	limit user anonymous 32
 }
 .Ed
 .Sh SEE ALSO

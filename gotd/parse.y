@@ -46,6 +46,8 @@
 
 #include "log.h"
 #include "gotd.h"
+#include "auth.h"
+#include "listen.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
@@ -94,6 +96,7 @@ typedef struct {
 	union {
 		long long	 number;
 		char		*string;
+		struct timeval	 tv;
 	} v;
 	int lineno;
 } YYSTYPE;
@@ -101,11 +104,12 @@ typedef struct {
 %}
 
 %token	PATH ERROR ON UNIX_SOCKET UNIX_GROUP USER REPOSITORY PERMIT DENY
-%token	RO RW
+%token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean
+%type	<v.tv>		timeout
 
 %%
 
@@ -133,6 +137,16 @@ boolean		: STRING {
 		}
 		| ON { $$ = 1; }
 		| NUMBER { $$ = $1; }
+		;
+
+timeout		: NUMBER {
+			if ($1 < 0) {
+				yyerror("invalid timeout: %lld", $1);
+				YYERROR;
+			}
+			$$.tv_sec = $1;
+			$$.tv_usec = 0;
+		}
 		;
 
 main		: UNIX_SOCKET STRING {
@@ -168,6 +182,28 @@ main		: UNIX_SOCKET STRING {
 				YYERROR;
 			}
 			free($2);
+		}
+		| connection
+		;
+
+connection	: CONNECTION '{' optnl conflags_l '}'
+		| CONNECTION conflags
+
+conflags_l	: conflags optnl conflags_l
+		| conflags optnl
+		;
+
+conflags	: REQUEST TIMEOUT timeout		{
+			memcpy(&gotd->request_timeout, &$3,
+			    sizeof(gotd->request_timeout));
+		}
+		| LIMIT USER STRING NUMBER	{
+			if (gotd_proc_id == PROC_LISTEN &&
+			    conf_limit_user_connections($3, $4) == -1) {
+				free($3);
+				YYERROR;
+			}
+			free($3);
 		}
 		;
 
@@ -276,13 +312,17 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{ "connection",			CONNECTION },
 		{ "deny",			DENY },
+		{ "limit",			LIMIT },
 		{ "on",				ON },
 		{ "path",			PATH },
 		{ "permit",			PERMIT },
 		{ "repository",			REPOSITORY },
+		{ "request",			REQUEST },
 		{ "ro",				RO },
 		{ "rw",				RW },
+		{ "timeout",			TIMEOUT },
 		{ "unix_group",			UNIX_GROUP },
 		{ "unix_socket",		UNIX_SOCKET },
 		{ "user",			USER },
@@ -637,6 +677,9 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 		return -1;
 	}
 
+	gotd->request_timeout.tv_sec = GOTD_DEFAULT_REQUEST_TIMEOUT;
+	gotd->request_timeout.tv_usec = 0;
+
 	file = newfile(filename, 0);
 	if (file == NULL) {
 		/* just return, as we don't require a conf file */
@@ -672,6 +715,64 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 	}
 
 	return (0);
+}
+
+static int
+uid_connection_limit_cmp(const void *pa, const void *pb)
+{
+	const struct gotd_uid_connection_limit *a = pa, *b = pb;
+
+	if (a->uid < b->uid)
+		return -1;
+	else if (a->uid > b->uid);
+		return 1;
+
+	return 0;
+}
+
+static int
+conf_limit_user_connections(const char *user, int maximum)
+{
+	uid_t uid;
+	struct gotd_uid_connection_limit *limit;
+	size_t nlimits;
+
+	if (maximum < 1) {
+		yyerror("max connections cannot be smaller 1");
+		return -1;
+	}
+	if (maximum > GOTD_MAXCLIENTS) {
+		yyerror("max connections must be <= %d", GOTD_MAXCLIENTS);
+		return -1;
+	}
+
+	if (gotd_auth_parseuid(user, &uid) == -1) {
+		yyerror("%s: no such user", user);
+		return -1;
+	}
+
+	limit = gotd_find_uid_connection_limit(gotd->connection_limits,
+	    gotd->nconnection_limits, uid);
+	if (limit) {
+		limit->max_connections = maximum;
+		return 0;
+	}
+
+	limit = gotd->connection_limits;
+	nlimits = gotd->nconnection_limits + 1;
+	limit = reallocarray(limit, nlimits, sizeof(*limit));
+	if (limit == NULL)
+		fatal("reallocarray");
+
+	limit[nlimits - 1].uid = uid;
+	limit[nlimits - 1].max_connections = maximum;
+
+	gotd->connection_limits = limit;
+	gotd->nconnection_limits = nlimits;
+	qsort(gotd->connection_limits, gotd->nconnection_limits,
+	    sizeof(gotd->connection_limits[0]), uid_connection_limit_cmp);
+
+	return 0;
 }
 
 static struct gotd_repo *
