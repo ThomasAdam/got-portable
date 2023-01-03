@@ -657,7 +657,7 @@ gotweb_free_transport(struct transport *t)
 }
 
 const struct got_error *
-gotweb_render_content_type(struct request *c, const uint8_t *type)
+gotweb_render_content_type(struct request *c, const char *type)
 {
 	const char *csp = "default-src 'self'; script-src 'none'; "
 		"object-src 'none';";
