@@ -55,7 +55,19 @@ Specify the inactivity timeout for operations between client and server.
 If this timeout is exceeded while a Git protocol request is being processed,
 the request will be aborted and the connection will be terminated.
 .Pp
-The default timeout is 3600 seconds (1 hour).
+The timeout value may also have a suffix indicating its unit of measure.
+Supported suffixes are:
+.Pp
+.Bl -tag -compact -width tenletters
+.It Ar s No or Ar S
+seconds
+.It Ar m No or Ar M
+minutes
+.It Ar h No or Ar H
+hours
+.El
+.Pp
+The default timeout is 1h (3600 seconds, one hour).
 This should only be changed if legitimate requests are exceeding the default
 timeout for some reason, such as the server spending an extraordinary
 amount of time generating a pack file.
@@ -205,7 +217,7 @@ repository "openbsd/ports" {
 }
 
 # Use a larger request timeout value:
-connection request timeout 7200  # 2 hours
+connection request timeout 2h
 
 # Some users are granted a higher concurrent connection limit:
 connection {

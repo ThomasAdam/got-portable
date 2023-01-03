@@ -148,6 +148,57 @@ timeout		: NUMBER {
 			$$.tv_sec = $1;
 			$$.tv_usec = 0;
 		}
+		| STRING {
+			const char	*errstr;
+			const char	*type = "seconds";
+			size_t		 len;
+			int		 mul = 1;
+
+			if (*$1 == '\0') {
+				yyerror("invalid number of seconds: %s", $1);
+				free($1);
+				YYERROR;
+			}
+
+			len = strlen($1);
+			switch ($1[len - 1]) {
+			case 'S':
+			case 's':
+				$1[len - 1] = '\0';
+				break;
+			case 'M':
+			case 'm':
+				type = "minutes";
+				mul = 60;
+				$1[len - 1] = '\0';
+				break;
+			case 'H':
+			case 'h':
+				type = "hours";
+				mul = 60 * 60;
+				$1[len - 1] = '\0';
+				break;
+			}
+
+			$$.tv_usec = 0;
+			$$.tv_sec = strtonum($1, 0, INT_MAX, &errstr);
+			if (errstr) {
+				yyerror("number of %s is %s: %s", type,
+				    errstr, $1);
+				free($1);
+				YYERROR;
+			}
+
+			if ($$.tv_sec > INT_MAX / mul) {
+				yyerror("number of %s is too too large: %s",
+				    type, $1);
+				free($1);
+				YYERROR;
+			}
+
+			$$.tv_sec *= mul;
+			free($1);
+		}
 		;
 
 main		: UNIX_SOCKET STRING {
