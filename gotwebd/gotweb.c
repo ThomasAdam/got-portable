@@ -180,8 +180,9 @@ gotweb_process_request(struct request *c)
 	}
 
 	if (qs->action == RSS) {
-		error = gotweb_render_content_type(c,
-		    "application/rss+xml;charset=utf-8");
+		error = gotweb_render_content_type_file(c,
+		    "application/rss+xml;charset=utf-8",
+		    repo_dir->name, ".rss");
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
@@ -671,11 +672,11 @@ gotweb_render_content_type(struct request *c, const uint8_t *type)
 
 const struct got_error *
 gotweb_render_content_type_file(struct request *c, const char *type,
-    const char *file)
+    const char *file, const char *suffix)
 {
 	fcgi_printf(c, "Content-type: %s\r\n"
-	    "Content-disposition: attachment; filename=%s\r\n\r\n",
-	    type, file);
+	    "Content-disposition: attachment; filename=%s%s\r\n\r\n",
+	    type, file, suffix ? suffix : "");
 	return NULL;
 }
 
