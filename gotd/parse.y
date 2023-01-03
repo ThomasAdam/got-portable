@@ -181,17 +181,10 @@ timeout		: NUMBER {
 			}
 
 			$$.tv_usec = 0;
-			$$.tv_sec = strtonum($1, 0, INT_MAX, &errstr);
+			$$.tv_sec = strtonum($1, 0, INT_MAX / mul, &errstr);
 			if (errstr) {
 				yyerror("number of %s is %s: %s", type,
 				    errstr, $1);
-				free($1);
-				YYERROR;
-			}
-
-			if ($$.tv_sec > INT_MAX / mul) {
-				yyerror("number of %s is too too large: %s",
-				    type, $1);
 				free($1);
 				YYERROR;
 			}
