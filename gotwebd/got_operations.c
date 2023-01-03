@@ -1044,7 +1044,7 @@ got_output_file_blob(struct request *c)
 			if (isbinary(buf, len - hdrlen)) {
 				error = gotweb_render_content_type_file(c,
 				    "application/octet-stream",
-				    qs->file);
+				    qs->file, NULL);
 				if (error) {
 					log_warnx("%s: %s", __func__,
 					    error->msg);
