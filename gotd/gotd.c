@@ -93,7 +93,6 @@ STAILQ_HEAD(gotd_clients, gotd_client);
 static struct gotd_clients gotd_clients[GOTD_CLIENT_TABLE_SIZE];
 static SIPHASH_KEY clients_hash_key;
 volatile int client_cnt;
-static struct timeval timeout = { 3600, 0 };
 static struct timeval auth_timeout = { 5, 0 };
 static struct gotd gotd;
 
@@ -1204,7 +1203,7 @@ gotd_request(int fd, short events, void *arg)
 		if (client->state == GOTD_STATE_EXPECT_LIST_REFS)
 			evtimer_add(&client->tmo, &auth_timeout);
 		else
-			evtimer_add(&client->tmo, &timeout);
+			evtimer_add(&client->tmo, &gotd.request_timeout);
 	}
 }
 
@@ -2586,7 +2585,8 @@ main(int argc, char **argv)
 		if (pledge("stdio sendfd unix", NULL) == -1)
 			err(1, "pledge");
 #endif
-		listen_main(title, fd);
+		listen_main(title, fd, gotd.connection_limits,
+		    gotd.nconnection_limits);
 		/* NOTREACHED */
 		break;
 	case PROC_AUTH:

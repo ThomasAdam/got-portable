@@ -70,6 +70,8 @@ static struct {
 	int fd;
 	struct gotd_imsgev iev;
 	struct gotd_imsgev pause;
+	struct gotd_uid_connection_limit *connection_limits;
+	size_t nconnection_limits;
 } gotd_listen;
 
 static int inflight;
@@ -173,6 +175,26 @@ find_uid_connection_counter(uid_t euid)
 	STAILQ_FOREACH(c, &gotd_client_uids[slot], entry) {
 		if (c->euid == euid)
 			return c;
+	}
+
+	return NULL;
+}
+
+struct gotd_uid_connection_limit *
+gotd_find_uid_connection_limit(struct gotd_uid_connection_limit *limits,
+    size_t nlimits, uid_t uid)
+{
+	/* This array is always sorted to allow for binary search. */
+	int i, left = 0, right = nlimits - 1;
+
+	while (left <= right) {
+		i = ((left + right) / 2);
+		if (limits[i].uid == uid)
+			return &limits[i];
+		if (limits[i].uid > uid)
+			left = i + 1;
+		else
+			right = i - 1;
 	}
 
 	return NULL;
@@ -303,7 +325,16 @@ gotd_accept(int fd, short event, void *arg)
 		counter->nconnections = 1;
 		add_uid_connection_counter(counter);
 	} else {
-		if (counter->nconnections >= GOTD_MAX_CONN_PER_UID) {
+		int max_connections = GOTD_MAX_CONN_PER_UID;
+		struct gotd_uid_connection_limit *limit;
+
+		limit = gotd_find_uid_connection_limit(
+		    gotd_listen.connection_limits,
+		    gotd_listen.nconnection_limits, euid);
+		if (limit)
+			max_connections = limit->max_connections;
+
+		if (counter->nconnections >= max_connections) {
 			log_warnx("maximum connections exceeded for uid %d",
 			    euid);
 			goto err;
@@ -426,7 +457,9 @@ listen_dispatch(int fd, short event, void *arg)
 }
 
 void
-listen_main(const char *title, int gotd_socket)
+listen_main(const char *title, int gotd_socket,
+    struct gotd_uid_connection_limit *connection_limits,
+    size_t nconnection_limits)
 {
 	struct gotd_imsgev iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -437,6 +470,8 @@ listen_main(const char *title, int gotd_socket)
 	gotd_listen.title = title;
 	gotd_listen.pid = getpid();
 	gotd_listen.fd = gotd_socket;
+	gotd_listen.connection_limits = connection_limits;
+	gotd_listen.nconnection_limits = nconnection_limits;
 
 	signal_set(&evsigint, SIGINT, listen_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, listen_sighdlr, NULL);
@@ -473,6 +508,7 @@ listen_shutdown(void)
 {
 	log_debug("%s: shutting down", gotd_listen.title);
 
+	free(gotd_listen.connection_limits);
 	if (gotd_listen.fd != -1)
 		close(gotd_listen.fd);
 

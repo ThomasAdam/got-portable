@@ -72,8 +72,8 @@ auth_sighdlr(int sig, short event, void *arg)
 	}
 }
 
-static int
-parseuid(const char *s, uid_t *uid)
+int
+gotd_auth_parseuid(const char *s, uid_t *uid)
 {
 	struct passwd *pw;
 	const char *errstr;
@@ -95,7 +95,7 @@ uidcheck(const char *s, uid_t desired)
 {
 	uid_t uid;
 
-	if (parseuid(s, &uid) != 0)
+	if (gotd_auth_parseuid(s, &uid) != 0)
 		return -1;
 	if (uid != desired)
 		return -1;

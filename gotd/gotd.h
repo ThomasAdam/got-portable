@@ -28,6 +28,8 @@
 #define GOTD_FD_NEEDED		6
 #define GOTD_FILENO_MSG_PIPE	3
 
+#define GOTD_DEFAULT_REQUEST_TIMEOUT	3600
+
 /* Client hash tables need some extra room. */
 #define GOTD_CLIENT_TABLE_SIZE (GOTD_MAXCLIENTS * 4)
 
@@ -109,6 +111,11 @@ struct gotd_object_id_array {
 	size_t				 nids;
 };
 
+struct gotd_uid_connection_limit {
+	uid_t uid;
+	int max_connections;
+};
+
 struct gotd {
 	pid_t pid;
 	char unix_socket_path[PATH_MAX];
@@ -117,6 +124,10 @@ struct gotd {
 	struct gotd_repolist repos;
 	int nrepos;
 	struct gotd_child_proc listen_proc;
+	struct timeval request_timeout;
+	struct timeval auth_timeout;
+	struct gotd_uid_connection_limit *connection_limits;
+	size_t nconnection_limits;
 
 	char *argv0;
 	const char *confpath;
