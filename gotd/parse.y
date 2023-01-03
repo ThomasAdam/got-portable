@@ -87,6 +87,7 @@ static int		 errors;
 
 static struct gotd		*gotd;
 static struct gotd_repo		*new_repo;
+static int			 conf_limit_user_connections(const char *, int);
 static struct gotd_repo		*conf_new_repo(const char *);
 static void			 conf_new_access_rule(struct gotd_repo *,
 				    enum gotd_access, int, char *);
