@@ -670,8 +670,8 @@ gotweb_render_content_type(struct request *c, const uint8_t *type)
 }
 
 const struct got_error *
-gotweb_render_content_type_file(struct request *c, const uint8_t *type,
-    char *file)
+gotweb_render_content_type_file(struct request *c, const char *type,
+    const char *file)
 {
 	fcgi_printf(c, "Content-type: %s\r\n"
 	    "Content-disposition: attachment; filename=%s\r\n\r\n",
