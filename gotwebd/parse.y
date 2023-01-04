@@ -121,7 +121,7 @@ typedef struct {
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
-%token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS
+%token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
 
 %token	<v.string>	STRING
 %type	<v.port>	fcgiport
@@ -338,6 +338,29 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			new_srv->fcgi_socket = 1;
 		}
+		| LISTEN ON SOCKET STRING {
+			if (!strcasecmp($4, "off") ||
+			    !strcasecmp($4, "no")) {
+				new_srv->unix_socket = 0;
+				free($4);
+				YYACCEPT;
+			}
+
+			new_srv->unix_socket = 1;
+
+			n = snprintf(new_srv->unix_socket_name,
+			    sizeof(new_srv->unix_socket_name), "%s%s",
+			    strlen(gotwebd->httpd_chroot) ?
+			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $4);
+			if (n < 0 ||
+			    (size_t)n >= sizeof(new_srv->unix_socket_name)) {
+				yyerror("%s: unix_socket_name truncated",
+				    __func__);
+				free($4);
+				YYERROR;
+			}
+			free($4);
+		}
 		| MAX_REPOS NUMBER {
 			if ($2 > 0)
 				new_srv->max_repos = $2;
@@ -366,23 +389,6 @@ serveropts1	: REPOS_PATH STRING {
 		| MAX_COMMITS_DISPLAY NUMBER {
 			if ($2 > 0)
 				new_srv->max_commits_display = $2;
-		}
-		| UNIX_SOCKET boolean {
-			new_srv->unix_socket = $2;
-		}
-		| UNIX_SOCKET_NAME STRING {
-			n = snprintf(new_srv->unix_socket_name,
-			    sizeof(new_srv->unix_socket_name), "%s%s",
-			    strlen(gotwebd->httpd_chroot) ?
-			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $2);
-			if (n < 0 ||
-			    (size_t)n >= sizeof(new_srv->unix_socket_name)) {
-				yyerror("%s: unix_socket_name truncated",
-				    __func__);
-				free($2);
-				YYERROR;
-			}
-			free($2);
 		}
 		;
 
@@ -453,6 +459,7 @@ lookup(char *s)
 		{ "site_link",			SITE_LINK },
 		{ "site_name",			SITE_NAME },
 		{ "site_owner",			SITE_OWNER },
+		{ "socket",			SOCKET },
 		{ "unix_socket",		UNIX_SOCKET },
 		{ "unix_socket_name",		UNIX_SOCKET_NAME },
 	};

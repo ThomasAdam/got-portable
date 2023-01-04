@@ -115,6 +115,10 @@ argument then
 will obtain the list of addresses on this interface only on startup.
 Any future changes to the address configuration of the interface will
 be ignored.
+.It Ic listen on socket off
+Disable use of unix socket.
+.It Ic listen on socket Ar path
+Set the path to the unix socket used by the server.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
 .It Ic logo_url Ar url
@@ -166,10 +170,6 @@ Set the displayed site name title.
 Set the displayed site owner.
 .It Ic show_site_owner Ar on | off
 Toggle display of the site owner.
-.It Ic unix_socket Ar on | off
-Enable or disable use of unix sockets.
-.It Ic unix_socket_name Ar path
-Set the path to the unix socket used by the server.
 .El
 .Sh FILES
 .Bl -tag -width Ds -compact
@@ -192,7 +192,7 @@ prefork 1
 
 server "localhost-unix" {
 	repos_path "/got/public"
-	unix_socket_name "/run/gotweb.sock"
+	listen on socket "/run/gotweb.sock"
 
 	site_name       "my public repos"
 	site_owner      "Got Owner"
@@ -218,7 +218,7 @@ server "localhost-unix" {
 # Example server context for FCGI over TCP connections:
 #server "localhost-tcp" {
 #	repos_path "/got/public"
-#	unix_socket		off
+#	listen on socket off
 #	listen on 127.0.0.1 port 9000
 #	listen on ::1 port 9000
 #}
