@@ -2543,9 +2543,15 @@ main(int argc, char **argv)
 		break;
 	case PROC_LISTEN:
 #ifndef PROFILE
-		if (pledge("stdio sendfd unix", NULL) == -1)
+		if (pledge("stdio sendfd unix unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
+		/*
+		 * Ensure that AF_UNIX bind(2) cannot be used with any other
+		 * sockets by revoking all filesystem access via unveil(2).
+		 */
+		apply_unveil_none();
+
 		listen_main(title, fd, gotd.connection_limits,
 		    gotd.nconnection_limits);
 		/* NOTREACHED */
