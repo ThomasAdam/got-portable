@@ -52,13 +52,6 @@ static const struct got_error *got_gotweb_flushfile(FILE *, int);
 static const struct got_error *got_gotweb_blame_cb(void *, int, int,
     struct got_commit_object *,struct got_object_id *);
 
-static int
-isbinary(const uint8_t *buf, size_t n)
-{
-	return memchr(buf, '\0', n) != NULL;
-}
-
-
 static const struct got_error *
 got_gotweb_flushfile(FILE *f, int fd)
 {
@@ -978,8 +971,8 @@ got_output_file_blob(struct request *c)
 	struct got_reflist_head refs;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
-	int obj_type, set_mime = 0, fd = -1;
-	size_t len, hdrlen;
+	int bin, obj_type, fd = -1;
+	size_t len;
 	const uint8_t *buf;
 
 	TAILQ_INIT(&refs);
@@ -1028,43 +1021,31 @@ got_output_file_blob(struct request *c)
 	error = got_object_open_as_blob(&blob, repo, commit_id, BUF, fd);
 	if (error)
 		goto done;
-	hdrlen = got_object_blob_get_hdrlen(blob);
-	do {
+
+	error = got_object_blob_is_binary(&bin, blob);
+	if (error)
+		goto done;
+
+	if (bin)
+		error = gotweb_render_content_type_file(c,
+		    "application/octet-stream", qs->file, NULL);
+	else
+		error = gotweb_render_content_type(c, "text/plain");
+
+	if (error) {
+		log_warnx("%s: %s", __func__, error->msg);
+		goto done;
+	}
+
+	for (;;) {
 		error = got_object_blob_read_block(&len, blob);
 		if (error)
 			goto done;
+		if (len == 0)
+			break;
 		buf = got_object_blob_get_read_buf(blob);
-
-		/*
-		 * Skip blob object header first time around,
-		 * which also contains a zero byte.
-		 */
-		buf += hdrlen;
-		if (set_mime == 0) {
-			if (isbinary(buf, len - hdrlen)) {
-				error = gotweb_render_content_type_file(c,
-				    "application/octet-stream",
-				    qs->file, NULL);
-				if (error) {
-					log_warnx("%s: %s", __func__,
-					    error->msg);
-					goto done;
-				}
-			} else {
-				error = gotweb_render_content_type(c,
-				  "text/plain");
-				if (error) {
-					log_warnx("%s: %s", __func__,
-					    error->msg);
-					goto done;
-				}
-			}
-		}
-		set_mime = 1;
-		fcgi_gen_binary_response(c, buf, len - hdrlen);
-
-		hdrlen = 0;
-	} while (len != 0);
+		fcgi_gen_binary_response(c, buf, len);
+	}
 done:
 	if (commit)
 		got_object_commit_close(commit);
