@@ -104,7 +104,7 @@ typedef struct {
 
 %}
 
-%token	PATH ERROR ON UNIX_SOCKET UNIX_GROUP USER REPOSITORY PERMIT DENY
+%token	PATH ERROR ON UNIX_SOCKET USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 
 %token	<v.string>	STRING
@@ -204,17 +204,6 @@ main		: UNIX_SOCKET STRING {
 					free($2);
 					YYERROR;
 				}
-			}
-			free($2);
-		}
-		| UNIX_GROUP STRING {
-			if (strlcpy(gotd->unix_group_name, $2,
-			    sizeof(gotd->unix_group_name)) >=
-			    sizeof(gotd->unix_group_name)) {
-				yyerror("%s: unix group name too long",
-				    __func__);
-				free($2);
-				YYERROR;
 			}
 			free($2);
 		}
@@ -372,7 +361,6 @@ lookup(char *s)
 		{ "ro",				RO },
 		{ "rw",				RW },
 		{ "timeout",			TIMEOUT },
-		{ "unix_group",			UNIX_GROUP },
 		{ "unix_socket",		UNIX_SOCKET },
 		{ "user",			USER },
 	};
@@ -713,11 +701,6 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 	if (strlcpy(gotd->unix_socket_path, GOTD_UNIX_SOCKET,
 	    sizeof(gotd->unix_socket_path)) >= sizeof(gotd->unix_socket_path)) {
 		fprintf(stderr, "%s: unix socket path too long", __func__);
-		return -1;
-	}
-	if (strlcpy(gotd->unix_group_name, GOTD_UNIX_GROUP,
-	    sizeof(gotd->unix_group_name)) >= sizeof(gotd->unix_group_name)) {
-		fprintf(stderr, "%s: unix group name too long", __func__);
 		return -1;
 	}
 	if (strlcpy(gotd->user_name, GOTD_USER,

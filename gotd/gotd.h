@@ -17,7 +17,6 @@
 
 #define GOTD_UNIX_SOCKET "/var/run/gotd.sock"
 #define GOTD_UNIX_SOCKET_BACKLOG 10
-#define GOTD_UNIX_GROUP	"_gotsh"
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
 #define GOTD_EMPTY_PATH	"/var/empty"
@@ -119,7 +118,6 @@ struct gotd_uid_connection_limit {
 struct gotd {
 	pid_t pid;
 	char unix_socket_path[PATH_MAX];
-	char unix_group_name[32];
 	char user_name[32];
 	struct gotd_repolist repos;
 	int nrepos;

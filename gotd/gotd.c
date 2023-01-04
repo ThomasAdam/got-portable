@@ -29,7 +29,6 @@
 #include <event.h>
 #include <limits.h>
 #include <pwd.h>
-#include <grp.h>
 #include <imsg.h>
 #include <sha1.h>
 #include <signal.h>
@@ -141,7 +140,7 @@ unix_socket_listen(const char *unix_socket_path, uid_t uid, gid_t gid)
 	}
 
 	old_umask = umask(S_IXUSR|S_IXGRP|S_IWOTH|S_IROTH|S_IXOTH);
-	mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP;
+	mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
 
 	if (bind(fd, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
 		log_warn("bind: %s", unix_socket_path);
@@ -174,25 +173,6 @@ unix_socket_listen(const char *unix_socket_path, uid_t uid, gid_t gid)
 	}
 
 	return fd;
-}
-
-static struct group *
-match_group(gid_t *groups, int ngroups, const char *unix_group_name)
-{
-	struct group *gr;
-	int i;
-
-	for (i = 0; i < ngroups; i++) {
-		gr = getgrgid(groups[i]);
-		if (gr == NULL) {
-			log_warn("getgrgid %d", groups[i]);
-			continue;
-		}
-		if (strcmp(gr->gr_name, unix_group_name) == 0)
-			return gr;
-	}
-
-	return NULL;
 }
 
 static uint64_t
@@ -2406,10 +2386,7 @@ main(int argc, char **argv)
 	const char *confpath = GOTD_CONF_PATH;
 	char *argv0 = argv[0];
 	char title[2048];
-	gid_t groups[NGROUPS_MAX];
-	int ngroups = NGROUPS_MAX;
 	struct passwd *pw = NULL;
-	struct group *gr = NULL;
 	char *repo_path = NULL;
 	enum gotd_procid proc_id = PROC_GOTD;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -2492,23 +2469,6 @@ main(int argc, char **argv)
 		    getprogname(), pw->pw_name, getprogname());
 	}
 
-	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
-		log_warnx("group membership list truncated");
-
-	gr = match_group(groups, ngroups, gotd.unix_group_name);
-	if (gr == NULL) {
-		fatalx("cannot start %s: the user running %s "
-		    "must be a secondary member of group %s",
-		    getprogname(), getprogname(), gotd.unix_group_name);
-	}
-	if (gr->gr_gid == pw->pw_gid) {
-		fatalx("cannot start %s: the user running %s "
-		    "must be a secondary member of group %s, but "
-		    "%s is the user's primary group",
-		    getprogname(), getprogname(), gotd.unix_group_name,
-		    gotd.unix_group_name);
-	}
-
 	if (proc_id == PROC_LISTEN &&
 	    !got_path_is_absolute(gotd.unix_socket_path))
 		fatalx("bad unix socket path \"%s\": must be an absolute path",
@@ -2529,11 +2489,10 @@ main(int argc, char **argv)
 		if (verbosity) {
 			log_info("socket: %s", gotd.unix_socket_path);
 			log_info("user: %s", pw->pw_name);
-			log_info("secondary group: %s", gr->gr_name);
 		}
 
 		fd = unix_socket_listen(gotd.unix_socket_path, pw->pw_uid,
-		    gr->gr_gid);
+		    pw->pw_gid);
 		if (fd == -1) {
 			fatal("cannot listen on unix socket %s",
 			    gotd.unix_socket_path);

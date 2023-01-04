@@ -66,13 +66,6 @@ program running on the client machine.
 .Pp
 Users running
 .Nm
-must be members of the group which has read/write permission to the
-.Xr gotd 8
-unix socket.
-The group used for this purpose can be configured in
-.Xr gotd.conf 5 .
-Users running
-.Nm
 should not have access to Git repositories by means other than
 accessing the unix socket of
 .Xr gotd 8
@@ -97,19 +90,21 @@ If not specified, the default path
 will be used.
 .El
 .Sh EXAMPLES
-The following
 .Xr sshd_config 5
-directives are recommended to protect the server machine and any systems
-reachable from it via
-.Xr ssh 1
-forwarding features.
-This example assumes the group called
-.Dq _gotsh
-has read/write access to the
-.Xr gotd 8
-unix socket.
+directives such as the following are recommended to protect the server
+machine and any systems reachable from it, especially if anonymous users
+are allowed to connect:
 .Bd -literal -offset indent
-Match Group _gotsh
+Match User anonymous
+    DisableForwarding yes
+    PermitTTY no
+.Ed
+.Pp
+It can be convenient to add all relevant users to a common group, such as
+.Dq developers ,
+and then use this group as the Match criteria:
+.Bd -literal -offset indent
+Match Group developers
     DisableForwarding yes
     PermitTTY no
 .Ed
