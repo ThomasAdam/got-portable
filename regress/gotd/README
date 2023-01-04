@@ -1,13 +1,12 @@
 Running server regression tests requires some manual system preparation.
 
-Two dedicated user accounts and a group must be created. Password login
+Two dedicated user accounts must be created. Password login
 for these users should be disabled.
 
- $ doas groupadd gotsh
- $ doas useradd -m -G gotsh got
- $ doas useradd -m -G gotsh gotdev
+ $ doas useradd -m got
+ $ doas useradd -m gotdev
 
-The above user and group names correspond to defaults used by the test suite.
+The above user names correspond to defaults used by the test suite.
 If needed, the defaults can be overridden on by passing values for the
 following variables to make(1): GOTD_USER, GOTD_DEVUSER, GOTD_GROUP
 

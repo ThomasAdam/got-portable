@@ -25,7 +25,6 @@ GOTD_TEST_USER_HOME!=userinfo $(GOTD_TEST_USER) | awk '/^dir/ {print $$2}'
 
 # gotd.conf parameters
 GOTD_USER?=got
-GOTD_GROUP?=gotsh
 GOTD_SOCK=${GOTD_DEVUSER_HOME}/gotd.sock
 
 .if "${GOT_RELEASE}" == "Yes"
@@ -60,7 +59,6 @@ ensure_root:
 
 start_gotd_ro: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -71,7 +69,6 @@ start_gotd_ro: ensure_root
 
 start_gotd_ro_group: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -83,7 +80,6 @@ start_gotd_ro_group: ensure_root
 # try a permit rule followed by a deny rule; last matched rule wins
 start_gotd_ro_denied_user: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -96,7 +92,6 @@ start_gotd_ro_denied_user: ensure_root
 # try a permit rule followed by a deny rule; last matched rule wins
 start_gotd_ro_denied_group: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -109,7 +104,6 @@ start_gotd_ro_denied_group: ensure_root
 # $GOTD_DEVUSER should not equal $GOTD_USER
 start_gotd_ro_bad_user: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -121,7 +115,6 @@ start_gotd_ro_bad_user: ensure_root
 # $GOTD_DEVUSER should not be in group wheel
 start_gotd_ro_bad_group: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
@@ -132,7 +125,6 @@ start_gotd_ro_bad_group: ensure_root
 
 start_gotd_rw: ensure_root
 	@echo 'unix_socket "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
-	@echo "unix_group $(GOTD_GROUP)" >> $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf

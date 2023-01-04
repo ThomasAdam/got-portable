@@ -92,19 +92,6 @@ should listen on.
 If not specified, the path
 .Pa /var/run/gotd.sock
 will be used.
-.It Ic unix_group Ar group
-Set the
-.Ar group ,
-defined in the
-.Xr group 5
-file, which is allowed to access
-.Xr gotd 8
-via
-.Xr gotsh 1 .
-The
-.Xr gotd 8
-user must be a secondary member of this group.
-If not specified, the group _gotsh will be used.
 .It Ic user Ar user
 Set the
 .Ar user
@@ -195,8 +182,7 @@ configuration file.
 .El
 .Sh EXAMPLES
 .Bd -literal -offset indent
-# Default unix_group and user values:
-unix_group _gotsh
+# Run as the default user:
 user _gotd
 
 # This repository can be accessed via ssh://user@example.com/src
@@ -228,5 +214,4 @@ connection {
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr gotsh 1 ,
-.Xr group 5 ,
 .Xr gotd 8
