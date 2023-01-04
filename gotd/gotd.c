@@ -527,6 +527,9 @@ send_info(struct gotd_client *client)
 	uint64_t slot;
 	struct gotd_repo *repo;
 
+	if (client->euid != 0)
+		return got_error_set_errno(EPERM, "info");
+
 	info.pid = gotd.pid;
 	info.verbosity = gotd.verbosity;
 	info.nrepos = gotd.nrepos;
