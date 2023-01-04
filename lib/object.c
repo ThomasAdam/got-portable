@@ -402,6 +402,29 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 }
 
 const struct got_error *
+got_object_blob_is_binary(int *binary, struct got_blob_object *blob)
+{
+	const struct got_error *err;
+	size_t hdrlen, len;
+
+	*binary = 0;
+	hdrlen = got_object_blob_get_hdrlen(blob);
+
+	if (fseeko(blob->f, hdrlen, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	err = got_object_blob_read_block(&len, blob);
+	if (err)
+		return err;
+
+	*binary = memchr(blob->read_buf, '\0', len) != NULL;
+
+	if (fseeko(blob->f, hdrlen, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+	return NULL;
+}
+
+const struct got_error *
 got_object_blob_dump_to_file(off_t *filesize, int *nlines,
     off_t **line_offsets, FILE *outfile, struct got_blob_object *blob)
 {
