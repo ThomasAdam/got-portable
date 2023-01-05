@@ -117,6 +117,7 @@
 
 /* Forward declaration */
 struct got_blob_object;
+struct got_tree_entry;
 
 enum imsg_type {
 	IMSG_CFG_SRV = IMSG_PROC_MAX,
@@ -467,6 +468,7 @@ int	gotweb_render_briefs(struct template *);
 int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
 int	gotweb_render_blob(struct template *, struct got_blob_object *);
+int	gotweb_render_tree(struct template *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */
@@ -495,7 +497,8 @@ const struct got_error *got_get_repo_commits(struct request *, int);
 const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
 const struct got_error *got_output_repo_diff(struct request *);
-const struct got_error *got_output_repo_tree(struct request *);
+int got_output_repo_tree(struct request *,
+    int (*)(struct template *, struct got_tree_entry *));
 const struct got_error *got_open_blob_for_output(struct got_blob_object **,
     int *, int *, struct request *);
 const struct got_error *got_output_file_blob(struct request *);
