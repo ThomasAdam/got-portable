@@ -3,7 +3,6 @@ bin_PROGRAMS = template
 include $(top_builddir)/Makefile.common
 
 template_SOURCES = template.c \
-	tmpl.c \
 	parse.y
 
 template_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
