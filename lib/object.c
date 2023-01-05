@@ -425,6 +425,16 @@ got_object_blob_is_binary(int *binary, struct got_blob_object *blob)
 }
 
 const struct got_error *
+got_object_blob_getline(char **line, ssize_t *linelen, size_t *linesize,
+    struct got_blob_object *blob)
+{
+	*linelen = getline(line, linesize, blob->f);
+	if (*linelen == -1 && !feof(blob->f))
+		return got_error_from_errno("getline");
+	return NULL;
+}
+
+const struct got_error *
 got_object_blob_dump_to_file(off_t *filesize, int *nlines,
     off_t **line_offsets, FILE *outfile, struct got_blob_object *blob)
 {

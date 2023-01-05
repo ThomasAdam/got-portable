@@ -298,6 +298,12 @@ const struct got_error *got_object_blob_is_binary(int *,
     struct got_blob_object *);
 
 /*
+ * getline(3) for blobs.
+ */
+const struct got_error *got_object_blob_getline(char **, ssize_t *,
+    size_t *, struct got_blob_object *);
+
+/*
  * Read the entire content of a blob and write it to the specified file.
  * Flush and rewind the file as well. Indicate the amount of bytes
  * written in the size_t output argument, and the number of lines in the
