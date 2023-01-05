@@ -104,7 +104,7 @@ typedef struct {
 
 %}
 
-%token	PATH ERROR ON UNIX_SOCKET USER REPOSITORY PERMIT DENY
+%token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 
 %token	<v.string>	STRING
@@ -194,18 +194,18 @@ timeout		: NUMBER {
 		}
 		;
 
-main		: UNIX_SOCKET STRING {
+main		: LISTEN ON STRING {
 			if (gotd_proc_id == PROC_LISTEN) {
-				if (strlcpy(gotd->unix_socket_path, $2,
+				if (strlcpy(gotd->unix_socket_path, $3,
 				    sizeof(gotd->unix_socket_path)) >=
 				    sizeof(gotd->unix_socket_path)) {
 					yyerror("%s: unix socket path too long",
 					    __func__);
-					free($2);
+					free($3);
 					YYERROR;
 				}
 			}
-			free($2);
+			free($3);
 		}
 		| USER STRING {
 			if (strlcpy(gotd->user_name, $2,
@@ -353,6 +353,7 @@ lookup(char *s)
 		{ "connection",			CONNECTION },
 		{ "deny",			DENY },
 		{ "limit",			LIMIT },
+		{ "listen",			LISTEN },
 		{ "on",				ON },
 		{ "path",			PATH },
 		{ "permit",			PERMIT },
@@ -361,7 +362,6 @@ lookup(char *s)
 		{ "ro",				RO },
 		{ "rw",				RW },
 		{ "timeout",			TIMEOUT },
-		{ "unix_socket",		UNIX_SOCKET },
 		{ "user",			USER },
 	};
 	const struct keywords *p;
