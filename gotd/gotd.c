@@ -1335,8 +1335,6 @@ gotd_sighdlr(int sig, short event, void *arg)
 	case SIGTERM:
 	case SIGINT:
 		gotd_shutdown();
-		log_warnx("gotd terminating");
-		exit(0);
 		break;
 	default:
 		fatalx("unexpected signal");
