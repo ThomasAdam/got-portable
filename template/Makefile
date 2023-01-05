@@ -1,5 +1,5 @@
 PROG=	template
-SRCS=	template.c tmpl.c parse.y
+SRCS=	template.c parse.y
 
 MAN=	template.1 template.7
 
