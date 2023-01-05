@@ -960,7 +960,8 @@ done:
 }
 
 const struct got_error *
-got_output_file_blob(struct request *c)
+got_open_blob_for_output(struct got_blob_object **blob, int *fd,
+    int *binary, struct request *c)
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
@@ -969,13 +970,14 @@ got_output_file_blob(struct request *c)
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_reflist_head refs;
-	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
-	int bin, obj_type, fd = -1;
-	size_t len;
-	const uint8_t *buf;
+	int obj_type;
 
 	TAILQ_INIT(&refs);
+
+	*blob = NULL;
+	*fd = -1;
+	*binary = 0;
 
 	if (asprintf(&path, "%s%s%s", qs->folder ? qs->folder : "",
 	    qs->folder ? "/" : "", qs->file) == -1) {
@@ -1014,19 +1016,52 @@ got_output_file_blob(struct request *c)
 		goto done;
 	}
 
-	error = got_gotweb_dupfd(&c->priv_fd[BLOB_FD_1], &fd);
+	error = got_gotweb_dupfd(&c->priv_fd[BLOB_FD_1], fd);
 	if (error)
 		goto done;
 
-	error = got_object_open_as_blob(&blob, repo, commit_id, BUF, fd);
+	error = got_object_open_as_blob(blob, repo, commit_id, BUF, *fd);
 	if (error)
 		goto done;
 
-	error = got_object_blob_is_binary(&bin, blob);
+	error = got_object_blob_is_binary(binary, *blob);
 	if (error)
 		goto done;
 
-	if (bin)
+ done:
+	if (commit)
+		got_object_commit_close(commit);
+
+	if (error) {
+		if (*fd != -1)
+			close(*fd);
+		if (*blob)
+			got_object_blob_close(*blob);
+		*fd = -1;
+		*blob = NULL;
+	}
+
+	free(in_repo_path);
+	free(commit_id);
+	free(path);
+	return error;
+}
+
+const struct got_error *
+got_output_file_blob(struct request *c)
+{
+	const struct got_error *error = NULL;
+	struct querystring *qs = c->t->qs;
+	struct got_blob_object *blob = NULL;
+	size_t len;
+	int binary, fd = -1;
+	const uint8_t *buf;
+
+	error = got_open_blob_for_output(&blob, &fd, &binary, c);
+	if (error)
+		return error;
+
+	if (binary)
 		error = gotweb_render_content_type_file(c,
 		    "application/octet-stream", qs->file, NULL);
 	else
@@ -1046,17 +1081,42 @@ got_output_file_blob(struct request *c)
 		buf = got_object_blob_get_read_buf(blob);
 		fcgi_gen_binary_response(c, buf, len);
 	}
-done:
-	if (commit)
-		got_object_commit_close(commit);
-	if (fd != -1 && close(fd) == -1 && error == NULL)
+ done:
+	if (close(fd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (blob)
 		got_object_blob_close(blob);
-	free(in_repo_path);
-	free(commit_id);
-	free(path);
 	return error;
+}
+
+int
+got_output_blob_by_lines(struct template *tp, struct got_blob_object *blob,
+    int (*cb)(struct template *, const char *, size_t))
+{
+	const struct got_error	*err;
+	char			*line = NULL;
+	size_t			 linesize = 0;
+	size_t			 lineno = 0;
+	ssize_t			 linelen = 0;
+
+	for (;;) {
+		err = got_object_blob_getline(&line, &linelen, &linesize,
+		    blob);
+		if (err || linelen == -1)
+			break;
+		lineno++;
+		if (cb(tp, line, lineno) == -1)
+			break;
+	}
+
+	free(line);
+
+	if (err) {
+		log_warnx("%s: got_object_blob_getline failed: %s",
+		    __func__, err->msg);
+		return -1;
+	}
+	return 0;
 }
 
 struct blame_line {

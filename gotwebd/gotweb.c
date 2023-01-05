@@ -66,6 +66,7 @@ static const struct querystring_keys querystring_keys[] = {
 static const struct action_keys action_keys[] = {
 	{ "blame",	BLAME },
 	{ "blob",	BLOB },
+	{ "blobraw",	BLOBRAW },
 	{ "briefs",	BRIEFS },
 	{ "commits",	COMMITS },
 	{ "diff",	DIFF },
@@ -109,11 +110,12 @@ void
 gotweb_process_request(struct request *c)
 {
 	const struct got_error *error = NULL, *error2 = NULL;
+	struct got_blob_object *blob = NULL;
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
 	uint8_t err[] = "gotwebd experienced an error: ";
-	int r, html = 0;
+	int r, html = 0, fd = -1;
 
 	/* init the transport */
 	error = gotweb_init_transport(&c->t);
@@ -150,10 +152,12 @@ gotweb_process_request(struct request *c)
 	 * querystring.
 	 */
 
-	if (qs->commit == NULL && (qs->action == BLAME || qs->action == BLOB ||
-	    qs->action == DIFF)) {
-		error2 = got_error(GOT_ERR_QUERYSTRING);
-		goto render;
+	if (qs->action == BLAME || qs->action == BLOB ||
+	    qs->action == BLOBRAW || qs->action == DIFF) {
+		if (qs->commit == NULL) {
+			error2 = got_error(GOT_ERR_QUERYSTRING);
+			goto render;
+		}
 	}
 
 	if (qs->action != INDEX) {
@@ -166,7 +170,7 @@ gotweb_process_request(struct request *c)
 			goto err;
 	}
 
-	if (qs->action == BLOB) {
+	if (qs->action == BLOBRAW) {
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto done;
@@ -176,6 +180,34 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		goto done;
+	}
+
+	if (qs->action == BLOB) {
+		int binary;
+		struct gotweb_url url = {
+			.index_page = -1,
+			.page = -1,
+			.action = BLOBRAW,
+			.path = qs->path,
+			.commit = qs->commit,
+			.folder = qs->folder,
+			.file = qs->file,
+		};
+
+		error = got_get_repo_commits(c, 1);
+		if (error)
+			goto done;
+
+		error2 = got_open_blob_for_output(&blob, &fd, &binary, c);
+		if (error2)
+			goto render;
+		if (binary) {
+			fcgi_puts(c->tp, "Status: 302\r\n");
+			fcgi_puts(c->tp, "Location: ");
+			gotweb_render_url(c, &url);
+			fcgi_puts(c->tp, "\r\n\r\n");
+			goto done;
+		}
 	}
 
 	if (qs->action == RSS) {
@@ -220,6 +252,10 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		break;
+	case BLOB:
+		if (gotweb_render_blob(c->tp, blob) == -1)
+			goto err;
 		break;
 	case BRIEFS:
 		if (gotweb_render_briefs(c->tp) == -1)
@@ -301,6 +337,10 @@ err:
 	if (html && fcgi_printf(c, "</div>\n") == -1)
 		return;
 done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (fd != -1)
+		close(fd);
 	if (html && srv != NULL)
 		gotweb_render_footer(c->tp);
 }
@@ -1626,6 +1666,8 @@ gotweb_action_name(int action)
 		return "blame";
 	case BLOB:
 		return "blob";
+	case BLOBRAW:
+		return "blobraw";
 	case BRIEFS:
 		return "briefs";
 	case COMMITS:

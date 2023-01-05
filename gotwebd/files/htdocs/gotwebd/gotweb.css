@@ -527,36 +527,36 @@ body {
 	white-space: pre-wrap;
 }
 
-#blame_title_wrapper {
+#blame_title_wrapper, #blob_title_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 	background-color: LightSlateGray;
 	color: #ffffff;
 }
-#blame_title {
+#blame_title, #blob_title_wrapper {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
-#blame_content {
+#blame_content, #blob_content {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#blame_header_wrapper {
+#blame_header_wrapper, #blob_header_wrapper {
 	float: left;
 	background-color: #f5fcfb;
 	width: 100%;
 }
-#blame_header {
+#blame_header, #blob_header {
 	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
 	width: 80%;
 }
-#blame {
+#blame, #blob {
 	clear: left;
 	float: left;
 	margin-left: 20px;
@@ -565,12 +565,15 @@ body {
 	white-space: pre;
 	overflow: auto;
 }
-.blame_wrapper {
+.blame_wrapper, .blob_line {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-.blame_number {
+.blame_wrapper:target, .blob_line:target {
+	background-color: Khaki;
+}
+.blame_number, .blob_number {
 	float: left;
 	width: 6em;
 	overflow: hidden;
@@ -590,7 +593,7 @@ body {
 	width: 6em;
 	overflow: hidden;
 }
-.blame_code {
+.blame_code, .blob_code {
 	float:left;
 	width: 50%;
 	overflow: visible;
