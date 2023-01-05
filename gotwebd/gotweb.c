@@ -99,7 +99,6 @@ static const struct got_error *gotweb_render_diff(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
 static const struct got_error *gotweb_render_tag(struct request *);
 static const struct got_error *gotweb_render_tags(struct request *);
-static const struct got_error *gotweb_render_tree(struct request *);
 static const struct got_error *gotweb_render_branches(struct request *);
 
 static void gotweb_free_querystring(struct querystring *);
@@ -307,11 +306,13 @@ render:
 		}
 		break;
 	case TREE:
-		error = gotweb_render_tree(c);
+		error = got_get_repo_commits(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		if (gotweb_render_tree(c->tp) == -1)
+			goto err;
 		break;
 	case ERR:
 	default:
@@ -1117,63 +1118,6 @@ done:
 	free(age);
 	free(escaped_refname);
 	got_ref_list_free(&refs);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_tree(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct transport *t = c->t;
-	struct repo_commit *rc = NULL;
-	char *age = NULL, *msg = NULL;
-	int r;
-
-	error = got_get_repo_commits(c, 1);
-	if (error)
-		return error;
-
-	rc = TAILQ_FIRST(&t->repo_commits);
-
-	error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
-	if (error)
-		goto done;
-
-	error = gotweb_escape_html(&msg, rc->commit_msg);
-	if (error)
-		goto done;
-
-	r = fcgi_printf(c, "<div id='tree_title_wrapper'>\n"
-	    "<div id='tree_title'>Tree</div>\n"
-	    "</div>\n"		/* #tree_title_wrapper */
-	    "<div id='tree_content'>\n"
-	    "<div id='tree_header_wrapper'>\n"
-	    "<div id='tree_header'>\n"
-	    "<div id='header_tree_title'>Tree:</div>\n"
-	    "<div id='header_tree'>%s</div>\n"
-	    "<div class='header_age_title'>Date:</div>\n"
-	    "<div class='header_age'>%s</div>\n"
-	    "<div id='header_commit_msg_title'>Message:</div>\n"
-	    "<div id='header_commit_msg'>%s</div>\n"
-	    "</div>\n"		/* #tree_header */
-	    "</div>\n"		/* #tree_header_wrapper */
-	    "<div class='dotted_line'></div>\n"
-	    "<div id='tree'>\n",
-	    rc->tree_id,
-	    age,
-	    msg);
-	if (r == -1)
-		goto done;
-
-	error = got_output_repo_tree(c);
-	if (error)
-		goto done;
-
-	fcgi_printf(c, "</div>\n"); /* #tree */
-	fcgi_printf(c, "</div>\n"); /* #tree_content */
-done:
-	free(age);
-	free(msg);
 	return error;
 }
 

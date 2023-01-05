@@ -793,8 +793,9 @@ err:
 	return error;
 }
 
-const struct got_error *
-got_output_repo_tree(struct request *c)
+int
+got_output_repo_tree(struct request *c,
+    int (*cb)(struct template *, struct got_tree_entry *))
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
@@ -805,10 +806,10 @@ got_output_repo_tree(struct request *c)
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
 	struct got_reflist_head refs;
 	struct got_tree_object *tree = NULL;
+	struct got_tree_entry *te;
 	struct repo_dir *repo_dir = t->repo_dir;
-	const char *name, *folder;
 	char *escaped_name = NULL, *path = NULL;
-	int nentries, i, r;
+	int nentries, i;
 
 	TAILQ_INIT(&refs);
 
@@ -845,106 +846,10 @@ got_output_repo_tree(struct request *c)
 
 	nentries = got_object_tree_get_nentries(tree);
 
-	folder = qs->folder ? qs->folder : "";
-
 	for (i = 0; i < nentries; i++) {
-		const char *modestr;
-		struct got_tree_entry *te;
-		mode_t mode;
-
 		te = got_object_tree_get_entry(tree, i);
-
-		mode = got_tree_entry_get_mode(te);
-		if (got_object_tree_entry_is_submodule(te))
-			modestr = "$";
-		else if (S_ISLNK(mode))
-			modestr = "@";
-		else if (S_ISDIR(mode))
-			modestr = "/";
-		else if (mode & S_IXUSR)
-			modestr = "*";
-		else
-			modestr = "";
-
-		name = got_tree_entry_get_name(te);
-		error = gotweb_escape_html(&escaped_name, name);
-		if (error)
-			goto done;
-
-		if (S_ISDIR(mode)) {
-			struct gotweb_url url = {
-				.index_page = -1,
-				.page = -1,
-				.action = TREE,
-				.commit = rc->commit_id,
-				.path = qs->path,
-				/* `folder' is filled later */
-			};
-			char *path = NULL;
-
-			if (fcgi_printf(c,"<div class='tree_wrapper'>\n"
-			    "<div class='tree_line'>") == -1)
-				goto done;
-
-			if (asprintf(&path, "%s/%s", folder, name) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			url.folder = path;
-			r = gotweb_link(c, &url, "%s%s", escaped_name,
-			    modestr);
-			free(path);
-			if (r == -1)
-				goto done;
-
-			if (fcgi_printf(c, "</div>\n" /* .tree_line */
-			    "<div class='tree_line_blank'>&nbsp;</div>\n"
-			    "</div>\n") == -1)
-				goto done;
-		} else {
-			struct gotweb_url url = {
-				.index_page = -1,
-				.page = -1,
-				.path = qs->path,
-				.commit = rc->commit_id,
-				.folder = folder,
-				.file = name,
-			};
-
-			if (fcgi_printf(c, "<div class='tree_wrapper'>\n"
-			    "<div class='tree_line'>") == -1)
-				goto done;
-
-			url.action = BLOB;
-			r = gotweb_link(c, &url, "%s%s", escaped_name,
-			    modestr);
-			if (r == -1)
-				goto done;
-
-			if (fcgi_printf(c, "</div>\n" /* .tree_line */
-			    "<div class='tree_line_blank'>") == -1)
-				goto done;
-
-			url.action = COMMITS;
-			r = gotweb_link(c, &url, "commits");
-			if (r == -1)
-				goto done;
-
-			if (fcgi_printf(c, " | ") == -1)
-				goto done;
-
-			url.action = BLAME;
-			r = gotweb_link(c, &url, "blame");
-			if (r == -1)
-				goto done;
-
-			if (fcgi_printf(c,
-			    "</div>\n"		/* .tree_line_blank */
-			    "</div>\n") == -1)	/* .tree_wrapper */
-				goto done;
-		}
-		free(escaped_name);
-		escaped_name = NULL;
+		if (cb(c->tp, te) == -1)
+			break;
 	}
 done:
 	free(escaped_name);
@@ -956,7 +861,11 @@ done:
 		got_object_tree_close(tree);
 	free(commit_id);
 	free(tree_id);
-	return error;
+	if (error) {
+		log_warnx("%s: %s", __func__, error->msg);
+		return -1;
+	}
+	return 0;
 }
 
 const struct got_error *
