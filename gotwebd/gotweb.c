@@ -1562,6 +1562,8 @@ should_urlencode(int c)
 	case ',':
 	case ';':
 	case '=':
+		/* needed because the URLs are embedded into the HTML */
+	case '\"':
 		return 1;
 	default:
 		return 0;
