@@ -85,7 +85,7 @@ expected to exceed the default limit, for example if an anonymous user
 is granted read access and many concurrent connections will share this
 anonymous user identity.
 .El
-.It Ic unix_socket Ar path
+.It Ic listen on Ar path
 Set the path to the unix socket which
 .Xr gotd 8
 should listen on.
@@ -184,6 +184,9 @@ configuration file.
 .Bd -literal -offset indent
 # Run as the default user:
 user _gotd
+
+# Listen on the default socket:
+listen on "/var/run/gotd.sock"
 
 # This repository can be accessed via ssh://user@example.com/src
 repository "src" {
