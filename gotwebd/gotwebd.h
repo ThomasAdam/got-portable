@@ -117,6 +117,9 @@
 
 #define GOTWEB_PACK_NUM_TEMPFILES     32
 
+/* Forward declaration */
+struct got_blob_object;
+
 enum imsg_type {
 	IMSG_CFG_SRV = IMSG_PROC_MAX,
 	IMSG_CFG_SOCK,
@@ -406,6 +409,7 @@ enum querystring_elements {
 enum query_actions {
 	BLAME,
 	BLOB,
+	BLOBRAW,
 	BRIEFS,
 	COMMITS,
 	DIFF,
@@ -464,6 +468,7 @@ int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);
 int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
+int	gotweb_render_blob(struct template *, struct got_blob_object *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */
@@ -493,7 +498,11 @@ const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
 const struct got_error *got_output_repo_diff(struct request *);
 const struct got_error *got_output_repo_tree(struct request *);
+const struct got_error *got_open_blob_for_output(struct got_blob_object **,
+    int *, int *, struct request *);
 const struct got_error *got_output_file_blob(struct request *);
+int got_output_blob_by_lines(struct template *, struct got_blob_object *,
+    int (*)(struct template *, const char *, size_t));
 const struct got_error *got_output_file_blame(struct request *);
 
 /* config.c */
