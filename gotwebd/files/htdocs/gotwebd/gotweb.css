@@ -106,6 +106,8 @@ body {
 }
 #content {
 	width: 100%;
+	float: left;
+	clear: both;
 }
 #np_wrapper {
 	clear: left;
@@ -528,9 +530,6 @@ body {
 }
 
 #blame_title_wrapper, #blob_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
 	background-color: LightSlateGray;
 	color: #ffffff;
 }
