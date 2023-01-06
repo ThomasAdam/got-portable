@@ -94,7 +94,6 @@ static const struct got_error *gotweb_get_repo_description(char **,
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
     const char *, int);
 static const struct got_error *gotweb_render_blame(struct request *);
-static const struct got_error *gotweb_render_diff(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
 static const struct got_error *gotweb_render_tag(struct request *);
 static const struct got_error *gotweb_render_tags(struct request *);
@@ -113,6 +112,7 @@ gotweb_process_request(struct request *c)
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
+	FILE *fp = NULL;
 	uint8_t err[] = "gotwebd experienced an error: ";
 	int r, html = 0, fd = -1;
 
@@ -270,11 +270,18 @@ render:
 			goto err;
 		break;
 	case DIFF:
-		error = gotweb_render_diff(c);
+		error = got_get_repo_commits(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		error = got_open_diff_for_output(&fp, &fd, c);
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+		if (gotweb_render_diff(c->tp, fp) == -1)
+			goto err;
 		break;
 	case INDEX:
 		error = gotweb_render_index(c);
@@ -340,6 +347,13 @@ err:
 done:
 	if (blob)
 		got_object_blob_close(blob);
+	if (fp) {
+		error = got_gotweb_flushfile(fp, fd);
+		if (error)
+			log_warnx("%s: got_gotweb_flushfile failure: %s",
+			    __func__, error->msg);
+		fd = -1;
+	}
 	if (fd != -1)
 		close(fd);
 	if (html && srv != NULL)
@@ -1117,75 +1131,6 @@ done:
 	free(age);
 	free(escaped_refname);
 	got_ref_list_free(&refs);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_diff(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct transport *t = c->t;
-	struct repo_commit *rc = NULL;
-	char *age = NULL, *author = NULL, *msg = NULL;
-	int r;
-
-	error = got_get_repo_commits(c, 1);
-	if (error)
-		return error;
-
-	rc = TAILQ_FIRST(&t->repo_commits);
-
-	error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
-	if (error)
-		goto done;
-	error = gotweb_escape_html(&author, rc->author);
-	if (error)
-		goto done;
-	error = gotweb_escape_html(&msg, rc->commit_msg);
-	if (error)
-		goto done;
-
-	r = fcgi_printf(c, "<div id='diff_title_wrapper'>\n"
-	    "<div id='diff_title'>Commit Diff</div>\n"
-	    "</div>\n"		/* #diff_title_wrapper */
-	    "<div id='diff_content'>\n"
-	    "<div id='diff_header_wrapper'>\n"
-	    "<div id='diff_header'>\n"
-	    "<div id='header_diff_title'>Diff:</div>\n"
-	    "<div id='header_diff'>%s<br />%s</div>\n"
-	    "<div class='header_commit_title'>Commit:</div>\n"
-	    "<div class='header_commit'>%s</div>\n"
-	    "<div id='header_tree_title'>Tree:</div>\n"
-	    "<div id='header_tree'>%s</div>\n"
-	    "<div class='header_author_title'>Author:</div>\n"
-	    "<div class='header_author'>%s</div>\n"
-	    "<div class='header_age_title'>Date:</div>\n"
-	    "<div class='header_age'>%s</div>\n"
-	    "<div id='header_commit_msg_title'>Message:</div>\n"
-	    "<div id='header_commit_msg'>%s</div>\n"
-	    "</div>\n"		/* #diff_header */
-	    "</div>\n"		/* #diff_header_wrapper */
-	    "<div class='dotted_line'></div>\n"
-	    "<div id='diff'>\n",
-	    rc->parent_id, rc->commit_id,
-	    rc->commit_id,
-	    rc->tree_id,
-	    author,
-	    age,
-	    msg);
-	if (r == -1)
-		goto done;
-
-	error = got_output_repo_diff(c);
-	if (error)
-		goto done;
-
-	fcgi_printf(c, "</div>\n"); /* #diff */
-	fcgi_printf(c, "</div>\n"); /* #diff_content */
-done:
-	free(age);
-	free(author);
-	free(msg);
 	return error;
 }
 
