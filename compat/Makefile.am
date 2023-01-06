@@ -11,8 +11,6 @@ libopenbsd_compat_a_SOURCES =  \
 	getdtablecount.c \
 	getopt.c \
 	getprogname.c \
-	imsg-buffer.c \
-	imsg.c \
 	merge.c \
 	reallocarray.c \
 	recallocarray.c \
@@ -51,6 +49,10 @@ endif
 
 if !HAVE_SETPROCTITLE
 libopenbsd_compat_a_SOURCES += setproctitle.c
+endif
+
+if !HAVE_IMSG
+libopenbsd_compat_a_SOURCES += imsg-buffer.c imsg.c
 endif
 
 EXTRA_DIST = \

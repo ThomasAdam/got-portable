@@ -355,9 +355,8 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM(
 
 # Look for imsg_init in libutil.
 AC_SEARCH_LIBS(imsg_init, util, found_imsg_init=yes, found_imsg_init=no)
-if test "x$found_imsg_init" = xyes; then
-	AC_DEFINE(HAVE_IMSG)
-else
+AM_CONDITIONAL([HAVE_IMSG], [test "x$found_imsg_init" = "xyes"])
+if test "x$found_imsg_init" = xno; then
 	AC_LIBOBJ(imsg)
 	AC_LIBOBJ(imsg-buffer)
 fi
