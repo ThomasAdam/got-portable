@@ -39,7 +39,6 @@
 static int gotweb_render_blob_line(struct template *, const char *, size_t);
 static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
 
-static inline int gotweb_render_diff_line(struct template *, char *);
 static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
 
@@ -567,83 +566,6 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 {!
 	free(dir);
 !}
-{{ end }}
-
-{{ define gotweb_render_diff(struct template *tp, FILE *fp) }}
-{!
-	struct request		*c = tp->tp_arg;
-	struct transport	*t = c->t;
-	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
-	char			*line = NULL;
-	size_t			 linesize = 0;
-	ssize_t			 linelen;
-!}
-<div id="diff_title_wrapper">
-  <div id="diff_title">Commit Diff</div>
-</div>
-<div id="diff_content">
-  <div id="diff_header_wrapper">
-    <div id="diff_header">
-      <div id="header_diff_title">Diff:</div>
-      <div id="header_diff">
-        {{ rc->parent_id }}
-        <br />
-        {{ rc->commit_id }}
-      </div>
-      <div class="header_commit_title">Commit:</div>
-      <div class="header_commit">{{ rc->commit_id }}</div>
-      <div id="header_tree_title">Tree:</div>
-      <div id="header_tree">{{ rc->tree_id }}</div>
-      <div class="header_author_title">Author:</div>
-      <div class="header_author">{{ rc->author }}</div>
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
-        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-      </div>
-      <div id="header_commit_msg_title">Message</div>
-      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
-    </div>
-  </div>
-  <div class="dotted_line"></div>
-  <div id="diff">
-    {{ "\n" }}
-    {{ while (linelen = getline(&line, &linesize, fp)) != -1 }}
-      {{ render gotweb_render_diff_line(tp, line) }}
-    {{ end }}
-  </div>
-</div>
-{{ finally }}
-{! free(line); !}
-{{ end }}
-
-{{ define gotweb_render_diff_line(struct template *tp, char *line )}}
-{!
-	const char		*color = NULL;
-	char			*nl;
-
-	if (!strncmp(line, "-", 1))
-		color = "diff_minus";
-	else if (!strncmp(line, "+", 1))
-		color = "diff_plus";
-	else if (!strncmp(line, "@@", 2))
-		color = "diff_chunk_header";
-	else if (!strncmp(line, "commit +", 8) ||
-	    !strncmp(line, "commit -", 8) ||
-	    !strncmp(line, "blob +", 6) ||
-	    !strncmp(line, "blob -", 6) ||
-	    !strncmp(line, "file +", 6) ||
-	    !strncmp(line, "file -", 6))
-		color = "diff_meta";
-	else if (!strncmp(line, "from:", 5) || !strncmp(line, "via:", 4))
-		color = "diff_author";
-	else if (!strncmp(line, "date:", 5))
-		color = "diff_date";
-
-	nl = strchr(line, '\n');
-	if (nl)
-		*nl = '\0';
-!}
-<div class="diff_line {{ color }}">{{ line }}</div>
 {{ end }}
 
 {{ define gotweb_render_rss(struct template *tp) }}

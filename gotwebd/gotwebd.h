@@ -469,7 +469,6 @@ int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
 int	gotweb_render_blob(struct template *, struct got_blob_object *);
 int	gotweb_render_tree(struct template *);
-int	gotweb_render_diff(struct template *, FILE *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */
@@ -491,15 +490,13 @@ int fcgi_printf(struct request *, const char *, ...)
 int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 
 /* got_operations.c */
-const struct got_error *got_gotweb_flushfile(FILE *, int);
 const struct got_error *got_get_repo_owner(char **, struct request *);
 const struct got_error *got_get_repo_age(char **, struct request *,
     const char *, int);
 const struct got_error *got_get_repo_commits(struct request *, int);
 const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
-const struct got_error *got_open_diff_for_output(FILE **, int *,
-    struct request *);
+const struct got_error *got_output_repo_diff(struct request *);
 int got_output_repo_tree(struct request *,
     int (*)(struct template *, struct got_tree_entry *));
 const struct got_error *got_open_blob_for_output(struct got_blob_object **,
