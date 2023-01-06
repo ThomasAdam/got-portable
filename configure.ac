@@ -600,8 +600,9 @@ PKG_CHECK_MODULES(
 	found_panel=no
 )
 if test "x$found_panel" = "xno"; then
-	AC_CHECK_LIB(panelw, update_panels,,
-		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"])
+	AC_CHECK_LIB(panelw, update_panels, [],
+		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"]),
+		[-lncurses]
 	)
 
 	LIBPANELW_LIBS="-lpanelw"
