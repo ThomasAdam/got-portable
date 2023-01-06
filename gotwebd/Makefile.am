@@ -58,7 +58,6 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/worktree.c \
 		  $(top_srcdir)/lib/worktree_open.c \
 		  $(top_srcdir)/template/tmpl.c \
-		  $(top_srcdir)/template/tmpl.h \
 		  fcgi.c \
 		  got_operations.c \
 		  gotweb.c \
@@ -76,6 +75,7 @@ endif
 
 gotwebd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = $(top_srcdir)/gotwebd/*.h \
+	     $(top_srcdir)/template/tmpl.h \
 	     gotwebd.8 gotwebd.conf.5
 
 man5_MANS = gotwebd.conf.5
