@@ -87,7 +87,7 @@ typedef struct {
 %}
 
 %token	DEFINE ELSE END ERROR FINALLY FOR IF INCLUDE PRINTF
-%token	RENDER TQFOREACH UNSAFE URLESCAPE
+%token	RENDER TQFOREACH UNSAFE URLESCAPE WHILE
 %token	<v.string>	STRING
 %type	<v.string>	string
 %type	<v.string>	stringy
@@ -273,6 +273,12 @@ loop		: '{' FOR stringy '}' {
 		} body end {
 			fputs("}\n", fp);
 		}
+		| '{' WHILE stringy '}' {
+			fprintf(fp, "while (%s) {\n", $3);
+			free($3);
+		} body end {
+			fputs("}\n", fp);
+		}
 		;
 
 end		: '{' END '}'
@@ -353,6 +359,7 @@ lookup(char *s)
 		{ "tailq-foreach",	TQFOREACH },
 		{ "unsafe",		UNSAFE },
 		{ "urlescape",		URLESCAPE },
+		{ "while",		WHILE },
 	};
 	const struct keywords	*p;
 
