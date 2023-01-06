@@ -43,6 +43,7 @@
 	 * The autoconf test for strerror_r is broken in current versions
 	 * of autoconf: https://savannah.gnu.org/support/?110367
 	 */
+char *__xpg_strerror_r(int, char *, size_t);
 #define strerror_r __xpg_strerror_r
 #endif
 
