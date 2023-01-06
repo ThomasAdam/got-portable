@@ -58,6 +58,7 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/worktree.c \
 		  $(top_srcdir)/lib/worktree_open.c \
 		  $(top_srcdir)/template/tmpl.c \
+		  $(top_srcdir)/template/tmpl.h \
 		  fcgi.c \
 		  got_operations.c \
 		  gotweb.c \
