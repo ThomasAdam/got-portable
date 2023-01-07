@@ -72,7 +72,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	const char *idstr1 = NULL, *idstr2 = NULL;
 	off_t size1, size2;
-	struct got_diffreg_result *result;
+	struct got_diffreg_result *result = NULL;
 	off_t outoff = 0;
 	int n;
 
@@ -185,14 +185,15 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 			goto done;
 	}
 
+done:
 	if (resultp && err == NULL)
 		*resultp = result;
-	else {
+	else if (result) {
 		free_err = got_diffreg_result_free(result);
 		if (free_err && err == NULL)
 			err = free_err;
 	}
-done:
+
 	return err;
 }
 
@@ -276,6 +277,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			goto done;
 	}
 
+done:
 	if (resultp && err == NULL)
 		*resultp = result;
 	else if (result) {
@@ -283,7 +285,6 @@ diff_blob_file(struct got_diffreg_result **resultp,
 		if (free_err && err == NULL)
 			err = free_err;
 	}
-done:
 	return err;
 }
 
