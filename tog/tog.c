@@ -4623,20 +4623,6 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 	if (err)
 		goto done;
 
-	committer_time = got_object_commit_get_committer_time(commit);
-	datestr = get_datestr(&committer_time, datebuf);
-	if (datestr) {
-		n = fprintf(outfile, "date: %s UTC\n", datestr);
-		if (n < 0) {
-			err = got_error_from_errno("fprintf");
-			goto done;
-		}
-		outoff += n;
-		err = add_line_metadata(lines, nlines, outoff,
-		    GOT_DIFF_LINE_DATE);
-		if (err)
-			goto done;
-	}
 	author = got_object_commit_get_author(commit);
 	committer = got_object_commit_get_committer(commit);
 	if (strcmp(author, committer) != 0) {
@@ -4648,6 +4634,20 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 		outoff += n;
 		err = add_line_metadata(lines, nlines, outoff,
 		    GOT_DIFF_LINE_AUTHOR);
+		if (err)
+			goto done;
+	}
+	committer_time = got_object_commit_get_committer_time(commit);
+	datestr = get_datestr(&committer_time, datebuf);
+	if (datestr) {
+		n = fprintf(outfile, "date: %s UTC\n", datestr);
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		outoff += n;
+		err = add_line_metadata(lines, nlines, outoff,
+		    GOT_DIFF_LINE_DATE);
 		if (err)
 			goto done;
 	}

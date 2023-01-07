@@ -4202,14 +4202,14 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	free(refs_str);
 	refs_str = NULL;
 	printf("from: %s\n", got_object_commit_get_author(commit));
-	committer_time = got_object_commit_get_committer_time(commit);
-	datestr = get_datestr(&committer_time, datebuf);
-	if (datestr)
-		printf("date: %s UTC\n", datestr);
 	author = got_object_commit_get_author(commit);
 	committer = got_object_commit_get_committer(commit);
 	if (strcmp(author, committer) != 0)
 		printf("via: %s\n", committer);
+	committer_time = got_object_commit_get_committer_time(commit);
+	datestr = get_datestr(&committer_time, datebuf);
+	if (datestr)
+		printf("date: %s UTC\n", datestr);
 	if (got_object_commit_get_nparents(commit) > 1) {
 		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *qid;
