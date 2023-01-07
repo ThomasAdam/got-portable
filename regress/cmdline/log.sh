@@ -849,6 +849,55 @@ test_log_submodule() {
 	test_done "$testroot" "$ret"
 }
 
+test_log_diffstat() {
+	local testroot=`test_init log_diffstat`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified\nalpha." > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'log_diffstat mod file' > /dev/null)
+
+	(cd $testroot/wt && got rm beta >/dev/null)
+	(cd $testroot/wt && chmod +x epsilon/zeta >/dev/null)
+	(cd $testroot/wt && got commit -m 'log_diffstat rm file' > /dev/null)
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'log_diffstat add file' > /dev/null)
+
+	(cd $testroot/wt && got log -d | grep -A2 '^ [MDmA]' | sed '/^--/d' > \
+	    $testroot/stdout)
+
+	echo " A  new  |  1+  0-" > $testroot/stdout.expected
+	echo "\n1 file changed, 1 insertions(+), 0 deletions(-)" >> \
+	    $testroot/stdout.expected
+	echo " D  beta          |  0+  1-" >> $testroot/stdout.expected
+	echo " m  epsilon/zeta  |  0+  0-" >> $testroot/stdout.expected
+	echo "\n2 files changed, 0 insertions(+), 1 deletions(-)" >> \
+	    $testroot/stdout.expected
+	echo " M  alpha  |  2+  1-" >> $testroot/stdout.expected
+	echo "\n1 file changed, 2 insertions(+), 1 deletions(-)" >> \
+	    $testroot/stdout.expected
+	echo " A  alpha         |  1+  0-" >> $testroot/stdout.expected
+	echo " A  beta          |  1+  0-" >> $testroot/stdout.expected
+	echo " A  epsilon/zeta  |  1+  0-" >> $testroot/stdout.expected
+	echo " A  gamma/delta   |  1+  0-" >> $testroot/stdout.expected
+	echo "\n4 files changed, 4 insertions(+), 0 deletions(-)" >> \
+	    $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
@@ -864,3 +913,4 @@ run_test test_log_reverse_display
 run_test test_log_in_worktree_different_repo
 run_test test_log_changed_paths
 run_test test_log_submodule
+run_test test_log_diffstat
