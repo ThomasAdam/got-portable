@@ -39,6 +39,10 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 
+#ifndef MAX
+#define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
+#endif
+
 static const struct got_error *
 add_line_metadata(struct got_diff_line **lines, size_t *nlines,
     off_t off, uint8_t type)
@@ -605,6 +609,137 @@ diff_entry_new_old(struct got_tree_entry *te2,
 
 	return cb(cb_arg, NULL, NULL, NULL, NULL, NULL, &te2->id,
 	    NULL, label2, 0, te2->mode, repo);
+}
+
+static void
+diffstat_field_width(size_t *maxlen, int *add_cols, int *rm_cols, size_t len,
+    uint32_t add, uint32_t rm)
+{
+	int d1 = 1, d2 = 1;
+
+	*maxlen = MAX(*maxlen, len);
+
+	while (add /= 10)
+		++d1;
+	*add_cols = MAX(*add_cols, d1);
+
+	while (rm /= 10)
+		++d2;
+	*rm_cols = MAX(*rm_cols, d2);
+}
+
+const struct got_error *
+got_diff_tree_compute_diffstat(void *arg, struct got_blob_object *blob1,
+    struct got_blob_object *blob2, FILE *f1, FILE *f2,
+    struct got_object_id *id1, struct got_object_id *id2,
+    const char *label1, const char *label2,
+    mode_t mode1, mode_t mode2, struct got_repository *repo)
+{
+	const struct got_error		*err = NULL;
+	struct got_diffreg_result	*result = NULL;
+	struct diff_result		*r;
+	struct got_diff_changed_path	*change = NULL;
+	struct got_diffstat_cb_arg	*a = arg;
+	struct got_pathlist_entry	*pe;
+	char				*path = NULL;
+	int				 i;
+
+	path = strdup(label2 ? label2 : label1);
+	if (path == NULL)
+		return got_error_from_errno("malloc");
+
+	change = malloc(sizeof(*change));
+	if (change == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+
+	change->add = 0;
+	change->rm = 0;
+	change->status = GOT_STATUS_NO_CHANGE;
+	if (id1 == NULL)
+		change->status = GOT_STATUS_ADD;
+	else if (id2 == NULL)
+		change->status = GOT_STATUS_DELETE;
+	else {
+		if (got_object_id_cmp(id1, id2) != 0)
+			change->status = GOT_STATUS_MODIFY;
+		else if (mode1 != mode2)
+			change->status = GOT_STATUS_MODE_CHANGE;
+	}
+
+	if (f1) {
+		err = got_opentemp_truncate(f1);
+		if (err)
+			goto done;
+	}
+	if (f2) {
+		err = got_opentemp_truncate(f2);
+		if (err)
+			goto done;
+	}
+
+	if (blob1) {
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f1,
+		    blob1);
+		if (err)
+			goto done;
+	}
+	if (blob2) {
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f2,
+		    blob2);
+		if (err)
+			goto done;
+	}
+
+	err = got_diffreg(&result, f1, f2, a->diff_algo, a->ignore_ws,
+	    a->force_text);
+	if (err)
+		goto done;
+
+	for (i = 0, r = result->result; i < r->chunks.len; ++i) {
+		int flags = (r->left->atomizer_flags | r->right->atomizer_flags);
+		int isbin = (flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
+
+		if (!isbin || a->force_text) {
+			struct diff_chunk *c;
+			int clc, crc;
+
+			c = diff_chunk_get(r, i);
+			clc = diff_chunk_get_left_count(c);
+			crc = diff_chunk_get_right_count(c);
+
+			if (clc && !crc)
+				change->rm += clc;
+			else if (crc && !clc)
+				change->add += crc;
+		}
+	}
+
+	err = got_pathlist_append(a->paths, path, change);
+	if (err)
+		goto done;
+
+	pe = TAILQ_LAST(a->paths, got_pathlist_head);
+	diffstat_field_width(&a->max_path_len, &a->add_cols, &a->rm_cols,
+	    pe->path_len, change->add, change->rm);
+	a->ins += change->add;
+	a->del += change->rm;
+	++a->nfiles;
+
+done:
+	if (result) {
+		const struct got_error *free_err;
+
+		free_err = got_diffreg_result_free(result);
+		if (free_err && err == NULL)
+			err = free_err;
+	}
+	if (err) {
+		free(path);
+		free(change);
+	}
+	return err;
 }
 
 const struct got_error *
