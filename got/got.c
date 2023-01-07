@@ -4449,9 +4449,9 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-bPpRs] [-C number] [-c commit] [-l N] "
-	    "[-r repository-path] [-S search-pattern] [-x commit] [path]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s log [-bdPpRs] [-C number] [-c commit] "
+	    "[-l N] [-r repository-path] [-S search-pattern] [-x commit] "
+	    "[path]\n", getprogname());
 	exit(1);
 }
 
@@ -4513,11 +4513,11 @@ cmd_log(int argc, char *argv[])
 				errx(1, "number of context lines is %s: %s",
 				    errstr, optarg);
 			break;
-		case 'd':
-			show_diffstat = 1;
-			break;
 		case 'c':
 			start_commit = optarg;
+			break;
+		case 'd':
+			show_diffstat = 1;
 			break;
 		case 'l':
 			limit = strtonum(optarg, 0, INT_MAX, &errstr);
