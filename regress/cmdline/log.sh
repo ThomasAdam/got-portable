@@ -859,7 +859,7 @@ test_log_diffstat() {
 		return 1
 	fi
 
-	echo "modified\nalpha." > $testroot/wt/alpha
+	printf "modified\nalpha.\n" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'log_diffstat mod file' > /dev/null)
 
 	(cd $testroot/wt && got rm beta >/dev/null)
@@ -873,22 +873,24 @@ test_log_diffstat() {
 	(cd $testroot/wt && got log -d | grep -A2 '^ [MDmA]' | sed '/^--/d' > \
 	    $testroot/stdout)
 
-	echo " A  new  |  1+  0-" > $testroot/stdout.expected
-	echo "\n1 file changed, 1 insertions(+), 0 deletions(-)" >> \
-	    $testroot/stdout.expected
-	echo " D  beta          |  0+  1-" >> $testroot/stdout.expected
-	echo " m  epsilon/zeta  |  0+  0-" >> $testroot/stdout.expected
-	echo "\n2 files changed, 0 insertions(+), 1 deletions(-)" >> \
-	    $testroot/stdout.expected
-	echo " M  alpha  |  2+  1-" >> $testroot/stdout.expected
-	echo "\n1 file changed, 2 insertions(+), 1 deletions(-)" >> \
-	    $testroot/stdout.expected
-	echo " A  alpha         |  1+  0-" >> $testroot/stdout.expected
-	echo " A  beta          |  1+  0-" >> $testroot/stdout.expected
-	echo " A  epsilon/zeta  |  1+  0-" >> $testroot/stdout.expected
-	echo " A  gamma/delta   |  1+  0-" >> $testroot/stdout.expected
-	echo "\n4 files changed, 4 insertions(+), 0 deletions(-)" >> \
-	    $testroot/stdout.expected
+	cat <<EOF >$testroot/stdout.expected
+ A  new  |  1+  0-
+
+1 file changed, 1 insertions(+), 0 deletions(-)
+ D  beta          |  0+  1-
+ m  epsilon/zeta  |  0+  0-
+
+2 files changed, 0 insertions(+), 1 deletions(-)
+ M  alpha  |  2+  1-
+
+1 file changed, 2 insertions(+), 1 deletions(-)
+ A  alpha         |  1+  0-
+ A  beta          |  1+  0-
+ A  epsilon/zeta  |  1+  0-
+ A  gamma/delta   |  1+  0-
+
+4 files changed, 4 insertions(+), 0 deletions(-)
+EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
