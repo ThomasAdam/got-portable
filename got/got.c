@@ -3753,12 +3753,41 @@ done:
 
 static const struct got_error *
 get_changed_paths(struct got_pathlist_head *paths,
-    struct got_commit_object *commit, struct got_repository *repo)
+    struct got_commit_object *commit, struct got_repository *repo,
+    struct got_diffstat_cb_arg *dsa)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_object_qid *qid;
+	got_diff_blob_cb cb = got_diff_tree_collect_changed_paths;
+	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
+
+	if (dsa) {
+		cb = got_diff_tree_compute_diffstat;
+
+		f1 = got_opentemp();
+		if (f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+		f2 = got_opentemp();
+		if (f2 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+		fd1 = got_opentempfd();
+		if (fd1 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+		fd2 = got_opentempfd();
+		if (fd2 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+	}
 
 	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
@@ -3789,13 +3818,21 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
-	    got_diff_tree_collect_changed_paths, paths, 0);
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, "", "", repo,
+	    cb, dsa ? (void *)dsa : paths, dsa ? 1 : 0);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
 	if (tree2)
 		got_object_tree_close(tree2);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (f1 && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(tree_id1);
 	return err;
 }
@@ -4129,9 +4166,9 @@ done:
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, const char *path,
-    struct got_pathlist_head *changed_paths, int show_patch,
-    int diff_context, struct got_reflist_object_id_map *refs_idmap,
-    const char *custom_refs_str)
+    struct got_pathlist_head *changed_paths, struct got_diffstat_cb_arg *dsa,
+    int show_patch, int diff_context,
+    struct got_reflist_object_id_map *refs_idmap, const char *custom_refs_str)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
@@ -4202,10 +4239,29 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 	if (changed_paths) {
 		struct got_pathlist_entry *pe;
+
 		TAILQ_FOREACH(pe, changed_paths, entry) {
 			struct got_diff_changed_path *cp = pe->data;
-			printf(" %c  %s\n", cp->status, pe->path);
+			char *stat = NULL;
+
+			if (dsa) {
+				int pad = dsa->max_path_len - pe->path_len + 1;
+
+				if (asprintf(&stat, "%*c | %*d+ %*d-",
+				    pad, ' ', dsa->add_cols + 1, cp->add,
+				    dsa->rm_cols + 1, cp->rm) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
+			}
+			printf(" %c  %s%s\n", cp->status, pe->path,
+			    stat ? stat : "");
+			free(stat);
 		}
+		if (dsa)
+			printf("\n%d file%s changed, %d insertions(+), "
+			    "%d deletions(-)\n", dsa->nfiles,
+			    dsa->nfiles > 1 ? "s" : "", dsa->ins, dsa->del);
 		printf("\n");
 	}
 	if (show_patch) {
@@ -4225,8 +4281,8 @@ done:
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_changed_paths,
-    int show_patch, const char *search_pattern, int diff_context, int limit,
-    int log_branches, int reverse_display_order,
+    int show_diffstat, int show_patch, const char *search_pattern,
+    int diff_context, int limit, int log_branches, int reverse_display_order,
     struct got_reflist_object_id_map *refs_idmap, int one_line,
     FILE *tmpfile)
 {
@@ -4256,6 +4312,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		goto done;
 	for (;;) {
 		struct got_object_id id;
+		struct got_diffstat_cb_arg dsa = { 0, 0, 0, 0, 0, 0,
+		    &changed_paths, 0, 0, GOT_DIFF_ALGORITHM_PATIENCE };
 
 		if (sigint_received || sigpipe_received)
 			break;
@@ -4272,8 +4330,10 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		if (err)
 			break;
 
-		if (show_changed_paths && !reverse_display_order) {
-			err = get_changed_paths(&changed_paths, commit, repo);
+		if ((show_changed_paths || show_diffstat) &&
+		    !reverse_display_order) {
+			err = get_changed_paths(&changed_paths, commit, repo,
+			    show_diffstat ? &dsa : NULL);
 			if (err)
 				break;
 		}
@@ -4317,8 +4377,10 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				    repo, refs_idmap);
 			else
 				err = print_commit(commit, &id, repo, path,
-				    show_changed_paths ? &changed_paths : NULL,
-				    show_patch, diff_context, refs_idmap, NULL);
+				    (show_changed_paths || show_diffstat) ?
+				    &changed_paths : NULL,
+				    show_diffstat ? &dsa : NULL, show_patch,
+				    diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -4335,13 +4397,16 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	}
 	if (reverse_display_order) {
 		STAILQ_FOREACH(qid, &reversed_commits, entry) {
+			struct got_diffstat_cb_arg dsa = { 0, 0, 0, 0, 0, 0,
+			    &changed_paths, 0, 0, GOT_DIFF_ALGORITHM_PATIENCE };
+
 			err = got_object_open_as_commit(&commit, repo,
 			    &qid->id);
 			if (err)
 				break;
-			if (show_changed_paths) {
+			if (show_changed_paths || show_diffstat) {
 				err = get_changed_paths(&changed_paths,
-				    commit, repo);
+				    commit, repo, show_diffstat ? &dsa : NULL);
 				if (err)
 					break;
 			}
@@ -4350,8 +4415,10 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				    repo, refs_idmap);
 			else
 				err = print_commit(commit, &qid->id, repo, path,
-				    show_changed_paths ? &changed_paths : NULL,
-				    show_patch, diff_context, refs_idmap, NULL);
+				    (show_changed_paths || show_diffstat) ?
+				    &changed_paths : NULL,
+				    show_diffstat ? &dsa : NULL, show_patch,
+				    diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -4416,7 +4483,7 @@ cmd_log(int argc, char *argv[])
 	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
 	int show_changed_paths = 0, show_patch = 0, limit = 0, log_branches = 0;
-	int reverse_display_order = 0, one_line = 0;
+	int show_diffstat = 0, reverse_display_order = 0, one_line = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
@@ -4434,7 +4501,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bC:c:l:PpRr:S:sx:")) != -1) {
+	while ((ch = getopt(argc, argv, "bC:c:dl:PpRr:S:sx:")) != -1) {
 		switch (ch) {
 		case 'b':
 			log_branches = 1;
@@ -4445,6 +4512,9 @@ cmd_log(int argc, char *argv[])
 			if (errstr != NULL)
 				errx(1, "number of context lines is %s: %s",
 				    errstr, optarg);
+			break;
+		case 'd':
+			show_diffstat = 1;
 			break;
 		case 'c':
 			start_commit = optarg;
@@ -4494,8 +4564,8 @@ cmd_log(int argc, char *argv[])
 	else if (!show_patch)
 		errx(1, "-C requires -p");
 
-	if (one_line && (show_patch || show_changed_paths))
-		errx(1, "cannot use -s with -p or -P");
+	if (one_line && (show_patch || show_changed_paths || show_diffstat))
+		errx(1, "cannot use -s with -d, -p or -P");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -4626,9 +4696,9 @@ cmd_log(int argc, char *argv[])
 	}
 
 	error = print_commits(start_id, end_id, repo, path ? path : "",
-	    show_changed_paths, show_patch, search_pattern, diff_context,
-	    limit, log_branches, reverse_display_order, refs_idmap, one_line,
-	    tmpfile);
+	    show_changed_paths, show_diffstat, show_patch, search_pattern,
+	    diff_context, limit, log_branches, reverse_display_order,
+	    refs_idmap, one_line, tmpfile);
 done:
 	free(path);
 	free(repo_path);
@@ -9873,7 +9943,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 	if (asprintf(&custom_refs_str, "formerly %s", branch_name) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = print_commit(old_commit, old_commit_id, repo, NULL, NULL,
+	err = print_commit(old_commit, old_commit_id, repo, NULL, NULL, NULL,
 	    0, 0, refs_idmap, custom_refs_str);
 	if (err)
 		goto done;

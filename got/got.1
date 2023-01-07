@@ -829,6 +829,11 @@ An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
+.It Fl d
+Display diffstat of changes introduced in the commit.
+Cannot be used with the
+.Fl s
+option.
 .It Fl l Ar N
 Limit history traversal to a given number of commits.
 If this option is not specified, a default limit value of zero is used,

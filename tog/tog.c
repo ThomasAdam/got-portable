@@ -4457,12 +4457,37 @@ get_datestr(time_t *time, char *datebuf)
 
 static const struct got_error *
 get_changed_paths(struct got_pathlist_head *paths,
-    struct got_commit_object *commit, struct got_repository *repo)
+    struct got_commit_object *commit, struct got_repository *repo,
+    struct got_diffstat_cb_arg *dsa)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_object_qid *qid;
+	FILE *f1 = NULL, *f2 = NULL;
+	int fd1 = -1, fd2 = -1;
+
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+	fd2 = got_opentempfd();
+	if (fd2 == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
 
 	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
@@ -4493,13 +4518,21 @@ get_changed_paths(struct got_pathlist_head *paths,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
-	    got_diff_tree_collect_changed_paths, paths, 0);
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, "", "", repo,
+	    got_diff_tree_compute_diffstat, dsa, 1);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
 	if (tree2)
 		got_object_tree_close(tree2);
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (f1 && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	free(tree_id1);
 	return err;
 }
@@ -4524,7 +4557,8 @@ add_line_metadata(struct got_diff_line **lines, size_t *nlines,
 static const struct got_error *
 write_commit_info(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *commit_id, struct got_reflist_head *refs,
-    struct got_repository *repo, FILE *outfile)
+    struct got_repository *repo, int ignore_ws, int force_text_diff,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	char datebuf[26], *datestr;
@@ -4535,6 +4569,8 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 	char *refs_str = NULL;
 	struct got_pathlist_head changed_paths;
 	struct got_pathlist_entry *pe;
+	struct got_diffstat_cb_arg dsa = { 0, 0, 0, 0, 0, 0, &changed_paths,
+	    ignore_ws, force_text_diff, tog_diff_algo };
 	off_t outoff = 0;
 	int n;
 
@@ -4651,12 +4687,17 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 			goto done;
 	}
 
-	err = get_changed_paths(&changed_paths, commit, repo);
+	err = get_changed_paths(&changed_paths, commit, repo, &dsa);
 	if (err)
 		goto done;
+
 	TAILQ_FOREACH(pe, &changed_paths, entry) {
 		struct got_diff_changed_path *cp = pe->data;
-		n = fprintf(outfile, "%c  %s\n", cp->status, pe->path);
+		int pad = dsa.max_path_len - pe->path_len + 1;
+
+		n = fprintf(outfile, "%c  %s%*c | %*d+ %*d-\n", cp->status,
+		    pe->path, pad, ' ', dsa.add_cols + 1, cp->add,
+		    dsa.rm_cols + 1, cp->rm);
 		if (n < 0) {
 			err = got_error_from_errno("fprintf");
 			goto done;
@@ -4669,6 +4710,24 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 		free((char *)pe->path);
 		free(pe->data);
 	}
+
+	fputc('\n', outfile);
+	outoff++;
+	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
+	if (err)
+		goto done;
+
+	n = fprintf(outfile,
+	    "%d file%s changed, %d insertions(+), %d deletions(-)\n",
+	    dsa.nfiles, dsa.nfiles > 1 ? "s" : "", dsa.ins, dsa.del);
+	if (n < 0) {
+		err = got_error_from_errno("fprintf");
+		goto done;
+	}
+	outoff += n;
+	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
+	if (err)
+		goto done;
 
 	fputc('\n', outfile);
 	outoff++;
@@ -4744,7 +4803,8 @@ create_diff(struct tog_diff_view_state *s)
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
 			err = write_commit_info(&s->lines, &s->nlines, s->id2,
-			    refs, s->repo, s->f);
+			    refs, s->repo, s->ignore_whitespace,
+			    s->force_text_diff, s->f);
 			if (err)
 				goto done;
 		} else {
@@ -4753,7 +4813,8 @@ create_diff(struct tog_diff_view_state *s)
 				if (got_object_id_cmp(s->id1, &pid->id) == 0) {
 					err = write_commit_info(&s->lines,
 					    &s->nlines, s->id2, refs, s->repo,
-					    s->f);
+					    s->ignore_whitespace,
+					    s->force_text_diff, s->f);
 					if (err)
 						goto done;
 					break;
@@ -5213,7 +5274,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'w':
 		if (ch == 'a')
 			s->force_text_diff = !s->force_text_diff;
-		if (ch == 'w')
+		else if (ch == 'w')
 			s->ignore_whitespace = !s->ignore_whitespace;
 		err = reset_diff_view(view);
 		break;
