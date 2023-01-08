@@ -274,10 +274,8 @@ repoopts1	: PATH STRING {
 					free($2);
 					YYERROR;
 				}
-				if (strlcpy(new_repo->path, $2,
-				    sizeof(new_repo->path)) >=
-				    sizeof(new_repo->path)) {
-					yyerror("%s: path truncated", __func__);
+				if (realpath($2, new_repo->path) == NULL) {
+					yyerror("realpath %s: %s", $2, strerror(errno));
 					free($2);
 					YYERROR;
 				}
