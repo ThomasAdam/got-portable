@@ -57,13 +57,10 @@ log_cmd() {
 ncpu=`sysctl -n hw.ncpuonline`
 lockfile=$worktree/.${prog}.lock
 
-cd "$worktree"
-if [ $? -ne 0 ]; then
-	exit 1
-fi
+cd "$worktree" || exit 1
 
 lockfile -r 3 "$lockfile" || exit 1
-trap "rm -f '$lockfile'" HUP INT QUIT KILL TERM
+trap "rm -f '$lockfile'" HUP INT QUIT KILL TERM EXIT
 
 rm -f regress.log failures.log
 echo -n "$prog for branch '$branch' on " > build.log
@@ -83,13 +80,11 @@ log_cmd build.log /usr/local/bin/got update -b "$branch"
 update_status="$?"
 if [ "$update_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog update failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 new_basecommit=`cat .got/base-commit`
 
 if [ "$force" != "1" -a "$old_basecommit" == "$new_basecommit" ]; then
-	rm -rf "$lockfile"
 	exit 0
 fi
 
@@ -99,7 +94,6 @@ log_cmd build.log make -j $ncpu
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 log_cmd build.log make install
@@ -107,7 +101,6 @@ log_cmd build.log make -j $ncpu webd
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 
@@ -121,7 +114,6 @@ if [ "$regress_status" != "0" -o "$regress_failure_grep" == "0" ]; then
 	printf "\n\n\t Test failures:\n\n" >> build.log
 	cat failures.log >> build.log
 	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 
@@ -135,7 +127,6 @@ if [ "$regress_status" != "0" -o "$regress_failure_grep" == "0" ]; then
 	printf "\n\n\t Test failures:\n\n" >> build.log
 	cat failures.log >> build.log
 	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 
@@ -147,10 +138,7 @@ log_cmd build.log make -j $ncpu GOT_RELEASE=Yes webd
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail $fromaddr_arg -s "$prog release mode build failure" $recipients < build.log
-	rm -rf "$lockfile"
 	exit 0
 fi
 
-
-rm -f "$lockfile"
 exit 0
