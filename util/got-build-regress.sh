@@ -22,30 +22,24 @@ fromaddr_arg=
 force=0
 testroot="/tmp"
 
-args=`getopt b:fR:r:w: $*`
-if [ $? -ne 0 ]
-then
-	echo "usage: $usage" >&2
-	exit 1
-fi
-set -- $args
-while [ $# -ne 0 ]; do
-	case "$1"
-	in
-		-b)
-			branch="$2"; shift; shift;;
-		-f)
-			force=1; shift;;
-		-w)
-			worktree="$2"; shift; shift;;
-		-r)
-			fromaddr_arg="-r $2"; shift; shift;;
-		-R)
-			testroot="$2"; shift; shift;;
-		--)
-			shift; break;;
+while getopts b:fR:r:w: arg; do
+	case $arg in
+		b)
+			branch="$OPTARG" ;;
+		f)
+			force=1 ;;
+		w)
+			worktree="$OPTARG" ;;
+		r)
+			fromaddr_arg="-r $OPTARG" ;;
+		R)
+			testroot="$OPTARG" ;;
+		?)
+			echo "usage: $usage" >&2
+			exit 1 ;;
 	esac
 done
+shift $(($OPTIND - 1))
 
 recipients="$@"
 if [ -z "$recipients" ]; then
