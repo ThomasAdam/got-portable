@@ -78,7 +78,7 @@ vlog(int pri, const char *fmt, va_list ap)
 
 	if (debug) {
 		/* best effort in out of mem situations */
-		if (asprintf(&nfmt, "%s\n", fmt) == -1) {
+		if (asprintf(&nfmt, "%s: %s\n", log_procname, fmt) == -1) {
 			vfprintf(stderr, fmt, ap);
 			fprintf(stderr, "\n");
 		} else {
@@ -166,10 +166,9 @@ vfatalc(int code, const char *emsg, va_list ap)
 		sep = "";
 	}
 	if (code)
-		logit(LOG_CRIT, "%s: %s%s%s",
-		    log_procname, s, sep, strerror(code));
+		logit(LOG_CRIT, "%s: %s%s", s, sep, strerror(code));
 	else
-		logit(LOG_CRIT, "%s%s%s", log_procname, sep, s);
+		logit(LOG_CRIT, "%s%s", sep, s);
 }
 
 void
