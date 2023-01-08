@@ -1837,6 +1837,57 @@ test_rebase_umask() {
 	test_done "$testroot" 0
 }
 
+test_rebase_out_of_date2() {
+	local testroot=`test_init rebase_out_of_date2`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+	local orig_author_time2=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Backdate the file alpha to an earlier version.
+	# This sets the work tree's base commit ID back to $commit0,
+	# which is out-of-date with respect to the master branch.
+	(cd $testroot/wt && got update -c $commit0 alpha > /dev/null)
+
+	# Rebase into an out-of-date work tree should be refused.
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "rebase succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	echo -n "got: work tree must be updated before it can be used to " \
+		> $testroot/stderr.expected
+	echo "rebase a branch" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -1857,3 +1908,4 @@ run_test test_rebase_resets_committer
 run_test test_rebase_no_author_info
 run_test test_rebase_nonbranch
 run_test test_rebase_umask
+run_test test_rebase_out_of_date2

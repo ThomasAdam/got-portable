@@ -10154,6 +10154,8 @@ cmd_rebase(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL, *parent_id = NULL;
 	struct got_object_id *resume_commit_id = NULL;
 	struct got_object_id *branch_head_commit_id = NULL, *yca_id = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	struct got_reference *head_ref = NULL;
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	int histedit_in_progress = 0, merge_in_progress = 0;
@@ -10356,7 +10358,19 @@ cmd_rebase(int argc, char *argv[])
 	if (!continue_rebase) {
 		struct got_object_id *base_commit_id;
 
+		error = got_ref_open(&head_ref, repo,
+		    got_worktree_get_head_ref_name(worktree), 0);
+		if (error)
+			goto done;
+		error = got_ref_resolve(&head_commit_id, repo, head_ref);
+		if (error)
+			goto done;
 		base_commit_id = got_worktree_get_base_commit_id(worktree);
+		if (got_object_id_cmp(base_commit_id, head_commit_id) != 0) {
+			error = got_error(GOT_ERR_REBASE_OUT_OF_DATE);
+			goto done;
+		}
+
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
 		    base_commit_id, branch_head_commit_id, 1, repo,
 		    check_cancelled, NULL);
@@ -10537,6 +10551,7 @@ done:
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
 	free(resume_commit_id);
+	free(head_commit_id);
 	free(yca_id);
 	if (commit)
 		got_object_commit_close(commit);
@@ -10546,6 +10561,8 @@ done:
 		got_ref_close(new_base_branch);
 	if (tmp_branch)
 		got_ref_close(tmp_branch);
+	if (head_ref)
+		got_ref_close(head_ref);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
