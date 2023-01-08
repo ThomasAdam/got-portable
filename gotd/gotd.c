@@ -2251,7 +2251,7 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	log_debug("starting %s for repository %s",
 	    proc->type == PROC_REPO_READ ? "reader" : "writer", repo->name);
 	if (realpath(repo->path, proc->repo_path) == NULL)
-		fatal("%s", repo->path);
+		return got_error_from_errno2("realpath", repo->path);
 	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
@@ -2306,7 +2306,7 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	log_debug("starting auth for uid %d repository %s",
 	    client->euid, repo->name);
 	if (realpath(repo->path, proc->repo_path) == NULL)
-		fatal("%s", repo->path);
+		return got_error_from_errno2("realpath", repo->path);
 	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
