@@ -2178,9 +2178,12 @@ contains changes to files outside of the work tree's path prefix,
 the work tree cannot be used to rebase this branch.
 .Pp
 The
-.Cm got update
+.Cm got update ,
+.Cm got integrate ,
+.Cm got merge ,
+.Cm got commit ,
 and
-.Cm got commit
+.Cm got histedit
 commands will refuse to run while a rebase operation is in progress.
 Other commands which manipulate the work tree may be used for
 conflict resolution purposes.
@@ -2423,6 +2426,7 @@ path prefix, the work tree cannot be used to edit the history of this branch.
 The
 .Cm got update ,
 .Cm got rebase ,
+.Cm got merge ,
 and
 .Cm got integrate
 commands will refuse to run while a histedit operation is in progress.
