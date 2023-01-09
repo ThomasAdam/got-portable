@@ -956,7 +956,7 @@ got_object_commit_retain(struct got_commit_object *commit)
 
 const struct got_error *
 got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
-    size_t hdrlen, off_t size)
+    size_t max_in_mem_size, size_t hdrlen, off_t size)
 {
 	const struct got_error *err = NULL;
 	off_t tot;
@@ -986,7 +986,7 @@ got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
 			goto done;
 		}
 #ifndef GOT_PACK_NO_MMAP
-		if (tot > 0 && tot <= SIZE_MAX) {
+		if (tot > 0 && tot <= max_in_mem_size) {
 			(*obj)->data = mmap(NULL, tot, PROT_READ,
 			    MAP_PRIVATE, *outfd, 0);
 			if ((*obj)->data == MAP_FAILED) {
