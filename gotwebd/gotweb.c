@@ -96,7 +96,6 @@ static const struct got_error *gotweb_get_clone_url(char **, struct server *,
 static const struct got_error *gotweb_render_blame(struct request *);
 static const struct got_error *gotweb_render_diff(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
-static const struct got_error *gotweb_render_tag(struct request *);
 static const struct got_error *gotweb_render_tags(struct request *);
 static const struct got_error *gotweb_render_branches(struct request *);
 
@@ -291,11 +290,18 @@ render:
 		}
 		break;
 	case TAG:
-		error = gotweb_render_tag(c);
+		error = got_get_repo_tags(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		if (c->t->tag_count == 0) {
+			error = got_error_msg(GOT_ERR_BAD_OBJ_ID,
+			    "bad commit id");
+			goto err;
+		}
+		if (gotweb_render_tag(c->tp) == -1)
+			goto done;
 		break;
 	case TAGS:
 		error = gotweb_render_tags(c);
@@ -1253,77 +1259,6 @@ gotweb_render_summary(struct request *c)
 	if (error)
 		log_warnx("%s: %s", __func__, error->msg);
 done:
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_tag(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct repo_tag *rt = NULL;
-	struct transport *t = c->t;
-	char *tagname = NULL, *age = NULL, *author = NULL, *msg = NULL;
-
-	error = got_get_repo_tags(c, 1);
-	if (error)
-		goto done;
-
-	if (t->tag_count == 0) {
-		error = got_error_set_errno(GOT_ERR_BAD_OBJ_ID,
-		    "bad commit id");
-		goto done;
-	}
-
-	rt = TAILQ_LAST(&t->repo_tags, repo_tags_head);
-
-	error = gotweb_get_time_str(&age, rt->tagger_time, TM_LONG);
-	if (error)
-		goto done;
-	error = gotweb_escape_html(&author, rt->tagger);
-	if (error)
-		goto done;
-	error = gotweb_escape_html(&msg, rt->commit_msg);
-	if (error)
-		goto done;
-
-	tagname = rt->tag_name;
-	if (strncmp(tagname, "refs/", 5) == 0)
-		tagname += 5;
-	error = gotweb_escape_html(&tagname, tagname);
-	if (error)
-		goto done;
-
-	fcgi_printf(c, "<div id='tags_title_wrapper'>\n"
-	    "<div id='tags_title'>Tag</div>\n"
-	    "</div>\n"		/* #tags_title_wrapper */
-	    "<div id='tags_content'>\n"
-	    "<div id='tag_header_wrapper'>\n"
-	    "<div id='tag_header'>\n"
-	    "<div class='header_commit_title'>Commit:</div>\n"
-	    "<div class='header_commit'>%s"
-	    " <span class='refs_str'>(%s)</span></div>\n"
-	    "<div class='header_author_title'>Tagger:</div>\n"
-	    "<div class='header_author'>%s</div>\n"
-	    "<div class='header_age_title'>Date:</div>\n"
-	    "<div class='header_age'>%s</div>\n"
-	    "<div id='header_commit_msg_title'>Message:</div>\n"
-	    "<div id='header_commit_msg'>%s</div>\n"
-	    "</div>\n"		/* #tag_header */
-	    "<div class='dotted_line'></div>\n"
-	    "<div id='tag_commit'>\n%s</div>"
-	    "</div>"		/* #tag_header_wrapper */
-	    "</div>",		/* #tags_content */
-	    rt->commit_id,
-	    tagname,
-	    author,
-	    age,
-	    msg,
-	    rt->tag_commit);
-
-done:
-	free(age);
-	free(author);
-	free(msg);
 	return error;
 }
 
