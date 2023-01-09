@@ -218,6 +218,7 @@ read_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 		    accumfile);
 		if (err)
 			goto done;
+		*size = obj->size;
 	}
 
 	*hdrlen = obj->hdrlen;
