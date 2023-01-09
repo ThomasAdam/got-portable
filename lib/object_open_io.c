@@ -250,7 +250,7 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
-	int idx, tempfile_idx = -1;
+	int idx, tempfd, tempfile_idx;
 	uint8_t *outbuf = NULL;
 	off_t size = 0;
 	size_t hdrlen = 0;
@@ -262,20 +262,9 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 		return NULL;
 	}
 
-	if (*outfd == -1) {
-		int tempfd;
-
-		err = got_repo_temp_fds_get(&tempfd, &tempfile_idx, repo);
-		if (err)
-			return err;
-
-		/* Duplicate tempfile descriptor to allow use of fdopen(3). */
-		*outfd = dup(tempfd);
-		if (*outfd == -1) {
-			got_repo_temp_fds_put(tempfile_idx, repo);
-			return got_error_from_errno("dup");
-		}
-	}
+	err = got_repo_temp_fds_get(&tempfd, &tempfile_idx, repo);
+	if (err)
+		return err;
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {
@@ -294,7 +283,7 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 				goto done;
 		}
 		err = read_packed_object_raw(&outbuf, &size, &hdrlen,
-		    *outfd, pack, packidx, idx, id);
+		    tempfd, pack, packidx, idx, id);
 		if (err)
 			goto done;
 	} else if (err->code == GOT_ERR_NO_OBJ) {
@@ -304,11 +293,28 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 		if (err)
 			goto done;
 		err = got_object_read_raw(&outbuf, &size, &hdrlen,
-		    GOT_DELTA_RESULT_SIZE_CACHED_MAX, *outfd, id, fd);
+		    GOT_DELTA_RESULT_SIZE_CACHED_MAX, tempfd, id, fd);
 		if (close(fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		if (err)
 			goto done;
+	}
+
+	if (outbuf == NULL) {
+		if (*outfd != -1) {
+			err = got_error_msg(GOT_ERR_NOT_IMPL, "bad outfd");
+			goto done;
+		}
+
+		/*
+		 * Duplicate tempfile descriptor to allow use of
+		 * fdopen(3) inside got_object_raw_alloc().
+		 */
+		*outfd = dup(tempfd);
+		if (*outfd == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
 	}
 
 	err = got_object_raw_alloc(obj, outbuf, outfd,
@@ -330,12 +336,24 @@ done:
 			*obj = NULL;
 		}
 		free(outbuf);
-		if (tempfile_idx != -1)
-			got_repo_temp_fds_put(tempfile_idx, repo);
+		got_repo_temp_fds_put(tempfile_idx, repo);
+		if (*outfd != -1) {
+			close(*outfd);
+			*outfd = -1;
+		}
 	} else {
-		(*obj)->tempfile_idx = tempfile_idx;
-		(*obj)->close_cb = put_raw_object_tempfile;
-		(*obj)->close_arg = repo;
+		if (((*obj)->f == NULL && (*obj)->fd == -1)) {
+			/* This raw object is not backed by a file. */
+			got_repo_temp_fds_put(tempfile_idx, repo);
+			if (*outfd != -1) {
+				close(*outfd);
+				*outfd = -1;
+			}
+		} else {
+			(*obj)->tempfile_idx = tempfile_idx;
+			(*obj)->close_cb = put_raw_object_tempfile;
+			(*obj)->close_arg = repo;
+		}
 	}
 	return err;
 }
