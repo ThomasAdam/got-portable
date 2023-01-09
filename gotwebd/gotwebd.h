@@ -472,6 +472,7 @@ int	gotweb_render_commits(struct template *);
 int	gotweb_render_blob(struct template *, struct got_blob_object *);
 int	gotweb_render_tree(struct template *);
 int	gotweb_render_tags_tmpl(struct template *);
+int	gotweb_render_tag(struct template *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */

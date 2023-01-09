@@ -649,6 +649,49 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 <div class="dotted_line"></div>
 {{ end }}
 
+{{ define gotweb_render_tag(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_tag		*rt;
+	const char		*tag_name;
+
+	rt = TAILQ_LAST(&t->repo_tags, repo_tags_head);
+	tag_name = rt->tag_name;
+
+	if (strncmp(tag_name, "refs/", 5) == 0)
+		tag_name += 5;
+!}
+<div id="tags_title_wrapper">
+  <div id="tags_title">Tag</div>
+</div>
+<div id="tags_content">
+  <div id="tag_header_wrapper">
+    <div id="tag_header">
+      <div class="header_commit_title">Commit:</div>
+      <div class="header_commit">
+        {{ rt->commit_id }}
+        {{ " " }}
+        <span class="refs_str">({{ tag_name }})</span>
+      </div>
+      <div class="header_author_title">Tagger:</div>
+      <div class="header_author">{{ rt->tagger }}</div>
+      <div class="header_age_title">Date:</div>
+      <div class="header_age">
+        {{ render gotweb_render_age(tp, rt->tagger_time, TM_LONG)}}
+      </div>
+      <div id="header_commit_msg_title">Message:</div>
+      <div id="header_commit_msg">{{ rt->commit_msg }}</div>
+    </div>
+    <div class="dotted_line"></div>
+    <div id="tag_commit">
+      {{ "\n" }}
+      {{ rt->tag_commit }}
+    </div>
+  </div>
+</div>
+{{ end }}
+
 {{ define gotweb_render_rss(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
