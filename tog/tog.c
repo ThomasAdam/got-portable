@@ -538,8 +538,10 @@ struct tog_help_view_state {
 	KEY_("C-f f PgDn Space", "Scroll the view down one page"), \
 	KEY_("C-u u", "Scroll the view up one half page"), \
 	KEY_("C-d d", "Scroll the view down one half page"), \
-	KEY_("g Home", "Go to line N (default: first line)"), \
-	KEY_("G End", "Go to line N (default: last line)"), \
+	KEY_("g", "Go to line N (default: first line)"), \
+	KEY_("Home =", "Go to the first line"), \
+	KEY_("G", "Go to line N (default: last line)"), \
+	KEY_("End *", "Go to the last line"), \
 	KEY_("l Right", "Scroll the view right"), \
 	KEY_("h Left", "Scroll the view left"), \
 	KEY_("$", "Scroll view to the rightmost position"), \
@@ -3698,6 +3700,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		log_move_cursor_up(view, 0, 0);
 		break;
 	case 'g':
+	case '=':
 	case KEY_HOME:
 		log_move_cursor_up(view, 0, 1);
 		view->count = 0;
@@ -3722,6 +3725,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->use_committer = !s->use_committer;
 		break;
 	case 'G':
+	case '*':
 	case KEY_END: {
 		/* We don't know yet how many commits, so we're forced to
 		 * traverse them all. */
@@ -7355,6 +7359,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = view_request_new(new_view, view, TOG_VIEW_REF);
 		break;
 	case 'g':
+	case '=':
 	case KEY_HOME:
 		s->selected = 0;
 		view->count = 0;
@@ -7365,6 +7370,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->first_displayed_entry = NULL;
 		break;
 	case 'G':
+	case '*':
 	case KEY_END: {
 		int eos = view->nlines - 3;
 
@@ -8275,12 +8281,14 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = view_request_new(new_view, view, TOG_VIEW_TREE);
 		break;
 	case 'g':
+	case '=':
 	case KEY_HOME:
 		s->selected = 0;
 		view->count = 0;
 		s->first_displayed_entry = TAILQ_FIRST(&s->refs);
 		break;
 	case 'G':
+	case '*':
 	case KEY_END: {
 		int eos = view->nlines - 1;
 
