@@ -39,6 +39,7 @@
 static int gotweb_render_blob_line(struct template *, const char *, size_t);
 static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
 
+static inline int tag_item(struct template *, struct repo_tag *);
 static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
 
@@ -566,6 +567,86 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 {!
 	free(dir);
 !}
+{{ end }}
+
+{{ define gotweb_render_tags_tmpl(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct querystring	*qs = t->qs;
+	struct repo_tag		*rt;
+	int			 commit_found;
+
+	commit_found = qs->commit == NULL;
+!}
+<div id="tags_title_wrapper">
+  <div id="tags_title">Tags</div>
+</div>
+<div id="tags_content">
+  {{ if t->tag_count == 0 }}
+    <div id="err_content">
+      This repository contains no tags
+    </div>
+  {{ else }}
+    {{ tailq-foreach rt &t->repo_tags entry }}
+      {{ if commit_found || !strcmp(qs->commit, rt->commit_id) }}
+        {! commit_found = 1; !}
+        {{ render tag_item(tp, rt) }}
+      {{ end }}
+    {{ end }}
+    {{ if t->next_id || t->prev_id }}
+      {{ render gotweb_render_navs(tp) }}
+    {{ end }}
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define tag_item(struct template *tp, struct repo_tag *rt) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_dir		*repo_dir = t->repo_dir;
+	char			*tag_name = rt->tag_name;
+	char			*msg = rt->tag_commit;
+	char			*nl;
+	struct gotweb_url	 url = {
+		.action = TAG,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+		.commit = rt->commit_id,
+	};
+
+	if (strncmp(tag_name, "refs/tags/", 10) == 0)
+		tag_name += 10;
+
+	if (msg) {
+		nl = strchr(msg, '\n');
+		if (nl)
+			*nl = '\0';
+	}
+!}
+<div class="tag_age">
+  {{ render gotweb_render_age(tp, rt->tagger_time, TM_DIFF) }}
+</div>
+<div class="tag">{{ tag_name }}</div>
+<div class="tag_log">
+  <a href="{{ render gotweb_render_url(c, &url) }}">
+    {{ msg }}
+  </a>
+</div>
+<div class="navs_wrapper">
+  <div class="navs">
+    <a href="{{ render gotweb_render_url(c, &url) }}">tag</a>
+    {{ " | " }}
+    {! url.action = BRIEFS; !}
+    <a href="{{ render gotweb_render_url(c, &url) }}">commit briefs</a>
+    {{ " | " }}
+    {! url.action = COMMITS; !}
+    <a href="{{ render gotweb_render_url(c, &url) }}">commits</a>
+  </div>
+</div>
+<div class="dotted_line"></div>
 {{ end }}
 
 {{ define gotweb_render_rss(struct template *tp) }}

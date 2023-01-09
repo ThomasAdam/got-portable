@@ -1331,13 +1331,9 @@ static const struct got_error *
 gotweb_render_tags(struct request *c)
 {
 	const struct got_error *error = NULL;
-	struct repo_tag *rt = NULL;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
-	struct repo_dir *repo_dir = t->repo_dir;
-	char *age = NULL, *tagname = NULL, *msg = NULL, *newline;
-	int r, commit_found = 0;
 
 	if (qs->action == BRIEFS) {
 		qs->action = TAGS;
@@ -1347,126 +1343,10 @@ gotweb_render_tags(struct request *c)
 	if (error)
 		goto done;
 
-	r = fcgi_printf(c, "<div id='tags_title_wrapper'>\n"
-	    "<div id='tags_title'>Tags</div>\n"
-	    "</div>\n"		/* #tags_title_wrapper */
-	    "<div id='tags_content'>\n");
-	if (r == -1)
+	if (gotweb_render_tags_tmpl(c->tp) == -1)
 		goto done;
 
-	if (t->tag_count == 0) {
-		r = fcgi_printf(c, "<div id='err_content'>%s\n</div>\n",
-		    "This repository contains no tags");
-		if (r == -1)
-			goto done;
-	}
-
-	TAILQ_FOREACH(rt, &t->repo_tags, entry) {
-		if (commit_found == 0 && qs->commit != NULL) {
-			if (strcmp(qs->commit, rt->commit_id) != 0)
-				continue;
-			else
-				commit_found = 1;
-		}
-		error = gotweb_get_time_str(&age, rt->tagger_time, TM_DIFF);
-		if (error)
-			goto done;
-
-		tagname = rt->tag_name;
-		if (strncmp(tagname, "refs/tags/", 10) == 0)
-			tagname += 10;
-		error = gotweb_escape_html(&tagname, tagname);
-		if (error)
-			goto done;
-
-		if (rt->tag_commit != NULL) {
-			newline = strchr(rt->tag_commit, '\n');
-			if (newline)
-				*newline = '\0';
-			error = gotweb_escape_html(&msg, rt->tag_commit);
-			if (error)
-				goto done;
-		}
-
-		if (fcgi_printf(c, "<div class='tag_age'>%s</div>\n"
-		    "<div class='tag'>%s</div>\n"
-		    "<div class='tag_log'>", age, tagname) == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = TAG,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rt->commit_id,
-		    }, "%s", msg ? msg : "");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, "</div>\n"	/* .tag_log */
-		    "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = TAG,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rt->commit_id,
-		    }, "tag");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, " | ") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = BRIEFS,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rt->commit_id,
-		    }, "commit briefs");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, " | ") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = COMMITS,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = rt->commit_id,
-		    }, "commits");
-		if (r == -1)
-			goto done;
-
-		r = fcgi_printf(c,
-		    "</div>\n"	/* .navs */
-		    "</div>\n"	/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n");
-		if (r == -1)
-			goto done;
-
-		free(age);
-		age = NULL;
-		free(tagname);
-		tagname = NULL;
-		free(msg);
-		msg = NULL;
-	}
-	if (t->next_id || t->prev_id) {
-		if (gotweb_render_navs(c->tp) == -1)
-			goto done;
-	}
-	fcgi_printf(c, "</div>\n"); /* #tags_content */
 done:
-	free(age);
-	free(tagname);
-	free(msg);
 	return error;
 }
 
