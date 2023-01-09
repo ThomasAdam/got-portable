@@ -981,7 +981,8 @@ got_object_raw_alloc(struct got_raw_object **obj, uint8_t *outbuf, int *outfd,
 		}
 
 		if (sb.st_size != tot) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			err = got_error_msg(GOT_ERR_BAD_OBJ_HDR,
+			    "raw object has unexpected size");
 			goto done;
 		}
 #ifndef GOT_PACK_NO_MMAP
