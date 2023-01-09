@@ -30,6 +30,15 @@ test_send_basic() {
 		return 1
 	fi
 
+	# create a second clone to test an incremental fetch with later
+	got clone -q -m ${GOTD_TEST_REPO_URL} $testroot/repo-clone2
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -53,10 +62,10 @@ test_send_basic() {
 	fi
 
 	# Verify that the send operation worked fine.
-	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone2
+	got fetch -q -r $testroot/repo-clone2
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "got clone failed unexpectedly" >&2
+		echo "got fetch failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
