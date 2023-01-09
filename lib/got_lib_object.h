@@ -155,4 +155,4 @@ const struct got_error *got_object_enumerate(int *,
     struct got_packidx *, struct got_repository *);
 
 const struct got_error *got_object_raw_alloc(struct got_raw_object **,
-    uint8_t *, int *, size_t, off_t);
+    uint8_t *, int *, size_t, size_t, off_t);

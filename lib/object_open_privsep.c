@@ -509,7 +509,8 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 			goto done;
 	}
 
-	err = got_object_raw_alloc(obj, outbuf, outfd, hdrlen, size);
+	err = got_object_raw_alloc(obj, outbuf, outfd,
+	    GOT_DELTA_RESULT_SIZE_CACHED_MAX, hdrlen, size);
 	if (err)
 		goto done;
 
