@@ -165,9 +165,9 @@ Move the selection cursor up N pages (default: 1).
 Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
 Move the selection cursor up N half pages (default: 1).
-.It Cm Home, g
+.It Cm Home, =
 Move the cursor to the newest commit.
-.It Cm End, G
+.It Cm End, *
 Move the cursor to the oldest commit.
 This will traverse all commits on the current branch which may take
 a long time depending on the number of commits in branch history.
@@ -175,6 +175,12 @@ If needed, this operation can be cancelled with
 .Cm C-g
 or
 .Cm Backspace .
+.It Cm g
+Move the cursor to commit N (default: 1).
+.It Cm G
+Like
+.Cm g
+but defaults to the oldest commit.
 .It Cm Enter
 Open a
 .Cm diff
@@ -327,10 +333,16 @@ Scroll up N pages (default: 1).
 Scroll down N half pages (default: 1).
 .It Cm Ctrl+u, u
 Scroll up N half pages (default: 1).
-.It Cm Home, g
+.It Cm Home
 Scroll to the top of the view.
-.It Cm End, G
+.It Cm End
 Scroll to the bottom of the view.
+.It Cm g
+Scroll to line N (default: 1).
+.It Cm G
+Like
+.Cm g
+but defaults to the last line in the diff.
 .It Cm \&(
 Navigate to the Nth previous file in the diff (default: 1).
 .It Cm \&)
@@ -438,10 +450,16 @@ Move the selection cursor up N pages (default: 1).
 Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
 Move the selection cursor up N half pages (default: 1).
-.It Cm Home, g
+.It Cm Home
 Move the selection cursor to the first line of the file.
-.It Cm End, G
+.It Cm End
 Move the selection cursor to the last line of the file.
+.It Cm g
+Move the selection cursor to line N (default: 1).
+.It Cm G
+Like
+.Cm g
+but defaults to the last line in the file.
 .It Cm Enter
 Open a
 .Cm diff
@@ -538,10 +556,16 @@ Move the selection cursor up N pages (default: 1).
 Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
 Move the selection cursor up N half pages (default: 1).
-.It Cm Home, g
+.It Cm Home, =
 Move the selection cursor to the first entry.
-.It Cm End, G
+.It Cm End, *
 Move the selection cursor to the last entry.
+.It Cm g
+Move the selection cursor to entry N (default: 1).
+.It Cm G
+Like
+.Cm g
+but defaults to the last entry.
 .It Cm Enter
 Enter the currently selected directory, or switch to the
 .Cm blame
@@ -614,10 +638,16 @@ Move the selection cursor up N pages (default: 1).
 Move the selection cursor down N half pages (default: 1).
 .It Cm Ctrl+u, u
 Move the selection cursor up N half pages (default: 1).
-.It Cm Home, g
+.It Cm Home, =
 Move the selection cursor to the first reference.
-.It Cm End, G
+.It Cm End, *
 Move the selection cursor to the last reference.
+.It Cm g
+Move the selection cursor to reference N (default: 1).
+.It Cm G
+Like
+.Cm g
+but defaults to the last reference.
 .It Cm Enter
 Open a
 .Cm log
