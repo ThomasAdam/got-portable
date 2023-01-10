@@ -1393,17 +1393,17 @@ got_output_repo_diff(struct request *c)
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd4, fd5,
 		     id1, id2, NULL, NULL, GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		     repo, f3);
+		     0, NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd4, fd5,
 		    id1, id2, NULL, "", "",  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		    repo, f3);
+		    0, NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2, fd4,
 		    fd5, id1, id2, NULL,  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		    repo, f3);
+		    0, NULL, repo, f3);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);

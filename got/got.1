@@ -904,7 +904,7 @@ is never traversed.
 .Tg di
 .It Xo
 .Cm diff
-.Op Fl aPsw
+.Op Fl adPsw
 .Op Fl C Ar number
 .Op Fl c Ar commit
 .Op Fl r Ar repository-path
@@ -962,6 +962,10 @@ arguments are provided, only show differences for the specified paths.
 Cannot be used together with the
 .Fl P
 option.
+.It Fl d
+Display diffstat of changes before the actual diff by annotating each file path
+or blob hash being diffed with the total number of lines added and removed.
+A summary line will display the total number of changes across all files.
 .It Fl P
 Interpret all arguments as paths only.
 This option can be used to resolve ambiguity in cases where paths

@@ -60,12 +60,78 @@ add_line_metadata(struct got_diff_line **lines, size_t *nlines,
 	return NULL;
 }
 
+static void
+diffstat_field_width(size_t *maxlen, int *add_cols, int *rm_cols, size_t len,
+    uint32_t add, uint32_t rm)
+{
+	int d1 = 1, d2 = 1;
+
+	if (maxlen)
+		*maxlen = MAX(*maxlen, len);
+
+	while (add /= 10)
+		++d1;
+	*add_cols = MAX(*add_cols, d1);
+
+	while (rm /= 10)
+		++d2;
+	*rm_cols = MAX(*rm_cols, d2);
+}
+
+static const struct got_error *
+get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
+    struct diff_result *r, int force_text, int status)
+{
+	const struct got_error *err;
+	struct got_pathlist_entry *pe;
+	struct got_diff_changed_path *change = NULL;
+	int flags = (r->left->atomizer_flags | r->right->atomizer_flags);
+	int isbin = (flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
+	int i;
+
+	change = calloc(1, sizeof(*change));
+	if (change == NULL)
+		return got_error_from_errno("malloc");
+
+	if (!isbin || force_text) {
+		for (i = 0; i < r->chunks.len; ++i) {
+			struct diff_chunk *c;
+			int clc, crc;
+
+			c = diff_chunk_get(r, i);
+			clc = diff_chunk_get_left_count(c);
+			crc = diff_chunk_get_right_count(c);
+
+			if (crc && !clc)
+				change->add += crc;
+			if (clc && !crc)
+				change->rm += clc;
+		}
+	}
+
+	change->status = status;
+	ds->ins += change->add;
+	ds->del += change->rm;
+	++ds->nfiles;
+
+	err = got_pathlist_append(ds->paths, path, change);
+	if (err)
+		return err;
+
+	pe = TAILQ_LAST(ds->paths, got_pathlist_head);
+	diffstat_field_width(&ds->max_path_len, &ds->add_cols, &ds->rm_cols,
+	    pe->path_len, change->add, change->rm);
+
+	return NULL;
+}
+
 static const struct got_error *
 diff_blobs(struct got_diff_line **lines, size_t *nlines,
     struct got_diffreg_result **resultp, struct got_blob_object *blob1,
     struct got_blob_object *blob2, FILE *f1, FILE *f2,
     const char *label1, const char *label2, mode_t mode1, mode_t mode2,
-    int diff_context, int ignore_whitespace, int force_text_diff, FILE *outfile,
+    int diff_context, int ignore_whitespace, int force_text_diff,
+    int show_diffstat, struct got_diffstat_cb_arg *ds, FILE *outfile,
     enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err = NULL, *free_err;
@@ -171,10 +237,50 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		free(modestr1);
 		free(modestr2);
 	}
+
 	err = got_diffreg(&result, f1, f2, diff_algo, ignore_whitespace,
 	     force_text_diff);
 	if (err)
 		goto done;
+
+	if (show_diffstat) {
+		char	*path = NULL;
+		int	 status = GOT_STATUS_NO_CHANGE;
+
+		if (label1 == NULL && label2 == NULL) {
+			/* diffstat of blobs, show hash instead of path */
+			if (asprintf(&path, "%.10s -> %.10s",
+			    idstr1, idstr2) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		} else {
+			path = strdup(label2 ? label2 : label1);
+			if (path == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+		}
+
+		/*
+		 * Ignore 'm'ode status change: if there's no accompanying
+		 * content change, there'll be no diffstat, and if there
+		 * are actual changes, 'M'odified takes precedence.
+		 */
+		if (blob1 == NULL)
+			status = GOT_STATUS_ADD;
+		else if (blob2 == NULL)
+			status = GOT_STATUS_DELETE;
+		else
+			status = GOT_STATUS_MODIFY;
+
+		err = get_diffstat(ds, path, result->result, force_text_diff,
+		    status);
+		if (err) {
+			free(path);
+			goto done;
+		}
+	}
 
 	if (outfile) {
 		err = got_diffreg_output(lines, nlines, result,
@@ -209,7 +315,8 @@ got_diff_blob_output_unidiff(void *arg, struct got_blob_object *blob1,
 
 	return diff_blobs(&a->lines, &a->nlines, NULL,
 	    blob1, blob2, f1, f2, label1, label2, mode1, mode2, a->diff_context,
-	    a->ignore_whitespace, a->force_text_diff, a->outfile, a->diff_algo);
+	    a->ignore_whitespace, a->force_text_diff, a->show_diffstat,
+	    a->diffstat, a->outfile, a->diff_algo);
 }
 
 const struct got_error *
@@ -217,11 +324,12 @@ got_diff_blob(struct got_diff_line **lines, size_t*nlines,
     struct got_blob_object *blob1, struct got_blob_object *blob2,
     FILE *f1, FILE *f2, const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, int show_diffstat,
+    struct got_diffstat_cb_arg *ds, FILE *outfile)
 {
 	return diff_blobs(lines, nlines, NULL, blob1, blob2, f1, f2,
 	    label1, label2, 0, 0, diff_context, ignore_whitespace,
-	    force_text_diff, outfile, diff_algo);
+	    force_text_diff, show_diffstat, ds, outfile, diff_algo);
 }
 
 static const struct got_error *
@@ -229,7 +337,8 @@ diff_blob_file(struct got_diffreg_result **resultp,
     struct got_blob_object *blob1, FILE *f1, off_t size1, const char *label1,
     FILE *f2, int f2_exists, struct stat *sb2, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
-    int force_text_diff, FILE *outfile)
+    int force_text_diff, int show_diffstat, struct got_diffstat_cb_arg *ds,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
@@ -278,6 +387,36 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			goto done;
 	}
 
+	if (show_diffstat) {
+		char	*path = NULL;
+		int	 status = GOT_STATUS_NO_CHANGE;
+
+		path = strdup(label2 ? label2 : label1);
+		if (path == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+
+		/*
+		 * Ignore 'm'ode status change: if there's no accompanying
+		 * content change, there'll be no diffstat, and if there
+		 * are actual changes, 'M'odified takes precedence.
+		 */
+		if (blob1 == NULL)
+			status = GOT_STATUS_ADD;
+		else if (!f2_exists)
+			status = GOT_STATUS_DELETE;
+		else
+			status = GOT_STATUS_MODIFY;
+
+		err = get_diffstat(ds, path, result->result, force_text_diff,
+		    status);
+		if (err) {
+			free(path);
+			goto done;
+		}
+	}
+
 done:
 	if (resultp && err == NULL)
 		*resultp = result;
@@ -293,11 +432,12 @@ const struct got_error *
 got_diff_blob_file(struct got_blob_object *blob1, FILE *f1, off_t size1,
     const char *label1, FILE *f2, int f2_exists, struct stat *sb2,
     const char *label2, enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, int show_diffstat,
+    struct got_diffstat_cb_arg *ds, FILE *outfile)
 {
 	return diff_blob_file(NULL, blob1, f1, size1, label1, f2, f2_exists,
 	    sb2, label2, diff_algo, diff_context, ignore_whitespace,
-	    force_text_diff, outfile);
+	    force_text_diff, show_diffstat, ds, outfile);
 }
 
 static const struct got_error *
@@ -612,23 +752,6 @@ diff_entry_new_old(struct got_tree_entry *te2,
 	    NULL, label2, 0, te2->mode, repo);
 }
 
-static void
-diffstat_field_width(size_t *maxlen, int *add_cols, int *rm_cols, size_t len,
-    uint32_t add, uint32_t rm)
-{
-	int d1 = 1, d2 = 1;
-
-	*maxlen = MAX(*maxlen, len);
-
-	while (add /= 10)
-		++d1;
-	*add_cols = MAX(*add_cols, d1);
-
-	while (rm /= 10)
-		++d2;
-	*rm_cols = MAX(*rm_cols, d2);
-}
-
 const struct got_error *
 got_diff_tree_compute_diffstat(void *arg, struct got_blob_object *blob1,
     struct got_blob_object *blob2, FILE *f1, FILE *f2,
@@ -638,35 +761,23 @@ got_diff_tree_compute_diffstat(void *arg, struct got_blob_object *blob1,
 {
 	const struct got_error		*err = NULL;
 	struct got_diffreg_result	*result = NULL;
-	struct diff_result		*r;
-	struct got_diff_changed_path	*change = NULL;
 	struct got_diffstat_cb_arg	*a = arg;
-	struct got_pathlist_entry	*pe;
 	char				*path = NULL;
-	int				 i;
+	int				 status = GOT_STATUS_NO_CHANGE;
 
 	path = strdup(label2 ? label2 : label1);
 	if (path == NULL)
 		return got_error_from_errno("malloc");
 
-	change = malloc(sizeof(*change));
-	if (change == NULL) {
-		err = got_error_from_errno("malloc");
-		goto done;
-	}
-
-	change->add = 0;
-	change->rm = 0;
-	change->status = GOT_STATUS_NO_CHANGE;
 	if (id1 == NULL)
-		change->status = GOT_STATUS_ADD;
+		status = GOT_STATUS_ADD;
 	else if (id2 == NULL)
-		change->status = GOT_STATUS_DELETE;
+		status = GOT_STATUS_DELETE;
 	else {
 		if (got_object_id_cmp(id1, id2) != 0)
-			change->status = GOT_STATUS_MODIFY;
+			status = GOT_STATUS_MODIFY;
 		else if (mode1 != mode2)
-			change->status = GOT_STATUS_MODE_CHANGE;
+			status = GOT_STATUS_MODE_CHANGE;
 	}
 
 	if (f1) {
@@ -698,35 +809,7 @@ got_diff_tree_compute_diffstat(void *arg, struct got_blob_object *blob1,
 	if (err)
 		goto done;
 
-	for (i = 0, r = result->result; i < r->chunks.len; ++i) {
-		int flags = (r->left->atomizer_flags | r->right->atomizer_flags);
-		int isbin = (flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
-
-		if (!isbin || a->force_text) {
-			struct diff_chunk *c;
-			int clc, crc;
-
-			c = diff_chunk_get(r, i);
-			clc = diff_chunk_get_left_count(c);
-			crc = diff_chunk_get_right_count(c);
-
-			if (clc && !crc)
-				change->rm += clc;
-			else if (crc && !clc)
-				change->add += crc;
-		}
-	}
-
-	err = got_pathlist_append(a->paths, path, change);
-	if (err)
-		goto done;
-
-	pe = TAILQ_LAST(a->paths, got_pathlist_head);
-	diffstat_field_width(&a->max_path_len, &a->add_cols, &a->rm_cols,
-	    pe->path_len, change->add, change->rm);
-	a->ins += change->add;
-	a->del += change->rm;
-	++a->nfiles;
+	err = get_diffstat(a, path, result->result, a->force_text, status);
 
 done:
 	if (result) {
@@ -736,10 +819,8 @@ done:
 		if (free_err && err == NULL)
 			err = free_err;
 	}
-	if (err) {
+	if (err)
 		free(path);
-		free(change);
-	}
 	return err;
 }
 
@@ -886,8 +967,8 @@ got_diff_objects_as_blobs(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff,
-    struct got_repository *repo, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, int show_diffstat,
+    struct got_diffstat_cb_arg *ds, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -907,7 +988,7 @@ got_diff_objects_as_blobs(struct got_diff_line **lines, size_t *nlines,
 	}
 	err = got_diff_blob(lines, nlines, blob1, blob2, f1, f2, label1, label2,
 	    diff_algo, diff_context, ignore_whitespace, force_text_diff,
-	    outfile);
+	    show_diffstat, ds, outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -1081,6 +1162,7 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
+    int show_diffstat, struct got_diffstat_cb_arg *dsa,
     struct got_repository *repo, FILE *outfile,
     enum got_diff_algorithm diff_algo)
 {
@@ -1107,6 +1189,8 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
+	arg.show_diffstat = show_diffstat;
+	arg.diffstat = dsa;
 	arg.outfile = outfile;
 	if (want_linemeta) {
 		arg.lines = *lines;
@@ -1115,14 +1199,12 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 		arg.lines = NULL;
 		arg.nlines = 0;
 	}
-	if (paths == NULL || TAILQ_EMPTY(paths)) {
-		err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2,
-		    label1, label2, repo,
-		    got_diff_blob_output_unidiff, &arg, 1);
-	} else {
+	if (paths == NULL || TAILQ_EMPTY(paths))
+		err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, label1,
+		    label2, repo, got_diff_blob_output_unidiff, &arg, 1);
+	else
 		err = diff_paths(tree1, tree2, f1, f2, fd1, fd2, paths, repo,
 		    got_diff_blob_output_unidiff, &arg);
-	}
 	if (want_linemeta) {
 		*lines = arg.lines; /* was likely re-allocated */
 		*nlines = arg.nlines;
@@ -1141,7 +1223,8 @@ got_diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo, FILE *outfile)
+    int force_text_diff, int show_diffstat, struct got_diffstat_cb_arg *dsa,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	char *idstr = NULL;
@@ -1183,7 +1266,7 @@ got_diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 
 	err = diff_objects_as_trees(lines, nlines, f1, f2, fd1, fd2, id1, id2,
 	    paths, label1, label2, diff_context, ignore_whitespace,
-	    force_text_diff, repo, outfile, diff_algo);
+	    force_text_diff, show_diffstat, dsa, repo, outfile, diff_algo);
 done:
 	free(idstr);
 	return err;
@@ -1195,6 +1278,7 @@ got_diff_objects_as_commits(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, enum got_diff_algorithm diff_algo,
     int diff_context, int ignore_whitespace, int force_text_diff,
+    int show_diffstat, struct got_diffstat_cb_arg *dsa,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
@@ -1238,8 +1322,8 @@ got_diff_objects_as_commits(struct got_diff_line **lines, size_t *nlines,
 	err = diff_objects_as_trees(lines, nlines, f1, f2, fd1, fd2,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
 	    got_object_commit_get_tree_id(commit2), paths, "", "",
-	    diff_context, ignore_whitespace, force_text_diff, repo, outfile,
-	    diff_algo);
+	    diff_context, ignore_whitespace, force_text_diff, show_diffstat,
+	    dsa, repo, outfile, diff_algo);
 done:
 	if (commit1)
 		got_object_commit_close(commit1);
