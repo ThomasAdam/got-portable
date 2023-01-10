@@ -59,6 +59,7 @@
 #include "log.h"
 #include "listen.h"
 #include "auth.h"
+#include "session.h"
 #include "repo_read.h"
 #include "repo_write.h"
 
@@ -82,10 +83,10 @@ struct gotd_client {
 	struct gotd_child_proc		*repo_read;
 	struct gotd_child_proc		*repo_write;
 	struct gotd_child_proc		*auth;
+	struct gotd_child_proc		*session;
 	int				 required_auth;
 	char				*packfile_path;
 	char				*packidx_path;
-	int				 nref_updates;
 };
 STAILQ_HEAD(gotd_clients, gotd_client);
 
@@ -97,6 +98,8 @@ static struct gotd gotd;
 
 void gotd_sighdlr(int sig, short event, void *arg);
 static void gotd_shutdown(void);
+static const struct got_error *start_session_child(struct gotd_client *,
+    struct gotd_repo *, char *, const char *, int, int);
 static const struct got_error *start_repo_child(struct gotd_client *,
     enum gotd_procid, struct gotd_repo *, char *, const char *, int, int);
 static const struct got_error *start_auth_child(struct gotd_client *, int,
@@ -205,7 +208,7 @@ find_client(uint32_t client_id)
 }
 
 static struct gotd_child_proc *
-get_client_proc(struct gotd_client *client)
+get_client_repo_proc(struct gotd_client *client)
 {
 	if (client->repo_read && client->repo_write) {
 		fatalx("uid %d is reading and writing in the same session",
@@ -230,10 +233,12 @@ find_client_by_proc_fd(int fd)
 		struct gotd_client *c;
 
 		STAILQ_FOREACH(c, &gotd_clients[slot], entry) {
-			struct gotd_child_proc *proc = get_client_proc(c);
+			struct gotd_child_proc *proc = get_client_repo_proc(c);
 			if (proc && proc->iev.ibuf.fd == fd)
 				return c;
 			if (c->auth && c->auth->iev.ibuf.fd == fd)
+				return c;
+			if (c->session && c->session->iev.ibuf.fd == fd)
 				return c;
 		}
 	}
@@ -251,30 +256,6 @@ static int
 client_is_writing(struct gotd_client *client)
 {
 	return client->repo_write != NULL;
-}
-
-static const struct got_error *
-ensure_client_is_reading(struct gotd_client *client)
-{
-	if (!client_is_reading(client)) {
-		return got_error_fmt(GOT_ERR_BAD_PACKET,
-		    "uid %d made a read-request but is not reading from "
-		    "a repository", client->euid);
-	}
-
-	return NULL;
-}
-
-static const struct got_error *
-ensure_client_is_writing(struct gotd_client *client)
-{
-	if (!client_is_writing(client)) {
-		return got_error_fmt(GOT_ERR_BAD_PACKET,
-		    "uid %d made a write-request but is not writing to "
-		    "a repository", client->euid);
-	}
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -323,6 +304,17 @@ wait_for_child(pid_t child_pid)
 }
 
 static void
+proc_done(struct gotd_child_proc *proc)
+{
+	event_del(&proc->iev.ev);
+	msgbuf_clear(&proc->iev.ibuf.w);
+	close(proc->iev.ibuf.fd);
+	kill_proc(proc, 0);
+	wait_for_child(proc->pid);
+	free(proc);
+}
+
+static void
 kill_auth_proc(struct gotd_client *client)
 {
 	struct gotd_child_proc *proc;
@@ -333,25 +325,35 @@ kill_auth_proc(struct gotd_client *client)
 	proc = client->auth;
 	client->auth = NULL;
 
-	event_del(&proc->iev.ev);
-	msgbuf_clear(&proc->iev.ibuf.w);
-	close(proc->iev.ibuf.fd);
-	kill_proc(proc, 0);
-	wait_for_child(proc->pid);
-	free(proc);
+	proc_done(proc);
+}
+
+static void
+kill_session_proc(struct gotd_client *client)
+{
+	struct gotd_child_proc *proc;
+
+	if (client->session == NULL)
+		return;
+
+	proc = client->session;
+	client->session = NULL;
+
+	proc_done(proc);
 }
 
 static void
 disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
-	struct gotd_child_proc *proc = get_client_proc(client);
+	struct gotd_child_proc *proc = get_client_repo_proc(client);
 	struct gotd_child_proc *listen_proc = &gotd.listen_proc;
 	uint64_t slot;
 
 	log_debug("uid %d: disconnecting", client->euid);
 
 	kill_auth_proc(client);
+	kill_session_proc(client);
 
 	idisconnect.client_id = client->id;
 	if (proc) {
@@ -378,7 +380,10 @@ disconnect(struct gotd_client *client)
 	imsg_clear(&client->iev.ibuf);
 	event_del(&client->iev.ev);
 	evtimer_del(&client->tmo);
-	close(client->fd);
+	if (client->fd != -1)
+		close(client->fd);
+	else if (client->iev.ibuf.fd != -1)
+		close(client->iev.ibuf.fd);
 	if (client->delta_cache_fd != -1)
 		close(client->delta_cache_fd);
 	if (client->packfile_path) {
@@ -402,7 +407,7 @@ disconnect_on_error(struct gotd_client *client, const struct got_error *err)
 	struct imsgbuf ibuf;
 
 	log_warnx("uid %d: %s", client->euid, err->msg);
-	if (err->code != GOT_ERR_EOF) {
+	if (err->code != GOT_ERR_EOF && client->fd != -1) {
 		imsg_init(&ibuf, client->fd);
 		gotd_imsg_send_error(&ibuf, 0, PROC_GOTD, err);
 		imsg_clear(&ibuf);
@@ -487,7 +492,7 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 	iclient.euid = client->euid;
 	iclient.egid = client->egid;
 
-	proc = get_client_proc(client);
+	proc = get_client_repo_proc(client);
 	if (proc) {
 		if (strlcpy(iclient.repo_name, proc->repo_path,
 		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
@@ -496,9 +501,13 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 		}
 		if (client_is_writing(client))
 			iclient.is_writing = 1;
+
+		iclient.repo_child_pid = proc->pid;
 	}
 
 	iclient.state = client->state;
+	if (client->session)
+		iclient.session_child_pid = client->session->pid;
 	iclient.ncapabilities = client->ncapabilities;
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT, PROC_GOTD, -1,
@@ -593,7 +602,7 @@ find_repo_by_name(const char *repo_name)
 }
 
 static const struct got_error *
-start_client_session(struct gotd_client *client, struct imsg *imsg)
+start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 {
 	const struct got_error *err;
 	struct gotd_imsg_list_refs ireq;
@@ -601,6 +610,10 @@ start_client_session(struct gotd_client *client, struct imsg *imsg)
 	size_t datalen;
 
 	log_debug("list-refs request from uid %d", client->euid);
+
+	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+		return got_error_msg(GOT_ERR_BAD_REQUEST,
+		    "unexpected list-refs request received");
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ireq))
@@ -635,336 +648,10 @@ start_client_session(struct gotd_client *client, struct imsg *imsg)
 			return err;
 	}
 
+	evtimer_add(&client->tmo, &auth_timeout);
+
 	/* Flow continues upon authentication successs/failure or timeout. */
 	return NULL;
-}
-
-static const struct got_error *
-forward_want(struct gotd_client *client, struct imsg *imsg)
-{
-	struct gotd_imsg_want ireq;
-	struct gotd_imsg_want iwant;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	memcpy(&ireq, imsg->data, datalen);
-
-	memset(&iwant, 0, sizeof(iwant));
-	memcpy(iwant.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
-	iwant.client_id = client->id;
-
-	if (gotd_imsg_compose_event(&client->repo_read->iev, GOTD_IMSG_WANT,
-	    PROC_GOTD, -1, &iwant, sizeof(iwant)) == -1)
-		return got_error_from_errno("imsg compose WANT");
-
-	return NULL;
-}
-
-static const struct got_error *
-forward_ref_update(struct gotd_client *client, struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_ref_update ireq;
-	struct gotd_imsg_ref_update *iref = NULL;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(ireq))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
-	if (datalen != sizeof(ireq) + ireq.name_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	iref = malloc(datalen);
-	if (iref == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(iref, imsg->data, datalen);
-
-	iref->client_id = client->id;
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_REF_UPDATE, PROC_GOTD, -1, iref, datalen) == -1)
-		err = got_error_from_errno("imsg compose REF_UPDATE");
-	free(iref);
-	return err;
-}
-
-static const struct got_error *
-forward_have(struct gotd_client *client, struct imsg *imsg)
-{
-	struct gotd_imsg_have ireq;
-	struct gotd_imsg_have ihave;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	memcpy(&ireq, imsg->data, datalen);
-
-	memset(&ihave, 0, sizeof(ihave));
-	memcpy(ihave.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
-	ihave.client_id = client->id;
-
-	if (gotd_imsg_compose_event(&client->repo_read->iev, GOTD_IMSG_HAVE,
-	    PROC_GOTD, -1, &ihave, sizeof(ihave)) == -1)
-		return got_error_from_errno("imsg compose HAVE");
-
-	return NULL;
-}
-
-static int
-client_has_capability(struct gotd_client *client, const char *capastr)
-{
-	struct gotd_client_capability *capa;
-	size_t i;
-
-	if (client->ncapabilities == 0)
-		return 0;
-
-	for (i = 0; i < client->ncapabilities; i++) {
-		capa = &client->capabilities[i];
-		if (strcmp(capa->key, capastr) == 0)
-			return 1;
-	}
-
-	return 0;
-}
-
-static const struct got_error *
-recv_capabilities(struct gotd_client *client, struct imsg *imsg)
-{
-	struct gotd_imsg_capabilities icapas;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(icapas))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&icapas, imsg->data, sizeof(icapas));
-
-	client->ncapa_alloc = icapas.ncapabilities;
-	client->capabilities = calloc(client->ncapa_alloc,
-	    sizeof(*client->capabilities));
-	if (client->capabilities == NULL) {
-		client->ncapa_alloc = 0;
-		return got_error_from_errno("calloc");
-	}
-
-	log_debug("expecting %zu capabilities from uid %d",
-	    client->ncapa_alloc, client->euid);
-	return NULL;
-}
-
-static const struct got_error *
-recv_capability(struct gotd_client *client, struct imsg *imsg)
-{
-	struct gotd_imsg_capability icapa;
-	struct gotd_client_capability *capa;
-	size_t datalen;
-	char *key, *value = NULL;
-
-	if (client->capabilities == NULL ||
-	    client->ncapabilities >= client->ncapa_alloc) {
-		return got_error_msg(GOT_ERR_BAD_REQUEST,
-		    "unexpected capability received");
-	}
-
-	memset(&icapa, 0, sizeof(icapa));
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(icapa))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&icapa, imsg->data, sizeof(icapa));
-
-	if (datalen != sizeof(icapa) + icapa.key_len + icapa.value_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	key = malloc(icapa.key_len + 1);
-	if (key == NULL)
-		return got_error_from_errno("malloc");
-	if (icapa.value_len > 0) {
-		value = malloc(icapa.value_len + 1);
-		if (value == NULL) {
-			free(key);
-			return got_error_from_errno("malloc");
-		}
-	}
-
-	memcpy(key, imsg->data + sizeof(icapa), icapa.key_len);
-	key[icapa.key_len] = '\0';
-	if (value) {
-		memcpy(value, imsg->data + sizeof(icapa) + icapa.key_len,
-		    icapa.value_len);
-		value[icapa.value_len] = '\0';
-	}
-
-	capa = &client->capabilities[client->ncapabilities++];
-	capa->key = key;
-	capa->value = value;
-
-	if (value)
-		log_debug("uid %d: capability %s=%s", client->euid, key, value);
-	else
-		log_debug("uid %d: capability %s", client->euid, key);
-
-	return NULL;
-}
-
-static const struct got_error *
-send_packfile(struct gotd_client *client)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_send_packfile ipack;
-	struct gotd_imsg_packfile_pipe ipipe;
-	int pipe[2];
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
-		return got_error_from_errno("socketpair");
-
-	memset(&ipack, 0, sizeof(ipack));
-	memset(&ipipe, 0, sizeof(ipipe));
-
-	ipack.client_id = client->id;
-	if (client_has_capability(client, GOT_CAPA_SIDE_BAND_64K))
-		ipack.report_progress = 1;
-
-	client->delta_cache_fd = got_opentempfd();
-	if (client->delta_cache_fd == -1)
-		return got_error_from_errno("got_opentempfd");
-
-	if (gotd_imsg_compose_event(&client->repo_read->iev,
-	    GOTD_IMSG_SEND_PACKFILE, PROC_GOTD, client->delta_cache_fd,
-	    &ipack, sizeof(ipack)) == -1) {
-		err = got_error_from_errno("imsg compose SEND_PACKFILE");
-		close(pipe[0]);
-		close(pipe[1]);
-		return err;
-	}
-
-	ipipe.client_id = client->id;
-
-	/* Send pack pipe end 0 to repo_read. */
-	if (gotd_imsg_compose_event(&client->repo_read->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0],
-	        &ipipe, sizeof(ipipe)) == -1) {
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-		close(pipe[1]);
-		return err;
-	}
-
-	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
-	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1], NULL, 0) == -1)
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-
-	return err;
-}
-
-static const struct got_error *
-recv_packfile(struct gotd_client *client)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_recv_packfile ipack;
-	struct gotd_imsg_packfile_pipe ipipe;
-	struct gotd_imsg_packidx_file ifile;
-	char *basepath = NULL, *pack_path = NULL, *idx_path = NULL;
-	int packfd = -1, idxfd = -1;
-	int pipe[2] = { -1, -1 };
-
-	if (client->packfile_path) {
-		return got_error_fmt(GOT_ERR_PRIVSEP_MSG,
-		    "uid %d already has a pack file", client->euid);
-	}
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
-		return got_error_from_errno("socketpair");
-
-	memset(&ipipe, 0, sizeof(ipipe));
-	ipipe.client_id = client->id;
-
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0],
-	        &ipipe, sizeof(ipipe)) == -1) {
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-		pipe[0] = -1;
-		goto done;
-	}
-	pipe[0] = -1;
-
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1],
-	        &ipipe, sizeof(ipipe)) == -1)
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-	pipe[1] = -1;
-
-	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.pack",
-	    client->repo_write->repo_path, GOT_OBJECTS_PACK_DIR,
-	    client->euid) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	err = got_opentemp_named_fd(&pack_path, &packfd, basepath, "");
-	if (err)
-		goto done;
-
-	free(basepath);
-	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.idx",
-	    client->repo_write->repo_path, GOT_OBJECTS_PACK_DIR,
-	    client->euid) == -1) {
-		err = got_error_from_errno("asprintf");
-		basepath = NULL;
-		goto done;
-	}
-	err = got_opentemp_named_fd(&idx_path, &idxfd, basepath, "");
-	if (err)
-		goto done;
-
-	memset(&ifile, 0, sizeof(ifile));
-	ifile.client_id = client->id;
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_PACKIDX_FILE, PROC_GOTD, idxfd,
-	    &ifile, sizeof(ifile)) == -1) {
-		err = got_error_from_errno("imsg compose PACKIDX_FILE");
-		idxfd = -1;
-		goto done;
-	}
-	idxfd = -1;
-
-	memset(&ipack, 0, sizeof(ipack));
-	ipack.client_id = client->id;
-	if (client_has_capability(client, GOT_CAPA_REPORT_STATUS))
-		ipack.report_status = 1;
-
-	if (gotd_imsg_compose_event(&client->repo_write->iev,
-	    GOTD_IMSG_RECV_PACKFILE, PROC_GOTD, packfd,
-	    &ipack, sizeof(ipack)) == -1) {
-		err = got_error_from_errno("imsg compose RECV_PACKFILE");
-		packfd = -1;
-		goto done;
-	}
-	packfd = -1;
-
-done:
-	free(basepath);
-	if (pipe[0] != -1 && close(pipe[0]) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (pipe[1] != -1 && close(pipe[1]) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (packfd != -1 && close(packfd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (err) {
-		free(pack_path);
-		free(idx_path);
-	} else {
-		client->packfile_path = pack_path;
-		client->packidx_path = idx_path;
-	}
-	return err;
 }
 
 static void
@@ -1031,144 +718,10 @@ gotd_request(int fd, short events, void *arg)
 			err = stop_gotd(client);
 			break;
 		case GOTD_IMSG_LIST_REFS:
-			if (client->state != GOTD_STATE_EXPECT_LIST_REFS) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected list-refs request received");
-				break;
-			}
-			err = start_client_session(client, &imsg);
-			if (err)
-				break;
-			break;
-		case GOTD_IMSG_CAPABILITIES:
-			if (client->state != GOTD_STATE_EXPECT_CAPABILITIES) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected capabilities received");
-				break;
-			}
-			log_debug("receiving capabilities from uid %d",
-			    client->euid);
-			err = recv_capabilities(client, &imsg);
-			break;
-		case GOTD_IMSG_CAPABILITY:
-			if (client->state != GOTD_STATE_EXPECT_CAPABILITIES) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected capability received");
-				break;
-			}
-			err = recv_capability(client, &imsg);
-			if (err || client->ncapabilities < client->ncapa_alloc)
-				break;
-			if (client_is_reading(client)) {
-				client->state = GOTD_STATE_EXPECT_WANT;
-				log_debug("uid %d: expecting want-lines",
-				    client->euid);
-			} else if (client_is_writing(client)) {
-				client->state = GOTD_STATE_EXPECT_REF_UPDATE;
-				log_debug("uid %d: expecting ref-update-lines",
-				    client->euid);
-			} else
-				fatalx("client %d is both reading and writing",
-				    client->euid);
-			break;
-		case GOTD_IMSG_WANT:
-			if (client->state != GOTD_STATE_EXPECT_WANT) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected want-line received");
-				break;
-			}
-			log_debug("received want-line from uid %d",
-			    client->euid);
-			err = ensure_client_is_reading(client);
-			if (err)
-				break;
-			err = forward_want(client, &imsg);
-			break;
-		case GOTD_IMSG_REF_UPDATE:
-			if (client->state != GOTD_STATE_EXPECT_REF_UPDATE) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected ref-update-line received");
-				break;
-			}
-			log_debug("received ref-update-line from uid %d",
-			    client->euid);
-			err = ensure_client_is_writing(client);
-			if (err)
-				break;
-			err = forward_ref_update(client, &imsg);
-			if (err)
-				break;
-			client->state = GOTD_STATE_EXPECT_MORE_REF_UPDATES;
-			break;
-		case GOTD_IMSG_HAVE:
-			if (client->state != GOTD_STATE_EXPECT_HAVE) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected have-line received");
-				break;
-			}
-			log_debug("received have-line from uid %d",
-			    client->euid);
-			err = ensure_client_is_reading(client);
-			if (err)
-				break;
-			err = forward_have(client, &imsg);
-			if (err)
-				break;
-			break;
-		case GOTD_IMSG_FLUSH:
-			if (client->state == GOTD_STATE_EXPECT_WANT ||
-			    client->state == GOTD_STATE_EXPECT_HAVE) {
-				err = ensure_client_is_reading(client);
-				if (err)
-					break;
-			} else if (client->state ==
-			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
-				err = ensure_client_is_writing(client);
-				if (err)
-					break;
-			} else {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected flush-pkt received");
-				break;
-			}
-			log_debug("received flush-pkt from uid %d",
-			    client->euid);
-			if (client->state == GOTD_STATE_EXPECT_WANT) {
-				client->state = GOTD_STATE_EXPECT_HAVE;
-				log_debug("uid %d: expecting have-lines",
-				    client->euid);
-			} else if (client->state == GOTD_STATE_EXPECT_HAVE) {
-				client->state = GOTD_STATE_EXPECT_DONE;
-				log_debug("uid %d: expecting 'done'",
-				    client->euid);
-			} else if (client->state ==
-			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
-				client->state = GOTD_STATE_EXPECT_PACKFILE;
-				log_debug("uid %d: expecting packfile",
-				    client->euid);
-				err = recv_packfile(client);
-			} else {
-				/* should not happen, see above */
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected client state");
-				break;
-			}
-			break;
-		case GOTD_IMSG_DONE:
-			if (client->state != GOTD_STATE_EXPECT_HAVE &&
-			    client->state != GOTD_STATE_EXPECT_DONE) {
-				err = got_error_msg(GOT_ERR_BAD_REQUEST,
-				    "unexpected flush-pkt received");
-				break;
-			}
-			log_debug("received 'done' from uid %d", client->euid);
-			err = ensure_client_is_reading(client);
-			if (err)
-				break;
-			client->state = GOTD_STATE_DONE;
-			err = send_packfile(client);
+			err = start_client_authentication(client, &imsg);
 			break;
 		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
@@ -1182,19 +735,16 @@ gotd_request(int fd, short events, void *arg)
 			disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(&client->iev);
-		if (client->state == GOTD_STATE_EXPECT_LIST_REFS)
-			evtimer_add(&client->tmo, &auth_timeout);
-		else
-			evtimer_add(&client->tmo, &gotd.request_timeout);
 	}
 }
 
 static void
-gotd_request_timeout(int fd, short events, void *arg)
+gotd_auth_timeout(int fd, short events, void *arg)
 {
 	struct gotd_client *client = arg;
 
-	log_debug("disconnecting uid %d due to timeout", client->euid);
+	log_debug("disconnecting uid %d due to authentication timeout",
+	    client->euid);
 	disconnect(client);
 }
 
@@ -1241,7 +791,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	/* The auth process will verify UID/GID for us. */
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
-	client->nref_updates = -1;
 
 	imsg_init(&client->iev.ibuf, client->fd);
 	client->iev.handler = gotd_request;
@@ -1252,7 +801,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	    &client->iev);
 	gotd_imsg_event_add(&client->iev);
 
-	evtimer_set(&client->tmo, gotd_request_timeout, client);
+	evtimer_set(&client->tmo, gotd_auth_timeout, client);
 
 	add_client(client);
 	log_debug("%s: new client uid %d connected on fd %d", __func__,
@@ -1279,6 +828,7 @@ static const char *gotd_proc_names[PROC_MAX] = {
 	"parent",
 	"listen",
 	"auth",
+	"session",
 	"repo_read",
 	"repo_write"
 };
@@ -1299,6 +849,7 @@ gotd_shutdown(void)
 	struct gotd_child_proc *proc;
 	uint64_t slot;
 
+	log_debug("shutting down");
 	for (slot = 0; slot < nitems(gotd_clients); slot++) {
 		struct gotd_client *c, *tmp;
 
@@ -1379,7 +930,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	int ret = 0;
 
 	if (proc->type == PROC_REPO_READ || proc->type == PROC_REPO_WRITE) {
-		client_proc = get_client_proc(client);
+		client_proc = get_client_repo_proc(client);
 		if (client_proc == NULL)
 			fatalx("no process found for uid %d", client->euid);
 		if (proc->pid != client_proc->pid) {
@@ -1387,6 +938,19 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			log_warnx("received message from PID %d for uid %d, "
 			    "while PID %d is the process serving this user",
 			    proc->pid, client->euid, client_proc->pid);
+			return 0;
+		}
+	}
+	if (proc->type == PROC_SESSION) {
+		if (client->session == NULL) {
+			log_warnx("no session found for uid %d", client->euid);
+			return 0;
+		}
+		if (proc->pid != client->session->pid) {
+			kill_proc(proc, 1);
+			log_warnx("received message from PID %d for uid %d, "
+			    "while PID %d is the process serving this user",
+			    proc->pid, client->euid, client->session->pid);
 			return 0;
 		}
 	}
@@ -1410,6 +974,14 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			    "authentication of uid %d from PID %d "
 			    "which is not the auth process",
 			    proc->pid, client->euid);
+		} else
+			ret = 1;
+		break;
+	case GOTD_IMSG_CLIENT_SESSION_READY:
+		if (proc->type != PROC_SESSION) {
+			err = got_error_fmt(GOT_ERR_BAD_PACKET,
+			    "unexpected \"ready\" signal from PID %d",
+			    proc->pid);
 		} else
 			ret = 1;
 		break;
@@ -1447,381 +1019,44 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 }
 
 static const struct got_error *
-list_refs_request(struct gotd_client *client, struct gotd_imsgev *iev)
+connect_repo_child(struct gotd_client *client,
+    struct gotd_child_proc *repo_proc)
 {
 	static const struct got_error *err;
-	struct gotd_imsg_list_refs_internal ilref;
-	int fd;
+	struct gotd_imsgev *session_iev = &client->session->iev;
+	struct gotd_imsg_connect_repo_child ireq;
+	int pipe[2];
 
-	memset(&ilref, 0, sizeof(ilref));
-	ilref.client_id = client->id;
+	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+		return got_error_msg(GOT_ERR_BAD_REQUEST,
+		    "unexpected repo child ready signal received");
 
-	fd = dup(client->fd);
-	if (fd == -1)
-		return got_error_from_errno("dup");
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, pipe) == -1)
+		fatal("socketpair");
 
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LIST_REFS_INTERNAL,
-	    PROC_GOTD, fd, &ilref, sizeof(ilref)) == -1) {
-		err = got_error_from_errno("imsg compose WANT");
-		close(fd);
+	memset(&ireq, 0, sizeof(ireq));
+	ireq.client_id = client->id;
+	ireq.proc_id = repo_proc->type;
+
+	/* Pass repo child pipe to session child process. */
+	if (gotd_imsg_compose_event(session_iev, GOTD_IMSG_CONNECT_REPO_CHILD,
+	    PROC_GOTD, pipe[0], &ireq, sizeof(ireq)) == -1) {
+		err = got_error_from_errno("imsg compose CONNECT_REPO_CHILD");
+		close(pipe[0]);
+		close(pipe[1]);
 		return err;
 	}
 
-	client->state = GOTD_STATE_EXPECT_CAPABILITIES;
-	log_debug("uid %d: expecting capabilities", client->euid);
-	return NULL;
-}
-
-static const struct got_error *
-recv_packfile_done(uint32_t *client_id, struct imsg *imsg)
-{
-	struct gotd_imsg_packfile_done idone;
-	size_t datalen;
-
-	log_debug("packfile-done received");
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(idone))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&idone, imsg->data, sizeof(idone));
-
-	*client_id = idone.client_id;
-	return NULL;
-}
-
-static const struct got_error *
-recv_packfile_install(uint32_t *client_id, struct imsg *imsg)
-{
-	struct gotd_imsg_packfile_install inst;
-	size_t datalen;
-
-	log_debug("packfile-install received");
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(inst))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&inst, imsg->data, sizeof(inst));
-
-	*client_id = inst.client_id;
-	return NULL;
-}
-
-static const struct got_error *
-recv_ref_updates_start(uint32_t *client_id, struct imsg *imsg)
-{
-	struct gotd_imsg_ref_updates_start istart;
-	size_t datalen;
-
-	log_debug("ref-updates-start received");
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(istart))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&istart, imsg->data, sizeof(istart));
-
-	*client_id = istart.client_id;
-	return NULL;
-}
-
-static const struct got_error *
-recv_ref_update(uint32_t *client_id, struct imsg *imsg)
-{
-	struct gotd_imsg_ref_update iref;
-	size_t datalen;
-
-	log_debug("ref-update received");
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(iref))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&iref, imsg->data, sizeof(iref));
-
-	*client_id = iref.client_id;
-	return NULL;
-}
-
-static const struct got_error *
-send_ref_update_ok(struct gotd_client *client,
-    struct gotd_imsg_ref_update *iref, const char *refname)
-{
-	struct gotd_imsg_ref_update_ok iok;
-	struct ibuf *wbuf;
-	size_t len;
-
-	memset(&iok, 0, sizeof(iok));
-	iok.client_id = client->id;
-	memcpy(iok.old_id, iref->old_id, SHA1_DIGEST_LENGTH);
-	memcpy(iok.new_id, iref->new_id, SHA1_DIGEST_LENGTH);
-	iok.name_len = strlen(refname);
-
-	len = sizeof(iok) + iok.name_len;
-	wbuf = imsg_create(&client->iev.ibuf, GOTD_IMSG_REF_UPDATE_OK,
-	    PROC_GOTD, gotd.pid, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create REF_UPDATE_OK");
-
-	if (imsg_add(wbuf, &iok, sizeof(iok)) == -1)
-		return got_error_from_errno("imsg_add REF_UPDATE_OK");
-	if (imsg_add(wbuf, refname, iok.name_len) == -1)
-		return got_error_from_errno("imsg_add REF_UPDATE_OK");
-
-	wbuf->fd = -1;
-	imsg_close(&client->iev.ibuf, wbuf);
-	gotd_imsg_event_add(&client->iev);
-	return NULL;
-}
-
-static void
-send_refs_updated(struct gotd_client *client)
-{
-	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_REFS_UPDATED, PROC_GOTD, -1, NULL, 0) == -1)
-		log_warn("imsg compose REFS_UPDATED");
-}
-
-static const struct got_error *
-send_ref_update_ng(struct gotd_client *client,
-    struct gotd_imsg_ref_update *iref, const char *refname,
-    const char *reason)
-{
-	const struct got_error *ng_err;
-	struct gotd_imsg_ref_update_ng ing;
-	struct ibuf *wbuf;
-	size_t len;
-
-	memset(&ing, 0, sizeof(ing));
-	ing.client_id = client->id;
-	memcpy(ing.old_id, iref->old_id, SHA1_DIGEST_LENGTH);
-	memcpy(ing.new_id, iref->new_id, SHA1_DIGEST_LENGTH);
-	ing.name_len = strlen(refname);
-
-	ng_err = got_error_fmt(GOT_ERR_REF_BUSY, "%s", reason);
-	ing.reason_len = strlen(ng_err->msg);
-
-	len = sizeof(ing) + ing.name_len + ing.reason_len;
-	wbuf = imsg_create(&client->iev.ibuf, GOTD_IMSG_REF_UPDATE_NG,
-	    PROC_GOTD, gotd.pid, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create REF_UPDATE_NG");
-
-	if (imsg_add(wbuf, &ing, sizeof(ing)) == -1)
-		return got_error_from_errno("imsg_add REF_UPDATE_NG");
-	if (imsg_add(wbuf, refname, ing.name_len) == -1)
-		return got_error_from_errno("imsg_add REF_UPDATE_NG");
-	if (imsg_add(wbuf, ng_err->msg, ing.reason_len) == -1)
-		return got_error_from_errno("imsg_add REF_UPDATE_NG");
-
-	wbuf->fd = -1;
-	imsg_close(&client->iev.ibuf, wbuf);
-	gotd_imsg_event_add(&client->iev);
-	return NULL;
-}
-
-static const struct got_error *
-install_pack(struct gotd_client *client, const char *repo_path,
-    struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_packfile_install inst;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
-	size_t datalen;
-	char *packfile_path = NULL, *packidx_path = NULL;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(inst))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&inst, imsg->data, sizeof(inst));
-
-	if (client->packfile_path == NULL)
-		return got_error_msg(GOT_ERR_BAD_REQUEST,
-		    "client has no pack file");
-	if (client->packidx_path == NULL)
-		return got_error_msg(GOT_ERR_BAD_REQUEST,
-		    "client has no pack file index");
-
-	if (got_sha1_digest_to_str(inst.pack_sha1, hex, sizeof(hex)) == NULL)
-		return got_error_msg(GOT_ERR_NO_SPACE,
-		    "could not convert pack file SHA1 to hex");
-
-	if (asprintf(&packfile_path, "/%s/%s/pack-%s.pack",
-	    repo_path, GOT_OBJECTS_PACK_DIR, hex) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
+	/* Pass session child pipe to repo child process. */
+	if (gotd_imsg_compose_event(&repo_proc->iev,
+	    GOTD_IMSG_CONNECT_REPO_CHILD, PROC_GOTD, pipe[1], NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose CONNECT_REPO_CHILD");
+		close(pipe[1]);
+		return err;
 	}
 
-	if (asprintf(&packidx_path, "/%s/%s/pack-%s.idx",
-	    repo_path, GOT_OBJECTS_PACK_DIR, hex) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	if (rename(client->packfile_path, packfile_path) == -1) {
-		err = got_error_from_errno3("rename", client->packfile_path,
-		    packfile_path);
-		goto done;
-	}
-
-	free(client->packfile_path);
-	client->packfile_path = NULL;
-
-	if (rename(client->packidx_path, packidx_path) == -1) {
-		err = got_error_from_errno3("rename", client->packidx_path,
-		    packidx_path);
-		goto done;
-	}
-
-	free(client->packidx_path);
-	client->packidx_path = NULL;
-done:
-	free(packfile_path);
-	free(packidx_path);
-	return err;
-}
-
-static const struct got_error *
-begin_ref_updates(struct gotd_client *client, struct imsg *imsg)
-{
-	struct gotd_imsg_ref_updates_start istart;
-	size_t datalen;
-
-	if (client->nref_updates != -1)
-		return got_error(GOT_ERR_PRIVSEP_MSG);
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(istart))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&istart, imsg->data, sizeof(istart));
-
-	if (istart.nref_updates <= 0)
-		return got_error(GOT_ERR_PRIVSEP_MSG);
-
-	client->nref_updates = istart.nref_updates;
 	return NULL;
-}
-
-static const struct got_error *
-update_ref(struct gotd_client *client, const char *repo_path,
-    struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct got_repository *repo = NULL;
-	struct got_reference *ref = NULL;
-	struct gotd_imsg_ref_update iref;
-	struct got_object_id old_id, new_id;
-	struct got_object_id *id = NULL;
-	struct got_object *obj = NULL;
-	char *refname = NULL;
-	size_t datalen;
-	int locked = 0;
-
-	log_debug("update-ref from uid %d", client->euid);
-
-	if (client->nref_updates <= 0)
-		return got_error(GOT_ERR_PRIVSEP_MSG);
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(iref))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&iref, imsg->data, sizeof(iref));
-	if (datalen != sizeof(iref) + iref.name_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	refname = malloc(iref.name_len + 1);
-	if (refname == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(refname, imsg->data + sizeof(iref), iref.name_len);
-	refname[iref.name_len] = '\0';
-
-	log_debug("updating ref %s for uid %d", refname, client->euid);
-
-	err = got_repo_open(&repo, repo_path, NULL, NULL);
-	if (err)
-		goto done;
-
-	memcpy(old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
-	memcpy(new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
-	err = got_object_open(&obj, repo, &new_id);
-	if (err)
-		goto done;
-
-	if (iref.ref_is_new) {
-		err = got_ref_open(&ref, repo, refname, 0);
-		if (err) {
-			if (err->code != GOT_ERR_NOT_REF)
-				goto done;
-			err = got_ref_alloc(&ref, refname, &new_id);
-			if (err)
-				goto done;
-			err = got_ref_write(ref, repo); /* will lock/unlock */
-			if (err)
-				goto done;
-		} else {
-			err = got_error_fmt(GOT_ERR_REF_BUSY,
-			    "%s has been created by someone else "
-			    "while transaction was in progress",
-			    got_ref_get_name(ref));
-			goto done;
-		}
-	} else {
-		err = got_ref_open(&ref, repo, refname, 1 /* lock */);
-		if (err)
-			goto done;
-		locked = 1;
-
-		err = got_ref_resolve(&id, repo, ref);
-		if (err)
-			goto done;
-
-		if (got_object_id_cmp(id, &old_id) != 0) {
-			err = got_error_fmt(GOT_ERR_REF_BUSY,
-			    "%s has been modified by someone else "
-			    "while transaction was in progress",
-			    got_ref_get_name(ref));
-			goto done;
-		}
-
-		err = got_ref_change_ref(ref, &new_id);
-		if (err)
-			goto done;
-
-		err = got_ref_write(ref, repo);
-		if (err)
-			goto done;
-
-		free(id);
-		id = NULL;
-	}
-done:
-	if (err) {
-		if (err->code == GOT_ERR_LOCKFILE_TIMEOUT) {
-			err = got_error_fmt(GOT_ERR_LOCKFILE_TIMEOUT,
-			    "could not acquire exclusive file lock for %s",
-			    refname);
-		}
-		send_ref_update_ng(client, &iref, refname, err->msg);
-	} else
-		send_ref_update_ok(client, &iref, refname);
-
-	if (client->nref_updates > 0) {
-		client->nref_updates--;
-		if (client->nref_updates == 0)
-			send_refs_updated(client);
-
-	}
-	if (locked) {
-		const struct got_error *unlock_err;
-		unlock_err = got_ref_unlock(ref);
-		if (unlock_err && err == NULL)
-			err = unlock_err;
-	}
-	if (ref)
-		got_ref_close(ref);
-	if (obj)
-		got_object_close(obj);
-	if (repo)
-		got_repo_close(repo);
-	free(refname);
-	free(id);
-	return err;
 }
 
 static void
@@ -1924,7 +1159,6 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	struct imsg imsg;
 	uint32_t client_id = 0;
 	int do_disconnect = 0;
-	enum gotd_procid proc_type;
 
 	client = find_client_by_proc_fd(fd);
 	if (client == NULL)
@@ -2002,13 +1236,10 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	log_info("authenticated uid %d for repository %s\n",
 	    client->euid, repo->name);
 
-	if (client->required_auth & GOTD_AUTH_WRITE)
-		proc_type = PROC_REPO_WRITE;
-	else
-		proc_type = PROC_REPO_READ;
-
-	err = start_repo_child(client, proc_type, repo, gotd.argv0,
+	err = start_session_child(client, repo, gotd.argv0,
 	    gotd.confpath, gotd.daemonize, gotd.verbosity);
+	if (err)
+		goto done;
 done:
 	if (err)
 		log_warnx("uid %d: %s", client->euid, err->msg);
@@ -2024,8 +1255,44 @@ done:
 	}
 }
 
+static const struct got_error *
+connect_session(struct gotd_client *client)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_connect iconnect;
+	int s;
+
+	memset(&iconnect, 0, sizeof(iconnect));
+
+	s = dup(client->fd);
+	if (s == -1)
+		return got_error_from_errno("dup");
+
+	iconnect.client_id = client->id;
+	iconnect.euid = client->euid;
+	iconnect.egid = client->egid;
+
+	if (gotd_imsg_compose_event(&client->session->iev, GOTD_IMSG_CONNECT,
+	    PROC_GOTD, s, &iconnect, sizeof(iconnect)) == -1) {
+		err = got_error_from_errno("imsg compose CONNECT");
+		close(s);
+		return err;
+	}
+
+	/*
+	 * We are no longer interested in messages from this client.
+	 * Further client requests will be handled by the session process.
+	 */
+	msgbuf_clear(&client->iev.ibuf.w);
+	imsg_clear(&client->iev.ibuf);
+	event_del(&client->iev.ev);
+	client->fd = -1; /* will be closed via copy in client->iev.ibuf.fd */
+
+	return NULL;
+}
+
 static void
-gotd_dispatch_repo_child(int fd, short event, void *arg)
+gotd_dispatch_client_session(int fd, short event, void *arg)
 {
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
@@ -2034,6 +1301,10 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	ssize_t n;
 	int shut = 0;
 	struct imsg imsg;
+
+	client = find_client_by_proc_fd(fd);
+	if (client == NULL)
+		fatalx("cannot find client for fd %d", fd);
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
@@ -2056,11 +1327,129 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 		}
 	}
 
+	proc = client->session;
+	if (proc == NULL)
+		fatalx("cannot find session child process for fd %d", fd);
+
+	for (;;) {
+		const struct got_error *err = NULL;
+		uint32_t client_id = 0;
+		int do_disconnect = 0, do_start_repo_child = 0;
+
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			do_disconnect = 1;
+			err = gotd_imsg_recv_error(&client_id, &imsg);
+			break;
+		case GOTD_IMSG_CLIENT_SESSION_READY:
+			if (client->state != GOTD_STATE_EXPECT_LIST_REFS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			do_start_repo_child = 1;
+			break;
+		case GOTD_IMSG_DISCONNECT:
+			do_disconnect = 1;
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		if (!verify_imsg_src(client, proc, &imsg)) {
+			log_debug("dropping imsg type %d from PID %d",
+			    imsg.hdr.type, proc->pid);
+			imsg_free(&imsg);
+			continue;
+		}
+		if (err)
+			log_warnx("uid %d: %s", client->euid, err->msg);
+
+		if (do_start_repo_child) {
+			struct gotd_repo *repo;
+
+			repo = find_repo_by_name(client->session->repo_name);
+			if (repo != NULL) {
+				enum gotd_procid proc_type;
+
+				if (client->required_auth & GOTD_AUTH_WRITE)
+					proc_type = PROC_REPO_WRITE;
+				else
+					proc_type = PROC_REPO_READ;
+
+				err = start_repo_child(client, proc_type, repo,
+				    gotd.argv0, gotd.confpath, gotd.daemonize,
+				    gotd.verbosity);
+			} else
+				err = got_error(GOT_ERR_NOT_GIT_REPO);
+
+			if (err) {
+				log_warnx("uid %d: %s", client->euid, err->msg);
+				do_disconnect = 1;
+			}
+		}
+
+		if (do_disconnect) {
+			if (err)
+				disconnect_on_error(client, err);
+			else
+				disconnect(client);
+		}
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		disconnect(client);
+	}
+}
+
+static void
+gotd_dispatch_repo_child(int fd, short event, void *arg)
+{
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_child_proc *proc = NULL;
+	struct gotd_client *client;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
 	client = find_client_by_proc_fd(fd);
 	if (client == NULL)
 		fatalx("cannot find client for fd %d", fd);
 
-	proc = get_client_proc(client);
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	proc = get_client_repo_proc(client);
 	if (proc == NULL)
 		fatalx("cannot find child process for fd %d", fd);
 
@@ -2068,8 +1457,6 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 		const struct got_error *err = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0;
-		int do_list_refs = 0, do_ref_updates = 0, do_ref_update = 0;
-		int do_packfile_install = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -2082,26 +1469,10 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
 		case GOTD_IMSG_REPO_CHILD_READY:
-			do_list_refs = 1;
-			break;
-		case GOTD_IMSG_PACKFILE_DONE:
-			do_disconnect = 1;
-			err = recv_packfile_done(&client_id, &imsg);
-			break;
-		case GOTD_IMSG_PACKFILE_INSTALL:
-			err = recv_packfile_install(&client_id, &imsg);
-			if (err == NULL)
-				do_packfile_install = 1;
-			break;
-		case GOTD_IMSG_REF_UPDATES_START:
-			err = recv_ref_updates_start(&client_id, &imsg);
-			if (err == NULL)
-				do_ref_updates = 1;
-			break;
-		case GOTD_IMSG_REF_UPDATE:
-			err = recv_ref_update(&client_id, &imsg);
-			if (err == NULL)
-				do_ref_update = 1;
+			err = connect_session(client);
+			if (err)
+				break;
+			err = connect_repo_child(client, proc);
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
@@ -2122,20 +1493,8 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 				disconnect_on_error(client, err);
 			else
 				disconnect(client);
-		} else {
-			if (do_list_refs)
-				err = list_refs_request(client, iev);
-			else if (do_packfile_install)
-				err = install_pack(client, proc->repo_path,
-				    &imsg);
-			else if (do_ref_updates)
-				err = begin_ref_updates(client, &imsg);
-			else if (do_ref_update)
-				err = update_ref(client, proc->repo_path,
-				    &imsg);
-			if (err)
-				log_warnx("uid %d: %s", client->euid, err->msg);
 		}
+
 		imsg_free(&imsg);
 	}
 done:
@@ -2144,7 +1503,7 @@ done:
 	} else {
 		/* This pipe is dead. Remove its event handler */
 		event_del(&iev->ev);
-		event_loopexit(NULL);
+		disconnect(client);
 	}
 }
 
@@ -2179,6 +1538,9 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 		break;
 	case PROC_AUTH:
 		argv[argc++] = (char *)"-A";
+		break;
+	case PROC_SESSION:
+		argv[argc++] = (char *)"-S";
 		break;
 	case PROC_REPO_READ:
 		argv[argc++] = (char *)"-R";
@@ -2227,6 +1589,45 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	proc->iev.handler = gotd_dispatch_listener;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
+}
+
+static const struct got_error *
+start_session_child(struct gotd_client *client, struct gotd_repo *repo,
+    char *argv0, const char *confpath, int daemonize, int verbosity)
+{
+	struct gotd_child_proc *proc;
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL)
+		return got_error_from_errno("calloc");
+
+	proc->type = PROC_SESSION;
+	if (strlcpy(proc->repo_name, repo->name,
+	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
+		fatalx("repository name too long: %s", repo->name);
+	log_debug("starting client uid %d session for repository %s",
+	    client->euid, repo->name);
+	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
+	    sizeof(proc->repo_path))
+		fatalx("repository path too long: %s", repo->path);
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1)
+		fatal("socketpair");
+	proc->pid = start_child(proc->type, proc->repo_path, argv0,
+	    confpath, proc->pipe[1], daemonize, verbosity);
+	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	log_debug("proc %s %s is on fd %d",
+	    gotd_proc_names[proc->type], proc->repo_path,
+	    proc->pipe[0]);
+	proc->iev.handler = gotd_dispatch_client_session;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
+	    gotd_dispatch_client_session, &proc->iev);
+	gotd_imsg_event_add(&proc->iev);
+
+	client->session = proc;
+	return NULL;
 }
 
 static const struct got_error *
@@ -2351,6 +1752,19 @@ apply_unveil_repo_readonly(const char *repo_path)
 }
 
 static void
+apply_unveil_repo_readwrite(const char *repo_path)
+{
+	if (unveil(repo_path, "rwc") == -1)
+		fatal("unveil %s", repo_path);
+
+	if (unveil(GOT_TMPDIR_STR, "rwc") == -1)
+		fatal("unveil %s", GOT_TMPDIR_STR);
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
+}
+
+static void
 apply_unveil_none(void)
 {
 	if (unveil("/", "") == -1)
@@ -2361,20 +1775,10 @@ apply_unveil_none(void)
 }
 
 static void
-apply_unveil(void)
+apply_unveil_selfexec(void)
 {
-	struct gotd_repo *repo;
-
 	if (unveil(gotd.argv0, "x") == -1)
 		fatal("unveil %s", gotd.argv0);
-
-	TAILQ_FOREACH(repo, &gotd.repos, entry) {
-		if (unveil(repo->path, "rwc") == -1)
-			fatal("unveil %s", repo->path);
-	}
-
-	if (unveil(GOT_TMPDIR_STR, "rwc") == -1)
-		fatal("unveil %s", GOT_TMPDIR_STR);
 
 	if (unveil(NULL, NULL) == -1)
 		fatal("unveil");
@@ -2396,7 +1800,7 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "Adf:LnP:RvW")) != -1) {
+	while ((ch = getopt(argc, argv, "Adf:LnP:RSvW")) != -1) {
 		switch (ch) {
 		case 'A':
 			proc_id = PROC_AUTH;
@@ -2420,6 +1824,9 @@ main(int argc, char **argv)
 			break;
 		case 'R':
 			proc_id = PROC_REPO_READ;
+			break;
+		case 'S':
+			proc_id = PROC_SESSION;
 			break;
 		case 'v':
 			if (verbosity < 3)
@@ -2506,7 +1913,8 @@ main(int argc, char **argv)
 		    gotd_proc_names[proc_id], repo_path);
 		if (daemonize && daemon(0, 0) == -1)
 			fatal("daemon");
-	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE) {
+	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE ||
+	    proc_id == PROC_SESSION) {
 		error = got_repo_pack_fds_open(&pack_fds);
 		if (error != NULL)
 			fatalx("cannot open pack tempfiles: %s", error->msg);
@@ -2536,8 +1944,8 @@ main(int argc, char **argv)
 	switch (proc_id) {
 	case PROC_GOTD:
 #ifndef PROFILE
-		if (pledge("stdio rpath wpath cpath proc exec "
-		    "sendfd recvfd fattr flock unveil", NULL) == -1)
+		/* "exec" promise will be limited to argv[0] via unveil(2). */
+		if (pledge("stdio proc exec sendfd recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
 		break;
@@ -2572,6 +1980,21 @@ main(int argc, char **argv)
 		auth_main(title, &gotd.repos, repo_path);
 		/* NOTREACHED */
 		break;
+	case PROC_SESSION:
+#ifndef PROFILE
+		/*
+		 * The "recvfd" promise is only needed during setup and
+		 * will be removed in a later pledge(2) call.
+		 */
+		if (pledge("stdio rpath wpath cpath recvfd sendfd fattr flock "
+		    "unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+		apply_unveil_repo_readwrite(repo_path);
+		session_main(title, repo_path, pack_fds, temp_fds,
+		    &gotd.request_timeout);
+		/* NOTREACHED */
+		break;
 	case PROC_REPO_READ:
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
@@ -2597,7 +2020,7 @@ main(int argc, char **argv)
 	if (proc_id != PROC_GOTD)
 		fatal("invalid process id %d", proc_id);
 
-	apply_unveil();
+	apply_unveil_selfexec();
 
 	signal_set(&evsigint, SIGINT, gotd_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, gotd_sighdlr, NULL);
@@ -2614,8 +2037,8 @@ main(int argc, char **argv)
 
 	event_dispatch();
 
-	if (pack_fds)
-		got_repo_pack_fds_close(pack_fds);
 	free(repo_path);
+	gotd_shutdown();
+
 	return 0;
 }

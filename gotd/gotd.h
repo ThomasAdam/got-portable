@@ -36,6 +36,7 @@ enum gotd_procid {
 	PROC_GOTD	= 0,
 	PROC_LISTEN,
 	PROC_AUTH,
+	PROC_SESSION,
 	PROC_REPO_READ,
 	PROC_REPO_WRITE,
 	PROC_MAX,
@@ -188,7 +189,9 @@ enum gotd_imsg_type {
 	GOTD_IMSG_CONNECT,
 
 	/* Child process management. */
+	GOTD_IMSG_CLIENT_SESSION_READY,
 	GOTD_IMSG_REPO_CHILD_READY,
+	GOTD_IMSG_CONNECT_REPO_CHILD,
 
 	/* Auth child process. */
 	GOTD_IMSG_AUTHENTICATE,
@@ -227,6 +230,8 @@ struct gotd_imsg_info_client {
 	char repo_name[NAME_MAX];
 	int is_writing;
 	enum gotd_client_state state;
+	pid_t session_child_pid;
+	pid_t repo_child_pid;
 	size_t ncapabilities;
 
 	/* Followed by ncapabilities GOTD_IMSG_CAPABILITY. */
@@ -426,6 +431,14 @@ struct gotd_imsg_connect {
 	uint32_t client_id;
 	uid_t euid;
 	gid_t egid;
+};
+
+/* Structure for GOTD_IMSG_CONNECT_REPO_CHILD. */
+struct gotd_imsg_connect_repo_child {
+	uint32_t client_id;
+	enum gotd_procid proc_id;
+
+	/* repo child imsg pipe is passed via imsg fd */
 };
 
 /* Structure for GOTD_IMSG_AUTHENTICATE. */
