@@ -785,7 +785,6 @@ got_repo_close(struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *child_err;
 	struct got_packidx_bloom_filter *bf;
-	struct got_pathlist_entry *pe;
 	size_t i;
 
 	for (i = 0; i < repo->pack_cache_size; i++) {
@@ -847,9 +846,7 @@ got_repo_close(struct got_repository *repo)
 		free(repo->extensions[i]);
 	free(repo->extensions);
 
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry)
-		free((void *)pe->path);
-	got_pathlist_free(&repo->packidx_paths);
+	got_pathlist_free(&repo->packidx_paths, GOT_PATHLIST_FREE_PATH);
 	free(repo);
 
 	return err;
@@ -2171,7 +2168,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 done:
 	if (dir)
 		closedir(dir);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	return err;
 }
 

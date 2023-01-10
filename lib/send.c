@@ -725,8 +725,8 @@ done:
 		err = got_error_from_errno("close");
 
 	got_ref_list_free(&refs);
-	got_pathlist_free(&have_refs);
-	got_pathlist_free(&their_refs);
+	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&their_refs, GOT_PATHLIST_FREE_NONE);
 	for (i = 0; i < nours; i++)
 		free(our_ids[i]);
 	free(our_ids);

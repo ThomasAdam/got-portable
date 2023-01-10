@@ -287,7 +287,7 @@ const struct got_error *got_worktree_rebase_in_progress(int *,
  * progress callback. Also populate a list of affected paths which should
  * be passed to got_worktree_rebase_commit() after a conflict-free merge.
  * This list must be initialized with TAILQ_INIT() and disposed of with
- * got_worktree_rebase_pathlist_free().
+ * got_pathlist_free(list, GOT_PATHLIST_FREE_PATH).
  */
 const struct got_error *got_worktree_rebase_merge_files(
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
@@ -304,9 +304,6 @@ const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_reference *, const char *, struct got_commit_object *,
     struct got_object_id *, struct got_repository *);
-
-/* Free a list of merged paths from got_worktree_merge_files. */
-void got_worktree_rebase_pathlist_free(struct got_pathlist_head *);
 
 /* Postpone the rebase operation. Should be called after a merge conflict. */
 const struct got_error *got_worktree_rebase_postpone(struct got_worktree *,
@@ -362,7 +359,7 @@ const struct got_error *got_worktree_histedit_in_progress(int *,
  * progress callback. Also populate a list of affected paths which should
  * be passed to got_worktree_histedit_commit() after a conflict-free merge.
  * This list must be initialized with TAILQ_INIT() and disposed of with
- * got_worktree_rebase_pathlist_free().
+ * got_pathlist_free(list, GOT_PATHLIST_FREE_PATH).
  */
 const struct got_error *got_worktree_histedit_merge_files(
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,

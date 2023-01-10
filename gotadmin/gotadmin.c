@@ -827,7 +827,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	got_pathlist_free(&exclude_args);
+	got_pathlist_free(&exclude_args, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&exclude_refs);
 	got_ref_list_free(&include_refs);
 	free(id_str);

@@ -1919,18 +1919,10 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
-	TAILQ_FOREACH(pe, &refs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&refs);
-	TAILQ_FOREACH(pe, &symrefs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&symrefs);
-	got_pathlist_free(&wanted_branches);
-	got_pathlist_free(&wanted_refs);
+	got_pathlist_free(&refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
 	free(pack_hash);
 	free(proto);
 	free(host);
@@ -2735,18 +2727,10 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &refs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&refs);
-	TAILQ_FOREACH(pe, &symrefs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&symrefs);
-	got_pathlist_free(&wanted_branches);
-	got_pathlist_free(&wanted_refs);
+	got_pathlist_free(&refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
 	free(id_str);
 	free(cwd);
 	free(repo_path);
@@ -3180,7 +3164,7 @@ done:
 		got_ref_close(head_ref);
 	if (ref)
 		got_ref_close(ref);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	free(commit_id_str);
 	free(commit_id);
 	free(repo_path);
@@ -3613,9 +3597,7 @@ done:
 			error = pack_err;
 	}
 	free(worktree_path);
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(commit_id);
 	free(commit_id_str);
 	return error;
@@ -4309,7 +4291,6 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	struct got_object_qid *qid;
 	struct got_commit_object *commit;
 	struct got_pathlist_head changed_paths;
-	struct got_pathlist_entry *pe;
 
 	STAILQ_INIT(&reversed_commits);
 	TAILQ_INIT(&changed_paths);
@@ -4371,11 +4352,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			}
 			if (have_match == 0) {
 				got_object_commit_close(commit);
-				TAILQ_FOREACH(pe, &changed_paths, entry) {
-					free((char *)pe->path);
-					free(pe->data);
-				}
-				got_pathlist_free(&changed_paths);
+				got_pathlist_free(&changed_paths,
+				    GOT_PATHLIST_FREE_ALL);
 				continue;
 			}
 		}
@@ -4404,11 +4382,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		    (end_id && got_object_id_cmp(&id, end_id) == 0))
 			break;
 
-		TAILQ_FOREACH(pe, &changed_paths, entry) {
-			free((char *)pe->path);
-			free(pe->data);
-		}
-		got_pathlist_free(&changed_paths);
+		got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	}
 	if (reverse_display_order) {
 		STAILQ_FOREACH(qid, &reversed_commits, entry) {
@@ -4437,11 +4411,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			got_object_commit_close(commit);
 			if (err)
 				break;
-			TAILQ_FOREACH(pe, &changed_paths, entry) {
-				free((char *)pe->path);
-				free(pe->data);
-			}
-			got_pathlist_free(&changed_paths);
+			got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 		}
 	}
 done:
@@ -4450,11 +4420,7 @@ done:
 		STAILQ_REMOVE_HEAD(&reversed_commits, entry);
 		got_object_qid_free(qid);
 	}
-	TAILQ_FOREACH(pe, &changed_paths, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&changed_paths);
+	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	if (search_pattern)
 		regfree(&regex);
 	got_commit_graph_close(graph);
@@ -5051,7 +5017,6 @@ cmd_diff(int argc, char *argv[])
 	const char *errstr;
 	struct got_reflist_head refs;
 	struct got_pathlist_head diffstat_paths, paths;
-	struct got_pathlist_entry *pe;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
 	int fd1 = -1, fd2 = -1;
 	int *pack_fds = NULL;
@@ -5481,14 +5446,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
-	TAILQ_FOREACH(pe, &diffstat_paths, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&diffstat_paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
+	got_pathlist_free(&diffstat_paths, GOT_PATHLIST_FREE_ALL);
 	got_ref_list_free(&refs);
 	if (outfile && fclose(outfile) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
@@ -6260,7 +6219,6 @@ cmd_status(int argc, char *argv[])
 	struct got_status_arg st;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
 	int ch, i, no_ignores = 0;
 	int *pack_fds = NULL;
 
@@ -6357,9 +6315,7 @@ done:
 			error = pack_err;
 	}
 
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	return error;
 }
@@ -6893,7 +6849,6 @@ cmd_branch(int argc, char *argv[])
 	const char *delref = NULL, *commit_id_arg = NULL;
 	struct got_reference *ref = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int *pack_fds = NULL;
@@ -7092,9 +7047,7 @@ done:
 	free(repo_path);
 	free(commit_id);
 	free(commit_id_str);
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	return error;
 }
 
@@ -7887,9 +7840,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	return error;
 }
@@ -8054,9 +8005,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	return error;
 }
@@ -9461,14 +9410,12 @@ done:
 	}
 	if (ref)
 		got_ref_close(ref);
-	got_pathlist_free(&branches);
-	got_pathlist_free(&tags);
+	got_pathlist_free(&branches, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&tags, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&all_branches);
 	got_ref_list_free(&all_tags);
-	got_pathlist_free(&delete_args);
-	TAILQ_FOREACH(pe, &delete_branches, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&delete_branches);
+	got_pathlist_free(&delete_args, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&delete_branches, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	free(repo_path);
 	free(proto);
@@ -10531,7 +10478,7 @@ cmd_rebase(int argc, char *argv[])
 			error = got_worktree_checkout_files(worktree,
 			    &paths, repo, update_progress, &upa,
 			    check_cancelled, NULL);
-			got_pathlist_free(&paths);
+			got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 			if (error)
 				goto done;
 			if (upa.did_something) {
@@ -10629,13 +10576,13 @@ cmd_rebase(int argc, char *argv[])
 				if (error)
 					goto done;
 			}
-			got_worktree_rebase_pathlist_free(&merged_paths);
+			got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 			break;
 		}
 
 		error = rebase_commit(&merged_paths, worktree, fileindex,
 		    tmp_branch, committer, commit_id, repo);
-		got_worktree_rebase_pathlist_free(&merged_paths);
+		got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 		if (error)
 			goto done;
 	}
@@ -11952,7 +11899,8 @@ cmd_histedit(int argc, char *argv[])
 				error = got_worktree_status(worktree, &paths,
 				    repo, 0, check_local_changes, &have_changes,
 				    check_cancelled, NULL);
-				got_pathlist_free(&paths);
+				got_pathlist_free(&paths,
+				    GOT_PATHLIST_FREE_NONE);
 				if (error) {
 					if (error->code != GOT_ERR_CANCELLED)
 						goto done;
@@ -12012,7 +11960,7 @@ cmd_histedit(int argc, char *argv[])
 				if (error)
 					goto done;
 			}
-			got_worktree_rebase_pathlist_free(&merged_paths);
+			got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 			break;
 		}
 
@@ -12024,7 +11972,7 @@ cmd_histedit(int argc, char *argv[])
 			printf("Stopping histedit for amending commit %s\n",
 			    id_str);
 			free(id_str);
-			got_worktree_rebase_pathlist_free(&merged_paths);
+			got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 			error = got_worktree_histedit_postpone(worktree,
 			    fileindex);
 			goto done;
@@ -12039,7 +11987,7 @@ cmd_histedit(int argc, char *argv[])
 
 		error = histedit_commit(&merged_paths, worktree, fileindex,
 		    tmp_branch, hle, committer, repo);
-		got_worktree_rebase_pathlist_free(&merged_paths);
+		got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 		if (error)
 			goto done;
 	}
@@ -12585,7 +12533,6 @@ cmd_stage(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
 	int ch, list_stage = 0, pflag = 0, allow_bad_symlinks = 0;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
@@ -12698,9 +12645,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	return error;
 }
@@ -12722,7 +12667,6 @@ cmd_unstage(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
 	int ch, pflag = 0;
 	struct got_update_progress_arg upa;
 	FILE *patch_script_file = NULL;
@@ -12821,9 +12765,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	return error;
 }
@@ -13264,7 +13206,6 @@ cmd_info(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *id_str = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
 	char *uuidstr = NULL;
 	int ch, show_files = 0;
 
@@ -13363,9 +13304,7 @@ cmd_info(int argc, char *argv[])
 done:
 	if (worktree)
 		got_worktree_close(worktree);
-	TAILQ_FOREACH(pe, &paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	free(id_str);
 	free(uuidstr);

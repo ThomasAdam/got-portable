@@ -535,25 +535,13 @@ done:
 	free(packpath);
 	free(progress);
 
-	TAILQ_FOREACH(pe, &have_refs, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&have_refs);
+	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
 	got_ref_list_free(&my_refs);
 	if (err) {
 		free(*pack_hash);
 		*pack_hash = NULL;
-		TAILQ_FOREACH(pe, refs, entry) {
-			free((void *)pe->path);
-			free(pe->data);
-		}
-		got_pathlist_free(refs);
-		TAILQ_FOREACH(pe, symrefs, entry) {
-			free((void *)pe->path);
-			free(pe->data);
-		}
-		got_pathlist_free(symrefs);
+		got_pathlist_free(refs, GOT_PATHLIST_FREE_ALL);
+		got_pathlist_free(symrefs, GOT_PATHLIST_FREE_ALL);
 	}
 	return err;
 }
