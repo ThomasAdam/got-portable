@@ -609,7 +609,7 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int sendfd;
+	int sendfd = -1;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 	struct got_pathlist_head refs;
