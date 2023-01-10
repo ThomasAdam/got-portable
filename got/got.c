@@ -2483,14 +2483,18 @@ cmd_fetch(int argc, char *argv[])
 		if (!fetch_all_branches)
 			fetch_all_branches = remote->fetch_all_branches;
 		for (i = 0; i < remote->nfetch_branches; i++) {
-			got_pathlist_append(&wanted_branches,
+			error = got_pathlist_append(&wanted_branches,
 			    remote->fetch_branches[i], NULL);
+			if (error)
+				goto done;
 		}
 	}
 	if (TAILQ_EMPTY(&wanted_refs)) {
 		for (i = 0; i < remote->nfetch_refs; i++) {
-			got_pathlist_append(&wanted_refs,
+			error = got_pathlist_append(&wanted_refs,
 			    remote->fetch_refs[i], NULL);
+			if (error)
+				goto done;
 		}
 	}
 
@@ -9287,8 +9291,10 @@ cmd_send(int argc, char *argv[])
 		}
 	} else if (nbranches == 0) {
 		for (i = 0; i < remote->nsend_branches; i++) {
-			got_pathlist_append(&branches,
+			error = got_pathlist_append(&branches,
 			    remote->send_branches[i], NULL);
+			if (error)
+				goto done;
 		}
 	}
 
