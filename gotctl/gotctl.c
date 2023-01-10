@@ -160,54 +160,6 @@ show_client_info(struct imsg *imsg)
 }
 
 static const struct got_error *
-show_capability(struct imsg *imsg)
-{
-	struct gotd_imsg_capability icapa;
-	size_t datalen;
-	char *key, *value = NULL;
-
-	memset(&icapa, 0, sizeof(icapa));
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(icapa))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&icapa, imsg->data, sizeof(icapa));
-
-	if (datalen != sizeof(icapa) + icapa.key_len + icapa.value_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	key = malloc(icapa.key_len + 1);
-	if (key == NULL)
-		return got_error_from_errno("malloc");
-	if (icapa.value_len > 0) {
-		value = malloc(icapa.value_len + 1);
-		if (value == NULL) {
-			free(key);
-			return got_error_from_errno("malloc");
-		}
-	}
-
-	memcpy(key, imsg->data + sizeof(icapa), icapa.key_len);
-	key[icapa.key_len] = '\0';
-	if (value) {
-		memcpy(value, imsg->data + sizeof(icapa) + icapa.key_len,
-		    icapa.value_len);
-		value[icapa.value_len] = '\0';
-	}
-
-	if (strcmp(key, GOT_CAPA_AGENT) == 0)
-		printf("  client user agent: %s\n", value);
-	else if (value)
-		printf("  client supports %s=%s\n", key, value);
-	else
-		printf("  client supports %s\n", key);
-
-	free(key);
-	free(value);
-	return NULL;
-}
-
-static const struct got_error *
 cmd_info(int argc, char *argv[], int gotd_sock)
 {
 	const struct got_error *err;
@@ -240,9 +192,6 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 			break;
 		case GOTD_IMSG_INFO_CLIENT:
 			err = show_client_info(&imsg);
-			break;
-		case GOTD_IMSG_CAPABILITY:
-			err = show_capability(&imsg);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
