@@ -3097,6 +3097,10 @@ In a work tree or a git repository directory, list all branch references:
 .Pp
 .Dl $ got branch -l
 .Pp
+As above, but list the most recently modified branches only:
+.Pp
+.Dl $ got branch -lt | head
+.Pp
 In a work tree or a git repository directory, create a new branch called
 .Dq unified-buffer-cache
 which is forked off the
