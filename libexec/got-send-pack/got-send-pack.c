@@ -593,11 +593,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 
 	err = send_done(ibuf);
 done:
-	TAILQ_FOREACH(pe, &their_refs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&their_refs);
+	got_pathlist_free(&their_refs, GOT_PATHLIST_FREE_ALL);
 	free(id_str);
 	free(id);
 	free(refname);
@@ -614,7 +610,6 @@ main(int argc, char **argv)
 	struct imsg imsg;
 	struct got_pathlist_head refs;
 	struct got_pathlist_head delete_refs;
-	struct got_pathlist_entry *pe;
 	struct got_imsg_send_request send_req;
 	struct got_imsg_send_ref href;
 	size_t datalen, i;
@@ -725,16 +720,8 @@ main(int argc, char **argv)
 
 	err = send_pack(sendfd, &refs, &delete_refs, &ibuf);
 done:
-	TAILQ_FOREACH(pe, &refs, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&refs);
-	TAILQ_FOREACH(pe, &delete_refs, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&delete_refs);
+	got_pathlist_free(&refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&delete_refs, GOT_PATHLIST_FREE_ALL);
 	if (sendfd != -1 && close(sendfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err != NULL && err->code != GOT_ERR_CANCELLED)  {

@@ -4711,8 +4711,6 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 		    GOT_DIFF_LINE_CHANGES);
 		if (err)
 			goto done;
-		free((char *)pe->path);
-		free(pe->data);
 	}
 
 	fputc('\n', outfile);
@@ -4737,7 +4735,7 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 	outoff++;
 	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
 done:
-	got_pathlist_free(&changed_paths);
+	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	free(id_str);
 	free(logmsg);
 	free(refs_str);

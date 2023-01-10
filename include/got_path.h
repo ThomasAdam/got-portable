@@ -92,8 +92,14 @@ const struct got_error *got_pathlist_insert(struct got_pathlist_entry **,
 const struct got_error *got_pathlist_append(struct got_pathlist_head *,
     const char *, void *);
 
+/* Flags passed to got_pathlist_free() to control which pointers are freed. */
+#define GOT_PATHLIST_FREE_NONE	0	  /* pathlist entry only */
+#define GOT_PATHLIST_FREE_PATH	(1 << 0)  /* entry and path pointer */
+#define GOT_PATHLIST_FREE_DATA	(1 << 1)  /* entry and data pointer */
+#define GOT_PATHLIST_FREE_ALL	(GOT_PATHLIST_FREE_PATH|GOT_PATHLIST_FREE_DATA)
+
 /* Free resources allocated for a path list. */
-void got_pathlist_free(struct got_pathlist_head *);
+void got_pathlist_free(struct got_pathlist_head *, int);
 
 /* Attempt to create a directory at a given path. */
 const struct got_error *got_path_mkdir(const char *);

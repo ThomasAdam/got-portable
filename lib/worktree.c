@@ -3411,26 +3411,16 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 }
 
 static void
-free_ignorelist(struct got_pathlist_head *ignorelist)
-{
-	struct got_pathlist_entry *pe;
-
-	TAILQ_FOREACH(pe, ignorelist, entry)
-		free((char *)pe->path);
-	got_pathlist_free(ignorelist);
-}
-
-static void
 free_ignores(struct got_pathlist_head *ignores)
 {
 	struct got_pathlist_entry *pe;
 
 	TAILQ_FOREACH(pe, ignores, entry) {
 		struct got_pathlist_head *ignorelist = pe->data;
-		free_ignorelist(ignorelist);
-		free((char *)pe->path);
+
+		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
 	}
-	got_pathlist_free(ignores);
+	got_pathlist_free(ignores, GOT_PATHLIST_FREE_PATH);
 }
 
 static const struct got_error *
@@ -3484,7 +3474,7 @@ done:
 	free(line);
 	if (err || pe == NULL) {
 		free(dirpath);
-		free_ignorelist(ignorelist);
+		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
 	}
 	return err;
 }
@@ -5782,7 +5772,7 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 	/* Write new list of entries; deleted entries have been dropped. */
 	err = got_object_tree_create(new_tree_id, &paths, *nentries, repo);
 done:
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	return err;
 }
 
@@ -6242,9 +6232,10 @@ done:
 		err = unlockerr;
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
+
 		free_commitable(ct);
 	}
-	got_pathlist_free(&commitable_paths);
+	got_pathlist_free(&commitable_paths, GOT_PATHLIST_FREE_NONE);
 	if (diff_path && unlink(diff_path) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", diff_path);
 	free(diff_path);
@@ -6591,17 +6582,6 @@ collect_merged_paths(void *arg, unsigned char status, const char *path)
 	if (err || new == NULL)
 		free(p);
 	return err;
-}
-
-void
-got_worktree_rebase_pathlist_free(struct got_pathlist_head *merged_paths)
-{
-	struct got_pathlist_entry *pe;
-
-	TAILQ_FOREACH(pe, merged_paths, entry)
-		free((char *)pe->path);
-
-	got_pathlist_free(merged_paths);
 }
 
 static const struct got_error *
@@ -7957,9 +7937,10 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 done:
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
+
 		free_commitable(ct);
 	}
-	got_pathlist_free(&commitable_paths);
+	got_pathlist_free(&commitable_paths, GOT_PATHLIST_FREE_NONE);
 	free(fileindex_path);
 	return err;
 }

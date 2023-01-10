@@ -980,16 +980,6 @@ read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 	return err;
 }
 
-static void
-free_dirlist(struct got_pathlist_head *dirlist)
-{
-	struct got_pathlist_entry *dle;
-
-	TAILQ_FOREACH(dle, dirlist, entry)
-		free(dle->data);
-	got_pathlist_free(dirlist);
-}
-
 static int
 have_tracked_file_in_dir(struct got_fileindex *fileindex, const char *path)
 {
@@ -1078,7 +1068,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 			err = got_error_from_errno2("closedir", subdirpath);
 		free(subpath);
 		free(subdirpath);
-		free_dirlist(&subdirlist);
+		got_pathlist_free(&subdirlist, GOT_PATHLIST_FREE_DATA);
 		if (err)
 			return err;
 	}
@@ -1237,7 +1227,7 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
 
 	if (closedir(dir) == -1 && err == NULL)
 		err = got_error_from_errno2("closedir", path);
-	free_dirlist(&dirlist);
+	got_pathlist_free(&dirlist, GOT_PATHLIST_FREE_DATA);
 	return err;
 }
 

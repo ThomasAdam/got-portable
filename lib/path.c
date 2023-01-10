@@ -272,11 +272,19 @@ got_pathlist_append(struct got_pathlist_head *pathlist,
 }
 
 void
-got_pathlist_free(struct got_pathlist_head *pathlist)
+got_pathlist_free(struct got_pathlist_head *pathlist, int freemask)
 {
 	struct got_pathlist_entry *pe;
 
 	while ((pe = TAILQ_FIRST(pathlist)) != NULL) {
+		if (freemask & GOT_PATHLIST_FREE_PATH) {
+			free((char *)pe->path);
+			pe->path = NULL;
+		}
+		if (freemask & GOT_PATHLIST_FREE_DATA) {
+			free(pe->data);
+			pe->data = NULL;
+		}
 		TAILQ_REMOVE(pathlist, pe, entry);
 		free(pe);
 	}

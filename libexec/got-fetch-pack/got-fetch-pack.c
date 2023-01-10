@@ -759,11 +759,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		    "pack file checksum mismatch");
 	}
 done:
-	TAILQ_FOREACH(pe, &symrefs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&symrefs);
+	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
 	free(have);
 	free(want);
 	free(id_str);
@@ -784,7 +780,6 @@ main(int argc, char **argv)
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_head wanted_branches;
 	struct got_pathlist_head wanted_refs;
-	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_request fetch_req;
 	struct got_imsg_fetch_have_ref href;
 	struct got_imsg_fetch_wanted_branch wbranch;
@@ -990,14 +985,8 @@ main(int argc, char **argv)
 	    fetch_req.fetch_all_branches, &wanted_branches,
 	    &wanted_refs, fetch_req.list_refs_only, &ibuf);
 done:
-	TAILQ_FOREACH(pe, &have_refs, entry) {
-		free((char *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&have_refs);
-	TAILQ_FOREACH(pe, &wanted_branches, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&wanted_branches);
+	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_PATH);
 	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)

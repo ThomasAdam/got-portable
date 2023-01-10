@@ -165,7 +165,7 @@ path_list(void)
 		i++;
 	}
 
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	return 1;
 }
 
@@ -202,7 +202,7 @@ path_list_reverse_input(void)
 		i++;
 	}
 
-	got_pathlist_free(&paths);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	return 1;
 }
 
