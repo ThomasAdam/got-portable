@@ -75,7 +75,6 @@ struct gotd_client {
 	size_t				 ncapabilities;
 	uint32_t			 id;
 	int				 fd;
-	int				 delta_cache_fd;
 	struct gotd_imsgev		 iev;
 	struct event			 tmo;
 	uid_t				 euid;
@@ -85,8 +84,6 @@ struct gotd_client {
 	struct gotd_child_proc		*auth;
 	struct gotd_child_proc		*session;
 	int				 required_auth;
-	char				*packfile_path;
-	char				*packidx_path;
 };
 STAILQ_HEAD(gotd_clients, gotd_client);
 
@@ -384,18 +381,6 @@ disconnect(struct gotd_client *client)
 		close(client->fd);
 	else if (client->iev.ibuf.fd != -1)
 		close(client->iev.ibuf.fd);
-	if (client->delta_cache_fd != -1)
-		close(client->delta_cache_fd);
-	if (client->packfile_path) {
-		if (unlink(client->packfile_path) == -1 && errno != ENOENT)
-			log_warn("unlink %s: ", client->packfile_path);
-		free(client->packfile_path);
-	}
-	if (client->packidx_path) {
-		if (unlink(client->packidx_path) == -1 && errno != ENOENT)
-			log_warn("unlink %s: ", client->packidx_path);
-		free(client->packidx_path);
-	}
 	free(client->capabilities);
 	free(client);
 	client_cnt--;
@@ -787,7 +772,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	client->id = iconnect.client_id;
 	client->fd = s;
 	s = -1;
-	client->delta_cache_fd = -1;
 	/* The auth process will verify UID/GID for us. */
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
