@@ -6800,7 +6800,7 @@ add_branch(struct got_repository *repo, const char *branch_name,
 {
 	const struct got_error *err = NULL;
 	struct got_reference *ref = NULL;
-	char *base_refname = NULL, *refname = NULL;
+	char *refname = NULL;
 
 	/*
 	 * Don't let the user create a branch name with a leading '-'.
@@ -6833,7 +6833,6 @@ add_branch(struct got_repository *repo, const char *branch_name,
 done:
 	if (ref)
 		got_ref_close(ref);
-	free(base_refname);
 	free(refname);
 	return err;
 }
