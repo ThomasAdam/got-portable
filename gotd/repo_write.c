@@ -67,6 +67,8 @@ static struct repo_write {
 	struct got_repository *repo;
 	int *pack_fds;
 	int *temp_fds;
+	int session_fd;
+	struct gotd_imsgev session_iev;
 } repo_write;
 
 struct gotd_ref_update {
@@ -1218,7 +1220,7 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 }
 
 static void
-repo_write_dispatch(int fd, short event, void *arg)
+repo_write_dispatch_session(int fd, short event, void *arg)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
@@ -1340,6 +1342,94 @@ repo_write_dispatch(int fd, short event, void *arg)
 	}
 }
 
+static const struct got_error *
+recv_connect(struct imsg *imsg)
+{
+	struct gotd_imsgev *iev = &repo_write.session_iev;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (imsg->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	if (repo_write.session_fd != -1)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	repo_write.session_fd = imsg->fd;
+
+	imsg_init(&iev->ibuf, repo_write.session_fd);
+	iev->handler = repo_write_dispatch_session;
+	iev->events = EV_READ;
+	iev->handler_arg = NULL;
+	event_set(&iev->ev, iev->ibuf.fd, EV_READ,
+	    repo_write_dispatch_session, iev);
+	gotd_imsg_event_add(iev);
+
+	return NULL;
+}
+
+static void
+repo_write_dispatch(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct imsg imsg;
+	ssize_t n;
+	int shut = 0;
+	struct repo_write_client *client = &repo_write_client;
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0)	/* Connection closed. */
+			shut = 1;
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0)	/* Connection closed. */
+			shut = 1;
+	}
+
+	while (err == NULL && check_cancelled(NULL) == NULL) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_CONNECT_REPO_CHILD:
+			err = recv_connect(&imsg);
+			break;
+		default:
+			log_debug("%s: unexpected imsg %d", repo_write.title,
+			    imsg.hdr.type);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut && check_cancelled(NULL) == NULL) {
+		if (err &&
+		    gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
+		        client->id, err) == -1) {
+			log_warnx("could not send error to parent: %s",
+			    err->msg);
+		}
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
 void
 repo_write_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds)
@@ -1351,6 +1441,8 @@ repo_write_main(const char *title, const char *repo_path,
 	repo_write.pid = getpid();
 	repo_write.pack_fds = pack_fds;
 	repo_write.temp_fds = temp_fds;
+	repo_write.session_fd = -1;
+	repo_write.session_iev.ibuf.fd = -1;
 
 	STAILQ_INIT(&repo_write_client.ref_updates);
 
@@ -1396,5 +1488,7 @@ repo_write_shutdown(void)
 		got_repo_close(repo_write.repo);
 	got_repo_pack_fds_close(repo_write.pack_fds);
 	got_repo_temp_fds_close(repo_write.temp_fds);
+	if (repo_write.session_fd != -1)
+		close(repo_write.session_fd);
 	exit(0);
 }

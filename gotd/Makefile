@@ -15,7 +15,7 @@ SRCS=		gotd.c auth.c repo_read.c repo_write.c log.c privsep_stub.c \
 		object_open_io.c object_parse.c opentemp.c pack.c path.c \
 		read_gitconfig.c read_gotconfig.c reference.c repository.c  \
 		sha1.c sigs.c pack_create_io.c pollfd.c reference_parse.c \
-		repo_imsg.c pack_index.c
+		repo_imsg.c pack_index.c session.c
 
 MAN =		${PROG}.conf.5 ${PROG}.8
 

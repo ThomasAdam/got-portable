@@ -147,6 +147,10 @@ show_client_info(struct imsg *imsg)
 
 	printf("client UID %d, GID %d, protocol state '%s', ",
 	    info.euid, info.egid, get_state_name(info.state));
+	if (info.session_child_pid)
+		printf("session PID %ld, ", (long)info.session_child_pid);
+	if (info.repo_child_pid)
+		printf("repo PID %ld, ", (long)info.repo_child_pid);
 	if (info.is_writing)
 		printf("writing to %s\n", info.repo_name);
 	else
