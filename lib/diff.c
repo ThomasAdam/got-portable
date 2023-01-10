@@ -91,7 +91,7 @@ get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
 
 	change = calloc(1, sizeof(*change));
 	if (change == NULL)
-		return got_error_from_errno("malloc");
+		return got_error_from_errno("calloc");
 
 	if (!isbin || force_text) {
 		for (i = 0; i < r->chunks.len; ++i) {
@@ -247,21 +247,6 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		char	*path = NULL;
 		int	 status = GOT_STATUS_NO_CHANGE;
 
-		if (label1 == NULL && label2 == NULL) {
-			/* diffstat of blobs, show hash instead of path */
-			if (asprintf(&path, "%.10s -> %.10s",
-			    idstr1, idstr2) == -1) {
-				err = got_error_from_errno("asprintf");
-				goto done;
-			}
-		} else {
-			path = strdup(label2 ? label2 : label1);
-			if (path == NULL) {
-				err = got_error_from_errno("malloc");
-				goto done;
-			}
-		}
-
 		/*
 		 * Ignore 'm'ode status change: if there's no accompanying
 		 * content change, there'll be no diffstat, and if there
@@ -273,6 +258,25 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 			status = GOT_STATUS_DELETE;
 		else
 			status = GOT_STATUS_MODIFY;
+
+		if (label1 == NULL && label2 == NULL) {
+			/* diffstat of blobs, show hash instead of path */
+			if (asprintf(&path, "%.10s -> %.10s",
+			    idstr1, idstr2) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		} else {
+			if (label2 != NULL &&
+			    (status != GOT_STATUS_DELETE || label1 == NULL))
+				path = strdup(label2);
+			else
+				path = strdup(label1);
+			if (path == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
 
 		err = get_diffstat(ds, path, result->result, force_text_diff,
 		    status);
@@ -391,12 +395,6 @@ diff_blob_file(struct got_diffreg_result **resultp,
 		char	*path = NULL;
 		int	 status = GOT_STATUS_NO_CHANGE;
 
-		path = strdup(label2 ? label2 : label1);
-		if (path == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-
 		/*
 		 * Ignore 'm'ode status change: if there's no accompanying
 		 * content change, there'll be no diffstat, and if there
@@ -408,6 +406,16 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			status = GOT_STATUS_DELETE;
 		else
 			status = GOT_STATUS_MODIFY;
+
+		if (label2 != NULL &&
+		    (status != GOT_STATUS_DELETE || label1 == NULL))
+			path = strdup(label2);
+		else
+			path = strdup(label1);
+		if (path == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 
 		err = get_diffstat(ds, path, result->result, force_text_diff,
 		    status);
@@ -767,7 +775,7 @@ got_diff_tree_compute_diffstat(void *arg, struct got_blob_object *blob1,
 
 	path = strdup(label2 ? label2 : label1);
 	if (path == NULL)
-		return got_error_from_errno("malloc");
+		return got_error_from_errno("strdup");
 
 	if (id1 == NULL)
 		status = GOT_STATUS_ADD;
@@ -838,7 +846,7 @@ got_diff_tree_collect_changed_paths(void *arg, struct got_blob_object *blob1,
 
 	path = strdup(label2 ? label2 : label1);
 	if (path == NULL)
-		return got_error_from_errno("malloc");
+		return got_error_from_errno("strdup");
 
 	change = malloc(sizeof(*change));
 	if (change == NULL) {

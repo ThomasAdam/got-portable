@@ -1016,8 +1016,8 @@ test_diff_binary_files() {
 test_diff_commits() {
 	local testroot=`test_init diff_commits`
 	local commit_id0=`git_show_head $testroot/repo`
-	alpha_id0=`get_blob_id $testroot/repo "" alpha`
-	beta_id0=`get_blob_id $testroot/repo "" beta`
+	local alpha_id0=`get_blob_id $testroot/repo "" alpha`
+	local beta_id0=`get_blob_id $testroot/repo "" beta`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1375,6 +1375,420 @@ EOF
 	test_done "$testroot" $ret
 }
 
+test_diff_commit_diffstat() {
+	local testroot=`test_init diff_commit_diffstat`
+	local commit_id0=`git_show_head $testroot/repo`
+	local alpha_id0=`get_blob_id $testroot/repo "" alpha`
+	local beta_id0=`get_blob_id $testroot/repo "" beta`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'committing changes' >/dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	alpha_id1=`get_blob_id $testroot/repo "" alpha`
+	new_id1=`get_blob_id $testroot/repo "" new`
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $commit_id0 refs/heads/master
+ M  alpha  |  1+  1-
+ D  beta   |  0+  1-
+ A  new    |  1+  0-
+
+3 files changed, 2 insertions(+), 2 deletions(-)
+
+EOF
+
+	echo "diff $commit_id0 refs/heads/master" >> $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -d -c master > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# same diffstat with explicit parent commit ID
+	(cd $testroot/wt && got diff -d -c $commit_id0 -c master \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $commit_id0 $commit_id1
+ M  alpha  |  1+  1-
+ D  beta   |  0+  1-
+ A  new    |  1+  0-
+
+3 files changed, 2 insertions(+), 2 deletions(-)
+
+EOF
+
+	# same diffstat with commit object IDs
+	echo "diff $commit_id0 $commit_id1" >> $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff -d -c $commit_id0 -c $commit_id1 \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $commit_id0 $commit_id1
+ M  alpha  |  1+  1-
+
+1 file changed, 1 insertions(+), 1 deletions(-)
+
+EOF
+
+	# same diffstat filtered by path "alpha"
+	echo "diff $commit_id0 $commit_id1" >> $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	(cd $testroot/repo && got diff -d -c $commit_id0 -c $commit_id1 alpha \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	# same diffstat in work tree
+	(cd $testroot/wt && got diff -d -c $commit_id0 -c $commit_id1 alpha \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $commit_id0 $commit_id1
+ D  beta  |  0+  1-
+ A  new   |  1+  0-
+
+2 files changed, 1 insertions(+), 1 deletions(-)
+
+EOF
+
+	# same diffstat filtered by paths "beta" and "new"
+	echo "diff $commit_id0 $commit_id1" >> $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	(cd $testroot/repo && got diff -d -c $commit_id0 -c $commit_id1 \
+		beta new > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_diff_worktree_diffstat() {
+	local testroot=`test_init diff_worktree_diffstat`
+	local head_rev=`git_show_head $testroot/repo`
+	local alpha_blobid=`get_blob_id $testroot/repo "" alpha`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $testroot/wt
+ M  alpha  |  1+  1-
+ D  beta   |  0+  1-
+ A  new    |  1+  0-
+
+3 files changed, 2 insertions(+), 2 deletions(-)
+
+EOF
+
+	echo "diff $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -d > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $testroot/wt
+ M  alpha         |  1+  1-
+ D  beta          |  0+  1-
+ M  epsilon/zeta  |  1+  1-
+ A  new           |  1+  0-
+
+4 files changed, 3 insertions(+), 3 deletions(-)
+
+EOF
+
+	# specify paths to diffstat
+	echo "diff $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + epsilon/zeta' >> $testroot/stdout.expected
+	echo '--- epsilon/zeta' >> $testroot/stdout.expected
+	echo '+++ epsilon/zeta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-zeta' >> $testroot/stdout.expected
+	echo '+modified zeta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -d new alpha epsilon beta > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# same diff irrespective of argument order
+	(cd $testroot/wt && got diff -d alpha new epsilon beta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# force paths with -P
+	echo master > $testroot/wt/master
+	(cd $testroot/wt && got add master > /dev/null)
+	(cd $testroot/wt && got diff -d -P new master > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+diffstat $testroot/wt
+ A  master  |  1+  0-
+ A  new     |  1+  0-
+
+2 files changed, 2 insertions(+), 0 deletions(-)
+
+EOF
+
+	echo "diff $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
+	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + master (mode 644)' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ master' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+master' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new (mode 644)' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff two blob ids
+	(cd $testroot/wt && got commit -m 'edit' alpha >/dev/null)
+	local alpha_new_blobid=`get_blob_id $testroot/repo "" alpha`
+	(cd $testroot/wt && got diff -d $alpha_blobid $alpha_new_blobid) \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	typeset -L10 short_alpha_id
+	typeset -L10 short_alpha_new_id
+	short_alpha_id=$alpha_blobid
+	short_alpha_new_id=$alpha_new_blobid
+	cat <<EOF >$testroot/stdout.expected
+diffstat $alpha_blobid $alpha_new_blobid
+ M  $short_alpha_id -> $short_alpha_new_id  |  1+  1-
+
+1 file changed, 1 insertions(+), 1 deletions(-)
+
+blob - $alpha_blobid
+blob + $alpha_new_blobid
+--- $alpha_blobid
++++ $alpha_new_blobid
+@@ -1 +1 @@
+-alpha
++modified alpha
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1389,3 +1803,5 @@ run_test test_diff_commits
 run_test test_diff_ignored_file
 run_test test_diff_crlf
 run_test test_diff_worktree_newfile_xbit
+run_test test_diff_commit_diffstat
+run_test test_diff_worktree_diffstat
