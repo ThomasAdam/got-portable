@@ -88,7 +88,7 @@ struct gotd_repo {
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
 
-enum gotd_client_state {
+enum gotd_session_state {
 	GOTD_STATE_EXPECT_LIST_REFS,
 	GOTD_STATE_EXPECT_CAPABILITIES,
 	GOTD_STATE_EXPECT_WANT,
@@ -229,7 +229,6 @@ struct gotd_imsg_info_client {
 	gid_t egid;
 	char repo_name[NAME_MAX];
 	int is_writing;
-	enum gotd_client_state state;
 	pid_t session_child_pid;
 	pid_t repo_child_pid;
 };
