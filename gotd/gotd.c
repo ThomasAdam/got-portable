@@ -81,8 +81,7 @@ struct gotd_client {
 	struct event			 tmo;
 	uid_t				 euid;
 	gid_t				 egid;
-	struct gotd_child_proc		*repo_read;
-	struct gotd_child_proc		*repo_write;
+	struct gotd_child_proc		*repo;
 	struct gotd_child_proc		*auth;
 	struct gotd_child_proc		*session;
 	int				 required_auth;
@@ -206,23 +205,6 @@ find_client(uint32_t client_id)
 	return NULL;
 }
 
-static struct gotd_child_proc *
-get_client_repo_proc(struct gotd_client *client)
-{
-	if (client->repo_read && client->repo_write) {
-		fatalx("uid %d is reading and writing in the same session",
-		    client->euid);
-		/* NOTREACHED */
-	}
-
-	if (client->repo_read)
-		return client->repo_read;
-	else if (client->repo_write)
-		return client->repo_write;
-
-	return NULL;
-}
-
 static struct gotd_client *
 find_client_by_proc_fd(int fd)
 {
@@ -232,8 +214,7 @@ find_client_by_proc_fd(int fd)
 		struct gotd_client *c;
 
 		STAILQ_FOREACH(c, &gotd_clients[slot], entry) {
-			struct gotd_child_proc *proc = get_client_repo_proc(c);
-			if (proc && proc->iev.ibuf.fd == fd)
+			if (c->repo && c->repo->iev.ibuf.fd == fd)
 				return c;
 			if (c->auth && c->auth->iev.ibuf.fd == fd)
 				return c;
@@ -248,13 +229,16 @@ find_client_by_proc_fd(int fd)
 static int
 client_is_reading(struct gotd_client *client)
 {
-	return client->repo_read != NULL;
+	return (client->required_auth &
+	    (GOTD_AUTH_READ | GOTD_AUTH_WRITE)) == GOTD_AUTH_READ;
 }
 
 static int
 client_is_writing(struct gotd_client *client)
 {
-	return client->repo_write != NULL;
+	return (client->required_auth &
+	    (GOTD_AUTH_READ | GOTD_AUTH_WRITE)) ==
+	    (GOTD_AUTH_READ | GOTD_AUTH_WRITE);
 }
 
 static const struct got_error *
@@ -345,7 +329,7 @@ static void
 disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
-	struct gotd_child_proc *proc = get_client_repo_proc(client);
+	struct gotd_child_proc *proc = client->repo;
 	struct gotd_child_proc *listen_proc = &gotd.listen_proc;
 	uint64_t slot;
 
@@ -437,7 +421,7 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 	iclient.euid = client->euid;
 	iclient.egid = client->egid;
 
-	proc = get_client_repo_proc(client);
+	proc = client->repo;
 	if (proc) {
 		if (strlcpy(iclient.repo_name, proc->repo_path,
 		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
@@ -859,18 +843,16 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
     struct imsg *imsg)
 {
 	const struct got_error *err;
-	struct gotd_child_proc *client_proc;
 	int ret = 0;
 
 	if (proc->type == PROC_REPO_READ || proc->type == PROC_REPO_WRITE) {
-		client_proc = get_client_repo_proc(client);
-		if (client_proc == NULL)
+		if (client->repo == NULL)
 			fatalx("no process found for uid %d", client->euid);
-		if (proc->pid != client_proc->pid) {
+		if (proc->pid != client->repo->pid) {
 			kill_proc(proc, 1);
 			log_warnx("received message from PID %d for uid %d, "
 			    "while PID %d is the process serving this user",
-			    proc->pid, client->euid, client_proc->pid);
+			    proc->pid, client->euid, client->repo->pid);
 			return 0;
 		}
 	}
@@ -1383,7 +1365,7 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 		}
 	}
 
-	proc = get_client_repo_proc(client);
+	proc = client->repo;
 	if (proc == NULL)
 		fatalx("cannot find child process for fd %d", fd);
 
@@ -1603,11 +1585,7 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	    gotd_dispatch_repo_child, &proc->iev);
 	gotd_imsg_event_add(&proc->iev);
 
-	if (proc->type == PROC_REPO_READ)
-		client->repo_read = proc;
-	else
-		client->repo_write = proc;
-
+	client->repo = proc;
 	return NULL;
 }
 
