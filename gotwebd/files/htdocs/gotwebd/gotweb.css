@@ -228,20 +228,6 @@ body {
 	padding-top: 2px;
 	padding-bottom: 2px;
 }
-#header_diff_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_diff {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
 .header_author_title {
 	clear: left;
 	float: left;
