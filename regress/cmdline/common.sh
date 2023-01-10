@@ -231,7 +231,7 @@ test_parseargs()
 		case $flag in
 		q)	export GOT_TEST_QUIET=1
 			;;
-		r)	export GOT_TEST_ROOT=$OPTARG
+		r)	export GOT_TEST_ROOT=${OPTARG%/}
 			;;
 		?)	echo "Supported options:"
 			echo "  -q: quiet mode"
