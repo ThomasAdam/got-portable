@@ -48,11 +48,10 @@ static const struct got_error *got_get_repo_commit(struct request *,
     struct got_object_id *);
 static const struct got_error *got_gotweb_dupfd(int *, int *);
 static const struct got_error *got_gotweb_openfile(FILE **, int *, int *);
-static const struct got_error *got_gotweb_flushfile(FILE *, int);
 static const struct got_error *got_gotweb_blame_cb(void *, int, int,
     struct got_commit_object *,struct got_object_id *);
 
-static const struct got_error *
+const struct got_error *
 got_gotweb_flushfile(FILE *f, int fd)
 {
 	if (fseek(f, 0, SEEK_SET) == -1)
@@ -1331,7 +1330,7 @@ done:
 }
 
 const struct got_error *
-got_output_repo_diff(struct request *c)
+got_open_diff_for_output(FILE **fp, int *fd, struct request *c)
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
@@ -1340,12 +1339,10 @@ got_output_repo_diff(struct request *c)
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_reflist_head refs;
 	FILE *f1 = NULL, *f2 = NULL, *f3 = NULL;
-	char *label1 = NULL, *label2 = NULL, *line = NULL;
-	char *newline, *eline = NULL, *color = NULL;
 	int obj_type, fd1, fd2, fd3, fd4 = -1, fd5 = -1;
-	size_t linesize = 0;
-	ssize_t linelen;
-	int wrlen = 0;
+
+	*fp = NULL;
+	*fd = -1;
 
 	TAILQ_INIT(&refs);
 
@@ -1365,14 +1362,14 @@ got_output_repo_diff(struct request *c)
 
 	if (rc->parent_id != NULL &&
 	    strncmp(rc->parent_id, "/dev/null", 9) != 0) {
-		error = got_repo_match_object_id(&id1, &label1,
+		error = got_repo_match_object_id(&id1, NULL,
 		    rc->parent_id, GOT_OBJ_TYPE_ANY,
 		    &refs, repo);
 		if (error)
 			goto done;
 	}
 
-	error = got_repo_match_object_id(&id2, &label2, rc->commit_id,
+	error = got_repo_match_object_id(&id2, NULL, rc->commit_id,
 	    GOT_OBJ_TYPE_ANY, &refs, repo);
 	if (error)
 		goto done;
@@ -1426,109 +1423,10 @@ got_output_repo_diff(struct request *c)
 		goto done;
 	}
 
-	while ((linelen = getline(&line, &linesize, f3)) != -1) {
-		if (strncmp(line, "-", 1) == 0) {
-			color = strdup("diff_minus");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "+", 1) == 0) {
-			color = strdup("diff_plus");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "@@", 2) == 0) {
-			color = strdup("diff_chunk_header");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "@@", 2) == 0) {
-			color = strdup("diff_chunk_header");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "commit +", 8) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "commit -", 8) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "blob +", 6) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "blob -", 6) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "file +", 6) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "file -", 6) == 0) {
-			color = strdup("diff_meta");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "from:", 5) == 0) {
-			color = strdup("diff_author");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "via:", 4) == 0) {
-			color = strdup("diff_author");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else if (strncmp(line, "date:", 5) == 0) {
-			color = strdup("diff_date");
-			if (color == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
+	*fp = f3;
+	*fd = fd3;
 
-		newline = strchr(line, '\n');
-		if (newline)
-			*newline = '\0';
-
-		error = gotweb_escape_html(&eline, line);
-		if (error)
-			goto done;
-
-		fcgi_printf(c, "<div class='diff_line %s'>%s</div>\n",
-		    color ? color : "", eline);
-		free(eline);
-		eline = NULL;
-
-		if (linelen > 0)
-			wrlen = wrlen + linelen;
-		free(color);
-		color = NULL;
-	}
-	if (linelen == -1 && ferror(f3))
-		error = got_error_from_errno("getline");
 done:
-	free(color);
 	if (fd4 != -1 && close(fd4) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (fd5 != -1 && close(fd5) == -1 && error == NULL)
@@ -1545,17 +1443,12 @@ done:
 		if (error == NULL)
 			error = f2_err;
 	}
-	if (f3) {
-		const struct got_error *f3_err =
-		    got_gotweb_flushfile(f3, fd3);
-		if (error == NULL)
-			error = f3_err;
+	if (error && f3) {
+		got_gotweb_flushfile(f3, fd3);
+		*fp = NULL;
+		*fd = -1;
 	}
 	got_ref_list_free(&refs);
-	free(line);
-	free(eline);
-	free(label1);
-	free(label2);
 	free(id1);
 	free(id2);
 	return error;
