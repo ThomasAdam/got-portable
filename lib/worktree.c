@@ -4253,7 +4253,7 @@ copy_one_line(FILE *infile, FILE *outfile, FILE *rejectfile)
 	if (rejectfile) {
 		n = fwrite(line, 1, linelen, rejectfile);
 		if (n != linelen)
-			err = got_ferror(outfile, GOT_ERR_IO);
+			err = got_ferror(rejectfile, GOT_ERR_IO);
 	}
 done:
 	free(line);
