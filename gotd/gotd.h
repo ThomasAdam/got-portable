@@ -232,9 +232,6 @@ struct gotd_imsg_info_client {
 	enum gotd_client_state state;
 	pid_t session_child_pid;
 	pid_t repo_child_pid;
-	size_t ncapabilities;
-
-	/* Followed by ncapabilities GOTD_IMSG_CAPABILITY. */
 };
 
 /* Structure for GOTD_IMSG_LIST_REFS. */

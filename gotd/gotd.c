@@ -70,9 +70,6 @@
 struct gotd_client {
 	STAILQ_ENTRY(gotd_client)	 entry;
 	enum gotd_client_state		 state;
-	struct gotd_client_capability	*capabilities;
-	size_t				 ncapa_alloc;
-	size_t				 ncapabilities;
 	uint32_t			 id;
 	int				 fd;
 	struct gotd_imsgev		 iev;
@@ -381,7 +378,6 @@ disconnect(struct gotd_client *client)
 		close(client->fd);
 	else if (client->iev.ibuf.fd != -1)
 		close(client->iev.ibuf.fd);
-	free(client->capabilities);
 	free(client);
 	client_cnt--;
 }
@@ -426,52 +422,11 @@ send_repo_info(struct gotd_imsgev *iev, struct gotd_repo *repo)
 }
 
 static const struct got_error *
-send_capability(struct gotd_client_capability *capa, struct gotd_imsgev* iev)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_capability icapa;
-	size_t len;
-	struct ibuf *wbuf;
-
-	memset(&icapa, 0, sizeof(icapa));
-
-	icapa.key_len = strlen(capa->key);
-	len = sizeof(icapa) + icapa.key_len;
-	if (capa->value) {
-		icapa.value_len = strlen(capa->value);
-		len += icapa.value_len;
-	}
-
-	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_CAPABILITY, 0, 0, len);
-	if (wbuf == NULL) {
-		err = got_error_from_errno("imsg_create CAPABILITY");
-		return err;
-	}
-
-	if (imsg_add(wbuf, &icapa, sizeof(icapa)) == -1)
-		return got_error_from_errno("imsg_add CAPABILITY");
-	if (imsg_add(wbuf, capa->key, icapa.key_len) == -1)
-		return got_error_from_errno("imsg_add CAPABILITY");
-	if (capa->value) {
-		if (imsg_add(wbuf, capa->value, icapa.value_len) == -1)
-			return got_error_from_errno("imsg_add CAPABILITY");
-	}
-
-	wbuf->fd = -1;
-	imsg_close(&iev->ibuf, wbuf);
-
-	gotd_imsg_event_add(iev);
-
-	return NULL;
-}
-
-static const struct got_error *
 send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsg_info_client iclient;
 	struct gotd_child_proc *proc;
-	size_t i;
 
 	memset(&iclient, 0, sizeof(iclient));
 	iclient.euid = client->euid;
@@ -493,19 +448,10 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 	iclient.state = client->state;
 	if (client->session)
 		iclient.session_child_pid = client->session->pid;
-	iclient.ncapabilities = client->ncapabilities;
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT, PROC_GOTD, -1,
 	    &iclient, sizeof(iclient)) == -1) {
 		err = got_error_from_errno("imsg compose INFO_CLIENT");
-		if (err)
-			return err;
-	}
-
-	for (i = 0; i < client->ncapabilities; i++) {
-		struct gotd_client_capability *capa;
-		capa = &client->capabilities[i];
-		err = send_capability(capa, iev);
 		if (err)
 			return err;
 	}
