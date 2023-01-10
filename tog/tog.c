@@ -5060,8 +5060,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		goto done;
 	}
 
-	s->first_displayed_line = 1;
-	s->last_displayed_line = view->nlines;
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
