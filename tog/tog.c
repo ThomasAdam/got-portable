@@ -4786,13 +4786,14 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_diff_objects_as_blobs(&s->lines, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
 		    s->label1, s->label2, tog_diff_algo, s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
+		    s->ignore_whitespace, s->force_text_diff, 0, NULL, s->repo,
+		    s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->lines, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
 		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, s->repo, s->f);
+		    s->force_text_diff, 0, NULL, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -4830,7 +4831,7 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_diff_objects_as_commits(&s->lines, &s->nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
 		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, s->repo, s->f);
+		    s->force_text_diff, 0, NULL, s->repo, s->f);
 		break;
 	}
 	default:

@@ -3624,7 +3624,8 @@ done:
 static const struct got_error *
 diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
     const char *path, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_repository *repo, FILE *outfile)
+    int force_text_diff, int show_diffstat, struct got_repository *repo,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -3666,7 +3667,7 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 		path++;
 	err = got_diff_blob(NULL, NULL, blob1, blob2, f1, f2, path, path,
 	    GOT_DIFF_ALGORITHM_PATIENCE, diff_context, ignore_whitespace,
-	    force_text_diff, outfile);
+	    force_text_diff, show_diffstat, NULL, outfile);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -3727,6 +3728,8 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
+	arg.show_diffstat = 0;
+	arg.diffstat = NULL;
 	arg.diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
 	arg.outfile = outfile;
 	arg.lines = NULL;
@@ -3891,7 +3894,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		switch (obj_type) {
 		case GOT_OBJ_TYPE_BLOB:
 			err = diff_blobs(obj_id1, obj_id2, path, diff_context,
-			    0, 0, repo, outfile);
+			    0, 0, 0, repo, outfile);
 			break;
 		case GOT_OBJ_TYPE_TREE:
 			err = diff_trees(obj_id1, obj_id2, path, diff_context,
@@ -4164,6 +4167,31 @@ done:
 }
 
 static const struct got_error *
+print_diffstat(struct got_diffstat_cb_arg *dsa, struct got_pathlist_head *paths,
+    const char *header)
+{
+	struct got_pathlist_entry *pe;
+
+	if (header != NULL)
+		printf("%s\n", header);
+
+	TAILQ_FOREACH(pe, paths, entry) {
+		struct got_diff_changed_path *cp = pe->data;
+		int pad = dsa->max_path_len - pe->path_len + 1;
+
+		printf(" %c  %s%*c | %*d+ %*d-\n", cp->status, pe->path, pad,
+		    ' ', dsa->add_cols + 1, cp->add, dsa->rm_cols + 1, cp->rm);
+	}
+	printf("\n%d file%s changed, %d insertions(+), %d deletions(-)\n\n",
+	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins, dsa->del);
+
+	if (fflush(stdout) != 0)
+		return got_error_from_errno("fflush");
+
+	return NULL;
+}
+
+static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, const char *path,
     struct got_pathlist_head *changed_paths, struct got_diffstat_cb_arg *dsa,
@@ -4237,31 +4265,18 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	} while (line);
 	free(logmsg0);
 
-	if (changed_paths) {
+	if (dsa && changed_paths) {
+		err = print_diffstat(dsa, changed_paths, NULL);
+		if (err)
+			goto done;
+	} else if (changed_paths) {
 		struct got_pathlist_entry *pe;
 
 		TAILQ_FOREACH(pe, changed_paths, entry) {
 			struct got_diff_changed_path *cp = pe->data;
-			char *stat = NULL;
 
-			if (dsa) {
-				int pad = dsa->max_path_len - pe->path_len + 1;
-
-				if (asprintf(&stat, "%*c | %*d+ %*d-",
-				    pad, ' ', dsa->add_cols + 1, cp->add,
-				    dsa->rm_cols + 1, cp->rm) == -1) {
-					err = got_error_from_errno("asprintf");
-					goto done;
-				}
-			}
-			printf(" %c  %s%s\n", cp->status, pe->path,
-			    stat ? stat : "");
-			free(stat);
+			printf(" %c  %s\n", cp->status, pe->path);
 		}
-		if (dsa)
-			printf("\n%d file%s changed, %d insertions(+), "
-			    "%d deletions(-)\n", dsa->nfiles,
-			    dsa->nfiles > 1 ? "s" : "", dsa->ins, dsa->del);
 		printf("\n");
 	}
 	if (show_patch) {
@@ -4727,7 +4742,7 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-aPsw] [-C number] [-c commit] "
+	fprintf(stderr, "usage: %s diff [-adPsw] [-C number] [-c commit] "
 	    "[-r repository-path] [object1 object2 | path ...]\n",
 	    getprogname());
 	exit(1);
@@ -4736,6 +4751,7 @@ usage_diff(void)
 struct print_diff_arg {
 	struct got_repository *repo;
 	struct got_worktree *worktree;
+	struct got_diffstat_cb_arg *diffstat;
 	int diff_context;
 	const char *id_str;
 	int header_shown;
@@ -4743,8 +4759,10 @@ struct print_diff_arg {
 	enum got_diff_algorithm diff_algo;
 	int ignore_whitespace;
 	int force_text_diff;
+	int show_diffstat;
 	FILE *f1;
 	FILE *f2;
+	FILE *outfile;
 };
 
 /*
@@ -4836,12 +4854,22 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		return got_error_from_errno("got_opentemp_truncate");
 
 	if (!a->header_shown) {
-		printf("diff %s%s\n", a->diff_staged ? "-s " : "",
-		    got_worktree_get_root_path(a->worktree));
-		printf("commit - %s\n", a->id_str);
-		printf("path + %s%s\n",
+		if (fprintf(a->outfile, "diff %s%s\n",
+		    a->diff_staged ? "-s " : "",
+		    got_worktree_get_root_path(a->worktree)) < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		if (fprintf(a->outfile, "commit - %s\n", a->id_str) < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		if (fprintf(a->outfile, "path + %s%s\n",
 		    got_worktree_get_root_path(a->worktree),
-		    a->diff_staged ? " (staged changes)" : "");
+		    a->diff_staged ? " (staged changes)" : "") < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
 		a->header_shown = 1;
 	}
 
@@ -4874,7 +4902,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		err = got_diff_objects_as_blobs(NULL, NULL, a->f1, a->f2,
 		    fd1, fd2, blob_id, staged_blob_id, label1, label2,
 		    a->diff_algo, a->diff_context, a->ignore_whitespace,
-		    a->force_text_diff, a->repo, stdout);
+		    a->force_text_diff, a->show_diffstat, a->diffstat, a->repo,
+		    a->outfile);
 		goto done;
 	}
 
@@ -4964,7 +4993,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 
 	err = got_diff_blob_file(blob1, a->f1, size1, label1, f2 ? f2 : a->f2,
 	    f2_exists, &sb, path, GOT_DIFF_ALGORITHM_PATIENCE, a->diff_context,
-	    a->ignore_whitespace, a->force_text_diff, stdout);
+	    a->ignore_whitespace, a->force_text_diff, a->show_diffstat,
+	    a->diffstat, a->outfile);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -4981,6 +5011,30 @@ done:
 }
 
 static const struct got_error *
+printfile(FILE *f)
+{
+	char	buf[8192];
+	size_t	r;
+
+	if (fseeko(f, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("fseek");
+
+	for (;;) {
+		r = fread(buf, 1, sizeof(buf), f);
+		if (r == 0) {
+			if (ferror(f))
+				return got_error_from_errno("fread");
+			if (feof(f))
+				break;
+		}
+		if (fwrite(buf, 1, r, stdout) != r)
+			return got_ferror(stdout, GOT_ERR_IO);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -4993,17 +5047,21 @@ cmd_diff(int argc, char *argv[])
 	char *labels[2] = { NULL, NULL };
 	int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
 	int diff_context = 3, diff_staged = 0, ignore_whitespace = 0, ch, i;
-	int force_text_diff = 0, force_path = 0, rflag = 0;
+	int force_text_diff = 0, force_path = 0, rflag = 0, show_diffstat = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
-	struct got_pathlist_head paths;
+	struct got_pathlist_head diffstat_paths, paths;
 	struct got_pathlist_entry *pe;
-	FILE *f1 = NULL, *f2 = NULL;
+	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
 	int fd1 = -1, fd2 = -1;
 	int *pack_fds = NULL;
+	struct got_diffstat_cb_arg dsa;
+
+	memset(&dsa, 0, sizeof(dsa));
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&paths);
+	TAILQ_INIT(&diffstat_paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -5011,7 +5069,7 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aC:c:Pr:sw")) != -1) {
+	while ((ch = getopt(argc, argv, "aC:c:dPr:sw")) != -1) {
 		switch (ch) {
 		case 'a':
 			force_text_diff = 1;
@@ -5027,6 +5085,9 @@ cmd_diff(int argc, char *argv[])
 			if (ncommit_args >= 2)
 				errx(1, "too many -c options used");
 			commit_args[ncommit_args++] = optarg;
+			break;
+		case 'd':
+			show_diffstat = 1;
 			break;
 		case 'P':
 			force_path = 1;
@@ -5091,6 +5152,13 @@ cmd_diff(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (show_diffstat) {
+		dsa.paths = &diffstat_paths;
+		dsa.force_text = force_text_diff;
+		dsa.ignore_ws = ignore_whitespace;
+		dsa.diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
+	}
+
 	if (rflag || worktree == NULL || ncommit_args > 0) {
 		if (force_path) {
 			error = got_error_msg(GOT_ERR_NOT_IMPL,
@@ -5150,6 +5218,12 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
+	outfile = got_opentemp();
+	if (outfile == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
 	if (ncommit_args == 0 && (ids[0] == NULL || ids[1] == NULL)) {
 		struct print_diff_arg arg;
 		char *id_str;
@@ -5189,12 +5263,33 @@ cmd_diff(int argc, char *argv[])
 		arg.diff_staged = diff_staged;
 		arg.ignore_whitespace = ignore_whitespace;
 		arg.force_text_diff = force_text_diff;
+		arg.show_diffstat = show_diffstat;
+		arg.diffstat = &dsa;
 		arg.f1 = f1;
 		arg.f2 = f2;
+		arg.outfile = outfile;
 
 		error = got_worktree_status(worktree, &paths, repo, 0,
 		    print_diff, &arg, check_cancelled, NULL);
 		free(id_str);
+		if (error)
+			goto done;
+
+		if (show_diffstat && dsa.nfiles > 0) {
+			char *header;
+
+			if (asprintf(&header, "diffstat %s%s",
+			    diff_staged ? "-s " : "",
+			    got_worktree_get_root_path(worktree)) == -1)
+				goto done;
+
+			error = print_diffstat(&dsa, &diffstat_paths, header);
+			free(header);
+			if (error)
+				goto done;
+		}
+
+		error = printfile(outfile);
 		goto done;
 	}
 
@@ -5329,24 +5424,45 @@ cmd_diff(int argc, char *argv[])
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
 		    fd1, fd2, ids[0], ids[1], NULL, NULL,
 		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
-		    ignore_whitespace, force_text_diff, repo, stdout);
+		    ignore_whitespace, force_text_diff, show_diffstat,
+		    show_diffstat ? &dsa : NULL, repo, outfile);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd1, fd2,
 		    ids[0], ids[1], &paths, "", "",
 		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
-		    ignore_whitespace, force_text_diff, repo, stdout);
+		    ignore_whitespace, force_text_diff, show_diffstat,
+		    show_diffstat ? &dsa : NULL, repo, outfile);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		printf("diff %s %s\n", labels[0], labels[1]);
+		fprintf(outfile, "diff %s %s\n", labels[0], labels[1]);
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2,
 		    fd1, fd2, ids[0], ids[1], &paths,
 		    GOT_DIFF_ALGORITHM_PATIENCE, diff_context,
-		    ignore_whitespace, force_text_diff, repo, stdout);
+		    ignore_whitespace, force_text_diff, show_diffstat,
+		    show_diffstat ? &dsa : NULL, repo, outfile);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	}
+	if (error)
+		goto done;
+
+	if (show_diffstat && dsa.nfiles > 0) {
+		char *header = NULL;
+
+		if (asprintf(&header, "diffstat %s %s",
+		    labels[0], labels[1]) == -1)
+			goto done;
+
+		error = print_diffstat(&dsa, &diffstat_paths, header);
+		free(header);
+		if (error)
+			goto done;
+	}
+
+	error = printfile(outfile);
+
 done:
 	free(labels[0]);
 	free(labels[1]);
@@ -5368,7 +5484,14 @@ done:
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
+	TAILQ_FOREACH(pe, &diffstat_paths, entry) {
+		free((char *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&diffstat_paths);
 	got_ref_list_free(&refs);
+	if (outfile && fclose(outfile) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	if (f1 && fclose(f1) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) == EOF && error == NULL)

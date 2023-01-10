@@ -5083,8 +5083,8 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 		}
 		err = got_diff_objects_as_blobs(NULL, NULL, f1, f2,
 		    fd1, fd2, ct->base_blob_id, ct->staged_blob_id,
-		    label1, label2, GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0,
-		    repo, diff_outfile);
+		    label1, label2, GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, 0,
+		    NULL, repo, diff_outfile);
 		goto done;
 	}
 
@@ -5154,7 +5154,7 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 
 	err = got_diff_blob_file(blob1, f1, size1, label1,
 	    ondisk_file ? ondisk_file : f2, f2_exists, &sb, ct->path,
-	    GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, diff_outfile);
+	    GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, 0, NULL, diff_outfile);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");
