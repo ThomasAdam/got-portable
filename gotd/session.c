@@ -63,7 +63,7 @@ static struct gotd_session {
 } gotd_session;
 
 static struct gotd_session_client {
-	enum gotd_client_state		 state;
+	enum gotd_session_state		 state;
 	int				 is_writing;
 	struct gotd_client_capability	*capabilities;
 	size_t				 ncapa_alloc;

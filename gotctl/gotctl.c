@@ -103,37 +103,6 @@ show_repo_info(struct imsg *imsg)
 	return NULL;
 }
 
-static const char *
-get_state_name(enum gotd_client_state state)
-{
-	static char unknown_state[64];
-
-	switch (state) {
-	case GOTD_STATE_EXPECT_LIST_REFS:
-		return "list-refs";
-	case GOTD_STATE_EXPECT_CAPABILITIES:
-		return "expect-capabilities";
-	case GOTD_STATE_EXPECT_WANT:
-		return "expect-want";
-	case GOTD_STATE_EXPECT_REF_UPDATE:
-		return "expect-ref-update";
-	case GOTD_STATE_EXPECT_MORE_REF_UPDATES:
-		return "expect-more-ref-updates";
-	case GOTD_STATE_EXPECT_HAVE:
-		return "expect-have";
-	case GOTD_STATE_EXPECT_PACKFILE:
-		return "expect-packfile";
-	case GOTD_STATE_EXPECT_DONE:
-		return "expect-done";
-	case GOTD_STATE_DONE:
-		return "done";
-	}
-
-	snprintf(unknown_state, sizeof(unknown_state),
-	    "unknown state %d", state);
-	return unknown_state;
-}
-
 static const struct got_error *
 show_client_info(struct imsg *imsg)
 {
@@ -145,8 +114,7 @@ show_client_info(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&info, imsg->data, sizeof(info));
 
-	printf("client UID %d, GID %d, protocol state '%s', ",
-	    info.euid, info.egid, get_state_name(info.state));
+	printf("client UID %d, GID %d, ", info.euid, info.egid);
 	if (info.session_child_pid)
 		printf("session PID %ld, ", (long)info.session_child_pid);
 	if (info.repo_child_pid)

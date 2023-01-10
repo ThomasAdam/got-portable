@@ -67,6 +67,11 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
+enum gotd_client_state {
+	GOTD_CLIENT_STATE_NEW,
+	GOTD_CLIENT_STATE_ACCESS_GRANTED,
+};
+
 struct gotd_client {
 	STAILQ_ENTRY(gotd_client)	 entry;
 	enum gotd_client_state		 state;
@@ -445,7 +450,6 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 		iclient.repo_child_pid = proc->pid;
 	}
 
-	iclient.state = client->state;
 	if (client->session)
 		iclient.session_child_pid = client->session->pid;
 
@@ -542,7 +546,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 
 	log_debug("list-refs request from uid %d", client->euid);
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (client->state != GOTD_CLIENT_STATE_NEW)
 		return got_error_msg(GOT_ERR_BAD_REQUEST,
 		    "unexpected list-refs request received");
 
@@ -661,8 +665,7 @@ gotd_request(int fd, short events, void *arg)
 	}
 
 	if (err) {
-		if (err->code != GOT_ERR_EOF ||
-		    client->state != GOTD_STATE_EXPECT_PACKFILE)
+		if (err->code != GOT_ERR_EOF)
 			disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(&client->iev);
@@ -714,7 +717,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 
 	*client_id = iconnect.client_id;
 
-	client->state = GOTD_STATE_EXPECT_LIST_REFS;
+	client->state = GOTD_CLIENT_STATE_NEW;
 	client->id = iconnect.client_id;
 	client->fd = s;
 	s = -1;
@@ -957,7 +960,7 @@ connect_repo_child(struct gotd_client *client,
 	struct gotd_imsg_connect_repo_child ireq;
 	int pipe[2];
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED)
 		return got_error_msg(GOT_ERR_BAD_REQUEST,
 		    "unexpected repo child ready signal received");
 
@@ -1134,6 +1137,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		err = gotd_imsg_recv_error(&client_id, &imsg);
 		break;
 	case GOTD_IMSG_ACCESS_GRANTED:
+		client->state = GOTD_CLIENT_STATE_ACCESS_GRANTED;
 		break;
 	default:
 		do_disconnect = 1;
@@ -1277,7 +1281,7 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
 		case GOTD_IMSG_CLIENT_SESSION_READY:
-			if (client->state != GOTD_STATE_EXPECT_LIST_REFS) {
+			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
