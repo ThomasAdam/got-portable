@@ -777,7 +777,7 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int fetchfd, packfd = -1;
+	int fetchfd = -1, packfd = -1;
 	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
 	struct imsgbuf ibuf;
 	struct imsg imsg;
