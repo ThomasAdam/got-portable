@@ -279,7 +279,7 @@ list_refs(struct imsg *imsg)
 		err = got_ref_resolve(&id, repo_write.repo, re->ref);
 		if (err)
 			goto done;
-		err = got_object_get_type(&obj_type, repo_write.repo, id);	
+		err = got_object_get_type(&obj_type, repo_write.repo, id);
 		free(id);
 		if (err)
 			goto done;
@@ -467,7 +467,7 @@ read_more_pack_stream(int infd, BUF *buf, size_t minsize)
 	err = buf_append(&newlen, buf, readahead, have);
 	if (err)
 		return err;
-	return NULL;	
+	return NULL;
 }
 
 static const struct got_error *
@@ -824,7 +824,7 @@ report_pack_status(const struct got_error *unpack_err)
 	struct imsgbuf ibuf;
 	const char *unpack_ok = "unpack ok\n";
 	size_t len;
-	
+
 	imsg_init(&ibuf, client->fd);
 
 	if (unpack_err)
@@ -1025,7 +1025,7 @@ verify_packfile(void)
 	packidx->fd = client->packidx_fd;
 	client->packidx_fd = -1;
 	packidx->len = sb.st_size;
-	
+
 	err = got_packidx_init_hdr(packidx, 1, client->pack.filesize);
 	if (err)
 		return err;
@@ -1044,7 +1044,7 @@ verify_packfile(void)
 		}
 	}
 
-done:	
+done:
 	close_err = got_packidx_close(packidx);
 	if (close_err && err == NULL)
 		err = close_err;

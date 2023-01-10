@@ -328,7 +328,7 @@ list_refs(struct imsg *imsg)
 		err = got_ref_resolve(&id, repo_read.repo, re->ref);
 		if (err)
 			goto done;
-		err = got_object_get_type(&obj_type, repo_read.repo, id);	
+		err = got_object_get_type(&obj_type, repo_read.repo, id);
 		free(id);
 		if (err)
 			goto done;
@@ -549,7 +549,7 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 		if (ret == -1) {
 			return got_error_from_errno("imsg compose "
 			    "PACKFILE_PROGRESS");
-		}	
+		}
 	} else {
 		a->sent_ready = 1;
 		ret = imsg_compose(a->ibuf, GOTD_IMSG_PACKFILE_READY,
@@ -653,7 +653,7 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
-	
+
 	if (log_getverbose() > 0 &&
 	    got_sha1_digest_to_str(packsha1, hex, sizeof(hex)))
 		log_debug("sent pack-%s.pack", hex);
