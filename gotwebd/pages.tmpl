@@ -388,8 +388,12 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
       <div class="commits_header">
         <div class="header_commit_title">Commit:</div>
         <div class="header_commit">{{ rc->commit_id }}</div>
-        <div class="header_author_title">Author:</div>
+        <div class="header_author_title">From:</div>
         <div class="header_author">{{ rc->author }}</div>
+	{{ if strcmp(rc->committer, rc->author) != 0 }}
+          <div class="header_author_title">Via:</div>
+          <div class="header_author">{{ rc->committer }}</div>
+	{{ end }}
         <div class="header_age_title">Date:</div>
         <div class="header_age">
           {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
