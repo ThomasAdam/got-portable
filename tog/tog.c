@@ -2720,7 +2720,7 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 			break;
 
 		s->last_displayed_entry = pentry ?
-		    pentry : s->last_displayed_entry;;
+		    pentry : s->last_displayed_entry;
 
 		pentry = TAILQ_NEXT(s->first_displayed_entry, entry);
 		if (pentry == NULL)
