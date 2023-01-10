@@ -1395,8 +1395,8 @@ test_diff_commit_diffstat() {
 	(cd $testroot/wt && got commit -m 'committing changes' >/dev/null)
 	local commit_id1=`git_show_head $testroot/repo`
 
-	alpha_id1=`get_blob_id $testroot/repo "" alpha`
-	new_id1=`get_blob_id $testroot/repo "" new`
+	local alpha_id1=`get_blob_id $testroot/repo "" alpha`
+	local new_id1=`get_blob_id $testroot/repo "" new`
 
 	cat <<EOF >$testroot/stdout.expected
 diffstat $commit_id0 refs/heads/master
