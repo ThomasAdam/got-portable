@@ -282,7 +282,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 	diff_url.commit = rc->commit_id;
 	tree_url.commit = rc->commit_id;
 
-	tmp = strchr(rc->author, '<');
+	tmp = strchr(rc->committer, '<');
 	if (tmp)
 		*tmp = '\0';
 
@@ -294,7 +294,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
       {{ render gotweb_render_age(tp, rc->committer_time, TM_DIFF) }}
     </div>
     <div class="briefs_author">
-      {{ rc->author }}
+      {{ rc->committer }}
     </div>
     <div class="briefs_log">
       <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
