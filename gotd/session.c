@@ -1406,6 +1406,7 @@ session_main(const char *title, const char *repo_path,
 	gotd_session_client.state = GOTD_STATE_EXPECT_LIST_REFS;
 	gotd_session_client.fd = -1;
 	gotd_session_client.nref_updates = -1;
+	gotd_session_client.delta_cache_fd = -1;
 
 	imsg_init(&gotd_session.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE);
 	gotd_session.parent_iev.handler = session_dispatch;
