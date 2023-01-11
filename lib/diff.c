@@ -114,8 +114,10 @@ get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
 	++ds->nfiles;
 
 	err = got_pathlist_append(ds->paths, path, change);
-	if (err)
+	if (err) {
+		free(change);
 		return err;
+	}
 
 	pe = TAILQ_LAST(ds->paths, got_pathlist_head);
 	diffstat_field_width(&ds->max_path_len, &ds->add_cols, &ds->rm_cols,
@@ -137,6 +139,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	const char *idstr1 = NULL, *idstr2 = NULL;
+	char *modestr1 = NULL, *modestr2 = NULL;
 	off_t size1, size2;
 	struct got_diffreg_result *result = NULL;
 	off_t outoff = 0;
@@ -185,8 +188,8 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		idstr2 = "/dev/null";
 
 	if (outfile) {
-		char *modestr1 = NULL, *modestr2 = NULL;
 		int modebits;
+
 		if (mode1 && mode1 != mode2) {
 			if (S_ISLNK(mode1))
 				modebits = S_IFLNK;
@@ -232,9 +235,6 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 			if (err)
 				goto done;
 		}
-
-		free(modestr1);
-		free(modestr2);
 	}
 
 	err = got_diffreg(&result, f1, f2, diff_algo, ignore_whitespace,
@@ -296,6 +296,8 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	}
 
 done:
+	free(modestr1);
+	free(modestr2);
 	if (resultp && err == NULL)
 		*resultp = result;
 	else if (result) {
@@ -896,13 +898,16 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 	if (tree2) {
 		te2 = got_object_tree_get_entry(tree2, 0);
 		if (te2 && asprintf(&l2, "%s%s%s", label2, label2[0] ? "/" : "",
-		    te2->name) == -1)
-			return got_error_from_errno("asprintf");
+		    te2->name) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
 	}
 
 	do {
 		if (te1) {
 			struct got_tree_entry *te = NULL;
+
 			if (tree2)
 				te = got_object_tree_find_entry(tree2,
 				    te1->name);
@@ -910,10 +915,12 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 				free(l2);
 				l2 = NULL;
 				if (te && asprintf(&l2, "%s%s%s", label2,
-				    label2[0] ? "/" : "", te->name) == -1)
-					return
-					    got_error_from_errno("asprintf");
+				    label2[0] ? "/" : "", te->name) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
 			}
+
 			err = diff_entry_old_new(te1, te, f1, f2, fd1, fd2,
 			    l1, l2, repo, cb, cb_arg, diff_content);
 			if (err)
@@ -922,21 +929,27 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 
 		if (te2) {
 			struct got_tree_entry *te = NULL;
+
 			if (tree1)
 				te = got_object_tree_find_entry(tree1,
 				    te2->name);
+
 			free(l2);
+			l2 = NULL;
 			if (te) {
 				if (asprintf(&l2, "%s%s%s", label2,
-				    label2[0] ? "/" : "", te->name) == -1)
-					return
-					    got_error_from_errno("asprintf");
+				    label2[0] ? "/" : "", te->name) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
 			} else {
 				if (asprintf(&l2, "%s%s%s", label2,
-				    label2[0] ? "/" : "", te2->name) == -1)
-					return
-					    got_error_from_errno("asprintf");
+				    label2[0] ? "/" : "", te2->name) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
 			}
+
 			err = diff_entry_new_old(te2, te, f1, f2, fd2, l2,
 			    repo, cb, cb_arg, diff_content);
 			if (err)
@@ -950,9 +963,12 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			te1 = got_object_tree_get_entry(tree1, tidx1);
 			if (te1 &&
 			    asprintf(&l1, "%s%s%s", label1,
-			    label1[0] ? "/" : "", te1->name) == -1)
-				return got_error_from_errno("asprintf");
+			    label1[0] ? "/" : "", te1->name) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
 		}
+
 		free(l2);
 		l2 = NULL;
 		if (te2) {
@@ -960,11 +976,16 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			te2 = got_object_tree_get_entry(tree2, tidx2);
 			if (te2 &&
 			    asprintf(&l2, "%s%s%s", label2,
-			        label2[0] ? "/" : "", te2->name) == -1)
-				return got_error_from_errno("asprintf");
+			    label2[0] ? "/" : "", te2->name) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
 		}
 	} while (te1 || te2);
 
+done:
+	free(l1);
+	free(l2);
 	return err;
 }
 
@@ -1377,6 +1398,7 @@ done:
 		*resultp = diffreg_result;
 	else if (diffreg_result) {
 		const struct got_error *free_err;
+
 		free_err = got_diffreg_result_free(diffreg_result);
 		if (free_err && err == NULL)
 			err = free_err;
