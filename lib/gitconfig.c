@@ -239,10 +239,9 @@ conf_parse_line(char **section, struct got_gitconfig *conf, int trans,
 			*section = NULL;
 			return NULL;
 		}
-		*section = malloc(i);
+		*section = strndup(line + 1, i - 1);
 		if (*section == NULL)
-			return got_error_from_errno("malloc");
-		strlcpy(*section, line + 1, i);
+			return got_error_from_errno("strndup");
 		return NULL;
 	}
 	while (isspace((unsigned char)*line))

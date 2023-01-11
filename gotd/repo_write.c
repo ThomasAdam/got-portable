@@ -349,11 +349,9 @@ recv_ref_update(struct imsg *imsg)
 
 	imsg_init(&ibuf, client->fd);
 
-	refname = malloc(iref.name_len + 1);
+	refname = strndup(imsg->data + sizeof(iref), iref.name_len);
 	if (refname == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(refname, imsg->data + sizeof(iref), iref.name_len);
-	refname[iref.name_len] = '\0';
+		return got_error_from_errno("strndup");
 
 	ref_update = calloc(1, sizeof(*ref_update));
 	if (ref_update == NULL) {
