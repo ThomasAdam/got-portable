@@ -96,7 +96,6 @@ static const struct got_error *gotweb_get_clone_url(char **, struct server *,
 static const struct got_error *gotweb_render_blame(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
 static const struct got_error *gotweb_render_tags(struct request *);
-static const struct got_error *gotweb_render_branches(struct request *);
 
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
@@ -1012,16 +1011,13 @@ done:
 }
 
 static const struct got_error *
-gotweb_render_branches(struct request *c)
+gotweb_render_summary(struct request *c)
 {
 	const struct got_error *error = NULL;
 	struct got_reflist_head refs;
-	struct got_reflist_entry *re;
 	struct transport *t = c->t;
-	struct querystring *qs = t->qs;
 	struct got_repository *repo = t->repo;
-	char *escaped_refname = NULL;
-	char *age = NULL;
+	struct server *srv = c->srv;
 	int r;
 
 	TAILQ_INIT(&refs);
@@ -1030,123 +1026,6 @@ gotweb_render_branches(struct request *c)
 	    got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
-
-	r = fcgi_printf(c, "<div id='branches_title_wrapper'>\n"
-	    "<div id='branches_title'>Branches</div>\n"
-	    "</div>\n"	/* #branches_title_wrapper */
-	    "<div id='branches_content'>\n");
-	if (r == -1)
-		goto done;
-
-	TAILQ_FOREACH(re, &refs, entry) {
-		const char *refname = NULL;
-
-		if (got_ref_is_symbolic(re->ref))
-			continue;
-
-		refname = got_ref_get_name(re->ref);
-		if (refname == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-		if (strncmp(refname, "refs/heads/", 11) != 0)
-			continue;
-
-		error = got_get_repo_age(&age, c, refname, TM_DIFF);
-		if (error)
-			goto done;
-
-		if (strncmp(refname, "refs/heads/", 11) == 0)
-			refname += 11;
-		error = gotweb_escape_html(&escaped_refname, refname);
-		if (error)
-			goto done;
-
-		r = fcgi_printf(c, "<div class='branches_wrapper'>\n"
-		    "<div class='branches_age'>%s</div>\n"
-		    "<div class='branches_space'>&nbsp;</div>\n"
-		    "<div class='branch'>", age);
-		if (r == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = SUMMARY,
-			.index_page = -1,
-			.page = -1,
-			.path = qs->path,
-			.headref = refname,
-		    }, "%s", escaped_refname);
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, "</div>\n"	/* .branch */
-		    "<div class='navs_wrapper'>\n"
-		    "<div class='navs'>") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = SUMMARY,
-			.index_page = -1,
-			.page = -1,
-			.path = qs->path,
-			.headref = refname,
-		    }, "summary");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, " | ") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = BRIEFS,
-			.index_page = -1,
-			.page = -1,
-			.path = qs->path,
-			.headref = refname,
-		    }, "commit briefs");
-		if (r == -1)
-			goto done;
-
-		if (fcgi_printf(c, " | ") == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = COMMITS,
-			.index_page = -1,
-			.page = -1,
-			.path = qs->path,
-			.headref = refname,
-		    }, "commits");
-		if (r == -1)
-			goto done;
-
-		r = fcgi_printf(c, "</div>\n"	/* .navs */
-		    "</div>\n"			/* .navs_wrapper */
-		    "<div class='dotted_line'></div>\n"
-		    "</div>\n");		/* .branches_wrapper */
-		if (r == -1)
-			goto done;
-
-		free(age);
-		age = NULL;
-		free(escaped_refname);
-		escaped_refname = NULL;
-	}
-	fcgi_printf(c, "</div>\n"); /* #branches_content */
-done:
-	free(age);
-	free(escaped_refname);
-	got_ref_list_free(&refs);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_summary(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct transport *t = c->t;
-	struct server *srv = c->srv;
-	int r;
 
 	if (fcgi_printf(c, "<div id='summary_wrapper'>\n") == -1)
 		goto done;
@@ -1200,10 +1079,9 @@ gotweb_render_summary(struct request *c)
 		goto done;
 	}
 
-	error = gotweb_render_branches(c);
-	if (error)
-		log_warnx("%s: %s", __func__, error->msg);
+	gotweb_render_branches(c->tp, &refs);
 done:
+	got_ref_list_free(&refs);
 	return error;
 }
 

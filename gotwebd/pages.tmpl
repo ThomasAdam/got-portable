@@ -29,7 +29,9 @@
 #include <sha1.h>
 #include <imsg.h>
 
+#include "got_error.h"
 #include "got_object.h"
+#include "got_reference.h"
 
 #include "proc.h"
 
@@ -41,6 +43,7 @@ static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
 
 static inline int diff_line(struct template *, char *);
 static inline int tag_item(struct template *, struct repo_tag *);
+static inline int branch(struct template *, struct got_reflist_entry *);
 static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
 
@@ -768,6 +771,73 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 		*nl = '\0';
 !}
 <div class="diff_line {{ color }}">{{ line }}</div>
+{{ end }}
+
+{{ define gotweb_render_branches(struct template *tp,
+    struct got_reflist_head *refs) }}
+{!
+	struct got_reflist_entry	*re;
+!}
+<div id="branches_title_wrapper">
+  <div id="branches_title">Branches</div>
+</div>
+<div id="branches_content">
+  {{ tailq-foreach re refs entry }}
+    {{ if !got_ref_is_symbolic(re->ref) }}
+      {{ render branch(tp, re) }}
+    {{ end }}
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define branch(struct template *tp, struct got_reflist_entry *re) }}
+{!
+	const struct got_error	*err;
+	struct request		*c = tp->tp_arg;
+	struct querystring	*qs = c->t->qs;
+	const char		*refname;
+	char			*age = NULL;
+	struct gotweb_url	 url = {
+		.action = SUMMARY,
+		.index_page = -1,
+		.page = -1,
+		.path = qs->path,
+	};
+
+	refname = got_ref_get_name(re->ref);
+
+	err = got_get_repo_age(&age, c, refname, TM_DIFF);
+	if (err) {
+		log_warnx("%s: %s", __func__, err->msg);
+		return -1;
+	}
+
+	if (strncmp(refname, "refs/heads/", 11) == 0)
+		refname += 11;
+
+	url.headref = refname;
+!}
+<div class="branches_wrapper">
+  <div class="branches_age">{{ age }}</div>
+  <div class="branches_space">&nbsp;</div>
+  <div class="branch">
+    <a href="{{ render gotweb_render_url(c, &url) }}">{{ refname }}</a>
+  </div>
+  <div class="navs_wrapper">
+    <div class="navs">
+      <a href="{{ render gotweb_render_url(c, &url) }}">summary</a>
+      {{" | "}}
+      {! url.action = BRIEFS; !}
+      <a href="{{ render gotweb_render_url(c, &url) }}">commit briefs</a>
+      {{" | "}}
+      {! url.action = COMMITS; !}
+      <a href="{{ render gotweb_render_url(c, &url) }}">commits</a>
+    </div>
+  </div>
+  <div class="dotted_line"></div>
+</div>
+{{ finally }}
+{! free(age); !}
 {{ end }}
 
 {{ define gotweb_render_rss(struct template *tp) }}
