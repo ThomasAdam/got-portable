@@ -339,14 +339,12 @@ announce_refs(int outfd, struct imsgbuf *ibuf, int client_is_reading,
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				goto done;
 			}
-			refname = malloc(iref.name_len + 1);
+			refname = strndup(imsg.data + sizeof(iref),
+			    iref.name_len);
 			if (refname == NULL) {
-				err = got_error_from_errno("malloc");
+				err = got_error_from_errno("strndup");
 				goto done;
 			}
-			memcpy(refname, imsg.data + sizeof(iref),
-			    iref.name_len);
-			refname[iref.name_len] = '\0';
 			err = send_ref(outfd, iref.id, refname,
 			    !sent_capabilities, client_is_reading,
 			    NULL, chattygot);
@@ -382,24 +380,20 @@ announce_refs(int outfd, struct imsgbuf *ibuf, int client_is_reading,
 			    symrefname != NULL || symreftarget != NULL)
 				break;
 
-			symrefname = malloc(isymref.name_len + 1);
+			symrefname = strndup(imsg.data + sizeof(isymref),
+			    isymref.name_len);
 			if (symrefname == NULL) {
 				err = got_error_from_errno("malloc");
 				goto done;
 			}
-			memcpy(symrefname, imsg.data + sizeof(isymref),
-			    isymref.name_len);
-			symrefname[isymref.name_len] = '\0';
 
-			symreftarget = malloc(isymref.target_len + 1);
-			if (symreftarget == NULL) {
-				err = got_error_from_errno("malloc");
-				goto done;
-			}
-			memcpy(symreftarget,
+			symreftarget = strndup(
 			    imsg.data + sizeof(isymref) + isymref.name_len,
 			    isymref.target_len);
-			symreftarget[isymref.target_len] = '\0';
+			if (symreftarget == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
 
 			if (asprintf(&symrefstr, "%s:%s", symrefname,
 			    symreftarget) == -1) {
@@ -1219,13 +1213,11 @@ report_unpack_status(struct imsg *imsg, int outfd, int chattygot)
 	if (datalen != sizeof(istatus) + istatus.reason_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	reason = malloc(istatus.reason_len + 1);
+	reason = strndup(imsg->data + sizeof(istatus), istatus.reason_len);
 	if (reason == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("strndup");
 		goto done;
 	}
-	memcpy(reason, imsg->data + sizeof(istatus), istatus.reason_len);
-	reason[istatus.reason_len] = '\0';
 
 	if (err == NULL)
 		len = snprintf(buf, sizeof(buf), "unpack ok\n");
@@ -1260,11 +1252,9 @@ recv_ref_update_ok(struct imsg *imsg, int outfd, int chattygot)
 
 	memcpy(&iok, imsg->data, sizeof(iok));
 
-	refname = malloc(iok.name_len + 1);
+	refname = strndup(imsg->data + sizeof(iok), iok.name_len);
 	if (refname == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(refname, imsg->data + sizeof(iok), iok.name_len);
-	refname[iok.name_len] = '\0';
+		return got_error_from_errno("strndup");
 
 	len = snprintf(buf, sizeof(buf), "ok %s\n", refname);
 	if (len >= sizeof(buf)) {
@@ -1296,20 +1286,16 @@ recv_ref_update_ng(struct imsg *imsg, int outfd, int chattygot)
 
 	memcpy(&ing, imsg->data, sizeof(ing));
 
-	refname = malloc(ing.name_len + 1);
+	refname = strndup(imsg->data + sizeof(ing), ing.name_len);
 	if (refname == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(refname, imsg->data + sizeof(ing), ing.name_len);
-	refname[ing.name_len] = '\0';
+		return got_error_from_errno("strndup");
 
-	reason = malloc(ing.reason_len + 1);
+	reason = strndup(imsg->data + sizeof(ing) + ing.name_len,
+	    ing.reason_len);
 	if (reason == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("strndup");
 		goto done;
 	}
-	memcpy(refname, imsg->data + sizeof(ing) + ing.name_len,
-	    ing.reason_len);
-	refname[ing.reason_len] = '\0';
 
 	len = snprintf(buf, sizeof(buf), "ng %s %s\n", refname, reason);
 	if (len >= sizeof(buf)) {

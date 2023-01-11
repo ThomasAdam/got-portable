@@ -2088,14 +2088,11 @@ got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
 	case GOT_IMSG_GITCONFIG_STR_VAL:
 		if (datalen == 0)
 			break;
-		/* datalen does not include terminating \0 */
-		*str = malloc(datalen + 1);
+		*str = strndup(imsg.data, datalen);
 		if (*str == NULL) {
-			err = got_error_from_errno("malloc");
+			err = got_error_from_errno("strndup");
 			break;
 		}
-		memcpy(*str, imsg.data, datalen);
-		(*str)[datalen] = '\0';
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -2366,14 +2363,11 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	case GOT_IMSG_GOTCONFIG_STR_VAL:
 		if (datalen == 0)
 			break;
-		/* datalen does not include terminating \0 */
-		*str = malloc(datalen + 1);
+		*str = strndup(imsg.data, datalen);
 		if (*str == NULL) {
-			err = got_error_from_errno("malloc");
+			err = got_error_from_errno("strndup");
 			break;
 		}
-		memcpy(*str, imsg.data, datalen);
-		(*str)[datalen] = '\0';
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -2828,9 +2822,9 @@ got_privsep_recv_enumerated_objects(int *found_all_objects,
 			}
 			memcpy(tree_id.sha1, itree->id, sizeof(tree_id.sha1));
 			free(path);
-			path = malloc(path_len + 1);
+			path = strndup(imsg.data + sizeof(*itree), path_len);
 			if (path == NULL) {
-				err = got_error_from_errno("malloc");
+				err = got_error_from_errno("strndup");
 				break;
 			}
 			free(canon_path);
@@ -2839,9 +2833,6 @@ got_privsep_recv_enumerated_objects(int *found_all_objects,
 				err = got_error_from_errno("malloc");
 				break;
 			}
-			memcpy(path, (uint8_t *)imsg.data + sizeof(*itree),
-			    path_len);
-			path[path_len] = '\0';
 			if (!got_path_is_absolute(path)) {
 				err = got_error(GOT_ERR_BAD_PATH);
 				break;

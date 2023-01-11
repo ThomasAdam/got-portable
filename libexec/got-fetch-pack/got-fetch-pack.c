@@ -854,13 +854,11 @@ main(int argc, char **argv)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		refname = malloc(href.name_len + 1);
+		refname = strndup(imsg.data + sizeof(href), href.name_len);
 		if (refname == NULL) {
-			err = got_error_from_errno("malloc");
+			err = got_error_from_errno("strndup");
 			goto done;
 		}
-		memcpy(refname, imsg.data + sizeof(href), href.name_len);
-		refname[href.name_len] = '\0';
 
 		id = malloc(sizeof(*id));
 		if (id == NULL) {
@@ -904,13 +902,12 @@ main(int argc, char **argv)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		refname = malloc(wbranch.name_len + 1);
+		refname = strndup(imsg.data + sizeof(wbranch),
+		    wbranch.name_len);
 		if (refname == NULL) {
-			err = got_error_from_errno("malloc");
+			err = got_error_from_errno("strndup");
 			goto done;
 		}
-		memcpy(refname, imsg.data + sizeof(wbranch), wbranch.name_len);
-		refname[wbranch.name_len] = '\0';
 
 		err = got_pathlist_append(&wanted_branches, refname, NULL);
 		if (err) {
@@ -946,13 +943,11 @@ main(int argc, char **argv)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		refname = malloc(wref.name_len + 1);
+		refname = strndup(imsg.data + sizeof(wref), wref.name_len);
 		if (refname == NULL) {
-			err = got_error_from_errno("malloc");
+			err = got_error_from_errno("strndup");
 			goto done;
 		}
-		memcpy(refname, imsg.data + sizeof(wref), wref.name_len);
-		refname[wref.name_len] = '\0';
 
 		err = got_pathlist_append(&wanted_refs, refname, NULL);
 		if (err) {

@@ -419,11 +419,9 @@ update_ref(struct gotd_session_client *client, const char *repo_path,
 	memcpy(&iref, imsg->data, sizeof(iref));
 	if (datalen != sizeof(iref) + iref.name_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	refname = malloc(iref.name_len + 1);
+	refname = strndup(imsg->data + sizeof(iref), iref.name_len);
 	if (refname == NULL)
-		return got_error_from_errno("malloc");
-	memcpy(refname, imsg->data + sizeof(iref), iref.name_len);
-	refname[iref.name_len] = '\0';
+		return got_error_from_errno("strndup");
 
 	log_debug("updating ref %s for uid %d", refname, client->euid);
 
@@ -667,23 +665,16 @@ recv_capability(struct gotd_session_client *client, struct imsg *imsg)
 	if (datalen != sizeof(icapa) + icapa.key_len + icapa.value_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	key = malloc(icapa.key_len + 1);
+	key = strndup(imsg->data + sizeof(icapa), icapa.key_len);
 	if (key == NULL)
-		return got_error_from_errno("malloc");
+		return got_error_from_errno("strndup");
 	if (icapa.value_len > 0) {
-		value = malloc(icapa.value_len + 1);
+		value = strndup(imsg->data + sizeof(icapa) + icapa.key_len,
+		    icapa.value_len);
 		if (value == NULL) {
 			free(key);
-			return got_error_from_errno("malloc");
+			return got_error_from_errno("strndup");
 		}
-	}
-
-	memcpy(key, imsg->data + sizeof(icapa), icapa.key_len);
-	key[icapa.key_len] = '\0';
-	if (value) {
-		memcpy(value, imsg->data + sizeof(icapa) + icapa.key_len,
-		    icapa.value_len);
-		value[icapa.value_len] = '\0';
 	}
 
 	capa = &client->capabilities[client->ncapabilities++];
