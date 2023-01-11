@@ -120,6 +120,7 @@
 /* Forward declaration */
 struct got_blob_object;
 struct got_tree_entry;
+struct got_reflist_head;
 
 enum imsg_type {
 	IMSG_CFG_SRV = IMSG_PROC_MAX,
@@ -474,6 +475,7 @@ int	gotweb_render_tree(struct template *);
 int	gotweb_render_tags_tmpl(struct template *);
 int	gotweb_render_tag(struct template *);
 int	gotweb_render_diff(struct template *, FILE *);
+int	gotweb_render_branches(struct template *, struct got_reflist_head *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */
