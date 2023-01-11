@@ -5249,8 +5249,10 @@ cmd_diff(int argc, char *argv[])
 
 			if (asprintf(&header, "diffstat %s%s",
 			    diff_staged ? "-s " : "",
-			    got_worktree_get_root_path(worktree)) == -1)
+			    got_worktree_get_root_path(worktree)) == -1) {
+				error = got_error_from_errno("asprintf");
 				goto done;
+			}
 
 			error = print_diffstat(&dsa, &diffstat_paths, header);
 			free(header);
@@ -5421,8 +5423,10 @@ cmd_diff(int argc, char *argv[])
 		char *header = NULL;
 
 		if (asprintf(&header, "diffstat %s %s",
-		    labels[0], labels[1]) == -1)
+		    labels[0], labels[1]) == -1) {
+			error = got_error_from_errno("asprintf");
 			goto done;
+		}
 
 		error = print_diffstat(&dsa, &diffstat_paths, header);
 		free(header);
