@@ -95,7 +95,6 @@ static const struct got_error *gotweb_get_clone_url(char **, struct server *,
     const char *, int);
 static const struct got_error *gotweb_render_blame(struct request *);
 static const struct got_error *gotweb_render_summary(struct request *);
-static const struct got_error *gotweb_render_tags(struct request *);
 
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
@@ -310,11 +309,13 @@ render:
 			goto done;
 		break;
 	case TAGS:
-		error = gotweb_render_tags(c);
+		error = got_get_repo_tags(c, srv->max_commits_display);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		if (gotweb_render_tags(c->tp) == -1)
+			goto done;
 		break;
 	case TREE:
 		error = got_get_repo_commits(c, 1);
@@ -1016,6 +1017,7 @@ gotweb_render_summary(struct request *c)
 	const struct got_error *error = NULL;
 	struct got_reflist_head refs;
 	struct transport *t = c->t;
+	struct querystring *qs = t->qs;
 	struct got_repository *repo = t->repo;
 	struct server *srv = c->srv;
 	int r;
@@ -1073,38 +1075,17 @@ gotweb_render_summary(struct request *c)
 	if (gotweb_render_briefs(c->tp) == -1)
 		goto done;
 
-	error = gotweb_render_tags(c);
-	if (error) {
-		log_warnx("%s: %s", __func__, error->msg);
+	qs->action = TAGS;
+	error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
+	if (error)
 		goto done;
-	}
+
+	if (gotweb_render_tags(c->tp) == -1)
+		goto done;
 
 	gotweb_render_branches(c->tp, &refs);
 done:
 	got_ref_list_free(&refs);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_tags(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct server *srv = c->srv;
-	struct transport *t = c->t;
-	struct querystring *qs = t->qs;
-
-	if (qs->action == BRIEFS) {
-		qs->action = TAGS;
-		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
-	} else
-		error = got_get_repo_tags(c, srv->max_commits_display);
-	if (error)
-		goto done;
-
-	if (gotweb_render_tags_tmpl(c->tp) == -1)
-		goto done;
-
-done:
 	return error;
 }
 
