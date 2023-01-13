@@ -472,7 +472,7 @@ int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
 int	gotweb_render_blob(struct template *, struct got_blob_object *);
 int	gotweb_render_tree(struct template *);
-int	gotweb_render_tags_tmpl(struct template *);
+int	gotweb_render_tags(struct template *);
 int	gotweb_render_tag(struct template *);
 int	gotweb_render_diff(struct template *, FILE *);
 int	gotweb_render_branches(struct template *, struct got_reflist_head *);

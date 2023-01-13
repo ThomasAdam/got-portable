@@ -576,7 +576,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 !}
 {{ end }}
 
-{{ define gotweb_render_tags_tmpl(struct template *tp) }}
+{{ define gotweb_render_tags(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
