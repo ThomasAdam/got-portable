@@ -1117,7 +1117,6 @@ got_ref_list_free(struct got_reflist_head *refs)
 		got_ref_close(re->ref);
 		free(re);
 	}
-
 }
 
 int
