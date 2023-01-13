@@ -840,6 +840,36 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 {! free(age); !}
 {{ end }}
 
+{{ define gotweb_render_summary(struct template *tp,
+    struct got_reflist_head *refs) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct server		*srv = c->srv;
+	struct transport	*t = c->t;
+!}
+<div id="summary_wrapper">
+  {{ if srv->show_repo_description }}
+    <div id="description_title">Description:</div>
+    <div id="description">{{ t->repo_dir->description }}</div>
+  {{ end }}
+  {{ if srv->show_repo_owner }}
+    <div id="repo_owner_title">Owner:</div>
+    <div id="repo_owner">{{ t->repo_dir->owner }}</div>
+  {{ end }}
+  {{ if srv->show_repo_age }}
+    <div id="last_change_title">Last Change:</div>
+    <div id="last_change">{{ t->repo_dir->age }}</div>
+  {{ end }}
+  {{ if srv->show_repo_cloneurl }}
+    <div id="cloneurl_title">Clone URL:</div>
+    <div id="cloneurl">{{ t->repo_dir->url }}</div>
+  {{ end }}
+</div>
+{{ render gotweb_render_briefs(tp) }}
+{{ render gotweb_render_tags(tp) }}
+{{ render gotweb_render_branches(tp, refs) }}
+{{ end }}
+
 {{ define gotweb_render_rss(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
