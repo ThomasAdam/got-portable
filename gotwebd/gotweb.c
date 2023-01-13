@@ -95,7 +95,6 @@ static const struct got_error *gotweb_get_repo_description(char **,
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
     const char *, int);
 static const struct got_error *gotweb_render_blame(struct request *);
-static const struct got_error *gotweb_render_summary(struct request *);
 
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
@@ -110,9 +109,12 @@ gotweb_process_request(struct request *c)
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
+	struct got_reflist_head refs;
 	FILE *fp = NULL;
 	uint8_t err[] = "gotwebd experienced an error: ";
 	int r, html = 0, fd = -1;
+
+	TAILQ_INIT(&refs);
 
 	/* init the transport */
 	error = gotweb_init_transport(&c->t);
@@ -289,11 +291,23 @@ render:
 		}
 		break;
 	case SUMMARY:
-		error = gotweb_render_summary(c);
+		error = got_ref_list(&refs, c->t->repo, "refs/heads",
+		    got_ref_cmp_by_name, NULL);
 		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
+			log_warnx("%s: got_ref_list: %s", __func__,
+			    error->msg);
 			goto err;
 		}
+		qs->action = TAGS;
+		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
+		if (error) {
+			log_warnx("%s: got_get_repo_tags: %s", __func__,
+			    error->msg);
+			goto err;
+		}
+		qs->action = SUMMARY;
+		if (gotweb_render_summary(c->tp, &refs) == -1)
+			goto done;
 		break;
 	case TAG:
 		error = got_get_repo_tags(c, 1);
@@ -365,6 +379,8 @@ done:
 		close(fd);
 	if (html && srv != NULL)
 		gotweb_render_footer(c->tp);
+
+	got_ref_list_free(&refs);
 }
 
 struct server *
@@ -1009,84 +1025,6 @@ gotweb_render_blame(struct request *c)
 done:
 	free(age);
 	free(msg);
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_summary(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct got_reflist_head refs;
-	struct transport *t = c->t;
-	struct querystring *qs = t->qs;
-	struct got_repository *repo = t->repo;
-	struct server *srv = c->srv;
-	int r;
-
-	TAILQ_INIT(&refs);
-
-	error = got_ref_list(&refs, repo, "refs/heads",
-	    got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
-	if (fcgi_printf(c, "<div id='summary_wrapper'>\n") == -1)
-		goto done;
-
-	if (srv->show_repo_description) {
-		r = fcgi_printf(c,
-		    "<div id='description_title'>Description:</div>\n"
-		    "<div id='description'>%s</div>\n",
-		    t->repo_dir->description ? t->repo_dir->description : "");
-		if (r == -1)
-			goto done;
-	}
-
-	if (srv->show_repo_owner) {
-		r = fcgi_printf(c,
-		    "<div id='repo_owner_title'>Owner:</div>\n"
-		    "<div id='repo_owner'>%s</div>\n",
-		    t->repo_dir->owner ? t->repo_dir->owner : "");
-		if (r == -1)
-			goto done;
-	}
-
-	if (srv->show_repo_age) {
-		r = fcgi_printf(c,
-		    "<div id='last_change_title'>Last Change:</div>\n"
-		    "<div id='last_change'>%s</div>\n",
-		    t->repo_dir->age);
-		if (r == -1)
-			goto done;
-	}
-
-	if (srv->show_repo_cloneurl) {
-		r = fcgi_printf(c,
-		    "<div id='cloneurl_title'>Clone URL:</div>\n"
-		    "<div id='cloneurl'>%s</div>\n",
-		    t->repo_dir->url ? t->repo_dir->url : "");
-		if (r == -1)
-			goto done;
-	}
-
-	r = fcgi_printf(c, "</div>\n"); /* #summary_wrapper */
-	if (r == -1)
-		goto done;
-
-	if (gotweb_render_briefs(c->tp) == -1)
-		goto done;
-
-	qs->action = TAGS;
-	error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
-	if (error)
-		goto done;
-
-	if (gotweb_render_tags(c->tp) == -1)
-		goto done;
-
-	gotweb_render_branches(c->tp, &refs);
-done:
-	got_ref_list_free(&refs);
 	return error;
 }
 
