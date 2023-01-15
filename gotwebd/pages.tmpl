@@ -39,6 +39,8 @@
 
 static int gotweb_render_blob_line(struct template *, const char *, size_t);
 static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
+static int blame_line(struct template *, const char *, struct blame_line *,
+    int, int);
 
 static inline int diff_line(struct template *, char *);
 static inline int tag_item(struct template *, struct repo_tag *);
@@ -867,6 +869,77 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 {{ render gotweb_render_briefs(tp) }}
 {{ render gotweb_render_tags(tp) }}
 {{ render gotweb_render_branches(tp, refs) }}
+{{ end }}
+
+{{ define gotweb_render_blame(struct template *tp) }}
+{!
+	const struct got_error	*err;
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+!}
+<div id="blame_title_wrapper">
+  <div id="blame_title">Blame</div>
+</div>
+<div id="blame_content">
+  <div id="blame_header_wrapper">
+    <div id="blame_header">
+      <div class="header_age_title">Date:</div>
+      <div class="header_age">
+        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+      </div>
+      <div id="header_commit_msg_title">Message:</div>
+      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
+    </div>
+  </div>
+  <div class="dotted_line"></div>
+  <div id="blame">
+    {{ "\n" }}
+    {!
+	err = got_output_file_blame(c, &blame_line);
+	if (err) {
+		log_warnx("%s: got_output_file_blame: %s", __func__,
+		    err->msg);
+		return (-1);
+	}
+    !}
+  </div>
+</div>
+{{ end }}
+
+{{ define blame_line(struct template *tp, const char *line,
+    struct blame_line *bline, int lprec, int lcur) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_dir		*repo_dir = t->repo_dir;
+	char			*committer, *s;
+	struct gotweb_url	 url = {
+		.action = DIFF,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+		.commit = bline->id_str,
+	};
+
+	s = strchr(bline->committer, '<');
+	committer = s ? s + 1 : bline->committer;
+
+	s = strchr(committer, '@');
+	if (s)
+		*s = '\0';
+!}
+<div class="blame_wrapper">
+  <div class="blame_number">{{ printf "%.*d", lprec, lcur }}</div>
+  <div class="blame_hash">
+    <a href="{{ render gotweb_render_url(c, &url) }}">
+      {{ printf "%.8s", bline->id_str }}
+    </a>
+  </div>
+  <div class="blame_date">{{ bline->datebuf }}</div>
+  <div class="blame_author">{{ printf "%.9s", committer }}</div>
+  <div class="blame_code">{{ line }}</div>
+</div>
 {{ end }}
 
 {{ define gotweb_render_rss(struct template *tp) }}

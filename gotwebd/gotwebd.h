@@ -145,6 +145,13 @@ struct fcgi_record_header {
 	uint8_t		reserved;
 }__attribute__((__packed__));
 
+struct blame_line {
+	int		 annotated;
+	char		*id_str;
+	char		*committer;
+	char		 datebuf[11]; /* YYYY-MM-DD + NUL */
+};
+
 struct repo_dir {
 	char			*name;
 	char			*owner;
@@ -433,6 +440,9 @@ enum gotweb_ref_tm {
 
 extern struct gotwebd	*gotwebd_env;
 
+typedef int (*got_render_blame_line_cb)(struct template *, const char *,
+    struct blame_line *, int, int);
+
 /* sockets.c */
 void sockets(struct privsep *, struct privsep_proc *);
 void sockets_shutdown(void);
@@ -477,6 +487,7 @@ int	gotweb_render_tag(struct template *);
 int	gotweb_render_diff(struct template *, FILE *);
 int	gotweb_render_branches(struct template *, struct got_reflist_head *);
 int	gotweb_render_summary(struct template *, struct got_reflist_head *);
+int	gotweb_render_blame(struct template *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */
@@ -514,7 +525,8 @@ const struct got_error *got_open_blob_for_output(struct got_blob_object **,
 const struct got_error *got_output_file_blob(struct request *);
 int got_output_blob_by_lines(struct template *, struct got_blob_object *,
     int (*)(struct template *, const char *, size_t));
-const struct got_error *got_output_file_blame(struct request *);
+const struct got_error *got_output_file_blame(struct request *,
+    got_render_blame_line_cb);
 
 /* config.c */
 int config_setserver(struct gotwebd *, struct server *);

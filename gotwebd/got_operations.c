@@ -1027,13 +1027,6 @@ got_output_blob_by_lines(struct template *tp, struct got_blob_object *blob,
 	return 0;
 }
 
-struct blame_line {
-	int annotated;
-	char *id_str;
-	char *committer;
-	char datebuf[11]; /* YYYY-MM-DD + NUL */
-};
-
 struct blame_cb_args {
 	struct blame_line *lines;
 	int nlines;
@@ -1043,6 +1036,7 @@ struct blame_cb_args {
 	FILE *f;
 	struct got_repository *repo;
 	struct request *c;
+	got_render_blame_line_cb cb;
 };
 
 static const struct got_error *
@@ -1053,14 +1047,11 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 	struct blame_cb_args *a = arg;
 	struct blame_line *bline;
 	struct request *c = a->c;
-	struct transport *t = c->t;
-	struct repo_dir *repo_dir = t->repo_dir;
-	char *line = NULL, *eline = NULL;
+	char *line = NULL;
 	size_t linesize = 0;
 	off_t offset;
 	struct tm tm;
 	time_t committer_time;
-	int r;
 
 	if (nlines != a->nlines ||
 	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
@@ -1105,76 +1096,26 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 	}
 
 	while (a->lineno_cur <= a->nlines && bline->annotated) {
-		char *smallerthan, *at, *nl, *committer;
-		size_t len;
-
 		if (getline(&line, &linesize, a->f) == -1) {
 			if (ferror(a->f))
 				err = got_error_from_errno("getline");
 			break;
 		}
 
-		committer = bline->committer;
-		smallerthan = strchr(committer, '<');
-		if (smallerthan && smallerthan[1] != '\0')
-			committer = smallerthan + 1;
-		at = strchr(committer, '@');
-		if (at)
-			*at = '\0';
-		len = strlen(committer);
-		if (len >= 9)
-			committer[8] = '\0';
-
-		nl = strchr(line, '\n');
-		if (nl)
-			*nl = '\0';
-
-		err = gotweb_escape_html(&eline, line);
-		if (err)
-			goto done;
-
-		if (fcgi_printf(c, "<div class='blame_wrapper'>"
-		    "<div class='blame_number'>%.*d</div>"
-		    "<div class='blame_hash'>",
-		    a->nlines_prec, a->lineno_cur) == -1)
-			goto done;
-
-		r = gotweb_link(c, &(struct gotweb_url){
-			.action = DIFF,
-			.index_page = -1,
-			.page = -1,
-			.path = repo_dir->name,
-			.commit = bline->id_str,
-		    }, "%.8s", bline->id_str);
-		if (r == -1)
-			goto done;
-
-		r = fcgi_printf(c,
-		    "</div>"
-		    "<div class='blame_date'>%s</div>"
-		    "<div class='blame_author'>%s</div>"
-		    "<div class='blame_code'>%s</div>"
-		    "</div>",	/* .blame_wrapper */
-		    bline->datebuf,
-		    committer,
-		    eline);
-		if (r == -1)
-			goto done;
+		if (a->cb(c->tp, line, bline, a->nlines_prec,
+		    a->lineno_cur) == -1)
+			break;
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
-
-		free(eline);
-		eline = NULL;
 	}
 done:
 	free(line);
-	free(eline);
 	return err;
 }
 
 const struct got_error *
-got_output_file_blame(struct request *c)
+got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
@@ -1194,6 +1135,7 @@ got_output_file_blame(struct request *c)
 	TAILQ_INIT(&refs);
 	bca.f = NULL;
 	bca.lines = NULL;
+	bca.cb = cb;
 
 	if (asprintf(&path, "%s%s%s", qs->folder ? qs->folder : "",
 	    qs->folder ? "/" : "", qs->file) == -1) {

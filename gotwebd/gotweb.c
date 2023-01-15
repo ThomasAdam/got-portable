@@ -94,7 +94,6 @@ static const struct got_error *gotweb_get_repo_description(char **,
     struct server *, const char *, int);
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
     const char *, int);
-static const struct got_error *gotweb_render_blame(struct request *);
 
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
@@ -246,11 +245,13 @@ render:
 
 	switch(qs->action) {
 	case BLAME:
-		error = gotweb_render_blame(c);
+		error = got_get_repo_commits(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
+		if (gotweb_render_blame(c->tp) == -1)
+			goto done;
 		break;
 	case BLOB:
 		if (gotweb_render_blob(c->tp, blob) == -1)
@@ -972,59 +973,6 @@ done:
 	}
 	if (d != NULL && closedir(d) == EOF && error == NULL)
 		error = got_error_from_errno("closedir");
-	return error;
-}
-
-static const struct got_error *
-gotweb_render_blame(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct transport *t = c->t;
-	struct repo_commit *rc = NULL;
-	char *age = NULL, *msg = NULL;
-	int r;
-
-	error = got_get_repo_commits(c, 1);
-	if (error)
-		return error;
-
-	rc = TAILQ_FIRST(&t->repo_commits);
-
-	error = gotweb_get_time_str(&age, rc->committer_time, TM_LONG);
-	if (error)
-		goto done;
-	error = gotweb_escape_html(&msg, rc->commit_msg);
-	if (error)
-		goto done;
-
-	r = fcgi_printf(c, "<div id='blame_title_wrapper'>\n"
-	    "<div id='blame_title'>Blame</div>\n"
-	    "</div>\n"		/* #blame_title_wrapper */
-	    "<div id='blame_content'>\n"
-	    "<div id='blame_header_wrapper'>\n"
-	    "<div id='blame_header'>\n"
-	    "<div class='header_age_title'>Date:</div>\n"
-	    "<div class='header_age'>%s</div>\n"
-	    "<div id='header_commit_msg_title'>Message:</div>\n"
-	    "<div id='header_commit_msg'>%s</div>\n"
-	    "</div>\n"		/* #blame_header */
-	    "</div>\n"		/* #blame_header_wrapper */
-	    "<div class='dotted_line'></div>\n"
-	    "<div id='blame'>\n",
-	    age,
-	    msg);
-	if (r == -1)
-		goto done;
-
-	error = got_output_file_blame(c);
-	if (error)
-		goto done;
-
-	fcgi_printf(c, "</div>\n"	/* #blame */
-	    "</div>\n");		/* #blame_content */
-done:
-	free(age);
-	free(msg);
 	return error;
 }
 
