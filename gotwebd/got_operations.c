@@ -955,48 +955,6 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	return error;
 }
 
-const struct got_error *
-got_output_file_blob(struct request *c)
-{
-	const struct got_error *error = NULL;
-	struct querystring *qs = c->t->qs;
-	struct got_blob_object *blob = NULL;
-	size_t len;
-	int binary, fd = -1;
-	const uint8_t *buf;
-
-	error = got_open_blob_for_output(&blob, &fd, &binary, c);
-	if (error)
-		return error;
-
-	if (binary)
-		error = gotweb_render_content_type_file(c,
-		    "application/octet-stream", qs->file, NULL);
-	else
-		error = gotweb_render_content_type(c, "text/plain");
-
-	if (error) {
-		log_warnx("%s: %s", __func__, error->msg);
-		goto done;
-	}
-
-	for (;;) {
-		error = got_object_blob_read_block(&len, blob);
-		if (error)
-			goto done;
-		if (len == 0)
-			break;
-		buf = got_object_blob_get_read_buf(blob);
-		fcgi_gen_binary_response(c, buf, len);
-	}
- done:
-	if (close(fd) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	if (blob)
-		got_object_blob_close(blob);
-	return error;
-}
-
 int
 got_output_blob_by_lines(struct template *tp, struct got_blob_object *blob,
     int (*cb)(struct template *, const char *, size_t))
