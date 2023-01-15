@@ -522,7 +522,6 @@ int got_output_repo_tree(struct request *,
     int (*)(struct template *, struct got_tree_entry *));
 const struct got_error *got_open_blob_for_output(struct got_blob_object **,
     int *, int *, struct request *);
-const struct got_error *got_output_file_blob(struct request *);
 int got_output_blob_by_lines(struct template *, struct got_blob_object *,
     int (*)(struct template *, const char *, size_t));
 const struct got_error *got_output_file_blame(struct request *,

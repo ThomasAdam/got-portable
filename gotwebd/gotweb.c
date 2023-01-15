@@ -169,14 +169,40 @@ gotweb_process_request(struct request *c)
 	}
 
 	if (qs->action == BLOBRAW) {
+		const uint8_t *buf;
+		size_t len;
+		int binary;
+
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto done;
-		error = got_output_file_blob(c);
+
+		error2 = got_open_blob_for_output(&blob, &fd, &binary, c);
+		if (error2)
+			goto render;
+
+		if (binary)
+			error = gotweb_render_content_type_file(c,
+			    "application/octet-stream", qs->file, NULL);
+		else
+			error = gotweb_render_content_type(c, "text/plain");
+
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
+			goto done;
 		}
+
+		for (;;) {
+			error = got_object_blob_read_block(&len, blob);
+			if (error)
+				goto done;
+			if (len == 0)
+				break;
+			buf = got_object_blob_get_read_buf(blob);
+			if (fcgi_gen_binary_response(c, buf, len) == -1)
+				goto done;
+		}
+
 		goto done;
 	}
 
