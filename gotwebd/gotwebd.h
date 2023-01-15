@@ -363,8 +363,8 @@ struct gotwebd {
 };
 
 /*
- * URL parameter for gotweb_link.  NULL values and int set to -1 are
- * implicitly ignored, and string are properly escaped.
+ * URL parameter for gotweb_render_url.  NULL values and int set to -1
+ * are implicitly ignored, and string are properly escaped.
  */
 struct gotweb_url {
 	int		 action;
@@ -460,13 +460,9 @@ void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
     struct gotweb_url *, int *);
 const struct got_error *gotweb_get_time_str(char **, time_t, int);
 const struct got_error *gotweb_init_transport(struct transport **);
-const struct got_error *gotweb_escape_html(char **, const char *);
 const char *gotweb_action_name(int);
 int gotweb_render_url(struct request *, struct gotweb_url *);
 int gotweb_render_absolute_url(struct request *, struct gotweb_url *);
-int gotweb_link(struct request *, struct gotweb_url *, const char *, ...)
-	__attribute__((__format__(printf, 3, 4)))
-	__attribute__((__nonnull__(3)));
 void gotweb_free_repo_commit(struct repo_commit *);
 void gotweb_free_repo_tag(struct repo_tag *);
 void gotweb_process_request(struct request *);

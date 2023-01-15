@@ -1002,70 +1002,6 @@ done:
 	return error;
 }
 
-const struct got_error *
-gotweb_escape_html(char **escaped_html, const char *orig_html)
-{
-	const struct got_error *error = NULL;
-	struct escape_pair {
-		char c;
-		const char *s;
-	} esc[] = {
-		{ '>', "&gt;" },
-		{ '<', "&lt;" },
-		{ '&', "&amp;" },
-		{ '"', "&quot;" },
-		{ '\'', "&apos;" },
-		{ '\n', "<br />" },
-	};
-	size_t orig_len, len;
-	int i, j, x;
-
-	orig_len = strlen(orig_html);
-	len = orig_len;
-	for (i = 0; i < orig_len; i++) {
-		for (j = 0; j < nitems(esc); j++) {
-			if (orig_html[i] != esc[j].c)
-				continue;
-			len += strlen(esc[j].s) - 1 /* escaped char */;
-		}
-	}
-
-	*escaped_html = calloc(len + 1 /* NUL */, sizeof(**escaped_html));
-	if (*escaped_html == NULL)
-		return got_error_from_errno("calloc");
-
-	x = 0;
-	for (i = 0; i < orig_len; i++) {
-		int escaped = 0;
-		for (j = 0; j < nitems(esc); j++) {
-			if (orig_html[i] != esc[j].c)
-				continue;
-
-			if (strlcat(*escaped_html, esc[j].s, len + 1)
-			    >= len + 1) {
-				error = got_error(GOT_ERR_NO_SPACE);
-				goto done;
-			}
-			x += strlen(esc[j].s);
-			escaped = 1;
-			break;
-		}
-		if (!escaped) {
-			(*escaped_html)[x] = orig_html[i];
-			x++;
-		}
-	}
-done:
-	if (error) {
-		free(*escaped_html);
-		*escaped_html = NULL;
-	} else {
-		(*escaped_html)[x] = '\0';
-	}
-
-	return error;
-}
-
 static inline int
 should_urlencode(int c)
 {
@@ -1276,32 +1212,6 @@ gotweb_render_absolute_url(struct request *c, struct gotweb_url *url)
 		return -1;
 
 	return gotweb_render_url(c, url);
-}
-
-int
-gotweb_link(struct request *c, struct gotweb_url *url, const char *fmt, ...)
-{
-	va_list ap;
-	int r;
-
-	if (fcgi_printf(c, "<a href='") == -1)
-		return -1;
-
-	if (gotweb_render_url(c, url) == -1)
-		return -1;
-
-	if (fcgi_printf(c, "'>") == -1)
-		return -1;
-
-	va_start(ap, fmt);
-	r = fcgi_vprintf(c, fmt, ap);
-	va_end(ap);
-	if (r == -1)
-		return -1;
-
-	if (fcgi_printf(c, "</a>"))
-		return -1;
-	return 0;
 }
 
 static struct got_repository *
