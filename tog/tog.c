@@ -4720,8 +4720,9 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 		goto done;
 
 	n = fprintf(outfile,
-	    "%d file%s changed, %d insertions(+), %d deletions(-)\n",
-	    dsa.nfiles, dsa.nfiles > 1 ? "s" : "", dsa.ins, dsa.del);
+	    "%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n",
+	    dsa.nfiles, dsa.nfiles > 1 ? "s" : "", dsa.ins,
+	    dsa.ins != 1 ? "s" : "", dsa.del, dsa.del != 1 ? "s" : "");
 	if (n < 0) {
 		err = got_error_from_errno("fprintf");
 		goto done;

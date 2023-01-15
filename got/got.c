@@ -4168,8 +4168,9 @@ print_diffstat(struct got_diffstat_cb_arg *dsa, struct got_pathlist_head *paths,
 		printf(" %c  %s%*c | %*d+ %*d-\n", cp->status, pe->path, pad,
 		    ' ', dsa->add_cols + 1, cp->add, dsa->rm_cols + 1, cp->rm);
 	}
-	printf("\n%d file%s changed, %d insertions(+), %d deletions(-)\n\n",
-	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins, dsa->del);
+	printf("\n%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n\n",
+	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins,
+	    dsa->ins != 1 ? "s" : "", dsa->del, dsa->del != 1 ? "s" : "");
 
 	if (fflush(stdout) != 0)
 		return got_error_from_errno("fflush");
