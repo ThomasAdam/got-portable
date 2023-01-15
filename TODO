@@ -42,11 +42,31 @@ gotwebd:
   having to monitor interfaces for dynamic address changes.
 
 gotd:
-- fork+exec needs to occur per session, not just once at startup
-- chroot is unnecessary on OpenBSD and requires root
-  (for details: https://marc.gameoftrees.org/mail/1666525253.10787_0.html)
+- add server-side support for 'got send -d'
+- ensure all error messages are propagated to clients before disconnecting,
+  there are probably still some cases where such error reporting is skipped
+- client connection timeout handling needs to be checked by regress tests,
+  and is likely in need of improvement
+- implement stress-tests to observe and fix misbehaviour under load
+- listener's fd-reserve limit needs to be reviewed and perhaps adjusted 
+- implement pre-commit checks (in lieu of hook scripts):
+  1. deny branch history rewriting ('got send -f') via gotd.conf
+  2. allow/deny creation/deletion of references via gotd.conf
+  3. deny modifications within a given reference namespace via gotd.conf
+  4. entirely hide a given reference namespace from clients via gotd.conf
+  5. allow/deny addition of binary files to a repo via gotd.conf
+  6. enforce a particular blob size limit via gotd.conf
+- implement post-commit-event libexec handlers (in lieu of hook scripts):
+  1. commit email notification, plaintext smtp to localhost port 25
+  2. general-purpose HTTP(s) GET/POST request as commit notification,
+     should use a format string to encode commit-info in the request URL
+  3. perform the equivalent of 'got send' to another repository
+- keep track of available repository disk space and fail gracefully when
+  uploaded pack files would fill up the disk too much, keeping a reserve
+- indexing pack files is currently failing if ref-deltas are present
 
 gotadmin:
+- got-index-pack is currently failing if ref-deltas are present
 - teach 'gotadmin cleanup' to remove redundant pack files
 - add support for generating git-fast-export streams from a repository
 - add support for importing git-fast-export streams into a repository
