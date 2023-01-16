@@ -1498,7 +1498,7 @@ EOF
 diffstat $commit_id0 $commit_id1
  M  alpha  |  1+  1-
 
-1 file changed, 1 insertions(+), 1 deletions(-)
+1 file changed, 1 insertion(+), 1 deletion(-)
 
 EOF
 
@@ -1538,7 +1538,7 @@ diffstat $commit_id0 $commit_id1
  D  beta  |  0+  1-
  A  new   |  1+  0-
 
-2 files changed, 1 insertions(+), 1 deletions(-)
+2 files changed, 1 insertion(+), 1 deletion(-)
 
 EOF
 
@@ -1770,7 +1770,7 @@ EOF
 diffstat $alpha_blobid $alpha_new_blobid
  M  $short_alpha_id -> $short_alpha_new_id  |  1+  1-
 
-1 file changed, 1 insertions(+), 1 deletions(-)
+1 file changed, 1 insertion(+), 1 deletion(-)
 
 blob - $alpha_blobid
 blob + $alpha_new_blobid
