@@ -876,14 +876,14 @@ test_log_diffstat() {
 	cat <<EOF >$testroot/stdout.expected
  A  new  |  1+  0-
 
-1 file changed, 1 insertions(+), 0 deletions(-)
+1 file changed, 1 insertion(+), 0 deletions(-)
  D  beta          |  0+  1-
  m  epsilon/zeta  |  0+  0-
 
-2 files changed, 0 insertions(+), 1 deletions(-)
+2 files changed, 0 insertions(+), 1 deletion(-)
  M  alpha  |  2+  1-
 
-1 file changed, 2 insertions(+), 1 deletions(-)
+1 file changed, 2 insertions(+), 1 deletion(-)
  A  alpha         |  1+  0-
  A  beta          |  1+  0-
  A  epsilon/zeta  |  1+  0-
