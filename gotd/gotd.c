@@ -1758,23 +1758,11 @@ main(int argc, char **argv)
 	if (argc != 0)
 		usage();
 
-	/* Require an absolute path in argv[0] for reliable re-exec. */
-	if (!got_path_is_absolute(argv0))
-		fatalx("bad path \"%s\": must be an absolute path", argv0);
-
 	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
 		fatalx("need root privileges");
 
-	log_init(daemonize ? 0 : 1, LOG_DAEMON);
-	log_setverbose(verbosity);
-
 	if (parse_config(confpath, proc_id, &gotd) != 0)
 		return 1;
-
-	gotd.argv0 = argv0;
-	gotd.daemonize = daemonize;
-	gotd.verbosity = verbosity;
-	gotd.confpath = confpath;
 
 	if (proc_id == PROC_GOTD &&
 	    (gotd.nrepos == 0 || TAILQ_EMPTY(&gotd.repos)))
@@ -1784,19 +1772,30 @@ main(int argc, char **argv)
 	if (pw == NULL)
 		fatalx("user %s not found", gotd.user_name);
 
-	if (pw->pw_uid == 0) {
-		fatalx("cannot run %s as %s: the user running %s "
-		    "must not be the superuser",
-		    getprogname(), pw->pw_name, getprogname());
-	}
+	if (pw->pw_uid == 0)
+		fatalx("cannot run %s as the superuser", getprogname());
 
 	if (proc_id == PROC_LISTEN &&
 	    !got_path_is_absolute(gotd.unix_socket_path))
 		fatalx("bad unix socket path \"%s\": must be an absolute path",
 		    gotd.unix_socket_path);
 
-	if (noaction)
+	if (noaction) {
+		fprintf(stderr, "configuration OK\n");
 		return 0;
+	}
+
+	gotd.argv0 = argv0;
+	gotd.daemonize = daemonize;
+	gotd.verbosity = verbosity;
+	gotd.confpath = confpath;
+
+	/* Require an absolute path in argv[0] for reliable re-exec. */
+	if (!got_path_is_absolute(argv0))
+		fatalx("bad path \"%s\": must be an absolute path", argv0);
+
+	log_init(daemonize ? 0 : 1, LOG_DAEMON);
+	log_setverbose(verbosity);
 
 	if (proc_id == PROC_GOTD) {
 		gotd.pid = getpid();
