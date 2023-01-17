@@ -916,7 +916,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			goto done;
 		}
 		nresolved += n;
-		nvalid += nresolved;
+		nvalid += n;
 	}
 
 	if (nloose + nresolved != nobj) {
