@@ -35,7 +35,7 @@
 - reduce max amount of tags stored in object cache to avoid high memory usage
 - avoid copying reused deltas to delta cache file; copy from pack file instead
 - got patch: handle the removal of binary files (op)
-- fix uninitialised fildes variables in libexec helpers (jamsek)
+- fix uninitialised variables in libexec helpers (jamsek)
 - got: minor refactor of got_pathlist_free() API (jamsek)
 - fix indexing of pack files which contain ref-deltas
 
