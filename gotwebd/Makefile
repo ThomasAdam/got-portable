@@ -32,6 +32,8 @@ TEMPLATE = ${.CURDIR}/../template/template
 .tmpl.c:
 	${TEMPLATE} -o $@ $<
 
+CLEANFILES = pages.c
+
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}
