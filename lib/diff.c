@@ -133,7 +133,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
     struct got_blob_object *blob2, FILE *f1, FILE *f2,
     const char *label1, const char *label2, mode_t mode1, mode_t mode2,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    int show_diffstat, struct got_diffstat_cb_arg *ds, FILE *outfile,
+    struct got_diffstat_cb_arg *diffstat, FILE *outfile,
     enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err = NULL, *free_err;
@@ -243,21 +243,20 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	if (err)
 		goto done;
 
-	if (show_diffstat) {
+	if (diffstat) {
 		char	*path = NULL;
 		int	 status = GOT_STATUS_NO_CHANGE;
 
-		/*
-		 * Ignore 'm'ode status change: if there's no accompanying
-		 * content change, there'll be no diffstat, and if there
-		 * are actual changes, 'M'odified takes precedence.
-		 */
 		if (blob1 == NULL)
 			status = GOT_STATUS_ADD;
 		else if (blob2 == NULL)
 			status = GOT_STATUS_DELETE;
-		else
-			status = GOT_STATUS_MODIFY;
+		else {
+			if (strcmp(idstr1, idstr2) != 0)
+				status = GOT_STATUS_MODIFY;
+			else if (mode1 != mode2)
+				status = GOT_STATUS_MODE_CHANGE;
+		}
 
 		if (label1 == NULL && label2 == NULL) {
 			/* diffstat of blobs, show hash instead of path */
@@ -278,8 +277,8 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 			}
 		}
 
-		err = get_diffstat(ds, path, result->result, force_text_diff,
-		    status);
+		err = get_diffstat(diffstat, path, result->result,
+		    force_text_diff, status);
 		if (err) {
 			free(path);
 			goto done;
@@ -321,8 +320,8 @@ got_diff_blob_output_unidiff(void *arg, struct got_blob_object *blob1,
 
 	return diff_blobs(&a->lines, &a->nlines, NULL,
 	    blob1, blob2, f1, f2, label1, label2, mode1, mode2, a->diff_context,
-	    a->ignore_whitespace, a->force_text_diff, a->show_diffstat,
-	    a->diffstat, a->outfile, a->diff_algo);
+	    a->ignore_whitespace, a->force_text_diff, a->diffstat, a->outfile,
+	    a->diff_algo);
 }
 
 const struct got_error *
@@ -330,12 +329,12 @@ got_diff_blob(struct got_diff_line **lines, size_t*nlines,
     struct got_blob_object *blob1, struct got_blob_object *blob2,
     FILE *f1, FILE *f2, const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff, int show_diffstat,
+    int ignore_whitespace, int force_text_diff,
     struct got_diffstat_cb_arg *ds, FILE *outfile)
 {
 	return diff_blobs(lines, nlines, NULL, blob1, blob2, f1, f2,
 	    label1, label2, 0, 0, diff_context, ignore_whitespace,
-	    force_text_diff, show_diffstat, ds, outfile, diff_algo);
+	    force_text_diff, ds, outfile, diff_algo);
 }
 
 static const struct got_error *
@@ -343,8 +342,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
     struct got_blob_object *blob1, FILE *f1, off_t size1, const char *label1,
     FILE *f2, int f2_exists, struct stat *sb2, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
-    int force_text_diff, int show_diffstat, struct got_diffstat_cb_arg *ds,
-    FILE *outfile)
+    int force_text_diff, struct got_diffstat_cb_arg *diffstat, FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
@@ -393,7 +391,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			goto done;
 	}
 
-	if (show_diffstat) {
+	if (diffstat) {
 		char	*path = NULL;
 		int	 status = GOT_STATUS_NO_CHANGE;
 
@@ -419,8 +417,8 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			goto done;
 		}
 
-		err = get_diffstat(ds, path, result->result, force_text_diff,
-		    status);
+		err = get_diffstat(diffstat, path, result->result,
+		    force_text_diff, status);
 		if (err) {
 			free(path);
 			goto done;
@@ -442,12 +440,12 @@ const struct got_error *
 got_diff_blob_file(struct got_blob_object *blob1, FILE *f1, off_t size1,
     const char *label1, FILE *f2, int f2_exists, struct stat *sb2,
     const char *label2, enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff, int show_diffstat,
+    int ignore_whitespace, int force_text_diff,
     struct got_diffstat_cb_arg *ds, FILE *outfile)
 {
 	return diff_blob_file(NULL, blob1, f1, size1, label1, f2, f2_exists,
 	    sb2, label2, diff_algo, diff_context, ignore_whitespace,
-	    force_text_diff, show_diffstat, ds, outfile);
+	    force_text_diff, ds, outfile);
 }
 
 static const struct got_error *
@@ -996,8 +994,8 @@ got_diff_objects_as_blobs(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff, int show_diffstat,
-    struct got_diffstat_cb_arg *ds, struct got_repository *repo, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, struct got_diffstat_cb_arg *ds,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -1017,7 +1015,7 @@ got_diff_objects_as_blobs(struct got_diff_line **lines, size_t *nlines,
 	}
 	err = got_diff_blob(lines, nlines, blob1, blob2, f1, f2, label1, label2,
 	    diff_algo, diff_context, ignore_whitespace, force_text_diff,
-	    show_diffstat, ds, outfile);
+	    ds, outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -1191,9 +1189,8 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    int show_diffstat, struct got_diffstat_cb_arg *dsa,
-    struct got_repository *repo, FILE *outfile,
-    enum got_diff_algorithm diff_algo)
+    struct got_diffstat_cb_arg *dsa, struct got_repository *repo,
+    FILE *outfile, enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -1218,7 +1215,6 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
-	arg.show_diffstat = show_diffstat;
 	arg.diffstat = dsa;
 	arg.outfile = outfile;
 	if (want_linemeta) {
@@ -1252,7 +1248,7 @@ got_diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, const char *label1, const char *label2,
     enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
-    int force_text_diff, int show_diffstat, struct got_diffstat_cb_arg *dsa,
+    int force_text_diff, struct got_diffstat_cb_arg *dsa,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
@@ -1295,7 +1291,7 @@ got_diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 
 	err = diff_objects_as_trees(lines, nlines, f1, f2, fd1, fd2, id1, id2,
 	    paths, label1, label2, diff_context, ignore_whitespace,
-	    force_text_diff, show_diffstat, dsa, repo, outfile, diff_algo);
+	    force_text_diff, dsa, repo, outfile, diff_algo);
 done:
 	free(idstr);
 	return err;
@@ -1307,8 +1303,7 @@ got_diff_objects_as_commits(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     struct got_pathlist_head *paths, enum got_diff_algorithm diff_algo,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    int show_diffstat, struct got_diffstat_cb_arg *dsa,
-    struct got_repository *repo, FILE *outfile)
+    struct got_diffstat_cb_arg *dsa, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
@@ -1351,8 +1346,8 @@ got_diff_objects_as_commits(struct got_diff_line **lines, size_t *nlines,
 	err = diff_objects_as_trees(lines, nlines, f1, f2, fd1, fd2,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
 	    got_object_commit_get_tree_id(commit2), paths, "", "",
-	    diff_context, ignore_whitespace, force_text_diff, show_diffstat,
-	    dsa, repo, outfile, diff_algo);
+	    diff_context, ignore_whitespace, force_text_diff, dsa, repo,
+	    outfile, diff_algo);
 done:
 	if (commit1)
 		got_object_commit_close(commit1);
