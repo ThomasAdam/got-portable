@@ -35,7 +35,13 @@ tog:
 - verify signed tag objects
 
 gotwebd:
-- gotwebd should display the committer field if it differs from the author
+- reply with a non-200 reply code when an error occur
+- fix COMMITS page for path that were deleted and/or re-added to the
+  repository. One way would be not to let the commit graph filter paths.
+  As an additional optimization we could keep a tailq or the object-id
+  set for everything traversed in the repo to have fast reverse-lookups.
+  (has the additional requirement to invalidate it when the reference
+  timestamp changes)
 - run-time changes of addresses on interfaces are being ignored by gotwebd
 - perhaps "bind interface" should be removed in favour of using only IP
   addresses? This makes the address family selection explicit and avoids
