@@ -5,6 +5,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
 	test_repo_write test_repo_write_empty test_request_bad
 NOOBJ=Yes
+CLEANFILES=gotd.conf
 
 .PHONY: ensure_root prepare_test_repo check_test_repo start_gotd
 
