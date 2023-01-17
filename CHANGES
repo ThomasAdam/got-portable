@@ -15,7 +15,7 @@
 - farewell, gotweb. you served us well. rm gotweb (tracey)
 - lots of gotwebd refactoring (op)
 - gotwebd: use a templating system to render HTML (op)
-- gotwebd: add an RSS feed for the tags
+- gotwebd: add an RSS feed for the tags (op)
 - gotwebd: remove erratic horizontal scrolling (op)
 - gotwebd.conf: use `listen on socket' syntax for UNIX sockets too (op)
 - gotwebd: render BLOB inline, add BLOBRAW for serving raw blobs (op)
