@@ -1,3 +1,44 @@
+* got 0.80; 2023-01-17
+  too many changes to list all here; see git repository history for more
+- implement per-repository read/write authorization rules in gotd
+- add a gotd "listen" process which watches the unix socket
+- add a gotd "session" process, split off from the parent process
+- switch gotd from chroot(2) to unveil(2)
+- run gotd authentication in a separate child process
+- enforce a per-uid connection limit in the gotd listen process
+- introduce connection options to gotd.conf
+- gotd: allow to express timeouts using minutes/hours (op)
+- switch gotd.conf syntax from 'unix_socket' to 'listen on'
+- remove the gotsh group requirement from gotd; any user can now connect
+- expose 'gotctl info' output only to the root user
+- remove support for showing client capabilities in 'gotctl info'
+- farewell, gotweb. you served us well. rm gotweb (tracey)
+- lots of gotwebd refactoring (op)
+- gotwebd: use a templating system to render HTML (op)
+- gotwebd: add an RSS feed for the tags
+- gotwebd: remove erratic horizontal scrolling (op)
+- gotwebd.conf: use `listen on socket' syntax for UNIX sockets too (op)
+- gotwebd: render BLOB inline, add BLOBRAW for serving raw blobs (op)
+- gotwebd: css: fix horizontal overflow in blob and blame pages (op)
+- gotwebd: urlencode also the double quote character (op)
+- gotwebd: make commit page more like `got log' / tog (op)
+- cope with deleted references when reloading the tog log view
+- tog: fix typo that breaks log search when in hsplit (jamsek)
+- tog: always echo input prompt to bottom left of screen (jamsek)
+- make 'tog log' display the committer handle by default, '@' switches to author
+- tog: add mutt-like =/* keymaps as home/end aliases (patch by Mikhail)
+- implement diffstat display for got log, got diff, and tog diff (jamsek)
+- show from: and via: headers on consecutive lines in 'got log' and 'tog log'
+- show full URL during got clone/fetch/send (op)
+- make 'got send' print errors reported by the server (op)
+- fix 'got rebase' not detecting an out-of-date work tree in some cases
+- reduce max amount of tags stored in object cache to avoid high memory usage
+- avoid copying reused deltas to delta cache file; copy from pack file instead
+- got patch: handle the removal of binary files (op)
+- fix uninitialised fildes variables in libexec helpers (jamsek)
+- got: minor refactor of got_pathlist_free() API (jamsek)
+- fix indexing of pack files which contain ref-deltas
+
 * got 0.79; 2022-11-08
 - repair build on OpenBSD/sparc64 (patch by Ted Bullock)
 - fix crash in gotd if client gets disconnected on error (reported by Mikhail)
