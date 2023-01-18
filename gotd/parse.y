@@ -744,6 +744,11 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 		}
 	}
 
+	if (proc_id == PROC_GOTD && TAILQ_EMPTY(&gotd->repos)) {
+		log_warnx("no repository defined in configuration file");
+		return (-1);
+	}
+
 	return (0);
 }
 

@@ -1764,10 +1764,6 @@ main(int argc, char **argv)
 	if (parse_config(confpath, proc_id, &gotd) != 0)
 		return 1;
 
-	if (proc_id == PROC_GOTD &&
-	    (gotd.nrepos == 0 || TAILQ_EMPTY(&gotd.repos)))
-		fatalx("no repository defined in configuration file");
-
 	pw = getpwnam(gotd.user_name);
 	if (pw == NULL)
 		fatalx("user %s not found", gotd.user_name);
