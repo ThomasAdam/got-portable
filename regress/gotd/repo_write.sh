@@ -143,5 +143,116 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_fetch_more_history() {
+	local testroot=`test_init fetch_more_history 1`
+
+	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Create some more commit history on the main branch.
+	# History needs to be deep enough to trick 'git pull' into sending
+	# a lot of 'have' lines, which triggered a bug in gotd.
+	for i in `jot 50`; do
+		echo "more alpha" >> $testroot/wt/alpha
+		(cd $testroot/wt && got commit -m 'more changes' > /dev/null)
+	done
+	got send -b main -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# create a second clone to test an incremental fetch with later
+	got clone -q -m ${GOTD_TEST_REPO_URL} $testroot/repo-clone2
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	# same for Git, which used to fail:
+	# fetch-pack: protocol error: bad band #69
+	# fatal: protocol error: bad pack header
+	# gotsh: unexpected 'have' packet
+	git clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone3 \
+		>$testroot/stdout 2>$testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Create more commit history on the main branch
+	echo "more alpha" >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
+	echo "more beta" >> $testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'more changes' > /dev/null)
+	(cd $testroot/wt && got rm epsilon/zeta > /dev/null)
+	(cd $testroot/wt && got commit -m 'rm epsilon/zeta' > /dev/null)
+	got send -b main -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Verify that the new changes can be fetched
+	got fetch -q -r $testroot/repo-clone2
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got tree -R -r $testroot/repo-clone2 > $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+alpha
+beta
+gamma/
+gamma/delta
+psi/
+psi/new
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Verify that git pull works, too
+	(cd $testroot/repo-clone3 && git pull -q > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git pull failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_send_basic
+run_test test_fetch_more_history

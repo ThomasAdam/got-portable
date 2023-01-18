@@ -1102,7 +1102,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 				err = ensure_client_is_writing(client);
 				if (err)
 					break;
-			} else {
+			} else if (client->state != GOTD_STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected flush-pkt received");
 				break;
@@ -1123,7 +1123,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 				log_debug("uid %d: expecting packfile",
 				    client->euid);
 				err = recv_packfile(client);
-			} else {
+			} else if (client->state != GOTD_STATE_EXPECT_DONE) {
 				/* should not happen, see above */
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected client state");
