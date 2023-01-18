@@ -252,7 +252,48 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_new_empty_branch() {
+	local testroot=`test_init send_new_empty_branch 1`
+
+	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local commit_id=`git_show_head $testroot/repo-clone`
+
+	got branch -r $testroot/repo-clone -c main newbranch2 >/dev/null
+	got send -b newbranch2 -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Verify that the send operation worked fine.
+	got clone -l ${GOTD_TEST_REPO_URL} | grep newbranch2 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone -l failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "refs/heads/newbranch2: $commit_id" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_fetch_more_history
+run_test test_send_new_empty_branch

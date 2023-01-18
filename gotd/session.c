@@ -394,8 +394,8 @@ begin_ref_updates(struct gotd_session_client *client, struct imsg *imsg)
 }
 
 static const struct got_error *
-update_ref(struct gotd_session_client *client, const char *repo_path,
-    struct imsg *imsg)
+update_ref(int *shut, struct gotd_session_client *client,
+    const char *repo_path, struct imsg *imsg)
 {
 	const struct got_error *err = NULL;
 	struct got_repository *repo = NULL;
@@ -495,8 +495,10 @@ done:
 
 	if (client->nref_updates > 0) {
 		client->nref_updates--;
-		if (client->nref_updates == 0)
+		if (client->nref_updates == 0) {
 			send_refs_updated(client);
+			*shut = 1;
+		}
 
 	}
 	if (locked) {
@@ -600,7 +602,7 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			else if (do_ref_updates)
 				err = begin_ref_updates(client, &imsg);
 			else if (do_ref_update)
-				err = update_ref(client,
+				err = update_ref(&shut, client,
 				    gotd_session.repo->path, &imsg);
 			if (err)
 				log_warnx("uid %d: %s", client->euid, err->msg);

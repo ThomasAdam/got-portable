@@ -89,6 +89,7 @@ static struct repo_write_client {
 	int				 packidx_fd;
 	struct gotd_ref_updates		 ref_updates;
 	int				 nref_updates;
+	int				 nref_new;
 } repo_write_client;
 
 static volatile sig_atomic_t sigint_received;
@@ -257,6 +258,7 @@ list_refs(struct imsg *imsg)
 	client->pack_pipe = -1;
 	client->packidx_fd = -1;
 	client->nref_updates = 0;
+	client->nref_new = 0;
 
 	imsg_init(&ibuf, client_fd);
 
@@ -370,6 +372,7 @@ recv_ref_update(struct imsg *imsg)
 		if (err)
 			goto done;
 		ref_update->ref_is_new = 1;
+		client->nref_new++;
 	}
 	if (got_ref_is_symbolic(ref)) {
 		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
@@ -685,12 +688,14 @@ validate_object_type(int obj_type)
 }
 
 static const struct got_error *
-recv_packdata(off_t *outsize, uint8_t *sha1, int infd, int outfd)
+recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
+    int infd, int outfd)
 {
 	const struct got_error *err;
+	struct repo_write_client *client = &repo_write_client;
 	struct got_packfile_hdr hdr;
 	size_t have;
-	uint32_t nobj, nhave = 0;
+	uint32_t nhave = 0;
 	SHA1_CTX ctx;
 	uint8_t expected_sha1[SHA1_DIGEST_LENGTH];
 	char hex[SHA1_DIGEST_STRING_LENGTH];
@@ -699,6 +704,7 @@ recv_packdata(off_t *outsize, uint8_t *sha1, int infd, int outfd)
 	ssize_t w;
 
 	*outsize = 0;
+	*nobj = 0;
 	SHA1Init(&ctx);
 
 	err = got_poll_read_full(infd, &have, &hdr, sizeof(hdr), sizeof(hdr));
@@ -715,12 +721,21 @@ recv_packdata(off_t *outsize, uint8_t *sha1, int infd, int outfd)
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile version");
 
-	nobj = be32toh(hdr.nobjects);
-	if (nobj == 0)
+	*nobj = be32toh(hdr.nobjects);
+	if (*nobj == 0) {
+		/*
+		 * Clients which are creating new references only
+		 * will send us an empty pack file.
+		 */
+		if (client->nref_updates > 0 &&
+		    client->nref_updates == client->nref_new)
+			return NULL;
+
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile with zero objects");
+	}
 
-	log_debug("expecting %d objects", nobj);
+	log_debug("expecting %d objects", *nobj);
 
 	err = got_pack_hwrite(outfd, &hdr, sizeof(hdr), &ctx);
 	if (err)
@@ -730,7 +745,7 @@ recv_packdata(off_t *outsize, uint8_t *sha1, int infd, int outfd)
 	if (err)
 		return err;
 
-	while (nhave != nobj) {
+	while (nhave != *nobj) {
 		uint8_t obj_type;
 		uint64_t obj_size;
 
@@ -762,7 +777,7 @@ recv_packdata(off_t *outsize, uint8_t *sha1, int infd, int outfd)
 		nhave++;
 	}
 
-	log_debug("received %u objects", nobj);
+	log_debug("received %u objects", *nobj);
 
 	SHA1Final(expected_sha1, &ctx);
 
@@ -859,7 +874,7 @@ done:
 }
 
 static const struct got_error *
-recv_packfile(struct imsg *imsg)
+recv_packfile(int *have_packfile, struct imsg *imsg)
 {
 	const struct got_error *err = NULL, *unpack_err;
 	struct repo_write_client *client = &repo_write_client;
@@ -875,9 +890,11 @@ recv_packfile(struct imsg *imsg)
 	struct got_ratelimit rl;
 	struct got_pack *pack = NULL;
 	off_t pack_filesize = 0;
+	uint32_t nobj = 0;
 
 	log_debug("packfile request received");
 
+	*have_packfile = 0;
 	got_ratelimit_init(&rl, 2, 0);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
@@ -928,8 +945,8 @@ recv_packfile(struct imsg *imsg)
 		goto done;
 
 	log_debug("receiving pack data");
-	unpack_err = recv_packdata(&pack_filesize, client->pack_sha1,
-	    client->pack_pipe, pack->fd);
+	unpack_err = recv_packdata(&pack_filesize, &nobj,
+	    client->pack_sha1, client->pack_pipe, pack->fd);
 	if (ireq.report_status) {
 		err = report_pack_status(unpack_err);
 		if (err) {
@@ -945,7 +962,18 @@ recv_packfile(struct imsg *imsg)
 
 	log_debug("pack data received");
 
+	/*
+	 * Clients which are creating new references only will
+	 * send us an empty pack file.
+	 */
+	if (nobj == 0 &&
+	    pack_filesize == sizeof(struct got_packfile_hdr) &&
+	    client->nref_updates > 0 &&
+	    client->nref_updates == client->nref_new)
+		goto done;
+
 	pack->filesize = pack_filesize;
+	*have_packfile = 1;
 
 	log_debug("begin indexing pack (%lld bytes in size)",
 	    (long long)pack->filesize);
@@ -1226,7 +1254,7 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	struct imsg imsg;
 	struct repo_write_client *client = &repo_write_client;
 	ssize_t n;
-	int shut = 0;
+	int shut = 0, have_packfile = 0;
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
@@ -1285,23 +1313,25 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			}
 			break;
 		case GOTD_IMSG_RECV_PACKFILE:
-			err = recv_packfile(&imsg);
+			err = recv_packfile(&have_packfile, &imsg);
 			if (err) {
 				log_warnx("%s: receive packfile: %s",
 				    repo_write.title, err->msg);
 				break;
 			}
-			err = verify_packfile();
-			if (err) {
-				log_warnx("%s: verify packfile: %s",
-				    repo_write.title, err->msg);
-				break;
-			}
-			err = install_packfile(iev);
-			if (err) {
-				log_warnx("%s: install packfile: %s",
-				    repo_write.title, err->msg);
-				break;
+			if (have_packfile) {
+				err = verify_packfile();
+				if (err) {
+					log_warnx("%s: verify packfile: %s",
+					    repo_write.title, err->msg);
+					break;
+				}
+				err = install_packfile(iev);
+				if (err) {
+					log_warnx("%s: install packfile: %s",
+					    repo_write.title, err->msg);
+					break;
+				}
 			}
 			err = update_refs(iev);
 			if (err) {
