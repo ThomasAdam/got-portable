@@ -107,7 +107,7 @@ static void kill_proc(struct gotd_child_proc *, int);
 __dead static void
 usage()
 {
-	fprintf(stderr, "usage: %s [-dv] [-f config-file]\n", getprogname());
+	fprintf(stderr, "usage: %s [-dnv] [-f config-file]\n", getprogname());
 	exit(1);
 }
 
