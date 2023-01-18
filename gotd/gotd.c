@@ -1771,11 +1771,6 @@ main(int argc, char **argv)
 	if (pw->pw_uid == 0)
 		fatalx("cannot run %s as the superuser", getprogname());
 
-	if (proc_id == PROC_LISTEN &&
-	    !got_path_is_absolute(gotd.unix_socket_path))
-		fatalx("bad unix socket path \"%s\": must be an absolute path",
-		    gotd.unix_socket_path);
-
 	if (noaction) {
 		fprintf(stderr, "configuration OK\n");
 		return 0;

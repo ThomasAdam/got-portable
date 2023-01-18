@@ -195,6 +195,10 @@ timeout		: NUMBER {
 		;
 
 main		: LISTEN ON STRING {
+			if (!got_path_is_absolute($3))
+				yyerror("bad unix socket path \"%s\": "
+				    "must be an absolute path", $3);
+
 			if (gotd_proc_id == PROC_LISTEN) {
 				if (strlcpy(gotd->unix_socket_path, $3,
 				    sizeof(gotd->unix_socket_path)) >=
