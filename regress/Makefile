@@ -1,3 +1,7 @@
 SUBDIR = cmdline delta deltify idset path fetch
 
-#.include <bsd.subdir.mk>
+.if make(clean)
+SUBDIR += gotd 
+.endif
+
+.include <bsd.subdir.mk>
