@@ -898,13 +898,36 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 		if (err)
 			break;
 		if (n == 0) {
-			if (curstate != STATE_EXPECT_MORE_WANT &&
+			if (curstate != STATE_EXPECT_WANT &&
+			    curstate != STATE_EXPECT_MORE_WANT &&
 			    curstate != STATE_EXPECT_HAVE &&
 			    curstate != STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
 				    "unexpected flush packet received");
 				goto done;
 			}
+
+			if (curstate == STATE_EXPECT_WANT) {
+				ssize_t r;
+				/*
+				 * If the client does not want to fetch
+				 * anything we should receive a flush
+				 * packet followed by EOF.
+				 */
+				r = read(infd, buf, sizeof(buf));
+				if (r == -1) {
+					err = got_error_from_errno("read");
+					goto done;
+				}
+				if (r == 0) /* EOF */
+					goto done;
+
+				/* Zero-length field followed by payload. */
+				err = got_error_msg(GOT_ERR_BAD_PACKET,
+				    "unexpected flush packet received");
+				goto done;
+			}
+
 			err = forward_flushpkt(&ibuf);
 			if (err)
 				goto done;
