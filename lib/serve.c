@@ -899,7 +899,8 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 			break;
 		if (n == 0) {
 			if (curstate != STATE_EXPECT_MORE_WANT &&
-			    curstate != STATE_EXPECT_HAVE) {
+			    curstate != STATE_EXPECT_HAVE &&
+			    curstate != STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
 				    "unexpected flush packet received");
 				goto done;
@@ -930,16 +931,21 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 			if (curstate == STATE_EXPECT_WANT)
 				curstate = STATE_EXPECT_MORE_WANT;
 		} else if (n >= 5 && strncmp(buf, "have ", 5) == 0) {
-			if (curstate != STATE_EXPECT_HAVE) {
+			if (curstate != STATE_EXPECT_HAVE &&
+			    curstate != STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
 				    "unexpected 'have' packet");
 				goto done;
 			}
-			err = recv_have(&have_ack, outfd, &ibuf, buf, n,
-			    chattygot);
-			if (err)
-				goto done;
-			seen_have = 1;
+			if (curstate == STATE_EXPECT_HAVE) {
+				err = recv_have(&have_ack, outfd, &ibuf,
+				    buf, n, chattygot);
+				if (err)
+					goto done;
+				seen_have = 1;
+				if (have_ack)
+					curstate = STATE_EXPECT_DONE;
+			}
 		} else if (n == 5 && strncmp(buf, "done\n", 5) == 0) {
 			if (curstate != STATE_EXPECT_HAVE &&
 			    curstate != STATE_EXPECT_DONE) {
