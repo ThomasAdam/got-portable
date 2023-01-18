@@ -1,3 +1,14 @@
+* got 0.81; 2023-01-18
+- gotd: print configuration errors without -d (op)
+- gotd: move nrepos check to parse_config (op)
+- gotd: move socket path check to parse.y and error from the main process (op)
+- fix an issue where multiple ref-updates are rejected by gotd
+- fix an issue where gotd fails to accept multiple have-lines from clients
+- regress: replace typeset with printf for shell portability (naddy)
+- fix spurious "gotsh: unexpected flush packet" error when client is up-to-date
+- gotd: fix "bad packfile with zero objects" error while creating branches
+- document the gotd -n option
+
 * got 0.80; 2023-01-17
   too many changes to list all here; see git repository history for more
 - implement per-repository read/write authorization rules in gotd
