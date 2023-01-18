@@ -1059,7 +1059,9 @@ session_dispatch_listener(int fd, short events, void *arg)
 			err = forward_want(client, &imsg);
 			break;
 		case GOTD_IMSG_REF_UPDATE:
-			if (client->state != GOTD_STATE_EXPECT_REF_UPDATE) {
+			if (client->state != GOTD_STATE_EXPECT_REF_UPDATE &&
+			    client->state !=
+			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected ref-update-line received");
 				break;

@@ -20,7 +20,7 @@
 test_send_basic() {
 	local testroot=`test_init send_basic 1`
 
-	ls -R ${GOTD_TEST_REPO} > $testroot/repo-list.before
+	ls -R ${GOTD_TEST_REPO}/objects/pack > $testroot/repo-list.before
 
 	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
 	ret=$?
@@ -38,6 +38,15 @@ test_send_basic() {
 		test_done "$testroot" "1"
 		return 1
 	fi
+	# same for Git
+	git clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone3 \
+		>$testroot/stdout 2>$testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 
 	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
 	ret=$?
@@ -52,8 +61,12 @@ test_send_basic() {
 	(cd $testroot/wt && got add psi/new > /dev/null)
 	echo "more alpha" >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
+	(cd $testroot/wt && got branch newbranch >/dev/null)
+	echo "even more alpha" >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'more changes' > /dev/null)
+	got tag -r $testroot/repo-clone -m "tagging 1.0" 1.0 >/dev/null
 
-	got send -q -r $testroot/repo-clone
+	got send -b main -b newbranch -q -r $testroot/repo-clone -t 1.0
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send failed unexpectedly" >&2
@@ -89,14 +102,25 @@ EOF
 		return 1
 	fi
 
+	# Verify that git pull works, too
+	(cd $testroot/repo-clone3 && git pull -q > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git pull failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	# sending to a repository should result in a new pack file
-	ls -R ${GOTD_TEST_REPO} > $testroot/repo-list.after
+	ls -R ${GOTD_TEST_REPO}/objects/pack > $testroot/repo-list.after
 	diff -u $testroot/repo-list.before $testroot/repo-list.after \
 		> $testroot/repo-list.diff
 	grep '^+[^+]' < $testroot/repo-list.diff > $testroot/repo-list.newlines
 	nplus=`wc -l < $testroot/repo-list.newlines | tr -d ' '`
 	if [ "$nplus" != "2" ]; then
-		echo "$nplus new files created"
+		echo "$nplus new files created:"
+		cat $testroot/repo-list.diff
 		test_done "$testroot" "$ret"
 		return 1
 	fi
