@@ -15,6 +15,8 @@ AC_SUBST(GOT_RELEASE)
 AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 
+AC_CONFIG_SUBDIRS([template])
+
 # When CFLAGS isn't set at this stage and gcc is detected by the macro below,
 # autoconf will automatically use CFLAGS="-O2 -g". Prevent that by using an
 # empty default.
@@ -685,7 +687,6 @@ AC_CONFIG_FILES([Makefile
 		 got/Makefile
 		 gotadmin/Makefile
 		 gotwebd/Makefile
-		 template/Makefile
 		 tog/Makefile
 		 Makefile.common:Makefile.common.in])
 AC_OUTPUT
