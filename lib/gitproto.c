@@ -54,7 +54,7 @@ tokenize_line(char **tokens, char *line, int len, int mintokens, int maxtokens)
 		tokens[i] = NULL;
 
 	for (i = 0; n < len && i < maxtokens; i++) {
-		while (isspace((unsigned char)*line)) {
+		while (n < len && isspace((unsigned char)*line)) {
 			line++;
 			n++;
 		}
