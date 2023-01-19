@@ -824,7 +824,7 @@ parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen, char *buf,
 	pte->mode = 0;
 	p = buf;
 	while (p < space) {
-		if (*p < '0' && *p > '7')
+		if (*p < '0' || *p > '7')
 			return got_error(GOT_ERR_BAD_OBJ_DATA);
 		pte->mode <<= 3;
 		pte->mode |= *p - '0';
