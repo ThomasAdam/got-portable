@@ -6,6 +6,14 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.81 (2023-01-19)
+
+* Changes from got-0.80 and got-0.81.  Portable changes include:
+
+* portable: Moving template/ to its own subproject (only used at compile-time)
+* portable: configure.ac: fix libpanelw detection
+* portable: __xpg_strerror_r: add forward-decl
+
 # got-portable 0.79 (2022-11-08)
 
 * Changes from got-0.79; ; no -portable specific changes worth mentioning.
