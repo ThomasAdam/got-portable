@@ -36,9 +36,6 @@ web server.
 .Nm
 provides the following options:
 .Bl -tag -width tenletters
-.It Fl d
-Do not daemonize.
-Send log output to stderr.
 .It Fl D Ar macro Ns = Ns Ar value
 Define
 .Ar macro
@@ -47,6 +44,9 @@ to be set to
 Overrides the definition of
 .Ar macro
 in the configuration file.
+.It Fl d
+Do not daemonize.
+Send log output to stderr.
 .It Fl f Ar file
 Set the path to the configuration file.
 If not specified, the file
