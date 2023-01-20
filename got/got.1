@@ -2999,6 +2999,14 @@ configuration file will only be used if neither
 nor the
 .Ev GOT_AUTHOR
 environment variable provide author information.
+.It Ev GOT_IGNORE_GITCONFIG
+If this variable is set then any remote repository definitions or author
+information found in Git configuration files will be ignored.
+.It Ev GOT_LOG_DEFAULT_LIMIT
+The default limit on the number of commits traversed by
+.Cm got log .
+If set to zero, the limit is unbounded.
+This variable will be silently ignored if it is set to a non-numeric value.
 .It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit ,
@@ -3011,14 +3019,6 @@ If not set, the
 text editor will be spawned in order to give
 .Xr ed 1
 the attention it deserves.
-.It Ev GOT_LOG_DEFAULT_LIMIT
-The default limit on the number of commits traversed by
-.Cm got log .
-If set to zero, the limit is unbounded.
-This variable will be silently ignored if it is set to a non-numeric value.
-.It Ev GOT_IGNORE_GITCONFIG
-If this variable is set then any remote repository definitions or author
-information found in Git configuration files will be ignored.
 .El
 .Sh FILES
 .Bl -tag -width packed-refs -compact
