@@ -698,6 +698,105 @@ work tree, use the repository path associated with this work tree.
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width TOG_VIEW_SPLIT_MODE
+.It Ev TOG_COLORS
+.Nm
+shows colorized output if this variable is set to a non-empty value.
+The default color scheme can be modified by setting the environment
+variables documented below.
+The colors available in color schemes are
+.Dq black ,
+.Dq red ,
+.Dq green ,
+.Dq yellow ,
+.Dq blue ,
+.Dq magenta ,
+.Dq cyan ,
+and
+.Dq default
+which maps to the terminal's default foreground color.
+.It Ev TOG_COLOR_AUTHOR
+The color used to mark up author information.
+If not set, the default value
+.Dq cyan
+is used.
+.It Ev TOG_COLOR_COMMIT
+The color used to mark up commit IDs.
+If not set, the default value
+.Dq green
+is used.
+.It Ev TOG_COLOR_DATE
+The color used to mark up date information.
+If not set, the default value
+.Dq yellow
+is used.
+.It Ev TOG_COLOR_DIFF_CHUNK_HEADER
+The color used to mark up chunk header lines in diffs.
+If not set, the default value
+.Dq yellow
+is used.
+.It Ev TOG_COLOR_DIFF_META
+The color used to mark up meta data in diffs.
+If not set, the default value
+.Dq green
+is used.
+.It Ev TOG_COLOR_DIFF_MINUS
+The color used to mark up removed lines in diffs.
+If not set, the default value
+.Dq magenta
+is used.
+.It Ev TOG_COLOR_DIFF_PLUS
+The color used to mark up added lines in diffs.
+If not set, the default value
+.Dq cyan
+is used.
+.It Ev TOG_COLOR_REFS_BACKUP
+The color used to mark up references in the
+.Dq refs/got/backup/
+namespace.
+If not set, the default value
+.Dq cyan
+is used.
+.It Ev TOG_COLOR_REFS_HEADS
+The color used to mark up references in the
+.Dq refs/heads/
+namespace.
+If not set, the default value
+.Dq green
+is used.
+.It Ev TOG_COLOR_REFS_REMOTES
+The color used to mark up references in the
+.Dq refs/remotes/
+namespace.
+If not set, the default value
+.Dq yellow
+is used.
+.It Ev TOG_COLOR_REFS_TAGS
+The color used to mark up references in the
+.Dq refs/tags/
+namespace.
+If not set, the default value
+.Dq magenta
+is used.
+.It Ev TOG_COLOR_TREE_DIRECTORY
+The color used to mark up directory tree entries.
+If not set, the default value
+.Dq cyan
+is used.
+.It Ev TOG_COLOR_TREE_EXECUTABLE
+The color used to mark up executable file tree entries.
+If not set, the default value
+.Dq green
+is used.
+.It Ev TOG_COLOR_TREE_SUBMODULE
+The color used to mark up submodule tree entries.
+If not set, the default value
+.Dq magenta
+is used.
+.It Ev TOG_COLOR_TREE_SYMLINK
+The color used to mark up symbolic link tree entries.
+If not set, the default value
+.Dq magenta
+is used.
 .It Ev TOG_DIFF_ALGORITHM
 Determines the default diff algorithm used by
 .Nm .
@@ -723,105 +822,6 @@ The
 .Cm S
 key can be used to switch between vertical and horizontal split layout
 at run-time.
-.It Ev TOG_COLORS
-.Nm
-shows colorized output if this variable is set to a non-empty value.
-The default color scheme can be modified by setting the environment
-variables documented below.
-The colors available in color schemes are
-.Dq black ,
-.Dq red ,
-.Dq green ,
-.Dq yellow ,
-.Dq blue ,
-.Dq magenta ,
-.Dq cyan ,
-and
-.Dq default
-which maps to the terminal's default foreground color.
-.It Ev TOG_COLOR_DIFF_MINUS
-The color used to mark up removed lines in diffs.
-If not set, the default value
-.Dq magenta
-is used.
-.It Ev TOG_COLOR_DIFF_PLUS
-The color used to mark up added lines in diffs.
-If not set, the default value
-.Dq cyan
-is used.
-.It Ev TOG_COLOR_DIFF_CHUNK_HEADER
-The color used to mark up chunk header lines in diffs.
-If not set, the default value
-.Dq yellow
-is used.
-.It Ev TOG_COLOR_DIFF_META
-The color used to mark up meta data in diffs.
-If not set, the default value
-.Dq green
-is used.
-.It Ev TOG_COLOR_TREE_SUBMODULE
-The color used to mark up submodule tree entries.
-If not set, the default value
-.Dq magenta
-is used.
-.It Ev TOG_COLOR_TREE_SYMLINK
-The color used to mark up symbolic link tree entries.
-If not set, the default value
-.Dq magenta
-is used.
-.It Ev TOG_COLOR_TREE_DIRECTORY
-The color used to mark up directory tree entries.
-If not set, the default value
-.Dq cyan
-is used.
-.It Ev TOG_COLOR_TREE_EXECUTABLE
-The color used to mark up executable file tree entries.
-If not set, the default value
-.Dq green
-is used.
-.It Ev TOG_COLOR_COMMIT
-The color used to mark up commit IDs.
-If not set, the default value
-.Dq green
-is used.
-.It Ev TOG_COLOR_AUTHOR
-The color used to mark up author information.
-If not set, the default value
-.Dq cyan
-is used.
-.It Ev TOG_COLOR_DATE
-The color used to mark up date information.
-If not set, the default value
-.Dq yellow
-is used.
-.It Ev TOG_COLOR_REFS_HEADS
-The color used to mark up references in the
-.Dq refs/heads/
-namespace.
-If not set, the default value
-.Dq green
-is used.
-.It Ev TOG_COLOR_REFS_TAGS
-The color used to mark up references in the
-.Dq refs/tags/
-namespace.
-If not set, the default value
-.Dq magenta
-is used.
-.It Ev TOG_COLOR_REFS_REMOTES
-The color used to mark up references in the
-.Dq refs/remotes/
-namespace.
-If not set, the default value
-.Dq yellow
-is used.
-.It Ev TOG_COLOR_REFS_BACKUP
-The color used to mark up references in the
-.Dq refs/got/backup/
-namespace.
-If not set, the default value
-.Dq cyan
-is used.
 .El
 .Sh EXIT STATUS
 .Ex -std tog
