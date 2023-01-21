@@ -79,6 +79,7 @@ static struct gotd_session_client {
 	char				*packfile_path;
 	char				*packidx_path;
 	int				 nref_updates;
+	int				 accept_flush_pkt;
 } gotd_session_client;
 
 void gotd_session_sighdlr(int sig, short event, void *arg);
@@ -1037,10 +1038,12 @@ session_dispatch_listener(int fd, short events, void *arg)
 				break;
 			if (!client->is_writing) {
 				client->state = GOTD_STATE_EXPECT_WANT;
+				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting want-lines",
 				    client->euid);
 			} else if (client->is_writing) {
 				client->state = GOTD_STATE_EXPECT_REF_UPDATE;
+				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting ref-update-lines",
 				    client->euid);
 			} else
@@ -1058,6 +1061,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 			err = ensure_client_is_reading(client);
 			if (err)
 				break;
+			client->accept_flush_pkt = 1;
 			err = forward_want(client, &imsg);
 			break;
 		case GOTD_IMSG_REF_UPDATE:
@@ -1077,6 +1081,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 			if (err)
 				break;
 			client->state = GOTD_STATE_EXPECT_MORE_REF_UPDATES;
+			client->accept_flush_pkt = 1;
 			break;
 		case GOTD_IMSG_HAVE:
 			if (client->state != GOTD_STATE_EXPECT_HAVE) {
@@ -1092,6 +1097,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 			err = forward_have(client, &imsg);
 			if (err)
 				break;
+			client->accept_flush_pkt = 1;
 			break;
 		case GOTD_IMSG_FLUSH:
 			if (client->state == GOTD_STATE_EXPECT_WANT ||
@@ -1109,6 +1115,19 @@ session_dispatch_listener(int fd, short events, void *arg)
 				    "unexpected flush-pkt received");
 				break;
 			}
+			if (!client->accept_flush_pkt) {
+				err = got_error_msg(GOT_ERR_BAD_REQUEST,
+				    "unexpected flush-pkt received");
+				break;
+			}
+
+			/*
+			 * Accept just one flush packet at a time.
+			 * Future client state transitions will set this flag
+			 * again if another flush packet is expected.
+			 */
+			client->accept_flush_pkt = 0;
+
 			log_debug("received flush-pkt from uid %d",
 			    client->euid);
 			if (client->state == GOTD_STATE_EXPECT_WANT) {
@@ -1117,6 +1136,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 				    client->euid);
 			} else if (client->state == GOTD_STATE_EXPECT_HAVE) {
 				client->state = GOTD_STATE_EXPECT_DONE;
+				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting 'done'",
 				    client->euid);
 			} else if (client->state ==
@@ -1144,6 +1164,7 @@ session_dispatch_listener(int fd, short events, void *arg)
 			if (err)
 				break;
 			client->state = GOTD_STATE_DONE;
+			client->accept_flush_pkt = 1;
 			err = send_packfile(client);
 			break;
 		default:
@@ -1402,6 +1423,7 @@ session_main(const char *title, const char *repo_path,
 	gotd_session_client.fd = -1;
 	gotd_session_client.nref_updates = -1;
 	gotd_session_client.delta_cache_fd = -1;
+	gotd_session_client.accept_flush_pkt = 1;
 
 	imsg_init(&gotd_session.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE);
 	gotd_session.parent_iev.handler = session_dispatch;
