@@ -93,12 +93,16 @@ test_request_bad_length_empty() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
+	echo -n '006c0000000000000000000000000000000000000000 ' \
 		> $testroot/stdout.expected
+	printf "capabilities^{}\0" >> $testroot/stdout.expected
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
+		>> $testroot/stdout.expected
+	echo -n '00000018ERR packet too short' >> $testroot/stdout.expected
 
-	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
+	echo "gotsh: packet too short" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -125,12 +129,16 @@ test_request_bad_length_small() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
+	echo -n '006c0000000000000000000000000000000000000000 ' \
 		> $testroot/stdout.expected
+	printf "capabilities^{}\0" >> $testroot/stdout.expected
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
+		>> $testroot/stdout.expected
+	echo -n '00000018ERR packet too short' >> $testroot/stdout.expected
 
-	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
+	echo "gotsh: packet too short" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -157,12 +165,17 @@ test_request_bad_length_large() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	printf "00000008NAK\n0021ERR read: Bad file descriptor" \
+	echo -n '006c0000000000000000000000000000000000000000 ' \
 		> $testroot/stdout.expected
+	printf "capabilities^{}\0" >> $testroot/stdout.expected
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
+		>> $testroot/stdout.expected
+	echo -n '0000001eERR unexpected end of file' \
+		>> $testroot/stdout.expected
 
-	echo "gotsh: read: Bad file descriptor" > $testroot/stderr.expected
+	echo "gotsh: unexpected end of file" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2

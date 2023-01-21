@@ -24,6 +24,7 @@ export GOT_AUTHOR_11="flan_hacker"
 export GOT_LOG_DEFAULT_LIMIT=0
 export GOT_TEST_ROOT="/tmp"
 export GOT_IGNORE_GITCONFIG=1
+export GOT_VERSION_STR=`got --version | cut -d ' ' -f2`
 
 export MALLOC_OPTIONS=S
 
