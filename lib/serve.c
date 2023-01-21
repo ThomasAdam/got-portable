@@ -928,9 +928,13 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 				goto done;
 			}
 
-			err = forward_flushpkt(&ibuf);
-			if (err)
-				goto done;
+			if (curstate == STATE_EXPECT_WANT ||
+			    curstate == STATE_EXPECT_MORE_WANT ||
+			    curstate == STATE_EXPECT_HAVE) {
+				err = forward_flushpkt(&ibuf);
+				if (err)
+					goto done;
+			}
 			if (curstate == STATE_EXPECT_HAVE && !have_ack) {
 				err = send_nak(outfd, chattygot);
 				if (err)
