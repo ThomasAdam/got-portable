@@ -100,6 +100,46 @@ static void gotweb_free_repo_dir(struct repo_dir *);
 
 struct server *gotweb_get_server(uint8_t *, uint8_t *);
 
+static int
+gotweb_reply(struct request *c, int status, const char *ctype,
+    struct gotweb_url *location)
+{
+	const char	*csp;
+
+	if (status != 200 && fcgi_printf(c, "Status: %d\r\n", status) == -1)
+		return -1;
+
+	if (location) {
+		if (fcgi_puts(c->tp, "Location: ") == -1 ||
+		    gotweb_render_url(c, location) == -1 ||
+		    fcgi_puts(c->tp, "\r\n") == -1)
+			return -1;
+	}
+
+	csp = "Content-Security-Policy: default-src 'self'; "
+	    "script-src 'none'; object-src 'none';\r\n";
+	if (fcgi_puts(c->tp, csp) == -1)
+		return -1;
+
+	if (ctype && fcgi_printf(c, "Content-Type: %s\r\n", ctype) == -1)
+		return -1;
+
+	return fcgi_puts(c->tp, "\r\n");
+}
+
+static int
+gotweb_reply_file(struct request *c, const char *ctype, const char *file,
+    const char *suffix)
+{
+	int r;
+
+	r = fcgi_printf(c, "Content-Disposition: attachment; "
+	    "filename=%s%s\r\n", file, suffix ? suffix : "");
+	if (r == -1)
+		return -1;
+	return gotweb_reply(c, 200, ctype, NULL);
+}
+
 void
 gotweb_process_request(struct request *c)
 {
@@ -171,7 +211,7 @@ gotweb_process_request(struct request *c)
 	if (qs->action == BLOBRAW) {
 		const uint8_t *buf;
 		size_t len;
-		int binary;
+		int binary, r;
 
 		error = got_get_repo_commits(c, 1);
 		if (error)
@@ -182,15 +222,12 @@ gotweb_process_request(struct request *c)
 			goto render;
 
 		if (binary)
-			error = gotweb_render_content_type_file(c,
-			    "application/octet-stream", qs->file, NULL);
+			r = gotweb_reply_file(c, "application/octet-stream",
+			    qs->file, NULL);
 		else
-			error = gotweb_render_content_type(c, "text/plain");
-
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
+			r = gotweb_reply(c, 200, "text/plain", NULL);
+		if (r == -1)
 			goto done;
-		}
 
 		for (;;) {
 			error = got_object_blob_read_block(&len, blob);
@@ -226,22 +263,16 @@ gotweb_process_request(struct request *c)
 		if (error2)
 			goto render;
 		if (binary) {
-			fcgi_puts(c->tp, "Status: 302\r\n");
-			fcgi_puts(c->tp, "Location: ");
-			gotweb_render_url(c, &url);
-			fcgi_puts(c->tp, "\r\n\r\n");
+			gotweb_reply(c, 302, NULL, &url);
 			goto done;
 		}
 	}
 
 	if (qs->action == RSS) {
-		error = gotweb_render_content_type_file(c,
-		    "application/rss+xml;charset=utf-8",
-		    repo_dir->name, ".rss");
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
-		}
+		const char *ctype = "application/rss+xml;charset=utf-8";
+
+		if (gotweb_reply_file(c, ctype, repo_dir->name, ".rss") == -1)
+			goto done;
 
 		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
 		if (error) {
@@ -254,11 +285,8 @@ gotweb_process_request(struct request *c)
 	}
 
 render:
-	error = gotweb_render_content_type(c, "text/html");
-	if (error) {
-		log_warnx("%s: %s", __func__, error->msg);
-		goto err;
-	}
+	if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+		goto done;
 	html = 1;
 
 	if (gotweb_render_header(c->tp) == -1)
@@ -759,29 +787,6 @@ gotweb_free_transport(struct transport *t)
 	free(t->next_id);
 	free(t->prev_id);
 	free(t);
-}
-
-const struct got_error *
-gotweb_render_content_type(struct request *c, const char *type)
-{
-	const char *csp = "default-src 'self'; script-src 'none'; "
-		"object-src 'none';";
-
-	fcgi_printf(c,
-	    "Content-Security-Policy: %s\r\n"
-	    "Content-Type: %s\r\n\r\n",
-	    csp, type);
-	return NULL;
-}
-
-const struct got_error *
-gotweb_render_content_type_file(struct request *c, const char *type,
-    const char *file, const char *suffix)
-{
-	fcgi_printf(c, "Content-type: %s\r\n"
-	    "Content-disposition: attachment; filename=%s%s\r\n\r\n",
-	    type, file, suffix ? suffix : "");
-	return NULL;
 }
 
 void
