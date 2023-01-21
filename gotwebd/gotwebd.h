@@ -449,11 +449,6 @@ void sockets_socket_accept(int, short, void *);
 int sockets_privinit(struct gotwebd *, struct socket *);
 
 /* gotweb.c */
-const struct got_error *gotweb_render_content_type(struct request *,
-    const char *);
-const struct got_error
-    *gotweb_render_content_type_file(struct request *, const char *,
-    const char *, const char *);
 void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
     struct gotweb_url *, int *);
 const struct got_error *gotweb_get_time_str(char **, time_t, int);
