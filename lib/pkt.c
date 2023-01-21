@@ -36,7 +36,7 @@ got_pkt_readn(ssize_t *off, int fd, void *buf, size_t n)
 		if (r == -1)
 			return got_error_from_errno("read");
 		if (r == 0)
-			return NULL;
+			return got_error(GOT_ERR_EOF);
 		*off += r;
 	}
 	return NULL;
