@@ -293,6 +293,32 @@ test_request_bad_large_repo_name() {
 	test_done "$testroot" "$ret"
 }
 
+test_request_bad_no_repo() {
+	local testroot=`test_init test_request_bad_no_repo`
+
+	for i in `seq 10`; do
+		ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack \
+			>/dev/null 2>/dev/null </dev/null
+	done
+
+	# should still be able to clone; the repo is empty however
+	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone \
+		2> $testroot/stderr
+	cat <<EOF > $testroot/stderr.expected
+got-fetch-pack: could not find any branches to fetch
+got: could not find any branches to fetch
+EOF
+
+	if ! cmp -s "$testroot/stderr.expected" "$testroot/stderr"; then
+		echo "got clone failed for unexpected reason" >&2
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" 1
+		return
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_request_bad_commit
 run_test test_request_bad_length_zero
@@ -302,3 +328,4 @@ run_test test_request_bad_length_large
 run_test test_request_bad_capabilities
 run_test test_request_bad_repository
 run_test test_request_bad_large_repo_name
+run_test test_request_bad_no_repo
