@@ -649,8 +649,7 @@ gotd_request(int fd, short events, void *arg)
 	}
 
 	if (err) {
-		if (err->code != GOT_ERR_EOF)
-			disconnect_on_error(client, err);
+		disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(&client->iev);
 	}
