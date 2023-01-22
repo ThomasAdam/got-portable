@@ -1494,7 +1494,8 @@ got_serve(int infd, int outfd, const char *gitcmd, int gotd_sock, int chattygot)
 	if (strcmp(command, GOT_SERVE_CMD_FETCH) == 0)
 		err = serve_read(infd, outfd, gotd_sock, repo_path, chattygot);
 	else if (strcmp(command, GOT_SERVE_CMD_SEND) == 0)
-		err = serve_write(infd, outfd, gotd_sock, repo_path, chattygot);
+		err = serve_write(infd, outfd, gotd_sock, repo_path,
+		    chattygot);
 	else
 		err = got_error(GOT_ERR_BAD_PACKET);
 
