@@ -72,6 +72,15 @@ main(int argc, char *argv[])
 	if (pledge("stdio recvfd unix unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
+
+	unix_socket_path = getenv("GOTD_UNIX_SOCKET");
+	if (unix_socket_path == NULL)
+		unix_socket_path = GOTD_UNIX_SOCKET;
+
+	error = apply_unveil(unix_socket_path);
+	if (error)
+		goto done;
+
 	if (strcmp(argv[0], GOT_SERVE_CMD_SEND) == 0 ||
 	    strcmp(argv[0], GOT_SERVE_CMD_FETCH) == 0) {
 		if (argc != 2)
@@ -89,18 +98,6 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	unix_socket_path = getenv("GOTD_UNIX_SOCKET");
-	if (unix_socket_path == NULL)
-		unix_socket_path = GOTD_UNIX_SOCKET;
-
-	error = apply_unveil(unix_socket_path);
-	if (error)
-		goto done;
-
-#ifndef PROFILE
-	if (pledge("stdio recvfd unix", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if ((gotd_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		err(1, "socket");
 
