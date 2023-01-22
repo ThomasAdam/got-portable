@@ -762,7 +762,6 @@ gotweb_free_repo_dir(struct repo_dir *repo_dir)
 		free(repo_dir->owner);
 		free(repo_dir->description);
 		free(repo_dir->url);
-		free(repo_dir->age);
 		free(repo_dir->path);
 	}
 	free(repo_dir);
@@ -1338,7 +1337,7 @@ done:
 	error = got_get_repo_owner(&repo_dir->owner, c);
 	if (error)
 		goto err;
-	error = got_get_repo_age(&repo_dir->age, c, NULL, TM_DIFF);
+	error = got_get_repo_age(&repo_dir->age, c, NULL);
 	if (error)
 		goto err;
 	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path,
@@ -1368,7 +1367,6 @@ gotweb_init_repo_dir(struct repo_dir **repo_dir, const char *dir)
 	(*repo_dir)->owner = NULL;
 	(*repo_dir)->description = NULL;
 	(*repo_dir)->url = NULL;
-	(*repo_dir)->age = NULL;
 	(*repo_dir)->path = NULL;
 
 	return NULL;
@@ -1466,9 +1464,10 @@ done:
 	return error;
 }
 
-const struct got_error *
-gotweb_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
+int
+gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
 {
+	struct request *c = tp->tp_arg;
 	struct tm tm;
 	long long diff_time;
 	const char *years = "years ago", *months = "months ago";
@@ -1479,69 +1478,67 @@ gotweb_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 	char datebuf[64];
 	size_t r;
 
-	*repo_age = NULL;
-
 	switch (ref_tm) {
 	case TM_DIFF:
 		diff_time = time(NULL) - committer_time;
 		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if (asprintf(repo_age, "%lld %s",
+			if (fcgi_printf(c, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 365), years) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if (asprintf(repo_age, "%lld %s",
+			if (fcgi_printf(c, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / (365 / 12)),
 			    months) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if (asprintf(repo_age, "%lld %s",
+			if (fcgi_printf(c, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if (asprintf(repo_age, "%lld %s",
+			if (fcgi_printf(c, "%lld %s",
 			    (diff_time / 60 / 60 / 24), days) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 60 * 60 * 2) {
-			if (asprintf(repo_age, "%lld %s",
+			if (fcgi_printf(c, "%lld %s",
 			    (diff_time / 60 / 60), hours) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 60 * 2) {
-			if (asprintf(repo_age, "%lld %s", (diff_time / 60),
+			if (fcgi_printf(c, "%lld %s", (diff_time / 60),
 			    minutes) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else if (diff_time > 2) {
-			if (asprintf(repo_age, "%lld %s", diff_time,
+			if (fcgi_printf(c, "%lld %s", diff_time,
 			    seconds) == -1)
-				return got_error_from_errno("asprintf");
+				return -1;
 		} else {
-			if (asprintf(repo_age, "%s", now) == -1)
-				return got_error_from_errno("asprintf");
+			if (fcgi_puts(tp, now) == -1)
+				return -1;
 		}
 		break;
 	case TM_LONG:
 		if (gmtime_r(&committer_time, &tm) == NULL)
-			return got_error_from_errno("gmtime_r");
+			return -1;
 
 		s = asctime_r(&tm, datebuf);
 		if (s == NULL)
-			return got_error_from_errno("asctime_r");
+			return -1;
 
-		if (asprintf(repo_age, "%s UTC", datebuf) == -1)
-			return got_error_from_errno("asprintf");
+		if (fcgi_puts(tp, datebuf) == -1 ||
+		    fcgi_puts(tp, " UTC") == -1)
+			return -1;
 		break;
 	case TM_RFC822:
 		if (gmtime_r(&committer_time, &tm) == NULL)
-			return got_error_from_errno("gmtime_r");
+			return -1;
 
 		r = strftime(datebuf, sizeof(datebuf),
 		    "%a, %d %b %Y %H:%M:%S GMT", &tm);
 		if (r == 0)
-			return got_error(GOT_ERR_NO_SPACE);
+			return -1;
 
-		*repo_age = strdup(datebuf);
-		if (*repo_age == NULL)
-			return got_error_from_errno("asprintf");
+		if (fcgi_puts(tp, datebuf) == -1)
+			return -1;
 		break;
 	}
-	return NULL;
+	return 0;
 }

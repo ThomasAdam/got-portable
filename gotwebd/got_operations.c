@@ -126,8 +126,7 @@ got_get_repo_owner(char **owner, struct request *c)
 }
 
 const struct got_error *
-got_get_repo_age(char **repo_age, struct request *c,
-    const char *refname, int ref_tm)
+got_get_repo_age(time_t *repo_age, struct request *c, const char *refname)
 {
 	const struct got_error *error = NULL;
 	struct server *srv = c->srv;
@@ -138,7 +137,6 @@ got_get_repo_age(char **repo_age, struct request *c,
 	struct got_reflist_entry *re;
 	time_t committer_time = 0, cmp_time = 0;
 
-	*repo_age = NULL;
 	TAILQ_INIT(&refs);
 
 	if (srv->show_repo_age == 0)
@@ -178,10 +176,8 @@ got_get_repo_age(char **repo_age, struct request *c,
 			break;
 	}
 
-	if (cmp_time != 0) {
-		committer_time = cmp_time;
-		error = gotweb_get_time_str(repo_age, committer_time, ref_tm);
-	}
+	if (cmp_time != 0)
+		*repo_age = cmp_time;
 done:
 	got_ref_list_free(&refs);
 	return error;

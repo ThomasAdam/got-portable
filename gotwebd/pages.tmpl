@@ -48,21 +48,6 @@ static inline int branch(struct template *, struct got_reflist_entry *);
 static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
 
-static int
-gotweb_render_age(struct template *tp, time_t time, int ref_tm)
-{
-	const struct got_error *err;
-	char *age;
-	int r;
-
-	err = gotweb_get_time_str(&age, time, ref_tm);
-	if (err)
-		return 0;
-	r = tp->tp_puts(tp, age);
-	free(age);
-	return r;
-}
-
 !}
 
 {{ define gotweb_render_header(struct template *tp) }}
@@ -220,7 +205,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
   {{ end }}
   {{ if srv->show_repo_age }}
     <div class="index_project_age">
-      {{ repo_dir->age }}
+      {{ render gotweb_render_age(tp, repo_dir->age, TM_DIFF) }}
     </div>
   {{ end }}
   <div class="navs_wrapper">
@@ -797,7 +782,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 	struct request		*c = tp->tp_arg;
 	struct querystring	*qs = c->t->qs;
 	const char		*refname;
-	char			*age = NULL;
+	time_t			 age;
 	struct gotweb_url	 url = {
 		.action = SUMMARY,
 		.index_page = -1,
@@ -807,7 +792,7 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 
 	refname = got_ref_get_name(re->ref);
 
-	err = got_get_repo_age(&age, c, refname, TM_DIFF);
+	err = got_get_repo_age(&age, c, refname);
 	if (err) {
 		log_warnx("%s: %s", __func__, err->msg);
 		return -1;
@@ -819,7 +804,9 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
 	url.headref = refname;
 !}
 <div class="branches_wrapper">
-  <div class="branches_age">{{ age }}</div>
+  <div class="branches_age">
+    {{ render gotweb_render_age(tp, age, TM_DIFF) }}
+  </div>
   <div class="branches_space">&nbsp;</div>
   <div class="branch">
     <a href="{{ render gotweb_render_url(c, &url) }}">{{ refname }}</a>
@@ -837,8 +824,6 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
   </div>
   <div class="dotted_line"></div>
 </div>
-{{ finally }}
-{! free(age); !}
 {{ end }}
 
 {{ define gotweb_render_summary(struct template *tp,
@@ -859,7 +844,9 @@ gotweb_render_age(struct template *tp, time_t time, int ref_tm)
   {{ end }}
   {{ if srv->show_repo_age }}
     <div id="last_change_title">Last Change:</div>
-    <div id="last_change">{{ t->repo_dir->age }}</div>
+    <div id="last_change">
+      {{ render gotweb_render_age(tp, t->repo_dir->age, TM_DIFF) }}
+    </div>
   {{ end }}
   {{ if srv->show_repo_cloneurl }}
     <div id="cloneurl_title">Clone URL:</div>
