@@ -155,7 +155,7 @@ struct repo_dir {
 	char			*owner;
 	char			*description;
 	char			*url;
-	char			*age;
+	time_t			 age;
 	char			*path;
 };
 
@@ -451,7 +451,7 @@ int sockets_privinit(struct gotwebd *, struct socket *);
 /* gotweb.c */
 void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
     struct gotweb_url *, int *);
-const struct got_error *gotweb_get_time_str(char **, time_t, int);
+int gotweb_render_age(struct template *, time_t, int);
 const struct got_error *gotweb_init_transport(struct transport **);
 const char *gotweb_action_name(int);
 int gotweb_render_url(struct request *, struct gotweb_url *);
@@ -500,8 +500,8 @@ int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 /* got_operations.c */
 const struct got_error *got_gotweb_flushfile(FILE *, int);
 const struct got_error *got_get_repo_owner(char **, struct request *);
-const struct got_error *got_get_repo_age(char **, struct request *,
-    const char *, int);
+const struct got_error *got_get_repo_age(time_t *, struct request *,
+    const char *);
 const struct got_error *got_get_repo_commits(struct request *, int);
 const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
