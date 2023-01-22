@@ -17,5 +17,6 @@
 #define GOT_SERVE_CMD_SEND "git-receive-pack"
 #define GOT_SERVE_CMD_FETCH "git-upload-pack"
 
-const struct got_error *got_serve(int infd, int outfd, const char *gitcmd,
-    int gotd_sock, int chattygot);
+const struct got_error *got_serve_parse_command(char **, char **, const char *);
+const struct got_error *got_serve(int infd, int outfd, const char *command,
+    const char *repo_path, int gotd_sock, int chattygot);
