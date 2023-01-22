@@ -63,8 +63,7 @@ int
 main(int argc, char *argv[])
 {
 	const struct got_error *error;
-	char unix_socket_path[PATH_MAX];
-	char *unix_socket_path_env = getenv("GOTD_UNIX_SOCKET");
+	const char *unix_socket_path;
 	int gotd_sock = -1;
 	struct sockaddr_un	 sun;
 	char *gitcmd = NULL, *command = NULL, *repo_path = NULL;
@@ -90,14 +89,9 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (unix_socket_path_env) {
-		if (strlcpy(unix_socket_path, unix_socket_path_env,
-		    sizeof(unix_socket_path)) >= sizeof(unix_socket_path))
-			errx(1, "gotd socket path too long");
-	} else {
-		strlcpy(unix_socket_path, GOTD_UNIX_SOCKET,
-		    sizeof(unix_socket_path));
-	}
+	unix_socket_path = getenv("GOTD_UNIX_SOCKET");
+	if (unix_socket_path == NULL)
+		unix_socket_path = GOTD_UNIX_SOCKET;
 
 	error = apply_unveil(unix_socket_path);
 	if (error)
