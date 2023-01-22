@@ -436,11 +436,6 @@ got_get_repo_commits(struct request *c, int limit)
 		if (error)
 			goto done;
 
-		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
-		    NULL);
-		if (error)
-			goto done;
-
 		error = got_init_repo_commit(&repo_commit);
 		if (error)
 			goto done;
@@ -505,7 +500,6 @@ got_get_repo_commits(struct request *c, int limit)
 				goto done;
 			}
 		}
-		got_ref_list_free(&refs);
 		if (error || (limit && --limit == 0)) {
 			if (commit_found || (qs->file != NULL &&
 			    strlen(qs->file) > 0))
