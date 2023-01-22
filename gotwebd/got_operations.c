@@ -327,8 +327,7 @@ got_get_repo_commits(struct request *c, int limit)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	char *in_repo_path = NULL, *repo_path = NULL, *file_path = NULL;
-	int chk_next = 0, chk_multi = 0, commit_found = 0;
-	int obj_type, limit_chk = 0;
+	int chk_next = 0, chk_multi = 0;
 
 	TAILQ_INIT(&refs);
 
@@ -343,58 +342,17 @@ got_get_repo_commits(struct request *c, int limit)
 		goto done;
 	}
 
-	/*
-	 * XXX: jumping directly to a commit id via
-	 * got_repo_match_object_id_prefix significantly improves performance,
-	 * but does not allow us to create a PREVIOUS button, since commits can
-	 * only be itereated forward. So, we have to match as we iterate from
-	 * the headref.
-	 */
-	if (qs->action == BRIEFS || qs->action == COMMITS ||
-	    (qs->action == TREE && qs->commit == NULL)) {
+	if (qs->commit) {
+		error = got_repo_match_object_id_prefix(&id, qs->commit,
+		    GOT_OBJ_TYPE_COMMIT, repo);
+		if (error)
+			goto done;
+	} else {
 		error = got_ref_open(&ref, repo, qs->headref, 0);
 		if (error)
 			goto done;
 
 		error = got_ref_resolve(&id, repo, ref);
-		if (error)
-			goto done;
-	} else if (qs->commit != NULL) {
-		error = got_ref_open(&ref, repo, qs->commit, 0);
-		if (error == NULL) {
-			error = got_ref_resolve(&id, repo, ref);
-			if (error)
-				goto done;
-			error = got_object_get_type(&obj_type, repo, id);
-			if (error)
-				goto done;
-			if (obj_type == GOT_OBJ_TYPE_TAG) {
-				struct got_tag_object *tag;
-				error = got_object_open_as_tag(&tag, repo, id);
-				if (error)
-					goto done;
-				if (got_object_tag_get_object_type(tag) !=
-				    GOT_OBJ_TYPE_COMMIT) {
-					got_object_tag_close(tag);
-					error = got_error(GOT_ERR_OBJ_TYPE);
-					goto done;
-				}
-				free(id);
-				id = got_object_id_dup(
-				    got_object_tag_get_object_id(tag));
-				if (id == NULL)
-					error = got_error_from_errno(
-					    "got_object_id_dup");
-				got_object_tag_close(tag);
-				if (error)
-					goto done;
-			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
-				error = got_error(GOT_ERR_OBJ_TYPE);
-				goto done;
-			}
-		}
-		error = got_repo_match_object_id_prefix(&id, qs->commit,
-		    GOT_OBJ_TYPE_COMMIT, repo);
 		if (error)
 			goto done;
 	}
@@ -447,35 +405,10 @@ got_get_repo_commits(struct request *c, int limit)
 			goto done;
 		}
 
-		if (limit_chk == ((limit * qs->page) - limit) &&
-		    commit_found == 0 && repo_commit->commit_id != NULL) {
-			t->prev_id = strdup(repo_commit->commit_id);
-			if (t->prev_id == NULL) {
-				error = got_error_from_errno("strdup");
-				gotweb_free_repo_commit(repo_commit);
-				goto done;
-			}
-		}
-
-		if (qs->commit != NULL && commit_found == 0 && limit != 1) {
-			if (strcmp(qs->commit, repo_commit->commit_id) == 0)
-				commit_found = 1;
-			else if (qs->file != NULL && strlen(qs->file) > 0 &&
-			    qs->page == 0)
-				commit_found = 1;
-			else {
-				gotweb_free_repo_commit(repo_commit);
-				limit_chk++;
-				continue;
-			}
-		}
-
 		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
 
-		if (limit == 1 && chk_multi == 0 &&
-		    srv->max_commits_display != 1)
-			commit_found = 1;
-		else {
+		if (!chk_multi || limit != 1 ||
+		    srv->max_commits_display == 1) {
 			chk_multi = 1;
 
 			/*
@@ -501,8 +434,7 @@ got_get_repo_commits(struct request *c, int limit)
 			}
 		}
 		if (error || (limit && --limit == 0)) {
-			if (commit_found || (qs->file != NULL &&
-			    strlen(qs->file) > 0))
+			if (qs->file != NULL && *qs->file != '\0')
 				if (chk_multi == 0)
 					break;
 			chk_next = 1;
