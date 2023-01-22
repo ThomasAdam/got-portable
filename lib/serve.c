@@ -64,8 +64,8 @@ static const struct got_capability write_capabilities[] = {
 #endif
 };
 
-static const struct got_error *
-parse_command(char **command, char **repo_path, const char *gitcmd)
+const struct got_error *
+got_serve_parse_command(char **command, char **repo_path, const char *gitcmd)
 {
 	const struct got_error *err = NULL;
 	size_t len, cmdlen, pathlen;
@@ -1482,14 +1482,10 @@ done:
 }
 
 const struct got_error *
-got_serve(int infd, int outfd, const char *gitcmd, int gotd_sock, int chattygot)
+got_serve(int infd, int outfd, const char *command, const char *repo_path,
+    int gotd_sock, int chattygot)
 {
 	const struct got_error *err = NULL;
-	char *command = NULL, *repo_path = NULL;
-
-	err = parse_command(&command, &repo_path, gitcmd);
-	if (err)
-		return err;
 
 	if (strcmp(command, GOT_SERVE_CMD_FETCH) == 0)
 		err = serve_read(infd, outfd, gotd_sock, repo_path, chattygot);
@@ -1499,7 +1495,5 @@ got_serve(int infd, int outfd, const char *gitcmd, int gotd_sock, int chattygot)
 	else
 		err = got_error(GOT_ERR_BAD_PACKET);
 
-	free(command);
-	free(repo_path);
 	return err;
 }
