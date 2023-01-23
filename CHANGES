@@ -1,3 +1,27 @@
+* got 0.82; 2023-01-23
+- fix comparison in tree object parser always evaluating to false (jamsek)
+- add missing bounds-check in gitproto ref-line tokenizer
+- gotd.8 and gotwebd.8 man page improvements (patch by Josiah Frentsos)
+- make gotd session process accept just one flush packet at a time
+- sort ENVIRONMENT entries in got.1 and tog.1 (op)
+- only forward implicit flush packets from gotsh if they are expected
+- return GOT_ERR_EOF from pkt.c if a read attempt indicates EOF
+- treat read errors from client socket in gotsh as fatal errors
+- gotwebd: refactor gotweb_render_content_type/_file (op)
+- gotwebd: turn gotweb_get_time_str into gotweb_render_age (op)
+- gotwebd: don't list references per-commit in got_get_repo_commits (op)
+- gotwebd: avoid history traversal in briefs/commits, kill "prev" button (op)
+- gotd: disconnect on client EOF error to avoid stale connections (op)
+- gotsh: validate with parse_command before connecting (op)
+- add a test for ssh connections to gotsh without a repo path argument (op)
+- gotsh: avoid a temporary buffer for the socket path (op)
+- gotsh: move apply_unveil right after the first pledge (op)
+- fix tog refreshing the screen more often than intended (jamsek)
+- tog: show action report on user-toggleable event (patch by Mikhail, jamsek)
+- don't print empty line when exiting tog (jamsek)
+- got: don't leak pathlist in commit and revert commands (jamsek)
+- gotd: fix wrong PIDs for parent and child processes shown in logs
+
 * got 0.81; 2023-01-18
 - gotd: print configuration errors without -d (op)
 - gotd: move nrepos check to parse_config (op)
