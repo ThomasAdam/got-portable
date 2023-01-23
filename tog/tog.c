@@ -695,6 +695,7 @@ struct tog_view {
 #define TOG_SEARCH_HAVE_NONE	3
 	regex_t regex;
 	regmatch_t regmatch;
+	const char *action;
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
@@ -1464,6 +1465,32 @@ get_compound_key(struct tog_view *view, int c)
 	return c;
 }
 
+static void
+action_report(struct tog_view *view)
+{
+	struct tog_view *v = view;
+
+	if (view_is_hsplit_top(view))
+		v = view->child;
+	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
+		v = view->parent;
+
+	wmove(v->window, v->nlines - 1, 0);
+	wclrtoeol(v->window);
+	wprintw(v->window, ":%s", view->action);
+	wrefresh(v->window);
+
+	/*
+	 * Clear action status report. Only clear in blame view
+	 * once annotating is complete, otherwise it's too fast.
+	 */
+	if (view->type == TOG_VIEW_BLAME) {
+		if (view->state.blame.blame_complete)
+			view->action = NULL;
+	} else
+		view->action = NULL;
+}
+
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
     struct tog_view_list_head *views)
@@ -1473,6 +1500,9 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	int ch, errcode;
 
 	*new = NULL;
+
+	if (view->action)
+		action_report(view);
 
 	/* Clear "no matches" indicator. */
 	if (view->search_next_done == TOG_SEARCH_NO_MORE ||
@@ -1673,10 +1703,13 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			err = view->input(new, view, ch);
 		break;
 	case 'A':
-		if (tog_diff_algo == GOT_DIFF_ALGORITHM_MYERS)
+		if (tog_diff_algo == GOT_DIFF_ALGORITHM_MYERS) {
 			tog_diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
-		else
+			view->action = "Patience diff algorithm";
+		} else {
 			tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
+			view->action = "Myers diff algorithm";
+		}
 		TAILQ_FOREACH(v, views, entry) {
 			if (v->reset) {
 				err = v->reset(v);
@@ -3723,6 +3756,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case '@':
 		s->use_committer = !s->use_committer;
+		view->action = s->use_committer ?
+		    "show committer" : "show commit author";
 		break;
 	case 'G':
 	case '*':
@@ -5266,10 +5301,18 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'a':
 	case 'w':
-		if (ch == 'a')
+		if (ch == 'a') {
 			s->force_text_diff = !s->force_text_diff;
-		else if (ch == 'w')
+			view->action = s->force_text_diff ?
+			    "force ASCII text enabled" :
+			    "force ASCII text disabled";
+		}
+		else if (ch == 'w') {
 			s->ignore_whitespace = !s->ignore_whitespace;
+			view->action = s->ignore_whitespace ?
+			    "ignore whitespace enabled" :
+			    "ignore whitespace disabled";
+		}
 		err = reset_diff_view(view);
 		break;
 	case 'g':
@@ -8238,6 +8281,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'o':
 		s->sort_by_date = !s->sort_by_date;
+		view->action = s->sort_by_date ? "sort by date" : "sort by name";
 		view->count = 0;
 		err = got_reflist_sort(&tog_refs, s->sort_by_date ?
 		    got_ref_cmp_by_commit_timestamp_descending :
