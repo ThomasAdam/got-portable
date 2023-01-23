@@ -1788,12 +1788,12 @@ main(int argc, char **argv)
 	log_setverbose(verbosity);
 
 	if (proc_id == PROC_GOTD) {
-		gotd.pid = getpid();
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		start_listener(argv0, confpath, daemonize, verbosity);
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
+		gotd.pid = getpid();
+		start_listener(argv0, confpath, daemonize, verbosity);
 	} else if (proc_id == PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		if (verbosity) {
@@ -1807,13 +1807,9 @@ main(int argc, char **argv)
 			fatal("cannot listen on unix socket %s",
 			    gotd.unix_socket_path);
 		}
-		if (daemonize && daemon(0, 0) == -1)
-			fatal("daemon");
 	} else if (proc_id == PROC_AUTH) {
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
-		if (daemonize && daemon(0, 0) == -1)
-			fatal("daemon");
 	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE ||
 	    proc_id == PROC_SESSION) {
 		error = got_repo_pack_fds_open(&pack_fds);
@@ -1826,8 +1822,6 @@ main(int argc, char **argv)
 			fatalx("repository path not specified");
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
-		if (daemonize && daemon(0, 0) == -1)
-			fatal("daemon");
 	} else
 		fatal("invalid process id %d", proc_id);
 
