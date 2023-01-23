@@ -12280,7 +12280,7 @@ cmd_merge(int argc, char *argv[])
 			interrupt_merge = 1;
 			break;
 		default:
-			usage_rebase();
+			usage_merge();
 			/* NOTREACHED */
 		}
 	}
