@@ -1739,7 +1739,7 @@ view_loop(struct tog_view *view)
 	while (!TAILQ_EMPTY(&views) && !done && !tog_thread_error &&
 	    !tog_fatal_signal_received()) {
 		/* Refresh fast during initialization, then become slower. */
-		if (fast_refresh && fast_refresh-- == 0)
+		if (fast_refresh && --fast_refresh == 0)
 			halfdelay(10); /* switch to once per second */
 
 		err = view_input(&new_view, &done, view, &views);
