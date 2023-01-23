@@ -1783,6 +1783,30 @@ view_loop(struct tog_view *view)
 		err = view_input(&new_view, &done, view, &views);
 		if (err)
 			break;
+
+		if (view->dying && view == TAILQ_FIRST(&views) &&
+		    TAILQ_NEXT(view, entry) == NULL)
+			done = 1;
+		if (done) {
+			struct tog_view *v;
+
+			/*
+			 * When we quit, scroll the screen up a single line
+			 * so we don't lose any information.
+			 */
+			TAILQ_FOREACH(v, &views, entry) {
+				wmove(v->window, 0, 0);
+				wdeleteln(v->window);
+				wnoutrefresh(v->window);
+				if (v->child && !view_is_fullscreen(v)) {
+					wmove(v->child->window, 0, 0);
+					wdeleteln(v->child->window);
+					wnoutrefresh(v->child->window);
+				}
+			}
+			doupdate();
+		}
+
 		if (view->dying) {
 			struct tog_view *v, *prev = NULL;
 
@@ -1846,7 +1870,7 @@ view_loop(struct tog_view *view)
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
 			view = new_view;
 		}
-		if (view) {
+		if (view && !done) {
 			if (view_is_parent_view(view)) {
 				if (view->child && view->child->focussed)
 					view = view->child;
@@ -9487,7 +9511,6 @@ main(int argc, char *argv[])
 	}
 
 	endwin();
-	putchar('\n');
 	if (cmd_argv) {
 		int i;
 		for (i = 0; i < argc; i++)
