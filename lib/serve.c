@@ -1373,7 +1373,7 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 		buf[0] = '\0';
 		err = got_pkt_readpkt(&n, infd, buf, sizeof(buf), chattygot);
 		if (err)
-			break;
+			goto done;
 		if (n == 0) {
 			if (curstate != STATE_EXPECT_MORE_REF_UPDATES) {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
