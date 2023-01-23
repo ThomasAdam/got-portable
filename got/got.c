@@ -8522,6 +8522,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(path);
 	free(cwd);
 	return error;
@@ -8873,6 +8874,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	free(id_str);
 	free(gitconfig_path);
