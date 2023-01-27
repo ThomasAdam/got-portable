@@ -1148,7 +1148,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	}
 	kill_auth_proc(client);
 
-	log_info("authenticated uid %d for repository %s\n",
+	log_info("authenticated uid %d for repository %s",
 	    client->euid, repo->name);
 
 	err = start_session_child(client, repo, gotd.argv0,
