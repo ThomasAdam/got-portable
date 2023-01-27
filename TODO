@@ -18,6 +18,8 @@ got:
   'got fetch' is supposed to work. To make this easier, if the HEAD symref
   points to a non-existent reference it should be updated by 'got fetch'
   to match the HEAD symref sent by the server.
+- got histedit -m on a commit which only changes filemode bits results
+  in the commit being miscategorized as a no-op change and be dropped.
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
