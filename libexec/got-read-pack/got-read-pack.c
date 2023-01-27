@@ -1473,6 +1473,9 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		if (got_object_idset_contains(idset, tree_id)) {
 			got_object_qid_free(qid);
 			qid = NULL;
+			err = send_tree_enumeration_done(ibuf);
+			if (err)
+				goto done;
 			continue;
 		}
 
