@@ -291,7 +291,7 @@ announce_refs(int outfd, struct imsgbuf *ibuf, int client_is_reading,
 	    sizeof(lsref.repo_name))
 		return got_error(GOT_ERR_NO_SPACE);
 	lsref.client_is_reading = client_is_reading;
-	
+
 	if (imsg_compose(ibuf, GOTD_IMSG_LIST_REFS, 0, 0, -1,
 	    &lsref, sizeof(lsref)) == -1)
 		return got_error_from_errno("imsg_compose LIST_REFS");
@@ -1179,7 +1179,7 @@ recv_packfile(struct imsg *imsg, int infd)
 
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-	
+
 	packfd = imsg->fd;
 	while (!pack_done) {
 		ssize_t r = 0;
