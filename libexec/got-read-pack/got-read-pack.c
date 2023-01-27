@@ -1019,7 +1019,8 @@ recv_object_ids(struct got_object_idset *idset, struct imsgbuf *ibuf)
 }
 
 static const struct got_error *
-recv_object_id_queue(struct got_object_id_queue *queue, struct imsgbuf *ibuf)
+recv_object_id_queue(struct got_object_id_queue *queue,
+    struct got_object_idset *queued_ids, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	int done = 0;
@@ -1037,6 +1038,9 @@ recv_object_id_queue(struct got_object_id_queue *queue, struct imsgbuf *ibuf)
 				return err;
 			memcpy(&qid->id, &ids[i], sizeof(qid->id));
 			STAILQ_INSERT_TAIL(queue, qid, entry);
+			err = got_object_idset_add(queued_ids, &qid->id, NULL);
+			if (err)
+				return err;
 		}
 	}
 
@@ -1362,7 +1366,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *tree_id = NULL;
 	size_t totlen = 0;
-	struct got_object_idset *idset;
+	struct got_object_idset *idset, *queued_ids = NULL;
 	int i, idx, have_all_entries = 1;
 	struct enumerated_tree *trees = NULL;
 	size_t ntrees = 0, nalloc = 16;
@@ -1379,7 +1383,13 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		goto done;
 	}
 
-	err = recv_object_id_queue(&commit_ids, ibuf);
+	queued_ids = got_object_idset_alloc();
+	if (queued_ids == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	err = recv_object_id_queue(&commit_ids, queued_ids, ibuf);
 	if (err)
 		goto done;
 
@@ -1497,6 +1507,8 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			STAILQ_FOREACH(pid, parents, entry) {
 				if (got_object_idset_contains(idset, &pid->id))
 					continue;
+				if (got_object_idset_contains(queued_ids, &pid->id))
+					continue;
 				err = got_object_qid_alloc_partial(&qid);
 				if (err)
 					goto done;
@@ -1528,6 +1540,8 @@ done:
 	got_object_id_queue_free(&commit_ids);
 	if (idset)
 		got_object_idset_free(idset);
+	if (queued_ids)
+		got_object_idset_free(queued_ids);
 	for (i = 0; i < ntrees; i++) {
 		struct enumerated_tree *tree = &trees[i];
 		free(tree->buf);
