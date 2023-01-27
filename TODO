@@ -62,6 +62,7 @@ gotd:
   4. entirely hide a given reference namespace from clients via gotd.conf
   5. allow/deny addition of binary files to a repo via gotd.conf
   6. enforce a particular blob size limit via gotd.conf
+  7. optionally reject merge commits via gotd.conf
 - implement post-commit-event libexec handlers (in lieu of hook scripts):
   1. commit email notification, plaintext smtp to localhost port 25
   2. general-purpose HTTP(s) GET/POST request as commit notification,
