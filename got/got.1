@@ -2005,10 +2005,26 @@ amended manually or with further
 .Cm got cherrypick
 commands,
 committed with
-.Cm got commit
-where the log message of the cherrypicked commit will appear in the editor,
-or discarded again with
-.Cm got revert .
+.Cm got commit .
+.Pp
+If invoked in a work tree where no
+.Cm rebase ,
+.Cm histedit ,
+or
+.Cm merge
+operation is taking place,
+.Cm got cherrypick
+creates a record of commits which have been merged into the work tree.
+When a file changed by
+.Cm got cherrypick
+is committed with
+.Cm got commit ,
+the log messages of relevant merged commits will then appear in the editor,
+where the messages can be further adjusted as needed.
+If all the changes in all files touched by a given commit are discarded,
+e.g. with
+.Cm got revert ,
+this commit's log message record will also disappear.
 .Pp
 .Cm got cherrypick
 will refuse to run if certain preconditions are not met.
@@ -2037,7 +2053,7 @@ in the current work tree will be displayed.
 Otherwise, all commit log messages will be displayed irrespective of the
 work tree in which they were created.
 This option cannot be used with
-.Cm X .
+.Fl X .
 .It Fl X
 Delete log messages created by previous cherrypick operations, represented by
 references in the
@@ -2052,7 +2068,7 @@ in the current work tree will be deleted.
 Otherwise, all commit log messages will be deleted irrespective of the
 work tree in which they were created.
 This option cannot be used with
-.Cm l .
+.Fl l .
 .El
 .Pp
 .Tg bo
@@ -2091,10 +2107,26 @@ amended manually or with further
 .Cm got backout
 commands,
 committed with
-.Cm got commit
-where the log message of the backed-out commit will appear in the editor,
-or discarded again with
-.Cm got revert .
+.Cm got commit .
+.Pp
+If invoked in a work tree where no
+.Cm rebase ,
+.Cm histedit ,
+or
+.Cm merge
+operation is taking place,
+.Cm got backout
+creates a record of commits which have been reverse-merged into the work tree.
+When a file changed by
+.Cm got backout
+is committed with
+.Cm got commit ,
+the log messages of relevant reverse-merged commits will then appear in
+the editor, where the messages can be further adjusted as needed.
+If all the changes in all files touched by a given commit are discarded,
+e.g. with
+.Cm got revert ,
+this commit's log message record will also disappear.
 .Pp
 .Cm got backout
 will refuse to run if certain preconditions are not met.
@@ -2123,7 +2155,7 @@ in the current work tree will be displayed.
 Otherwise, all commit log messages will be displayed irrespective of the
 work tree in which they were created.
 This option cannot be used with
-.Cm X .
+.Fl X .
 .It Fl X
 Delete log messages created by previous backout operations, represented by
 references in the
@@ -2138,7 +2170,7 @@ in the current work tree will be deleted.
 Otherwise, all commit log messages will be deleted irrespective of the
 work tree in which they were created.
 This option cannot be used with
-.Cm l .
+.Fl l .
 .El
 .Pp
 .Tg rb
