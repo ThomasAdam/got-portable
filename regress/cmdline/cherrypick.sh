@@ -1725,6 +1725,284 @@ test_cherrypick_umask() {
 	test_done "$testroot" 0
 }
 
+test_cherrypick_logmsg_ref() {
+	local testroot=`test_init cherrypick_logmsg_ref`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+
+	git_commit $testroot/repo -m "commit changes on newbranch"
+	local commit_time=`git_show_author_time $testroot/repo`
+	local branch_rev=`git_show_head $testroot/repo`
+
+	echo "modified new file on branch" > $testroot/repo/epsilon/new
+
+	git_commit $testroot/repo -m "commit modified new file on newbranch"
+	local commit_time2=`git_show_author_time $testroot/repo`
+	local branch_rev2=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick $branch_rev > /dev/null)
+	(cd $testroot/wt && got cherrypick $branch_rev2 > /dev/null)
+
+	# show all log message refs in the work tree
+	local sep="-----------------------------------------------"
+	local logmsg="commit changes on newbranch"
+	local changeset=" M  alpha\n D  beta\n A  epsilon/new\n M  gamma/delta"
+	local logmsg2="commit modified new file on newbranch"
+	local changeset2=" M  epsilon/new"
+	local date=`date -u -r $commit_time +"%a %b %e %X %Y UTC"`
+	local date2=`date -u -r $commit_time2 +"%a %b %e %X %Y UTC"`
+	local ymd=`date -u -r $commit_time +"%F"`
+	local short_id=$(printf '%.7s' $branch_rev)
+	local ymd2=`date -u -r $commit_time2 +"%F"`
+	local short_id2="newbranch"
+	local sorted=$(printf "$branch_rev\n$branch_rev2" | sort)
+
+	for r in $sorted; do
+		echo $sep >> $testroot/stdout.expected
+		if [ $r == $branch_rev ]; then
+			echo "commit $r" >> $testroot/stdout.expected
+			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+			echo "date: $date" >> $testroot/stdout.expected
+			printf " \n $logmsg\n \n" >> $testroot/stdout.expected
+			printf "$changeset\n\n" >> $testroot/stdout.expected
+
+			# for forthcoming wt 'cherrypick -X' test
+			echo "deleted: $ymd $short_id $logmsg" >> \
+			    $testroot/stdout.wt_deleted
+		else
+			echo "commit $r (newbranch)" \
+			    >> $testroot/stdout.expected
+			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+			echo "date: $date2" >> $testroot/stdout.expected
+			printf " \n $logmsg2\n \n" >> $testroot/stdout.expected
+			printf "$changeset2\n\n" >> $testroot/stdout.expected
+
+			# for forthcoming wt 'cherrypick -X' test
+			echo "deleted: $ymd2 $short_id2 $logmsg2" >> \
+			    $testroot/stdout.wt_deleted
+		fi
+	done
+
+	(cd $testroot/wt && got cherrypick -l > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# only show log message ref of the specified commit id
+	echo $sep > $testroot/stdout.expected
+	echo "commit $branch_rev" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $date" >> $testroot/stdout.expected
+	printf " \n $logmsg\n \n" >> $testroot/stdout.expected
+	printf "$changeset\n\n" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got cherrypick -l $branch_rev > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# only show log message ref of the specified symref
+	echo $sep > $testroot/stdout.expected
+	echo "commit $branch_rev2 (newbranch)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $date2" >> $testroot/stdout.expected
+	printf " \n $logmsg2\n \n" >> $testroot/stdout.expected
+	printf "$changeset2\n\n" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got cherrypick -l "newbranch" > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a second work tree with cherrypicked commits and ensure
+	# cy -l within the new work tree only shows the refs it created
+	got checkout $testroot/repo $testroot/wt2 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch2)
+
+	echo "modified delta on branch2" > $testroot/repo/gamma/delta
+	echo "modified alpha on branch2" > $testroot/repo/alpha
+	echo "new file on branch2" > $testroot/repo/epsilon/new2
+	(cd $testroot/repo && git add epsilon/new2)
+
+	git_commit $testroot/repo -m "commit changes on newbranch2"
+	local b2_commit_time=`git_show_author_time $testroot/repo`
+	local branch2_rev=`git_show_head $testroot/repo`
+
+	echo "modified file new2 on branch2" > $testroot/repo/epsilon/new2
+
+	git_commit $testroot/repo -m "commit modified file new2 on newbranch2"
+	local b2_commit_time2=`git_show_author_time $testroot/repo`
+	local branch2_rev2=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt2 && got cherrypick $branch2_rev > /dev/null)
+	(cd $testroot/wt2 && got cherrypick $branch2_rev2 > /dev/null)
+
+	local b2_logmsg="commit changes on newbranch2"
+	local b2_changeset=" M  alpha\n A  epsilon/new2\n M  gamma/delta"
+	local b2_logmsg2="commit modified file new2 on newbranch2"
+	local b2_changeset2=" M  epsilon/new2"
+	date=`date -u -r $b2_commit_time +"%a %b %e %X %Y UTC"`
+	date2=`date -u -r $b2_commit_time2 +"%a %b %e %X %Y UTC"`
+	sorted=$(printf "$branch2_rev\n$branch2_rev2" | sort)
+
+	echo -n > $testroot/stdout.expected
+	for r in $sorted; do
+		echo $sep >> $testroot/stdout.expected
+		if [ $r == $branch2_rev ]; then
+			echo "commit $r" >> $testroot/stdout.expected
+			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+			echo "date: $date" >> $testroot/stdout.expected
+			printf " \n $b2_logmsg\n \n" >> \
+			    $testroot/stdout.expected
+			printf "$b2_changeset\n\n" >> \
+			    $testroot/stdout.expected
+		else
+			echo "commit $r (newbranch2)" \
+			    >> $testroot/stdout.expected
+			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+			echo "date: $date2" >> $testroot/stdout.expected
+			printf " \n $b2_logmsg2\n \n" >> \
+			    $testroot/stdout.expected
+			printf "$b2_changeset2\n\n" >> \
+			    $testroot/stdout.expected
+		fi
+	done
+
+	(cd $testroot/wt2 && got cherrypick -l > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# ensure both wt and wt2 logmsg refs can be retrieved from the repo
+	sorted=`printf \
+	    "$branch_rev\n$branch_rev2\n$branch2_rev\n$branch2_rev2" | sort`
+
+	echo -n > $testroot/stdout.expected
+	for r in $sorted; do
+		echo "commit $r" >> $testroot/stdout.expected
+	done
+
+	(cd $testroot/repo && got cherrypick -l | grep ^commit | \
+	    sort | cut -f1,2 -d' ' > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# delete logmsg ref of the specified commit in work tree 2
+	ymd=`date -u -r $b2_commit_time +"%F"`
+	short_id=$(printf '%.7s' $branch2_rev)
+
+	echo "deleted: $ymd $short_id $b2_logmsg" > $testroot/stdout.expected
+	(cd $testroot/wt2 && got cherrypick -X $branch2_rev > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# delete all logmsg refs in work tree 1
+	(cd $testroot && mv stdout.wt_deleted stdout.expected)
+	(cd $testroot/wt && got cherrypick -X > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# confirm all work tree 1 refs were deleted
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got cherrypick -l > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# make sure the remaining ref in work tree 2 was not also deleted
+	echo $sep > $testroot/stdout.expected
+	echo "commit $branch2_rev2 (newbranch2)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $date2" >> $testroot/stdout.expected
+	printf " \n $b2_logmsg2\n \n" >> $testroot/stdout.expected
+	printf "$b2_changeset2\n\n" >> $testroot/stdout.expected
+
+	(cd $testroot/wt2 && got cherrypick -l > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# ensure we can delete work tree refs from the repository dir
+	ymd=`date -u -r $b2_commit_time2 +"%F"`
+	echo "deleted: $ymd newbranch2 $b2_logmsg2" > $testroot/stdout.expected
+	(cd $testroot/repo && got cherrypick -X > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -1743,3 +2021,4 @@ run_test test_cherrypick_same_branch
 run_test test_cherrypick_dot_on_a_line_by_itself
 run_test test_cherrypick_binary_file
 run_test test_cherrypick_umask
+run_test test_cherrypick_logmsg_ref
