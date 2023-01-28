@@ -9897,7 +9897,7 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 				err = got_ref_delete(re->ref, repo);
 				if (err)
 					goto done;
-				printf("deleted: ");
+				printf("Deleted: ");
 				err = print_commit_oneline(commit, id, repo,
 				    refs_idmap);
 			} else {

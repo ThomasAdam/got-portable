@@ -1780,7 +1780,7 @@ test_cherrypick_logmsg_ref() {
 			printf "$changeset\n\n" >> $testroot/stdout.expected
 
 			# for forthcoming wt 'cherrypick -X' test
-			echo "deleted: $ymd $short_id $logmsg" >> \
+			echo "Deleted: $ymd $short_id $logmsg" >> \
 			    $testroot/stdout.wt_deleted
 		else
 			echo "commit $r (newbranch)" \
@@ -1791,7 +1791,7 @@ test_cherrypick_logmsg_ref() {
 			printf "$changeset2\n\n" >> $testroot/stdout.expected
 
 			# for forthcoming wt 'cherrypick -X' test
-			echo "deleted: $ymd2 $short_id2 $logmsg2" >> \
+			echo "Deleted: $ymd2 $short_id2 $logmsg2" >> \
 			    $testroot/stdout.wt_deleted
 		fi
 	done
@@ -1936,7 +1936,7 @@ test_cherrypick_logmsg_ref() {
 	ymd=`date -u -r $b2_commit_time +"%F"`
 	short_id=$(printf '%.7s' $branch2_rev)
 
-	echo "deleted: $ymd $short_id $b2_logmsg" > $testroot/stdout.expected
+	echo "Deleted: $ymd $short_id $b2_logmsg" > $testroot/stdout.expected
 	(cd $testroot/wt2 && got cherrypick -X $branch2_rev > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1991,7 +1991,7 @@ test_cherrypick_logmsg_ref() {
 
 	# ensure we can delete work tree refs from the repository dir
 	ymd=`date -u -r $b2_commit_time2 +"%F"`
-	echo "deleted: $ymd newbranch2 $b2_logmsg2" > $testroot/stdout.expected
+	echo "Deleted: $ymd newbranch2 $b2_logmsg2" > $testroot/stdout.expected
 	(cd $testroot/repo && got cherrypick -X > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
