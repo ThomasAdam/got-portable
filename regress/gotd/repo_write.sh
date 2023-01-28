@@ -292,8 +292,98 @@ test_send_new_empty_branch() {
 	test_done "$testroot" "$ret"
 }
 
+test_delete_branch() {
+	local testroot=`test_init delete_branch 1`
+
+	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch foo) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got branch failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo modified alpha > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	if ! got send -q -r $testroot/repo-clone -b foo; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got send -r $testroot/repo-clone -d foo >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send -d failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+Connecting to "origin" ${GOTD_TEST_REPO_URL}
+Server has deleted refs/heads/foo
+EOF
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# now try again but while also updating another branch
+	# other than deleting `foo'.
+
+	(cd $testroot/wt && got up -b main && \
+		echo 'more alpha' > alpha && \
+		got commit -m 'edit alpha on main' && \
+		got send -q -b foo) >/dev/null
+
+	got send -r $testroot/repo-clone -d foo -b main | \
+		grep '^Server has' >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send -d foo -b main failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat <<EOF >$testroot/stdout.expected
+Server has accepted refs/heads/main
+Server has deleted refs/heads/foo
+EOF
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
 
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_fetch_more_history
 run_test test_send_new_empty_branch
+run_test test_delete_branch

@@ -325,6 +325,7 @@ struct gotd_imsg_ref_update {
 	uint8_t old_id[SHA1_DIGEST_LENGTH];
 	uint8_t new_id[SHA1_DIGEST_LENGTH];
 	int ref_is_new;
+	int delete_ref;
 	uint32_t client_id;
 	size_t name_len;
 

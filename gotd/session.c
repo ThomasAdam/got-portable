@@ -432,7 +432,8 @@ update_ref(int *shut, struct gotd_session_client *client,
 
 	memcpy(old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
 	memcpy(new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
-	err = got_object_open(&obj, repo, &new_id);
+	err = got_object_open(&obj, repo,
+	    iref.delete_ref ? &old_id : &new_id);
 	if (err)
 		goto done;
 
@@ -454,6 +455,30 @@ update_ref(int *shut, struct gotd_session_client *client,
 			    got_ref_get_name(ref));
 			goto done;
 		}
+	} else if (iref.delete_ref) {
+		err = got_ref_open(&ref, repo, refname, 1 /* lock */);
+		if (err)
+			goto done;
+		locked = 1;
+
+		err = got_ref_resolve(&id, repo, ref);
+		if (err)
+			goto done;
+
+		if (got_object_id_cmp(id, &old_id) != 0) {
+			err = got_error_fmt(GOT_ERR_REF_BUSY,
+			    "%s has been modified by someone else "
+			    "while transaction was in progress",
+			    got_ref_get_name(ref));
+			goto done;
+		}
+
+		err = got_ref_delete(ref, repo);
+		if (err)
+			goto done;
+
+		free(id);
+		id = NULL;
 	} else {
 		err = got_ref_open(&ref, repo, refname, 1 /* lock */);
 		if (err)

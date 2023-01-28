@@ -75,6 +75,7 @@ struct gotd_ref_update {
 	STAILQ_ENTRY(gotd_ref_update) entry;
 	struct got_reference *ref;
 	int ref_is_new;
+	int delete_ref;
 	struct got_object_id old_id;
 	struct got_object_id new_id;
 };
@@ -89,6 +90,7 @@ static struct repo_write_client {
 	int				 packidx_fd;
 	struct gotd_ref_updates		 ref_updates;
 	int				 nref_updates;
+	int				 nref_del;
 	int				 nref_new;
 } repo_write_client;
 
@@ -258,6 +260,7 @@ list_refs(struct imsg *imsg)
 	client->pack_pipe = -1;
 	client->packidx_fd = -1;
 	client->nref_updates = 0;
+	client->nref_del = 0;
 	client->nref_new = 0;
 
 	imsg_init(&ibuf, client_fd);
@@ -330,6 +333,7 @@ protect_ref_namespace(struct got_reference *ref, const char *namespace)
 static const struct got_error *
 recv_ref_update(struct imsg *imsg)
 {
+	static const char zero_id[SHA1_DIGEST_LENGTH];
 	const struct got_error *err = NULL;
 	struct repo_write_client *client = &repo_write_client;
 	struct gotd_imsg_ref_update iref;
@@ -418,6 +422,10 @@ recv_ref_update(struct imsg *imsg)
 	    repo_write.pid);
 
 	ref_update->ref = ref;
+	if (memcmp(ref_update->new_id.sha1, zero_id, sizeof(zero_id)) == 0) {
+		ref_update->delete_ref = 1;
+		client->nref_del++;
+	}
 	STAILQ_INSERT_HEAD(&client->ref_updates, ref_update, entry);
 	client->nref_updates++;
 	ref = NULL;
@@ -705,6 +713,11 @@ recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
 
 	*outsize = 0;
 	*nobj = 0;
+
+	/* if only deleting references there's nothing to read */
+	if (client->nref_updates == client->nref_del)
+		return NULL;
+
 	SHA1Init(&ctx);
 
 	err = got_poll_read_full(infd, &have, &hdr, sizeof(hdr), sizeof(hdr));
@@ -981,6 +994,15 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	    client->nref_updates == client->nref_new)
 		goto done;
 
+	/*
+	 * Clients which are deleting references only will send
+	 * no pack file.
+	 */
+	if (nobj == 0 &&
+	    client->nref_del > 0 &&
+	    client->nref_updates == client->nref_del)
+		goto done;
+
 	pack->filesize = pack_filesize;
 	*have_packfile = 1;
 
@@ -1057,6 +1079,9 @@ verify_packfile(void)
 		return err;
 
 	STAILQ_FOREACH(ref_update, &client->ref_updates, entry) {
+		if (ref_update->delete_ref)
+			continue;
+
 		err = got_object_id_str(&id_str, &ref_update->new_id);
 		if (err)
 			goto done;
@@ -1130,6 +1155,7 @@ send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 	memcpy(iref.old_id, ref_update->old_id.sha1, SHA1_DIGEST_LENGTH);
 	memcpy(iref.new_id, ref_update->new_id.sha1, SHA1_DIGEST_LENGTH);
 	iref.ref_is_new = ref_update->ref_is_new;
+	iref.delete_ref = ref_update->delete_ref;
 	iref.client_id = client->id;
 	iref.name_len = strlen(refname);
 
