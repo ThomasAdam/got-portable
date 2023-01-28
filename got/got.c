@@ -8725,6 +8725,7 @@ usage_commit(void)
 struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
 	const char *prepared_log;
+	const char *merged_log;
 	int non_interactive;
 	const char *editor;
 	const char *worktree_path;
@@ -8791,6 +8792,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 	struct got_pathlist_entry *pe;
 	const struct got_error *err = NULL;
 	char *template = NULL;
+	char *prepared_msg = NULL, *merged_msg = NULL;
 	struct collect_commit_logmsg_arg *a = arg;
 	int initial_content_len;
 	int fd = -1;
@@ -8815,21 +8817,19 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 		goto done;
 
 	if (a->prepared_log) {
-		char *msg;
-		err = read_prepared_logmsg(&msg, a->prepared_log);
+		err = read_prepared_logmsg(&prepared_msg, a->prepared_log);
 		if (err)
 			goto done;
-		if (write(fd, msg, strlen(msg)) == -1) {
-			err = got_error_from_errno2("write", a->logmsg_path);
-			free(msg);
+	} else if (a->merged_log) {
+		err = read_prepared_logmsg(&merged_msg, a->merged_log);
+		if (err)
 			goto done;
-		}
-		free(msg);
 	}
 
 	initial_content_len = asprintf(&initial_content,
-	    "\n# changes to be committed on branch %s:\n",
-	    a->branch_name);
+	    "%s%s\n# changes to be committed on branch %s:\n",
+	    prepared_msg ? prepared_msg : "",
+	    merged_msg ? merged_msg : "", a->branch_name);
 	if (initial_content_len == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -8857,6 +8857,8 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 done:
 	free(initial_content);
 	free(template);
+	free(prepared_msg);
+	free(merged_msg);
 
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", a->logmsg_path);
@@ -9016,7 +9018,7 @@ cmd_commit(int argc, char *argv[])
 	char *cwd = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
-	char *prepared_logmsg = NULL;
+	char *prepared_logmsg = NULL, *merged_logmsg = NULL;
 	struct collect_commit_logmsg_arg cl_arg;
 	const char *author = NULL;
 	char *gitconfig_path = NULL, *editor = NULL, *committer = NULL;
@@ -9151,9 +9153,8 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 
 	if (prepared_logmsg == NULL) {
-		error = lookup_logmsg_ref(&prepared_logmsg,
-		    argc > 0 ? &paths : NULL, &refs,
-		    worktree, repo);
+		error = lookup_logmsg_ref(&merged_logmsg,
+		    argc > 0 ? &paths : NULL, &refs, worktree, repo);
 		if (error)
 			goto done;
 	}
@@ -9161,6 +9162,7 @@ cmd_commit(int argc, char *argv[])
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.prepared_log = prepared_logmsg;
+	cl_arg.merged_log = merged_logmsg;
 	cl_arg.non_interactive = non_interactive;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
 	cl_arg.branch_name = got_worktree_get_head_ref_name(worktree);
