@@ -8417,21 +8417,22 @@ commit_path_changed_in_worktree(int *add_logmsg, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
-
-	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
-	if (err)
-		goto done;
-
 	err = got_object_open_as_tree(&tree, repo,
 	    got_object_commit_get_tree_id(commit));
 	if (err)
 		goto done;
 
-	err = got_object_open_as_tree(&ptree, repo,
-	    got_object_commit_get_tree_id(pcommit));
-	if (err)
-		goto done;
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (pid != NULL) {
+		err = got_object_open_as_commit(&pcommit, repo, &pid->id);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&ptree, repo,
+		    got_object_commit_get_tree_id(pcommit));
+		if (err)
+			goto done;
+	}
 
 	err = got_diff_tree(ptree, tree, NULL, NULL, -1, -1, "", "", repo,
 	    got_diff_tree_collect_changed_paths, &paths, 0);
