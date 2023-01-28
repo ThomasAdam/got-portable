@@ -8370,6 +8370,178 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 	return NULL;
 }
 
+/*
+ * Shortcut work tree status callback to determine if the set of
+ * paths scanned has at least one versioned path that is modified.
+ * Set arg and return GOT_ERR_FILE_MODIFIED as soon as a path is
+ * passed with a status that is neither unchanged nor unversioned.
+ */
+static const struct got_error *
+worktree_has_changed_path(void *arg, unsigned char status,
+    unsigned char staged_status, const char *path,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
+{
+	int *has_changes = arg;
+
+	if (status == staged_status && (status == GOT_STATUS_DELETE))
+		status = GOT_STATUS_NO_CHANGE;
+
+	if (!(status == GOT_STATUS_NO_CHANGE ||
+	    status == GOT_STATUS_UNVERSIONED) ||
+	    staged_status != GOT_STATUS_NO_CHANGE) {
+		*has_changes = 1;
+		return got_error(GOT_ERR_FILE_MODIFIED);
+	}
+
+	return NULL;
+}
+
+/*
+ * Check that the changeset of the commit identified by id is
+ * comprised of at least one path that is modified in the work tree.
+ */
+static const struct got_error *
+commit_path_changed_in_worktree(int *add_logmsg, struct got_object_id *id,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_pathlist_head	 paths;
+	struct got_commit_object	*commit = NULL, *pcommit = NULL;
+	struct got_tree_object		*tree = NULL, *ptree = NULL;
+	struct got_object_qid		*pid;
+
+	TAILQ_INIT(&paths);
+
+	err = got_object_open_as_commit(&commit, repo, id);
+	if (err)
+		goto done;
+
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
+
+	err = got_object_open_as_commit(&pcommit, repo, &pid->id);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree, repo,
+	    got_object_commit_get_tree_id(commit));
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&ptree, repo,
+	    got_object_commit_get_tree_id(pcommit));
+	if (err)
+		goto done;
+
+	err = got_diff_tree(ptree, tree, NULL, NULL, -1, -1, "", "", repo,
+	    got_diff_tree_collect_changed_paths, &paths, 0);
+	if (err)
+		goto done;
+
+	err = got_worktree_status(worktree, &paths, repo, 0,
+	    worktree_has_changed_path, add_logmsg, check_cancelled, NULL);
+	if (err && err->code == GOT_ERR_FILE_MODIFIED) {
+		/*
+		 * At least one changed path in the referenced commit is
+		 * modified in the work tree, that's all we need to know!
+		 */
+		err = NULL;
+	}
+
+done:
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_ALL);
+	if (commit)
+		got_object_commit_close(commit);
+	if (pcommit)
+		got_object_commit_close(pcommit);
+	if (tree)
+		got_object_tree_close(tree);
+	if (ptree)
+		got_object_tree_close(ptree);
+	return err;
+}
+
+/*
+ * Remove any "logmsg" reference comprised entirely of paths that have
+ * been reverted in this work tree. If any path in the logmsg ref changeset
+ * remains in a changed state in the worktree, do not remove the reference.
+ */
+static const struct got_error *
+rm_logmsg_ref(struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_reflist_head		 refs;
+	struct got_reflist_entry	*re;
+	struct got_commit_object	*commit = NULL;
+	struct got_object_id		*commit_id = NULL;
+	char				*uuidstr = NULL;
+
+	TAILQ_INIT(&refs);
+
+	err = got_worktree_get_uuid(&uuidstr, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_list(&refs, repo, "refs/got/worktree",
+	    got_ref_cmp_by_name, repo);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(re, &refs, entry) {
+		const char	*refname;
+		int		 has_changes = 0;
+
+		refname = got_ref_get_name(re->ref);
+
+		if (!strncmp(refname, GOT_WORKTREE_CHERRYPICK_REF_PREFIX,
+		    GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN))
+			refname += GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN + 1;
+		else if (!strncmp(refname, GOT_WORKTREE_BACKOUT_REF_PREFIX,
+		    GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN))
+			refname += GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN + 1;
+		else
+			continue;
+
+		if (strncmp(refname, uuidstr, GOT_WORKTREE_UUID_STRLEN) == 0)
+			refname += GOT_WORKTREE_UUID_STRLEN + 1; /* skip '-' */
+		else
+			continue;
+
+		err = got_repo_match_object_id(&commit_id, NULL, refname,
+		    GOT_OBJ_TYPE_COMMIT, NULL, repo);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_commit(&commit, repo, commit_id);
+		if (err)
+			goto done;
+
+		err = commit_path_changed_in_worktree(&has_changes, commit_id,
+		    worktree, repo);
+		if (err)
+			goto done;
+
+		if (!has_changes) {
+			err = got_ref_delete(re->ref, repo);
+			if (err)
+				goto done;
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+		free(commit_id);
+		commit_id = NULL;
+	}
+
+done:
+	free(uuidstr);
+	free(commit_id);
+	got_ref_list_free(&refs);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
 static const struct got_error *
 cmd_revert(int argc, char *argv[])
 {
@@ -8447,7 +8619,11 @@ cmd_revert(int argc, char *argv[])
 			goto done;
 		}
 	}
-	error = apply_unveil(got_repo_get_path(repo), 1,
+
+	/*
+	 * XXX "c" perm needed on repo dir to delete merge references.
+	 */
+	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
@@ -8489,6 +8665,8 @@ cmd_revert(int argc, char *argv[])
 	cpa.action = "revert";
 	error = got_worktree_revert(worktree, &paths, revert_progress, NULL,
 	    pflag ? choose_patch : NULL, &cpa, repo);
+
+	error = rm_logmsg_ref(worktree, repo);
 done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
@@ -8670,6 +8848,132 @@ done:
 }
 
 static const struct got_error *
+cat_logmsg(FILE *f, struct got_commit_object *commit, const char *idstr,
+    const char *type, int has_content)
+{
+	const struct got_error	*err = NULL;
+	char			*logmsg = NULL;
+
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	if (err)
+		return err;
+
+	if (fprintf(f, "%s# log message of %s commit %s:%s",
+	    has_content ? "\n" : "", type, idstr, logmsg) < 0)
+		err = got_ferror(f, GOT_ERR_IO);
+
+	free(logmsg);
+	return err;
+}
+
+/*
+ * Lookup "logmsg" references of backed-out and cherrypicked commits
+ * belonging to the current work tree. If found, and the worktree has
+ * at least one modified file that was changed in the referenced commit,
+ * add its log message to *logmsg. Add all refs found to matched_refs
+ * to be scheduled for removal on successful commit.
+ */
+static const struct got_error *
+lookup_logmsg_ref(char **logmsg, struct got_reflist_head *matched_refs,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_commit_object	*commit = NULL;
+	struct got_object_id		*id = NULL;
+	struct got_reflist_head		 refs;
+	struct got_reflist_entry	*re, *re_match;
+	FILE				*f = NULL;
+	char				*uuidstr = NULL;
+	int				 added_logmsg = 0;
+
+	TAILQ_INIT(&refs);
+
+	err = got_opentemp_named(logmsg, &f, "got-commit-logmsg", "");
+	if (err)
+		goto done;
+
+	err = got_worktree_get_uuid(&uuidstr, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_list(&refs, repo, "refs/got/worktree",
+	    got_ref_cmp_by_name, repo);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(re, &refs, entry) {
+		const char	*refname, *type;
+		int		 add_logmsg = 0;
+
+		refname = got_ref_get_name(re->ref);
+
+		if (strncmp(refname, GOT_WORKTREE_CHERRYPICK_REF_PREFIX,
+		    GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN) == 0) {
+			refname += GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN + 1;
+			type = "cherrypicked";
+		} else if (strncmp(refname, GOT_WORKTREE_BACKOUT_REF_PREFIX,
+		    GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN) == 0) {
+			refname += GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN + 1;
+			type = "backed-out";
+		} else
+			continue;
+
+		if (strncmp(refname, uuidstr, GOT_WORKTREE_UUID_STRLEN) == 0)
+			refname += GOT_WORKTREE_UUID_STRLEN + 1; /* skip '-' */
+		else
+			continue;
+
+		err = got_repo_match_object_id(&id, NULL, refname,
+		    GOT_OBJ_TYPE_COMMIT, NULL, repo);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_commit(&commit, repo, id);
+		if (err)
+			goto done;
+
+		err = commit_path_changed_in_worktree(&add_logmsg, id,
+		    worktree, repo);
+		if (err)
+			goto done;
+
+		if (add_logmsg) {
+			err = cat_logmsg(f, commit, refname, type,
+			    added_logmsg);
+			if (err)
+				goto done;
+			if (!added_logmsg)
+				++added_logmsg;
+
+			err = got_reflist_entry_dup(&re_match, re);
+			if (err)
+				goto done;
+			TAILQ_INSERT_HEAD(matched_refs, re_match, entry);
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+		free(id);
+		id = NULL;
+	}
+
+done:
+	free(id);
+	free(uuidstr);
+	got_ref_list_free(&refs);
+	if (commit)
+		got_object_commit_close(commit);
+	if (f && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (!added_logmsg) {
+		if (*logmsg && unlink(*logmsg) != 0 && err == NULL)
+			err = got_error_from_errno2("unlink", *logmsg);
+		*logmsg = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
 cmd_commit(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -8686,8 +8990,11 @@ cmd_commit(int argc, char *argv[])
 	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
 	int show_diff = 1;
 	struct got_pathlist_head paths;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
 	int *pack_fds = NULL;
 
+	TAILQ_INIT(&refs);
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
@@ -8809,6 +9116,13 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (prepared_logmsg == NULL) {
+		error = lookup_logmsg_ref(&prepared_logmsg, &refs,
+		    worktree, repo);
+		if (error)
+			goto done;
+	}
+
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.prepared_log = prepared_logmsg;
@@ -8837,6 +9151,13 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 	printf("Created commit %s\n", id_str);
+
+	TAILQ_FOREACH(re, &refs, entry) {
+		error = got_ref_delete(re->ref, repo);
+		if (error)
+			goto done;
+	}
+
 done:
 	if (preserve_logmsg) {
 		fprintf(stderr, "%s: log message preserved in %s\n",
@@ -8858,6 +9179,7 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
+	got_ref_list_free(&refs);
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	free(id_str);
@@ -9437,10 +9759,221 @@ done:
 	return error;
 }
 
+/*
+ * Print and if delete is set delete all ref_prefix references.
+ * If wanted_ref is not NULL, only print or delete this reference.
+ */
+static const struct got_error *
+process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
+    const char *wanted_ref, int delete, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error			*err;
+	struct got_pathlist_head		 paths;
+	struct got_reflist_head			 refs;
+	struct got_reflist_entry		*re;
+	struct got_reflist_object_id_map	*refs_idmap = NULL;
+	struct got_commit_object		*commit = NULL;
+	struct got_object_id			*id = NULL;
+	char					*uuidstr = NULL;
+	int					 found = 0;
+
+	TAILQ_INIT(&refs);
+	TAILQ_INIT(&paths);
+
+	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, repo);
+	if (err)
+		goto done;
+
+	err = got_reflist_object_id_map_create(&refs_idmap, &refs, repo);
+	if (err)
+		goto done;
+
+	if (worktree != NULL) {
+		err = got_worktree_get_uuid(&uuidstr, worktree);
+		if (err)
+			goto done;
+	}
+
+	if (wanted_ref) {
+		if (strncmp(wanted_ref, "refs/heads/", 11) == 0)
+			wanted_ref += 11;
+	}
+
+	TAILQ_FOREACH(re, &refs, entry) {
+		const char *refname;
+
+		refname = got_ref_get_name(re->ref);
+
+		err = check_cancelled(NULL);
+		if (err)
+			goto done;
+
+		if (strncmp(refname, ref_prefix, prefix_len) == 0)
+			refname += prefix_len + 1;  /* skip '-' delimiter */
+		else
+			continue;
+
+		if (worktree == NULL || strncmp(refname, uuidstr,
+		    GOT_WORKTREE_UUID_STRLEN) == 0)
+			refname += GOT_WORKTREE_UUID_STRLEN + 1; /* skip '-' */
+		else
+			continue;
+
+		err = got_repo_match_object_id(&id, NULL, refname,
+		    GOT_OBJ_TYPE_COMMIT, NULL, repo);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_commit(&commit, repo, id);
+		if (err)
+			goto done;
+
+		if (wanted_ref)
+			found = strncmp(wanted_ref, refname,
+			    strlen(wanted_ref)) == 0;
+		if (wanted_ref && !found) {
+			struct got_reflist_head	*ci_refs;
+
+			ci_refs = got_reflist_object_id_map_lookup(refs_idmap,
+			    id);
+
+			if (ci_refs) {
+				char		*refs_str = NULL;
+				char const	*r = NULL;
+
+				err = build_refs_str(&refs_str, ci_refs, id,
+				    repo, 1);
+				if (err)
+					goto done;
+
+				r = refs_str;
+				while (r) {
+					if (strncmp(r, wanted_ref,
+					    strlen(wanted_ref)) == 0) {
+						found = 1;
+						break;
+					}
+					r = strchr(r, ' ');
+					if (r)
+						++r;
+				}
+				free(refs_str);
+			}
+		}
+
+		if (wanted_ref == NULL || found) {
+			if (delete) {
+				err = got_ref_delete(re->ref, repo);
+				if (err)
+					goto done;
+				printf("deleted: ");
+				err = print_commit_oneline(commit, id, repo,
+				    refs_idmap);
+			} else {
+				/*
+				 * Print paths modified by commit to help
+				 * associate commits with worktree changes.
+				 */
+				err = get_changed_paths(&paths, commit,
+				    repo, NULL);
+				if (err)
+					goto done;
+
+				err = print_commit(commit, id, repo, NULL,
+				    &paths, NULL, 0, 0, refs_idmap, NULL);
+				got_pathlist_free(&paths,
+				    GOT_PATHLIST_FREE_ALL);
+			}
+			if (err || found)
+				goto done;
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+		free(id);
+		id = NULL;
+	}
+
+	if (wanted_ref != NULL && !found)
+		err = got_error_fmt(GOT_ERR_NOT_REF, "%s", wanted_ref);
+
+done:
+	free(id);
+	free(uuidstr);
+	got_ref_list_free(&refs);
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_ALL);
+	if (refs_idmap)
+		got_reflist_object_id_map_free(refs_idmap);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
+/*
+ * Create new temp "logmsg" ref of the backed-out or cherrypicked commit
+ * identified by id for log messages to prepopulate the editor on commit.
+ */
+static const struct got_error *
+logmsg_ref(struct got_object_id *id, const char *prefix,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error	*err = NULL;
+	char			*idstr, *ref = NULL, *refname = NULL;
+	int			 histedit_in_progress;
+	int			 rebase_in_progress, merge_in_progress;
+
+	/*
+	 * Silenty refuse to create merge reference if any histedit, merge,
+	 * or rebase operation is in progress.
+	 */
+	err = got_worktree_histedit_in_progress(&histedit_in_progress,
+	    worktree);
+	if (err)
+		return err;
+	if (histedit_in_progress)
+		return NULL;
+
+	err = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
+	if (err)
+		return err;
+	if (rebase_in_progress)
+		return NULL;
+
+	err = got_worktree_merge_in_progress(&merge_in_progress, worktree,
+	    repo);
+	if (err)
+		return err;
+	if (merge_in_progress)
+		return NULL;
+
+	err = got_object_id_str(&idstr, id);
+	if (err)
+		return err;
+
+	err = got_worktree_get_logmsg_ref_name(&refname, worktree, prefix);
+	if (err)
+		goto done;
+
+	if (asprintf(&ref, "%s-%s", refname, idstr) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = create_ref(ref, got_worktree_get_base_commit_id(worktree),
+	    -1, repo);
+done:
+	free(ref);
+	free(idstr);
+	free(refname);
+	return err;
+}
+
 __dead static void
 usage_cherrypick(void)
 {
-	fprintf(stderr, "usage: %s cherrypick commit-id\n", getprogname());
+	fprintf(stderr, "usage: %s cherrypick [-lX] [commit-id]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -9454,12 +9987,18 @@ cmd_cherrypick(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
-	int ch;
+	int ch, list_refs = 0, remove_refs = 0;
 	struct got_update_progress_arg upa;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "lX")) != -1) {
 		switch (ch) {
+		case 'l':
+			list_refs = 1;
+			break;
+		case 'X':
+			remove_refs = 1;
+			break;
 		default:
 			usage_cherrypick();
 			/* NOTREACHED */
@@ -9474,8 +10013,13 @@ cmd_cherrypick(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc != 1)
+	if (list_refs || remove_refs) {
+		if (argc != 0 && argc != 1)
+			usage_cherrypick();
+	} else if (argc != 1)
 		usage_cherrypick();
+	if (list_refs && remove_refs)
+		option_conflict('l', 'X');
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -9489,21 +10033,34 @@ cmd_cherrypick(int argc, char *argv[])
 
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (error->code == GOT_ERR_NOT_WORKTREE)
-			error = wrap_not_worktree_error(error, "cherrypick",
-			    cwd);
-		goto done;
+		if (list_refs || remove_refs) {
+			if (error->code != GOT_ERR_NOT_WORKTREE)
+				goto done;
+		} else {
+			if (error->code == GOT_ERR_NOT_WORKTREE)
+				error = wrap_not_worktree_error(error,
+				    "cherrypick", cwd);
+			goto done;
+		}
 	}
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	error = got_repo_open(&repo,
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd,
 	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
+
+	if (list_refs || remove_refs) {
+		error = process_logmsg_refs(GOT_WORKTREE_CHERRYPICK_REF_PREFIX,
+		    GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN,
+		    argc == 1 ? argv[0] : NULL, remove_refs, worktree, repo);
+		goto done;
+	}
 
 	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
 	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
@@ -9524,8 +10081,13 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (upa.did_something)
+	if (upa.did_something) {
+		error = logmsg_ref(commit_id,
+		    GOT_WORKTREE_CHERRYPICK_REF_PREFIX, worktree, repo);
+		if (error)
+			goto done;
 		printf("Merged commit %s\n", commit_id_str);
+	}
 	print_merge_progress_stats(&upa);
 done:
 	if (commit)
@@ -9551,7 +10113,7 @@ done:
 __dead static void
 usage_backout(void)
 {
-	fprintf(stderr, "usage: %s backout commit-id\n", getprogname());
+	fprintf(stderr, "usage: %s backout [-lX] [commit-id]\n", getprogname());
 	exit(1);
 }
 
@@ -9565,12 +10127,18 @@ cmd_backout(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
-	int ch;
+	int ch, list_refs = 0, remove_refs = 0;
 	struct got_update_progress_arg upa;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "lX")) != -1) {
 		switch (ch) {
+		case 'l':
+			list_refs = 1;
+			break;
+		case 'X':
+			remove_refs = 1;
+			break;
 		default:
 			usage_backout();
 			/* NOTREACHED */
@@ -9585,8 +10153,13 @@ cmd_backout(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc != 1)
+	if (list_refs || remove_refs) {
+		if (argc != 0 && argc != 1)
+			usage_backout();
+	} else if (argc != 1)
 		usage_backout();
+	if (list_refs && remove_refs)
+		option_conflict('l', 'X');
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -9600,20 +10173,34 @@ cmd_backout(int argc, char *argv[])
 
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (error->code == GOT_ERR_NOT_WORKTREE)
-			error = wrap_not_worktree_error(error, "backout", cwd);
-		goto done;
+		if (list_refs || remove_refs) {
+			if (error->code != GOT_ERR_NOT_WORKTREE)
+				goto done;
+		} else {
+			if (error->code == GOT_ERR_NOT_WORKTREE)
+				error = wrap_not_worktree_error(error,
+				    "backout", cwd);
+			goto done;
+		}
 	}
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	error = got_repo_open(&repo,
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd,
 	    NULL, pack_fds);
 	if (error != NULL)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
+
+	if (list_refs || remove_refs) {
+		error = process_logmsg_refs(GOT_WORKTREE_BACKOUT_REF_PREFIX,
+		    GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN,
+		    argc == 1 ? argv[0] : NULL, remove_refs, worktree, repo);
+		goto done;
+	}
 
 	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
 	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
@@ -9638,8 +10225,13 @@ cmd_backout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (upa.did_something)
+	if (upa.did_something) {
+		error = logmsg_ref(commit_id, GOT_WORKTREE_BACKOUT_REF_PREFIX,
+		    worktree, repo);
+		if (error)
+			goto done;
 		printf("Backed out commit %s\n", commit_id_str);
+	}
 	print_merge_progress_stats(&upa);
 done:
 	if (commit)
@@ -10100,6 +10692,62 @@ done:
 }
 
 static const struct got_error *
+worktree_has_logmsg_ref(const char *caller, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_reflist_head		 refs;
+	struct got_reflist_entry	*re;
+	char				*uuidstr = NULL;
+	static char			 msg[160];
+
+	TAILQ_INIT(&refs);
+
+	err = got_worktree_get_uuid(&uuidstr, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_list(&refs, repo, "refs/got/worktree",
+	    got_ref_cmp_by_name, repo);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(re, &refs, entry) {
+		const char *cmd, *refname, *type;
+
+		refname = got_ref_get_name(re->ref);
+
+		if (strncmp(refname, GOT_WORKTREE_CHERRYPICK_REF_PREFIX,
+		    GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN) == 0) {
+			refname += GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN + 1;
+			cmd = "cherrypick";
+			type = "cherrypicked";
+		} else if (strncmp(refname, GOT_WORKTREE_BACKOUT_REF_PREFIX,
+		    GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN) == 0) {
+			refname += GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN + 1;
+			cmd = "backout";
+			type = "backed-out";
+		} else
+			continue;
+
+		if (strncmp(refname, uuidstr, GOT_WORKTREE_UUID_STRLEN) != 0)
+			continue;
+
+		snprintf(msg, sizeof(msg),
+		    "work tree has references created by %s commits which "
+		    "must be removed with 'got %s -X' before running the %s "
+		    "command", type, cmd, caller);
+		err = got_error_msg(GOT_ERR_WORKTREE_META, msg);
+		goto done;
+	}
+
+done:
+	free(uuidstr);
+	got_ref_list_free(&refs);
+	return err;
+}
+
+static const struct got_error *
 process_backup_refs(const char *backup_ref_prefix,
     const char *wanted_branch_name,
     int delete, struct got_repository *repo)
@@ -10339,6 +10987,12 @@ cmd_rebase(int argc, char *argv[])
 	    gitconfig_path, pack_fds);
 	if (error != NULL)
 		goto done;
+
+	if (worktree != NULL && !list_backups && !delete_backups) {
+		error = worktree_has_logmsg_ref("rebase", worktree, repo);
+		if (error)
+			goto done;
+	}
 
 	error = get_author(&committer, repo, worktree);
 	if (error && error->code != GOT_ERR_COMMIT_NO_AUTHOR)
@@ -11677,6 +12331,12 @@ cmd_histedit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (worktree != NULL && !list_backups && !delete_backups) {
+		error = worktree_has_logmsg_ref("histedit", worktree, repo);
+		if (error)
+			goto done;
+	}
+
 	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
 	if (error)
 		goto done;
@@ -12309,6 +12969,12 @@ cmd_merge(int argc, char *argv[])
 	    pack_fds);
 	if (error != NULL)
 		goto done;
+
+	if (worktree != NULL) {
+		error = worktree_has_logmsg_ref("merge", worktree, repo);
+		if (error)
+			goto done;
+	}
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);

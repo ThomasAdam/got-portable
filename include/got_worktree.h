@@ -87,6 +87,21 @@ const struct got_error *got_worktree_match_path_prefix(int *,
     struct got_worktree *, const char *);
 
 /*
+ * Prefix for references pointing at base commit of backout/cherrypick commits.
+ * Reference path takes the form: PREFIX-WORKTREE_UUID-COMMIT_ID
+ */
+#define GOT_WORKTREE_CHERRYPICK_REF_PREFIX	"refs/got/worktree/cherrypick"
+#define GOT_WORKTREE_BACKOUT_REF_PREFIX		"refs/got/worktree/backout"
+
+#define GOT_WORKTREE_CHERRYPICK_REF_PREFIX_LEN		\
+	sizeof(GOT_WORKTREE_CHERRYPICK_REF_PREFIX) - 1
+#define GOT_WORKTREE_BACKOUT_REF_PREFIX_LEN		\
+	sizeof(GOT_WORKTREE_BACKOUT_REF_PREFIX) - 1
+#define GOT_WORKTREE_UUID_STRLEN	36
+
+const struct got_error *got_worktree_get_logmsg_ref_name(char **,
+    struct got_worktree *, const char *);
+/*
  * Get the name of a work tree's HEAD reference.
  */
 const char *got_worktree_get_head_ref_name(struct got_worktree *);
