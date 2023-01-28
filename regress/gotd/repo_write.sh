@@ -295,7 +295,7 @@ test_send_new_empty_branch() {
 test_delete_branch() {
 	local testroot=`test_init delete_branch 1`
 
-	got clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got clone failed unexpectedly" >&2
@@ -328,26 +328,88 @@ test_delete_branch() {
 		return 1
 	fi
 
+	local foo_id=`git_show_branch_head "$testroot/repo-clone" foo`
+	local main_id=`git_show_branch_head "$testroot/repo-clone" main`
+	local nb_id=`git_show_branch_head "$testroot/repo-clone" newbranch`
+	local nb2_id=`git_show_branch_head "$testroot/repo-clone" newbranch2`
+	local tag_id=`got ref -r "$testroot/repo-clone" -l refs/tags/1.0 | \
+		awk '{print $2}'`
+
 	if ! got send -q -r $testroot/repo-clone -b foo; then
 		echo "got send failed unexpectedly" >&2
 		test_done "$testroot" 1
 		return 1
 	fi
 
-	got send -r $testroot/repo-clone -d foo >$testroot/stdout
+	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
+	cat <<EOF >$testroot/refs.expected
+HEAD: refs/heads/main
+HEAD: $main_id
+refs/heads/foo: $foo_id
+refs/heads/main: $main_id
+refs/heads/newbranch: $nb_id
+refs/heads/newbranch2: $nb2_id
+refs/tags/1.0: $tag_id
+EOF
+	if ! cmp -s $testroot/refs.expected $testroot/refs; then
+		diff -u $testroot/refs.expected $testroot/refs
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/repo-clone && git push -d origin foo) >/dev/null 2>&1
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "got send -d failed unexpectedly" >&2
+		echo "git push -d failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
+	cat <<EOF >$testroot/refs.expected
+HEAD: refs/heads/main
+HEAD: $main_id
+refs/heads/main: $main_id
+refs/heads/newbranch: $nb_id
+refs/heads/newbranch2: $nb2_id
+refs/tags/1.0: $tag_id
+EOF
+	if ! cmp -s $testroot/refs.expected $testroot/refs; then
+		diff -u $testroot/refs.expected $testroot/refs
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# try to delete multiple branches in one go
+	got send -r $testroot/repo-clone -d newbranch -d newbranch2 \
+		>$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send with multiple -d failed unexpectedly" >&2
 		test_done "$testroot" 1
 		return 1
 	fi
 
 	cat <<EOF >$testroot/stdout.expected
 Connecting to "origin" ${GOTD_TEST_REPO_URL}
-Server has deleted refs/heads/foo
+Server has deleted refs/heads/newbranch2
+Server has deleted refs/heads/newbranch
 EOF
 	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
+	cat <<EOF >$testroot/refs.expected
+HEAD: refs/heads/main
+HEAD: $main_id
+refs/heads/main: $main_id
+refs/tags/1.0: $tag_id
+EOF
+	if ! cmp -s $testroot/refs.expected $testroot/refs; then
+		diff -u $testroot/refs.expected $testroot/refs
 		test_done "$testroot" 1
 		return 1
 	fi
@@ -359,6 +421,7 @@ EOF
 		echo 'more alpha' > alpha && \
 		got commit -m 'edit alpha on main' && \
 		got send -q -b foo) >/dev/null
+	main_id=`git_show_branch_head "$testroot/repo-clone" main`
 
 	got send -r $testroot/repo-clone -d foo -b main | \
 		grep '^Server has' >$testroot/stdout
@@ -375,6 +438,19 @@ Server has deleted refs/heads/foo
 EOF
 	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
+	cat <<EOF >$testroot/refs.expected
+HEAD: refs/heads/main
+HEAD: $main_id
+refs/heads/main: $main_id
+refs/tags/1.0: $tag_id
+EOF
+	if ! cmp -s $testroot/refs.expected $testroot/refs; then
+		diff -u $testroot/refs.expected $testroot/refs
 		test_done "$testroot" 1
 		return 1
 	fi
