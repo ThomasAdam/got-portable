@@ -8894,11 +8894,12 @@ cat_logmsg(FILE *f, struct got_commit_object *commit, const char *idstr,
  * Lookup "logmsg" references of backed-out and cherrypicked commits
  * belonging to the current work tree. If found, and the worktree has
  * at least one modified file that was changed in the referenced commit,
- * add its log message to *logmsg. Add all refs found to matched_refs
- * to be scheduled for removal on successful commit.
+ * add its log message to a new temporary file at *logmsg_path.
+ * Add all refs found to matched_refs to be scheduled for removal on
+ * successful commit.
  */
 static const struct got_error *
-lookup_logmsg_ref(char **logmsg, struct got_pathlist_head *paths,
+lookup_logmsg_ref(char **logmsg_path, struct got_pathlist_head *paths,
     struct got_reflist_head *matched_refs, struct got_worktree *worktree,
     struct got_repository *repo)
 {
@@ -8913,7 +8914,7 @@ lookup_logmsg_ref(char **logmsg, struct got_pathlist_head *paths,
 
 	TAILQ_INIT(&refs);
 
-	err = got_opentemp_named(logmsg, &f, "got-commit-logmsg", "");
+	err = got_opentemp_named(logmsg_path, &f, "got-commit-logmsg", "");
 	if (err)
 		goto done;
 
@@ -8995,9 +8996,9 @@ done:
 	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (!added_logmsg) {
-		if (*logmsg && unlink(*logmsg) != 0 && err == NULL)
-			err = got_error_from_errno2("unlink", *logmsg);
-		*logmsg = NULL;
+		if (*logmsg_path && unlink(*logmsg_path) != 0 && err == NULL)
+			err = got_error_from_errno2("unlink", *logmsg_path);
+		*logmsg_path = NULL;
 	}
 	return err;
 }
