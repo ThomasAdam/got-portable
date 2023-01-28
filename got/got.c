@@ -8914,9 +8914,7 @@ lookup_logmsg_ref(char **logmsg_path, struct got_pathlist_head *paths,
 
 	TAILQ_INIT(&refs);
 
-	err = got_opentemp_named(logmsg_path, &f, "got-commit-logmsg", "");
-	if (err)
-		goto done;
+	*logmsg_path = NULL;
 
 	err = got_worktree_get_uuid(&uuidstr, worktree);
 	if (err)
@@ -8968,6 +8966,12 @@ lookup_logmsg_ref(char **logmsg_path, struct got_pathlist_head *paths,
 			goto done;
 
 		if (add_logmsg) {
+			if (f == NULL) {
+				err = got_opentemp_named(logmsg_path, &f,
+				    "got-commit-logmsg", "");
+				if (err)
+					goto done;
+			}
 			err = cat_logmsg(f, commit, refname, type,
 			    added_logmsg);
 			if (err)
