@@ -2240,6 +2240,13 @@ get_ref_name(char **refname, struct got_worktree *worktree, const char *prefix)
 }
 
 const struct got_error *
+got_worktree_get_logmsg_ref_name(char **refname, struct got_worktree *worktree,
+    const char *prefix)
+{
+	return get_ref_name(refname, worktree, prefix);
+}
+
+const struct got_error *
 got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
 {
 	return get_ref_name(refname, worktree, GOT_WORKTREE_BASE_REF_PREFIX);
