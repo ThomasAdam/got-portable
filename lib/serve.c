@@ -59,9 +59,7 @@ static const struct got_capability write_capabilities[] = {
 	{ GOT_CAPA_OFS_DELTA, NULL },
 	{ GOT_CAPA_REPORT_STATUS, NULL },
 	{ GOT_CAPA_NO_THIN, NULL },
-#if 0
 	{ GOT_CAPA_DELETE_REFS, NULL },
-#endif
 };
 
 const struct got_error *
