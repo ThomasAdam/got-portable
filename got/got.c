@@ -8370,19 +8370,24 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 	return NULL;
 }
 
+struct wt_commitable_path_arg {
+	struct got_pathlist_head	*commit_paths;
+	int				*has_changes;
+};
+
 /*
- * Shortcut work tree status callback to determine if the set of
- * paths scanned has at least one versioned path that is modified.
- * Set arg and return GOT_ERR_FILE_MODIFIED as soon as a path is
- * passed with a status that is neither unchanged nor unversioned.
+ * Shortcut work tree status callback to determine if the set of paths scanned
+ * has at least one versioned path that is being modified and, if not NULL, is
+ * in the arg->commit_paths list.  Set arg and return GOT_ERR_FILE_MODIFIED as
+ * soon as a path is passed with a status that satisfies this criteria.
  */
 static const struct got_error *
-worktree_has_changed_path(void *arg, unsigned char status,
+worktree_has_commitable_path(void *arg, unsigned char status,
     unsigned char staged_status, const char *path,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
     struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
-	int *has_changes = arg;
+	struct wt_commitable_path_arg *a = arg;
 
 	if (status == staged_status && (status == GOT_STATUS_DELETE))
 		status = GOT_STATUS_NO_CHANGE;
@@ -8390,8 +8395,21 @@ worktree_has_changed_path(void *arg, unsigned char status,
 	if (!(status == GOT_STATUS_NO_CHANGE ||
 	    status == GOT_STATUS_UNVERSIONED) ||
 	    staged_status != GOT_STATUS_NO_CHANGE) {
-		*has_changes = 1;
-		return got_error(GOT_ERR_FILE_MODIFIED);
+		if (a->commit_paths != NULL) {
+			struct got_pathlist_entry *pe;
+
+			TAILQ_FOREACH(pe, a->commit_paths, entry) {
+				if (strncmp(path, pe->path,
+				    pe->path_len) == 0) {
+					*a->has_changes = 1;
+					break;
+				}
+			}
+		} else
+			*a->has_changes = 1;
+
+		if (*a->has_changes)
+			return got_error(GOT_ERR_FILE_MODIFIED);
 	}
 
 	return NULL;
@@ -8399,11 +8417,12 @@ worktree_has_changed_path(void *arg, unsigned char status,
 
 /*
  * Check that the changeset of the commit identified by id is
- * comprised of at least one path that is modified in the work tree.
+ * comprised of at least one modified path that is being committed.
  */
 static const struct got_error *
-commit_path_changed_in_worktree(int *add_logmsg, struct got_object_id *id,
-    struct got_worktree *worktree, struct got_repository *repo)
+commit_path_changed_in_worktree(struct wt_commitable_path_arg *wcpa,
+    struct got_object_id *id, struct got_worktree *worktree,
+    struct got_repository *repo)
 {
 	const struct got_error		*err;
 	struct got_pathlist_head	 paths;
@@ -8440,7 +8459,7 @@ commit_path_changed_in_worktree(int *add_logmsg, struct got_object_id *id,
 		goto done;
 
 	err = got_worktree_status(worktree, &paths, repo, 0,
-	    worktree_has_changed_path, add_logmsg, check_cancelled, NULL);
+	    worktree_has_commitable_path, wcpa, check_cancelled, NULL);
 	if (err && err->code == GOT_ERR_FILE_MODIFIED) {
 		/*
 		 * At least one changed path in the referenced commit is
@@ -8475,6 +8494,7 @@ rm_logmsg_ref(struct got_worktree *worktree, struct got_repository *repo)
 	struct got_reflist_entry	*re;
 	struct got_commit_object	*commit = NULL;
 	struct got_object_id		*commit_id = NULL;
+	struct wt_commitable_path_arg	 wcpa;
 	char				*uuidstr = NULL;
 
 	TAILQ_INIT(&refs);
@@ -8517,7 +8537,10 @@ rm_logmsg_ref(struct got_worktree *worktree, struct got_repository *repo)
 		if (err)
 			goto done;
 
-		err = commit_path_changed_in_worktree(&has_changes, commit_id,
+		wcpa.commit_paths = NULL;
+		wcpa.has_changes = &has_changes;
+
+		err = commit_path_changed_in_worktree(&wcpa, commit_id,
 		    worktree, repo);
 		if (err)
 			goto done;
@@ -8875,8 +8898,9 @@ cat_logmsg(FILE *f, struct got_commit_object *commit, const char *idstr,
  * to be scheduled for removal on successful commit.
  */
 static const struct got_error *
-lookup_logmsg_ref(char **logmsg, struct got_reflist_head *matched_refs,
-    struct got_worktree *worktree, struct got_repository *repo)
+lookup_logmsg_ref(char **logmsg, struct got_pathlist_head *paths,
+    struct got_reflist_head *matched_refs, struct got_worktree *worktree,
+    struct got_repository *repo)
 {
 	const struct got_error		*err;
 	struct got_commit_object	*commit = NULL;
@@ -8903,8 +8927,9 @@ lookup_logmsg_ref(char **logmsg, struct got_reflist_head *matched_refs,
 		goto done;
 
 	TAILQ_FOREACH(re, &refs, entry) {
-		const char	*refname, *type;
-		int		 add_logmsg = 0;
+		const char			*refname, *type;
+		struct wt_commitable_path_arg	 wcpa;
+		int				 add_logmsg = 0;
 
 		refname = got_ref_get_name(re->ref);
 
@@ -8933,7 +8958,10 @@ lookup_logmsg_ref(char **logmsg, struct got_reflist_head *matched_refs,
 		if (err)
 			goto done;
 
-		err = commit_path_changed_in_worktree(&add_logmsg, id,
+		wcpa.commit_paths = paths;
+		wcpa.has_changes = &add_logmsg;
+
+		err = commit_path_changed_in_worktree(&wcpa, id,
 		    worktree, repo);
 		if (err)
 			goto done;
@@ -9118,7 +9146,8 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 
 	if (prepared_logmsg == NULL) {
-		error = lookup_logmsg_ref(&prepared_logmsg, &refs,
+		error = lookup_logmsg_ref(&prepared_logmsg,
+		    argc > 0 ? &paths : NULL, &refs,
 		    worktree, repo);
 		if (error)
 			goto done;
