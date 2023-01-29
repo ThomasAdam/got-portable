@@ -2897,7 +2897,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			}
 			err = merge_file(&local_changes_subsumed, a->worktree,
 			    f_orig, f_deriv, f_deriv2, ondisk_path, path2,
-			    sb.st_mode, a->label_orig, NULL, label_deriv2,
+			    mode2, a->label_orig, NULL, label_deriv2,
 			    GOT_DIFF_ALGORITHM_PATIENCE, repo,
 			    a->progress_cb, a->progress_arg);
 		}

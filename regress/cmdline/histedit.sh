@@ -2213,6 +2213,102 @@ test_histedit_umask() {
 	test_done "$testroot" 0
 }
 
+test_histedit_mesg_filemode_change() {
+	local testroot=`test_init histedit_mode_change`
+
+	local orig_commit=`git_show_head $testroot/repo`
+	local orig_author_time=`git_show_author_time $testroot/repo`
+
+	chmod +x $testroot/repo/alpha
+	git_commit $testroot/repo -m "set x bit on alpha"
+	local old_commit1=`git_show_head $testroot/repo`
+	local old_author_time1=`git_show_author_time $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -x $testroot/wt/alpha ]; then
+		echo "file alpha has unexpected executable bit" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 's/ x bit / executable bit /' "\$1"
+EOF
+
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		got histedit -m > $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+	local new_author_time1=`git_show_author_time $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "$short_old_commit1 -> $short_new_commit1: set executable bit on alpha" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -x $testroot/wt/alpha ]; then
+		echo "file alpha lost its executable bit" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l1 | grep ' set executable bit on alpha' \
+		> $testroot/stdout)
+
+	echo ' set executable bit on alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2236,3 +2332,4 @@ run_test test_histedit_prepend_line
 run_test test_histedit_mesg_invalid
 run_test test_histedit_resets_committer
 run_test test_histedit_umask
+run_test test_histedit_mesg_filemode_change
