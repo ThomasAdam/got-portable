@@ -2268,11 +2268,10 @@ EOF
 	fi
 
 	echo "alpha" > $testroot/content.expected
-	cat $testroot/wt/alpha > $testroot/content
-	cmp -s $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/wt/alpha
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/content.expected $testroot/content
+		diff -u $testroot/content.expected $testroot/wt/alpha
 		test_done "$testroot" "$ret"
 		return 1
 	fi
