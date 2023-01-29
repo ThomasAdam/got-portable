@@ -2252,7 +2252,7 @@ EOF
 
 	chmod +x $testroot/editor.sh
 
-	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
 		got histedit -m > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
