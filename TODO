@@ -50,7 +50,6 @@ gotwebd:
   having to monitor interfaces for dynamic address changes.
 
 gotd:
-- add server-side support for 'got send -d'
 - ensure all error messages are propagated to clients before disconnecting,
   there are probably still some cases where such error reporting is skipped
 - client connection timeout handling needs to be checked by regress tests,
