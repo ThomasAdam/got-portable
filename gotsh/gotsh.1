@@ -95,7 +95,7 @@ directives such as the following are recommended to protect the server
 machine and any systems reachable from it, especially if anonymous users
 are allowed to connect:
 .Bd -literal -offset indent
-Match User anonymous
+Match User developer
     DisableForwarding yes
     PermitTTY no
 .Ed
@@ -105,6 +105,34 @@ It can be convenient to add all relevant users to a common group, such as
 and then use this group as the Match criteria:
 .Bd -literal -offset indent
 Match Group developers
+    DisableForwarding yes
+    PermitTTY no
+.Ed
+.Pp
+Anonymous users can be given public read-only access by using a
+.Xr gotd.conf 5
+access rule such as the following:
+.Bd -literal -offset indent
+repository "public" {
+	path "/var/git/public.git"
+	permit ro anonymous
+}
+.Ed
+.Pp
+The anonymous user account should have a publicly known password, or can be
+set up with an empty password in which case the user's
+.Xr vipw 8
+entry would look similar to this example:
+.Bd -literal
+anonymous::1002:1002::0:0:Anonymous:/home/anonymous:/usr/local/bin/gotsh
+.Ed
+.Pp
+Use of an empty password must be explicitly allowed in
+.Xr sshd_config 5 :
+.Bd -literal -offset indent
+Match User anonymous
+    PasswordAuthentication yes
+    PermitEmptyPasswords yes
     DisableForwarding yes
     PermitTTY no
 .Ed
