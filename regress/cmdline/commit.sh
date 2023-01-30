@@ -1727,6 +1727,264 @@ test_commit_bad_author() {
 	test_done "$testroot" 0
 }
 
+test_commit_logmsg_ref() {
+	local testroot=`test_init commit_logmsg_ref`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+
+	local bo_logmsg_prefix="log message of backed-out commit"
+	local cy_logmsg_prefix="log message of cherrypicked commit"
+	local branch_rev_logmsg="changes on newbranch to cherrypick"
+	local branch_rev2_logmsg="modified zeta on newbranch to cherrypick"
+
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+
+	git_commit $testroot/repo -m "$branch_rev_logmsg"
+	local branch_rev=`git_show_head $testroot/repo`
+
+	echo "modified zeta on branch" > $testroot/repo/epsilon/zeta
+
+	git_commit $testroot/repo -m "$branch_rev2_logmsg"
+	local branch_rev2=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick $branch_rev > /dev/null)
+	(cd $testroot/wt && got cherrypick $branch_rev2 > /dev/null)
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 's/# l/l/' "\$1"
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
+	    got commit > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "'got commit' failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# check that multiple cherrypicked log messages populate the editor
+	local first=`printf '%s\n%s' $branch_rev $branch_rev2 | sort | head -1`
+	local second=`printf '%s\n%s' $branch_rev $branch_rev2 | sort | tail -1`
+
+	if [ $branch_rev == $first ]; then
+		local first_msg=$branch_rev_logmsg
+		local second_msg=$branch_rev2_logmsg
+	else
+		local first_msg=$branch_rev2_logmsg
+		local second_msg=$branch_rev_logmsg
+	fi
+
+	echo " $cy_logmsg_prefix $first:" > $testroot/stdout.expected
+	echo " $first_msg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " $cy_logmsg_prefix $second:" >> $testroot/stdout.expected
+	echo " $second_msg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -l2 | \
+	    grep -A2 'log message' | sed '/^--/d' > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check that only the relevant log message populates the editor
+	# when the changes from one of two backout commits are reverted
+	got checkout $testroot/repo $testroot/wt2 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt2 && got backout $branch_rev > /dev/null)
+	(cd $testroot/wt2 && got backout $branch_rev2 > /dev/null)
+	(cd $testroot/wt2 && got revert epsilon/zeta > /dev/null)
+
+	(cd $testroot/wt2 && env VISUAL="$testroot/editor.sh" \
+	    got commit > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "'got commit' failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo " $bo_logmsg_prefix $branch_rev:" > $testroot/stdout.expected
+	echo " $branch_rev_logmsg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt2 && got log -l1 | \
+	    grep -A2 'log message' > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check that a cherrypicked log message is still
+	# used when its changes are only partially reverted
+	branch_rev_logmsg="changes to cherrypick and partially revert"
+
+	echo "newline in alpha" >> $testroot/repo/alpha
+	echo "modified epsilon/zeta on branch" > $testroot/repo/epsilon/zeta
+
+	git_commit $testroot/repo -m "$branch_rev_logmsg"
+	branch_rev=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick $branch_rev > /dev/null)
+	(cd $testroot/wt && got revert alpha > /dev/null)
+
+	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
+	    got commit > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "'got commit' failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo " $cy_logmsg_prefix $branch_rev:" > $testroot/stdout.expected
+	echo " $branch_rev_logmsg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -l1 | \
+	    grep -A2 'log message' > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check we don't use and consequently delete the logmsg ref of a
+	# cherrypicked commit when omitting its changed path from the commit
+	branch_rev_logmsg="changes to cherrypick but omit from the commit"
+
+	echo "changed delta" >> $testroot/repo/gamma/delta
+
+	git_commit $testroot/repo -m "$branch_rev_logmsg"
+	local author_time=`git_show_author_time $testroot/repo`
+	local d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	branch_rev=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got update > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cherrypick $branch_rev > /dev/null)
+
+	echo "changed alpha" >> $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -m \
+	    "don't commit cy change to gamma/delta" alpha > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "'got commit' failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# confirm logmsg ref was not deleted with got cherrypick -l
+	echo "-----------------------------------------------" \
+	    > $testroot/stdout.expected
+	echo "commit $branch_rev (newbranch)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " $branch_rev_logmsg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " M  gamma/delta" >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got cherrypick -l > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# confirm a previously unused logmsg ref is picked up
+	# when an affected path is actually committed
+	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
+	    got commit > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "'got commit' failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo " $cy_logmsg_prefix $branch_rev:" > $testroot/stdout.expected
+	echo " $branch_rev_logmsg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -l1 | \
+	    grep -A2 'log message' > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# make sure we are not littering work trees
+	# by leaving temp got-logmsg-* files behind
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "$testroot/wt is not clean"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt2 && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "$testroot/repo is not clean"
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -1757,3 +2015,4 @@ run_test test_commit_prepared_logmsg
 run_test test_commit_large_file
 run_test test_commit_gitignore
 run_test test_commit_bad_author
+run_test test_commit_logmsg_ref
