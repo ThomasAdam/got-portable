@@ -1,3 +1,15 @@
+* got 0.83; 2023-01-30
+- fix usage display error in got merge command (patch by Mikhail)
+- fix missing commits in pack files created with packed object enumeration
+- avoid traversing enumerated commits more than once in got-read-pack
+- fix ulimit-related test failures on sparc64 (tracey)
+- got commit editor now shows log messages from backout and cherrypick (jamsek)
+- new cherrypick/backout -l option to show recorded log messages (jamsek)
+- new cherrypick/backout -X option to discard recorded log messages (jamsek)
+- gotd: implement the delete-refs capability (op)
+- fix histedit -m on a commit which only changes filemode bits
+- gotsh.1: show how to set up anonymous public read-only repository access
+
 * got 0.82; 2023-01-23
 - fix comparison in tree object parser always evaluating to false (jamsek)
 - add missing bounds-check in gitproto ref-line tokenizer
