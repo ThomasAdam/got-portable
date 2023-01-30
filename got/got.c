@@ -9203,6 +9203,9 @@ done:
 	    error == NULL)
 		error = got_error_from_errno2("unlink", cl_arg.logmsg_path);
 	free(cl_arg.logmsg_path);
+	if (merged_logmsg && unlink(merged_logmsg) == -1 && error == NULL)
+		error = got_error_from_errno2("unlink", merged_logmsg);
+	free(merged_logmsg);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
