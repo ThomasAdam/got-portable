@@ -8,16 +8,12 @@ got:
   instead of the root directory checked out at /usr/src.
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
-- Add an option where 'got cherrypick' and 'got backout' will immediately
-  create a new commit with a log-message based on the original log message.
-  This must require an up-to-date and clean work tree to avoid unrelated
-  changes from getting mixed in. Perform an implicit work tree base-commit
-  bump after committing, like 'got rebase' and 'got histedit' do it.
 - When a clone fails the HEAD symref will always point to "refs/heads/main"
   (ie. the internal default HEAD symref of Got). Resuming a failed clone with
   'got fetch' is supposed to work. To make this easier, if the HEAD symref
   points to a non-existent reference it should be updated by 'got fetch'
   to match the HEAD symref sent by the server.
+- cherrypick/backout -l should display relevant refs/got/worktree/ references
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
@@ -33,10 +29,11 @@ tog:
   very often, and 'tog log' blocks far too long in this case
 - make it possible to view the contents of tag objects
 - verify signed tag objects
+- make it possible to toggle the parent to diff against in merge commits
 
 gotwebd:
-- reply with a non-200 reply code when an error occur
-- fix COMMITS page for path that were deleted and/or re-added to the
+- reply with a non-200 reply code when an error occurs
+- fix COMMITS page for paths that were deleted and/or re-added to the
   repository. One way would be not to let the commit graph filter paths.
   As an additional optimization we could keep a tailq or the object-id
   set for everything traversed in the repo to have fast reverse-lookups.
@@ -69,8 +66,11 @@ gotd:
   3. perform the equivalent of 'got send' to another repository
 - keep track of available repository disk space and fail gracefully when
   uploaded pack files would fill up the disk too much, keeping a reserve
+- reuse packed non-delta objects directly (without re-deltification) for speed
+- create packfiles with filemode 444, like git does
 
 gotadmin:
 - teach 'gotadmin cleanup' to remove redundant pack files
 - add support for generating git-fast-export streams from a repository
 - add support for importing git-fast-export streams into a repository
+- create packfiles with filemode 444, like git does
