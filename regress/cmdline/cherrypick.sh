@@ -1773,7 +1773,7 @@ test_cherrypick_logmsg_ref() {
 	for r in $sorted; do
 		echo $sep >> $testroot/stdout.expected
 		if [ $r == $branch_rev ]; then
-			echo "commit $r" >> $testroot/stdout.expected
+			echo "cherrypick $r" >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date" >> $testroot/stdout.expected
 			printf " \n $logmsg\n \n" >> $testroot/stdout.expected
@@ -1783,7 +1783,7 @@ test_cherrypick_logmsg_ref() {
 			echo "Deleted: $ymd $short_id $logmsg" >> \
 			    $testroot/stdout.wt_deleted
 		else
-			echo "commit $r (newbranch)" \
+			echo "cherrypick $r (newbranch)" \
 			    >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date2" >> $testroot/stdout.expected
@@ -1808,7 +1808,7 @@ test_cherrypick_logmsg_ref() {
 
 	# only show log message ref of the specified commit id
 	echo $sep > $testroot/stdout.expected
-	echo "commit $branch_rev" >> $testroot/stdout.expected
+	echo "cherrypick $branch_rev" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $date" >> $testroot/stdout.expected
 	printf " \n $logmsg\n \n" >> $testroot/stdout.expected
@@ -1826,7 +1826,7 @@ test_cherrypick_logmsg_ref() {
 
 	# only show log message ref of the specified symref
 	echo $sep > $testroot/stdout.expected
-	echo "commit $branch_rev2 (newbranch)" >> $testroot/stdout.expected
+	echo "cherrypick $branch_rev2 (newbranch)" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $date2" >> $testroot/stdout.expected
 	printf " \n $logmsg2\n \n" >> $testroot/stdout.expected
@@ -1883,7 +1883,7 @@ test_cherrypick_logmsg_ref() {
 	for r in $sorted; do
 		echo $sep >> $testroot/stdout.expected
 		if [ $r == $branch2_rev ]; then
-			echo "commit $r" >> $testroot/stdout.expected
+			echo "cherrypick $r" >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date" >> $testroot/stdout.expected
 			printf " \n $b2_logmsg\n \n" >> \
@@ -1891,7 +1891,7 @@ test_cherrypick_logmsg_ref() {
 			printf "$b2_changeset\n\n" >> \
 			    $testroot/stdout.expected
 		else
-			echo "commit $r (newbranch2)" \
+			echo "cherrypick $r (newbranch2)" \
 			    >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date2" >> $testroot/stdout.expected
@@ -1918,10 +1918,10 @@ test_cherrypick_logmsg_ref() {
 
 	echo -n > $testroot/stdout.expected
 	for r in $sorted; do
-		echo "commit $r" >> $testroot/stdout.expected
+		echo "cherrypick $r" >> $testroot/stdout.expected
 	done
 
-	(cd $testroot/repo && got cherrypick -l | grep ^commit | \
+	(cd $testroot/repo && got cherrypick -l | grep ^cherrypick | \
 	    sort | cut -f1,2 -d' ' > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1973,7 +1973,8 @@ test_cherrypick_logmsg_ref() {
 
 	# make sure the remaining ref in work tree 2 was not also deleted
 	echo $sep > $testroot/stdout.expected
-	echo "commit $branch2_rev2 (newbranch2)" >> $testroot/stdout.expected
+	echo "cherrypick $branch2_rev2 (newbranch2)" \
+	    >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $date2" >> $testroot/stdout.expected
 	printf " \n $b2_logmsg2\n \n" >> $testroot/stdout.expected
