@@ -14,6 +14,8 @@ got:
   points to a non-existent reference it should be updated by 'got fetch'
   to match the HEAD symref sent by the server.
 - cherrypick/backout -l should display relevant refs/got/worktree/ references
+- If invoked in a work tree, got fetch could default to fetching the work
+  tree's current branch, instead of fetching the remote repository's HEAD.
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
