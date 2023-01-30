@@ -2308,6 +2308,122 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_drop_only() {
+	local testroot=`test_init histedit_drop_only`
+
+	local orig_commit=`git_show_head $testroot/repo`
+	local drop="->  drop commit:"
+	local dropmsg="commit changes to drop"
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+
+	git_commit $testroot/repo -m "$dropmsg 1"
+	local drop_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+
+	git_commit $testroot/repo -m "$dropmsg 2"
+	local drop_commit2=`git_show_head $testroot/repo`
+
+	echo "modified delta on master" > $testroot/repo/gamma/delta
+
+	git_commit $testroot/repo -m "$dropmsg 3"
+	local drop_commit3=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -d > $testroot/stdout)
+	local new_commit1=`git_show_head $testroot/repo`
+
+	local short_commit1=`trim_obj_id 28 $drop_commit1`
+	local short_commit2=`trim_obj_id 28 $drop_commit2`
+	local short_commit3=`trim_obj_id 28 $drop_commit3`
+
+	echo "$short_commit1 $drop $dropmsg 1" > $testroot/stdout.expected
+	echo "$short_commit2 $drop $dropmsg 2" >> $testroot/stdout.expected
+	echo "$short_commit3 $drop $dropmsg 3" >> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "delta" > $testroot/content.expected
+	cat $testroot/wt/gamma/delta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -e $testroot/wt/beta ]; then
+		echo "removed file beta should be restored" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/new ]; then
+		echo "new file should no longer exist" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log | grep ^commit > $testroot/stdout)
+	echo "commit $orig_commit (master)" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2332,3 +2448,4 @@ run_test test_histedit_mesg_invalid
 run_test test_histedit_resets_committer
 run_test test_histedit_umask
 run_test test_histedit_mesg_filemode_change
+run_test test_histedit_drop_only

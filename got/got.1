@@ -2391,7 +2391,7 @@ None of the other options can be used together with
 .Tg he
 .It Xo
 .Cm histedit
-.Op Fl aceflmX
+.Op Fl acdeflmX
 .Op Fl F Ar histedit-script
 .Op Ar branch
 .Xc
@@ -2568,6 +2568,14 @@ Abort an interrupted histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl c
 Continue an interrupted histedit operation.
+If this option is used, no other command-line arguments are allowed.
+.It Fl d
+Drop all commits.
+This option is a quick equivalent to a histedit script which drops all
+commits.
+The
+.Fl d
+option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl e
 Interrupt the histedit operation for editing after merging each commit.
