@@ -1915,7 +1915,7 @@ EOF
 	# confirm logmsg ref was not deleted with got cherrypick -l
 	echo "-----------------------------------------------" \
 	    > $testroot/stdout.expected
-	echo "commit $branch_rev (newbranch)" >> $testroot/stdout.expected
+	echo "cherrypick $branch_rev (newbranch)" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $d" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected

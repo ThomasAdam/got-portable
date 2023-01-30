@@ -4198,7 +4198,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, const char *path,
     struct got_pathlist_head *changed_paths,
     struct got_diffstat_cb_arg *diffstat, int show_patch, int diff_context,
-    struct got_reflist_object_id_map *refs_idmap, const char *custom_refs_str)
+    struct got_reflist_object_id_map *refs_idmap, const char *custom_refs_str,
+    const char *prefix)
 {
 	const struct got_error *err = NULL;
 	FILE *f = NULL;
@@ -4224,10 +4225,12 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 	printf(GOT_COMMIT_SEP_STR);
 	if (custom_refs_str)
-		printf("commit %s (%s)\n", id_str, custom_refs_str);
+		printf("%s %s (%s)\n", prefix ? prefix : "commit", id_str,
+		    custom_refs_str);
 	else
-		printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
-		    refs_str ? refs_str : "", refs_str ? ")" : "");
+		printf("%s %s%s%s%s\n", prefix ? prefix : "commit", id_str,
+		    refs_str ? " (" : "", refs_str ? refs_str : "",
+		    refs_str ? ")" : "");
 	free(id_str);
 	id_str = NULL;
 	free(refs_str);
@@ -4412,7 +4415,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				    (show_changed_paths || show_diffstat) ?
 				    &changed_paths : NULL,
 				    show_diffstat ? &dsa : NULL, show_patch,
-				    diff_context, refs_idmap, NULL);
+				    diff_context, refs_idmap, NULL, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -4447,7 +4450,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 				    (show_changed_paths || show_diffstat) ?
 				    &changed_paths : NULL,
 				    show_diffstat ? &dsa : NULL, show_patch,
-				    diff_context, refs_idmap, NULL);
+				    diff_context, refs_idmap, NULL, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -9815,6 +9818,7 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 	struct got_reflist_object_id_map	*refs_idmap = NULL;
 	struct got_commit_object		*commit = NULL;
 	struct got_object_id			*id = NULL;
+	const char				*header_prefix;
 	char					*uuidstr = NULL;
 	int					 found = 0;
 
@@ -9840,8 +9844,13 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 			wanted_ref += 11;
 	}
 
+	if (strcmp(ref_prefix, GOT_WORKTREE_BACKOUT_REF_PREFIX) == 0)
+		header_prefix = "backout";
+	else
+		header_prefix = "cherrypick";
+
 	TAILQ_FOREACH(re, &refs, entry) {
-		const char *refname;
+		const char *refname, *wt;
 
 		refname = got_ref_get_name(re->ref);
 
@@ -9853,6 +9862,8 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 			refname += prefix_len + 1;  /* skip '-' delimiter */
 		else
 			continue;
+
+		wt = refname;
 
 		if (worktree == NULL || strncmp(refname, uuidstr,
 		    GOT_WORKTREE_UUID_STRLEN) == 0)
@@ -9921,9 +9932,14 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 					goto done;
 
 				err = print_commit(commit, id, repo, NULL,
-				    &paths, NULL, 0, 0, refs_idmap, NULL);
+				    &paths, NULL, 0, 0, refs_idmap, NULL,
+				    header_prefix);
 				got_pathlist_free(&paths,
 				    GOT_PATHLIST_FREE_ALL);
+
+				if (worktree == NULL)
+					printf("work tree: %.*s\n\n",
+					    GOT_WORKTREE_UUID_STRLEN, wt);
 			}
 			if (err || found)
 				goto done;
@@ -10657,7 +10673,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 		return got_error_from_errno("asprintf");
 
 	err = print_commit(old_commit, old_commit_id, repo, NULL, NULL, NULL,
-	    0, 0, refs_idmap, custom_refs_str);
+	    0, 0, refs_idmap, custom_refs_str, NULL);
 	if (err)
 		goto done;
 
