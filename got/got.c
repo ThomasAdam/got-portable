@@ -12283,6 +12283,8 @@ cmd_histedit(int argc, char *argv[])
 		option_conflict('e', 'm');
 	if (edit_script_path && edit_only)
 		option_conflict('F', 'e');
+	if (fold_only && edit_only)
+		option_conflict('f', 'e');
 	if (drop_only && abort_edit)
 		option_conflict('d', 'a');
 	if (drop_only && continue_edit)
