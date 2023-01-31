@@ -364,7 +364,7 @@ got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
 	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* commit is packed */
 		iobj.idx = pack_idx;
-		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+		memcpy(&iobj.id, id, sizeof(iobj.id));
 		data = &iobj;
 		len = sizeof(iobj);
 	} else {
@@ -423,7 +423,7 @@ got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
 	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* tag is packed */
 		iobj.idx = pack_idx;
-		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+		memcpy(&iobj.id, id, sizeof(iobj.id));
 		data = &iobj;
 		len = sizeof(iobj);
 	} else {
@@ -450,7 +450,7 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
 	memset(&iobj, 0, sizeof(iobj));
 	if (pack_idx != -1) { /* blob is packed */
 		iobj.idx = pack_idx;
-		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+		memcpy(&iobj.id, id, sizeof(iobj.id));
 		data = &iobj;
 		len = sizeof(iobj);
 	} else {
@@ -1957,7 +1957,7 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 
 	memset(&iobj, 0, sizeof(iobj));
 	iobj.idx = idx;
-	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+	memcpy(&iobj.id, id, sizeof(iobj.id));
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKED_OBJECT_REQUEST, 0, 0, -1,
 	    &iobj, sizeof(iobj)) == -1)
@@ -1975,7 +1975,7 @@ got_privsep_send_packed_raw_obj_req(struct imsgbuf *ibuf, int idx,
 
 	memset(&iobj, 0, sizeof(iobj));
 	iobj.idx = idx;
-	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+	memcpy(&iobj.id, id, sizeof(iobj.id));
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKED_RAW_OBJECT_REQUEST, 0, 0, -1,
 	    &iobj, sizeof(iobj)) == -1)

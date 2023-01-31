@@ -526,7 +526,7 @@ struct got_object_id;
  * GOT_IMSG_PACKED_RAW_OBJECT_REQUEST data.
  */
 struct got_imsg_packed_object {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	int idx;
 } __attribute__((__packed__));
 
