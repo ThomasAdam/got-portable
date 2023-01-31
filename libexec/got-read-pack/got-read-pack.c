@@ -880,7 +880,7 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (datalen != sizeof(req))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&req, imsg->data, sizeof(req));
-	memcpy(id.sha1, req.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &req.id, sizeof(id));
 
 	imsg->fd = -1;
 
