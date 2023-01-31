@@ -11165,12 +11165,12 @@ cmd_rebase(int argc, char *argv[])
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
 		    base_commit_id, branch_head_commit_id, 1, repo,
 		    check_cancelled, NULL);
-		if (error)
-			goto done;
-		if (yca_id == NULL) {
-			error = got_error_msg(GOT_ERR_ANCESTRY,
-			    "specified branch shares no common ancestry "
-			    "with work tree's branch");
+		if (error) {
+			if (error->code == GOT_ERR_ANCESTRY) {
+				error = got_error_msg(GOT_ERR_ANCESTRY,
+				    "specified branch shares no common "
+				    "ancestry with work tree's branch");
+			}
 			goto done;
 		}
 
@@ -11226,17 +11226,16 @@ cmd_rebase(int argc, char *argv[])
 
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	pid = STAILQ_FIRST(parent_ids);
-	if (pid == NULL) {
-		error = got_error(GOT_ERR_EMPTY_REBASE);
-		goto done;
+	if (pid) {
+		error = collect_commits(&commits, commit_id, &pid->id,
+		    yca_id, got_worktree_get_path_prefix(worktree),
+		    GOT_ERR_REBASE_PATH, repo);
+		if (error)
+			goto done;
 	}
-	error = collect_commits(&commits, commit_id, &pid->id,
-	    yca_id, got_worktree_get_path_prefix(worktree),
-	    GOT_ERR_REBASE_PATH, repo);
+
 	got_object_commit_close(commit);
 	commit = NULL;
-	if (error)
-		goto done;
 
 	if (!continue_rebase) {
 		error = got_worktree_rebase_prepare(&new_base_branch,
