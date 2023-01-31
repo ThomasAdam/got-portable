@@ -304,7 +304,7 @@ struct got_imsg_raw_obj {
 
 /* Structure for GOT_IMSG_RAW_DELTA. */
 struct got_imsg_raw_delta {
-	uint8_t base_id[SHA1_DIGEST_LENGTH];
+	struct got_object_id base_id;
 	uint64_t base_size;
 	uint64_t result_size;
 	off_t delta_size;

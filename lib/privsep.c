@@ -2984,7 +2984,7 @@ got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
 	idelta.delta_compressed_size = delta_compressed_size;
 	idelta.delta_offset = delta_offset;
 	idelta.delta_out_offset = delta_out_offset;
-	memcpy(idelta.base_id, base_id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&idelta.base_id, &base_id, sizeof(idelta.base_id));
 
 	ret = imsg_compose(ibuf, GOT_IMSG_RAW_DELTA, 0, 0, -1,
 	    &idelta, sizeof(idelta));
@@ -3037,7 +3037,7 @@ got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
 			err = got_error_from_errno("malloc");
 			break;
 		}
-		memcpy((*base_id)->sha1, delta->base_id, SHA1_DIGEST_LENGTH);
+		memcpy(*base_id, &delta->base_id, sizeof(**base_id));
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
