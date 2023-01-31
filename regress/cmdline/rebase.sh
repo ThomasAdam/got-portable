@@ -915,7 +915,11 @@ test_rebase_no_commits_to_rebase() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got branch -n newbranch)
+	# Create an unrelated branch with 'got import'.
+	mkdir -p $testroot/newtree
+	echo "new file" > $testroot/newtree/newfile
+	got import -m new -b newbranch -r $testroot/repo \
+		$testroot/newtree > /dev/null
 
 	echo "modified alpha on master" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'test rebase_no_commits_to_rebase' \
@@ -925,7 +929,9 @@ test_rebase_no_commits_to_rebase() {
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
 		2> $testroot/stderr)
 
-	echo "got: no commits to rebase" > $testroot/stderr.expected
+	echo -n "got: specified branch shares no common ancestry " \
+		> $testroot/stderr.expected
+	echo "with work tree's branch" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1888,6 +1894,47 @@ test_rebase_out_of_date2() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_one_commit() {
+	local testroot=`test_init rebase_one_commit`
+
+	if ! got checkout $testroot/repo $testroot/wt >/dev/null; then
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch newbranch) >/dev/null
+
+	echo "modified alpha on newbranch" >$testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha') >/dev/null
+	(cd $testroot/wt && got update) >/dev/null
+	local commit=`git_show_branch_head $testroot/repo newbranch`
+
+	echo -n '' > $testroot/stderr.expected
+
+	(cd $testroot/wt && got rebase master >$testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "rebase comand failed unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "Forwarding refs/heads/master to commit $commit" \
+		>$testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -1909,3 +1956,4 @@ run_test test_rebase_no_author_info
 run_test test_rebase_nonbranch
 run_test test_rebase_umask
 run_test test_rebase_out_of_date2
+run_test test_rebase_one_commit

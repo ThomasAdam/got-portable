@@ -138,7 +138,6 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_MODIFIED,	"work tree contains local changes; these "
 	    "changes must be committed or reverted first" },
 	{ GOT_ERR_NOT_REBASING,	"rebase operation not in progress" },
-	{ GOT_ERR_EMPTY_REBASE,	"no commits to rebase" },
 	{ GOT_ERR_REBASE_COMMITID,"rebase commit ID mismatch" },
 	{ GOT_ERR_REBASING,	"a rebase operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
