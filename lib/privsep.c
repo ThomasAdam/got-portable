@@ -2954,7 +2954,7 @@ got_privsep_send_raw_delta_req(struct imsgbuf *ibuf, int idx,
 
 	memset(&dreq, 0, sizeof(dreq));
 	dreq.idx = idx;
-	memcpy(dreq.id, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&dreq.id, id, sizeof(dreq.id));
 
 	if (imsg_compose(ibuf, GOT_IMSG_RAW_DELTA_REQUEST, 0, 0, -1,
 	    &dreq, sizeof(dreq)) == -1)

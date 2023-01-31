@@ -546,7 +546,7 @@ struct got_imsg_delta {
  * Structure for GOT_IMSG_RAW_DELTA_REQUEST data.
  */
 struct got_imsg_raw_delta_request {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	int idx;
 };
 
