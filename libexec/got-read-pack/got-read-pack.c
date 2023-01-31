@@ -95,7 +95,7 @@ object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	obj = got_object_cache_get(objcache, &id);
 	if (obj) {
@@ -162,7 +162,7 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	err = open_commit(&commit, pack, packidx, iobj.idx, &id, objcache);
 	if (err)
@@ -237,7 +237,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	err = open_tree(&buf, entries, nentries, nentries_alloc,
 	    pack, packidx, iobj.idx, &id, objcache);
@@ -332,7 +332,7 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	obj = got_object_cache_get(objcache, &id);
 	if (obj) {
@@ -393,7 +393,7 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	obj = got_object_cache_get(objcache, &id);
 	if (obj) {
@@ -617,7 +617,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (datalen < sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	path_len = datalen - sizeof(iobj) - 1;
 	if (path_len < 0)
@@ -801,7 +801,7 @@ raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &iobj.id, sizeof(id));
 
 	obj = got_object_cache_get(objcache, &id);
 	if (obj) {
