@@ -423,10 +423,8 @@ got_get_repo_commits(struct request *c, int limit)
 					error = got_error_from_errno("strdup");
 					goto done;
 				}
-				if (commit) {
-					got_object_commit_close(commit);
-					commit = NULL;
-				}
+				got_object_commit_close(commit);
+				commit = NULL;
 				TAILQ_REMOVE(&t->repo_commits, repo_commit,
 				    entry);
 				gotweb_free_repo_commit(repo_commit);
