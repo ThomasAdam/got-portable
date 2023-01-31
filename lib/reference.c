@@ -71,7 +71,7 @@ struct got_symref {
 /* A non-symbolic reference (there is no better designation). */
 struct got_ref {
 	char *name;
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 };
 
 /* A reference which points to an arbitrary object. */
@@ -102,7 +102,7 @@ alloc_ref(struct got_reference **ref, const char *name,
 	if (*ref == NULL)
 		return got_error_from_errno("calloc");
 
-	memcpy((*ref)->ref.ref.sha1, id->sha1, sizeof((*ref)->ref.ref.sha1));
+	memcpy(&(*ref)->ref.ref.id, id, sizeof((*ref)->ref.ref.id));
 	(*ref)->flags = flags;
 	(*ref)->ref.ref.name = strdup(name);
 	(*ref)->mtime = mtime;
@@ -511,8 +511,8 @@ got_ref_dup(struct got_reference *ref)
 			free(ret);
 			return NULL;
 		}
-		memcpy(ret->ref.ref.sha1, ref->ref.ref.sha1,
-		    sizeof(ret->ref.ref.sha1));
+		memcpy(&ret->ref.ref.id, &ref->ref.ref.id,
+		    sizeof(ret->ref.ref.id));
 	}
 
 	return ret;
@@ -585,7 +585,7 @@ ref_resolve(struct got_object_id **id, struct got_repository *repo,
 	*id = calloc(1, sizeof(**id));
 	if (*id == NULL)
 		return got_error_from_errno("calloc");
-	memcpy((*id)->sha1, ref->ref.ref.sha1, sizeof((*id)->sha1));
+	memcpy(*id, &ref->ref.ref.id, sizeof(**id));
 	return NULL;
 }
 
@@ -604,15 +604,8 @@ got_ref_to_str(struct got_reference *ref)
 	if (ref->flags & GOT_REF_IS_SYMBOLIC)
 		return strdup(ref->ref.symref.ref);
 
-	str = malloc(SHA1_DIGEST_STRING_LENGTH);
-	if (str == NULL)
+	if (got_object_id_str(&str, &ref->ref.ref.id) != NULL)
 		return NULL;
-
-	if (got_sha1_digest_to_str(ref->ref.ref.sha1, str,
-	    SHA1_DIGEST_STRING_LENGTH) == NULL) {
-		free(str);
-		return NULL;
-	}
 
 	return str;
 }
@@ -1131,7 +1124,7 @@ got_ref_change_ref(struct got_reference *ref, struct got_object_id *id)
 	if (ref->flags & GOT_REF_IS_SYMBOLIC)
 		return got_error(GOT_ERR_BAD_REF_TYPE);
 
-	memcpy(ref->ref.ref.sha1, id->sha1, sizeof(ref->ref.ref.sha1));
+	memcpy(&ref->ref.ref.id, id, sizeof(ref->ref.ref.id));
 	return NULL;
 }
 
@@ -1160,7 +1153,7 @@ got_ref_change_symref_to_ref(struct got_reference *symref,
 		return got_error(GOT_ERR_BAD_REF_TYPE);
 
 	symref->ref.ref.name = symref->ref.symref.name;
-	memcpy(symref->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&symref->ref.ref.id, id, sizeof(symref->ref.ref.id));
 	symref->flags &= ~GOT_REF_IS_SYMBOLIC;
 	return NULL;
 }
@@ -1211,14 +1204,16 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 			goto done;
 		}
 	} else {
-		char hex[SHA1_DIGEST_STRING_LENGTH];
-		if (got_sha1_digest_to_str(ref->ref.ref.sha1, hex,
-		    sizeof(hex)) == NULL) {
-			err = got_error(GOT_ERR_BAD_REF_DATA);
+		char *hex;
+		size_t len;
+
+		err = got_object_id_str(&hex, &ref->ref.ref.id);
+		if (err)
 			goto done;
-		}
+		len = strlen(hex);
 		n = fprintf(f, "%s\n", hex);
-		if (n != sizeof(hex)) {
+		free(hex);
+		if (n != len + 1) {
 			err = got_ferror(f, GOT_ERR_IO);
 			goto done;
 		}
@@ -1331,8 +1326,8 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			continue;
 
 		if (strcmp(ref->ref.ref.name, delref->ref.ref.name) == 0 &&
-		    memcmp(ref->ref.ref.sha1, delref->ref.ref.sha1,
-		    sizeof(delref->ref.ref.sha1)) == 0) {
+		    got_object_id_cmp(&ref->ref.ref.id,
+		    &delref->ref.ref.id) == 0) {
 			found_delref = 1;
 			got_ref_close(ref);
 			continue;
@@ -1358,18 +1353,20 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 
 		TAILQ_FOREACH(re, &refs, entry) {
-			char hex[SHA1_DIGEST_STRING_LENGTH];
+			char *hex;
+			size_t len;
 
-			if (got_sha1_digest_to_str(re->ref->ref.ref.sha1, hex,
-			    sizeof(hex)) == NULL) {
-				err = got_error(GOT_ERR_BAD_REF_DATA);
+			err = got_object_id_str(&hex, &re->ref->ref.ref.id);
+			if (err)
 				goto done;
-			}
+			len = strlen(hex);
 			n = fprintf(tmpf, "%s ", hex);
-			if (n != sizeof(hex)) {
+			free(hex);
+			if (n != len + 1) {
 				err = got_ferror(f, GOT_ERR_IO);
 				goto done;
 			}
+
 			n = fprintf(tmpf, "%s\n", re->ref->ref.ref.name);
 			if (n != strlen(re->ref->ref.ref.name) + 1) {
 				err = got_ferror(f, GOT_ERR_IO);
