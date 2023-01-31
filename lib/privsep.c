@@ -2997,7 +2997,8 @@ got_privsep_send_raw_delta(struct imsgbuf *ibuf, uint64_t base_size,
 const struct got_error *
 got_privsep_recv_raw_delta(uint64_t *base_size, uint64_t *result_size,
     off_t *delta_size, off_t *delta_compressed_size, off_t *delta_offset,
-    off_t *delta_out_offset, struct got_object_id **base_id, struct imsgbuf *ibuf)
+    off_t *delta_out_offset, struct got_object_id **base_id,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
