@@ -10146,6 +10146,7 @@ cmd_cherrypick(int argc, char *argv[])
 	}
 	print_merge_progress_stats(&upa);
 done:
+	free(cwd);
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);
@@ -10290,6 +10291,7 @@ cmd_backout(int argc, char *argv[])
 	}
 	print_merge_progress_stats(&upa);
 done:
+	free(cwd);
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);
