@@ -578,7 +578,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return got_error_from_errno("imsg_create FETCH_HAVE_REF");
 
 		/* Keep in sync with struct got_imsg_fetch_have_ref! */
-		if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1)
+		if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 			return got_error_from_errno("imsg_add FETCH_HAVE_REF");
 		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1)
 			return got_error_from_errno("imsg_add FETCH_HAVE_REF");

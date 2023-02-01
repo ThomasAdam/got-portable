@@ -878,7 +878,7 @@ main(int argc, char **argv)
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
-		memcpy(id->sha1, href.id, SHA1_DIGEST_LENGTH);
+		memcpy(id, &href.id, sizeof(*id));
 		err = got_pathlist_append(&have_refs, refname, id);
 		if (err) {
 			free(refname);
