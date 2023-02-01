@@ -433,7 +433,7 @@ struct got_imsg_fetch_symrefs {
 /* Structure for GOT_IMSG_FETCH_REF data. */
 struct got_imsg_fetch_ref {
 	/* Describes a reference which will be fetched. */
-	uint8_t refid[SHA1_DIGEST_LENGTH];
+	struct got_object_id refid;
 	/* Followed by reference name in remaining data of imsg buffer. */
 };
 

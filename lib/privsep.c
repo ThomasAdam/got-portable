@@ -736,7 +736,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 		}
 		break;
 	case GOT_IMSG_FETCH_REF:
-		if (datalen <= SHA1_DIGEST_LENGTH) {
+		if (datalen <= sizeof(**id)) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
@@ -745,9 +745,9 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 			err = got_error_from_errno("malloc");
 			break;
 		}
-		memcpy((*id)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
-		*refname = strndup(imsg.data + SHA1_DIGEST_LENGTH,
-		    datalen - SHA1_DIGEST_LENGTH);
+		memcpy(*id, imsg.data, sizeof(**id));
+		*refname = strndup(imsg.data + sizeof(**id),
+		    datalen - sizeof(**id));
 		if (*refname == NULL) {
 			err = got_error_from_errno("strndup");
 			break;
