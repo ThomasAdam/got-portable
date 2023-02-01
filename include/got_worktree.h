@@ -332,7 +332,7 @@ const struct got_error *got_worktree_rebase_postpone(struct got_worktree *,
  */
 const struct got_error *got_worktree_rebase_complete(struct got_worktree *,
     struct got_fileindex *, struct got_reference *, struct got_reference *,
-    struct got_reference *, struct got_repository *, int create_backup);
+    struct got_repository *, int create_backup);
 
 /*
  * Abort the current rebase operation.

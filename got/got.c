@@ -10426,13 +10426,12 @@ done:
 
 static const struct got_error *
 rebase_complete(struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_reference *branch, struct got_reference *new_base_branch,
-    struct got_reference *tmp_branch, struct got_repository *repo,
-    int create_backup)
+    struct got_reference *branch, struct got_reference *tmp_branch,
+    struct got_repository *repo, int create_backup)
 {
 	printf("Switching work tree to %s\n", got_ref_get_name(branch));
 	return got_worktree_rebase_complete(worktree, fileindex,
-	    new_base_branch, tmp_branch, branch, repo, create_backup);
+	    tmp_branch, branch, repo, create_backup);
 }
 
 static const struct got_error *
@@ -11249,8 +11248,7 @@ cmd_rebase(int argc, char *argv[])
 	if (STAILQ_EMPTY(&commits)) {
 		if (continue_rebase) {
 			error = rebase_complete(worktree, fileindex,
-			    branch, new_base_branch, tmp_branch, repo,
-			    create_backup);
+			    branch, tmp_branch, repo, create_backup);
 			goto done;
 		} else {
 			/* Fast-forward the reference of the branch. */
@@ -11335,7 +11333,7 @@ cmd_rebase(int argc, char *argv[])
 		}
 	} else
 		error = rebase_complete(worktree, fileindex, branch,
-		    new_base_branch, tmp_branch, repo, create_backup);
+		    tmp_branch, repo, create_backup);
 done:
 	free(cwd);
 	free(committer);
