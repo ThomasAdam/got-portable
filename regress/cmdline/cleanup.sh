@@ -291,7 +291,7 @@ test_cleanup_missing_pack_file() {
 
 	# Some freshly cloned Git repositories suffer from lonely pack index
 	# files. Remove the pack file we just wrote to simulate this issue.
-	rm $testroot/repo/.git/objects/pack/pack-$packname
+	rm -f $testroot/repo/.git/objects/pack/pack-$packname
 
 	# cleanup should now refuse to purge objects
 	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
