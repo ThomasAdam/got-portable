@@ -29,16 +29,26 @@ SAVED_CFLAGS="$CFLAGS"
 SAVED_CPPFLAGS="$CPPFLAGS"
 SAVED_LDFLAGS="$LDFLAGS"
 
+# YACC override
+YACC_OVERRIDE="yes"
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
+if test -z "$YACC"; then
+YACC_OVERRIDE="no"
 AC_PROG_YACC
+fi
 AM_PROG_AR
 AC_PROG_RANLIB
 PKG_PROG_PKG_CONFIG
+
+if test "$YACC_OVERRIDE" = "yes"; then
+	AC_MSG_NOTICE("Using YACC set from environment: $YACC")
+fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([ \
@@ -228,6 +238,12 @@ AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
 AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 
+# Look for yacc.
+if test "YACC_OVERRIDE" = "yes" && test -n "$YACC" \
+	&& ! command -v "$YACC" >/dev/null 2>&1; then
+	AC_MSG_ERROR("yacc not found: $YACC")
+fi
+
 if test x"$PLATFORM" = "xdarwin"; then
 	# Check for and/or set HOMEBREW_PREFIX.  brew is a common way of
 	# installing applications.  The other is MacPorts.
@@ -277,7 +293,8 @@ if test x"$PLATFORM" = "xdarwin"; then
 
 	AC_MSG_NOTICE("HOMEBREW_PREFIX determined as: $HOMEBREW_PREFIX")
 
-	if ! test -x "${HOMEBREW_PREFIX}/opt/bison/bin/bison"; then
+	if test "$YACC_OVERRIDE" = "no" && \
+		! test -x "${HOMEBREW_PREFIX}/opt/bison/bin/bison"; then
 		AC_MSG_WARN([
 			     "***********************************************************
 			     GNU Bison not found: ${HOMEBREW_PREFIX}/opt/bison/bin/bison
@@ -309,14 +326,17 @@ if test x"$PLATFORM" = "xdarwin"; then
 		GNUBISON="${HOMEBREW_PREFIX}/opt/bison/bin/bison"
 	fi
 
-	if test "$FOUND_BISON" = "no"; then
+	if test "$FOUND_BISON" = "no" && test "$YACC_OVERRIDE" = "no"; then
 		AC_MSG_ERROR("*** Couldn't find GNU BISON ***")
 	fi
 
-	AC_MSG_NOTICE("Found GNU Bison as: $GNUBISON")
-
 	# Override YACC here to point to the GNU version of bison.
-	export YACC="${GNUBISON} -y"
+	if test "$YACC_OVERRIDE" = "yes"; then
+		export YACC="$YACC -y"
+	else
+		AC_MSG_NOTICE("Found GNU Bison as: $GNUBISON")
+		export YACC="${GNUBISON} -y"
+	fi
 	export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFIX}/opt/openssl@3/lib $LDFLAGS"
 	export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/ncurses/include -I${HOMEBREW_PREFIX}/opt/openssl@3/include $CPPFLAGS"
 	export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/ncurses/lib/pkgconfig"
@@ -702,6 +722,7 @@ Configured got-portable with:
 
  Prefix:       ${prefix}
  Executables:  ${executables}
+ Bison:        $YACC
  Helpers:      ${helpers}
  Man pages:    ${manpages}
 "
