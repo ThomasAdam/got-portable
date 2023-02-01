@@ -171,7 +171,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	if (err)
 		goto done;
 
-	if (fchmod(packfd, GOT_DEFAULT_FILE_MODE) != 0) {
+	if (fchmod(packfd, GOT_DEFAULT_PACK_MODE) == -1) {
 		err = got_error_from_errno2("fchmod", tmpfile_path);
 		goto done;
 	}
@@ -301,7 +301,7 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 	free(path);
 	if (err)
 		goto done;
-	if (fchmod(idxfd, GOT_DEFAULT_FILE_MODE) != 0) {
+	if (fchmod(idxfd, GOT_DEFAULT_PACK_MODE) == -1) {
 		err = got_error_from_errno2("fchmod", tmpidxpath);
 		goto done;
 	}

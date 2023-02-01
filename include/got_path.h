@@ -16,6 +16,8 @@
 
 /* Utilities for dealing with filesystem paths. */
 
+#define GOT_DEFAULT_PACK_MODE	(S_IFREG | \
+	S_IRUSR | S_IRGRP | S_IROTH)
 #define GOT_DEFAULT_FILE_MODE	(S_IFREG | \
 	S_IRUSR|S_IWUSR | S_IRGRP | S_IROTH)
 #define GOT_DEFAULT_DIR_MODE	(S_IFDIR | \

@@ -18,6 +18,7 @@
 #include <sys/queue.h>
 #include <sys/tree.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 
 #include <errno.h>
@@ -883,6 +884,10 @@ recv_packfile(struct gotd_session_client *client)
 	err = got_opentemp_named_fd(&pack_path, &packfd, basepath, "");
 	if (err)
 		goto done;
+	if (fchmod(packfd, GOT_DEFAULT_PACK_MODE) == -1) {
+		err = got_error_from_errno2("fchmod", pack_path);
+		goto done;
+	}
 
 	free(basepath);
 	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.idx",
@@ -895,6 +900,10 @@ recv_packfile(struct gotd_session_client *client)
 	err = got_opentemp_named_fd(&idx_path, &idxfd, basepath, "");
 	if (err)
 		goto done;
+	if (fchmod(idxfd, GOT_DEFAULT_PACK_MODE) == -1) {
+		err = got_error_from_errno2("fchmod", idx_path);
+		goto done;
+	}
 
 	memset(&ifile, 0, sizeof(ifile));
 	ifile.client_id = client->id;
