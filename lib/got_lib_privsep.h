@@ -384,7 +384,7 @@ struct got_imsg_tag_object {
 
 /* Structure for GOT_IMSG_FETCH_HAVE_REF data. */
 struct got_imsg_fetch_have_ref {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	size_t name_len;
 	/* Followed by name_len data bytes. */
 } __attribute__((__packed__));
