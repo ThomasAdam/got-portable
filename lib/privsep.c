@@ -1203,15 +1203,14 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	size_t logmsg_len = strlen(commit->logmsg);
 
 	total = sizeof(*icommit) + author_len + committer_len +
-	    commit->nparents * SHA1_DIGEST_LENGTH;
+	    commit->nparents * sizeof(struct got_object_id);
 
 	buf = malloc(total);
 	if (buf == NULL)
 		return got_error_from_errno("malloc");
 
 	icommit = (struct got_imsg_commit_object *)buf;
-	memcpy(icommit->tree_id, commit->tree_id->sha1,
-	    sizeof(icommit->tree_id));
+	memcpy(&icommit->tree_id, commit->tree_id, sizeof(icommit->tree_id));
 	icommit->author_len = author_len;
 	icommit->author_time = commit->author_time;
 	icommit->author_gmtoff = commit->author_gmtoff;
@@ -1227,8 +1226,8 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	memcpy(buf + len, commit->committer, committer_len);
 	len += committer_len;
 	STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
-		memcpy(buf + len, &qid->id, SHA1_DIGEST_LENGTH);
-		len += SHA1_DIGEST_LENGTH;
+		memcpy(buf + len, &qid->id, sizeof(qid->id));
+		len += sizeof(qid->id);
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT, 0, 0, -1, buf, len) == -1) {
@@ -1263,7 +1262,7 @@ get_commit_from_imsg(struct got_commit_object **commit,
 	icommit = imsg->data;
 	if (datalen != sizeof(*icommit) + icommit->author_len +
 	    icommit->committer_len +
-	    icommit->nparents * SHA1_DIGEST_LENGTH)
+	    icommit->nparents * sizeof(struct got_object_id))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	if (icommit->nparents < 0)
@@ -1276,8 +1275,8 @@ get_commit_from_imsg(struct got_commit_object **commit,
 		return got_error_from_errno(
 		    "got_object_commit_alloc_partial");
 
-	memcpy((*commit)->tree_id->sha1, icommit->tree_id,
-	    SHA1_DIGEST_LENGTH);
+	memcpy((*commit)->tree_id, &icommit->tree_id,
+	    sizeof(icommit->tree_id));
 	(*commit)->author_time = icommit->author_time;
 	(*commit)->author_gmtoff = icommit->author_gmtoff;
 	(*commit)->committer_time = icommit->committer_time;
@@ -1342,7 +1341,7 @@ get_commit_from_imsg(struct got_commit_object **commit,
 		if (err)
 			break;
 		memcpy(&qid->id, imsg->data + len +
-		    i * SHA1_DIGEST_LENGTH, sizeof(qid->id));
+		    i * sizeof(qid->id), sizeof(qid->id));
 		STAILQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
 		(*commit)->nparents++;
 	}

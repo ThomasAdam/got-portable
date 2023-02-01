@@ -233,7 +233,7 @@ struct got_imsg_object {
 
 /* Structure for GOT_IMSG_COMMIT data. */
 struct got_imsg_commit_object {
-	uint8_t tree_id[SHA1_DIGEST_LENGTH];
+	struct got_object_id tree_id;
 	size_t author_len;
 	time_t author_time;
 	time_t author_gmtoff;
@@ -247,7 +247,7 @@ struct got_imsg_commit_object {
 	 * Followed by author_len + committer_len data bytes
 	 */
 
-	/* Followed by 'nparents' SHA1_DIGEST_LENGTH length strings */
+	/* Followed by 'nparents' struct got_object_id */
 
 	/*
 	 * Followed by 'logmsg_len' bytes of commit log message data in
