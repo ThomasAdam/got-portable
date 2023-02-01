@@ -918,7 +918,7 @@ got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
 				err = got_error_from_errno("malloc");
 				goto done;
 			}
-			memcpy(id->sha1, iremote_ref.id, SHA1_DIGEST_LENGTH);
+			memcpy(id, &iremote_ref.id, sizeof(*id));
 			refname = strndup(imsg.data + sizeof(iremote_ref),
 			    datalen - sizeof(iremote_ref));
 			if (refname == NULL) {

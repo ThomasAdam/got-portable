@@ -466,7 +466,7 @@ struct got_imsg_send_ref {
 
 /* Structure for GOT_IMSG_SEND_REMOTE_REF data. */
 struct got_imsg_send_remote_ref {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	size_t name_len;
 	/* Followed by name_len data bytes. */
 } __attribute__((__packed__));
