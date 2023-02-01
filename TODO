@@ -15,6 +15,12 @@ got:
   to match the HEAD symref sent by the server.
 - If invoked in a work tree, got fetch could default to fetching the work
   tree's current branch, instead of fetching the remote repository's HEAD.
+- 'got patch' should be able to detect an already applied patch.
+- 'got patch' should ideally do more passes if a patch doesn't apply and
+  try fancy things (like ignoring context and whitespaces) only in later
+  passes.
+- investigate wether it's worth for 'got patch' to memory-map the files to
+  edit.  (c.f. Plan A / Plan B in Larry' patch.)
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
@@ -44,6 +50,9 @@ gotwebd:
 - perhaps "bind interface" should be removed in favour of using only IP
   addresses? This makes the address family selection explicit and avoids
   having to monitor interfaces for dynamic address changes.
+- add breadcrumbs to navigate in the directory tree
+- add more action links, like "raw", "blame" and "commits" in the blob
+  page.
 
 gotd:
 - ensure all error messages are propagated to clients before disconnecting,
