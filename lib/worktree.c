@@ -7016,9 +7016,9 @@ done:
 
 const struct got_error *
 got_worktree_rebase_complete(struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_reference *new_base_branch,
-    struct got_reference *tmp_branch, struct got_reference *rebased_branch,
-    struct got_repository *repo, int create_backup)
+    struct got_fileindex *fileindex, struct got_reference *tmp_branch,
+    struct got_reference *rebased_branch, struct got_repository *repo,
+    int create_backup)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_object_id *new_head_commit_id = NULL;
