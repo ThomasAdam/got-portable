@@ -10746,7 +10746,7 @@ done:
 	if (yca_commit)
 		got_object_commit_close(yca_commit);
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
