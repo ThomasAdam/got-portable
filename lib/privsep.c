@@ -816,7 +816,7 @@ send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
 		return got_error_from_errno("imsg_create SEND_REF");
 
 	/* Keep in sync with struct got_imsg_send_ref! */
-	if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1)
+	if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_add SEND_REF");
 	if (imsg_add(wbuf, &delete, sizeof(delete)) == -1)
 		return got_error_from_errno("imsg_add SEND_REF");

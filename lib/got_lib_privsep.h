@@ -458,7 +458,7 @@ struct got_imsg_send_upload_progress {
 
 /* Structure for GOT_IMSG_SEND_REF data. */
 struct got_imsg_send_ref {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	int delete;
 	size_t name_len;
 	/* Followed by name_len data bytes. */

@@ -714,7 +714,7 @@ main(int argc, char **argv)
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
-		memcpy(id->sha1, href.id, SHA1_DIGEST_LENGTH);
+		memcpy(id, &href.id, sizeof(*id));
 		if (href.delete)
 			err = got_pathlist_append(&delete_refs, refname, id);
 		else
