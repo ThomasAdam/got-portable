@@ -112,6 +112,18 @@ N increments (default: 1).
 Go to line N in the view (default: last line).
 .It Cm g
 Go to line N in the view (default: first line).
+.It Cm Right-arrow, l
+Scroll view to the right N increments (default: 1).
+.br
+Output moves left on the screen.
+.It Cm Left-arrow, h
+Scroll view to the left N increments (default: 1).
+.br
+Output moves right on the screen.
+.It Cm $
+Scroll view to the rightmost position.
+.It Cm 0
+Scroll view left to the start of the line.
 .El
 .Pp
 The commands for
@@ -145,18 +157,6 @@ are as follows (N denotes optional prefixed count modifier):
 Move the selection cursor down N lines (default: 1).
 .It Cm Up-arrow, k, <, Comma, Ctrl-p
 Move the selection cursor up N lines (default: 1).
-.It Cm Right-arrow, l
-Scroll log message field to the right N increments (default: 1).
-.br
-Log message moves left on the screen.
-.It Cm Left-arrow, h
-Scroll log message field to the left N increments (default: 1).
-.br
-Log message moves right on the screen.
-.It Cm $
-Scroll log message field to the rightmost position.
-.It Cm 0
-Scroll log message field to the leftmost position.
 .It Cm Page-down, Space, Ctrl+f, f
 Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
@@ -313,18 +313,6 @@ detected.
 Scroll down N lines (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
 Scroll up N lines (default: 1).
-.It Cm Right-arrow, l
-Scroll view to the right N increments (default: 1).
-.br
-Diff output moves left on the screen.
-.It Cm Left-arrow, h
-Scroll view to the left N increments (default: 1).
-.br
-Diff output moves right on the screen.
-.It Cm $
-Scroll view to the rightmost position.
-.It Cm 0
-Scroll view left to the start of the line.
 .It Cm Page-down, Space, Ctrl+f, f
 Scroll down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b
@@ -430,18 +418,6 @@ are as follows (N denotes optional prefixed count modifier):
 Move the selection cursor down N pages (default: 1).
 .It Cm Up-arrow, k, Ctrl-p
 Move the selection cursor up N pages (default: 1).
-.It Cm Right-arrow, l
-Scroll view to the right N increments (default: 1).
-.br
-File output moves left on the screen.
-.It Cm Left-arrow, h
-Scroll view to the left N increments (default: 1).
-.br
-File output moves right on the screen.
-.It Cm $
-Scroll view to the rightmost position.
-.It Cm 0
-Scroll view left to the start of the line.
 .It Cm Page-down, Space, Ctrl+f, f
 Move the selection cursor down N pages (default: 1).
 .It Cm Page-up, Ctrl+b, b

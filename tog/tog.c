@@ -3697,6 +3697,36 @@ log_goto_line(struct tog_view *view, int nlines)
 
 }
 
+static void
+horizontal_scroll_input(struct tog_view *view, int ch)
+{
+
+	switch (ch) {
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);
+		if (view->x <= 0)
+			view->count = 0;
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 2 < view->maxx)
+			view->x += 2;
+		else
+			view->count = 0;
+		break;
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 2, 0);
+		view->count = 0;
+		break;
+	default:
+		break;
+	}
+}
+
 static const struct got_error *
 input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
@@ -3730,24 +3760,12 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->quit = 1;
 		break;
 	case '0':
-		view->x = 0;
-		break;
 	case '$':
-		view->x = MAX(view->maxx - view->ncols / 2, 0);
-		view->count = 0;
-		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (view->x + view->ncols / 2 < view->maxx)
-			view->x += 2;  /* move two columns right */
-		else
-			view->count = 0;
-		break;
 	case KEY_LEFT:
 	case 'h':
-		view->x -= MIN(view->x, 2);  /* move two columns back */
-		if (view->x <= 0)
-			view->count = 0;
+		horizontal_scroll_input(view, ch);
 		break;
 	case 'k':
 	case KEY_UP:
@@ -5304,24 +5322,12 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 	switch (ch) {
 	case '0':
-		view->x = 0;
-		break;
 	case '$':
-		view->x = MAX(view->maxx - view->ncols / 3, 0);
-		view->count = 0;
-		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (view->x + view->ncols / 3 < view->maxx)
-			view->x += 2;  /* move two columns right */
-		else
-			view->count = 0;
-		break;
 	case KEY_LEFT:
 	case 'h':
-		view->x -= MIN(view->x, 2);  /* move two columns back */
-		if (view->x <= 0)
-			view->count = 0;
+		horizontal_scroll_input(view, ch);
 		break;
 	case 'a':
 	case 'w':
@@ -6329,24 +6335,12 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 	switch (ch) {
 	case '0':
-		view->x = 0;
-		break;
 	case '$':
-		view->x = MAX(view->maxx - view->ncols / 3, 0);
-		view->count = 0;
-		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (view->x + view->ncols / 3 < view->maxx)
-			view->x += 2;  /* move two columns right */
-		else
-			view->count = 0;
-		break;
 	case KEY_LEFT:
 	case 'h':
-		view->x -= MIN(view->x, 2);  /* move two columns back */
-		if (view->x <= 0)
-			view->count = 0;
+		horizontal_scroll_input(view, ch);
 		break;
 	case 'q':
 		s->done = 1;
@@ -6784,7 +6778,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 	wchar_t *wline;
 	char *index = NULL;
 	struct tog_color *tc;
-	int width, n, nentries, i = 1;
+	int width, n, nentries, scrollx, i = 1;
 	int limit = view->nlines;
 
 	s->ndisplayed = 0;
@@ -6861,6 +6855,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		te = s->first_displayed_entry;
 	}
 
+	view->maxx = 0;
 	for (i = got_tree_entry_get_index(te); i < nentries; i++) {
 		char *line = NULL, *id_str = NULL, *link_target = NULL;
 		const char *modestr = "";
@@ -6907,8 +6902,19 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		}
 		free(id_str);
 		free(link_target);
-		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
-		    0, 0);
+
+		/* use full line width to determine view->maxx */
+		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 0, 0);
+		if (err) {
+			free(line);
+			break;
+		}
+		view->maxx = MAX(view->maxx, width);
+		free(wline);
+		wline = NULL;
+
+		err = format_line(&wline, &width, &scrollx, line, view->x,
+		    view->ncols, 0, 0);
 		if (err) {
 			free(line);
 			break;
@@ -6922,7 +6928,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		waddwstr(view->window, wline);
+		waddwstr(view->window, &wline[scrollx]);
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -7396,6 +7402,14 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		return tree_goto_line(view, nscroll);
 
 	switch (ch) {
+	case '0':
+	case '$':
+	case KEY_RIGHT:
+	case 'l':
+	case KEY_LEFT:
+	case 'h':
+		horizontal_scroll_input(view, ch);
+		break;
 	case 'i':
 		s->show_ids = !s->show_ids;
 		view->count = 0;
@@ -8307,24 +8321,12 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 	switch (ch) {
 	case '0':
-		view->x = 0;
-		break;
 	case '$':
-		view->x = MAX(view->maxx - view->ncols / 2, 0);
-		view->count = 0;
-		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (view->x + view->ncols / 2 < view->maxx)
-			view->x += 2;
-		else
-			view->count = 0;
-		break;
 	case KEY_LEFT:
 	case 'h':
-		view->x -= MIN(view->x, 2);
-		if (view->x <= 0)
-			view->count = 0;
+		horizontal_scroll_input(view, ch);
 		break;
 	case 'i':
 		s->show_ids = !s->show_ids;
@@ -8938,24 +8940,12 @@ input_help_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 	switch (ch) {
 	case '0':
-		view->x = 0;
-		break;
 	case '$':
-		view->x = MAX(view->maxx - view->ncols / 3, 0);
-		view->count = 0;
-		break;
 	case KEY_RIGHT:
 	case 'l':
-		if (view->x + view->ncols / 3 < view->maxx)
-			view->x += 2;
-		else
-			view->count = 0;
-		break;
 	case KEY_LEFT:
 	case 'h':
-		view->x -= MIN(view->x, 2);
-		if (view->x <= 0)
-			view->count = 0;
+		horizontal_scroll_input(view, ch);
 		break;
 	case 'g':
 	case KEY_HOME:
