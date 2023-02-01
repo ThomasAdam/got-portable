@@ -8059,7 +8059,7 @@ show_ref_view(struct tog_view *view)
 	char *line = NULL;
 	wchar_t *wline;
 	struct tog_color *tc;
-	int width, n;
+	int width, n, scrollx;
 	int limit = view->nlines;
 
 	werase(view->window);
@@ -8097,6 +8097,7 @@ show_ref_view(struct tog_view *view)
 		return NULL;
 
 	n = 0;
+	view->maxx = 0;
 	while (re && limit > 0) {
 		char *line = NULL;
 		char ymd[13];  /* YYYY-MM-DD + "  " + NUL */
@@ -8164,8 +8165,18 @@ show_ref_view(struct tog_view *view)
 		    got_ref_get_name(re->ref)) == -1)
 			return got_error_from_errno("asprintf");
 
-		err = format_line(&wline, &width, NULL, line, 0, view->ncols,
-		    0, 0);
+		/* use full line width to determine view->maxx */
+		err = format_line(&wline, &width, NULL, line, 0, INT_MAX, 0, 0);
+		if (err) {
+			free(line);
+			return err;
+		}
+		view->maxx = MAX(view->maxx, width);
+		free(wline);
+		wline = NULL;
+
+		err = format_line(&wline, &width, &scrollx, line, view->x,
+		    view->ncols, 0, 0);
 		if (err) {
 			free(line);
 			return err;
@@ -8179,7 +8190,7 @@ show_ref_view(struct tog_view *view)
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		waddwstr(view->window, wline);
+		waddwstr(view->window, &wline[scrollx]);
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -8290,6 +8301,26 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		return ref_goto_line(view, nscroll);
 
 	switch (ch) {
+	case '0':
+		view->x = 0;
+		break;
+	case '$':
+		view->x = MAX(view->maxx - view->ncols / 2, 0);
+		view->count = 0;
+		break;
+	case KEY_RIGHT:
+	case 'l':
+		if (view->x + view->ncols / 2 < view->maxx)
+			view->x += 2;
+		else
+			view->count = 0;
+		break;
+	case KEY_LEFT:
+	case 'h':
+		view->x -= MIN(view->x, 2);
+		if (view->x <= 0)
+			view->count = 0;
+		break;
 	case 'i':
 		s->show_ids = !s->show_ids;
 		view->count = 0;
