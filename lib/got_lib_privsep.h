@@ -220,7 +220,7 @@ struct got_imsg_error {
  * Structure for GOT_IMSG_TREE_REQUEST and GOT_IMSG_OBJECT data.
  */
 struct got_imsg_object {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 
 	/* These fields are the same as in struct got_object. */
 	int type;

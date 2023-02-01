@@ -398,7 +398,7 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TREE_REQUEST");
 
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_add TREE_REQUEST");
 
 	if (pack_idx != -1) { /* tree is packed */
@@ -510,7 +510,7 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 
 	memset(&iobj, 0, sizeof(iobj));
 
-	memcpy(iobj.id, obj->id.sha1, sizeof(iobj.id));
+	memcpy(&iobj.id, &obj->id, sizeof(iobj.id));
 	iobj.type = obj->type;
 	iobj.flags = obj->flags;
 	iobj.hdrlen = obj->hdrlen;
@@ -1118,7 +1118,7 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
 	if (*obj == NULL)
 		return got_error_from_errno("calloc");
 
-	memcpy((*obj)->id.sha1, iobj->id, SHA1_DIGEST_LENGTH);
+	memcpy(&(*obj)->id, &iobj->id, sizeof(iobj->id));
 	(*obj)->type = iobj->type;
 	(*obj)->flags = iobj->flags;
 	(*obj)->hdrlen = iobj->hdrlen;
