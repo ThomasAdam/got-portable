@@ -281,7 +281,7 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 		return got_error_from_errno("imsg_create FETCH_REF");
 
 	/* Keep in sync with struct got_imsg_fetch_ref definition! */
-	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, refid, sizeof(*refid)) == -1)
 		return got_error_from_errno("imsg_add FETCH_REF");
 	if (imsg_add(wbuf, refname, reflen) == -1)
 		return got_error_from_errno("imsg_add FETCH_REF");
