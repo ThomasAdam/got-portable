@@ -6926,7 +6926,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (width < view->ncols - 1)
+		if (width < view->ncols)
 			waddch(view->window, '\n');
 		if (n == s->selected && view->focussed)
 			wstandend(view->window);
@@ -8188,7 +8188,7 @@ show_ref_view(struct tog_view *view)
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (width < view->ncols - 1)
+		if (width < view->ncols)
 			waddch(view->window, '\n');
 		if (n == s->selected && view->focussed)
 			wstandend(view->window);
@@ -8834,22 +8834,20 @@ show_help_view(struct tog_view *view)
 			int skip;
 
 			err = format_line(&wline, &width, &skip, line,
-			    view->x, view->ncols - 1, 0, view->x ? 1 : 0);
+			    view->x, view->ncols, 0, view->x ? 1 : 0);
 			if (err) {
 				free(line);
 				return err;
 			}
-			rc = waddwstr(view->window, &wline[skip]);
+			waddwstr(view->window, &wline[skip]);
 			free(wline);
 			wline = NULL;
-			if (rc == ERR)
-				return got_error_msg(GOT_ERR_IO, "waddwstr");
 		}
 		if (s->lineno == view->hiline) {
 			while (width++ < view->ncols)
 				waddch(view->window, ' ');
 		} else {
-			if (width <= view->ncols)
+			if (width < view->ncols)
 				waddch(view->window, '\n');
 		}
 		if (attr)
