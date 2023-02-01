@@ -285,9 +285,9 @@ test_backout_logmsg_ref() {
 	local short_id=$(printf '%.7s' $branch_rev)
 	local ymd2=`date -u -r $commit_time2 +"%F"`
 	local short_id2="newbranch"
-	local sorted=$(printf "$branch_rev\n$branch_rev2" | sort)
+	local wt_sorted=$(printf "$branch_rev\n$branch_rev2" | sort)
 
-	for r in $sorted; do
+	for r in $wt_sorted; do
 		echo $sep >> $testroot/stdout.expected
 		if [ $r == $branch_rev ]; then
 			echo "backout $r" >> $testroot/stdout.expected
@@ -394,10 +394,10 @@ test_backout_logmsg_ref() {
 	local b2_changeset2=" M  epsilon/new2"
 	date=`date -u -r $b2_commit_time +"%a %b %e %X %Y UTC"`
 	date2=`date -u -r $b2_commit_time2 +"%a %b %e %X %Y UTC"`
-	sorted=$(printf "$branch2_rev\n$branch2_rev2" | sort)
+	local wt2_sorted=$(printf "$branch2_rev\n$branch2_rev2" | sort)
 
 	echo -n > $testroot/stdout.expected
-	for r in $sorted; do
+	for r in $wt2_sorted; do
 		echo $sep >> $testroot/stdout.expected
 		if [ $r == $branch2_rev ]; then
 			echo "backout $r" >> $testroot/stdout.expected
@@ -429,17 +429,40 @@ test_backout_logmsg_ref() {
 		return 1
 	fi
 
-	# ensure both wt and wt2 logmsg refs can be retrieved from the repo
-	sorted=`printf \
-	    "$branch_rev\n$branch_rev2\n$branch2_rev\n$branch2_rev2" | sort`
+	# ensure both wt and wt2 logmsg refs can be retrieved and the
+	# work tree UUID is displayed when listing refs from the repo
+	local wt_uuid=$(cat $testroot/wt/.got/uuid)
+	local wt2_uuid=$(cat $testroot/wt2/.got/uuid)
+	local wt_first=`printf "$wt_uuid\n$wt2_uuid" | sort | head -1`
 
-	echo -n > $testroot/stdout.expected
-	for r in $sorted; do
-		echo "backout $r" >> $testroot/stdout.expected
+	for r in $wt_sorted; do
+		echo -n "backout $r" >> $testroot/wt.list
+		if [ $r == $branch_rev2 ]; then
+			echo -n " (newbranch)" >> $testroot/wt.list
+		fi
+		echo >> $testroot/wt.list
+		echo "work tree: $wt_uuid" >> $testroot/wt.list
 	done
 
-	(cd $testroot/repo && got backout -l | grep ^backout | \
-	    sort | cut -f1,2 -d' ' > $testroot/stdout)
+	for r in $wt2_sorted; do
+		echo -n "backout $r" >> $testroot/wt2.list
+		if [ $r == $branch2_rev2 ]; then
+			echo -n " (newbranch2)" >> $testroot/wt2.list
+		fi
+		echo >> $testroot/wt2.list
+		echo "work tree: $wt2_uuid" >> $testroot/wt2.list
+	done
+
+	if [ $wt_uuid == $wt_first ]; then
+		mv $testroot/wt.list $testroot/stdout.expected
+		cat $testroot/wt2.list >> $testroot/stdout.expected
+	else
+		mv $testroot/wt2.list $testroot/stdout.expected
+		cat $testroot/wt.list >> $testroot/stdout.expected
+	fi
+
+	(cd $testroot/repo && got backout -l | egrep "^(backout|work)" \
+	    > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
