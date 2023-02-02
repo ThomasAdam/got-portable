@@ -1406,7 +1406,7 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 	for (i = idx0; i <= idxN; i++) {
 		struct got_parsed_tree_entry *pte = &entries[i];
 
-		/* Keep in sync with struct got_imsg_tree_object definition! */
+		/* Keep in sync with struct got_imsg_tree_entry definition! */
 		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1)
 			return got_error_from_errno("imsg_add TREE_ENTRY");
 		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1)
