@@ -263,6 +263,52 @@ test_fetch_branch() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified beta on foo" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified beta"
+	local commit_id4=`git_show_head $testroot/repo`
+
+	got checkout -b foo $testroot/repo-clone $testroot/wt > /dev/null
+
+	# fetch new commits on branch 'foo', implicitly obtaining the
+	# branch name from a work tree
+	(cd $testroot/wt && got fetch -q > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	wt_uuid=`(cd $testroot/wt && got info | grep 'UUID:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/got/worktree/base-$wt_uuid: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id4" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id2" \
+		>> $testroot/stdout.expected
+	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
