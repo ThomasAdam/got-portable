@@ -2443,6 +2443,12 @@ cmd_fetch(int argc, char *argv[])
 				}
 			}
 		}
+		if (TAILQ_EMPTY(&wanted_branches)) {
+			error = got_pathlist_append(&wanted_branches,
+			    got_worktree_get_head_ref_name(worktree), NULL);
+			if (error)
+				goto done;
+		}
 	}
 	if (remote == NULL) {
 		repo_conf = got_repo_get_gotconfig(repo);
