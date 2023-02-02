@@ -171,7 +171,7 @@ main(int argc, char *argv[])
 				goto done;
 		}
 		SHA1Final(id.sha1, &sha1_ctx);
-		if (memcmp(expected_id.sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		if (got_object_id_cmp(&expected_id, &id) != 0) {
 			char buf[SHA1_DIGEST_STRING_LENGTH];
 			err = got_error_fmt(GOT_ERR_OBJ_CSUM,
 			    "checksum failure for object %s",
