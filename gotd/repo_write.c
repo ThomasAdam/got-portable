@@ -938,15 +938,17 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	}
 
 	for (i = 0; i < nitems(tempfiles); i++) {
-		int fd = dup(repo_tempfiles[i].fd);
+		int fd;
 		FILE *f;
+
+		fd = dup(repo_tempfiles[i].fd);
 		if (fd == -1) {
 			err = got_error_from_errno("dup");
 			goto done;
 		}
 		f = fdopen(fd, "w+");
 		if (f == NULL) {
-			err = got_error_from_errno("dup");
+			err = got_error_from_errno("fdopen");
 			close(fd);
 			goto done;
 		}
