@@ -191,6 +191,7 @@ struct transport {
 	struct got_repository	*repo;
 	struct repo_dir		*repo_dir;
 	struct querystring	*qs;
+	char			*more_id;
 	char			*next_id;
 	char			*prev_id;
 	unsigned int		 repos_total;

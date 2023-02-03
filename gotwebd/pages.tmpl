@@ -42,6 +42,8 @@ static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
 static int blame_line(struct template *, const char *, struct blame_line *,
     int, int);
 
+static inline int gotweb_render_more(struct template *, int);
+
 static inline int diff_line(struct template *, char *);
 static inline int tag_item(struct template *, struct repo_tag *);
 static inline int branch(struct template *, struct got_reflist_entry *);
@@ -303,10 +305,32 @@ static inline int rss_author(struct template *, char *);
     </div>
     <div class="dotted_line"></div>
   {{ end }}
-  {{ if t->next_id || t->prev_id }}
-    {{ render gotweb_render_navs(tp) }}
-  {{ end }}
+  {{ render gotweb_render_more(tp, BRIEFS) }}
 </div>
+{{ end }}
+
+{{ define gotweb_render_more(struct template *tp, int action) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct querystring	*qs = t->qs;
+	struct gotweb_url	 more = {
+		.action = action,
+		.index_page = -1,
+		.path = qs->path,
+		.commit = t->more_id,
+		.headref = qs->headref,
+	};
+!}
+  {{ if t->more_id }}
+    <div id="np_wrapper">
+      <div id="nav_more">
+        <a href="{{ render gotweb_render_url(c, &more) }}">
+          More
+        </a>
+      </div>
+    </div>
+  {{ end }}
 {{ end }}
 
 {{ define gotweb_render_navs(struct template *tp) }}
@@ -403,9 +427,7 @@ static inline int rss_author(struct template *, char *);
     </div>
     <div class="dotted_line"></div>
   {{ end }}
-  {{ if t->next_id || t->prev_id }}
-    {{ render gotweb_render_navs(tp) }}
-  {{ end }}
+  {{ render gotweb_render_more(tp, COMMITS) }}
 </div>
 {{ end }}
 
@@ -589,6 +611,7 @@ static inline int rss_author(struct template *, char *);
       {{ end }}
     {{ end }}
     {{ if t->next_id || t->prev_id }}
+      {! qs->action = TAGS; !}
       {{ render gotweb_render_navs(tp) }}
     {{ end }}
   {{ end }}
