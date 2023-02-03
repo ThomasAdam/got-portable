@@ -1001,7 +1001,7 @@ send_packfile(struct gotd_session_client *client)
 }
 
 static void
-session_dispatch_listener(int fd, short events, void *arg)
+session_dispatch_client(int fd, short events, void *arg)
 {
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
@@ -1274,11 +1274,11 @@ recv_connect(struct imsg *imsg)
 	client->egid = iconnect.egid;
 
 	imsg_init(&client->iev.ibuf, client->fd);
-	client->iev.handler = session_dispatch_listener;
+	client->iev.handler = session_dispatch_client;
 	client->iev.events = EV_READ;
 	client->iev.handler_arg = NULL;
 	event_set(&client->iev.ev, client->iev.ibuf.fd, EV_READ,
-	    session_dispatch_listener, &client->iev);
+	    session_dispatch_client, &client->iev);
 	gotd_imsg_event_add(&client->iev);
 	evtimer_set(&client->tmo, gotd_request_timeout, client);
 
