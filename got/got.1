@@ -383,8 +383,10 @@ Fetch all branches from the remote repository's
 reference namespace.
 This option can be enabled by default for specific repositories in
 .Xr got.conf 5 .
-If this option is not specified, a branch resolved via the remote
-repository's HEAD reference will be fetched.
+If this option is not specified, the work tree's current branch
+will be fetched if invoked within a work tree,
+otherwise a branch resolved via the remote repository's HEAD reference
+will be fetched.
 Cannot be used together with the
 .Fl b
 option.
