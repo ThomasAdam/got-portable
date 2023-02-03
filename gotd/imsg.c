@@ -71,7 +71,7 @@ gotd_imsg_flush(struct imsgbuf *ibuf)
 				break;
 			}
 		}
-	}	
+	}
 
 	return err;
 }
