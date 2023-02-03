@@ -55,6 +55,7 @@ gotwebd:
   page.
 - add a "rawdiff" page to serve a diff as text/plain (or text/x-patch),
   or maybe "rawcommit" that includes the commentary too.
+- consider changing the URL scheme to avoid so many query parameters
 
 gotd:
 - ensure all error messages are propagated to clients before disconnecting,
