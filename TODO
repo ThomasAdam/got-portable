@@ -53,6 +53,8 @@ gotwebd:
 - add breadcrumbs to navigate in the directory tree
 - add more action links, like "raw", "blame" and "commits" in the blob
   page.
+- add a "rawdiff" page to serve a diff as text/plain (or text/x-patch),
+  or maybe "rawcommit" that includes the commentary too.
 
 gotd:
 - ensure all error messages are propagated to clients before disconnecting,
