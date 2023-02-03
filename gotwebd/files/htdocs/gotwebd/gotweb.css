@@ -117,6 +117,10 @@ body {
 	background-color: #f5fcfb;
 	overflow: hidden;
 }
+#nav_more {
+	padding: 5px 0;
+	text-align: center;
+}
 #nav_prev {
 	float: left;
 	padding-left: 10px;

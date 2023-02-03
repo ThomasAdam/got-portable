@@ -418,8 +418,8 @@ got_get_repo_commits(struct request *c, int limit)
 			 */
 			if (chk_next && (qs->action == BRIEFS ||
 			    qs->action == COMMITS || qs->action == SUMMARY)) {
-				t->next_id = strdup(repo_commit->commit_id);
-				if (t->next_id == NULL) {
+				t->more_id = strdup(repo_commit->commit_id);
+				if (t->more_id == NULL) {
 					error = got_error_from_errno("strdup");
 					goto done;
 				}

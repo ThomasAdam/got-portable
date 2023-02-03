@@ -782,6 +782,7 @@ gotweb_free_transport(struct transport *t)
 	}
 	gotweb_free_repo_dir(t->repo_dir);
 	gotweb_free_querystring(t->qs);
+	free(t->more_id);
 	free(t->next_id);
 	free(t->prev_id);
 	free(t);
@@ -815,60 +816,6 @@ gotweb_get_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
 				.action = -1,
 				.index_page = qs->index_page + 1,
 				.page = -1,
-			};
-		}
-		break;
-	case BRIEFS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			*have_prev = 1;
-			*prev = (struct gotweb_url){
-				.action = BRIEFS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-			};
-		}
-		if (t->next_id) {
-			*have_next = 1;
-			*next = (struct gotweb_url){
-				.action = BRIEFS,
-				.index_page = -1,
-				.page = qs->page + 1,
-				.path = qs->path,
-				.commit = t->next_id,
-				.headref = qs->headref,
-			};
-		}
-		break;
-	case COMMITS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			*have_prev = 1;
-			*prev = (struct gotweb_url){
-				.action = COMMITS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-				.folder = qs->folder,
-				.file = qs->file,
-			};
-		}
-		if (t->next_id) {
-			*have_next = 1;
-			*next = (struct gotweb_url){
-				.action = COMMITS,
-				.index_page = -1,
-				.page = qs->page + 1,
-				.path = qs->path,
-				.commit = t->next_id,
-				.headref = qs->headref,
-				.folder = qs->folder,
-				.file = qs->file,
 			};
 		}
 		break;
