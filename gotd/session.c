@@ -1313,7 +1313,7 @@ recv_repo_child(struct imsg *imsg)
 	else
 		return got_error_msg(GOT_ERR_PRIVSEP_MSG,
 		    "bad child process type");
-		
+
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
@@ -1414,7 +1414,7 @@ done:
 		/* This pipe is dead. Remove its event handler */
 		event_del(&iev->ev);
 		event_loopexit(NULL);
-	}	
+	}
 }
 
 void
