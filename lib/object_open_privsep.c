@@ -102,7 +102,7 @@ done:
 			close(accumfd);
 	} else
 		pack->child_has_tempfiles = 1;
-	return NULL;
+	return err;
 }
 
 static const struct got_error *

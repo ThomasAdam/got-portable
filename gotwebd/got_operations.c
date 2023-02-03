@@ -93,8 +93,8 @@ got_gotweb_dupfd(int *priv_fd, int *fd)
 {
 	*fd = dup(*priv_fd);
 
-	if (*fd < 0)
-		return NULL;
+	if (*fd == -1)
+		return got_error_from_errno("dup");
 
 	return NULL;
 }
