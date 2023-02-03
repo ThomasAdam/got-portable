@@ -21,6 +21,9 @@ got:
   passes.
 - investigate wether it's worth for 'got patch' to memory-map the files to
   edit.  (c.f. Plan A / Plan B in Larry' patch.)
+- when fetching pack files got should verify that the requested branch tips
+  are present in the pack file sent by the server, before making this pack
+  file visible to readers of the repository
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
