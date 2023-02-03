@@ -2088,7 +2088,7 @@ delete_missing_ref(struct got_reference *ref,
 done:
 	free(id);
 	free(id_str);
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
