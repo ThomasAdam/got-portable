@@ -593,11 +593,8 @@ update_packidx(struct got_packidx *packidx, uint32_t nobj,
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 
 	idx = find_object_idx(packidx, obj->id.sha1);
-	if (idx == -1) {
-		char hex[SHA1_DIGEST_STRING_LENGTH];
-		got_sha1_digest_to_str(obj->id.sha1, hex, sizeof(hex));
+	if (idx == -1)
 		return; /* object already indexed */
-	}
 
 	memmove(&packidx->hdr.sorted_ids[idx + 1],
 	    &packidx->hdr.sorted_ids[idx],
