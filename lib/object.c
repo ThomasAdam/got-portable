@@ -374,7 +374,7 @@ got_object_blob_rewind(struct got_blob_object *blob)
 char *
 got_object_blob_id_str(struct got_blob_object *blob, char *buf, size_t size)
 {
-	return got_sha1_digest_to_str(blob->id.sha1, buf, size);
+	return got_object_id_hex(&blob->id, buf, size);
 }
 
 size_t

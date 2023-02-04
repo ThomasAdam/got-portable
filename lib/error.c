@@ -32,7 +32,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
-#include "got_lib_sha1.h"
+#include "got_lib_object_parse.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -367,11 +367,11 @@ got_ferror(FILE *f, int code)
 const struct got_error *
 got_error_no_obj(struct got_object_id *id)
 {
-	char msg[sizeof("object   not found") + SHA1_DIGEST_STRING_LENGTH];
-	char id_str[SHA1_DIGEST_STRING_LENGTH];
+	char id_str[GOT_OBJECT_ID_HEX_MAXLEN];
+	char msg[sizeof("object   not found") + sizeof(id_str)];
 	int ret;
 
-	if (!got_sha1_digest_to_str(id->sha1, id_str, sizeof(id_str)))
+	if (!got_object_id_hex(id, id_str, sizeof(id_str)))
 		return got_error(GOT_ERR_NO_OBJ);
 
 	ret = snprintf(msg, sizeof(msg), "object %s not found", id_str);
