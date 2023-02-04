@@ -343,11 +343,7 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 
 	SHA1Final(sha1, &sha1_ctx);
 	if (memcmp(expected_id->sha1, sha1, SHA1_DIGEST_LENGTH) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
+		err = got_error_checksum(expected_id);
 		goto done;
 	}
 
@@ -766,11 +762,7 @@ got_object_read_commit(struct got_commit_object **commit, int fd,
 
 	SHA1Final(id.sha1, &sha1_ctx);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
+		err = got_error_checksum(expected_id);
 		goto done;
 	}
 
@@ -939,11 +931,7 @@ got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 
 	SHA1Final(id.sha1, &sha1_ctx);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
+		err = got_error_checksum(expected_id);
 		goto done;
 	}
 
@@ -1183,11 +1171,7 @@ got_object_read_tag(struct got_tag_object **tag, int fd,
 
 	SHA1Final(id.sha1, &sha1_ctx);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
-		char buf[SHA1_DIGEST_STRING_LENGTH];
-		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-		    "checksum failure for object %s",
-		    got_sha1_digest_to_str(expected_id->sha1, buf,
-		    sizeof(buf)));
+		err = got_error_checksum(expected_id);
 		goto done;
 	}
 
