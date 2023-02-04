@@ -38,7 +38,6 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
-#include "got_lib_sha1.h"
 
 static volatile sig_atomic_t sigint_received;
 
@@ -184,11 +183,7 @@ main(int argc, char *argv[])
 		}
 		SHA1Final(id.sha1, &sha1_ctx);
 		if (got_object_id_cmp(&expected_id, &id) != 0) {
-			char buf[SHA1_DIGEST_STRING_LENGTH];
-			err = got_error_fmt(GOT_ERR_OBJ_CSUM,
-			    "checksum failure for object %s",
-			    got_sha1_digest_to_str(expected_id.sha1, buf,
-			    sizeof(buf)));
+			err = got_error_checksum(&expected_id);
 			goto done;
 		}
 

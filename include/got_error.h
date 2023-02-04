@@ -263,6 +263,14 @@ struct got_object_id; /* forward declaration */
 const struct got_error *got_error_no_obj(struct got_object_id *);
 
 /*
+ * Obtain an error with code GOT_ERR_OBJ_CSUM and an error message which
+ * contains the specified object ID. The message buffer is statically
+ * allocated; future invocations of this function will overwrite the
+ * message set during earlier invocations.
+ */
+const struct got_error *got_error_checksum(struct got_object_id *);
+
+/*
  * Obtain an error with code GOT_ERR_NOT_REF and an error message which
  * contains the specified reference name. The message buffer is statically
  * allocated; future invocations of this function will overwrite the

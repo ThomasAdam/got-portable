@@ -391,6 +391,24 @@ got_error_no_obj(struct got_object_id *id)
 }
 
 const struct got_error *
+got_error_checksum(struct got_object_id *id)
+{
+	char id_str[GOT_OBJECT_ID_HEX_MAXLEN];
+	char msg[sizeof("checksum failure for object ") + sizeof(id_str)];
+	int ret;
+
+	if (!got_object_id_hex(id, id_str, sizeof(id_str)))
+		return got_error(GOT_ERR_OBJ_CSUM);
+
+	ret = snprintf(msg, sizeof(msg), "checksum failure for object %s",
+	    id_str);
+	if (ret < 0 || (size_t)ret >= sizeof(msg))
+		return got_error(GOT_ERR_OBJ_CSUM);
+
+	return got_error_msg(GOT_ERR_OBJ_CSUM, msg);
+}
+
+const struct got_error *
 got_error_not_ref(const char *refname)
 {
 	char msg[sizeof("reference   not found") + 1004];
