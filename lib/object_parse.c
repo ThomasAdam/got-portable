@@ -87,19 +87,25 @@ got_object_qid_alloc_partial(struct got_object_qid **qid)
 const struct got_error *
 got_object_id_str(char **outbuf, struct got_object_id *id)
 {
-	static const size_t len = SHA1_DIGEST_STRING_LENGTH;
+	static const size_t len = GOT_OBJECT_ID_HEX_MAXLEN;
 
 	*outbuf = malloc(len);
 	if (*outbuf == NULL)
 		return got_error_from_errno("malloc");
 
-	if (got_sha1_digest_to_str(id->sha1, *outbuf, len) == NULL) {
+	if (got_object_id_hex(id, *outbuf, len) == NULL) {
 		free(*outbuf);
 		*outbuf = NULL;
 		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
 	}
 
 	return NULL;
+}
+
+char *
+got_object_id_hex(struct got_object_id *id, char *buf, size_t len)
+{
+	return got_sha1_digest_to_str(id->sha1, buf, len);
 }
 
 void

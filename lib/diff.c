@@ -137,8 +137,8 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
     enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err = NULL, *free_err;
-	char hex1[SHA1_DIGEST_STRING_LENGTH];
-	char hex2[SHA1_DIGEST_STRING_LENGTH];
+	char hex1[GOT_OBJECT_ID_HEX_MAXLEN];
+	char hex2[GOT_OBJECT_ID_HEX_MAXLEN];
 	const char *idstr1 = NULL, *idstr2 = NULL;
 	char *modestr1 = NULL, *modestr2 = NULL;
 	off_t size1, size2;
@@ -345,7 +345,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
     int force_text_diff, struct got_diffstat_cb_arg *diffstat, FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
-	char hex1[SHA1_DIGEST_STRING_LENGTH];
+	char hex1[GOT_OBJECT_ID_HEX_MAXLEN];
 	const char *idstr1 = NULL;
 	struct got_diffreg_result *result = NULL;
 
