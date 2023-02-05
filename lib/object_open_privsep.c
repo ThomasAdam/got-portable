@@ -444,7 +444,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		return err;
 
-	memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&(*obj)->id, id, sizeof(*id));
 
 	(*obj)->refcnt++;
 	return got_repo_cache_object(repo, id, *obj);
