@@ -83,6 +83,36 @@ send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
 }
 
 static const struct got_error *
+send_gitconfig_pair(struct imsgbuf *ibuf, const char *key, const char *val)
+{
+	struct ibuf *wbuf;
+	size_t klen = key ? strlen(key) : 0;
+	size_t vlen = val ? strlen(val) : 0;
+	size_t tot = sizeof(klen) + sizeof(vlen) + klen + vlen;
+
+	if (tot > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_GITCONFIG_PAIR, 0, 0, tot);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create GITCONFIG_PAIR");
+
+	/* Keep in sync with got_imsg_gitconfig_pair */
+	if (imsg_add(wbuf, &klen, sizeof(klen)) == -1)
+		return got_error_from_errno("imsg_add GITCONFIG_PAIR");
+	if (imsg_add(wbuf, &vlen, sizeof(vlen)) == -1)
+		return got_error_from_errno("imsg_add GITCONFIG_PAIR");
+	if (imsg_add(wbuf, key, klen) == -1)
+		return got_error_from_errno("imsg_add GITCONFIG_PAIR");
+	if (imsg_add(wbuf, val, vlen) == -1)
+		return got_error_from_errno("imsg_add GITCONFIG_PAIR");
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
 gitconfig_str_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
     const char *section, const char *tag)
 {
@@ -281,12 +311,8 @@ gitconfig_extensions_request(struct imsgbuf *ibuf,
 	if (tags == NULL)
 		return send_gitconfig_int(ibuf, 0);
 
-	TAILQ_FOREACH(node, &tags->fields, link) {
-		val = got_gitconfig_get_str(gitconfig, "extensions",
-		    node->field);
-		if (get_boolean_val(val))
-			nextensions++;
-	}
+	TAILQ_FOREACH(node, &tags->fields, link)
+		nextensions++;
 
 	err = send_gitconfig_int(ibuf, nextensions);
 	if (err)
@@ -295,11 +321,9 @@ gitconfig_extensions_request(struct imsgbuf *ibuf,
 	TAILQ_FOREACH(node, &tags->fields, link) {
 		val = got_gitconfig_get_str(gitconfig, "extensions",
 		    node->field);
-		if (get_boolean_val(val)) {
-			err = send_gitconfig_str(ibuf, node->field);
-			if (err)
-				goto done;
-		}
+		err = send_gitconfig_pair(ibuf, node->field, val);
+		if (err)
+			goto done;
 	}
 done:
 	got_gitconfig_free_list(tags);

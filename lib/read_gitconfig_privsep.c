@@ -45,8 +45,8 @@ const struct got_error *
 got_repo_read_gitconfig(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
     struct got_remote_repo **remotes, int *nremotes,
-    char **gitconfig_owner, char ***extensions, int *nextensions,
-    const char *gitconfig_path)
+    char **gitconfig_owner, char ***extnames, char ***extvals,
+    int *nextensions, const char *gitconfig_path)
 {
 	const struct got_error *err = NULL, *child_err = NULL;
 	int fd = -1;
@@ -55,8 +55,10 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	struct imsgbuf *ibuf;
 
 	*gitconfig_repository_format_version = 0;
-	if (extensions)
-		*extensions = NULL;
+	if (extnames)
+		*extnames = NULL;
+	if (extvals)
+		*extvals = NULL;
 	if (nextensions)
 		*nextensions = 0;
 	*gitconfig_author_name = NULL;
@@ -117,7 +119,7 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	if (err)
 		goto done;
 
-	if (extensions && nextensions) {
+	if (extnames && extvals && nextensions) {
 		err = got_privsep_send_gitconfig_repository_extensions_req(
 		    ibuf);
 		if (err)
@@ -127,18 +129,24 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			goto done;
 		if (*nextensions > 0) {
 			int i;
-			*extensions = calloc(*nextensions, sizeof(char *));
-			if (*extensions == NULL) {
+			*extnames = calloc(*nextensions, sizeof(char *));
+			if (*extnames == NULL) {
+				err = got_error_from_errno("calloc");
+				goto done;
+			}
+			*extvals = calloc(*nextensions, sizeof(char *));
+			if (*extvals == NULL) {
 				err = got_error_from_errno("calloc");
 				goto done;
 			}
 			for (i = 0; i < *nextensions; i++) {
-				char *ext;
-				err = got_privsep_recv_gitconfig_str(&ext,
-				    ibuf);
+				char *ext, *val;
+				err = got_privsep_recv_gitconfig_pair(&ext,
+				    &val, ibuf);
 				if (err)
 					goto done;
-				(*extensions)[i] = ext;
+				(*extnames)[i] = ext;
+				(*extvals)[i] = val;
 			}
 		}
 	}
