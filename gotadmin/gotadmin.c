@@ -1218,8 +1218,6 @@ cmd_cleanup(int argc, char *argv[])
 	char scaled_before[FMT_SCALED_STRSIZE];
 	char scaled_after[FMT_SCALED_STRSIZE];
 	char scaled_diff[FMT_SCALED_STRSIZE];
-	char **extensions;
-	int nextensions, i;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "anpqr:")) != -1) {
@@ -1273,15 +1271,11 @@ cmd_cleanup(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	got_repo_get_gitconfig_extensions(&extensions, &nextensions,
-	    repo);
-	for (i = 0; i < nextensions; i++) {
-		if (strcasecmp(extensions[i], "preciousObjects") == 0) {
-			error = got_error_msg(GOT_ERR_GIT_REPO_EXT,
-			    "the preciousObjects Git extension is enabled; "
-			    "this implies that objects must not be deleted");
-			goto done;
-		}
+	if (got_repo_has_extension(repo, "preciousObjects")) {
+		error = got_error_msg(GOT_ERR_GIT_REPO_EXT,
+		    "the preciousObjects Git extension is enabled; "
+		    "this implies that objects must not be deleted");
+		goto done;
 	}
 
 	if (remove_lonely_packidx) {
