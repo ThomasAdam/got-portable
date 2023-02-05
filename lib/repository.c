@@ -117,12 +117,17 @@ got_repo_get_gitconfig_owner(struct got_repository *repo)
 	return repo->gitconfig_owner;
 }
 
-void
-got_repo_get_gitconfig_extensions(char ***extensions, int *nextensions,
-    struct got_repository *repo)
+int
+got_repo_has_extension(struct got_repository *repo, const char *ext)
 {
-	*extensions = repo->extensions;
-	*nextensions = repo->nextensions;
+	int i;
+
+	for (i = 0; i < repo->nextensions; ++i) {
+		if (!strcasecmp(ext, repo->extensions[i]))
+			return 1;
+	}
+
+	return 0;
 }
 
 int
