@@ -124,7 +124,8 @@ struct got_repository {
 	int ngitconfig_remotes;
 	struct got_remote_repo *gitconfig_remotes;
 	char *gitconfig_owner;
-	char **extensions;
+	char **extnames;
+	char **extvals;
 	int nextensions;
 
 	/* Settings read from got.conf. */
@@ -170,7 +171,7 @@ struct got_pack *got_repo_get_pinned_pack(struct got_repository *);
 void got_repo_unpin_pack(struct got_repository *);
 
 const struct got_error *got_repo_read_gitconfig(int *, char **, char **,
-    struct got_remote_repo **, int *, char **, char ***, int *,
+    struct got_remote_repo **, int *, char **, char ***, char ***, int *,
     const char *);
 
 const struct got_error *got_repo_temp_fds_get(int *, int *,

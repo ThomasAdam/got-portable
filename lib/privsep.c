@@ -2103,6 +2103,60 @@ got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_recv_gitconfig_pair(char **key, char **val, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_gitconfig_pair p;
+	struct imsg imsg;
+	size_t datalen;
+	uint8_t *data;
+
+	*key = *val = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	data = imsg.data;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	if (imsg.hdr.type != GOT_IMSG_GITCONFIG_PAIR) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
+	if (datalen < sizeof(p)) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	memcpy(&p, data, sizeof(p));
+	data += sizeof(p);
+
+	if (datalen != sizeof(p) + p.klen + p.vlen) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	*key = strndup(data, p.klen);
+	if (*key == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	data += p.klen;
+
+	*val = strndup(data, p.vlen);
+	if (*val == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+
+done:
+	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
 got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;

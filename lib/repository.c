@@ -74,6 +74,28 @@
 RB_PROTOTYPE(got_packidx_bloom_filter_tree, got_packidx_bloom_filter, entry,
     got_packidx_bloom_filter_cmp);
 
+static inline int
+is_boolean_val(const char *val)
+{
+	return (strcasecmp(val, "true") == 0 ||
+	    strcasecmp(val, "false") == 0 ||
+	    strcasecmp(val, "on") == 0 ||
+    	    strcasecmp(val, "off") == 0 ||
+	    strcasecmp(val, "yes") == 0 ||
+    	    strcasecmp(val, "no") == 0 ||
+	    strcasecmp(val, "1") == 0 ||
+	    strcasecmp(val, "0") == 0);
+}
+
+static inline int
+get_boolean_val(const char *val)
+{
+	return (strcasecmp(val, "true") == 0 ||
+	    strcasecmp(val, "on") == 0 ||
+	    strcasecmp(val, "yes") == 0 ||
+	    strcasecmp(val, "1") == 0);
+}
+
 const char *
 got_repo_get_path(struct got_repository *repo)
 {
@@ -128,8 +150,8 @@ got_repo_has_extension(struct got_repository *repo, const char *ext)
 	int i;
 
 	for (i = 0; i < repo->nextensions; ++i) {
-		if (!strcasecmp(ext, repo->extensions[i]))
-			return 1;
+		if (!strcasecmp(ext, repo->extnames[i]))
+			return get_boolean_val(repo->extvals[i]);
 	}
 
 	return 0;
@@ -598,7 +620,8 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 		err = got_repo_read_gitconfig(&dummy_repo_version,
 		    &repo->global_gitconfig_author_name,
 		    &repo->global_gitconfig_author_email,
-		    NULL, NULL, NULL, NULL, NULL, global_gitconfig_path);
+		    NULL, NULL, NULL, NULL, NULL, NULL,
+		    global_gitconfig_path);
 		if (err)
 			return err;
 	}
@@ -612,8 +635,8 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 	    &repo->gitconfig_repository_format_version,
 	    &repo->gitconfig_author_name, &repo->gitconfig_author_email,
 	    &repo->gitconfig_remotes, &repo->ngitconfig_remotes,
-	    &repo->gitconfig_owner, &repo->extensions, &repo->nextensions,
-	    repo_gitconfig_path);
+	    &repo->gitconfig_owner, &repo->extnames, &repo->extvals,
+	    &repo->nextensions, repo_gitconfig_path);
 	if (err)
 		goto done;
 
@@ -766,8 +789,18 @@ got_repo_open(struct got_repository **repop, const char *path,
 		goto done;
 	}
 	for (i = 0; i < repo->nextensions; i++) {
-		char *ext = repo->extensions[i];
+		char *ext = repo->extnames[i];
+		char *val = repo->extvals[i];
 		int j, supported = 0;
+
+		if (!is_boolean_val(val)) {
+			err = got_error_path(ext, GOT_ERR_GIT_REPO_EXT);
+			goto done;
+		}
+
+		if (!get_boolean_val(val))
+			continue;
+
 		for (j = 0; j < nitems(repo_extensions); j++) {
 			if (strcmp(ext, repo_extensions[j]) == 0) {
 				supported = 1;
@@ -852,9 +885,12 @@ got_repo_close(struct got_repository *repo)
 	for (i = 0; i < repo->ngitconfig_remotes; i++)
 		got_repo_free_remote_repo_data(&repo->gitconfig_remotes[i]);
 	free(repo->gitconfig_remotes);
-	for (i = 0; i < repo->nextensions; i++)
-		free(repo->extensions[i]);
-	free(repo->extensions);
+	for (i = 0; i < repo->nextensions; i++) {
+		free(repo->extnames[i]);
+		free(repo->extvals[i]);
+	}
+	free(repo->extnames);
+	free(repo->extvals);
 
 	got_pathlist_free(&repo->packidx_paths, GOT_PATHLIST_FREE_PATH);
 	free(repo);

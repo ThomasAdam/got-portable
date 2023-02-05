@@ -158,6 +158,7 @@ enum got_imsg_type {
 	GOT_IMSG_GITCONFIG_REMOTES_REQUEST,
 	GOT_IMSG_GITCONFIG_INT_VAL,
 	GOT_IMSG_GITCONFIG_STR_VAL,
+	GOT_IMSG_GITCONFIG_PAIR,
 	GOT_IMSG_GITCONFIG_REMOTES,
 	GOT_IMSG_GITCONFIG_REMOTE,
 	GOT_IMSG_GITCONFIG_OWNER_REQUEST,
@@ -627,6 +628,16 @@ struct got_imsg_remotes {
 };
 
 /*
+ * Structure for GOT_IMSG_GITCONFIG_PAIR.
+ */
+struct got_imsg_gitconfig_pair {
+	size_t	klen;
+	size_t	vlen;
+	/* Followed by klen data bytes of key string. */
+	/* Followed by vlen data bytes of value string. */
+};
+
+/*
  * Structure for GOT_IMSG_PATCH data.
  */
 struct got_imsg_patch {
@@ -746,6 +757,8 @@ const struct got_error *got_privsep_send_gitconfig_remotes_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_owner_req(struct imsgbuf *);
 const struct got_error *got_privsep_recv_gitconfig_str(char **,
+    struct imsgbuf *);
+const struct got_error *got_privsep_recv_gitconfig_pair(char **, char **,
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_gitconfig_int(int *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_gitconfig_remotes(

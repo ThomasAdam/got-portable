@@ -793,7 +793,7 @@ test_checkout_repo_with_unknown_extension() {
 	local testroot=`test_init checkout_repo_with_unknown_extension`
 
 	(cd $testroot/repo &&
-	    git config --add extensions.badExtension true)
+	    git config --add extensions.badExtension foobar)
 	(cd $testroot/repo &&
 	    git config --add extensions.otherBadExtension 0)
 
