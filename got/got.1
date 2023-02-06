@@ -342,6 +342,25 @@ or Git's
 file of the local repository, as created by
 .Cm got clone .
 .Pp
+By default, any branches configured in
+.Xr got.conf 5
+for the
+.Ar remote-repository
+will be fetched.
+If
+.Cm got fetch
+is invoked in a work tree then this work tree's current branch will be
+fetched, too, provided it is present on the server.
+This default behaviour can be overridden with the
+.Fl a
+and
+.Fl b
+options.
+If no branches to fetch can be found in
+.Xr got.conf 5 ,
+on the command line, or via a work tree, a branch resolved via the remote
+repository's HEAD reference will be fetched.
+.Pp
 New changes will be stored in a separate pack file downloaded from the server.
 Optionally, separate pack files stored in the repository can be combined with
 .Xr git-repack 1 .
@@ -383,10 +402,6 @@ Fetch all branches from the remote repository's
 reference namespace.
 This option can be enabled by default for specific repositories in
 .Xr got.conf 5 .
-If this option is not specified, the work tree's current branch
-will be fetched if invoked within a work tree,
-otherwise a branch resolved via the remote repository's HEAD reference
-will be fetched.
 Cannot be used together with the
 .Fl b
 option.
@@ -398,10 +413,6 @@ from the remote repository's
 reference namespace.
 This option may be specified multiple times to build a list of branches
 to fetch.
-If this option is not specified, the work tree's current branch
-will be fetched if invoked within a work tree,
-otherwise a branch resolved via the remote repository's HEAD reference
-will be fetched.
 Cannot be used together with the
 .Fl a
 option.
