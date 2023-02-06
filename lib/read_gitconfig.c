@@ -52,8 +52,8 @@ const struct got_error *
 got_repo_read_gitconfig(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
     struct got_remote_repo **remotes, int *nremotes,
-    char **gitconfig_owner, char ***extensions, int *nextensions,
-    const char *gitconfig_path)
+    char **gitconfig_owner, char ***extnames, char ***extvals,
+    int *nextensions, const char *gitconfig_path)
 {
 	const struct got_error *err = NULL;
 	struct got_gitconfig *gitconfig = NULL;
@@ -63,8 +63,10 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	const char *author, *email, *owner;
 
 	*gitconfig_repository_format_version = 0;
-	if (extensions)
-		*extensions = NULL;
+	if (extnames)
+		*extnames = NULL;
+	if (extvals)
+		*extvals = NULL;
 	if (nextensions)
 		*nextensions = 0;
 	*gitconfig_author_name = NULL;
@@ -91,7 +93,7 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	    "core", "repositoryformatversion", 0);
 
 	tags = got_gitconfig_get_tag_list(gitconfig, "extensions");
-	if (extensions && nextensions && tags) {
+	if (extnames && extvals && nextensions && tags) {
 		size_t numext = 0;
 		TAILQ_FOREACH(node, &tags->fields, link) {
 			char *ext = node->field;
@@ -100,8 +102,13 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			if (get_boolean_val(val))
 				numext++;
 		}
-		*extensions = calloc(numext, sizeof(char *));
-		if (*extensions == NULL) {
+		*extnames = calloc(numext, sizeof(char *));
+		if (*extnames == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+		*extvals = calloc(numext, sizeof(char *));
+		if (*extvals == NULL) {
 			err = got_error_from_errno("calloc");
 			goto done;
 		}
@@ -110,12 +117,20 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			char *val = got_gitconfig_get_str(gitconfig,
 			    "extensions", ext);
 			if (get_boolean_val(val)) {
-				char *extstr = strdup(ext);
+				char *extstr = NULL, *valstr = NULL;
+
+				extstr = strdup(ext);
 				if (extstr == NULL) {
 					err = got_error_from_errno("strdup");
 					goto done;
 				}
-				(*extensions)[(*nextensions)] = extstr;
+				valstr = strdup(val);
+				if (valstr == NULL) {
+					err = got_error_from_errno("strdup");
+					goto done;
+				}
+				(*extnames)[(*nextensions)] = extstr;
+				(*extvals)[(*nextensions)] = valstr;
 				(*nextensions)++;
 			}
 		}
@@ -248,11 +263,15 @@ done:
 	if (gitconfig)
 		got_gitconfig_close(gitconfig);
 	if (err) {
-		if (extensions && nextensions) {
-			for (i = 0; i < (*nextensions); i++)
-				free((*extensions)[i]);
-			free(*extensions);
-			*extensions = NULL;
+		if (extnames && extvals && nextensions) {
+			for (i = 0; i < (*nextensions); i++) {
+				free((*extnames)[i]);
+				free((*extvals)[i]);
+			}
+			free(*extnames);
+			*extnames = NULL;
+			free(*extvals);
+			*extvals = NULL;
 			*nextensions = 0;
 		}
 		if (remotes && nremotes) {
