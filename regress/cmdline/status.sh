@@ -695,6 +695,36 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_status_gitignore_trailing_slashes() {
+	local testroot=`test_init status_gitignore_trailing_slashes`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	echo "unversioned file" > $testroot/wt/epsilon/bar
+	echo "unversioned file" > $testroot/wt/epsilon/boo
+	echo "unversioned file" > $testroot/wt/epsilon/moo
+	echo "epsilon/" > $testroot/wt/.gitignore
+
+	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "xfail trailing slashes"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_status_status_code() {
 	local testroot=`test_init status_status_code`
 
@@ -1044,6 +1074,7 @@ run_test test_status_empty_dir_unversioned_file
 run_test test_status_many_paths
 run_test test_status_cvsignore
 run_test test_status_gitignore
+run_test test_status_gitignore_trailing_slashes
 run_test test_status_status_code
 run_test test_status_suppress
 run_test test_status_empty_file
