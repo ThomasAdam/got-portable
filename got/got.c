@@ -2443,12 +2443,6 @@ cmd_fetch(int argc, char *argv[])
 				}
 			}
 		}
-		if (TAILQ_EMPTY(&wanted_branches)) {
-			error = got_pathlist_append(&wanted_branches,
-			    got_worktree_get_head_ref_name(worktree), NULL);
-			if (error)
-				goto done;
-		}
 	}
 	if (remote == NULL) {
 		repo_conf = got_repo_get_gotconfig(repo);
@@ -2483,6 +2477,12 @@ cmd_fetch(int argc, char *argv[])
 		for (i = 0; i < remote->nfetch_branches; i++) {
 			error = got_pathlist_append(&wanted_branches,
 			    remote->fetch_branches[i], NULL);
+			if (error)
+				goto done;
+		}
+		if (worktree) {
+			error = got_pathlist_append(&wanted_branches,
+			    got_worktree_get_head_ref_name(worktree), NULL);
 			if (error)
 				goto done;
 		}

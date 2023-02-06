@@ -188,6 +188,8 @@ test_fetch_branch() {
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id3=`git_show_head $testroot/repo`
 
+	# foo is now the default HEAD branch in $testroot/repo
+	# but got.conf still says to fetch "master"
 	got fetch -q -r $testroot/repo-clone -b foo > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -228,7 +230,8 @@ test_fetch_branch() {
 		return 1
 	fi
 
-	got fetch -q -r $testroot/repo-clone -b master > $testroot/stdout
+	# got.conf tells us to fetch the 'master' branch by default
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
@@ -271,6 +274,9 @@ test_fetch_branch() {
 	git_commit $testroot/repo -m "modified beta"
 	local commit_id4=`git_show_head $testroot/repo`
 
+	# set the default HEAD branch back to master
+	(cd $testroot/repo && git checkout -q master)
+
 	got checkout -b foo $testroot/repo-clone $testroot/wt > /dev/null
 
 	# fetch new commits on branch 'foo', implicitly obtaining the
@@ -297,7 +303,7 @@ test_fetch_branch() {
 		>> $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id4" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
