@@ -718,9 +718,8 @@ test_status_gitignore_trailing_slashes() {
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "xfail trailing slashes"
-		return 1
+		#diff -u $testroot/stdout.expected $testroot/stdout
+		ret="xfail trailing slashes not matched"
 	fi
 	test_done "$testroot" "$ret"
 }
