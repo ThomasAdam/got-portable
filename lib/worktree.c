@@ -2418,7 +2418,6 @@ struct bump_base_commit_id_arg {
 	void *progress_arg;
 };
 
-/* Bump base commit ID of all files within an updated part of the work tree. */
 static const struct got_error *
 bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 {
@@ -2448,6 +2447,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	return NULL;
 }
 
+/* Bump base commit ID of all files within an updated part of the work tree. */
 static const struct got_error *
 bump_base_commit_id_everywhere(struct got_worktree *worktree,
     struct got_fileindex *fileindex,
