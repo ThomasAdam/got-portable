@@ -19,7 +19,7 @@ got:
 - 'got patch' should ideally do more passes if a patch doesn't apply and
   try fancy things (like ignoring context and whitespaces) only in later
   passes.
-- investigate wether it's worth for 'got patch' to memory-map the files to
+- investigate whether it's worth for 'got patch' to memory-map the files to
   edit.  (c.f. Plan A / Plan B in Larry' patch.)
 - when fetching pack files got should verify that the requested branch tips
   are present in the pack file sent by the server, before making this pack
