@@ -2153,18 +2153,32 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		    strcmp(de->d_name, "..") == 0)
 			continue;
 
+		err = got_path_dirent_type(&type, path_dir, de);
+		if (err)
+			goto done;
+
 		TAILQ_FOREACH(pe, ignores, entry) {
-			if (fnmatch(pe->path, de->d_name, 0) == 0) {
+			if (type == DT_DIR && pe->path_len > 0 &&
+			    pe->path[pe->path_len - 1] == '/') {
+				char stripped[PATH_MAX];
+
+				if (strlcpy(stripped, pe->path,
+				    sizeof(stripped)) >= sizeof(stripped)) {
+					err = got_error(GOT_ERR_NO_SPACE);
+					goto done;
+				}
+				got_path_strip_trailing_slashes(stripped);
+				if (fnmatch(stripped, de->d_name, 0) == 0) {
+					ignore = 1;
+					break;
+				}
+			} else if (fnmatch(pe->path, de->d_name, 0) == 0) {
 				ignore = 1;
 				break;
 			}
 		}
 		if (ignore)
 			continue;
-
-		err = got_path_dirent_type(&type, path_dir, de);
-		if (err)
-			goto done;
 
 		if (type == DT_DIR) {
 			err = import_subdir(&new_te, de, path_dir,
