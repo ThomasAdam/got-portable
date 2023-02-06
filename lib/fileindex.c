@@ -101,7 +101,6 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		ie->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
 	}
 
-
 	if ((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
 		if (update_timestamps) {
 			ie->ctime_sec = sb.st_ctim.tv_sec;
