@@ -117,6 +117,9 @@ The
 .Ar pattern
 follows the globbing rules documented in
 .Xr glob 7 .
+Ignore patterns which end with a slash,
+.Dq / ,
+will only match directories.
 .It Fl m Ar message
 Use the specified log message when creating the new commit.
 Without the

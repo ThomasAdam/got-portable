@@ -374,7 +374,7 @@ test_import_ignores() {
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
 
-	got import -I alpha -I '*lta*' -I '*silon' \
+	got import -I alpha -I 'beta/' -I '*lta*' -I '*silon/' \
 		-m 'init' -r $testroot/repo $testroot/tree > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
