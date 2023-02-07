@@ -1725,7 +1725,7 @@ cmd_clone(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, &wanted_refs,
-	    list_refs_only, verbosity, fetchfd, repo,
+	    list_refs_only, verbosity, fetchfd, repo, NULL,
 	    fetch_progress, &fpa);
 	if (error)
 		goto done;
@@ -2296,7 +2296,7 @@ cmd_fetch(int argc, char *argv[])
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
-	int *pack_fds = NULL;
+	int *pack_fds = NULL, have_bflag = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -2313,6 +2313,7 @@ cmd_fetch(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			have_bflag = 1;
 			break;
 		case 'd':
 			delete_refs = 1;
@@ -2480,12 +2481,6 @@ cmd_fetch(int argc, char *argv[])
 			if (error)
 				goto done;
 		}
-		if (worktree) {
-			error = got_pathlist_append(&wanted_branches,
-			    got_worktree_get_head_ref_name(worktree), NULL);
-			if (error)
-				goto done;
-		}
 	}
 	if (TAILQ_EMPTY(&wanted_refs)) {
 		for (i = 0; i < remote->nfetch_refs; i++) {
@@ -2554,6 +2549,8 @@ cmd_fetch(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
 	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
+	    (worktree != NULL && !have_bflag) ?
+	    got_worktree_get_head_ref_name(worktree) : NULL,
 	    fetch_progress, &fpa);
 	if (error)
 		goto done;

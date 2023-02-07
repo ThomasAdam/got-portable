@@ -46,4 +46,5 @@ typedef const struct got_error *(*got_fetch_progress_cb)(void *,
 const struct got_error *got_fetch_pack(struct got_object_id **,
 	struct got_pathlist_head *, struct got_pathlist_head *, const char *,
 	int, int, struct got_pathlist_head *, struct got_pathlist_head *,
-	int, int, int, struct got_repository *, got_fetch_progress_cb, void *);
+	int, int, int, struct got_repository *, const char *,
+	got_fetch_progress_cb, void *);

@@ -531,7 +531,8 @@ const struct got_error *
 got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
-    struct got_pathlist_head *wanted_refs, int list_refs_only, int verbosity)
+    struct got_pathlist_head *wanted_refs, int list_refs_only,
+    const char *worktree_branch, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
@@ -539,26 +540,41 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_request fetchreq;
 
+	if (worktree_branch)
+		len = sizeof(fetchreq) + strlen(worktree_branch);
+	else
+		len = sizeof(fetchreq);
+
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+		close(fd);
+		return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create FETCH_HAVE_REF");
+
 	memset(&fetchreq, 0, sizeof(fetchreq));
 	fetchreq.fetch_all_branches = fetch_all_branches;
 	fetchreq.list_refs_only = list_refs_only;
 	fetchreq.verbosity = verbosity;
+	if (worktree_branch != NULL)
+		fetchreq.worktree_branch_len = strlen(worktree_branch);
 	TAILQ_FOREACH(pe, have_refs, entry)
 		fetchreq.n_have_refs++;
 	TAILQ_FOREACH(pe, wanted_branches, entry)
 		fetchreq.n_wanted_branches++;
 	TAILQ_FOREACH(pe, wanted_refs, entry)
 		fetchreq.n_wanted_refs++;
-	len = sizeof(struct got_imsg_fetch_request);
-	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
-		close(fd);
-		return got_error(GOT_ERR_NO_SPACE);
+	if (imsg_add(wbuf, &fetchreq, sizeof(fetchreq)) == -1)
+		return got_error_from_errno("imsg_add FETCH_REQUEST");
+	if (worktree_branch) {
+		if (imsg_add(wbuf, worktree_branch,
+		    strlen(worktree_branch))== -1)
+			return got_error_from_errno("imsg_add FETCH_REQUEST");
 	}
-
-	if (imsg_compose(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, fd,
-	    &fetchreq, sizeof(fetchreq)) == -1)
-		return got_error_from_errno(
-		    "imsg_compose FETCH_SERVER_PROGRESS");
+	wbuf->fd = fd;
+	imsg_close(ibuf, wbuf);
 
 	err = flush_imsg(ibuf);
 	if (err) {

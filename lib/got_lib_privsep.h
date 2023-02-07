@@ -407,9 +407,11 @@ struct got_imsg_fetch_request {
 	int fetch_all_branches;
 	int list_refs_only;
 	int verbosity;
+	size_t worktree_branch_len;
 	size_t n_have_refs;
 	size_t n_wanted_branches;
 	size_t n_wanted_refs;
+	/* Followed by worktree_branch_len bytes of reference name. */
 	/* Followed by n_have_refs GOT_IMSG_FETCH_HAVE_REF messages. */
 	/* Followed by n_wanted_branches times GOT_IMSG_FETCH_WANTED_BRANCH. */
 	/* Followed by n_wanted_refs times GOT_IMSG_FETCH_WANTED_REF. */
@@ -698,7 +700,7 @@ const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
     int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
     struct got_pathlist_head *, int, struct got_pathlist_head *,
-    struct got_pathlist_head *, int, int);
+    struct got_pathlist_head *, int, const char *, int);
 const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *, char **,
