@@ -536,13 +536,14 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
-	size_t len;
+	size_t len, worktree_branch_len;
 	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_request fetchreq;
 
-	if (worktree_branch)
-		len = sizeof(fetchreq) + strlen(worktree_branch);
-	else
+	if (worktree_branch) {
+		worktree_branch_len = strlen(worktree_branch);
+		len = sizeof(fetchreq) + worktree_branch_len;
+	} else
 		len = sizeof(fetchreq);
 
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
@@ -559,7 +560,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	fetchreq.list_refs_only = list_refs_only;
 	fetchreq.verbosity = verbosity;
 	if (worktree_branch != NULL)
-		fetchreq.worktree_branch_len = strlen(worktree_branch);
+		fetchreq.worktree_branch_len = worktree_branch_len;
 	TAILQ_FOREACH(pe, have_refs, entry)
 		fetchreq.n_have_refs++;
 	TAILQ_FOREACH(pe, wanted_branches, entry)
@@ -569,8 +570,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	if (imsg_add(wbuf, &fetchreq, sizeof(fetchreq)) == -1)
 		return got_error_from_errno("imsg_add FETCH_REQUEST");
 	if (worktree_branch) {
-		if (imsg_add(wbuf, worktree_branch,
-		    strlen(worktree_branch))== -1)
+		if (imsg_add(wbuf, worktree_branch, worktree_branch_len) == -1)
 			return got_error_from_errno("imsg_add FETCH_REQUEST");
 	}
 	wbuf->fd = fd;
