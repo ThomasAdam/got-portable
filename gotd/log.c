@@ -166,9 +166,9 @@ vfatalc(int code, const char *emsg, va_list ap)
 		sep = "";
 	}
 	if (code)
-		logit(LOG_CRIT, "%s: %s%s", s, sep, strerror(code));
+		logit(LOG_CRIT, "%s%s%s", s, sep, strerror(code));
 	else
-		logit(LOG_CRIT, "%s%s", sep, s);
+		logit(LOG_CRIT, "%s", s);
 }
 
 void
