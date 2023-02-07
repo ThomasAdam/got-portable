@@ -71,7 +71,7 @@ static const struct got_capability got_capabilities[] = {
 
 static void
 match_remote_ref(struct got_pathlist_head *have_refs,
-    struct got_object_id *my_id, char *refname)
+    struct got_object_id *my_id, const char *refname)
 {
 	struct got_pathlist_entry *pe;
 
@@ -292,11 +292,48 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 }
 
 static const struct got_error *
+fetch_ref(struct imsgbuf *ibuf, struct got_pathlist_head *have_refs,
+    struct got_object_id *have, struct got_object_id *want,
+    const char *refname, const char *id_str)
+{
+	const struct got_error *err;
+	char *theirs = NULL, *mine = NULL;
+
+	if (!got_parse_sha1_digest(want->sha1, id_str)) {
+		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		goto done;
+	}
+
+	match_remote_ref(have_refs, have, refname);
+	err = send_fetch_ref(ibuf, want, refname);
+	if (err)
+		goto done;
+
+	if (chattygot)
+		fprintf(stderr, "%s: %s will be fetched\n",
+		    getprogname(), refname);
+	if (chattygot > 1) {
+		err = got_object_id_str(&theirs, want);
+		if (err)
+			goto done;
+		err = got_object_id_str(&mine, have);
+		if (err)
+			goto done;
+		fprintf(stderr, "%s: remote: %s\n%s: local:  %s\n",
+		    getprogname(), theirs, getprogname(), mine);
+	}
+done:
+	free(theirs);
+	free(mine);
+	return err;
+}
+
+static const struct got_error *
 fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
-    struct imsgbuf *ibuf)
+    const char *worktree_branch, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKT_MAX];
@@ -305,7 +342,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	int is_firstpkt = 1, nref = 0, refsz = 16;
 	int i, n, nwant = 0, nhave = 0, acked = 0;
 	off_t packsz = 0, last_reported_packsz = 0;
-	char *id_str = NULL, *refname = NULL;
+	char *id_str = NULL, *default_id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	const char *default_branch = NULL;
 	struct got_pathlist_head symrefs;
@@ -346,6 +383,21 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		    &server_capabilities, buf, n);
 		if (err)
 			goto done;
+
+		if (refsz == nref + 1) {
+			refsz *= 2;
+			have = reallocarray(have, refsz, sizeof(have[0]));
+			if (have == NULL) {
+				err = got_error_from_errno("reallocarray");
+				goto done;
+			}
+			want = reallocarray(want, refsz, sizeof(want[0]));
+			if (want == NULL) {
+				err = got_error_from_errno("reallocarray");
+				goto done;
+			}
+		}
+
 		if (is_firstpkt) {
 			if (chattygot && server_capabilities[0] != '\0')
 				fprintf(stderr, "%s: server capabilities: %s\n",
@@ -383,107 +435,80 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 			continue;
 		}
-
-		if (strncmp(refname, "refs/heads/", 11) == 0) {
-			if (fetch_all_branches || list_refs_only) {
-				found_branch = 1;
-			} else if (!TAILQ_EMPTY(wanted_branches)) {
-				TAILQ_FOREACH(pe, wanted_branches, entry) {
-					if (match_branch(refname, pe->path))
-						break;
-				}
-				if (pe == NULL) {
-					if (chattygot) {
-						fprintf(stderr,
-						    "%s: ignoring %s\n",
-						    getprogname(), refname);
-					}
-					continue;
-				}
-				found_branch = 1;
-			} else if (default_branch != NULL) {
-				if (!match_branch(refname, default_branch)) {
-					if (chattygot) {
-						fprintf(stderr,
-						    "%s: ignoring %s\n",
-						    getprogname(), refname);
-					}
-					continue;
-				}
-				found_branch = 1;
-			}
-		} else if (strncmp(refname, "refs/tags/", 10) != 0) {
-			if (!TAILQ_EMPTY(wanted_refs)) {
-				TAILQ_FOREACH(pe, wanted_refs, entry) {
-					if (match_wanted_ref(refname, pe->path))
-						break;
-				}
-				if (pe == NULL) {
-					if (chattygot) {
-						fprintf(stderr,
-						    "%s: ignoring %s\n",
-						    getprogname(), refname);
-					}
-					continue;
-				}
-				found_branch = 1;
-			} else if (!list_refs_only) {
-				if (chattygot) {
-					fprintf(stderr, "%s: ignoring %s\n",
-					    getprogname(), refname);
-				}
-				continue;
-			}
-		}
-
-		if (refsz == nref + 1) {
-			refsz *= 2;
-			have = reallocarray(have, refsz, sizeof(have[0]));
-			if (have == NULL) {
-				err = got_error_from_errno("reallocarray");
-				goto done;
-			}
-			want = reallocarray(want, refsz, sizeof(want[0]));
-			if (want == NULL) {
-				err = got_error_from_errno("reallocarray");
+		if (default_branch && default_id_str == NULL &&
+		    strcmp(refname, default_branch) == 0) {
+			default_id_str = strdup(id_str);
+			if (default_id_str == NULL) {
+				err = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
-		if (!got_parse_sha1_digest(want[nref].sha1, id_str)) {
-			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
-			goto done;
-		}
-		match_remote_ref(have_refs, &have[nref], refname);
-		err = send_fetch_ref(ibuf, &want[nref], refname);
-		if (err)
-			goto done;
 
-		if (chattygot)
-			fprintf(stderr, "%s: %s will be fetched\n",
-			    getprogname(), refname);
-		if (chattygot > 1) {
-			char *theirs, *mine;
-			err = got_object_id_str(&theirs, &want[nref]);
+		if (list_refs_only || strncmp(refname, "refs/tags/", 10) == 0) {
+			err = fetch_ref(ibuf, have_refs, &have[nref],
+			    &want[nref], refname, id_str);
 			if (err)
 				goto done;
-			err = got_object_id_str(&mine, &have[nref]);
-			if (err) {
-				free(theirs);
-				goto done;
+			nref++;
+		} else if (strncmp(refname, "refs/heads/", 11) == 0) {
+			if (fetch_all_branches) {
+				err = fetch_ref(ibuf, have_refs, &have[nref],
+				    &want[nref], refname, id_str);
+				if (err)
+					goto done;
+				nref++;
+				found_branch = 1;
+				continue;
 			}
-			fprintf(stderr, "%s: remote: %s\n%s: local:  %s\n",
-			    getprogname(), theirs, getprogname(), mine);
-			free(theirs);
-			free(mine);
+			TAILQ_FOREACH(pe, wanted_branches, entry) {
+				if (match_branch(refname, pe->path))
+					break;
+			}
+			if (pe != NULL || (worktree_branch != NULL &&
+			    match_branch(refname, worktree_branch))) {
+				err = fetch_ref(ibuf, have_refs, &have[nref],
+				    &want[nref], refname, id_str);
+				if (err)
+					goto done;
+				nref++;
+				found_branch = 1;
+			} else if (chattygot) {
+				fprintf(stderr, "%s: ignoring %s\n",
+				    getprogname(), refname);
+			}
+		} else {
+			TAILQ_FOREACH(pe, wanted_refs, entry) {
+				if (match_wanted_ref(refname, pe->path))
+					break;
+			}
+			if (pe != NULL) {
+				err = fetch_ref(ibuf, have_refs, &have[nref],
+				    &want[nref], refname, id_str);
+				if (err)
+					goto done;
+				nref++;
+			} else if (chattygot) {
+				fprintf(stderr, "%s: ignoring %s\n",
+				    getprogname(), refname);
+			}
 		}
-		nref++;
 	}
 
 	if (list_refs_only)
 		goto done;
 
-	/* Abort if we haven't found any branch to fetch. */
-	if (!found_branch) {
+	if (!found_branch && default_branch && default_id_str &&
+	    strncmp(default_branch, "refs/heads/", 11) == 0) {
+		err = fetch_ref(ibuf, have_refs, &have[nref],
+		    &want[nref], default_branch, default_id_str);
+		if (err)
+			goto done;
+		nref++;
+		found_branch = 1;
+	}
+
+	/* Abort if we haven't found anything to fetch. */
+	if (nref == 0) {
 		err = got_error(GOT_ERR_FETCH_NO_BRANCH);
 		goto done;
 	}
@@ -763,6 +788,7 @@ done:
 	free(have);
 	free(want);
 	free(id_str);
+	free(default_id_str);
 	free(refname);
 	free(server_capabilities);
 	return err;
@@ -785,6 +811,7 @@ main(int argc, char **argv)
 	struct got_imsg_fetch_wanted_branch wbranch;
 	struct got_imsg_fetch_wanted_ref wref;
 	size_t datalen, i;
+	char *worktree_branch = NULL;
 #if 0
 	static int attached;
 	while (!attached)
@@ -823,6 +850,22 @@ main(int argc, char **argv)
 	}
 	memcpy(&fetch_req, imsg.data, sizeof(fetch_req));
 	fetchfd = imsg.fd;
+
+	if (datalen != sizeof(fetch_req) +
+	    fetch_req.worktree_branch_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	if (fetch_req.worktree_branch_len != 0) {
+		worktree_branch = strndup(imsg.data +
+		    sizeof(fetch_req), fetch_req.worktree_branch_len);
+		if (worktree_branch == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+	}
+
 	imsg_free(&imsg);
 
 	if (fetch_req.verbosity > 0)
@@ -978,8 +1021,10 @@ main(int argc, char **argv)
 
 	err = fetch_pack(fetchfd, packfd, pack_sha1, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,
-	    &wanted_refs, fetch_req.list_refs_only, &ibuf);
+	    &wanted_refs, fetch_req.list_refs_only,
+	    worktree_branch, &ibuf);
 done:
+	free(worktree_branch);
 	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
 	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_PATH);
 	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
