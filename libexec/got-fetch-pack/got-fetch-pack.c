@@ -385,17 +385,21 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			goto done;
 
 		if (refsz == nref + 1) {
+			struct got_object_id *h, *w;
+
 			refsz *= 2;
-			have = reallocarray(have, refsz, sizeof(have[0]));
-			if (have == NULL) {
+			h = reallocarray(have, refsz, sizeof(have[0]));
+			if (h == NULL) {
 				err = got_error_from_errno("reallocarray");
 				goto done;
 			}
-			want = reallocarray(want, refsz, sizeof(want[0]));
-			if (want == NULL) {
+			have = h;
+			w = reallocarray(want, refsz, sizeof(want[0]));
+			if (w == NULL) {
 				err = got_error_from_errno("reallocarray");
 				goto done;
 			}
+			want = w;
 		}
 
 		if (is_firstpkt) {
