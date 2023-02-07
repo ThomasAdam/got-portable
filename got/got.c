@@ -2297,6 +2297,7 @@ cmd_fetch(int argc, char *argv[])
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
 	int *pack_fds = NULL, have_bflag = 0;
+	const char *worktree_branch = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -2538,6 +2539,14 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (worktree && !have_bflag) {
+		const char *refname;
+
+		refname = got_worktree_get_head_ref_name(worktree);
+		if (strncmp(refname, "refs/heads/", 11) == 0)
+			worktree_branch = refname;
+	}
+
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
@@ -2549,9 +2558,7 @@ cmd_fetch(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
 	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
-	    (worktree != NULL && !have_bflag) ?
-	    got_worktree_get_head_ref_name(worktree) : NULL,
-	    fetch_progress, &fpa);
+	    worktree_branch, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
