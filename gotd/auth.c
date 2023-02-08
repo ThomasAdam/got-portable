@@ -266,11 +266,10 @@ auth_dispatch(int fd, short event, void *arg)
 		case GOTD_IMSG_AUTHENTICATE:
 			err = recv_authreq(&imsg, iev);
 			if (err)
-				log_warnx("%s: %s", gotd_auth.title, err->msg);
+				log_warnx("%s", err->msg);
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", gotd_auth.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 
@@ -332,6 +331,6 @@ auth_main(const char *title, struct gotd_repolist *repos,
 static void
 auth_shutdown(void)
 {
-	log_debug("%s: shutting down", gotd_auth.title);
+	log_debug("shutting down");
 	exit(0);
 }

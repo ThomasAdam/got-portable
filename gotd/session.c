@@ -1481,7 +1481,7 @@ done:
 void
 gotd_session_shutdown(void)
 {
-	log_debug("%s: shutting down", gotd_session.title);
+	log_debug("shutting down");
 	if (gotd_session.repo)
 		got_repo_close(gotd_session.repo);
 	got_repo_pack_fds_close(gotd_session.pack_fds);
