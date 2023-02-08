@@ -435,12 +435,10 @@ listen_dispatch(int fd, short event, void *arg)
 		case GOTD_IMSG_DISCONNECT:
 			err = recv_disconnect(&imsg);
 			if (err)
-				log_warnx("%s: disconnect: %s",
-				    gotd_listen.title, err->msg);
+				log_warnx("disconnect: %s", err->msg);
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", gotd_listen.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 
@@ -506,7 +504,7 @@ listen_main(const char *title, int gotd_socket,
 static void
 listen_shutdown(void)
 {
-	log_debug("%s: shutting down", gotd_listen.title);
+	log_debug("shutting down");
 
 	free(gotd_listen.connection_limits);
 	if (gotd_listen.fd != -1)
