@@ -1189,23 +1189,6 @@ done:
 }
 
 static const struct got_error *
-recv_disconnect(struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_disconnect idisconnect;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(idisconnect))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&idisconnect, imsg->data, sizeof(idisconnect));
-
-	log_debug("client disconnecting");
-
-	return err;
-}
-
-static const struct got_error *
 receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	struct repo_write_client *client = &repo_write_client;
@@ -1346,13 +1329,6 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 				log_warnx("%s: update refs: %s",
 				    repo_write.title, err->msg);
 			}
-			break;
-		case GOTD_IMSG_DISCONNECT:
-			err = recv_disconnect(&imsg);
-			if (err)
-				log_warnx("%s: disconnect: %s",
-				    repo_write.title, err->msg);
-			shut = 1;
 			break;
 		default:
 			log_debug("%s: unexpected imsg %d", repo_write.title,
