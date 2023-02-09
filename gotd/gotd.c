@@ -1075,8 +1075,12 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	int do_disconnect = 0;
 
 	client = find_client_by_proc_fd(fd);
-	if (client == NULL)
-		fatalx("cannot find client for fd %d", fd);
+	if (client == NULL) {
+		/* Can happen during process teardown. */
+		warnx("cannot find client for fd %d", fd);
+		shut = 1;
+		goto done;
+	}
 
 	if (client->auth == NULL)
 		fatalx("cannot find auth child process for fd %d", fd);
@@ -1218,8 +1222,12 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 	struct imsg imsg;
 
 	client = find_client_by_proc_fd(fd);
-	if (client == NULL)
-		fatalx("cannot find client for fd %d", fd);
+	if (client == NULL) {
+		/* Can happen during process teardown. */
+		warnx("cannot find client for fd %d", fd);
+		shut = 1;
+		goto done;
+	}
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
@@ -1340,8 +1348,12 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	struct imsg imsg;
 
 	client = find_client_by_proc_fd(fd);
-	if (client == NULL)
-		fatalx("cannot find client for fd %d", fd);
+	if (client == NULL) {
+		/* Can happen during process teardown. */
+		warnx("cannot find client for fd %d", fd);
+		shut = 1;
+		goto done;
+	}
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
