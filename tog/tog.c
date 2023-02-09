@@ -1288,7 +1288,7 @@ tog_resizeterm(void)
 }
 
 static const struct got_error *
-view_search_start(struct tog_view *view)
+view_search_start(struct tog_view *view, int fast_refresh)
 {
 	const struct got_error *err = NULL;
 	struct tog_view *v = view;
@@ -1321,6 +1321,8 @@ view_search_start(struct tog_view *view)
 	cbreak();
 	noecho();
 	nodelay(v->window, TRUE);
+	if (!fast_refresh)
+		halfdelay(10);
 	if (ret == ERR)
 		return NULL;
 
@@ -1488,7 +1490,7 @@ action_report(struct tog_view *view)
 
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
-    struct tog_view_list_head *views)
+    struct tog_view_list_head *views, int fast_refresh)
 {
 	const struct got_error *err = NULL;
 	struct tog_view *v;
@@ -1683,7 +1685,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	case '/':
 		view->count = 0;
 		if (view->search_start)
-			view_search_start(view);
+			view_search_start(view, fast_refresh);
 		else
 			err = view->input(new, view, ch);
 		break;
@@ -1775,7 +1777,7 @@ view_loop(struct tog_view *view)
 		if (fast_refresh && --fast_refresh == 0)
 			halfdelay(10); /* switch to once per second */
 
-		err = view_input(&new_view, &done, view, &views);
+		err = view_input(&new_view, &done, view, &views, fast_refresh);
 		if (err)
 			break;
 
