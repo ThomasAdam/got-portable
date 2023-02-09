@@ -2038,8 +2038,13 @@ When a file changed by
 is committed with
 .Cm got commit ,
 the log messages of relevant merged commits will then appear in the editor,
-where the messages must be further adjusted to convey the reasons for
+where the messages should be further adjusted to convey the reasons for
 cherrypicking the changes.
+At the very least, comment lines must be removed.
+Otherwise
+.Cm got commit
+will fail with an unmodified log message error.
+.Pp
 If all the changes in all files touched by a given commit are discarded,
 e.g. with
 .Cm got revert ,
@@ -2141,8 +2146,13 @@ When a file changed by
 is committed with
 .Cm got commit ,
 the log messages of relevant reverse-merged commits will then appear in
-the editor, where the messages must be further adjusted to convey the
+the editor, where the messages should be further adjusted to convey the
 reasons for backing out the changes.
+At the very least, comment lines must be removed.
+Otherwise
+.Cm got commit
+will fail with an unmodified log message error.
+.Pp
 If all the changes in all files touched by a given commit are discarded,
 e.g. with
 .Cm got revert ,

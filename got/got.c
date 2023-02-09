@@ -389,13 +389,60 @@ doneediting:
 }
 
 static const struct got_error *
+read_logmsg(char **logmsg, size_t *len, FILE *fp, size_t filesize,
+    int strip_comments)
+{
+	const struct got_error *err = NULL;
+	char *line = NULL;
+	size_t linesize = 0;
+
+	*logmsg = NULL;
+	*len = 0;
+
+	if (fseeko(fp, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	*logmsg = malloc(filesize + 1);
+	if (*logmsg == NULL)
+		return got_error_from_errno("malloc");
+	(*logmsg)[0] = '\0';
+
+	while (getline(&line, &linesize, fp) != -1) {
+		if ((strip_comments && line[0] == '#') ||
+		    (*len == 0 && line[0] == '\n'))
+			continue; /* remove comments and leading empty lines */
+		*len = strlcat(*logmsg, line, filesize + 1);
+		if (*len >= filesize + 1) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+	}
+	if (ferror(fp)) {
+		err = got_ferror(fp, GOT_ERR_IO);
+		goto done;
+	}
+
+	while (*len > 0 && (*logmsg)[*len - 1] == '\n') {
+		(*logmsg)[*len - 1] = '\0';
+		(*len)--;
+	}
+done:
+	free(line);
+	if (err) {
+		free(*logmsg);
+		*logmsg = NULL;
+		*len = 0;
+	}
+	return err;
+}
+
+static const struct got_error *
 edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
     const char *initial_content, size_t initial_content_len,
     int require_modification)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
-	size_t linesize = 0;
 	struct stat st, st2;
 	FILE *fp = NULL;
 	size_t len, logmsg_len;
@@ -435,8 +482,8 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	s = buf;
 	len = 0;
 	while ((line = strsep(&s, "\n")) != NULL) {
-		if ((line[0] == '#' || (len == 0 && line[0] == '\n')))
-			continue; /* remove comments and leading empty lines */
+		if (len == 0 && line[0] == '\n')
+			continue; /* remove leading empty lines */
 		len = strlcat(initial_content_stripped, line,
 		    initial_content_len + 1);
 		if (len >= initial_content_len + 1) {
@@ -449,47 +496,35 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		len--;
 	}
 
-	logmsg_len = st2.st_size;
-	*logmsg = malloc(logmsg_len + 1);
-	if (*logmsg == NULL)
-		return got_error_from_errno("malloc");
-	(*logmsg)[0] = '\0';
-
 	fp = fopen(logmsg_path, "re");
 	if (fp == NULL) {
 		err = got_error_from_errno("fopen");
 		goto done;
 	}
 
-	len = 0;
-	while (getline(&line, &linesize, fp) != -1) {
-		if ((line[0] == '#' || (len == 0 && line[0] == '\n')))
-			continue; /* remove comments and leading empty lines */
-		len = strlcat(*logmsg, line, logmsg_len + 1);
-		if (len >= logmsg_len + 1) {
-			err = got_error(GOT_ERR_NO_SPACE);
-			goto done;
-		}
-	}
-	free(line);
-	if (ferror(fp)) {
-		err = got_ferror(fp, GOT_ERR_IO);
+	/*
+	 * Check whether the log message was modified.
+	 * Editing or removal of comments does count as a modifcation to
+	 * support reuse of existing log messages during cherrypick/backout.
+	 */
+	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size, 0);
+	if (err)
 		goto done;
-	}
-	while (len > 0 && (*logmsg)[len - 1] == '\n') {
-		(*logmsg)[len - 1] = '\0';
-		len--;
-	}
-
-	if (len == 0) {
-		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
-		    "commit message cannot be empty, aborting");
-		goto done;
-	}
 	if (require_modification &&
 	    strcmp(*logmsg, initial_content_stripped) == 0)
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
+
+	/* Read log message again, stripping comments this time around. */
+	free(*logmsg);
+	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size, 1);
+	if (err)
+		goto done;
+	if (logmsg_len == 0) {
+		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "commit message cannot be empty, aborting");
+		goto done;
+	}
 done:
 	free(initial_content_stripped);
 	free(buf);
