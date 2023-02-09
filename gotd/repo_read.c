@@ -286,8 +286,6 @@ list_refs(struct imsg *imsg)
 	}
 	client->id = ireq.client_id;
 	client->fd = client_fd;
-	client->delta_cache_fd = -1;
-	client->pack_pipe = -1;
 
 	imsg_init(&ibuf, client_fd);
 
@@ -670,35 +668,6 @@ done:
 	return err;
 }
 
-static const struct got_error *
-recv_disconnect(struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_disconnect idisconnect;
-	size_t datalen;
-	int delta_cache_fd, pack_pipe;
-	struct repo_read_client *client = &repo_read_client;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(idisconnect))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&idisconnect, imsg->data, sizeof(idisconnect));
-
-	log_debug("client disconnecting");
-
-	free_object_ids(&client->have_ids);
-	free_object_ids(&client->want_ids);
-	if (close(client->fd) == -1)
-		err = got_error_from_errno("close");
-	delta_cache_fd = client->delta_cache_fd;
-	if (delta_cache_fd != -1 && close(delta_cache_fd) == -1 && err == NULL)
-		return got_error_from_errno("close");
-	pack_pipe = client->pack_pipe;
-	if (pack_pipe != -1 && close(pack_pipe) == -1 && err == NULL)
-		return got_error_from_errno("close");
-	return err;
-}
-
 static void
 repo_read_dispatch_session(int fd, short event, void *arg)
 {
@@ -773,13 +742,6 @@ repo_read_dispatch_session(int fd, short event, void *arg)
 			if (err)
 				log_warnx("%s: sending packfile: %s",
 				    repo_read.title, err->msg);
-			break;
-		case GOTD_IMSG_DISCONNECT:
-			err = recv_disconnect(&imsg);
-			if (err)
-				log_warnx("%s: disconnect: %s",
-				    repo_read.title, err->msg);
-			shut = 1;
 			break;
 		default:
 			log_debug("%s: unexpected imsg %d", repo_read.title,
@@ -898,7 +860,12 @@ repo_read_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds)
 {
 	const struct got_error *err = NULL;
+	struct repo_read_client *client = &repo_read_client;
 	struct gotd_imsgev iev;
+
+	client->fd = -1;
+	client->delta_cache_fd = -1;
+	client->pack_pipe = -1;
 
 	repo_read.title = title;
 	repo_read.pid = getpid();
@@ -945,7 +912,19 @@ done:
 void
 repo_read_shutdown(void)
 {
+	struct repo_read_client *client = &repo_read_client;
+
 	log_debug("%s: shutting down", repo_read.title);
+
+	free_object_ids(&client->have_ids);
+	free_object_ids(&client->want_ids);
+	if (client->fd != -1)
+		close(client->fd);
+	if (client->delta_cache_fd != -1)
+		close(client->delta_cache_fd);
+	if (client->pack_pipe != -1)
+		close(client->pack_pipe);
+
 	if (repo_read.repo)
 		got_repo_close(repo_read.repo);
 	got_repo_pack_fds_close(repo_read.pack_fds);

@@ -257,8 +257,6 @@ list_refs(struct imsg *imsg)
 	}
 	client->id = ireq.client_id;
 	client->fd = client_fd;
-	client->pack_pipe = -1;
-	client->packidx_fd = -1;
 	client->nref_updates = 0;
 	client->nref_del = 0;
 	client->nref_new = 0;
@@ -1196,8 +1194,6 @@ recv_disconnect(struct imsg *imsg)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_disconnect idisconnect;
 	size_t datalen;
-	int pack_pipe = -1, idxfd = -1;
-	struct repo_write_client *client = &repo_write_client;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(idisconnect))
@@ -1206,22 +1202,6 @@ recv_disconnect(struct imsg *imsg)
 
 	log_debug("client disconnecting");
 
-	while (!STAILQ_EMPTY(&client->ref_updates)) {
-		struct gotd_ref_update *ref_update;
-		ref_update = STAILQ_FIRST(&client->ref_updates);
-		STAILQ_REMOVE_HEAD(&client->ref_updates, entry);
-		got_ref_close(ref_update->ref);
-		free(ref_update);
-	}
-	err = got_pack_close(&client->pack);
-	if (client->fd != -1 && close(client->fd) == -1)
-		err = got_error_from_errno("close");
-	pack_pipe = client->pack_pipe;
-	if (pack_pipe != -1 && close(pack_pipe) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	idxfd = client->packidx_fd;
-	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
 	return err;
 }
 
@@ -1491,7 +1471,13 @@ repo_write_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds)
 {
 	const struct got_error *err = NULL;
+	struct repo_write_client *client = &repo_write_client;
 	struct gotd_imsgev iev;
+
+	client->fd = -1;
+	client->pack_pipe = -1;
+	client->packidx_fd = -1;
+	client->pack.fd = -1;
 
 	repo_write.title = title;
 	repo_write.pid = getpid();
@@ -1539,7 +1525,26 @@ done:
 void
 repo_write_shutdown(void)
 {
+	struct repo_write_client *client = &repo_write_client;
+	struct gotd_ref_update *ref_update;
+
 	log_debug("%s: shutting down", repo_write.title);
+
+	while (!STAILQ_EMPTY(&client->ref_updates)) {
+		ref_update = STAILQ_FIRST(&client->ref_updates);
+		STAILQ_REMOVE_HEAD(&client->ref_updates, entry);
+		got_ref_close(ref_update->ref);
+		free(ref_update);
+	}
+
+	got_pack_close(&client->pack);
+	if (client->fd != -1)
+		close(client->fd);
+	if (client->pack_pipe != -1)
+		close(client->pack_pipe);
+	if (client->packidx_fd != -1)
+		close(client->packidx_fd);
+
 	if (repo_write.repo)
 		got_repo_close(repo_write.repo);
 	got_repo_pack_fds_close(repo_write.pack_fds);
