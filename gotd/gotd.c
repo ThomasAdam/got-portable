@@ -338,13 +338,8 @@ disconnect(struct gotd_client *client)
 	kill_auth_proc(client);
 	kill_session_proc(client);
 
-	idisconnect.client_id = client->id;
 	if (proc) {
-		if (gotd_imsg_compose_event(&proc->iev,
-		    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
-		    &idisconnect, sizeof(idisconnect)) == -1)
-			log_warn("imsg compose DISCONNECT");
-
+		event_del(&proc->iev.ev);
 		msgbuf_clear(&proc->iev.ibuf.w);
 		close(proc->iev.ibuf.fd);
 		kill_proc(proc, 0);
@@ -353,6 +348,7 @@ disconnect(struct gotd_client *client)
 		proc = NULL;
 	}
 
+	idisconnect.client_id = client->id;
 	if (gotd_imsg_compose_event(&listen_proc->iev,
 	    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
 	    &idisconnect, sizeof(idisconnect)) == -1)
