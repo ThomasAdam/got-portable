@@ -1715,9 +1715,9 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	if (staged_status == GOT_STATUS_MODIFY ||
 	    staged_status == GOT_STATUS_ADD)
-		memcpy(id.sha1, ie->staged_blob_sha1, sizeof(id.sha1));
+		got_fileindex_entry_get_staged_blob_id(&id, ie);
 	else
-		memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
+		got_fileindex_entry_get_blob_id(&id, ie);
 
 	fd1 = got_opentempfd();
 	if (fd1 == -1) {
@@ -1927,7 +1927,7 @@ update_blob(struct got_worktree *worktree,
 				goto done;
 			}
 			struct got_object_id id2;
-			memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+			got_fileindex_entry_get_blob_id(&id2, ie);
 			err = got_object_open_as_blob(&blob2, repo, &id2, 8192,
 			    fd2);
 			if (err)
@@ -3341,19 +3341,14 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	    staged_status == GOT_STATUS_NO_CHANGE && !report_unchanged)
 		return NULL;
 
-	if (got_fileindex_entry_has_blob(ie)) {
-		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		blob_idp = &blob_id;
-	}
-	if (got_fileindex_entry_has_commit(ie)) {
-		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		commit_idp = &commit_id;
-	}
+	if (got_fileindex_entry_has_blob(ie))
+		blob_idp = got_fileindex_entry_get_blob_id(&blob_id, ie);
+	if (got_fileindex_entry_has_commit(ie))
+		commit_idp = got_fileindex_entry_get_commit_id(&commit_id, ie);
 	if (staged_status == GOT_STATUS_ADD ||
 	    staged_status == GOT_STATUS_MODIFY) {
-		memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
-		    SHA1_DIGEST_LENGTH);
-		staged_blob_idp = &staged_blob_id;
+		staged_blob_idp = got_fileindex_entry_get_staged_blob_id(
+		    &staged_blob_id, ie);
 	}
 
 	return (*status_cb)(status_arg, status, staged_status,
@@ -3405,8 +3400,8 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	if (!got_path_is_child(ie->path, a->status_path, a->status_path_len))
 		return NULL;
 
-	memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-	memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+	got_fileindex_entry_get_blob_id(&blob_id, ie);
+	got_fileindex_entry_get_commit_id(&commit_id, ie);
 	if (got_fileindex_entry_has_file_on_disk(ie))
 		status = GOT_STATUS_MISSING;
 	else
@@ -4780,12 +4775,10 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	case GOT_STATUS_MISSING: {
 		struct got_object_id id;
 		if (staged_status == GOT_STATUS_ADD ||
-		    staged_status == GOT_STATUS_MODIFY) {
-			memcpy(id.sha1, ie->staged_blob_sha1,
-			    SHA1_DIGEST_LENGTH);
-		} else
-			memcpy(id.sha1, ie->blob_sha1,
-			    SHA1_DIGEST_LENGTH);
+		    staged_status == GOT_STATUS_MODIFY)
+			got_fileindex_entry_get_staged_blob_id(&id, ie);
+		else
+			got_fileindex_entry_get_blob_id(&id, ie);
 		fd = got_opentempfd();
 		if (fd == -1) {
 			err = got_error_from_errno("got_opentempfd");
@@ -8280,9 +8273,8 @@ check_stage_ok(void *arg, unsigned char status,
 		return got_error_from_errno("asprintf");
 
 	if (got_fileindex_entry_has_commit(ie)) {
-		memcpy(base_commit_id.sha1, ie->commit_sha1,
-		    SHA1_DIGEST_LENGTH);
-		base_commit_idp = &base_commit_id;
+		base_commit_idp = got_fileindex_entry_get_commit_id(
+		    &base_commit_id, ie);
 	}
 
 	if (status == GOT_STATUS_CONFLICT) {
@@ -9114,22 +9106,17 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 	if (pe == NULL) /* not found */
 		return NULL;
 
-	if (got_fileindex_entry_has_blob(ie)) {
-		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		blob_idp = &blob_id;
-	}
+	if (got_fileindex_entry_has_blob(ie))
+		blob_idp = got_fileindex_entry_get_blob_id(&blob_id, ie);
 	stage = got_fileindex_entry_stage_get(ie);
 	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 	    stage == GOT_FILEIDX_STAGE_ADD) {
-		memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
-		    SHA1_DIGEST_LENGTH);
-		staged_blob_idp = &staged_blob_id;
+		staged_blob_idp = got_fileindex_entry_get_staged_blob_id(
+		    &staged_blob_id, ie);
 	}
 
-	if (got_fileindex_entry_has_commit(ie)) {
-		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		commit_idp = &commit_id;
-	}
+	if (got_fileindex_entry_has_commit(ie))
+		commit_idp = got_fileindex_entry_get_commit_id(&commit_id, ie);
 
 	return a->info_cb(a->info_arg, ie->path, got_fileindex_perms_to_st(ie),
 	    (time_t)ie->mtime_sec, blob_idp, staged_blob_idp, commit_idp);

@@ -1228,4 +1228,31 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
 	return err;
 }
 
+struct got_object_id *
+got_fileindex_entry_get_staged_blob_id(struct got_object_id *id,
+    struct got_fileindex_entry *ie)
+{
+	memset(id, 0, sizeof(*id));
+	memcpy(id->sha1, ie->staged_blob_sha1, sizeof(ie->staged_blob_sha1));
+	return id;
+}
+
+struct got_object_id *
+got_fileindex_entry_get_blob_id(struct got_object_id *id,
+    struct got_fileindex_entry *ie)
+{
+	memset(id, 0, sizeof(*id));
+	memcpy(id->sha1, ie->blob_sha1, sizeof(ie->blob_sha1));
+	return id;
+}
+
+struct got_object_id *
+got_fileindex_entry_get_commit_id(struct got_object_id *id,
+    struct got_fileindex_entry *ie)
+{
+	memset(id, 0, sizeof(*id));
+	memcpy(id->sha1, ie->commit_sha1, sizeof(ie->commit_sha1));
+	return id;
+}
+
 RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

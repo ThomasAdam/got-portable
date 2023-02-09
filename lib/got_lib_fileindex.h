@@ -174,3 +174,14 @@ void got_fileindex_entry_staged_filetype_set(struct got_fileindex_entry *, int);
 int got_fileindex_entry_staged_filetype_get(struct got_fileindex_entry *);
 
 void got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *);
+
+/*
+ * Retrieve staged, blob or commit id from a fileindex entry, and return
+ * the given object id.
+ */
+struct got_object_id *got_fileindex_entry_get_staged_blob_id(
+    struct got_object_id *, struct got_fileindex_entry *);
+struct got_object_id *got_fileindex_entry_get_blob_id(struct got_object_id *,
+    struct got_fileindex_entry *);
+struct got_object_id *got_fileindex_entry_get_commit_id(struct got_object_id *,
+    struct got_fileindex_entry *);
