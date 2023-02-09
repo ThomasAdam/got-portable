@@ -105,7 +105,7 @@ static const struct got_error *start_auth_child(struct gotd_client *, int,
 static void kill_proc(struct gotd_child_proc *, int);
 
 __dead static void
-usage()
+usage(void)
 {
 	fprintf(stderr, "usage: %s [-dnv] [-f config-file]\n", getprogname());
 	exit(1);
