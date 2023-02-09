@@ -36,7 +36,7 @@
 static int chattygot;
 
 __dead static void
-usage()
+usage(void)
 {
 	fprintf(stderr, "usage: %s -c '%s|%s repository-path'\n",
 	    getprogname(), GOT_SERVE_CMD_SEND, GOT_SERVE_CMD_FETCH);
