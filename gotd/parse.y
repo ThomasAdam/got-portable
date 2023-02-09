@@ -109,7 +109,6 @@ typedef struct {
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
-%type	<v.number>	boolean
 %type	<v.tv>		timeout
 
 %%
@@ -118,26 +117,6 @@ grammar		:
 		| grammar '\n'
 		| grammar main '\n'
 		| grammar repository '\n'
-		;
-
-boolean		: STRING {
-			if (strcasecmp($1, "1") == 0 ||
-			    strcasecmp($1, "yes") == 0 ||
-			    strcasecmp($1, "on") == 0)
-				$$ = 1;
-			else if (strcasecmp($1, "0") == 0 ||
-			    strcasecmp($1, "off") == 0 ||
-			    strcasecmp($1, "no") == 0)
-				$$ = 0;
-			else {
-				yyerror("invalid boolean value '%s'", $1);
-				free($1);
-				YYERROR;
-			}
-			free($1);
-		}
-		| ON { $$ = 1; }
-		| NUMBER { $$ = $1; }
 		;
 
 timeout		: NUMBER {
