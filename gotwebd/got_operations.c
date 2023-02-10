@@ -981,8 +981,10 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		}
 
 		if (a->cb(c->tp, line, bline, a->nlines_prec,
-		    a->lineno_cur) == -1)
+		    a->lineno_cur) == -1) {
+			err = got_error(GOT_ERR_CANCELLED);
 			break;
+		}
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
