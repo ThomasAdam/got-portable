@@ -1013,7 +1013,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 
 	(*blob)->hdrlen = hdrlen;
 	(*blob)->blocksize = blocksize;
-	memcpy(&(*blob)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&(*blob)->id, id, sizeof(*id));
 
 done:
 	free(path_packfile);
