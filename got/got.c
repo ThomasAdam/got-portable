@@ -389,8 +389,7 @@ doneediting:
 }
 
 static const struct got_error *
-read_logmsg(char **logmsg, size_t *len, FILE *fp, size_t filesize,
-    int strip_comments)
+read_logmsg(char **logmsg, size_t *len, FILE *fp, size_t filesize)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -408,8 +407,7 @@ read_logmsg(char **logmsg, size_t *len, FILE *fp, size_t filesize,
 	(*logmsg)[0] = '\0';
 
 	while (getline(&line, &linesize, fp) != -1) {
-		if ((strip_comments && line[0] == '#') ||
-		    (*len == 0 && line[0] == '\n'))
+		if (line[0] == '#' || (*len == 0 && line[0] == '\n'))
 			continue; /* remove comments and leading empty lines */
 		*len = strlcat(*logmsg, line, filesize + 1);
 		if (*len >= filesize + 1) {
@@ -468,7 +466,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	}
 
 	/* strip comments and leading/trailing newlines */
-	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size, 1);
+	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size);
 	if (err)
 		goto done;
 	if (logmsg_len == 0) {
