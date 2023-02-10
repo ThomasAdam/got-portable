@@ -2040,10 +2040,10 @@ is committed with
 the log messages of relevant merged commits will then appear in the editor,
 where the messages should be further adjusted to convey the reasons for
 cherrypicking the changes.
-At the very least, comment lines must be removed.
-Otherwise
+Upon exiting the editor, if the time stamp of the log message file
+is unchanged or the log message is empty,
 .Cm got commit
-will fail with an unmodified log message error.
+will fail with an unmodified or empty log message error.
 .Pp
 If all the changes in all files touched by a given commit are discarded,
 e.g. with
@@ -2148,10 +2148,10 @@ is committed with
 the log messages of relevant reverse-merged commits will then appear in
 the editor, where the messages should be further adjusted to convey the
 reasons for backing out the changes.
-At the very least, comment lines must be removed.
-Otherwise
+Upon exiting the editor, if the time stamp of the log message file
+is unchanged or the log message is empty,
 .Cm got commit
-will fail with an unmodified log message error.
+will fail with an unmodified or empty log message error.
 .Pp
 If all the changes in all files touched by a given commit are discarded,
 e.g. with

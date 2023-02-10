@@ -442,11 +442,9 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
     int require_modification)
 {
 	const struct got_error *err = NULL;
-	char *line = NULL;
 	struct stat st, st2;
 	FILE *fp = NULL;
-	size_t len, logmsg_len;
-	char *initial_content_stripped = NULL, *buf = NULL, *s;
+	size_t logmsg_len;
 
 	*logmsg = NULL;
 
@@ -459,42 +457,9 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	if (stat(logmsg_path, &st2) == -1)
 		return got_error_from_errno("stat");
 
-	if (require_modification &&
-	    st.st_mtime == st2.st_mtime && st.st_size == st2.st_size)
+	if (require_modification && timespeccmp(&st.st_mtim, &st2.st_mtim, ==))
 		return got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
-
-	/*
-	 * Set up a stripped version of the initial content without comments
-	 * and blank lines. We need this in order to check if the message
-	 * has in fact been edited.
-	 */
-	initial_content_stripped = malloc(initial_content_len + 1);
-	if (initial_content_stripped == NULL)
-		return got_error_from_errno("malloc");
-	initial_content_stripped[0] = '\0';
-
-	buf = strdup(initial_content);
-	if (buf == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
-	}
-	s = buf;
-	len = 0;
-	while ((line = strsep(&s, "\n")) != NULL) {
-		if (len == 0 && line[0] == '\n')
-			continue; /* remove leading empty lines */
-		len = strlcat(initial_content_stripped, line,
-		    initial_content_len + 1);
-		if (len >= initial_content_len + 1) {
-			err = got_error(GOT_ERR_NO_SPACE);
-			goto done;
-		}
-	}
-	while (len > 0 && initial_content_stripped[len - 1] == '\n') {
-		initial_content_stripped[len - 1] = '\0';
-		len--;
-	}
 
 	fp = fopen(logmsg_path, "re");
 	if (fp == NULL) {
@@ -502,21 +467,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		goto done;
 	}
 
-	/*
-	 * Check whether the log message was modified.
-	 * Editing or removal of comments does count as a modifcation to
-	 * support reuse of existing log messages during cherrypick/backout.
-	 */
-	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size, 0);
-	if (err)
-		goto done;
-	if (require_modification &&
-	    strcmp(*logmsg, initial_content_stripped) == 0)
-		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
-		    "no changes made to commit message, aborting");
-
-	/* Read log message again, stripping comments this time around. */
-	free(*logmsg);
+	/* strip comments and leading/trailing newlines */
 	err = read_logmsg(logmsg, &logmsg_len, fp, st2.st_size, 1);
 	if (err)
 		goto done;
@@ -526,8 +477,6 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		goto done;
 	}
 done:
-	free(initial_content_stripped);
-	free(buf);
 	if (fp && fclose(fp) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
