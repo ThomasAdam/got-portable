@@ -767,8 +767,10 @@ got_output_repo_tree(struct request *c,
 
 	for (i = 0; i < nentries; i++) {
 		te = got_object_tree_get_entry(tree, i);
-		if (cb(c->tp, te) == -1)
+		if (cb(c->tp, te) == -1) {
+			error = got_error(GOT_ERR_CANCELLED);
 			break;
+		}
 	}
 done:
 	free(escaped_name);
@@ -891,8 +893,10 @@ got_output_blob_by_lines(struct template *tp, struct got_blob_object *blob,
 		if (err || linelen == -1)
 			break;
 		lineno++;
-		if (cb(tp, line, lineno) == -1)
+		if (cb(tp, line, lineno) == -1) {
+			err = got_error(GOT_ERR_CANCELLED);
 			break;
+		}
 	}
 
 	free(line);
