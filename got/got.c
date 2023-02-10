@@ -452,10 +452,19 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	if (spawn_editor(editor, logmsg_path) == -1)
 		return got_error_from_errno("failed spawning editor");
 
+	if (require_modification) {
+		struct timespec timeout;
+
+		timeout.tv_sec = 0;
+		timeout.tv_nsec = 1;
+		nanosleep(&timeout,  NULL);
+	}
+
 	if (stat(logmsg_path, &st2) == -1)
 		return got_error_from_errno("stat");
 
-	if (require_modification && timespeccmp(&st.st_mtim, &st2.st_mtim, ==))
+	if (require_modification && st.st_size == st2.st_size &&
+	    timespeccmp(&st.st_mtim, &st2.st_mtim, ==))
 		return got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 
