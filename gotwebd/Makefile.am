@@ -4,9 +4,12 @@ include $(top_builddir)/Makefile.common
 
 # /home/n6tadam/projects/got/gotwebd/../template/template -o pages.c pages.tmpl
 
-SUFFIXES: .tmpl
-.tmpl.c:
-	$(top_srcdir)/template/template -o pages.c pages.tmpl
+BUILT_SOURCES = pages.c
+CLEANFILES = pages.c parse.c
+
+pages.c: $(top_srcdir)/gotwebd/pages.tmpl
+	${MAKE} -C $(top_builddir)/template
+	$(top_builddir)/template/template -o pages.c $(top_srcdir)/gotwebd/pages.tmpl
 
 gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/blame.c \
@@ -63,7 +66,7 @@ gotwebd_SOURCES = config.c \
 		  gotweb.c \
 		  gotwebd.c \
 		  log.c \
-		  pages.tmpl \
+		  pages.c \
 		  parse.y \
 		  proc.c \
 		  sockets.c
@@ -75,6 +78,7 @@ endif
 
 gotwebd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = $(top_srcdir)/gotwebd/*.h \
+	     $(top_srcdir)/gotwebd/*.tmpl \
 	     $(top_srcdir)/template/tmpl.h \
 	     gotwebd.8 gotwebd.conf.5
 
