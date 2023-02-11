@@ -199,9 +199,9 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 			break;
 	}
 
-	*id = malloc(sizeof(**id));
+	*id = calloc(1, sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
@@ -393,9 +393,9 @@ got_object_tree_create(struct got_object_id **id,
 		treesize += n;
 	}
 
-	*id = malloc(sizeof(**id));
+	*id = calloc(1, sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
@@ -582,9 +582,9 @@ got_object_commit_create(struct got_object_id **id,
 	}
 	commitsize += n;
 
-	*id = malloc(sizeof(**id));
+	*id = calloc(1, sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
@@ -849,9 +849,9 @@ got_object_tag_create(struct got_object_id **id,
 		tagsize += n;
 	}
 
-	*id = malloc(sizeof(**id));
+	*id = calloc(1, sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_from_errno("malloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
