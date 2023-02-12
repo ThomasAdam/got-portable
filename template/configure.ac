@@ -15,11 +15,22 @@ AC_ARG_VAR(HOSTCFLAGS, [CFLAGS for the host compiler])
 # paths. But for Makefile.am we want to use AM_CPPFLAGS and friends.
 SAVED_CFLAGS="$CFLAGS"
 
+# YACC override
+YACC_OVERRIDE="yes"
+
 test -n "$HOSTCC"	&& export CC="$HOSTCC"
 test -n "$HOSTCFLAGS"	&& export CFLAGS="$SAVED_CFLAGS $HOSTCFLAGS"
 
 AC_PROG_CC
+
+if test -z "$YACC"; then
+YACC_OVERRIDE="no"
 AC_PROG_YACC
+fi
+
+if test "$YACC_OVERRIDE" = "yes"; then
+	AC_MSG_NOTICE("Using YACC set from environment: $YACC")
+fi
 
 AM_CPPFLAGS="$CFLAGS"
 
@@ -36,3 +47,5 @@ AC_CHECK_DECL([TAILQ_REMOVE], [],
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
+
+echo "BISON IS: $YACC"
