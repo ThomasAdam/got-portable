@@ -1647,8 +1647,9 @@ get_file_status(unsigned char *status, struct stat *sb,
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
 	size_t flen, blen;
-	unsigned char staged_status = get_staged_status(ie);
+	unsigned char staged_status;
 
+	staged_status = get_staged_status(ie);
 	*status = GOT_STATUS_NO_CHANGE;
 	memset(sb, 0, sizeof(*sb));
 
@@ -3327,12 +3328,13 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 {
 	const struct got_error *err = NULL;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
-	unsigned char staged_status = get_staged_status(ie);
+	unsigned char staged_status;
 	struct stat sb;
 	struct got_object_id blob_id, commit_id, staged_blob_id;
 	struct got_object_id *blob_idp = NULL, *commit_idp = NULL;
 	struct got_object_id *staged_blob_idp = NULL;
 
+	staged_status = get_staged_status(ie);
 	err = get_file_status(&status, &sb, ie, abspath, dirfd, de_name, repo);
 	if (err)
 		return err;
