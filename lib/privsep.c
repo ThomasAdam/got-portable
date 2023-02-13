@@ -1452,8 +1452,7 @@ send_tree_entries(struct imsgbuf *ibuf, struct got_parsed_tree_entry *entries,
 	i = 0;
 	for (j = 0; j < nentries; j++) {
 		struct got_parsed_tree_entry *pte = &entries[j];
-		size_t len = SHA1_DIGEST_LENGTH + sizeof(pte->mode) +
-		    sizeof(pte->namelen) + pte->namelen;
+		size_t len = sizeof(struct got_imsg_tree_entry) + pte->namelen;
 
 		if (j > 0 &&
 		    entries_len + len > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
