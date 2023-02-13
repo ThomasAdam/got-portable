@@ -1425,6 +1425,398 @@ test_fetch_delete_remote_refs() {
 	test_done "$testroot" "$ret"
 }
 
+test_fetch_honor_wt_conf_bflag() {
+	local testroot=`test_init fetch_branch`
+	local testurl=ssh://127.0.0.1/$testroot
+
+	# server will have 'boo', 'hoo', and 'master'
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id boo
+	(cd $testroot/repo && git checkout -q boo)
+	echo "modified beta on boo" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified beta"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id2 hoo
+	(cd $testroot/repo && git checkout -q hoo)
+	echo "modified delta on hoo" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "modified delta"
+	local commit_id3=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# only clone will have foo and bar
+	got branch -r $testroot/repo-clone -c $commit_id foo
+	got branch -r $testroot/repo-clone -c $commit_id bar
+
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q boo)
+	# from repo: fetch got.conf branch not repo HEAD
+	# boo is the default HEAD in $testroot/repo, which is not up-to-date
+	# on the clone, but we fetch got.conf "master" which is up-to-date
+	got fetch -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
+	    > $testroot/stdout.expected
+	echo "Already up-to-date" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from repo: fetch -b hoo not got.conf branch or repo HEAD
+	got fetch -q -r $testroot/repo-clone -b hoo > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from repo: fetch -b foo which doesn't exist on the server but
+	# do not fallback to repo HEAD "boo" because we used the -b flag
+	got fetch -r $testroot/repo-clone -b foo > $testroot/stdout \
+	    2> $testroot/stderr
+
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
+	    > $testroot/stdout.expected
+	echo "got-fetch-pack: could not find any branches to fetch" \
+	    > $testroot/stderr.expected
+	echo "got: could not find any branches to fetch" \
+	    >> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from repo: fetch got.conf branch which doesn't exist, so fallback
+	# to repo HEAD "boo"
+	# change default branch in got.conf from "master" to "foo"
+	sed -i "s/master/foo/" $testroot/repo-clone/got.conf
+
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from wt: fetch got.conf "foo", which doesn't exist on the server,
+	# and implicit wt branch "boo", not repo HEAD "master"
+	echo "modified delta on boo" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "modified delta"
+	local commit_id4=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+
+	got checkout -b boo $testroot/repo-clone $testroot/wt > /dev/null
+	(cd $testroot/wt && got fetch -q > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local wt_uuid=`(cd $testroot/wt && got info | grep 'UUID:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/got/worktree/base-$wt_uuid: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id4" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from wt: fetch got.conf "master" and wt "boo", not repo HEAD "hoo"
+	# change default branch in got.conf from "foo" to "master"
+	sed -i "s/foo/master/" $testroot/repo-clone/got.conf
+	echo "modified delta on master" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "modified delta on master"
+	local commit_id5=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q boo)
+	echo "modified alpha on boo" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha on boo"
+	local commit_id6=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q hoo)
+	echo "modified beta on hoo" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified beta on hoo"
+	local commit_id7=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got fetch -q > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/got/worktree/base-$wt_uuid: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/hoo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id6" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id5" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from wt: fetch -b hoo not got.conf "master" or wt "boo" or
+	# repo HEAD "boo"
+	(cd $testroot/repo && git checkout -q boo)
+	echo "modified alpha again on boo" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha again on boo"
+	local commit_id8=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got fetch -q -b hoo > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/got/worktree/base-$wt_uuid: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id6" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo: $commit_id7" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id5" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from wt: fetch -b bar that doesn't exist on the server but
+	# do not fetch got.conf "master" or wt "boo" or repo HEAD "boo"
+	(cd $testroot/wt && got fetch -b bar > $testroot/stdout \
+	    2> $testroot/stderr)
+
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
+	    > $testroot/stdout.expected
+	echo "got-fetch-pack: could not find any branches to fetch" \
+	    > $testroot/stderr.expected
+	echo "got: could not find any branches to fetch" \
+	    >> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
 
 test_parseargs "$@"
 run_test test_fetch_basic
@@ -1441,3 +1833,4 @@ run_test test_fetch_update_headref
 run_test test_fetch_headref_deleted_locally
 run_test test_fetch_gotconfig_remote_repo
 run_test test_fetch_delete_remote_refs
+run_test test_fetch_honor_wt_conf_bflag
