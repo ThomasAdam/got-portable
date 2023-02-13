@@ -333,7 +333,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
-    const char *worktree_branch, struct imsgbuf *ibuf)
+    const char *worktree_branch, int no_head, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKT_MAX];
@@ -501,7 +501,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	if (list_refs_only)
 		goto done;
 
-	if (!found_branch && default_branch && default_id_str &&
+	if (!found_branch && !no_head && default_branch && default_id_str &&
 	    strncmp(default_branch, "refs/heads/", 11) == 0) {
 		err = fetch_ref(ibuf, have_refs, &have[nref],
 		    &want[nref], default_branch, default_id_str);
@@ -1026,7 +1026,7 @@ main(int argc, char **argv)
 	err = fetch_pack(fetchfd, packfd, pack_sha1, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,
 	    &wanted_refs, fetch_req.list_refs_only,
-	    worktree_branch, &ibuf);
+	    worktree_branch, fetch_req.no_head, &ibuf);
 done:
 	free(worktree_branch);
 	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
