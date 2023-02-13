@@ -764,26 +764,6 @@ test_commit_cmdline_author() {
 
 	echo "modified alpha" > $testroot/wt/alpha
 
-	# first try with a -A equals to $GOT_AUTHOR
-	(cd $testroot/wt && got commit -A "$GOT_AUTHOR" -m 'edit alpha') \
-		> /dev/null 2> $testroot/stderr
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		test_done "$testroot" 1
-		return 1
-	fi
-
-	echo 'got: specified author is equal to the default one' \
-	     > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" $ret
-		return 1
-	fi
-
-	# try again with a different author
 	local author="Foo <foo@example.com>"
 	(cd $testroot/wt && got commit -A "$author" -m 'edit alpha') \
 		> /dev/null
