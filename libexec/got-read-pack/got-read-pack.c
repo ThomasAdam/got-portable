@@ -544,7 +544,8 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 			free(*buf2);
 			*buf2 = NULL;
 			err = open_tree(buf2, entries2, nentries2,
-			nentries_alloc2, pack, packidx, idx, &id2, objcache);
+			    nentries_alloc2, pack, packidx, idx, &id2,
+			    objcache);
 			pte2 = NULL;
 			if (err)
 				break;
