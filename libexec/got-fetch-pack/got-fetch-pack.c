@@ -513,6 +513,25 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 
 	/* Abort if we haven't found anything to fetch. */
 	if (nref == 0) {
+		struct got_pathlist_entry *pe;
+		static char msg[PATH_MAX + 33];
+
+		pe = TAILQ_FIRST(wanted_branches);
+		if (pe) {
+			snprintf(msg, sizeof(msg),
+			    "branch \"%s\" not found on server", pe->path);
+			err = got_error_msg(GOT_ERR_FETCH_NO_BRANCH, msg);
+			goto done;
+		}
+
+		pe = TAILQ_FIRST(wanted_refs);
+		if (pe) {
+			snprintf(msg, sizeof(msg),
+			    "reference \"%s\" not found on server", pe->path);
+			err = got_error_msg(GOT_ERR_FETCH_NO_BRANCH, msg);
+			goto done;
+		}
+
 		err = got_error(GOT_ERR_FETCH_NO_BRANCH);
 		goto done;
 	}
