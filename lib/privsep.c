@@ -532,7 +532,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
-    const char *worktree_branch, int verbosity)
+    const char *worktree_branch, int no_head, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
@@ -556,6 +556,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		return got_error_from_errno("imsg_create FETCH_HAVE_REF");
 
 	memset(&fetchreq, 0, sizeof(fetchreq));
+	fetchreq.no_head = no_head;
 	fetchreq.fetch_all_branches = fetch_all_branches;
 	fetchreq.list_refs_only = list_refs_only;
 	fetchreq.verbosity = verbosity;

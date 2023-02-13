@@ -354,15 +354,15 @@ If
 .Cm got fetch
 is invoked in a work tree then this work tree's current branch will be
 fetched, too, provided it is present on the server.
+If no branches to fetch can be found in
+.Xr got.conf 5
+or via a work tree, or said branches are not found on the server, a branch
+resolved via the remote repository's HEAD reference will be fetched.
 This default behaviour can be overridden with the
 .Fl a
 and
 .Fl b
 options.
-If no branches to fetch can be found in
-.Xr got.conf 5 ,
-on the command line, or via a work tree, a branch resolved via the remote
-repository's HEAD reference will be fetched.
 .Pp
 New changes will be stored in a separate pack file downloaded from the server.
 Optionally, separate pack files stored in the repository can be combined with

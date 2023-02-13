@@ -1716,7 +1716,7 @@ cmd_clone(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, &wanted_refs,
-	    list_refs_only, verbosity, fetchfd, repo, NULL,
+	    list_refs_only, verbosity, fetchfd, repo, NULL, 0,
 	    fetch_progress, &fpa);
 	if (error)
 		goto done;
@@ -2546,10 +2546,11 @@ cmd_fetch(int argc, char *argv[])
 	fpa.create_configs = 0;
 	fpa.configs_created = 0;
 	memset(&fpa.config_info, 0, sizeof(fpa.config_info));
+
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
 	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
-	    worktree_branch, fetch_progress, &fpa);
+	    worktree_branch, have_bflag, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
