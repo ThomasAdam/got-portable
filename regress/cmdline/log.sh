@@ -129,7 +129,7 @@ test_log_in_worktree() {
 }
 
 test_log_in_worktree_with_path_prefix() {
-	local testroot=`test_init log_in_prefixed_worktree`
+	local testroot=`test_init log_in_worktree_with_path_prefix`
 	local head_rev=`git_show_head $testroot/repo`
 
 	echo "modified zeta" > $testroot/repo/epsilon/zeta
