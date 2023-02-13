@@ -1568,7 +1568,7 @@ test_fetch_honor_wt_conf_bflag() {
 
 	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
 	    > $testroot/stdout.expected
-	echo "got-fetch-pack: could not find any branches to fetch" \
+	echo "got-fetch-pack: branch \"foo\" not found on server" \
 	    > $testroot/stderr.expected
 	echo "got: could not find any branches to fetch" \
 	    >> $testroot/stderr.expected
@@ -1797,7 +1797,7 @@ test_fetch_honor_wt_conf_bflag() {
 
 	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
 	    > $testroot/stdout.expected
-	echo "got-fetch-pack: could not find any branches to fetch" \
+	echo "got-fetch-pack: branch \"bar\" not found on server" \
 	    > $testroot/stderr.expected
 	echo "got: could not find any branches to fetch" \
 	    >> $testroot/stderr.expected
