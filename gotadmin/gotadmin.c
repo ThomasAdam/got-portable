@@ -284,6 +284,11 @@ cmd_init(int argc, char *argv[])
 	char *repo_path = NULL;
 	int ch;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "b:")) != -1) {
 		switch (ch) {
 		case 'b':
@@ -298,10 +303,6 @@ cmd_init(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc != 1)
 		usage_init();
 
@@ -338,6 +339,12 @@ cmd_info(int argc, char *argv[])
 	char scaled[FMT_SCALED_STRSIZE];
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
 		case 'r':
@@ -356,11 +363,6 @@ cmd_info(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (repo_path == NULL) {
 		error = get_repo_path(&repo_path);
 		if (error)
@@ -706,6 +708,12 @@ cmd_pack(int argc, char *argv[])
 	TAILQ_INIT(&exclude_refs);
 	TAILQ_INIT(&include_refs);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "aqr:x:")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -737,11 +745,6 @@ cmd_pack(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (repo_path == NULL) {
 		error = get_repo_path(&repo_path);
 		if (error)
@@ -1035,6 +1038,12 @@ cmd_listpack(int argc, char *argv[])
 	int show_stats = 0, human_readable = 0;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "hs")) != -1) {
 		switch (ch) {
 		case 'h':
@@ -1058,11 +1067,6 @@ cmd_listpack(int argc, char *argv[])
 	if (packfile_path == NULL)
 		return got_error_from_errno2("realpath", argv[0]);
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	error = got_repo_pack_fds_open(&pack_fds);
 	if (error != NULL)
 		goto done;
@@ -1220,6 +1224,12 @@ cmd_cleanup(int argc, char *argv[])
 	char scaled_diff[FMT_SCALED_STRSIZE];
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "anpqr:")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -1250,11 +1260,6 @@ cmd_cleanup(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (repo_path == NULL) {
 		error = get_repo_path(&repo_path);
 		if (error)
