@@ -9144,11 +9144,6 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (author != NULL && !strcmp(committer, author)) {
-		error = got_error(GOT_ERR_COMMIT_REDUNDANT_AUTHOR);
-		goto done;
-	}
-
 	if (author == NULL)
 		author = committer;
 
