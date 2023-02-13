@@ -759,6 +759,13 @@ cmd_import(int argc, char *argv[])
 
 	TAILQ_INIT(&ignores);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "b:I:m:r:")) != -1) {
 		switch (ch) {
 		case 'b':
@@ -796,12 +803,6 @@ cmd_import(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc != 1)
 		usage_import();
 
@@ -2947,6 +2948,12 @@ cmd_checkout(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "b:c:Ep:q")) != -1) {
 		switch (ch) {
 		case 'b':
@@ -2975,11 +2982,6 @@ cmd_checkout(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc == 1) {
 		char *base, *dotgit;
 		const char *path;
@@ -3431,6 +3433,12 @@ cmd_update(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "b:c:q")) != -1) {
 		switch (ch) {
 		case 'b':
@@ -3453,11 +3461,6 @@ cmd_update(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	worktree_path = getcwd(NULL, 0);
 	if (worktree_path == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -6249,6 +6252,12 @@ cmd_status(int argc, char *argv[])
 	st.status_codes = NULL;
 	st.suppress = 0;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "IS:s:")) != -1) {
 		switch (ch) {
 		case 'I':
@@ -6290,11 +6299,6 @@ cmd_status(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -6475,6 +6479,12 @@ cmd_ref(int argc, char *argv[])
 	char *refname = NULL;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "c:dlr:s:t")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -6546,11 +6556,6 @@ cmd_ref(int argc, char *argv[])
 	if (refname)
 		got_path_strip_trailing_slashes(refname);
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-	    "sendfd unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -6875,6 +6880,12 @@ cmd_branch(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "c:d:lnr:t")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -6925,11 +6936,6 @@ cmd_branch(int argc, char *argv[])
 	} else if (!do_show && argc != 1)
 		usage_branch();
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-	    "sendfd unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -7507,6 +7513,12 @@ cmd_tag(int argc, char *argv[])
 	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "c:lm:r:s:Vv")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -7572,11 +7584,6 @@ cmd_tag(int argc, char *argv[])
 	if (argc == 1)
 		tag_name = argv[0];
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-	    "sendfd unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -7751,6 +7758,12 @@ cmd_add(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "IR")) != -1) {
 		switch (ch) {
 		case 'I':
@@ -7768,11 +7781,6 @@ cmd_add(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc < 1)
 		usage_add();
 
@@ -7895,6 +7903,12 @@ cmd_remove(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "fkRs:")) != -1) {
 		switch (ch) {
 		case 'f':
@@ -7932,11 +7946,6 @@ cmd_remove(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc < 1)
 		usage_remove();
 
@@ -8588,6 +8597,12 @@ cmd_revert(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "F:pR")) != -1) {
 		switch (ch) {
 		case 'F':
@@ -8608,11 +8623,6 @@ cmd_revert(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (argc < 1)
 		usage_revert();
 	if (patch_script_path && !pflag)
@@ -9039,6 +9049,12 @@ cmd_commit(int argc, char *argv[])
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "A:F:m:NnS")) != -1) {
 		switch (ch) {
 		case 'A':
@@ -9078,11 +9094,6 @@ cmd_commit(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -10049,6 +10060,12 @@ cmd_cherrypick(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "lX")) != -1) {
 		switch (ch) {
 		case 'l':
@@ -10066,11 +10083,6 @@ cmd_cherrypick(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (list_refs || remove_refs) {
 		if (argc != 0 && argc != 1)
 			usage_cherrypick();
@@ -10190,6 +10202,12 @@ cmd_backout(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "lX")) != -1) {
 		switch (ch) {
 		case 'l':
@@ -10207,11 +10225,6 @@ cmd_backout(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (list_refs || remove_refs) {
 		if (argc != 0 && argc != 1)
 			usage_backout();
@@ -10959,6 +10972,12 @@ cmd_rebase(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "aclX")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -10982,11 +11001,6 @@ cmd_rebase(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (list_backups) {
 		if (abort_rebase)
 			option_conflict('l', 'a');
@@ -12233,6 +12247,12 @@ cmd_histedit(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "acdeF:flmX")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -12271,11 +12291,6 @@ cmd_histedit(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (abort_edit && continue_edit)
 		option_conflict('a', 'c');
 	if (edit_script_path && edit_logmsg_only)
@@ -12830,6 +12845,12 @@ cmd_integrate(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int *pack_fds = NULL;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
 		default:
@@ -12844,11 +12865,7 @@ cmd_integrate(int argc, char *argv[])
 	if (argc != 1)
 		usage_integrate();
 	branch_arg = argv[0];
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
+
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -12999,6 +13016,12 @@ cmd_merge(int argc, char *argv[])
 
 	memset(&upa, 0, sizeof(upa));
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "acn")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -13018,12 +13041,6 @@ cmd_merge(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
-
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 
 	if (abort_merge && continue_merge)
 		option_conflict('a', 'c');
@@ -13305,6 +13322,12 @@ cmd_stage(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "F:lpS")) != -1) {
 		switch (ch) {
 		case 'F':
@@ -13328,11 +13351,6 @@ cmd_stage(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (list_stage && (pflag || patch_script_path))
 		errx(1, "-l option cannot be used with other options");
 	if (patch_script_path && !pflag)
@@ -13440,6 +13458,12 @@ cmd_unstage(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "F:p")) != -1) {
 		switch (ch) {
 		case 'F':
@@ -13457,11 +13481,6 @@ cmd_unstage(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if (patch_script_path && !pflag)
 		errx(1, "-F option can only be used together with -p option");
 
@@ -13975,6 +13994,12 @@ cmd_info(int argc, char *argv[])
 
 	TAILQ_INIT(&paths);
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
 		default:
@@ -13986,11 +14011,6 @@ cmd_info(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");

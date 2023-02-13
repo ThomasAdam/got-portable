@@ -9451,10 +9451,16 @@ main(int argc, char *argv[])
 	};
 	char *diff_algo_str = NULL;
 
+	setlocale(LC_CTYPE, "");
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
 	if (!isatty(STDIN_FILENO))
 		errx(1, "standard input is not a tty");
-
-	setlocale(LC_CTYPE, "");
 
 	while ((ch = getopt_long(argc, argv, "+hV", longopts, NULL)) != -1) {
 		switch (ch) {
@@ -9479,12 +9485,6 @@ main(int argc, char *argv[])
 		got_version_print_str();
 		return 0;
 	}
-
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 
 	if (argc == 0) {
 		if (hflag)
