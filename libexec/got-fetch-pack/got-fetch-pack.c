@@ -342,12 +342,13 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	int is_firstpkt = 1, nref = 0, refsz = 16;
 	int i, n, nwant = 0, nhave = 0, acked = 0;
 	off_t packsz = 0, last_reported_packsz = 0;
-	char *id_str = NULL, *refname = NULL;
+	char *id_str = NULL, *default_id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	const char *default_branch = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0, have_sidebands = 0;
+	int found_branch = 0;
 	SHA1_CTX sha1_ctx;
 	uint8_t sha1_buf[SHA1_DIGEST_LENGTH];
 	size_t sha1_buf_len = 0;
@@ -438,17 +439,13 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 			continue;
 		}
-
-		/* always fetch remote HEAD unless -b was specified */
-		if (!no_head && default_branch &&
-		    strcmp(refname, default_branch) == 0 &&
-		    strncmp(default_branch, "refs/heads/", 11) == 0) {
-			err = fetch_ref(ibuf, have_refs, &have[nref],
-			    &want[nref], default_branch, id_str);
-			if (err)
+		if (default_branch && default_id_str == NULL &&
+		    strcmp(refname, default_branch) == 0) {
+			default_id_str = strdup(id_str);
+			if (default_id_str == NULL) {
+				err = got_error_from_errno("strdup");
 				goto done;
-			nref++;
-			continue;
+			}
 		}
 
 		if (list_refs_only || strncmp(refname, "refs/tags/", 10) == 0) {
@@ -464,6 +461,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				if (err)
 					goto done;
 				nref++;
+				found_branch = 1;
 				continue;
 			}
 			TAILQ_FOREACH(pe, wanted_branches, entry) {
@@ -477,6 +475,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				if (err)
 					goto done;
 				nref++;
+				found_branch = 1;
 			} else if (chattygot) {
 				fprintf(stderr, "%s: ignoring %s\n",
 				    getprogname(), refname);
@@ -501,6 +500,16 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 
 	if (list_refs_only)
 		goto done;
+
+	if (!found_branch && !no_head && default_branch && default_id_str &&
+	    strncmp(default_branch, "refs/heads/", 11) == 0) {
+		err = fetch_ref(ibuf, have_refs, &have[nref],
+		    &want[nref], default_branch, default_id_str);
+		if (err)
+			goto done;
+		nref++;
+		found_branch = 1;
+	}
 
 	/* Abort if we haven't found anything to fetch. */
 	if (nref == 0) {
@@ -802,6 +811,7 @@ done:
 	free(have);
 	free(want);
 	free(id_str);
+	free(default_id_str);
 	free(refname);
 	free(server_capabilities);
 	return err;

@@ -211,11 +211,8 @@ test_fetch_branch() {
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
-	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
-		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/foo: $commit_id3" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -1116,11 +1113,8 @@ test_fetch_update_headref() {
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
-	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
-		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/foo: $commit_id" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -1432,7 +1426,7 @@ test_fetch_delete_remote_refs() {
 }
 
 test_fetch_honor_wt_conf_bflag() {
-	local testroot=`test_init fetch_honor_wt_conf_bflag`
+	local testroot=`test_init fetch_branch`
 	local testurl=ssh://127.0.0.1/$testroot
 
 	# server will have 'boo', 'hoo', and 'master'
@@ -1502,15 +1496,11 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q master)
-	echo "alpha master" > $testroot/repo/alpha
-	git_commit $testroot/repo -m "alpha master"
-	local commit_id_alpha_master=`git_show_head $testroot/repo`
-
 	(cd $testroot/repo && git checkout -q boo)
-
-	# from repo: no -b used, fetch got.conf "master" and repo HEAD "boo"
-	got fetch -q -r $testroot/repo-clone > $testroot/stdout
+	# from repo: fetch got.conf branch not repo HEAD
+	# boo is the default HEAD in $testroot/repo, which is not up-to-date
+	# on the clone, but we fetch got.conf "master" which is up-to-date
+	got fetch -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
@@ -1518,19 +1508,9 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	got ref -l -r $testroot/repo-clone > $testroot/stdout
-
-	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
-	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
-	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
-	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
-	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
-		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/boo: $commit_id2" \
-		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/master: $commit_id_alpha_master" \
-		>> $testroot/stdout.expected
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
+	    > $testroot/stdout.expected
+	echo "Already up-to-date" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -1563,17 +1543,14 @@ test_fetch_honor_wt_conf_bflag() {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
-	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
-		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/boo: $commit_id2" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo: $commit_id3" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/master: $commit_id_alpha_master" \
+	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
@@ -1612,14 +1589,10 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	# from repo: fetch got.conf branch "foo", which
-	# doesn't exist on the server, and repo HEAD "boo"
+	# from repo: fetch got.conf branch which doesn't exist, so fallback
+	# to repo HEAD "boo"
 	# change default branch in got.conf from "master" to "foo"
 	sed -i "s/master/foo/" $testroot/repo-clone/got.conf
-
-	echo "modified alpha again on boo" > $testroot/repo/alpha
-	git_commit $testroot/repo -m "modified alpha again on boo"
-	commit_id_alpha=`git_show_head $testroot/repo`
 
 	got fetch -q -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
@@ -1649,11 +1622,11 @@ test_fetch_honor_wt_conf_bflag() {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/boo: $commit_id_alpha" \
+	echo "refs/remotes/origin/boo: $commit_id2" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo: $commit_id3" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/master: $commit_id_alpha_master" \
+	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
@@ -1664,16 +1637,13 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	# from wt: fetch got.conf "foo", which doesn't exist on the
-	# server, and implicit wt branch "boo", and repo HEAD "master"
+	# from wt: fetch got.conf "foo", which doesn't exist on the server,
+	# and implicit wt branch "boo", not repo HEAD "master"
 	echo "modified delta on boo" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta"
 	local commit_id4=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q master)
-	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
-	git_commit $testroot/repo -m "modified zeta on master"
-	local commit_id_zeta=`git_show_head $testroot/repo`
 
 	got checkout -b boo $testroot/repo-clone $testroot/wt > /dev/null
 	(cd $testroot/wt && got fetch -q > $testroot/stdout)
@@ -1707,7 +1677,7 @@ test_fetch_honor_wt_conf_bflag() {
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo: $commit_id3" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/master: $commit_id_zeta" \
+	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
@@ -1718,7 +1688,7 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	# from wt: fetch got.conf "master" and wt "boo", and repo HEAD "hoo"
+	# from wt: fetch got.conf "master" and wt "boo", not repo HEAD "hoo"
 	# change default branch in got.conf from "foo" to "master"
 	sed -i "s/foo/master/" $testroot/repo-clone/got.conf
 	echo "modified delta on master" > $testroot/repo/gamma/delta
@@ -1761,7 +1731,7 @@ test_fetch_honor_wt_conf_bflag() {
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/boo: $commit_id6" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/hoo: $commit_id7" \
+	echo "refs/remotes/origin/hoo: $commit_id3" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id5" \
 		>> $testroot/stdout.expected
@@ -1776,10 +1746,6 @@ test_fetch_honor_wt_conf_bflag() {
 
 	# from wt: fetch -b hoo not got.conf "master" or wt "boo" or
 	# repo HEAD "boo"
-	echo "hoo delta!" > $testroot/repo/gamma/delta
-	git_commit $testroot/repo -m "hoo delta!"
-	local commit_id_delta=`git_show_head $testroot/repo`
-
 	(cd $testroot/repo && git checkout -q boo)
 	echo "modified alpha again on boo" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha again on boo"
@@ -1811,7 +1777,7 @@ test_fetch_honor_wt_conf_bflag() {
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/boo: $commit_id6" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/hoo: $commit_id_delta" \
+	echo "refs/remotes/origin/hoo: $commit_id7" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id5" \
 		>> $testroot/stdout.expected
