@@ -348,16 +348,13 @@ file of the local repository, as created by
 By default, any branches configured in
 .Xr got.conf 5
 for the
-.Ar remote-repository
+.Ar remote-repository ,
+and the branch resolved via the remote repository's HEAD reference,
 will be fetched.
 If
 .Cm got fetch
 is invoked in a work tree then this work tree's current branch will be
 fetched, too, provided it is present on the server.
-If no branches to fetch can be found in
-.Xr got.conf 5
-or via a work tree, or said branches are not found on the server, a branch
-resolved via the remote repository's HEAD reference will be fetched.
 This default behaviour can be overridden with the
 .Fl a
 and

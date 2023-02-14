@@ -1544,7 +1544,7 @@ cmd_clone(int argc, char *argv[])
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
-	int list_refs_only = 0;
+	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
@@ -1562,6 +1562,7 @@ cmd_clone(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			bflag = 1;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -1717,7 +1718,7 @@ cmd_clone(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, &wanted_refs,
-	    list_refs_only, verbosity, fetchfd, repo, NULL, 0,
+	    list_refs_only, verbosity, fetchfd, repo, NULL, bflag,
 	    fetch_progress, &fpa);
 	if (error)
 		goto done;
