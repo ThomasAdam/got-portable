@@ -1426,7 +1426,7 @@ test_fetch_delete_remote_refs() {
 }
 
 test_fetch_honor_wt_conf_bflag() {
-	local testroot=`test_init fetch_branch`
+	local testroot=`test_init fetch_honor_wt_conf_bflag`
 	local testurl=ssh://127.0.0.1/$testroot
 
 	# server will have 'boo', 'hoo', and 'master'
