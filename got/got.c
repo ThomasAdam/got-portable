@@ -8732,7 +8732,7 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-NS] [-A author] [-F path] "
+	fprintf(stderr, "usage: %s commit [-NnS] [-A author] [-F path] "
 	    "[-m message] [path ...]\n", getprogname());
 	exit(1);
 }
