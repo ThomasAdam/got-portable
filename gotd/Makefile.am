@@ -49,7 +49,7 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/sigs.c
        
 gotd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-EXTRA_DIST = gotd.8 gotd.conf.5
+EXTRA_DIST = gotd.8 gotd.conf.5 *.h
 
 man5_MANS = gotd.conf.5
 man8_MANS = gotd.8
