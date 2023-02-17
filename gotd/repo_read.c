@@ -647,7 +647,7 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	err = got_pack_create(packsha1, client->pack_pipe, delta_cache,
 	    client->have_ids.ids, client->have_ids.nids,
 	    client->want_ids.ids, client->want_ids.nids,
-	    repo_read.repo, 0, 1, pack_progress, &pa, &rl,
+	    repo_read.repo, 0, 1, 0, pack_progress, &pa, &rl,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
