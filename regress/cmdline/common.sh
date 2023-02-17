@@ -117,7 +117,13 @@ maybe_pack_repo()
 {
 	local repo="$1"
 	if [ -n "$GOT_TEST_PACK" ]; then
-		(cd $repo && git repack -a -q)
+		arg=""
+		if [ "$GOT_TEST_PACK" = "ref-delta" ]; then
+			arg="-D"
+		fi
+
+		(cd $repo && gotadmin pack -a $arg > /dev/null)
+		(cd $repo && gotadmin cleanup -a -q)
 	fi
 }
 
