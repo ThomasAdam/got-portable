@@ -103,6 +103,12 @@ if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	exit 0
 fi
+log_cmd build.log make -j $ncpu server
+build_status="$?"
+if [ "$build_status" -ne 0 ]; then
+	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
+	exit 0
+fi
 
 printf "\n\n\tRunning tests\n\n" >> build.log
 log_cmd regress.log env PATH=$HOME/bin:$PATH make regress GOT_TEST_ROOT="$testroot"
@@ -148,6 +154,7 @@ log_cmd build.log make clean
 log_cmd build.log make obj
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes webd
+log_cmd build.log make -j $ncpu GOT_RELEASE=Yes server
 build_status="$?"
 if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog release mode build failure" $recipients < build.log
