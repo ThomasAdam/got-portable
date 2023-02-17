@@ -14,6 +14,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+regress_run_only=""
+
 export GIT_AUTHOR_NAME="Flan Hacker"
 export GIT_AUTHOR_EMAIL="flan_hacker@openbsd.org"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
@@ -241,11 +243,21 @@ test_parseargs()
 			;;
 		esac
 	done
+	shift $(($OPTIND - 1))
+	regress_run_only="$@"
 } >&2
 
 run_test()
 {
 	testfunc="$1"
+
+	if [ -n "$regress_run_only" ]; then
+		case "$regress_run_only" in
+		*$testfunc*) ;;
+		*) return ;;
+		esac
+	fi
+
 	if [ -z "$GOT_TEST_QUIET" ]; then
 		echo -n "$testfunc "
 	fi
