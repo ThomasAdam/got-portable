@@ -96,7 +96,7 @@ work tree, use the repository path associated with this work tree.
 .El
 .It Xo
 .Cm pack
-.Op Fl aq
+.Op Fl aDq
 .Op Fl r Ar repository-path
 .Op Fl x Ar reference
 .Op Ar reference ...
@@ -128,6 +128,10 @@ are as follows:
 Add objects to the generated pack file even if they are already packed
 in a different pack file.
 Unless this option is specified, only loose objects will be added.
+.It Fl D
+Force the use of ref-delta representation for deltified objects.
+If this option is not specified, offset-deltas will be used to represent
+deltified objects.
 .It Fl q
 Suppress progress reporting output.
 .It Fl r Ar repository-path

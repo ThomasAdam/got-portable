@@ -34,7 +34,7 @@ const struct got_error *
 got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
     struct got_reflist_head *include_refs,
     struct got_reflist_head *exclude_refs, struct got_repository *repo,
-    int loose_obj_only,
+    int loose_obj_only, int force_refdelta,
     got_pack_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
 
