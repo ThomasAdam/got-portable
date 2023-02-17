@@ -452,7 +452,7 @@ done:
 __dead static void
 usage_pack(void)
 {
-	fprintf(stderr, "usage: %s pack [-aq] [-r repository-path] "
+	fprintf(stderr, "usage: %s pack [-aDq] [-r repository-path] "
 	    "[-x reference] [reference ...]\n", getprogname());
 	exit(1);
 }
@@ -692,7 +692,7 @@ cmd_pack(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
-	int ch, i, loose_obj_only = 1, verbosity = 0;
+	int ch, i, loose_obj_only = 1, force_refdelta = 0, verbosity = 0;
 	struct got_object_id *pack_hash = NULL;
 	char *id_str = NULL;
 	struct got_pack_progress_arg ppa;
@@ -714,10 +714,13 @@ cmd_pack(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aqr:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "aDqr:x:")) != -1) {
 		switch (ch) {
 		case 'a':
 			loose_obj_only = 0;
+			break;
+		case 'D':
+			force_refdelta = 1;
 			break;
 		case 'q':
 			verbosity = -1;
@@ -802,7 +805,7 @@ cmd_pack(int argc, char *argv[])
 
 	error = got_repo_pack_objects(&packfile, &pack_hash,
 	    &include_refs, &exclude_refs, repo, loose_obj_only,
-	    pack_progress, &ppa, check_cancelled, NULL);
+	    force_refdelta, pack_progress, &ppa, check_cancelled, NULL);
 	if (error) {
 		if (ppa.printed_something)
 			printf("\n");

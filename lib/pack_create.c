@@ -1550,14 +1550,14 @@ packoff(char *hdr, off_t off)
 }
 
 static const struct got_error *
-deltahdr(off_t *packfile_size, SHA1_CTX *ctx, int packfd,
+deltahdr(off_t *packfile_size, SHA1_CTX *ctx, int packfd, int force_refdelta,
     struct got_pack_meta *m)
 {
 	const struct got_error *err;
 	char buf[32];
 	int nh;
 
-	if (m->prev->off != 0) {
+	if (m->prev->off != 0 && !force_refdelta) {
 		err = packhdr(&nh, buf, sizeof(buf),
 		    GOT_OBJ_TYPE_OFFSET_DELTA, m->delta_len);
 		if (err)
@@ -1590,7 +1590,7 @@ static const struct got_error *
 write_packed_object(off_t *packfile_size, int packfd,
     FILE *delta_cache, uint8_t *delta_cache_map, size_t delta_cache_size,
     struct got_pack_meta *m, int *outfd, SHA1_CTX *ctx,
-    struct got_repository *repo)
+    struct got_repository *repo, int force_refdelta)
 {
 	const struct got_error *err = NULL;
 	struct got_deflate_checksum csum;
@@ -1641,7 +1641,7 @@ write_packed_object(off_t *packfile_size, int packfd,
 		got_object_raw_close(raw);
 		raw = NULL;
 	} else if (m->delta_buf) {
-		err = deltahdr(packfile_size, ctx, packfd, m);
+		err = deltahdr(packfile_size, ctx, packfd, force_refdelta, m);
 		if (err)
 			goto done;
 		err = hwrite(packfd, m->delta_buf,
@@ -1652,7 +1652,7 @@ write_packed_object(off_t *packfile_size, int packfd,
 		free(m->delta_buf);
 		m->delta_buf = NULL;
 	} else if (delta_cache_map) {
-		err = deltahdr(packfile_size, ctx, packfd, m);
+		err = deltahdr(packfile_size, ctx, packfd, force_refdelta, m);
 		if (err)
 			goto done;
 		err = hcopy_mmap(delta_cache_map, delta_offset,
@@ -1666,7 +1666,7 @@ write_packed_object(off_t *packfile_size, int packfd,
 			err = got_error_from_errno("fseeko");
 			goto done;
 		}
-		err = deltahdr(packfile_size, ctx, packfd, m);
+		err = deltahdr(packfile_size, ctx, packfd, force_refdelta, m);
 		if (err)
 			goto done;
 		err = hcopy(delta_cache, packfd,
@@ -1686,7 +1686,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
     FILE *delta_cache, struct got_pack_meta **deltify, int ndeltify,
     struct got_pack_meta **reuse, int nreuse,
     int ncolored, int nfound, int ntrees, int nours,
-    struct got_repository *repo,
+    struct got_repository *repo, int force_refdelta,
     got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl,
     got_cancel_cb cancel_cb, void *cancel_arg)
@@ -1750,7 +1750,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 		m = deltify[i];
 		err = write_packed_object(&packfile_size, packfd,
 		    delta_cache, delta_cache_map, delta_cache_size,
-		    m, &outfd, &ctx, repo);
+		    m, &outfd, &ctx, repo, force_refdelta);
 		if (err)
 			goto done;
 	}
@@ -1779,7 +1779,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 		m = reuse[i];
 		err = write_packed_object(&packfile_size, packfd,
 		    packfile, reuse_pack->map, reuse_pack->filesize,
-		    m, &outfd, &ctx, repo);
+		    m, &outfd, &ctx, repo, force_refdelta);
 		if (err)
 			goto done;
 	}
@@ -1826,7 +1826,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
-    got_pack_progress_cb progress_cb, void *progress_arg,
+    int force_refdelta, got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
@@ -1933,7 +1933,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 
 	err = genpack(packsha1, packfd, reuse_pack, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
-	    nours, repo, progress_cb, progress_arg, rl,
+	    nours, repo, force_refdelta, progress_cb, progress_arg, rl,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
