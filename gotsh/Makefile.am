@@ -8,6 +8,8 @@ gotsh_SOURCES = gotsh.c \
 	$(top_srcdir)/gotd/imsg.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/gitproto.c \
+	$(top_srcdir)/lib/inflate.c \
+	$(top_srcdir)/lib/object_parse.c \
 	$(top_srcdir)/lib/path.c \
 	$(top_srcdir)/lib/pkt.c \
 	$(top_srcdir)/lib/pollfd.c \
