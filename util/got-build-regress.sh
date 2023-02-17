@@ -78,13 +78,13 @@ log_cmd build.log cat .got/base-commit
 old_basecommit=`cat .got/base-commit`
 log_cmd build.log /usr/local/bin/got update -b "$branch"
 update_status="$?"
-if [ "$update_status" != "0" ]; then
+if [ "$update_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog update failure" $recipients < build.log
 	exit 0
 fi
 new_basecommit=`cat .got/base-commit`
 
-if [ "$force" != "1" -a "$old_basecommit" == "$new_basecommit" ]; then
+if [ "$force" -ne 1 -a "$old_basecommit" == "$new_basecommit" ]; then
 	exit 0
 fi
 
@@ -92,14 +92,14 @@ printf "\n\n\tTesting a regular dev build\n\n" >> build.log
 log_cmd build.log make obj
 log_cmd build.log make -j $ncpu
 build_status="$?"
-if [ "$build_status" != "0" ]; then
+if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	exit 0
 fi
 log_cmd build.log make install
 log_cmd build.log make -j $ncpu webd
 build_status="$?"
-if [ "$build_status" != "0" ]; then
+if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	exit 0
 fi
@@ -110,7 +110,7 @@ regress_status="$?"
 cat regress.log >> build.log
 egrep "test.*failed" regress.log > failures.log
 regress_failure_grep="$?"
-if [ "$regress_status" != "0" -o "$regress_failure_grep" == "0" ]; then
+if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
 	printf "\n\n\t Test failures:\n\n" >> build.log
 	cat failures.log >> build.log
 	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
@@ -123,7 +123,7 @@ regress_status="$?"
 cat regress.log >> build.log
 egrep "test.*failed" regress.log > failures.log
 regress_failure_grep="$?"
-if [ "$regress_status" != "0" -o "$regress_failure_grep" == "0" ]; then
+if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
 	printf "\n\n\t Test failures:\n\n" >> build.log
 	cat failures.log >> build.log
 	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
@@ -136,7 +136,7 @@ log_cmd build.log make obj
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes webd
 build_status="$?"
-if [ "$build_status" != "0" ]; then
+if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog release mode build failure" $recipients < build.log
 	exit 0
 fi
