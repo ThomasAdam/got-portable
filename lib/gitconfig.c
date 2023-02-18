@@ -179,7 +179,7 @@ conf_set_now(struct got_gitconfig *conf, char *section, char *tag,
 		conf_remove_now(conf, section, tag);
 	else if (got_gitconfig_get_str(conf, section, tag)) {
 		if (!is_default)
-			LOG_DBG((LOG_MISC,
+			LOG_DBG((LOG_MISC, 95,
 			    "conf_set_now: duplicate tag [%s]:%s, "
 			    "ignoring...\n", section, tag));
 		return 1;
