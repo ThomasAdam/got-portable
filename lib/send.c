@@ -642,7 +642,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		ppa.progress_cb = progress_cb;
 		ppa.progress_arg = progress_arg;
 		err = got_pack_create(packsha1, packfd, delta_cache,
-		    their_ids, ntheirs, our_ids, nours, repo, 0, 0, 1,
+		    their_ids, ntheirs, our_ids, nours, repo, 0, 1, 0,
 		    pack_progress, &ppa, &rl, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
