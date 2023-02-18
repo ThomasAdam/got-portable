@@ -1544,7 +1544,7 @@ cmd_clone(int argc, char *argv[])
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
-	int list_refs_only = 0;
+	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&refs);
@@ -1562,6 +1562,7 @@ cmd_clone(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			bflag = 1;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -1717,7 +1718,7 @@ cmd_clone(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, &wanted_refs,
-	    list_refs_only, verbosity, fetchfd, repo, NULL, 0,
+	    list_refs_only, verbosity, fetchfd, repo, NULL, NULL, bflag,
 	    fetch_progress, &fpa);
 	if (error)
 		goto done;
@@ -2282,6 +2283,8 @@ cmd_fetch(int argc, char *argv[])
 	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
 	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
+	struct got_reflist_head remote_refs;
+	struct got_reflist_entry *re;
 	struct got_object_id *pack_hash = NULL;
 	int i, ch, fetchfd = -1, fetchstatus;
 	pid_t fetchpid = -1;
@@ -2289,10 +2292,11 @@ cmd_fetch(int argc, char *argv[])
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
 	int *pack_fds = NULL, have_bflag = 0;
-	const char *worktree_branch = NULL;
+	const char *remote_head = NULL, *worktree_branch = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
+	TAILQ_INIT(&remote_refs);
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
@@ -2531,12 +2535,51 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (worktree && !have_bflag) {
-		const char *refname;
+	if (!have_bflag) {
+		/*
+		 * If set, get this remote's HEAD ref target so
+		 * if it has changed on the server we can fetch it.
+		 */
+		error = got_ref_list(&remote_refs, repo, "refs/remotes",
+		    got_ref_cmp_by_name, repo);
+		if (error)
+			goto done;
 
-		refname = got_worktree_get_head_ref_name(worktree);
-		if (strncmp(refname, "refs/heads/", 11) == 0)
-			worktree_branch = refname;
+		TAILQ_FOREACH(re, &remote_refs, entry) {
+			const char	*remote_refname, *remote_target;
+			size_t		 remote_name_len;
+
+			if (!got_ref_is_symbolic(re->ref))
+				continue;
+
+			remote_name_len = strlen(remote->name);
+			remote_refname = got_ref_get_name(re->ref);
+
+			/* we only want refs/remotes/$remote->name/HEAD */
+			if (strncmp(remote_refname + 13, remote->name,
+			    remote_name_len) != 0)
+				continue;
+
+			if (strcmp(remote_refname + remote_name_len + 14,
+			    GOT_REF_HEAD) != 0)
+				continue;
+
+			/*
+			 * Take the name itself because we already
+			 * only match with refs/heads/ in fetch_pack().
+			 */
+			remote_target = got_ref_get_symref_target(re->ref);
+			remote_head = remote_target + remote_name_len + 14;
+			break;
+		}
+
+		if (worktree) {
+			const char *refname;
+
+			refname = got_worktree_get_head_ref_name(worktree);
+			if (strncmp(refname, "refs/heads/", 11) == 0)
+				worktree_branch = refname;
+		}
 	}
 
 	fpa.last_scaled_size[0] = '\0';
@@ -2551,7 +2594,7 @@ cmd_fetch(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
 	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
-	    worktree_branch, have_bflag, fetch_progress, &fpa);
+	    worktree_branch, remote_head, have_bflag, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -2730,6 +2773,7 @@ done:
 	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
 	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
 	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
+	got_ref_list_free(&remote_refs);
 	free(id_str);
 	free(cwd);
 	free(repo_path);

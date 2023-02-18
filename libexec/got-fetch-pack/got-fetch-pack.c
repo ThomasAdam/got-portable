@@ -333,7 +333,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
-    const char *worktree_branch, int no_head, struct imsgbuf *ibuf)
+    const char *worktree_branch, const char *remote_head,
+    int no_head, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKT_MAX];
@@ -501,14 +502,27 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	if (list_refs_only)
 		goto done;
 
-	if (!found_branch && !no_head && default_branch && default_id_str &&
+	/*
+	 * If -b was not used and either none of the requested branches
+	 * (got.conf, worktree) were found or the client already has the
+	 * remote HEAD symref but its target changed, fetch remote's HEAD.
+	 */
+	if (!no_head && default_branch && default_id_str &&
 	    strncmp(default_branch, "refs/heads/", 11) == 0) {
-		err = fetch_ref(ibuf, have_refs, &have[nref],
-		    &want[nref], default_branch, default_id_str);
-		if (err)
-			goto done;
-		nref++;
-		found_branch = 1;
+		int remote_head_changed = 0;
+
+		if (remote_head) {
+			if (strcmp(remote_head, default_branch + 11) != 0)
+				remote_head_changed = 1;
+		}
+
+		if (!found_branch || remote_head_changed) {
+			err = fetch_ref(ibuf, have_refs, &have[nref],
+			    &want[nref], default_branch, default_id_str);
+			if (err)
+				goto done;
+			nref++;
+		}
 	}
 
 	/* Abort if we haven't found anything to fetch. */
@@ -834,7 +848,7 @@ main(int argc, char **argv)
 	struct got_imsg_fetch_wanted_branch wbranch;
 	struct got_imsg_fetch_wanted_ref wref;
 	size_t datalen, i;
-	char *worktree_branch = NULL;
+	char *remote_head = NULL, *worktree_branch = NULL;
 #if 0
 	static int attached;
 	while (!attached)
@@ -887,7 +901,7 @@ main(int argc, char **argv)
 	fetchfd = imsg.fd;
 
 	if (datalen != sizeof(fetch_req) +
-	    fetch_req.worktree_branch_len) {
+	    fetch_req.worktree_branch_len + fetch_req.remote_head_len) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
@@ -896,6 +910,15 @@ main(int argc, char **argv)
 		worktree_branch = strndup(imsg.data +
 		    sizeof(fetch_req), fetch_req.worktree_branch_len);
 		if (worktree_branch == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+	}
+
+	if (fetch_req.remote_head_len != 0) {
+		remote_head = strndup(imsg.data + sizeof(fetch_req) +
+		    fetch_req.worktree_branch_len, fetch_req.remote_head_len);
+		if (remote_head == NULL) {
 			err = got_error_from_errno("strndup");
 			goto done;
 		}
@@ -1057,9 +1080,10 @@ main(int argc, char **argv)
 	err = fetch_pack(fetchfd, packfd, pack_sha1, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,
 	    &wanted_refs, fetch_req.list_refs_only,
-	    worktree_branch, fetch_req.no_head, &ibuf);
+	    worktree_branch, remote_head, fetch_req.no_head, &ibuf);
 done:
 	free(worktree_branch);
+	free(remote_head);
 	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
 	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_PATH);
 	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
