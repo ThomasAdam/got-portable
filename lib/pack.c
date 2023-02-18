@@ -1140,7 +1140,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	if (err)
 		return err;
 	if (pack->map) {
-		delta_data_offset = delta_offset + tslen + sizeof(id);
+		delta_data_offset = delta_offset + tslen + SHA1_DIGEST_LENGTH;
 	} else {
 		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 		if (delta_data_offset == -1)
