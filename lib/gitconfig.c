@@ -67,6 +67,7 @@ log_debug(int cls, int level, const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
+	putc('\n', stderr);
 }
 #endif
 
@@ -179,7 +180,7 @@ conf_set_now(struct got_gitconfig *conf, char *section, char *tag,
 		if (!is_default)
 			LOG_DBG((LOG_MISC, 95,
 			    "conf_set_now: duplicate tag [%s]:%s, "
-			    "ignoring...\n", section, tag));
+			    "ignoring...", section, tag));
 		return 1;
 	}
 	node = calloc(1, sizeof *node);
