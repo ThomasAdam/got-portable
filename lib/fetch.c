@@ -105,7 +105,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only, int verbosity,
     int fetchfd, struct got_repository *repo, const char *worktree_refname,
-    int no_head, got_fetch_progress_cb progress_cb, void *progress_arg)
+    const char *remote_head, int no_head, got_fetch_progress_cb progress_cb,
+    void *progress_arg)
 {
 	size_t i;
 	int imsg_fetchfds[2], imsg_idxfds[2];
@@ -261,7 +262,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs,
 	    fetch_all_branches, wanted_branches, wanted_refs,
-	    list_refs_only, worktree_refname, no_head, verbosity);
+	    list_refs_only, worktree_refname, remote_head, no_head, verbosity);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;

@@ -358,6 +358,10 @@ If no branches to fetch can be found in
 .Xr got.conf 5
 or via a work tree, or said branches are not found on the server, a branch
 resolved via the remote repository's HEAD reference will be fetched.
+Likewise, if a HEAD reference for the
+.Ar remote-repository
+exists but its target no longer matches the remote HEAD, then
+the new target branch will be fetched.
 This default behaviour can be overridden with the
 .Fl a
 and

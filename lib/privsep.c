@@ -532,19 +532,23 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
-    const char *worktree_branch, int no_head, int verbosity)
+    const char *worktree_branch, const char *remote_head,
+    int no_head, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
-	size_t len, worktree_branch_len;
 	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_request fetchreq;
+	size_t remote_head_len, worktree_branch_len, len = sizeof(fetchreq);
 
 	if (worktree_branch) {
 		worktree_branch_len = strlen(worktree_branch);
-		len = sizeof(fetchreq) + worktree_branch_len;
-	} else
-		len = sizeof(fetchreq);
+		len += worktree_branch_len;
+	}
+	if (remote_head) {
+		remote_head_len = strlen(remote_head);
+		len += remote_head_len;
+	}
 
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
 		close(fd);
@@ -562,6 +566,8 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	fetchreq.verbosity = verbosity;
 	if (worktree_branch != NULL)
 		fetchreq.worktree_branch_len = worktree_branch_len;
+	if (remote_head != NULL)
+		fetchreq.remote_head_len = remote_head_len;
 	TAILQ_FOREACH(pe, have_refs, entry)
 		fetchreq.n_have_refs++;
 	TAILQ_FOREACH(pe, wanted_branches, entry)
@@ -572,6 +578,10 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		return got_error_from_errno("imsg_add FETCH_REQUEST");
 	if (worktree_branch) {
 		if (imsg_add(wbuf, worktree_branch, worktree_branch_len) == -1)
+			return got_error_from_errno("imsg_add FETCH_REQUEST");
+	}
+	if (remote_head) {
+		if (imsg_add(wbuf, remote_head, remote_head_len) == -1)
 			return got_error_from_errno("imsg_add FETCH_REQUEST");
 	}
 	wbuf->fd = fd;
