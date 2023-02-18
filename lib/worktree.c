@@ -1511,9 +1511,14 @@ done:
 	return err;
 }
 
-/* Upgrade STATUS_MODIFY to STATUS_CONFLICT if a conflict marker is found. */
+/*
+ * Upgrade STATUS_MODIFY to STATUS_CONFLICT if a
+ * conflict marker is found in newly added lines only.
+ */
 static const struct got_error *
-get_modified_file_content_status(unsigned char *status, FILE *f)
+get_modified_file_content_status(unsigned char *status,
+    struct got_blob_object *blob, const char *path, struct stat *sb,
+    FILE *ondisk_file)
 {
 	const struct got_error *err = NULL;
 	const char *markers[3] = {
@@ -1521,10 +1526,45 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 		GOT_DIFF_CONFLICT_MARKER_SEP,
 		GOT_DIFF_CONFLICT_MARKER_END
 	};
+	FILE *f = NULL, *f1 = NULL;
 	int i = 0;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
+	off_t sz1 = 0;
+
+	if (*status == GOT_STATUS_MODIFY) {
+		f = got_opentemp();
+		if (f == NULL)
+			return got_error_from_errno("got_opentemp");
+
+		f1 = got_opentemp();
+		if (f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+
+		if (blob) {
+			err = got_object_blob_dump_to_file(&sz1, NULL, NULL,
+			    f1, blob);
+			if (err)
+				goto done;
+		}
+
+		err = got_diff_blob_file(blob, f1, sz1, NULL, ondisk_file, 1,
+		    sb, path, GOT_DIFF_ALGORITHM_MYERS, 0, 0, 0, NULL, f);
+		if (err)
+			goto done;
+
+		if (fflush(f) == EOF) {
+			err = got_error_from_errno("fflush");
+			goto done;
+		}
+		if (fseeko(f, 0L, SEEK_SET) == -1) {
+			err = got_error_from_errno("fseek");
+			goto done;
+		}
+	}
 
 	while (*status == GOT_STATUS_MODIFY) {
 		linelen = getline(&line, &linesize, f);
@@ -1535,7 +1575,8 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 			break;
 		}
 
-		if (strncmp(line, markers[i], strlen(markers[i])) == 0) {
+		if (*line == '+' &&
+		    strncmp(line + 1, markers[i], strlen(markers[i])) == 0) {
 			if (strcmp(markers[i], GOT_DIFF_CONFLICT_MARKER_END)
 			    == 0)
 				*status = GOT_STATUS_CONFLICT;
@@ -1543,7 +1584,13 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 				i++;
 		}
 	}
+
+done:
 	free(line);
+	if (f != NULL && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f1 != NULL && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 
 	return err;
 }
@@ -1784,7 +1831,8 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	if (*status == GOT_STATUS_MODIFY) {
 		rewind(f);
-		err = get_modified_file_content_status(status, f);
+		err = get_modified_file_content_status(status, blob, ie->path,
+		    sb, f);
 	} else if (xbit_differs(ie, sb->st_mode))
 		*status = GOT_STATUS_MODE_CHANGE;
 done:
@@ -4945,6 +4993,7 @@ struct collect_commitables_arg {
 	int have_staged_files;
 	int allow_bad_symlinks;
 	int diff_header_shown;
+	int commit_conflicts;
 	FILE *diff_outfile;
 	FILE *f1;
 	FILE *f2;
@@ -5021,7 +5070,8 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 	} else {
 		if (ct->status != GOT_STATUS_MODIFY &&
 		    ct->status != GOT_STATUS_ADD &&
-		    ct->status != GOT_STATUS_DELETE)
+		    ct->status != GOT_STATUS_DELETE &&
+		    ct->status != GOT_STATUS_CONFLICT)
 			return NULL;
 	}
 
@@ -5178,13 +5228,16 @@ collect_commitables(void *arg, unsigned char status,
 		    staged_status != GOT_STATUS_DELETE)
 			return NULL;
 	} else {
-		if (status == GOT_STATUS_CONFLICT)
+		if (status == GOT_STATUS_CONFLICT && !a->commit_conflicts) {
+			printf("C  %s\n", relpath);
 			return got_error(GOT_ERR_COMMIT_CONFLICT);
+		}
 
 		if (status != GOT_STATUS_MODIFY &&
 		    status != GOT_STATUS_MODE_CHANGE &&
 		    status != GOT_STATUS_ADD &&
-		    status != GOT_STATUS_DELETE)
+		    status != GOT_STATUS_DELETE &&
+		    status != GOT_STATUS_CONFLICT)
 			return NULL;
 	}
 
@@ -5534,7 +5587,8 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 		if (ct->staged_status == GOT_STATUS_NO_CHANGE) {
 			if (ct->status != GOT_STATUS_MODIFY &&
 			    ct->status != GOT_STATUS_MODE_CHANGE &&
-			    ct->status != GOT_STATUS_DELETE)
+			    ct->status != GOT_STATUS_DELETE &&
+			    ct->status != GOT_STATUS_CONFLICT)
 				continue;
 		} else {
 			if (ct->staged_status != GOT_STATUS_MODIFY &&
@@ -5742,6 +5796,7 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 				/* NB: Deleted entries get dropped here. */
 				if (ct->status == GOT_STATUS_MODIFY ||
 				    ct->status == GOT_STATUS_MODE_CHANGE ||
+				    ct->status == GOT_STATUS_CONFLICT ||
 				    ct->staged_status == GOT_STATUS_MODIFY) {
 					err = alloc_modified_blob_tree_entry(
 					    &new_te, te, ct);
@@ -5951,7 +6006,8 @@ commit_worktree(struct got_object_id **new_commit_id,
 
 		if (ct->status != GOT_STATUS_ADD &&
 		    ct->status != GOT_STATUS_MODIFY &&
-		    ct->status != GOT_STATUS_MODE_CHANGE)
+		    ct->status != GOT_STATUS_MODE_CHANGE &&
+		    ct->status != GOT_STATUS_CONFLICT)
 			continue;
 
 		if (asprintf(&ondisk_path, "%s/%s",
@@ -6102,7 +6158,8 @@ const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
     const char *author, const char *committer, int allow_bad_symlinks,
-    int show_diff, got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
+    int show_diff, int commit_conflicts,
+    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -6155,6 +6212,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.have_staged_files = have_staged_files;
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
 	cc_arg.diff_header_shown = 0;
+	cc_arg.commit_conflicts = commit_conflicts;
 	if (show_diff) {
 		err = got_opentemp_named(&diff_path, &cc_arg.diff_outfile,
 		    GOT_TMPDIR_STR "/got", ".diff");
@@ -6711,7 +6769,7 @@ rebase_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *tmp_branch, const char *committer,
     struct got_commit_object *orig_commit, const char *new_logmsg,
-    struct got_repository *repo)
+    int allow_conflict, struct got_repository *repo)
 {
 	const struct got_error *err, *sync_err;
 	struct got_pathlist_head commitable_paths;
@@ -6735,6 +6793,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = 0;
+	cc_arg.commit_conflicts = allow_conflict;
 	/*
 	 * If possible get the status of individual files directly to
 	 * avoid crawling the entire work tree once per rebased commit.
@@ -6830,7 +6889,8 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_reference *tmp_branch,
     const char *committer, struct got_commit_object *orig_commit,
-    struct got_object_id *orig_commit_id, struct got_repository *repo)
+    struct got_object_id *orig_commit_id, int allow_conflict,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	char *commit_ref_name;
@@ -6854,7 +6914,7 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
 	    worktree, fileindex, tmp_branch, committer, orig_commit,
-	    NULL, repo);
+	    NULL, allow_conflict, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
@@ -6869,7 +6929,7 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
     struct got_fileindex *fileindex, struct got_reference *tmp_branch,
     const char *committer, struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, const char *new_logmsg,
-    struct got_repository *repo)
+    int allow_conflict, struct got_repository *repo)
 {
 	const struct got_error *err;
 	char *commit_ref_name;
@@ -6885,7 +6945,7 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
 	    worktree, fileindex, tmp_branch, committer, orig_commit,
-	    new_logmsg, repo);
+	    new_logmsg, allow_conflict, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
@@ -7850,7 +7910,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *author, const char *committer, int allow_bad_symlinks,
     struct got_object_id *branch_tip, const char *branch_name,
-    struct got_repository *repo,
+    int allow_conflict, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg)
 
 {
@@ -7896,6 +7956,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = have_staged_files;
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
+	cc_arg.commit_conflicts = allow_conflict;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    collect_commitables, &cc_arg, NULL, NULL, 1, 0);
 	if (err)

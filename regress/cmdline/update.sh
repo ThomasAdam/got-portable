@@ -2970,7 +2970,7 @@ test_update_binary_file() {
 	fi
 
 	(cd $testroot/wt && got status > $testroot/stdout)
-	echo 'C  foo' > $testroot/stdout.expected
+	echo 'M  foo' > $testroot/stdout.expected
 	echo -n '?  ' >> $testroot/stdout.expected
 	(cd $testroot/wt && ls foo-1-* >> $testroot/stdout.expected)
 	echo -n '?  ' >> $testroot/stdout.expected

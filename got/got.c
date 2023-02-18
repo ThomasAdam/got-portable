@@ -8776,7 +8776,7 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-NnS] [-A author] [-F path] "
+	fprintf(stderr, "usage: %s commit [-CNnS] [-A author] [-F path] "
 	    "[-m message] [path ...]\n", getprogname());
 	exit(1);
 }
@@ -9083,7 +9083,7 @@ cmd_commit(int argc, char *argv[])
 	char *gitconfig_path = NULL, *editor = NULL, *committer = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
 	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
-	int show_diff = 1;
+	int show_diff = 1, commit_conflicts = 0;
 	struct got_pathlist_head paths;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
@@ -9099,13 +9099,16 @@ cmd_commit(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "A:F:m:NnS")) != -1) {
+	while ((ch = getopt(argc, argv, "A:CF:m:NnS")) != -1) {
 		switch (ch) {
 		case 'A':
 			author = optarg;
 			error = valid_author(author);
 			if (error)
 				return error;
+			break;
+		case 'C':
+			commit_conflicts = 1;
 			break;
 		case 'F':
 			if (logmsg != NULL)
@@ -9230,8 +9233,8 @@ cmd_commit(int argc, char *argv[])
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
 	error = got_worktree_commit(&id, worktree, &paths, author, committer,
-	    allow_bad_symlinks, show_diff, collect_commit_logmsg, &cl_arg,
-	    print_status, NULL, repo);
+	    allow_bad_symlinks, show_diff, commit_conflicts,
+	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 		    cl_arg.logmsg_path != NULL)
@@ -10368,7 +10371,7 @@ done:
 __dead static void
 usage_rebase(void)
 {
-	fprintf(stderr, "usage: %s rebase [-aclX] [branch]\n", getprogname());
+	fprintf(stderr, "usage: %s rebase [-aCclX] [branch]\n", getprogname());
 	exit(1);
 }
 
@@ -10492,7 +10495,8 @@ static const struct got_error *
 rebase_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *tmp_branch, const char *committer,
-    struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_object_id *commit_id, int allow_conflict,
+    struct got_repository *repo)
 {
 	const struct got_error *error;
 	struct got_commit_object *commit;
@@ -10504,7 +10508,7 @@ rebase_commit(struct got_pathlist_head *merged_paths,
 
 	error = got_worktree_rebase_commit(&new_commit_id, merged_paths,
 	    worktree, fileindex, tmp_branch, committer, commit, commit_id,
-	    repo);
+	    allow_conflict, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -11000,6 +11004,7 @@ cmd_rebase(int argc, char *argv[])
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	int histedit_in_progress = 0, merge_in_progress = 0;
 	int create_backup = 1, list_backups = 0, delete_backups = 0;
+	int allow_conflict = 0;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
 	const struct got_object_id_queue *parent_ids;
@@ -11017,10 +11022,13 @@ cmd_rebase(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aclX")) != -1) {
+	while ((ch = getopt(argc, argv, "aCclX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_rebase = 1;
+			break;
+		case 'C':
+			allow_conflict = 1;
 			break;
 		case 'c':
 			continue_rebase = 1;
@@ -11043,6 +11051,8 @@ cmd_rebase(int argc, char *argv[])
 	if (list_backups) {
 		if (abort_rebase)
 			option_conflict('l', 'a');
+		if (allow_conflict)
+			option_conflict('l', 'C');
 		if (continue_rebase)
 			option_conflict('l', 'c');
 		if (delete_backups)
@@ -11052,12 +11062,19 @@ cmd_rebase(int argc, char *argv[])
 	} else if (delete_backups) {
 		if (abort_rebase)
 			option_conflict('X', 'a');
+		if (allow_conflict)
+			option_conflict('X', 'C');
 		if (continue_rebase)
 			option_conflict('X', 'c');
 		if (list_backups)
 			option_conflict('l', 'X');
 		if (argc != 0 && argc != 1)
 			usage_rebase();
+	} else if (allow_conflict) {
+		if (abort_rebase)
+			option_conflict('C', 'a');
+		if (!continue_rebase)
+			errx(1, "-C option requires -c");
 	} else {
 		if (abort_rebase && continue_rebase)
 			usage_rebase();
@@ -11177,7 +11194,7 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 
 		error = rebase_commit(NULL, worktree, fileindex, tmp_branch,
-		    committer, resume_commit_id, repo);
+		    committer, resume_commit_id, allow_conflict, repo);
 		if (error)
 			goto done;
 
@@ -11356,7 +11373,7 @@ cmd_rebase(int argc, char *argv[])
 		}
 
 		error = rebase_commit(&merged_paths, worktree, fileindex,
-		    tmp_branch, committer, commit_id, repo);
+		    tmp_branch, committer, commit_id, 0, repo);
 		got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 		if (error)
 			goto done;
@@ -11427,7 +11444,7 @@ done:
 __dead static void
 usage_histedit(void)
 {
-	fprintf(stderr, "usage: %s histedit [-acdeflmX] [-F histedit-script] "
+	fprintf(stderr, "usage: %s histedit [-aCcdeflmX] [-F histedit-script] "
 	    "[branch]\n", getprogname());
 	exit(1);
 }
@@ -12167,7 +12184,7 @@ static const struct got_error *
 histedit_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *tmp_branch, struct got_histedit_list_entry *hle,
-    const char *committer, struct got_repository *repo)
+    const char *committer, int allow_conflict, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit;
@@ -12186,7 +12203,7 @@ histedit_commit(struct got_pathlist_head *merged_paths,
 
 	err = got_worktree_histedit_commit(&new_commit_id, merged_paths,
 	    worktree, fileindex, tmp_branch, committer, commit, hle->commit_id,
-	    hle->logmsg, repo);
+	    hle->logmsg, allow_conflict, repo);
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -12271,7 +12288,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	int drop_only = 0, edit_logmsg_only = 0, fold_only = 0, edit_only = 0;
-	int list_backups = 0, delete_backups = 0;
+	int allow_conflict = 0, list_backups = 0, delete_backups = 0;
 	const char *edit_script_path = NULL;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
@@ -12292,10 +12309,13 @@ cmd_histedit(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "acdeF:flmX")) != -1) {
+	while ((ch = getopt(argc, argv, "aCcdeF:flmX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_edit = 1;
+			break;
+		case 'C':
+			allow_conflict = 1;
 			break;
 		case 'c':
 			continue_edit = 1;
@@ -12330,16 +12350,24 @@ cmd_histedit(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (abort_edit && allow_conflict)
+		option_conflict('a', 'C');
 	if (abort_edit && continue_edit)
 		option_conflict('a', 'c');
+	if (edit_script_path && allow_conflict)
+		option_conflict('F', 'C');
 	if (edit_script_path && edit_logmsg_only)
 		option_conflict('F', 'm');
 	if (abort_edit && edit_logmsg_only)
 		option_conflict('a', 'm');
+	if (edit_logmsg_only && allow_conflict)
+		option_conflict('m', 'C');
 	if (continue_edit && edit_logmsg_only)
 		option_conflict('c', 'm');
 	if (abort_edit && fold_only)
 		option_conflict('a', 'f');
+	if (fold_only && allow_conflict)
+		option_conflict('f', 'C');
 	if (continue_edit && fold_only)
 		option_conflict('c', 'f');
 	if (fold_only && edit_logmsg_only)
@@ -12358,6 +12386,8 @@ cmd_histedit(int argc, char *argv[])
 		option_conflict('f', 'e');
 	if (drop_only && abort_edit)
 		option_conflict('d', 'a');
+	if (drop_only && allow_conflict)
+		option_conflict('d', 'C');
 	if (drop_only && continue_edit)
 		option_conflict('d', 'c');
 	if (drop_only && edit_logmsg_only)
@@ -12371,6 +12401,8 @@ cmd_histedit(int argc, char *argv[])
 	if (list_backups) {
 		if (abort_edit)
 			option_conflict('l', 'a');
+		if (allow_conflict)
+			option_conflict('l', 'C');
 		if (continue_edit)
 			option_conflict('l', 'c');
 		if (edit_script_path)
@@ -12390,6 +12422,8 @@ cmd_histedit(int argc, char *argv[])
 	} else if (delete_backups) {
 		if (abort_edit)
 			option_conflict('X', 'a');
+		if (allow_conflict)
+			option_conflict('X', 'C');
 		if (continue_edit)
 			option_conflict('X', 'c');
 		if (drop_only)
@@ -12406,7 +12440,9 @@ cmd_histedit(int argc, char *argv[])
 			option_conflict('X', 'l');
 		if (argc != 0 && argc != 1)
 			usage_histedit();
-	} else if (argc != 0)
+	} else if (allow_conflict && !continue_edit)
+		errx(1, "-C option requires -c");
+	else if (argc != 0)
 		usage_histedit();
 
 	/*
@@ -12722,7 +12758,7 @@ cmd_histedit(int argc, char *argv[])
 				if (have_changes) {
 					error = histedit_commit(NULL, worktree,
 					    fileindex, tmp_branch, hle,
-					    committer, repo);
+					    committer, allow_conflict, repo);
 					if (error)
 						goto done;
 				} else {
@@ -12798,7 +12834,7 @@ cmd_histedit(int argc, char *argv[])
 		}
 
 		error = histedit_commit(&merged_paths, worktree, fileindex,
-		    tmp_branch, hle, committer, repo);
+		    tmp_branch, hle, committer, allow_conflict, repo);
 		got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 		if (error)
 			goto done;
@@ -13031,7 +13067,7 @@ done:
 __dead static void
 usage_merge(void)
 {
-	fprintf(stderr, "usage: %s merge [-acn] [branch]\n", getprogname());
+	fprintf(stderr, "usage: %s merge [-aCcn] [branch]\n", getprogname());
 	exit(1);
 }
 
@@ -13047,7 +13083,7 @@ cmd_merge(int argc, char *argv[])
 	struct got_object_id *branch_tip = NULL, *yca_id = NULL;
 	struct got_object_id *wt_branch_tip = NULL;
 	int ch, merge_in_progress = 0, abort_merge = 0, continue_merge = 0;
-	int interrupt_merge = 0;
+	int allow_conflict = 0, interrupt_merge = 0;
 	struct got_update_progress_arg upa;
 	struct got_object_id *merge_commit_id = NULL;
 	char *branch_name = NULL;
@@ -13061,11 +13097,13 @@ cmd_merge(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "acn")) != -1) {
+	while ((ch = getopt(argc, argv, "aCcn")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_merge = 1;
 			break;
+		case 'C':
+			allow_conflict = 1;
 		case 'c':
 			continue_merge = 1;
 			break;
@@ -13081,6 +13119,12 @@ cmd_merge(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (allow_conflict) {
+		if (abort_merge)
+			option_conflict('a', 'C');
+		if (!continue_merge)
+			errx(1, "-C option requires -c");
+	}
 	if (abort_merge && continue_merge)
 		option_conflict('a', 'c');
 	if (abort_merge || continue_merge) {
@@ -13269,7 +13313,8 @@ cmd_merge(int argc, char *argv[])
 	} else {
 		error = got_worktree_merge_commit(&merge_commit_id, worktree,
 		    fileindex, author, NULL, 1, branch_tip, branch_name,
-		    repo, continue_merge ? print_status : NULL, NULL);
+		    allow_conflict, repo, continue_merge ? print_status : NULL,
+		    NULL);
 		if (error)
 			goto done;
 		error = got_worktree_merge_complete(worktree, fileindex, repo);
