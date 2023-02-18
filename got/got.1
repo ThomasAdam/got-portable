@@ -1652,7 +1652,7 @@ is a directory.
 .Tg ci
 .It Xo
 .Cm commit
-.Op Fl NnS
+.Op Fl CNnS
 .Op Fl A Ar author
 .Op Fl F Ar path
 .Op Fl m Ar message
@@ -1740,6 +1740,14 @@ information which is obtained, as usual, from the
 environment variable, or
 .Xr got.conf 5 ,
 or Git configuration settings.
+.It Fl C
+Allow committing files in conflicted status.
+.Pp
+Committing files with conflict markers should generally be avoided.
+Cases where conflict markers must be stored in the repository for
+some legitimate reason should be very rare.
+There are usually ways to avoid storing conflict markers verbatim by
+applying appropriate programming tricks.
 .It Fl F Ar path
 Use the prepared log message stored in the file found at
 .Ar path
@@ -2209,7 +2217,7 @@ This option cannot be used with
 .Tg rb
 .It Xo
 .Cm rebase
-.Op Fl aclX
+.Op Fl aCclX
 .Op Ar branch
 .Xc
 .Dl Pq alias: Cm rb
@@ -2359,6 +2367,11 @@ are as follows:
 .It Fl a
 Abort an interrupted rebase operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl C
+Allow a rebase operation to continue with files in conflicted status.
+This option should generally be avoided, and can only be used with the
+.Fl c
+option.
 .It Fl c
 Continue an interrupted rebase operation.
 If this option is used, no other command-line arguments are allowed.
@@ -2422,7 +2435,7 @@ None of the other options can be used together with
 .Tg he
 .It Xo
 .Cm histedit
-.Op Fl acdeflmX
+.Op Fl aCcdeflmX
 .Op Fl F Ar histedit-script
 .Op Ar branch
 .Xc
@@ -2597,6 +2610,11 @@ are as follows:
 .It Fl a
 Abort an interrupted histedit operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl C
+Allow a histedit operation to continue with files in conflicted status.
+This option should generally be avoided, and can only be used with the
+.Fl c
+option.
 .It Fl c
 Continue an interrupted histedit operation.
 If this option is used, no other command-line arguments are allowed.
@@ -2749,7 +2767,7 @@ or reverted with
 .Tg mg
 .It Xo
 .Cm merge
-.Op Fl acn
+.Op Fl aCcn
 .Op Ar branch
 .Xc
 .Dl Pq alias: Cm mg
@@ -2864,6 +2882,11 @@ are as follows:
 .It Fl a
 Abort an interrupted merge operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl C
+Allow a merge operation to continue with files in conflicted status.
+This option should generally be avoided, and can only be used with the
+.Fl c
+option.
 .It Fl c
 Continue an interrupted merge operation.
 If this option is used, no other command-line arguments are allowed.

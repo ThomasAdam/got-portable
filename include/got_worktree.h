@@ -257,7 +257,7 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, struct got_pathlist_head *, const char *,
-    const char *, int, int, got_worktree_commit_msg_cb, void *,
+    const char *, int, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
 /* Get the path of a commitable worktree item. */
@@ -318,7 +318,7 @@ const struct got_error *got_worktree_rebase_merge_files(
 const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_reference *, const char *, struct got_commit_object *,
-    struct got_object_id *, struct got_repository *);
+    struct got_object_id *, int, struct got_repository *);
 
 /* Postpone the rebase operation. Should be called after a merge conflict. */
 const struct got_error *got_worktree_rebase_postpone(struct got_worktree *,
@@ -392,7 +392,7 @@ const struct got_error *got_worktree_histedit_merge_files(
 const struct got_error *got_worktree_histedit_commit(struct got_object_id **,
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_reference *, const char *, struct got_commit_object *,
-    struct got_object_id *, const char *, struct got_repository *);
+    struct got_object_id *, const char *, int, struct got_repository *);
 
 /*
  * Record the specified commit as skipped during histedit.
@@ -469,7 +469,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *author, const char *committer, int allow_bad_symlinks,
     struct got_object_id *branch_tip, const char *branch_name,
-    struct got_repository *repo,
+    int allow_conflict, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg);
 
 /*

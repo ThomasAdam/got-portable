@@ -294,6 +294,7 @@ test_commit_rejects_conflicted_file() {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got update -c $initial_rev > /dev/null)
 
@@ -317,8 +318,14 @@ test_commit_rejects_conflicted_file() {
 
 	(cd $testroot/wt && got commit -m 'commit it' > $testroot/stdout \
 		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got commit succeeded unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
-	echo -n > $testroot/stdout.expected
+	echo "C  alpha" > $testroot/stdout.expected
 	echo "got: cannot commit file in conflicted status" \
 		> $testroot/stderr.expected
 
@@ -333,6 +340,71 @@ test_commit_rejects_conflicted_file() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -C -m 'commit it' > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# make sure the conflicted commit produces a diff
+	local conflict_commit=`git_show_head $testroot/repo`
+	local blob_minus=`got tree -r $testroot/repo -c $commit_id1 -i | \
+	    grep 'alpha$' | cut -d' ' -f1`
+	local blob_plus=`got tree -r $testroot/repo -c $conflict_commit -i | \
+	    grep 'alpha$' | cut -d' ' -f1`
+
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -c master > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+diff $commit_id1 refs/heads/master
+commit - $commit_id1
+commit + $conflict_commit
+blob - $blob_minus
+blob + $blob_plus
+--- alpha
++++ alpha
+@@ -1 +1,7 @@
++<<<<<<< merged change: commit $commit_id1
+ modified alpha
++||||||| 3-way merge base: commit $initial_rev
++alpha
++=======
++modified alpha, too
++>>>>>>>
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
