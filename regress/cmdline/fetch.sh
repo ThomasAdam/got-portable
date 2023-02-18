@@ -188,8 +188,8 @@ test_fetch_branch() {
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id3=`git_show_head $testroot/repo`
 
-	# foo is now the default HEAD branch in $testroot/repo
-	# but got.conf still says to fetch "master"
+	# foo is now the default HEAD branch in $testroot/repo and should be
+	# fetched as the clone's remote HEAD symref target no longer matches
 	got fetch -q -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -211,8 +211,11 @@ test_fetch_branch() {
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id3" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -1113,8 +1116,11 @@ test_fetch_update_headref() {
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -1497,10 +1503,21 @@ test_fetch_honor_wt_conf_bflag() {
 	fi
 
 	(cd $testroot/repo && git checkout -q boo)
-	# from repo: fetch got.conf branch not repo HEAD
-	# boo is the default HEAD in $testroot/repo, which is not up-to-date
-	# on the clone, but we fetch got.conf "master" which is up-to-date
-	got fetch -r $testroot/repo-clone > $testroot/stdout
+	# clone has remote/origin/HEAD symref with "master" as its target
+	# but the repo has changed HEAD to "boo", so we should fetch "boo"
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got fetch command failed unexpectedly" >&2
@@ -1508,9 +1525,7 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
-	    > $testroot/stdout.expected
-	echo "Already up-to-date" >> $testroot/stdout.expected
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -1520,7 +1535,7 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	# from repo: fetch -b hoo not got.conf branch or repo HEAD
+	# from repo: fetch -b hoo
 	got fetch -q -r $testroot/repo-clone -b hoo > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1543,10 +1558,13 @@ test_fetch_honor_wt_conf_bflag() {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/boo: $commit_id2" >> $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/hoo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/boo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/boo: $commit_id2" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo: $commit_id3" \
 		>> $testroot/stdout.expected
@@ -1688,8 +1706,8 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	# from wt: fetch got.conf "master" and wt "boo", not repo HEAD "hoo"
-	# change default branch in got.conf from "foo" to "master"
+	# from wt: fetch got.conf "master", wt "boo", and the repo's new HEAD
+	# "hoo" as it no longer matches our remote HEAD symref target "master"
 	sed -i "s/foo/master/" $testroot/repo-clone/got.conf
 	echo "modified delta on master" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta on master"
@@ -1731,7 +1749,7 @@ test_fetch_honor_wt_conf_bflag() {
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/boo: $commit_id6" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/hoo: $commit_id3" \
+	echo "refs/remotes/origin/hoo: $commit_id7" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id5" \
 		>> $testroot/stdout.expected
