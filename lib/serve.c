@@ -221,17 +221,11 @@ static const struct got_error *
 send_zero_refs(int outfd, int client_is_reading, int chattygot)
 {
 	const struct got_error *err = NULL;
+	const char *line = GOT_SHA1_STRING_ZERO " capabilities^{}";
 	char buf[GOT_PKT_MAX];
-	uint8_t zero[SHA1_DIGEST_LENGTH];
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	size_t len, capalen = 0;
 
-	memset(&zero, 0, sizeof(zero));
-
-	if (got_sha1_digest_to_str(zero, hex, sizeof(hex)) == NULL)
-		return got_error(GOT_ERR_BAD_OBJ_ID);
-
-	len = snprintf(buf, sizeof(buf), "%s capabilities^{}", hex);
+	len = strlcpy(buf, line, sizeof(buf));
 	if (len >= sizeof(buf))
 		return got_error(GOT_ERR_NO_SPACE);
 
