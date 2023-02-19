@@ -564,7 +564,7 @@ send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_TRAVERSED_COMMITS, 0, 0,
 	    sizeof(struct got_imsg_traversed_commits) +
-	    ncommits * SHA1_DIGEST_LENGTH);
+	    ncommits * sizeof(commit_ids[0]));
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TRAVERSED_COMMITS");
 
@@ -573,7 +573,7 @@ send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
 
 	for (i = 0; i < ncommits; i++) {
 		struct got_object_id *id = &commit_ids[i];
-		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+		if (imsg_add(wbuf, id, sizeof(*id)) == -1) {
 			return got_error_from_errno(
 			    "imsg_add TRAVERSED_COMMITS");
 		}
@@ -658,7 +658,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		}
 
 		if (sizeof(struct got_imsg_traversed_commits) +
-		    ncommits * SHA1_DIGEST_LENGTH >= max_datalen) {
+		    ncommits * sizeof(commit_ids[0]) >= max_datalen) {
 			err = send_traversed_commits(commit_ids, ncommits,
 			    ibuf);
 			if (err)
@@ -1193,7 +1193,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 	err = got_object_qid_alloc_partial(&qid);
 	if (err)
 		return err;
-	memcpy(&qid->id.sha1, tree_id, SHA1_DIGEST_LENGTH);
+	memcpy(&qid->id, tree_id, sizeof(*tree_id));
 	qid->data = strdup(path);
 	if (qid->data == NULL) {
 		err = got_error_from_errno("strdup");
@@ -1797,7 +1797,7 @@ commit_painting_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (datalen != sizeof(ireq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&ireq, imsg->data, sizeof(ireq));
-	memcpy(id.sha1, ireq.id, SHA1_DIGEST_LENGTH);
+	memcpy(&id, &ireq.id, sizeof(id));
 
 	err = queue_commit_id(&ids, &id, ireq.color);
 	if (err)

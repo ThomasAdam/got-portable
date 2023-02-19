@@ -344,7 +344,7 @@ struct got_imsg_reused_deltas {
 
 /* Structure for GOT_IMSG_COMMIT_PAINTING_REQUEST. */
 struct got_imsg_commit_painting_request {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	int idx;
 	int color;
 } __attribute__((__packed__));
@@ -365,7 +365,7 @@ struct got_imsg_painted_commits {
 
 /* Structure for GOT_IMSG_TAG data. */
 struct got_imsg_tag_object {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	int obj_type;
 	size_t tag_len;
 	size_t tagger_len;
@@ -585,7 +585,7 @@ struct got_imsg_commit_traversal_request {
 /* Structure for GOT_IMSG_TRAVERSED_COMMITS  */
 struct got_imsg_traversed_commits {
 	size_t ncommits;
-	/* Followed by ncommit IDs of SHA1_DIGEST_LENGTH each */
+	/* Followed by ncommit struct got_object_id */
 } __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_ENUMERATED_COMMIT  */
