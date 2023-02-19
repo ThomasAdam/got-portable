@@ -374,6 +374,8 @@ test_import_ignores() {
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
 
+	touch $testroot/tree/upsilon
+	mkdir $testroot/tree/ysilon
 	got import -I alpha -I 'beta/' -I '*lta*' -I '*silon/' \
 		-m 'init' -r $testroot/repo $testroot/tree > $testroot/stdout
 	ret=$?
@@ -384,6 +386,7 @@ test_import_ignores() {
 
 	local head_commit=`git_show_head $testroot/repo`
 	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/tree/upsilon" >> $testroot/stdout.expected
 	echo "Created branch refs/heads/main with commit $head_commit" \
 		>> $testroot/stdout.expected
 
