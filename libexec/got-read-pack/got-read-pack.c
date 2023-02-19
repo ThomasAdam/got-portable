@@ -677,8 +677,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			}
 			commit_ids = new;
 		}
-		memcpy(commit_ids[ncommits - 1].sha1, id.sha1,
-		    SHA1_DIGEST_LENGTH);
+		memcpy(&commit_ids[ncommits - 1], &id, sizeof(id));
 
 		pid = STAILQ_FIRST(&commit->parent_ids);
 		if (pid == NULL)
@@ -747,7 +746,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		}
 
 		if (!changed) {
-			memcpy(id.sha1, pid->id.sha1, SHA1_DIGEST_LENGTH);
+			memcpy(&id, &pid->id, sizeof(id));
 			got_object_commit_close(commit);
 			commit = pcommit;
 			pcommit = NULL;
