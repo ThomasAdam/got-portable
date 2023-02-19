@@ -1511,6 +1511,8 @@ done:
 	return err;
 }
 
+static const struct got_error *skip_one_line(FILE *);
+
 /*
  * Upgrade STATUS_MODIFY to STATUS_CONFLICT if a
  * conflict marker is found in newly added lines only.
@@ -1520,77 +1522,102 @@ get_modified_file_content_status(unsigned char *status,
     struct got_blob_object *blob, const char *path, struct stat *sb,
     FILE *ondisk_file)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err, *free_err;
 	const char *markers[3] = {
 		GOT_DIFF_CONFLICT_MARKER_BEGIN,
 		GOT_DIFF_CONFLICT_MARKER_SEP,
 		GOT_DIFF_CONFLICT_MARKER_END
 	};
-	FILE *f = NULL, *f1 = NULL;
-	int i = 0;
+	FILE *f1 = NULL;
+	struct got_diffreg_result *diffreg_result = NULL;
+	struct diff_result *r;
+	int nchunks_parsed, n, i = 0, ln = 0;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	off_t sz1 = 0;
 
-	if (*status == GOT_STATUS_MODIFY) {
-		f = got_opentemp();
-		if (f == NULL)
-			return got_error_from_errno("got_opentemp");
+	if (*status != GOT_STATUS_MODIFY)
+		return NULL;
 
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
+	f1 = got_opentemp();
+	if (f1 == NULL)
+		return got_error_from_errno("got_opentemp");
 
-		if (blob) {
-			err = got_object_blob_dump_to_file(&sz1, NULL, NULL,
-			    f1, blob);
-			if (err)
-				goto done;
-		}
-
-		err = got_diff_blob_file(blob, f1, sz1, NULL, ondisk_file, 1,
-		    sb, path, GOT_DIFF_ALGORITHM_MYERS, 0, 0, 0, NULL, f);
+	if (blob) {
+		got_object_blob_rewind(blob);
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f1, blob);
 		if (err)
 			goto done;
-
-		if (fflush(f) == EOF) {
-			err = got_error_from_errno("fflush");
-			goto done;
-		}
-		if (fseeko(f, 0L, SEEK_SET) == -1) {
-			err = got_error_from_errno("fseek");
-			goto done;
-		}
 	}
 
-	while (*status == GOT_STATUS_MODIFY) {
-		linelen = getline(&line, &linesize, f);
-		if (linelen == -1) {
-			if (feof(f))
-				break;
-			err = got_ferror(f, GOT_ERR_IO);
-			break;
+	err = got_diff_files(&diffreg_result, f1, 1, NULL, ondisk_file,
+	    1, NULL, 0, 0, 1, NULL, GOT_DIFF_ALGORITHM_MYERS);
+	if (err)
+		goto done;
+
+	if (fseek(ondisk_file, 0L, SEEK_SET) == -1) {
+		err = got_ferror(ondisk_file, GOT_ERR_IO);
+		goto done;
+	}
+
+	r = diffreg_result->result;
+
+	for (n = 0; n < r->chunks.len; n += nchunks_parsed) {
+		struct diff_chunk *c;
+		struct diff_chunk_context cc = {};
+		int clc, crc;
+
+		/*
+		 * We can optimise a little by advancing straight
+		 * to the next chunk if this one has no added lines.
+		 */
+		c = diff_chunk_get(r, n);
+		clc = diff_chunk_get_left_count(c);
+		crc = diff_chunk_get_right_count(c);
+
+		if (!crc && clc) {
+			nchunks_parsed = 1;
+			continue;  /* removed lines */
 		}
 
-		if (*line == '+' &&
-		    strncmp(line + 1, markers[i], strlen(markers[i])) == 0) {
-			if (strcmp(markers[i], GOT_DIFF_CONFLICT_MARKER_END)
-			    == 0)
-				*status = GOT_STATUS_CONFLICT;
-			else
-				i++;
+		diff_chunk_context_load_change(&cc, &nchunks_parsed, r, n, 0);
+
+		while (ln < cc.right.start) {
+			err = skip_one_line(ondisk_file);
+			if (err)
+				goto done;
+			++ln;
+		}
+
+		while (ln < cc.right.end) {
+			linelen = getline(&line, &linesize, ondisk_file);
+			if (linelen == -1) {
+				if (feof(ondisk_file))
+					break;
+				err = got_ferror(ondisk_file, GOT_ERR_IO);
+				break;
+			}
+
+			if (line && strncmp(line, markers[i],
+			    strlen(markers[i])) == 0) {
+				if (strcmp(markers[i],
+				    GOT_DIFF_CONFLICT_MARKER_END) == 0) {
+					*status = GOT_STATUS_CONFLICT;
+					goto done;
+				} else
+					i++;
+			}
+			++ln;
 		}
 	}
 
 done:
 	free(line);
-	if (f != NULL && fclose(f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	if (f1 != NULL && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
+	free_err = got_diffreg_result_free(diffreg_result);
+	if (err == NULL)
+		err = free_err;
 
 	return err;
 }
