@@ -1793,7 +1793,7 @@ got_privsep_send_tag(struct imsgbuf *ibuf, struct got_tag_object *tag)
 		return got_error_from_errno("malloc");
 
 	itag = (struct got_imsg_tag_object *)buf;
-	memcpy(itag->id, tag->id.sha1, sizeof(itag->id));
+	memcpy(&itag->id, &tag->id, sizeof(itag->id));
 	itag->obj_type = tag->obj_type;
 	itag->tag_len = tag_len;
 	itag->tagger_len = tagger_len;
@@ -1864,7 +1864,7 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 			break;
 		}
 
-		memcpy((*tag)->id.sha1, itag->id, SHA1_DIGEST_LENGTH);
+		memcpy(&(*tag)->id, &itag->id, sizeof(itag->id));
 
 		(*tag)->tag = strndup(imsg.data + len, itag->tag_len);
 		if ((*tag)->tag == NULL) {
@@ -2680,6 +2680,7 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	struct got_imsg_traversed_commits *icommits;
+	struct got_object_id *ids;
 	size_t datalen;
 	int i, done = 0;
 
@@ -2696,18 +2697,18 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 		case GOT_IMSG_TRAVERSED_COMMITS:
 			icommits = imsg.data;
 			if (datalen != sizeof(*icommits) +
-			    icommits->ncommits * SHA1_DIGEST_LENGTH) {
+			    icommits->ncommits * sizeof(*ids)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
+			ids = imsg.data + sizeof(*icommits);
 			for (i = 0; i < icommits->ncommits; i++) {
 				struct got_object_qid *qid;
-				uint8_t *sha1 = (uint8_t *)imsg.data +
-				    sizeof(*icommits) + i * SHA1_DIGEST_LENGTH;
+
 				err = got_object_qid_alloc_partial(&qid);
 				if (err)
 					break;
-				memcpy(qid->id.sha1, sha1, SHA1_DIGEST_LENGTH);
+				memcpy(&qid->id, &ids[i], sizeof(ids[i]));
 				STAILQ_INSERT_TAIL(commit_ids, qid, entry);
 
 				/* The last commit may contain a change. */
@@ -3381,7 +3382,7 @@ got_privsep_send_painting_request(struct imsgbuf *ibuf, int idx,
 	struct got_imsg_commit_painting_request ireq;
 
 	memset(&ireq, 0, sizeof(ireq));
-	memcpy(ireq.id, id->sha1, sizeof(ireq.id));
+	memcpy(&ireq.id, id, sizeof(ireq.id));
 	ireq.idx = idx;
 	ireq.color = color;
 
