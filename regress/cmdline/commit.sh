@@ -976,6 +976,39 @@ test_commit_gitconfig_author() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# retry with spaces in the git config
+	ed -s "$testroot/repo/.git/config" <<EOF
+,s/	/    /g
+wq
+EOF
+	echo "modified again" > $testroot/wt/alpha
+
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_IGNORE_GITCONFIG && cd "$testroot/wt" && \
+		got commit -m 'test gitconfig author again' >/dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$testroot/repo" && got log -l1 | grep ^from: > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "from: Flan Luck <flan_luck@openbsd.org>" \
+		> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }

@@ -243,8 +243,10 @@ conf_parse_line(char **section, struct got_gitconfig *conf, int trans,
 			return got_error_from_errno("strndup");
 		return NULL;
 	}
-	while (isspace((unsigned char)*line))
+	while (sz > 0 && isspace((unsigned char)*line)) {
 		line++;
+		sz--;
+	}
 
 	/* Deal with assignments.  */
 	for (i = 0; i < sz; i++)
