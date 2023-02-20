@@ -1559,17 +1559,14 @@ get_modified_file_content_status(unsigned char *status,
 		struct diff_chunk *c;
 		struct diff_chunk_context cc = {};
 		off_t pos;
-		int clc, crc;
 
 		/*
 		 * We can optimise a little by advancing straight
 		 * to the next chunk if this one has no added lines.
 		 */
 		c = diff_chunk_get(r, n);
-		clc = diff_chunk_get_left_count(c);
-		crc = diff_chunk_get_right_count(c);
 
-		if (!crc || crc == clc) {
+		if (diff_chunk_type(c) != CHUNK_PLUS) {
 			nchunks_parsed = 1;
 			continue;  /* removed or unchanged lines */
 		}
