@@ -709,17 +709,20 @@ test_status_gitignore_trailing_slashes() {
 	echo "unversioned file" > $testroot/wt/epsilon/bar
 	echo "unversioned file" > $testroot/wt/epsilon/boo
 	echo "unversioned file" > $testroot/wt/epsilon/moo
-	echo "epsilon/" > $testroot/wt/.gitignore
+	echo "unversioned file" > $testroot/wt/upsilon
+
+	# Match the directory epsilon but not the regular file upsilon
+	echo "*psilon/" > $testroot/wt/.gitignore
 
 	echo '?  .gitignore' > $testroot/stdout.expected
 	echo '?  foo' >> $testroot/stdout.expected
+	echo '?  upsilon' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		#diff -u $testroot/stdout.expected $testroot/stdout
-		ret="xfail trailing slashes not matched"
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
