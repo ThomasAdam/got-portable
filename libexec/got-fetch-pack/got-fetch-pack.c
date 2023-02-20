@@ -588,6 +588,11 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		nhave++;
 	}
 
+	n = strlcpy(buf, "done\n", sizeof(buf));
+	err = got_pkt_writepkt(fd, buf, n, chattygot);
+	if (err)
+		goto done;
+
 	while (nhave > 0 && !acked) {
 		struct got_object_id common_id;
 
@@ -600,8 +605,12 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			goto done;
 		}
 		if (n >= 4 && strncmp(buf, "NAK\n", 4) == 0) {
-			/* Server has not located our objects yet. */
-			continue;
+			/*
+			 * Server could not find a common ancestor.
+			 * Perhaps it is an out-of-date mirror, or there
+			 * is a repository with unrelated history.
+			 */
+			break;
 		}
 		if (n < 4 + SHA1_DIGEST_STRING_LENGTH ||
 		    strncmp(buf, "ACK ", 4) != 0) {
@@ -616,11 +625,6 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		}
 		acked++;
 	}
-
-	n = strlcpy(buf, "done\n", sizeof(buf));
-	err = got_pkt_writepkt(fd, buf, n, chattygot);
-	if (err)
-		goto done;
 
 	if (nhave == 0) {
 		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
