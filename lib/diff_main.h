@@ -28,8 +28,8 @@ struct diff_range {
 struct diff_atom {
 	struct diff_data *root; /* back pointer to root diff data */
 
-	off_t pos;		/* if not memory-mapped */
-	const uint8_t *at;	/* if memory-mapped */
+	off_t pos;		/* set whether memory-mapped or not */
+	const uint8_t *at;	/* only set if memory-mapped */
 	off_t len;
 
 	/* This hash is just a very cheap speed up for finding *mismatching*
@@ -141,6 +141,16 @@ struct diff_result {
 
 	diff_chunk_arraylist_t chunks;
 };
+
+enum diff_chunk_type {
+	CHUNK_EMPTY,
+	CHUNK_PLUS,
+	CHUNK_MINUS,
+	CHUNK_SAME,
+	CHUNK_ERROR,
+};
+
+enum diff_chunk_type diff_chunk_type(const struct diff_chunk *c);
 
 struct diff_state;
 
