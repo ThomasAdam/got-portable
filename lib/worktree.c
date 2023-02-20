@@ -1513,8 +1513,6 @@ done:
 	return err;
 }
 
-static const struct got_error *skip_one_line(FILE *);
-
 /*
  * Upgrade STATUS_MODIFY to STATUS_CONFLICT if a
  * conflict marker is found in newly added lines only.
