@@ -74,6 +74,8 @@ int diff_chunk_get_right_start(const struct diff_chunk *c,
 int diff_chunk_get_right_end(const struct diff_chunk *c,
 			     const struct diff_result *r,
 			     int context_lines);
+off_t diff_chunk_get_left_start_pos(const struct diff_chunk *c);
+off_t diff_chunk_get_right_start_pos(const struct diff_chunk *c);
 struct diff_chunk *diff_chunk_get(const struct diff_result *r, int chunk_idx);
 int diff_chunk_get_left_count(struct diff_chunk *c);
 int diff_chunk_get_right_count(struct diff_chunk *c);

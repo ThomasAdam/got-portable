@@ -30,6 +30,18 @@
 #include "diff_internal.h"
 #include "diff_debug.h"
 
+off_t
+diff_chunk_get_left_start_pos(const struct diff_chunk *c)
+{
+	return c->left_start->pos;
+}
+
+off_t
+diff_chunk_get_right_start_pos(const struct diff_chunk *c)
+{
+	return c->right_start->pos;
+}
+
 bool
 diff_chunk_context_empty(const struct diff_chunk_context *cc)
 {
