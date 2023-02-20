@@ -1555,16 +1555,12 @@ get_modified_file_content_status(unsigned char *status,
 	if (err)
 		goto done;
 
-	if (fseek(ondisk_file, 0L, SEEK_SET) == -1) {
-		err = got_ferror(ondisk_file, GOT_ERR_IO);
-		goto done;
-	}
-
 	r = diffreg_result->result;
 
 	for (n = 0; n < r->chunks.len; n += nchunks_parsed) {
 		struct diff_chunk *c;
 		struct diff_chunk_context cc = {};
+		off_t pos;
 		int clc, crc;
 
 		/*
@@ -1575,19 +1571,19 @@ get_modified_file_content_status(unsigned char *status,
 		clc = diff_chunk_get_left_count(c);
 		crc = diff_chunk_get_right_count(c);
 
-		if (!crc && clc) {
+		if (!crc || crc == clc) {
 			nchunks_parsed = 1;
-			continue;  /* removed lines */
+			continue;  /* removed or unchanged lines */
+		}
+
+		pos = diff_chunk_get_right_start_pos(c);
+		if (fseek(ondisk_file, pos, SEEK_SET) == -1) {
+			err = got_ferror(ondisk_file, GOT_ERR_IO);
+			goto done;
 		}
 
 		diff_chunk_context_load_change(&cc, &nchunks_parsed, r, n, 0);
-
-		while (ln < cc.right.start) {
-			err = skip_one_line(ondisk_file);
-			if (err)
-				goto done;
-			++ln;
-		}
+		ln = cc.right.start;
 
 		while (ln < cc.right.end) {
 			linelen = getline(&line, &linesize, ondisk_file);
