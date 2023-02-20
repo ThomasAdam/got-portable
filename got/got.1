@@ -788,6 +788,9 @@ and
 .Pa .gitignore
 files in each traversed directory and will not display unversioned files
 which match these patterns.
+Ignore patterns which end with a slash,
+.Dq / ,
+will only match directories.
 As an extension to
 .Xr glob 7
 matching rules,

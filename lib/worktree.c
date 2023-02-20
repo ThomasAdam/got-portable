@@ -3553,6 +3553,26 @@ done:
 }
 
 static int
+match_path(const char *pattern, size_t pattern_len, const char *path,
+    int flags)
+{
+	char buf[PATH_MAX];
+
+	/*
+	 * Trailing slashes signify directories.
+	 * Append a * to make such patterns conform to fnmatch rules.
+	 */
+	if (pattern_len > 0 && pattern[pattern_len - 1] == '/') {
+		if (snprintf(buf, sizeof(buf), "%s*", pattern) >= sizeof(buf))
+			return FNM_NOMATCH; /* XXX */
+
+		return fnmatch(buf, path, flags);
+	}
+
+	return fnmatch(pattern, path, flags);
+}
+
+static int
 match_ignores(struct got_pathlist_head *ignores, const char *path)
 {
 	struct got_pathlist_entry *pe;
@@ -3563,14 +3583,15 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 		struct got_pathlist_entry *pi;
 
 		TAILQ_FOREACH(pi, ignorelist, entry) {
-			const char *p, *pattern = pi->path;
+			const char *p;
 
-			if (strncmp(pattern, "**/", 3) != 0)
+			if (pi->path_len < 3 ||
+			    strncmp(pi->path, "**/", 3) != 0)
 				continue;
-			pattern += 3;
 			p = path;
 			while (*p) {
-				if (fnmatch(pattern, p,
+				if (match_path(pi->path + 3,
+				    pi->path_len - 3, p,
 				    FNM_PATHNAME | FNM_LEADING_DIR)) {
 					/* Retry in next directory. */
 					while (*p && *p != '/')
@@ -3595,11 +3616,11 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 			struct got_pathlist_head *ignorelist = pe->data;
 			struct got_pathlist_entry *pi;
 			TAILQ_FOREACH(pi, ignorelist, entry) {
-				const char *pattern = pi->path;
 				int flags = FNM_LEADING_DIR;
-				if (strstr(pattern, "/**/") == NULL)
+				if (strstr(pi->path, "/**/") == NULL)
 					flags |= FNM_PATHNAME;
-				if (fnmatch(pattern, path, flags))
+				if (match_path(pi->path, pi->path_len,
+				    path, flags))
 					continue;
 				return 1;
 			}
