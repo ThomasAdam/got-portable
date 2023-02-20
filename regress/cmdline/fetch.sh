@@ -1836,6 +1836,96 @@ test_fetch_honor_wt_conf_bflag() {
 	test_done "$testroot" "$ret"
 }
 
+test_fetch_from_out_of_date_remote() {
+	local testroot=`test_init fetch_from_out_of_date_remote`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone2 \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone2 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+HEAD: refs/heads/master
+refs/heads/master: $commit_id2
+refs/remotes/origin/HEAD: refs/remotes/origin/master
+refs/remotes/origin/master: $commit_id2
+EOF
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat >> $testroot/repo-clone2/got.conf <<EOF
+remote "other" {
+	server "127.0.0.1"
+	protocol ssh
+	repository "$testroot/repo-clone"
+	branch { "master" }
+}
+EOF
+	got fetch -q -r $testroot/repo-clone2 other \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone2 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+HEAD: refs/heads/master
+refs/heads/master: $commit_id2
+refs/remotes/origin/HEAD: refs/remotes/origin/master
+refs/remotes/origin/master: $commit_id2
+refs/remotes/other/HEAD: refs/remotes/other/master
+refs/remotes/other/master: $commit_id
+EOF
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 test_parseargs "$@"
 run_test test_fetch_basic
 run_test test_fetch_list
@@ -1852,3 +1942,4 @@ run_test test_fetch_headref_deleted_locally
 run_test test_fetch_gotconfig_remote_repo
 run_test test_fetch_delete_remote_refs
 run_test test_fetch_honor_wt_conf_bflag
+run_test test_fetch_from_out_of_date_remote
