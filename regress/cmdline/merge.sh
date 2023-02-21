@@ -1425,6 +1425,46 @@ test_merge_umask() {
 	test_done "$testroot" 0
 }
 
+test_merge_gitconfig_author() {
+	local testroot=`test_init merge_gitconfig_author`
+
+	(cd $testroot/repo && git config user.name 'Flan Luck')
+	(cd $testroot/repo && git config user.email 'flan_luck@openbsd.org')
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" >$testroot/repo/alpha
+	git_commit "$testroot/repo" -m "committing alpha on newbranch"
+	echo "modified delta on branch" >$testroot/repo/gamma/delta
+	git_commit "$testroot/repo" -m "committing delta on newbranch"
+
+	# diverge from newbranch
+	(cd "$testroot/repo" && git checkout -q master)
+	echo "modified beta on master" >$testroot/repo/beta
+	git_commit "$testroot/repo" -m "committing zeto no master"
+
+	got checkout "$testroot/repo" "$testroot/wt" >/dev/null
+
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_IGNORE_GITCONFIG && cd $testroot/wt && \
+		 got merge newbranch > /dev/null)
+
+	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "from: Flan Luck <flan_luck@openbsd.org>" \
+		> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
@@ -1436,3 +1476,4 @@ run_test test_merge_no_op
 run_test test_merge_imported_branch
 run_test test_merge_interrupt
 run_test test_merge_umask
+run_test test_merge_gitconfig_author
