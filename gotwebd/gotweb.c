@@ -855,17 +855,10 @@ gotweb_render_index(struct request *c)
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = NULL;
-	DIR *d;
 	struct dirent **sd_dent = NULL;
 	unsigned int d_cnt, d_i, d_disp = 0;
 	unsigned int d_skipped = 0;
 	int type;
-
-	d = opendir(srv->repos_path);
-	if (d == NULL) {
-		error = got_error_from_errno2("opendir", srv->repos_path);
-		return error;
-	}
 
 	d_cnt = scandir(srv->repos_path, &sd_dent, NULL, alphasort);
 	if (d_cnt == -1) {
@@ -947,8 +940,6 @@ done:
 			free(sd_dent[d_i]);
 		free(sd_dent);
 	}
-	if (d != NULL && closedir(d) == EOF && error == NULL)
-		error = got_error_from_errno("closedir");
 	return error;
 }
 
