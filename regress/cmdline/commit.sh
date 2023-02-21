@@ -982,6 +982,9 @@ test_commit_gitconfig_author() {
 
 	# retry with spaces in the git config
 	ed -s "$testroot/repo/.git/config" <<EOF
+/^\[user/ a
+    # it's me!
+.
 ,s/	/    /g
 wq
 EOF
@@ -989,9 +992,20 @@ EOF
 
 	# unset in a subshell to avoid affecting our environment
 	(unset GOT_IGNORE_GITCONFIG && cd "$testroot/wt" && \
-		got commit -m 'test gitconfig author again' >/dev/null)
+		got commit -m 'test gitconfig author again' \
+		>/dev/null 2>$testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# shouldn't have triggered any parsing error
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi

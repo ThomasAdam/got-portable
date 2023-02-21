@@ -224,10 +224,6 @@ conf_parse_line(char **section, struct got_gitconfig *conf, int trans,
 	size_t	 i;
 	int	 j;
 
-	/* Lines starting with '#' or ';' are comments.  */
-	if (*line == '#' || *line == ';')
-		return NULL;
-
 	/* '[section]' parsing...  */
 	if (*line == '[') {
 		for (i = 1; i < sz; i++)
@@ -249,6 +245,10 @@ conf_parse_line(char **section, struct got_gitconfig *conf, int trans,
 		line++;
 		sz--;
 	}
+
+	/* Lines starting with '#' or ';' are comments.  */
+	if (*line == '#' || *line == ';')
+		return NULL;
 
 	/* Deal with assignments.  */
 	for (i = 0; i < sz; i++)
