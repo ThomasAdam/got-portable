@@ -13079,6 +13079,7 @@ cmd_merge(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_fileindex *fileindex = NULL;
 	char *cwd = NULL, *id_str = NULL, *author = NULL;
+	char *gitconfig_path = NULL;
 	struct got_reference *branch = NULL, *wt_branch = NULL;
 	struct got_object_id *branch_tip = NULL, *yca_id = NULL;
 	struct got_object_id *wt_branch_tip = NULL;
@@ -13151,9 +13152,12 @@ cmd_merge(int argc, char *argv[])
 		goto done;
 	}
 
+	error = get_gitconfig_path(&gitconfig_path);
+	if (error)
+		goto done;
 	error = got_repo_open(&repo,
-	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL,
-	    pack_fds);
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd,
+	    gitconfig_path, pack_fds);
 	if (error != NULL)
 		goto done;
 
@@ -13329,6 +13333,7 @@ cmd_merge(int argc, char *argv[])
 
 	}
 done:
+	free(gitconfig_path);
 	free(id_str);
 	free(merge_commit_id);
 	free(author);
