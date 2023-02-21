@@ -188,7 +188,7 @@ with their default values.
 # all paths relative to /var/www (httpd chroot jail)
 #
 
-prefork 1
+prefork 3
 
 server "localhost-unix" {
 	repos_path "/got/public"
@@ -202,17 +202,16 @@ server "localhost-unix" {
 	logo_url   "https://gameoftrees.org"
 
 	# on by default
-	#show_site_owner  off
-	#show_repo_owner  off
-	#show_repo_age  false
+	#show_site_owner  on
+	#show_repo_owner  on
+	#show_repo_age  on
 	#show_repo_description no
-	#show_repo_cloneurl  off
-	# off by default
-	#respect_exportok  on
+	#show_repo_cloneurl  on
+	#respect_exportok off
 
-	#max_repos   100
+	#max_repos   0
 	#max_repos_display  25
-	#max_commits_display  50
+	#max_commits_display  25
 }
 
 # Example server context for FCGI over TCP connections:
