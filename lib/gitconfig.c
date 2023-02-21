@@ -55,8 +55,8 @@
 #define LOG_DBG(x)
 #endif
 
-#define log_print printf
-#define log_error printf
+#define log_print(...) fprintf(stderr, __VA_ARGS__)
+#define log_error(...) fprintf(stderr, __VA_ARGS__)
 
 #ifdef GITCONFIG_DEBUG
 static void
