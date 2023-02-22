@@ -4583,14 +4583,23 @@ cat_diff(FILE *dst, FILE *src, struct got_diff_line **d_lines, size_t *d_nlines,
 			return got_ferror(dst, GOT_ERR_IO);
 	}
 
-	/*
-	 * The diff driver initialises the first line at offset zero when the
-	 * array isn't prepopulated, skip it; we already have it in *d_lines.
-	 */
-	for (i = 1; i < s_nlines; ++i)
-		s_lines[i].offset += (*d_lines)[*d_nlines - 1].offset;
+	if (s_nlines == 0 && *d_nlines == 0)
+		return NULL;
 
-	--s_nlines;
+	/*
+	 * If commit info was in dst, increment line offsets
+	 * of the appended diff content, but skip s_lines[0]
+	 * because offset zero is already in *d_lines.
+	 */
+	if (*d_nlines > 0) {
+		for (i = 1; i < s_nlines; ++i)
+			s_lines[i].offset += (*d_lines)[*d_nlines - 1].offset;
+
+		if (s_nlines > 0) {
+			--s_nlines;
+			++s_lines;
+		}
+	}
 
 	p = reallocarray(*d_lines, *d_nlines + s_nlines, sizeof(*p));
 	if (p == NULL) {
@@ -4600,7 +4609,7 @@ cat_diff(FILE *dst, FILE *src, struct got_diff_line **d_lines, size_t *d_nlines,
 
 	*d_lines = p;
 
-	memcpy(*d_lines + *d_nlines, s_lines + 1, s_nlines * sizeof(*s_lines));
+	memcpy(*d_lines + *d_nlines, s_lines, s_nlines * sizeof(*s_lines));
 	*d_nlines += s_nlines;
 
 	return NULL;
