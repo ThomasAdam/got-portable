@@ -1,3 +1,37 @@
+* got 0.84; 2023-02-22
+  too many changes to list all here; see git repository history for more;
+  and see git repository history for per-change authorship information
+- add 'got histedit -d' flag to drop all commits
+- show worktree UUID in backout/cherrypick -l output
+- several changes in preparation for eventual SHA256 object ID support
+- make 'got rebase' work when the to-be-rebased branch has no parent commit
+- fix bad line-wrapping in tog ref and tree views
+- add horizontal scrolling support to tog ref and tree views
+- create .pack and .idx files with filemode 0444, like Git does
+- make 'got fetch' fetch the work tree's current branch as an implicit fallback
+- improve 'got fetch' behaviour when work tree's branch is not on server
+- gotwebd: fix briefs/tags navigation overlap
+- drop double process name from some gotd logs
+- tog: fix high CPU usage issue after starting search (reported by Mikhail)
+- fix gotd exiting with abnormal error during client connection teardown
+- fix gotd segfault in libevent while disconnecting clients
+- tweak 'got commit' log-message validation: now checks timestamp and size > 0
+- gotwebd: abort blame if the client disconnects midway through
+- make 'got fetch -b branch' only fetch the named branch
+- got/tog/gotadmin: call pledge(2) earlier where possible
+- no longer error out if redundant "got commit -A $GOT_AUTHOR" option is used
+- add 'gotadmin pack' -D flag to force generation of ref-deltas in pack files
+- make 'got fetch' update cached HEAD symref if it has changed in remote repo
+- add commit/histedit/merge/rebase -C option to commit unresolved conflicts
+- make 'got status' check for merge conflict markers on newly added lines only
+- fix read/write out of bounds in gitconfig file parser (reported by James Cook)
+- fix "got fetch" hanging if remote repo is out-of-date (reported by James Cook)
+- ignore patterns with trailing "/" now match directories (suggested by Lucas)
+- make 'got merge' honour author setting in gitconfig (reported by James Cook)
+- sync default values shown in gotwebd.conf(5) EXAMPLES section
+- fix parsing of indented comments in gitconfig file (reported by James Cook)
+- fix tog diff between arbitrary commits; regression from 0.80
+
 * got 0.83; 2023-01-30
 - fix usage display error in got merge command (patch by Mikhail)
 - fix missing commits in pack files created with packed object enumeration
