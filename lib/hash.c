@@ -71,17 +71,15 @@ parse_digest(uint8_t *digest, int len, const char *line)
 static char *
 digest_to_str(const uint8_t *digest, int len, char *buf)
 {
+	const char hex[] = "0123456789abcdef";
 	char *p = buf;
-	char hex[3];
 	int i;
 
 	for (i = 0; i < len; i++) {
-		snprintf(hex, sizeof(hex), "%.2x", digest[i]);
-		p[0] = hex[0];
-		p[1] = hex[1];
-		p += 2;
+		*p++ = hex[digest[i] >> 4];
+		*p++ = hex[digest[i] & 0xf];
 	}
-	p[0] = '\0';
+	*p = '\0';
 
 	return buf;
 }
