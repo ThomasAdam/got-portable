@@ -65,6 +65,7 @@ regress-delta:
 		$(top_srcdir)/lib/deltify.c \
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/hash.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
 		$(top_srcdir)/lib/murmurhash2.c \
@@ -87,7 +88,6 @@ regress-delta:
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/reference_parse.c \
 		$(top_srcdir)/lib/repository.c \
-		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/delta/delta_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
@@ -105,6 +105,7 @@ regress-deltify:
 		$(top_srcdir)/lib/deltify.c \
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/hash.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
 		$(top_srcdir)/lib/murmurhash2.c \
@@ -127,7 +128,6 @@ regress-deltify:
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/reference_parse.c \
 		$(top_srcdir)/lib/repository.c \
-		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/deltify/deltify_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
@@ -147,6 +147,7 @@ regress-fetch:
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/fetch.c \
 		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/hash.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
 		$(top_srcdir)/lib/murmurhash2.c \
@@ -169,7 +170,6 @@ regress-fetch:
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/reference_parse.c \
 		$(top_srcdir)/lib/repository.c \
-		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/fetch/fetch_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) -lm && \
@@ -189,6 +189,7 @@ regress-idset:
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/fetch.c \
 		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/hash.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
 		$(top_srcdir)/lib/murmurhash2.c \
@@ -211,7 +212,6 @@ regress-idset:
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/reference_parse.c \
 		$(top_srcdir)/lib/repository.c \
-		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/idset/idset_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
@@ -231,6 +231,7 @@ regress-path:
 		$(top_srcdir)/lib/error.c \
 		$(top_srcdir)/lib/fetch.c \
 		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/hash.c \
 		$(top_srcdir)/lib/inflate.c \
 		$(top_srcdir)/lib/lockfile.c \
 		$(top_srcdir)/lib/murmurhash2.c \
@@ -253,7 +254,6 @@ regress-path:
 		$(top_srcdir)/lib/reference.c \
 		$(top_srcdir)/lib/reference_parse.c \
 		$(top_srcdir)/lib/repository.c \
-		$(top_srcdir)/lib/sha1.c \
 		$(top_srcdir)/lib/sigs.c \
 		$(top_srcdir)/regress/path/path_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \

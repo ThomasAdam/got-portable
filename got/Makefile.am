@@ -28,6 +28,7 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/fetch.c \
 	$(top_srcdir)/lib/fileindex.c \
 	$(top_srcdir)/lib/gotconfig.c \
+	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/lockfile.c \
 	$(top_srcdir)/lib/murmurhash2.c \
@@ -53,7 +54,6 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/reference_parse.c \
 	$(top_srcdir)/lib/repository.c \
 	$(top_srcdir)/lib/send.c \
-	$(top_srcdir)/lib/sha1.c \
 	$(top_srcdir)/lib/sigs.c \
 	$(top_srcdir)/lib/worktree.c \
 	$(top_srcdir)/lib/worktree_open.c

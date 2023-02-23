@@ -15,7 +15,7 @@ got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/pollfd.c \
 	$(top_srcdir)/lib/privsep.c \
 	$(top_srcdir)/lib/ratelimit.c \
-	$(top_srcdir)/lib/sha1.c
+	$(top_srcdir)/lib/hash.c
 
 got_index_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 

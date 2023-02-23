@@ -12,6 +12,7 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/deltify.c \
        $(top_srcdir)/lib/error.c \
        $(top_srcdir)/lib/gotconfig.c \
+       $(top_srcdir)/lib/hash.c \
        $(top_srcdir)/lib/inflate.c \
        $(top_srcdir)/lib/lockfile.c \
        $(top_srcdir)/lib/murmurhash2.c \
@@ -35,7 +36,6 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/reference_parse.c \
        $(top_srcdir)/lib/repository.c \
        $(top_srcdir)/lib/repository_admin.c \
-       $(top_srcdir)/lib/sha1.c \
        $(top_srcdir)/lib/sigs.c \
        $(top_srcdir)/lib/worktree_open.c
 
