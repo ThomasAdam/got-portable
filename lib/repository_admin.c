@@ -483,7 +483,7 @@ got_repo_find_pack(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 	*dot = '\0';
-	if (!got_parse_sha1_digest(id.sha1, p)) {
+	if (!got_parse_object_id(&id, p, GOT_HASH_SHA1)) {
 		err = got_error_fmt(GOT_ERR_BAD_PATH,
 		    "'%s' is not a valid pack file name",
 		    packfile_name);
@@ -682,8 +682,8 @@ get_loose_object_ids(struct got_object_idset **loose_ids, off_t *ondisk_size,
 				goto done;
 			}
 
-			memset(&id, 0, sizeof(id));
-			if (!got_parse_sha1_digest(id.sha1, id_str)) {
+			if (!got_parse_object_id(&id, id_str,
+			    GOT_HASH_SHA1)) {
 				free(id_str);
 				continue;
 			}

@@ -70,15 +70,15 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	if (!got_parse_sha1_digest(id1.sha1, id_str1)) {
+	if (!got_parse_object_id(&id1, id_str1, GOT_HASH_SHA1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}
-	if (!got_parse_sha1_digest(id2.sha1, id_str2)) {
+	if (!got_parse_object_id(&id2, id_str2, GOT_HASH_SHA1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}
-	if (!got_parse_sha1_digest(id3.sha1, id_str3)) {
+	if (!got_parse_object_id(&id3, id_str3, GOT_HASH_SHA1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}

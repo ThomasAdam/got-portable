@@ -301,7 +301,7 @@ fetch_ref(struct imsgbuf *ibuf, struct got_pathlist_head *have_refs,
 	const struct got_error *err;
 	char *theirs = NULL, *mine = NULL;
 
-	if (!got_parse_sha1_digest(want->sha1, id_str)) {
+	if (!got_parse_object_id(want, id_str, GOT_HASH_SHA1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}
@@ -620,7 +620,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			    "unexpected message from server");
 			goto done;
 		}
-		if (!got_parse_sha1_digest(common_id.sha1, buf + 4)) {
+		if (!got_parse_object_id(&common_id, buf + 4,
+		    GOT_HASH_SHA1)) {
 			err = got_error_msg(GOT_ERR_BAD_PACKET,
 			    "bad object ID in ACK packet from server");
 			goto done;

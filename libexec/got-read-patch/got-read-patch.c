@@ -194,7 +194,7 @@ blobid(const char *line, char **blob, int git)
 	if ((*blob = strndup(line, len)) == NULL)
 		return got_error_from_errno("strndup");
 
-	if (!git && !got_parse_sha1_digest(digest, *blob)) {
+	if (!git && !got_parse_hash_digest(digest, *blob, GOT_HASH_SHA1)) {
 		/* silently ignore invalid blob ids */
 		free(*blob);
 		*blob = NULL;

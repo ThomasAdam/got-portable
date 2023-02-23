@@ -36,6 +36,7 @@
 #include "got_path.h"
 #include "got_version.h"
 #include "got_reference.h"
+#include "got_object.h"
 
 #include "got_lib_pkt.h"
 #include "got_lib_dial.h"
@@ -433,7 +434,7 @@ parse_want_line(char **common_capabilities, uint8_t *id, char *buf, size_t len)
 	if (err)
 		return err;
 
-	if (!got_parse_sha1_digest(id, id_str)) {
+	if (!got_parse_hash_digest(id, id_str, GOT_HASH_SHA1)) {
 		err = got_error_msg(GOT_ERR_BAD_PACKET,
 		    "want-line with bad object ID");
 		goto done;
@@ -462,7 +463,7 @@ parse_have_line(uint8_t *id, char *buf, size_t len)
 	if (err)
 		return err;
 
-	if (!got_parse_sha1_digest(id, id_str)) {
+	if (!got_parse_hash_digest(id, id_str, GOT_HASH_SHA1)) {
 		err = got_error_msg(GOT_ERR_BAD_PACKET,
 		    "have-line with bad object ID");
 		goto done;
@@ -1049,8 +1050,8 @@ parse_ref_update_line(char **common_capabilities, char **refname,
 	if (err)
 		return err;
 
-	if (!got_parse_sha1_digest(old_id, old_id_str) ||
-	    !got_parse_sha1_digest(new_id, new_id_str)) {
+	if (!got_parse_hash_digest(old_id, old_id_str, GOT_HASH_SHA1) ||
+	    !got_parse_hash_digest(new_id, new_id_str, GOT_HASH_SHA1)) {
 		err = got_error_msg(GOT_ERR_BAD_PACKET,
 		    "ref-update with bad object ID");
 		goto done;

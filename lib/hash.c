@@ -15,12 +15,17 @@
  */
 
 #include <sys/types.h>
+#include <sys/queue.h>
+
 #include <sha1.h>
 #include <sha2.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <limits.h>
+
+#include "got_object.h"
 
 #include "got_lib_hash.h"
 
@@ -41,14 +46,14 @@ got_parse_xdigit(uint8_t *val, const char *hex)
 	return 1;
 }
 
-int
-got_parse_sha1_digest(uint8_t *digest, const char *line)
+static int
+parse_digest(uint8_t *digest, int len, const char *line)
 {
 	uint8_t b = 0;
 	char hex[3] = {'\0', '\0', '\0'};
 	int i, j;
 
-	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+	for (i = 0; i < len; i++) {
 		if (line[0] == '\0' || line[1] == '\0')
 			return 0;
 		for (j = 0; j < 2; j++) {
@@ -63,17 +68,14 @@ got_parse_sha1_digest(uint8_t *digest, const char *line)
 	return 1;
 }
 
-char *
-got_sha1_digest_to_str(const uint8_t *digest, char *buf, size_t size)
+static char *
+digest_to_str(const uint8_t *digest, int len, char *buf)
 {
 	char *p = buf;
 	char hex[3];
 	int i;
 
-	if (size < SHA1_DIGEST_STRING_LENGTH)
-		return NULL;
-
-	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+	for (i = 0; i < len; i++) {
 		snprintf(hex, sizeof(hex), "%.2x", digest[i]);
 		p[0] = hex[0];
 		p[1] = hex[1];
@@ -82,4 +84,47 @@ got_sha1_digest_to_str(const uint8_t *digest, char *buf, size_t size)
 	p[0] = '\0';
 
 	return buf;
+}
+
+char *
+got_sha1_digest_to_str(const uint8_t *digest, char *buf, size_t size)
+{
+	if (size < SHA1_DIGEST_STRING_LENGTH)
+		return NULL;
+	return digest_to_str(digest, SHA1_DIGEST_LENGTH, buf);
+}
+
+char *
+got_sha256_digest_to_str(const uint8_t *digest, char *buf, size_t size)
+{
+	if (size < SHA256_DIGEST_STRING_LENGTH)
+		return NULL;
+	return digest_to_str(digest, SHA256_DIGEST_LENGTH, buf);
+}
+
+int
+got_parse_hash_digest(uint8_t *digest, const char *line,
+    enum got_hash_algorithm algo)
+{
+	switch (algo) {
+	case GOT_HASH_SHA1:
+		return parse_digest(digest, SHA1_DIGEST_LENGTH, line);
+	case GOT_HASH_SHA256:
+		return parse_digest(digest, SHA256_DIGEST_LENGTH, line);
+	default:
+		return 0;
+	}
+}
+
+int
+got_parse_object_id(struct got_object_id *id, const char *line,
+    enum got_hash_algorithm algo)
+{
+	memset(id, 0, sizeof(*id));
+
+	/* XXX: temporary until we grow got_object_id */
+	if (algo != GOT_HASH_SHA1)
+		return 0;
+
+	return got_parse_hash_digest(id->sha1, line, algo);
 }
