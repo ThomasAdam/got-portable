@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
-#include <sha2.h>
 #include <zlib.h>
 
 #include "got_compat.h"

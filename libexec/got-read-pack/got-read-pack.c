@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha2.h>
 #include <unistd.h>
 #include <zlib.h>
 

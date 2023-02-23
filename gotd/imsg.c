@@ -23,7 +23,6 @@
 #include <imsg.h>
 #include <limits.h>
 #include <poll.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

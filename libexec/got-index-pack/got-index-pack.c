@@ -20,7 +20,6 @@
 #include <sys/mman.h>
 #include <sys/uio.h>
 
-#include <sha2.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

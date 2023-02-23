@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

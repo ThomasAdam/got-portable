@@ -20,7 +20,6 @@
 #include <event.h>
 #include <fcntl.h>
 #include <imsg.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

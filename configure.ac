@@ -61,6 +61,10 @@ AC_CHECK_HEADERS([ \
 	netinet/in.h \
 	paths.h \
 	poll.h \
+	sha.h \
+	sha1.h \
+	sha2.h \
+	sha256.h \
 	stddef.h \
 	stdint.h \
 	stdlib.h \
@@ -76,6 +80,38 @@ AC_CHECK_HEADERS([ \
 	unistd.h \
 	wchar.h \
 ])
+
+if test "x$ac_cv_header_sha2_h" = xyes; then
+	AC_DEFINE(HAVE_SHA2)
+fi
+
+# Check for SHA1_DIGEST_LENGTH
+have_sha1_digest_length=no
+if test "x$ac_cv_header_sha_h" = xyes; then
+	AC_RUN_IFELSE([AC_LANG_PROGRAM(
+	    [#include <sha.h>],
+	    [#if !defined(SHA1_DIGEST_LENGTH) && defined (SHA_DIGEST_LENGTH)
+		exit(1);
+	     #endif
+	    ])],
+	[have_sha1_digest_length=yes])
+	AC_DEFINE(HAVE_SHA_AS_SHA1)
+fi
+
+if test "x$ac_cv_header_sha1_h" = xyes; then
+	AC_RUN_IFELSE([AC_LANG_PROGRAM(
+	    [#include <sha1.h>],
+	    [#if !defined(SHA1_DIGEST_LENGTH) && defined(SHA_DIGEST_LENGTH)
+		exit(1);
+	     #endif
+	]    )],
+	[have_sha1_digest_length=yes])
+	AC_DEFINE(HAVE_SHA1_AS_SHA1)
+fi
+
+if test "x$have_sha1_digest_length" = "xno"; then
+	AC_DEFINE(NEEDS_SHA1_DEFS)
+fi
 
 # Checks for typ edefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL

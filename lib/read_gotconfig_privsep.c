@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <imsg.h>
-#include <sha2.h>
 #include <limits.h>
 
 #include "got_error.h"

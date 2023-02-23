@@ -28,7 +28,6 @@
 #include <string.h>
 #include <err.h>
 #include <assert.h>
-#include <sha2.h>
 
 #include "got_error.h"
 #include "got_date.h"

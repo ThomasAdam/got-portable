@@ -19,7 +19,6 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 
-#include <sha2.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdint.h>

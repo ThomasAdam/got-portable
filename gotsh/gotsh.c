@@ -22,7 +22,6 @@
 #include <event.h>
 #include <imsg.h>
 #include <limits.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

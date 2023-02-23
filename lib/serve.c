@@ -22,7 +22,6 @@
 #include <event.h>
 #include <poll.h>
 #include <limits.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

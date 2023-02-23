@@ -179,15 +179,35 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include <CommonCrypto/CommonDigest.h>
 #endif
 
-#if defined(HAVE_LIBCRYPTO) && !defined(__APPLE__) && !defined(__DragonFly__)
-#include <sha1.h>
-#elif !defined(__APPLE__) && !defined(__DragonFly__)
-#include <sha.h>
-#elif defined(__DragonFly__)
+#ifdef HAVE_SHA_AS_SHA1
+#  include <sha.h>
+#endif
+#ifdef HAVE_SHA1_AS_SHA1
+#      include <sha1.h>
+#endif
+#ifdef HAVE_SHA2
+#    include <sha2.h>
+#endif
+#ifdef HAVE_SHA256
+#    include <sha256.h>
+#endif
+
+/* Catch-all for systems where the header files don't exist and/or the below
+ * still are not defined.
+ */
+#ifndef SHA256_DIGEST_LENGTH
+#define SHA256_DIGEST_LENGTH 32
+#endif
+
+#ifndef SHA256_DIGEST_STRING_LENGTH
+#define SHA256_DIGEST_STRING_LENGTH (SHA256_DIGEST_LENGTH * 2 + 1)
+#endif
+
+#if defined(__DragonFly__)
 #include <openssl/sha.h>
 #endif
 
-#if !defined(HAVE_LIBCRYPTO) || defined(__APPLE__) || defined(__DragonFly__)
+#ifdef NEEDS_SHA1_DEFS
 #define SHA1_DIGEST_LENGTH		SHA_DIGEST_LENGTH
 #define SHA1_DIGEST_STRING_LENGTH	(SHA1_DIGEST_LENGTH * 2 + 1)
 

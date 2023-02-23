@@ -25,7 +25,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

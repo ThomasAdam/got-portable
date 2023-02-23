@@ -30,7 +30,6 @@
 #include <limits.h>
 #include <pwd.h>
 #include <imsg.h>
-#include <sha2.h>
 #include <signal.h>
 #include <siphash.h>
 #include <stdarg.h>

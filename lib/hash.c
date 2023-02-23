@@ -17,7 +17,6 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
-#include <sha2.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

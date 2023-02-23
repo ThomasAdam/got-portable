@@ -25,7 +25,6 @@
 #include <limits.h>
 #include <pwd.h>
 #include <grp.h>
-#include <sha2.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
