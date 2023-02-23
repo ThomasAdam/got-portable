@@ -74,14 +74,15 @@ const struct got_error *
 got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 {
 	const struct got_error *err = NULL;
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_packidx_v2_hdr *h;
-	SHA1_CTX ctx;
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
+	struct got_hash ctx;
+	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
 	size_t nobj, len_fanout, len_ids, offset, remain;
 	ssize_t n;
 	int i;
 
-	SHA1Init(&ctx);
+	got_hash_init(&ctx, algo);
 
 	h = &p->hdr;
 	offset = 0;
@@ -116,7 +117,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	remain -= sizeof(*h->magic);
 
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->magic, sizeof(*h->magic));
+		got_hash_update(&ctx, h->magic, sizeof(*h->magic));
 
 	if (remain < sizeof(*h->version)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
@@ -147,7 +148,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	remain -= sizeof(*h->version);
 
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->version, sizeof(*h->version));
+		got_hash_update(&ctx, h->version, sizeof(*h->version));
 
 	len_fanout =
 	    sizeof(*h->fanout_table) * GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS;
@@ -176,7 +177,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	if (err)
 		goto done;
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->fanout_table, len_fanout);
+		got_hash_update(&ctx, h->fanout_table, len_fanout);
 	offset += len_fanout;
 	remain -= len_fanout;
 
@@ -204,7 +205,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 		}
 	}
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->sorted_ids, len_ids);
+		got_hash_update(&ctx, h->sorted_ids, len_ids);
 	offset += len_ids;
 	remain -= len_ids;
 
@@ -229,7 +230,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 		}
 	}
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
+		got_hash_update(&ctx, h->crc32, nobj * sizeof(*h->crc32));
 	remain -= nobj * sizeof(*h->crc32);
 	offset += nobj * sizeof(*h->crc32);
 
@@ -254,8 +255,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 		}
 	}
 	if (verify)
-		SHA1Update(&ctx, (uint8_t *)h->offsets,
-		    nobj * sizeof(*h->offsets));
+		got_hash_update(&ctx, h->offsets, nobj * sizeof(*h->offsets));
 	remain -= nobj * sizeof(*h->offsets);
 	offset += nobj * sizeof(*h->offsets);
 
@@ -297,7 +297,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 		}
 	}
 	if (verify)
-		SHA1Update(&ctx, (uint8_t*)h->large_offsets,
+		got_hash_update(&ctx, h->large_offsets,
 		    p->nlargeobj * sizeof(*h->large_offsets));
 	remain -= p->nlargeobj * sizeof(*h->large_offsets);
 	offset += p->nlargeobj * sizeof(*h->large_offsets);
@@ -325,10 +325,11 @@ checksum:
 		}
 	}
 	if (verify) {
-		SHA1Update(&ctx, h->trailer->packfile_sha1, SHA1_DIGEST_LENGTH);
-		SHA1Final(sha1, &ctx);
-		if (memcmp(h->trailer->packidx_sha1, sha1,
-		    SHA1_DIGEST_LENGTH) != 0)
+		got_hash_update(&ctx, h->trailer->packfile_sha1,
+		    SHA1_DIGEST_LENGTH);
+		got_hash_final(&ctx, hash);
+		if (got_hash_cmp(ctx.algo, hash, h->trailer->packidx_sha1)
+		    != 0)
 			err = got_error(GOT_ERR_PACKIDX_CSUM);
 	}
 done:

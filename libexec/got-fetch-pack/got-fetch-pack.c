@@ -351,14 +351,14 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0, have_sidebands = 0;
 	int found_branch = 0;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	uint8_t sha1_buf[SHA1_DIGEST_LENGTH];
 	size_t sha1_buf_len = 0;
 	ssize_t w;
 	struct got_ratelimit rl;
 
 	TAILQ_INIT(&symrefs);
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 	got_ratelimit_init(&rl, 0, 500);
 
 	have = malloc(refsz * sizeof(have[0]));
@@ -762,7 +762,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				    sha1_buf_len + r > SHA1_DIGEST_LENGTH) {
 					size_t nshift = MIN(sha1_buf_len + r -
 					    SHA1_DIGEST_LENGTH, sha1_buf_len);
-					SHA1Update(&sha1_ctx, sha1_buf, nshift);
+					got_hash_update(&ctx, sha1_buf,
+					    nshift);
 					memmove(sha1_buf, sha1_buf + nshift,
 					    sha1_buf_len - nshift);
 					sha1_buf_len -= nshift;
@@ -776,7 +777,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				 * Mix in previously buffered bytes which
 				 * are not part of the checksum after all.
 				 */
-				SHA1Update(&sha1_ctx, sha1_buf, r);
+				got_hash_update(&ctx, sha1_buf, r);
 
 				/* Update potential checksum buffer. */
 				memmove(sha1_buf, sha1_buf + r,
@@ -785,10 +786,10 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 		} else {
 			/* Mix in any previously buffered bytes. */
-			SHA1Update(&sha1_ctx, sha1_buf, sha1_buf_len);
+			got_hash_update(&ctx, sha1_buf, sha1_buf_len);
 
 			/* Mix in bytes read minus potential checksum bytes. */
-			SHA1Update(&sha1_ctx, buf, r - SHA1_DIGEST_LENGTH);
+			got_hash_update(&ctx, buf, r - SHA1_DIGEST_LENGTH);
 
 			/* Buffer potential checksum bytes. */
 			memcpy(sha1_buf, buf + r - SHA1_DIGEST_LENGTH,
@@ -820,7 +821,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	if (err)
 		goto done;
 
-	SHA1Final(pack_sha1, &sha1_ctx);
+	got_hash_final(&ctx, pack_sha1);
 	if (sha1_buf_len != SHA1_DIGEST_LENGTH ||
 	    memcmp(pack_sha1, sha1_buf, sha1_buf_len) != 0) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE,

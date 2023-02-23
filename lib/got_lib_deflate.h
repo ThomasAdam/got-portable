@@ -20,6 +20,9 @@ struct got_deflate_checksum {
 
 	/* If not NULL, mix output bytes into this SHA1 context. */
 	SHA1_CTX *output_sha1;
+
+	/* If not NULL, mix output bytes into this hash context. */
+	struct got_hash *output_ctx;
 };
 
 struct got_deflate_buf {

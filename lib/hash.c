@@ -128,3 +128,50 @@ got_parse_object_id(struct got_object_id *id, const char *line,
 
 	return got_parse_hash_digest(id->sha1, line, algo);
 }
+
+void
+got_hash_init(struct got_hash *hash, enum got_hash_algorithm algo)
+{
+	memset(hash, 0, sizeof(*hash));
+	hash->algo = algo;
+
+	if (algo == GOT_HASH_SHA1)
+		SHA1Init(&hash->sha1_ctx);
+	else if (algo == GOT_HASH_SHA256)
+		SHA256Init(&hash->sha256_ctx);
+}
+
+void
+got_hash_update(struct got_hash *hash, const void *data, size_t len)
+{
+	if (hash->algo == GOT_HASH_SHA1)
+		SHA1Update(&hash->sha1_ctx, data, len);
+	else if (hash->algo == GOT_HASH_SHA256)
+		SHA256Update(&hash->sha256_ctx, data, len);
+}
+
+void
+got_hash_final(struct got_hash *hash, uint8_t *out)
+{
+	if (hash->algo == GOT_HASH_SHA1)
+		SHA1Final(out, &hash->sha1_ctx);
+	else if (hash->algo == GOT_HASH_SHA256)
+		SHA256Final(out, &hash->sha256_ctx);
+}
+
+void
+got_hash_final_object_id(struct got_hash *hash, struct got_object_id *id)
+{
+	memset(id, 0, sizeof(*id));
+	got_hash_final(hash, id->sha1);
+}
+
+int
+got_hash_cmp(enum got_hash_algorithm algo, uint8_t *b1, uint8_t *b2)
+{
+	if (algo == GOT_HASH_SHA1)
+		return memcmp(b1, b2, SHA1_DIGEST_LENGTH);
+	else if (algo == GOT_HASH_SHA256)
+		return memcmp(b1, b2, SHA256_DIGEST_LENGTH);
+	return -1;
+}

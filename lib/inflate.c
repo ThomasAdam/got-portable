@@ -31,6 +31,7 @@
 #include "got_object.h"
 #include "got_path.h"
 
+#include "got_lib_hash.h"
 #include "got_lib_inflate.h"
 #include "got_lib_poll.h"
 
@@ -94,6 +95,9 @@ csum_input(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 
 	if (csum->input_sha1)
 		SHA1Update(csum->input_sha1, buf, len);
+
+	if (csum->input_ctx)
+		got_hash_update(csum->input_ctx, buf, len);
 }
 
 static void
@@ -104,6 +108,9 @@ csum_output(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 
 	if (csum->output_sha1)
 		SHA1Update(csum->output_sha1, buf, len);
+
+	if (csum->output_ctx)
+		got_hash_update(csum->output_ctx, buf, len);
 }
 
 const struct got_error *
