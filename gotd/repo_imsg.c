@@ -31,7 +31,7 @@
 #include "got_error.h"
 #include "got_object.h"
 
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 
 #include "gotd.h"
 #include "log.h"

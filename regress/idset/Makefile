@@ -1,7 +1,7 @@
 .PATH:${.CURDIR}/../../lib
 
 PROG = idset_test
-SRCS = error.c sha1.c object_idset.c inflate.c path.c object_parse.c \
+SRCS = error.c hash.c object_idset.c inflate.c path.c object_parse.c \
 	idset_test.c pollfd.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib

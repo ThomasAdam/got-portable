@@ -4,7 +4,7 @@
 
 PROG=		gotctl
 SRCS=		gotctl.c error.c imsg.c inflate.c object_parse.c path.c \
-		pollfd.c sha1.c
+		pollfd.c hash.c
 
 MAN =		${PROG}.8
 

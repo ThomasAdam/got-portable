@@ -22,9 +22,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include "got_compat.h"
-
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 
 int
 got_parse_xdigit(uint8_t *val, const char *hex)

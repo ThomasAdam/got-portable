@@ -44,7 +44,7 @@
 #include "got_fetch.h"
 #include "got_reference.h"
 
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"

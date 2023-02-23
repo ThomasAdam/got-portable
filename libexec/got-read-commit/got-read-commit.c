@@ -40,7 +40,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 
 static volatile sig_atomic_t sigint_received;
 

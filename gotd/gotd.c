@@ -51,7 +51,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 #include "got_lib_gitproto.h"
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"

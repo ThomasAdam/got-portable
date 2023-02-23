@@ -52,7 +52,7 @@
 #include "got_lib_diff.h"
 #include "got_lib_object.h"
 #include "got_lib_privsep.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
