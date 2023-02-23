@@ -34,6 +34,7 @@
 #include "got_object.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
@@ -88,11 +89,11 @@ main(int argc, char *argv[])
 		struct got_object_id id;
 		struct got_object_id expected_id;
 		struct got_inflate_checksum csum;
-		SHA1_CTX sha1_ctx;
+		struct got_hash ctx;
 
-		SHA1Init(&sha1_ctx);
+		got_hash_init(&ctx, GOT_HASH_SHA1);
 		memset(&csum, 0, sizeof(csum));
-		csum.output_sha1 = &sha1_ctx;
+		csum.output_ctx = &ctx;
 
 		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
@@ -181,7 +182,7 @@ main(int argc, char *argv[])
 			if (err)
 				goto done;
 		}
-		SHA1Final(id.sha1, &sha1_ctx);
+		got_hash_final_object_id(&ctx, &id);
 		if (got_object_id_cmp(&expected_id, &id) != 0) {
 			err = got_error_checksum(&expected_id);
 			goto done;

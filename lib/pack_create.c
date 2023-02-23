@@ -47,6 +47,7 @@
 
 #include "got_lib_deltify.h"
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_object_cache.h"
@@ -1419,14 +1420,14 @@ done:
 }
 
 static const struct got_error *
-hwrite(int fd, const void *buf, off_t len, SHA1_CTX *ctx)
+hwrite(int fd, const void *buf, off_t len, struct got_hash *ctx)
 {
-	SHA1Update(ctx, buf, len);
+	got_hash_update(ctx, buf, len);
 	return got_poll_write_full(fd, buf, len);
 }
 
 static const struct got_error *
-hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
+hcopy(FILE *fsrc, int fd_dst, off_t len, struct got_hash *ctx)
 {
 	const struct got_error *err;
 	unsigned char buf[65536];
@@ -1438,7 +1439,7 @@ hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
 		n = fread(buf, 1, copylen, fsrc);
 		if (n != copylen)
 			return got_ferror(fsrc, GOT_ERR_IO);
-		SHA1Update(ctx, buf, copylen);
+		got_hash_update(ctx, buf, copylen);
 		err = got_poll_write_full(fd_dst, buf, copylen);
 		if (err)
 			return err;
@@ -1450,12 +1451,12 @@ hcopy(FILE *fsrc, int fd_dst, off_t len, SHA1_CTX *ctx)
 
 static const struct got_error *
 hcopy_mmap(uint8_t *src, off_t src_offset, size_t src_size,
-    int fd, off_t len, SHA1_CTX *ctx)
+    int fd, off_t len, struct got_hash *ctx)
 {
 	if (src_offset + len > src_size)
 		return got_error(GOT_ERR_RANGE);
 
-	SHA1Update(ctx, src + src_offset, len);
+	got_hash_update(ctx, src + src_offset, len);
 	return got_poll_write_full(fd, src + src_offset, len);
 }
 
@@ -1550,8 +1551,8 @@ packoff(char *hdr, off_t off)
 }
 
 static const struct got_error *
-deltahdr(off_t *packfile_size, SHA1_CTX *ctx, int packfd, int force_refdelta,
-    struct got_pack_meta *m)
+deltahdr(off_t *packfile_size, struct got_hash *ctx, int packfd,
+    int force_refdelta, struct got_pack_meta *m)
 {
 	const struct got_error *err;
 	char buf[32];
@@ -1589,7 +1590,7 @@ deltahdr(off_t *packfile_size, SHA1_CTX *ctx, int packfd, int force_refdelta,
 static const struct got_error *
 write_packed_object(off_t *packfile_size, int packfd,
     FILE *delta_cache, uint8_t *delta_cache_map, size_t delta_cache_size,
-    struct got_pack_meta *m, int *outfd, SHA1_CTX *ctx,
+    struct got_pack_meta *m, int *outfd, struct got_hash *ctx,
     struct got_repository *repo, int force_refdelta)
 {
 	const struct got_error *err = NULL;
@@ -1599,7 +1600,7 @@ write_packed_object(off_t *packfile_size, int packfd,
 	struct got_raw_object *raw = NULL;
 	off_t outlen, delta_offset;
 
-	csum.output_sha1 = ctx;
+	csum.output_ctx = ctx;
 	csum.output_crc = NULL;
 
 	if (m->reused_delta_offset)
@@ -1693,7 +1694,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 {
 	const struct got_error *err = NULL;
 	int i;
-	SHA1_CTX ctx;
+	struct got_hash ctx;
 	struct got_pack_meta *m;
 	char buf[32];
 	off_t packfile_size = 0;
@@ -1703,7 +1704,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 	size_t delta_cache_size = 0;
 	FILE *packfile = NULL;
 
-	SHA1Init(&ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 #ifndef GOT_PACK_NO_MMAP
 	delta_cache_fd = dup(fileno(delta_cache));
@@ -1784,7 +1785,7 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 			goto done;
 	}
 
-	SHA1Final(pack_sha1, &ctx);
+	got_hash_final(&ctx, pack_sha1);
 	err = got_poll_write_full(packfd, pack_sha1, SHA1_DIGEST_LENGTH);
 	if (err)
 		goto done;

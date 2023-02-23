@@ -32,6 +32,7 @@
 #include "got_object.h"
 #include "got_path.h"
 
+#include "got_lib_hash.h"
 #include "got_lib_fileindex.h"
 #include "got_lib_worktree.h"
 
@@ -352,12 +353,12 @@ got_fileindex_free(struct got_fileindex *fileindex)
 }
 
 static const struct got_error *
-write_fileindex_val64(SHA1_CTX *ctx, uint64_t val, FILE *outfile)
+write_fileindex_val64(struct got_hash *ctx, uint64_t val, FILE *outfile)
 {
 	size_t n;
 
 	val = htobe64(val);
-	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	got_hash_update(ctx, &val, sizeof(val));
 	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -365,12 +366,12 @@ write_fileindex_val64(SHA1_CTX *ctx, uint64_t val, FILE *outfile)
 }
 
 static const struct got_error *
-write_fileindex_val32(SHA1_CTX *ctx, uint32_t val, FILE *outfile)
+write_fileindex_val32(struct got_hash *ctx, uint32_t val, FILE *outfile)
 {
 	size_t n;
 
 	val = htobe32(val);
-	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	got_hash_update(ctx, &val, sizeof(val));
 	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -378,12 +379,12 @@ write_fileindex_val32(SHA1_CTX *ctx, uint32_t val, FILE *outfile)
 }
 
 static const struct got_error *
-write_fileindex_val16(SHA1_CTX *ctx, uint16_t val, FILE *outfile)
+write_fileindex_val16(struct got_hash *ctx, uint16_t val, FILE *outfile)
 {
 	size_t n;
 
 	val = htobe16(val);
-	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	got_hash_update(ctx, &val, sizeof(val));
 	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -391,7 +392,7 @@ write_fileindex_val16(SHA1_CTX *ctx, uint16_t val, FILE *outfile)
 }
 
 static const struct got_error *
-write_fileindex_path(SHA1_CTX *ctx, const char *path, FILE *outfile)
+write_fileindex_path(struct got_hash *ctx, const char *path, FILE *outfile)
 {
 	size_t n, len, pad = 0;
 	static const uint8_t zero[8] = { 0 };
@@ -402,11 +403,11 @@ write_fileindex_path(SHA1_CTX *ctx, const char *path, FILE *outfile)
 	if (pad == 0)
 		pad = 8; /* NUL-terminate */
 
-	SHA1Update(ctx, path, len);
+	got_hash_update(ctx, path, len);
 	n = fwrite(path, 1, len, outfile);
 	if (n != len)
 		return got_ferror(outfile, GOT_ERR_IO);
-	SHA1Update(ctx, zero, pad);
+	got_hash_update(ctx, zero, pad);
 	n = fwrite(zero, 1, pad, outfile);
 	if (n != pad)
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -414,7 +415,7 @@ write_fileindex_path(SHA1_CTX *ctx, const char *path, FILE *outfile)
 }
 
 static const struct got_error *
-write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
+write_fileindex_entry(struct got_hash *ctx, struct got_fileindex_entry *ie,
     FILE *outfile)
 {
 	const struct got_error *err;
@@ -448,12 +449,12 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
 	if (err)
 		return err;
 
-	SHA1Update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 	n = fwrite(ie->blob_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
 	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	SHA1Update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
 	n = fwrite(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
 	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -469,7 +470,7 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
 	stage = got_fileindex_entry_stage_get(ie);
 	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 	    stage == GOT_FILEIDX_STAGE_ADD) {
-		SHA1Update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
+		got_hash_update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
 		n = fwrite(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,
 		    outfile);
 		if (n != SHA1_DIGEST_LENGTH)
@@ -484,20 +485,20 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_hdr hdr;
-	SHA1_CTX ctx;
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
+	struct got_hash ctx;
+	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
 	size_t n;
 	struct got_fileindex_entry *ie, *tmp;
 
-	SHA1Init(&ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	hdr.signature = htobe32(GOT_FILE_INDEX_SIGNATURE);
 	hdr.version = htobe32(GOT_FILE_INDEX_VERSION);
 	hdr.nentries = htobe32(fileindex->nentries);
 
-	SHA1Update(&ctx, (uint8_t *)&hdr.signature, sizeof(hdr.signature));
-	SHA1Update(&ctx, (uint8_t *)&hdr.version, sizeof(hdr.version));
-	SHA1Update(&ctx, (uint8_t *)&hdr.nentries, sizeof(hdr.nentries));
+	got_hash_update(&ctx, &hdr.signature, sizeof(hdr.signature));
+	got_hash_update(&ctx, &hdr.version, sizeof(hdr.version));
+	got_hash_update(&ctx, &hdr.nentries, sizeof(hdr.nentries));
 	n = fwrite(&hdr.signature, 1, sizeof(hdr.signature), outfile);
 	if (n != sizeof(hdr.signature))
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -521,9 +522,9 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 			return err;
 	}
 
-	SHA1Final(sha1, &ctx);
-	n = fwrite(sha1, 1, sizeof(sha1), outfile);
-	if (n != sizeof(sha1))
+	got_hash_final(&ctx, hash);
+	n = fwrite(hash, 1, SHA1_DIGEST_LENGTH, outfile);
+	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	if (fflush(outfile) != 0)
@@ -533,46 +534,46 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 }
 
 static const struct got_error *
-read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
+read_fileindex_val64(uint64_t *val, struct got_hash *ctx, FILE *infile)
 {
 	size_t n;
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
+	got_hash_update(ctx, val, sizeof(*val));
 	*val = be64toh(*val);
 	return NULL;
 }
 
 static const struct got_error *
-read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
+read_fileindex_val32(uint32_t *val, struct got_hash *ctx, FILE *infile)
 {
 	size_t n;
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
+	got_hash_update(ctx, val, sizeof(*val));
 	*val = be32toh(*val);
 	return NULL;
 }
 
 static const struct got_error *
-read_fileindex_val16(uint16_t *val, SHA1_CTX *ctx, FILE *infile)
+read_fileindex_val16(uint16_t *val, struct got_hash *ctx, FILE *infile)
 {
 	size_t n;
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
+	got_hash_update(ctx, val, sizeof(*val));
 	*val = be16toh(*val);
 	return NULL;
 }
 
 static const struct got_error *
-read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
+read_fileindex_path(char **path, struct got_hash *ctx, FILE *infile)
 {
 	const struct got_error *err = NULL;
 	const size_t chunk_size = 8;
@@ -597,7 +598,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 			err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 			break;
 		}
-		SHA1Update(ctx, *path + len, chunk_size);
+		got_hash_update(ctx, *path + len, chunk_size);
 		len += chunk_size;
 	} while (memchr(*path + len - chunk_size, '\0', chunk_size) == NULL);
 
@@ -609,7 +610,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 }
 
 static const struct got_error *
-read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
+read_fileindex_entry(struct got_fileindex_entry **iep, struct got_hash *ctx,
     FILE *infile, uint32_t version)
 {
 	const struct got_error *err;
@@ -654,14 +655,14 @@ read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	SHA1Update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 
 	n = fread(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
 	if (n != SHA1_DIGEST_LENGTH) {
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	SHA1Update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
 
 	err = read_fileindex_val32(&ie->flags, ctx, infile);
 	if (err)
@@ -681,7 +682,8 @@ read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
 				err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 				goto done;
 			}
-			SHA1Update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
+			got_hash_update(ctx, ie->staged_blob_sha1,
+			    SHA1_DIGEST_LENGTH);
 		}
 	} else {
 		/* GOT_FILE_INDEX_VERSION 1 does not support staging. */
@@ -701,14 +703,14 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_hdr hdr;
-	SHA1_CTX ctx;
+	struct got_hash ctx;
 	struct got_fileindex_entry *ie;
 	uint8_t sha1_expected[SHA1_DIGEST_LENGTH];
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
 	int i;
 
-	SHA1Init(&ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	n = fread(&hdr.signature, 1, sizeof(hdr.signature), infile);
 	if (n != sizeof(hdr.signature)) {
@@ -729,9 +731,9 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	}
 
-	SHA1Update(&ctx, (uint8_t *)&hdr.signature, sizeof(hdr.signature));
-	SHA1Update(&ctx, (uint8_t *)&hdr.version, sizeof(hdr.version));
-	SHA1Update(&ctx, (uint8_t *)&hdr.nentries, sizeof(hdr.nentries));
+	got_hash_update(&ctx, &hdr.signature, sizeof(hdr.signature));
+	got_hash_update(&ctx, &hdr.version, sizeof(hdr.version));
+	got_hash_update(&ctx, &hdr.nentries, sizeof(hdr.nentries));
 
 	hdr.signature = be32toh(hdr.signature);
 	hdr.version = be32toh(hdr.version);
@@ -754,7 +756,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	n = fread(sha1_expected, 1, sizeof(sha1_expected), infile);
 	if (n != sizeof(sha1_expected))
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-	SHA1Final(sha1, &ctx);
+	got_hash_final(&ctx, sha1);
 	if (memcmp(sha1, sha1_expected, SHA1_DIGEST_LENGTH) != 0)
 		return got_error(GOT_ERR_FILEIDX_CSUM);
 

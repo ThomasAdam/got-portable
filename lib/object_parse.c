@@ -288,8 +288,8 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	const struct got_error *err = NULL;
 	struct got_object *obj;
 	struct got_inflate_checksum csum;
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
-	SHA1_CTX sha1_ctx;
+	struct got_object_id id;
+	struct got_hash ctx;
 	size_t len, consumed;
 	FILE *f = NULL;
 
@@ -297,9 +297,9 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	*size = 0;
 	*hdrlen = 0;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
+	csum.output_ctx = &ctx;
 
 	if (lseek(infd, SEEK_SET, 0) == -1)
 		return got_error_from_errno("lseek");
@@ -340,8 +340,8 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 		goto done;
 	}
 
-	SHA1Final(sha1, &sha1_ctx);
-	if (memcmp(expected_id->sha1, sha1, SHA1_DIGEST_LENGTH) != 0) {
+	got_hash_final_object_id(&ctx, &id);
+	if (got_object_id_cmp(expected_id, &id) != 0) {
 		err = got_error_checksum(expected_id);
 		goto done;
 	}
@@ -749,18 +749,18 @@ got_object_read_commit(struct got_commit_object **commit, int fd,
 	size_t len;
 	uint8_t *p;
 	struct got_inflate_checksum csum;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	struct got_object_id id;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
+	csum.output_ctx = &ctx;
 
 	err = got_inflate_to_mem_fd(&p, &len, NULL, &csum, expected_size, fd);
 	if (err)
 		return err;
 
-	SHA1Final(id.sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, &id);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
 		err = got_error_checksum(expected_id);
 		goto done;
@@ -918,18 +918,18 @@ got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 	struct got_object *obj = NULL;
 	size_t len;
 	struct got_inflate_checksum csum;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	struct got_object_id id;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
+	csum.output_ctx = &ctx;
 
 	err = got_inflate_to_mem_fd(p, &len, NULL, &csum, 0, fd);
 	if (err)
 		return err;
 
-	SHA1Final(id.sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, &id);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
 		err = got_error_checksum(expected_id);
 		goto done;
@@ -1158,19 +1158,19 @@ got_object_read_tag(struct got_tag_object **tag, int fd,
 	size_t len;
 	uint8_t *p;
 	struct got_inflate_checksum csum;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	struct got_object_id id;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 	memset(&csum, 0, sizeof(csum));
-	csum.output_sha1 = &sha1_ctx;
+	csum.output_ctx = &ctx;
 
 	err = got_inflate_to_mem_fd(&p, &len, NULL, &csum,
 	    expected_size, fd);
 	if (err)
 		return err;
 
-	SHA1Final(id.sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, &id);
 	if (got_object_id_cmp(expected_id, &id) != 0) {
 		err = got_error_checksum(expected_id);
 		goto done;

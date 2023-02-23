@@ -42,6 +42,7 @@
 
 #include "got_lib_delta.h"
 #include "got_lib_delta_cache.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_ratelimit.h"
@@ -49,8 +50,6 @@
 #include "got_lib_pack_index.h"
 #include "got_lib_repository.h"
 #include "got_lib_poll.h"
-
-#include "got_lib_hash.h" /* XXX temp include for debugging */
 
 #include "log.h"
 #include "gotd.h"
@@ -478,7 +477,7 @@ read_more_pack_stream(int infd, BUF *buf, size_t minsize)
 
 static const struct got_error *
 copy_object_type_and_size(uint8_t *type, uint64_t *size, int infd, int outfd,
-    off_t *outsize, BUF *buf, size_t *buf_pos, SHA1_CTX *ctx)
+    off_t *outsize, BUF *buf, size_t *buf_pos, struct got_hash *ctx)
 {
 	const struct got_error *err = NULL;
 	uint8_t t = 0;
@@ -527,7 +526,7 @@ copy_object_type_and_size(uint8_t *type, uint64_t *size, int infd, int outfd,
 
 static const struct got_error *
 copy_ref_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
-    SHA1_CTX *ctx)
+    struct got_hash *ctx)
 {
 	const struct got_error *err = NULL;
 	size_t remain = buf_len(buf) - *buf_pos;
@@ -550,7 +549,7 @@ copy_ref_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
 
 static const struct got_error *
 copy_offset_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
-    SHA1_CTX *ctx)
+    struct got_hash *ctx)
 {
 	const struct got_error *err = NULL;
 	uint64_t o = 0;
@@ -597,7 +596,7 @@ copy_offset_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos
 
 static const struct got_error *
 copy_zstream(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
-    SHA1_CTX *ctx)
+    struct got_hash *ctx)
 {
 	const struct got_error *err = NULL;
 	z_stream z;
@@ -701,7 +700,7 @@ recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
 	struct got_packfile_hdr hdr;
 	size_t have;
 	uint32_t nhave = 0;
-	SHA1_CTX ctx;
+	struct got_hash ctx;
 	uint8_t expected_sha1[SHA1_DIGEST_LENGTH];
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	BUF *buf = NULL;
@@ -715,7 +714,7 @@ recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
 	if (client->nref_updates == client->nref_del)
 		return NULL;
 
-	SHA1Init(&ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	err = got_poll_read_full(infd, &have, &hdr, sizeof(hdr), sizeof(hdr));
 	if (err)
@@ -789,7 +788,7 @@ recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
 
 	log_debug("received %u objects", *nobj);
 
-	SHA1Final(expected_sha1, &ctx);
+	got_hash_final(&ctx, expected_sha1);
 
 	remain = buf_len(buf) - buf_pos;
 	if (remain < SHA1_DIGEST_LENGTH) {

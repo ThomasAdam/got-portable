@@ -126,14 +126,14 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 	char *header = NULL;
 	int fd = -1;
 	struct stat sb;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	size_t headerlen = 0, n;
 
 	*id = NULL;
 	*blobfile = NULL;
 	*blobsize = 0;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (fd == -1) {
@@ -155,7 +155,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
-	SHA1Update(&sha1_ctx, header, headerlen);
+	got_hash_update(&ctx, header, headerlen);
 
 	*blobfile = got_opentemp();
 	if (*blobfile == NULL) {
@@ -188,7 +188,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 		}
 		if (inlen == 0)
 			break; /* EOF */
-		SHA1Update(&sha1_ctx, buf, inlen);
+		got_hash_update(&ctx, buf, inlen);
 		n = fwrite(buf, 1, inlen, *blobfile);
 		if (n != inlen) {
 			err = got_ferror(*blobfile, GOT_ERR_IO);
@@ -204,7 +204,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-	SHA1Final((*id)->sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, *id);
 
 	if (fflush(*blobfile) != 0) {
 		err = got_error_from_errno("fflush");
@@ -307,7 +307,7 @@ got_object_tree_create(struct got_object_id **id,
 {
 	const struct got_error *err = NULL;
 	char modebuf[sizeof("100644 ")];
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	char *header = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *treefile = NULL;
@@ -319,7 +319,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	*id = NULL;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	sorted_entries = calloc(nentries, sizeof(struct got_tree_entry *));
 	if (sorted_entries == NULL)
@@ -345,7 +345,7 @@ got_object_tree_create(struct got_object_id **id,
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
-	SHA1Update(&sha1_ctx, header, headerlen);
+	got_hash_update(&ctx, header, headerlen);
 
 	treefile = got_opentemp();
 	if (treefile == NULL) {
@@ -371,7 +371,7 @@ got_object_tree_create(struct got_object_id **id,
 			err = got_ferror(treefile, GOT_ERR_IO);
 			goto done;
 		}
-		SHA1Update(&sha1_ctx, modebuf, len);
+		got_hash_update(&ctx, modebuf, len);
 		treesize += n;
 
 		len = strlen(te->name) + 1; /* must include NUL */
@@ -380,7 +380,7 @@ got_object_tree_create(struct got_object_id **id,
 			err = got_ferror(treefile, GOT_ERR_IO);
 			goto done;
 		}
-		SHA1Update(&sha1_ctx, te->name, len);
+		got_hash_update(&ctx, te->name, len);
 		treesize += n;
 
 		len = SHA1_DIGEST_LENGTH;
@@ -389,7 +389,7 @@ got_object_tree_create(struct got_object_id **id,
 			err = got_ferror(treefile, GOT_ERR_IO);
 			goto done;
 		}
-		SHA1Update(&sha1_ctx, te->id.sha1, len);
+		got_hash_update(&ctx, te->id.sha1, len);
 		treesize += n;
 	}
 
@@ -398,7 +398,7 @@ got_object_tree_create(struct got_object_id **id,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-	SHA1Final((*id)->sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, *id);
 
 	if (fflush(treefile) != 0) {
 		err = got_error_from_errno("fflush");
@@ -427,7 +427,7 @@ got_object_commit_create(struct got_object_id **id,
     const char *logmsg, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	char *header = NULL, *tree_str = NULL;
 	char *author_str = NULL, *committer_str = NULL;
 	char *id_str = NULL;
@@ -439,7 +439,7 @@ got_object_commit_create(struct got_object_id **id,
 
 	*id = NULL;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	msg0 = strdup(logmsg);
 	if (msg0 == NULL)
@@ -478,7 +478,7 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
-	SHA1Update(&sha1_ctx, header, headerlen);
+	got_hash_update(&ctx, header, headerlen);
 
 	commitfile = got_opentemp();
 	if (commitfile == NULL) {
@@ -502,7 +502,7 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	}
 	len = strlen(tree_str);
-	SHA1Update(&sha1_ctx, tree_str, len);
+	got_hash_update(&ctx, tree_str, len);
 	n = fwrite(tree_str, 1, len, commitfile);
 	if (n != len) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -525,7 +525,7 @@ got_object_commit_create(struct got_object_id **id,
 				goto done;
 			}
 			len = strlen(parent_str);
-			SHA1Update(&sha1_ctx, parent_str, len);
+			got_hash_update(&ctx, parent_str, len);
 			n = fwrite(parent_str, 1, len, commitfile);
 			if (n != len) {
 				err = got_ferror(commitfile, GOT_ERR_IO);
@@ -540,7 +540,7 @@ got_object_commit_create(struct got_object_id **id,
 	}
 
 	len = strlen(author_str);
-	SHA1Update(&sha1_ctx, author_str, len);
+	got_hash_update(&ctx, author_str, len);
 	n = fwrite(author_str, 1, len, commitfile);
 	if (n != len) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -549,7 +549,7 @@ got_object_commit_create(struct got_object_id **id,
 	commitsize += n;
 
 	len = strlen(committer_str);
-	SHA1Update(&sha1_ctx, committer_str, len);
+	got_hash_update(&ctx, committer_str, len);
 	n = fwrite(committer_str, 1, len, commitfile);
 	if (n != len) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -557,7 +557,7 @@ got_object_commit_create(struct got_object_id **id,
 	}
 	commitsize += n;
 
-	SHA1Update(&sha1_ctx, "\n", 1);
+	got_hash_update(&ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, commitfile);
 	if (n != 1) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -566,7 +566,7 @@ got_object_commit_create(struct got_object_id **id,
 	commitsize += n;
 
 	len = strlen(msg);
-	SHA1Update(&sha1_ctx, msg, len);
+	got_hash_update(&ctx, msg, len);
 	n = fwrite(msg, 1, len, commitfile);
 	if (n != len) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -574,7 +574,7 @@ got_object_commit_create(struct got_object_id **id,
 	}
 	commitsize += n;
 
-	SHA1Update(&sha1_ctx, "\n", 1);
+	got_hash_update(&ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, commitfile);
 	if (n != 1) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
@@ -587,7 +587,7 @@ got_object_commit_create(struct got_object_id **id,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-	SHA1Final((*id)->sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, *id);
 
 	if (fflush(commitfile) != 0) {
 		err = got_error_from_errno("fflush");
@@ -619,7 +619,7 @@ got_object_tag_create(struct got_object_id **id,
     struct got_repository *repo, int verbosity)
 {
 	const struct got_error *err = NULL;
-	SHA1_CTX sha1_ctx;
+	struct got_hash ctx;
 	char *header = NULL;
 	char *tag_str = NULL, *tagger_str = NULL;
 	char *id_str = NULL, *obj_str = NULL, *type_str = NULL;
@@ -633,7 +633,7 @@ got_object_tag_create(struct got_object_id **id,
 
 	*id = NULL;
 
-	SHA1Init(&sha1_ctx);
+	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	err = got_object_id_str(&id_str, object_id);
 	if (err)
@@ -764,7 +764,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 
 	headerlen = strlen(header) + 1;
-	SHA1Update(&sha1_ctx, header, headerlen);
+	got_hash_update(&ctx, header, headerlen);
 
 	tagfile = got_opentemp();
 	if (tagfile == NULL) {
@@ -779,7 +779,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += headerlen;
 	len = strlen(obj_str);
-	SHA1Update(&sha1_ctx, obj_str, len);
+	got_hash_update(&ctx, obj_str, len);
 	n = fwrite(obj_str, 1, len, tagfile);
 	if (n != len) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -787,7 +787,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += n;
 	len = strlen(type_str);
-	SHA1Update(&sha1_ctx, type_str, len);
+	got_hash_update(&ctx, type_str, len);
 	n = fwrite(type_str, 1, len, tagfile);
 	if (n != len) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -796,7 +796,7 @@ got_object_tag_create(struct got_object_id **id,
 	tagsize += n;
 
 	len = strlen(tag_str);
-	SHA1Update(&sha1_ctx, tag_str, len);
+	got_hash_update(&ctx, tag_str, len);
 	n = fwrite(tag_str, 1, len, tagfile);
 	if (n != len) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -805,7 +805,7 @@ got_object_tag_create(struct got_object_id **id,
 	tagsize += n;
 
 	len = strlen(tagger_str);
-	SHA1Update(&sha1_ctx, tagger_str, len);
+	got_hash_update(&ctx, tagger_str, len);
 	n = fwrite(tagger_str, 1, len, tagfile);
 	if (n != len) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -813,7 +813,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += n;
 
-	SHA1Update(&sha1_ctx, "\n", 1);
+	got_hash_update(&ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, tagfile);
 	if (n != 1) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -822,7 +822,7 @@ got_object_tag_create(struct got_object_id **id,
 	tagsize += n;
 
 	len = strlen(msg);
-	SHA1Update(&sha1_ctx, msg, len);
+	got_hash_update(&ctx, msg, len);
 	n = fwrite(msg, 1, len, tagfile);
 	if (n != len) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -830,7 +830,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 	tagsize += n;
 
-	SHA1Update(&sha1_ctx, "\n", 1);
+	got_hash_update(&ctx, "\n", 1);
 	n = fwrite("\n", 1, 1, tagfile);
 	if (n != 1) {
 		err = got_ferror(tagfile, GOT_ERR_IO);
@@ -840,7 +840,7 @@ got_object_tag_create(struct got_object_id **id,
 
 	if (signer_id && buf_len(buf) > 0) {
 		len = buf_len(buf);
-		SHA1Update(&sha1_ctx, buf_get(buf), len);
+		got_hash_update(&ctx, buf_get(buf), len);
 		n = fwrite(buf_get(buf), 1, len, tagfile);
 		if (n != len) {
 			err = got_ferror(tagfile, GOT_ERR_IO);
@@ -854,7 +854,7 @@ got_object_tag_create(struct got_object_id **id,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-	SHA1Final((*id)->sha1, &sha1_ctx);
+	got_hash_final_object_id(&ctx, *id);
 
 	if (fflush(tagfile) != 0) {
 		err = got_error_from_errno("fflush");
