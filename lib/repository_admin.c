@@ -54,7 +54,7 @@
 #include "got_lib_repository.h"
 #include "got_lib_ratelimit.h"
 #include "got_lib_pack_create.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 #include "got_lib_lockfile.h"
 
 #ifndef nitems

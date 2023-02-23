@@ -47,7 +47,7 @@
 #include "got_diff.h"
 
 #include "got_lib_worktree.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 #include "got_lib_fileindex.h"
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"

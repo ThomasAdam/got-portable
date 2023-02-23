@@ -52,7 +52,7 @@
 #include "got_lib_repository.h"
 #include "got_lib_poll.h"
 
-#include "got_lib_sha1.h" /* XXX temp include for debugging */
+#include "got_lib_hash.h" /* XXX temp include for debugging */
 
 #include "log.h"
 #include "gotd.h"

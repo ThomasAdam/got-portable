@@ -40,7 +40,7 @@
 #include "got_lib_pkt.h"
 #include "got_lib_dial.h"
 #include "got_lib_gitproto.h"
-#include "got_lib_sha1.h"
+#include "got_lib_hash.h"
 #include "got_lib_poll.h"
 
 #include "gotd.h"

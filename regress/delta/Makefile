@@ -1,7 +1,7 @@
 .PATH:${.CURDIR}/../../lib
 
 PROG = delta_test
-SRCS = delta.c error.c opentemp.c path.c inflate.c sha1.c delta_test.c \
+SRCS = delta.c error.c opentemp.c path.c inflate.c hash.c delta_test.c \
 	pollfd.c object_parse.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
