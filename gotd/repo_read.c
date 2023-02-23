@@ -25,6 +25,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <sha1.h>
+#include <sha2.h>
 #include <siphash.h>
 #include <stdio.h>
 #include <string.h>

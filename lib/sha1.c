@@ -15,6 +15,8 @@
  */
 
 #include <sys/types.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

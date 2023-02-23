@@ -28,6 +28,8 @@
 #include <limits.h>
 #include <locale.h>
 #include <ctype.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

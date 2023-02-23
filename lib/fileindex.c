@@ -23,6 +23,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sha1.h>
+#include <sha2.h>
+#include <endian.h>
 #include <limits.h>
 #include <unistd.h>
 

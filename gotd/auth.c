@@ -26,6 +26,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <sha1.h>
+#include <sha2.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>

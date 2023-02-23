@@ -27,6 +27,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>

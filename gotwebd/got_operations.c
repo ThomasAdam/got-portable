@@ -20,6 +20,9 @@
 #include <sys/stat.h>
 
 #include <event.h>
+#include <imsg.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

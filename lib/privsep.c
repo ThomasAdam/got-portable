@@ -29,6 +29,9 @@
 #include <errno.h>
 #include <stdint.h>
 #include <poll.h>
+#include <imsg.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <unistd.h>
 #include <zlib.h>
 
