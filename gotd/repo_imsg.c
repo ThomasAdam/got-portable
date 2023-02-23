@@ -20,7 +20,6 @@
 
 #include <event.h>
 #include <limits.h>
-#include <sha1.h>
 #include <sha2.h>
 #include <stdint.h>
 #include <stdio.h>

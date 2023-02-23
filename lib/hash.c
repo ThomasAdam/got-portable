@@ -17,13 +17,14 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
-#include <sha1.h>
 #include <sha2.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+
+#include "got_compat.h"
 
 #include "got_object.h"
 

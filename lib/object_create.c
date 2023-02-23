@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <sha1.h>
 #include <sha2.h>
 #include <unistd.h>
 #include <zlib.h>

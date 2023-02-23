@@ -20,7 +20,6 @@
 #include <sys/tree.h>
 #include <sys/uio.h>
 
-#include <sha1.h>
 #include <sha2.h>
 #include <limits.h>
 #include <stdio.h>

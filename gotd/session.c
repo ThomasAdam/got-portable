@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <event.h>
 #include <limits.h>
-#include <sha1.h>
 #include <sha2.h>
 #include <signal.h>
 #include <stdint.h>

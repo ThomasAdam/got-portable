@@ -69,7 +69,6 @@
 
 #include <ctype.h>
 #include <limits.h>
-#include <sha1.h>
 #include <sha2.h>
 #include <stdio.h>
 #include <stdarg.h>
