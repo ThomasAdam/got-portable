@@ -1601,8 +1601,8 @@ write_packed_object(off_t *packfile_size, int packfd,
 	struct got_raw_object *raw = NULL;
 	off_t outlen, delta_offset;
 
+	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = ctx;
-	csum.output_crc = NULL;
 
 	if (m->reused_delta_offset)
 		delta_offset = m->reused_delta_offset;
