@@ -25,6 +25,7 @@
 #include <panel.h>
 #include <locale.h>
 #include <sha1.h>
+#include <sha2.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdarg.h>

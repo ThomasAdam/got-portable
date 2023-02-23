@@ -30,6 +30,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <sha1.h>
+#include <sha2.h>
 #include <unistd.h>
 #include <zlib.h>
 

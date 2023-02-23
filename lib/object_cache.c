@@ -24,6 +24,7 @@
 #include <string.h>
 #include <limits.h>
 #include <sha1.h>
+#include <sha2.h>
 #include <zlib.h>
 
 #include "got_error.h"
