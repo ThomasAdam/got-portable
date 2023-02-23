@@ -6,6 +6,12 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.84 (2023-02-23)
+
+* Changes from got-0.84.  Portable change include:
+
+* portable: allow for yacc to be found via setting YACC env var.
+
 # got-portable 0.83 (2023-01-31)
 
 * Changes from got-0.83; no -portable specific changes worth mentioning.
