@@ -387,7 +387,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	if (err)
 		return err;
 
-	if (!got_parse_sha1_digest(qid->id.sha1, id_str)) {
+	if (!got_parse_object_id(&qid->id, id_str, GOT_HASH_SHA1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		got_object_qid_free(qid);
 		return err;
@@ -620,6 +620,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
     size_t len)
 {
 	const struct got_error *err = NULL;
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	char *s = buf;
 	size_t label_len;
 	ssize_t remain = (ssize_t)len;
@@ -639,7 +640,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		}
 		s += label_len;
-		if (!got_parse_sha1_digest((*commit)->tree_id->sha1, s)) {
+		if (!got_parse_object_id((*commit)->tree_id, s, algo)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
@@ -974,6 +975,7 @@ const struct got_error *
 got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 {
 	const struct got_error *err = NULL;
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	size_t remain = len;
 	char *s = buf;
 	size_t label_len;
@@ -993,7 +995,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 			goto done;
 		}
 		s += label_len;
-		if (!got_parse_sha1_digest((*tag)->id.sha1, s)) {
+		if (!got_parse_object_id(&(*tag)->id, s, algo)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}

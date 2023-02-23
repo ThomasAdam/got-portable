@@ -155,6 +155,7 @@ static const struct got_error *
 parse_ref_line(struct got_reference **ref, const char *name, const char *line,
     time_t mtime)
 {
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_object_id id;
 
 	if (strncmp(line, "ref: ", 5) == 0) {
@@ -162,7 +163,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line,
 		return parse_symref(ref, name, line);
 	}
 
-	if (!got_parse_sha1_digest(id.sha1, line))
+	if (!got_parse_object_id(&id, line, algo))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	return alloc_ref(ref, name, &id, 0, mtime);
@@ -292,6 +293,7 @@ static const struct got_error *
 parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
     const char *line, time_t mtime)
 {
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_object_id id;
 	const char *name;
 
@@ -300,7 +302,7 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 	if (line[0] == '#' || line[0] == '^')
 		return NULL;
 
-	if (!got_parse_sha1_digest(id.sha1, line))
+	if (!got_parse_object_id(&id, line, algo))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	if (abs_refname) {

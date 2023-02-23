@@ -706,7 +706,7 @@ open_blob(char **path, FILE **fp, const char *blobid,
 			return err;
 		idptr = matched_id;
 	} else {
-		if (!got_parse_sha1_digest(id.sha1, blobid))
+		if (!got_parse_object_id(&id, blobid, GOT_HASH_SHA1))
 			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		idptr = &id;
 	}

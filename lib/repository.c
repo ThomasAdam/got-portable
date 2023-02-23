@@ -1738,6 +1738,7 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 	}
 	while ((dent = readdir(dir)) != NULL) {
 		int cmp;
+		enum got_hash_algorithm algo = GOT_HASH_SHA1;
 
 		free(id_str);
 		id_str = NULL;
@@ -1751,7 +1752,7 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 			goto done;
 		}
 
-		if (!got_parse_sha1_digest(id.sha1, id_str))
+		if (!got_parse_object_id(&id, id_str, algo))
 			continue;
 
 		/*
@@ -2291,6 +2292,7 @@ got_repo_get_loose_object_info(int *nobjects, off_t *ondisk_size,
 			char *id_str;
 			int fd;
 			struct stat sb;
+			enum got_hash_algorithm algo = GOT_HASH_SHA1;
 
 			if (strcmp(dent->d_name, ".") == 0 ||
 			    strcmp(dent->d_name, "..") == 0)
@@ -2301,7 +2303,7 @@ got_repo_get_loose_object_info(int *nobjects, off_t *ondisk_size,
 				goto done;
 			}
 
-			if (!got_parse_sha1_digest(id.sha1, id_str)) {
+			if (!got_parse_object_id(&id, id_str, algo)) {
 				free(id_str);
 				continue;
 			}

@@ -15,7 +15,13 @@
  */
 
 #define GOT_SHA1_STRING_ZERO "0000000000000000000000000000000000000000"
+#define GOT_SHA256_STRING_ZERO "0000000000000000000000000000000000000000000000000000000000000000"
 
 int got_parse_xdigit(uint8_t *, const char *);
-int got_parse_sha1_digest(uint8_t *, const char *);
+
 char *got_sha1_digest_to_str(const uint8_t *, char *, size_t);
+char *got_sha256_digest_to_str(const uint8_t *, char *, size_t);
+
+int got_parse_hash_digest(uint8_t *, const char *, enum got_hash_algorithm);
+int got_parse_object_id(struct got_object_id *, const char *,
+    enum got_hash_algorithm);

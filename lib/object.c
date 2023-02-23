@@ -151,7 +151,7 @@ got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
 {
 	struct got_object_id id;
 
-	if (!got_parse_sha1_digest(id.sha1, id_str))
+	if (!got_parse_object_id(&id, id_str, GOT_HASH_SHA1))
 		return got_error_path(id_str, GOT_ERR_BAD_OBJ_ID_STR);
 
 	return got_object_open(obj, repo, &id);

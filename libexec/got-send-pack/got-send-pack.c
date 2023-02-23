@@ -414,7 +414,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
-		if (!got_parse_sha1_digest(id->sha1, id_str)) {
+		if (!got_parse_object_id(id, id_str, GOT_HASH_SHA1)) {
 			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
 		}

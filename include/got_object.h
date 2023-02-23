@@ -16,6 +16,11 @@
 
 #define GOT_OBJECT_ID_HEX_MAXLEN SHA1_DIGEST_STRING_LENGTH
 
+enum got_hash_algorithm {
+	GOT_HASH_SHA1,
+	GOT_HASH_SHA256,
+};
+
 struct got_object_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 };
