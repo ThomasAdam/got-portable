@@ -12,7 +12,7 @@ got:
   creating a merge commit. Fast-forward should only be done if linear
   history exists from the tip of the branch being merged to the tip of
   the work tree's branch, and if the tip of the work tree's branch is
-  itself not a merge commit (this makes "staggered" merges possible
+  itself not a merge commit (this makes "stacked" merges possible
   by default, and prevents a 'main' branch from being fast-forwarded
   to a vendor branch in case no new commits were added to 'main' since
   the previous vendor merge). Provide an option (-M) which forces creation
