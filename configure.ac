@@ -85,31 +85,27 @@ if test "x$ac_cv_header_sha2_h" = xyes; then
 	AC_DEFINE(HAVE_SHA2)
 fi
 
+if test "x$ac_cv_header_sha256_h" = xyes; then
+	AC_DEFINE(HAVE_SHA256)
+fi
+
 # Check for SHA1_DIGEST_LENGTH
-have_sha1_digest_length=no
 if test "x$ac_cv_header_sha_h" = xyes; then
-	AC_RUN_IFELSE([AC_LANG_PROGRAM(
-	    [#include <sha.h>],
-	    [#if !defined(SHA1_DIGEST_LENGTH) && defined (SHA_DIGEST_LENGTH)
-		exit(1);
-	     #endif
-	    ])],
-	[have_sha1_digest_length=yes])
-	AC_DEFINE(HAVE_SHA_AS_SHA1)
+AC_CHECK_DECL([SHA_DIGEST_LENGTH],
+	      [AC_DEFINE(HAVE_SHA_AS_SHA1)],
+	      [AC_DEFINE(NEEDS_SHA1_DEFS)],
+	      [#include <sha.h>])
 fi
 
 if test "x$ac_cv_header_sha1_h" = xyes; then
-	AC_RUN_IFELSE([AC_LANG_PROGRAM(
-	    [#include <sha1.h>],
-	    [#if !defined(SHA1_DIGEST_LENGTH) && defined(SHA_DIGEST_LENGTH)
-		exit(1);
-	     #endif
-	]    )],
-	[have_sha1_digest_length=yes])
-	AC_DEFINE(HAVE_SHA1_AS_SHA1)
+AC_CHECK_DECL([SHA_DIGEST_LENGTH],
+	      [AC_DEFINE(HAVE_SHA1_AS_SHA1)],
+	      [AC_DEFINE(NEEDS_SHA1_DEFS)],
+	      [#include <sha1.h>])
 fi
 
-if test "x$have_sha1_digest_length" = "xno"; then
+if test "x$ac_cv_header_sha_h" = xno || test "x$ac_cv_header_sha1_h" = xno
+then
 	AC_DEFINE(NEEDS_SHA1_DEFS)
 fi
 
