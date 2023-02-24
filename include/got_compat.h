@@ -177,8 +177,22 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #if defined(__APPLE__)
 #define COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonDigest.h>
+
+#define SHA512_BLOCK_LENGTH		128
+typedef struct _SHA2_CTX {
+	union {
+		u_int32_t	st32[8];
+		u_int64_t	st64[8];
+	} state;
+	u_int64_t	bitcount[2];
+	u_int8_t	buffer[SHA512_BLOCK_LENGTH];
+} SHA2_CTX;
+#define SHA256Init SHA256_Init
+#define SHA256Update SHA256_Update
+#define SHA256Final SHA256_Final
 #endif
 
+#ifndef __APPLE__
 #ifdef HAVE_SHA_AS_SHA1
 #  include <sha.h>
 #endif
@@ -187,9 +201,12 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #endif
 #ifdef HAVE_SHA2
 #    include <sha2.h>
+#else
+#    include "sha2.h"
 #endif
 #ifdef HAVE_SHA256
 #    include <sha256.h>
+#endif
 #endif
 
 /* Catch-all for systems where the header files don't exist and/or the below
