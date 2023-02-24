@@ -106,7 +106,7 @@ test_update_deletes_file() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git_rm $testroot/repo beta)
+	git_rm $testroot/repo beta
 	git_commit $testroot/repo -m "deleting a file"
 
 	echo "D  beta" > $testroot/stdout.expected
@@ -147,7 +147,7 @@ test_update_deletes_dir() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git_rm $testroot/repo -r epsilon)
+	git_rm $testroot/repo -r epsilon
 	git_commit $testroot/repo -m "deleting a directory"
 
 	echo "D  epsilon/zeta" > $testroot/stdout.expected
