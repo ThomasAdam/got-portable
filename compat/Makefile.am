@@ -55,6 +55,16 @@ if !HAVE_IMSG
 libopenbsd_compat_a_SOURCES += imsg-buffer.c imsg.c
 endif
 
+if !HOST_DARWIN
+# Fake an assigment here.  It does nothing, but you cannot have consecutive
+# nested if statements in Makefiles, so we have to do something here, even if
+# it's a dummy assignment.
+NOTING=something
+if !HAVE_SHA2
+libopenbsd_compat_a_SOURCES += sha2.c sha2.h
+endif
+endif
+
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
 	imsg.h \
