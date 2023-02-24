@@ -8,6 +8,15 @@ got:
   instead of the root directory checked out at /usr/src.
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
+- Teach 'got merge' to fast-forward a branch if possible, instead of
+  creating a merge commit. Fast-forward should only be done if linear
+  history exists from the tip of the branch being merged to the tip of
+  the work tree's branch, and if the tip of the work tree's branch is
+  itself not a merge commit (this makes "staggered" merges possible
+  by default, and prevents a 'main' branch from being fast-forwarded
+  to a vendor branch in case no new commits were added to 'main' since
+  the previous vendor merge). Provide an option (-M) which forces creation
+  of a merge commit, for cases where users deem fast-forward undesirable.
 - When a clone fails the HEAD symref will always point to "refs/heads/main"
   (ie. the internal default HEAD symref of Got). Resuming a failed clone with
   'got fetch' is supposed to work. To make this easier, if the HEAD symref
