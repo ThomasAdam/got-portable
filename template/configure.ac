@@ -27,7 +27,7 @@ PKG_CHECK_MODULES(LIBBSD, libbsd-overlay, [
 	CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
 	LIBS="$LIBBSD_LIBS $LIBS"
 	AC_DEFINE(HAVE_LIBBSD)
-], [AC_MSG_NOTICE([libbisd not found])])
+], [AC_MSG_NOTICE([libbsd not found])])
 
 
 AM_CPPFLAGS="$CFLAGS"
