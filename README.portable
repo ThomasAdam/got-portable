@@ -228,8 +228,11 @@ After that point, the version of `GOT_PORTABLE_VER` in
 TODO
 ====
 
-configure.ac should start defining AC_ENABLE arguments to allow for
-finer-grained control of where to search for includes/libraries, etc.
+* configure.ac should start defining AC_ENABLE arguments to allow for
+  finer-grained control of where to search for includes/libraries, etc.
+* review the compat/ code.  Some of those functions are probably picked up in
+  libbsd, so we should drop such implementations from compat/ where there's
+  overlap between libbsd and what's natively available.
 
 CONTACT
 =======
