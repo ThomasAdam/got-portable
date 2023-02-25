@@ -18,6 +18,13 @@ got_alpine_linux_task:
     - apk add libevent-dev git build-base bsd-compat-headers bison automake make autoconf libbsd-dev util-linux-dev libressl-dev zlib-dev ncurses-dev
     - .github/ci/build.sh
 
+got_void_linux_task:
+  container:
+    image: 2010220rc01-mini-bb-x86_64-musl
+  before_build_script: .github/ci/before-install.sh
+  build:script: .github/ci/build.sh
+  test_script: make install && make tests
+
 got_freebsd_task:
   freebsd_instance:
     image_family: freebsd-13-0
