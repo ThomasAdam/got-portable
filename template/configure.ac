@@ -5,6 +5,8 @@ AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_ARG_VAR(HOSTCC, [The C compiler on the host.])
 AC_ARG_VAR(HOSTCFLAGS, [CFLAGS for the host compiler])
 
+AC_USE_SYSTEM_EXTENSIONS
+
 # When CFLAGS isn't set at this stage and gcc is detected by the macro below,
 # autoconf will automatically use CFLAGS="-O2 -g". Prevent that by using an
 # empty default.
