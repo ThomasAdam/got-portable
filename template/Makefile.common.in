@@ -1,0 +1,21 @@
+AM_CFLAGS += \
+	    @AM_CFLAGS@ \
+	    -Wunused-variable \
+	    -Wwrite-strings
+# Ideally, we should be enabling further flags, but this requires upstream
+# changes.  Leaving these here for now.
+#
+#	    -g -Wall -Wno-long-long -W -Wformat=2 -Wmissing-prototypes \
+#	    -Wstrict-prototypes -Wmissing-declarations -Wwrite-strings \
+#	    -Wshadow -Wpointer-arith -Wno-sign-compare -Wundef \
+#	    -Wbad-function-cast -Winline -Wcast-align \
+#	    -Wdeclaration-after-statement -Wno-pointer-sign \
+#	    -Wno-attributes -Wno-unused-result
+
+AM_CPPFLAGS += \
+	      @AM_CPPFLAGS@ \
+	      -DGOT_VERSION=@VERSION@ \
+	      -DGOT_VERSION_NUMBER=@VERSION@ \
+	      -DGOT_LIBEXECDIR="$(libexecdir)" \
+	      -I$(top_srcdir)/template \
+	      -I.

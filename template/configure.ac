@@ -45,5 +45,14 @@ AC_CHECK_DECL([TAILQ_REMOVE], [],
     [AC_MSG_ERROR("*** sys/queue.h is missing key defines ***")],
     [#include <sys/queue.h>])
 
-AC_CONFIG_FILES([Makefile])
+AC_SUBST(AM_CPPFLAGS)
+CPPFLAGS="$SAVED_CPPFLAGS"
+AC_SUBST(AM_CFLAGS)
+CFLAGS="$SAVED_CFLAGS"
+AC_SUBST(AM_LDFLAGS)
+LDFLAGS="$SAVED_LDFLAGS"
+
+AC_CONFIG_FILES([Makefile
+		 Makefile.common:Makefile.common.in
+		])
 AC_OUTPUT
