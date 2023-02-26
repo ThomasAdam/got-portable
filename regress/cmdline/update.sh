@@ -636,6 +636,30 @@ test_update_file_in_subsubdir() {
 	test_done "$testroot" "0"
 }
 
+test_update_changes_file_to_dir() {
+	local testroot=`test_init update_changes_file_to_dir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	git_rm $testroot/repo alpha
+	mkdir $testroot/repo/alpha
+	echo eta > $testroot/repo/alpha/eta
+	(cd $testroot/repo && git add alpha/eta)
+	git_commit $testroot/repo -m "changed alpha into directory"
+
+	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		ret="xfail change file into directory"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_update_merges_file_edits() {
 	local testroot=`test_init update_merges_file_edits`
 
@@ -3088,6 +3112,7 @@ run_test test_update_moves_files_to_new_dir
 run_test test_update_creates_missing_parent
 run_test test_update_creates_missing_parent_with_subdir
 run_test test_update_file_in_subsubdir
+run_test test_update_changes_file_to_dir
 run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
 run_test test_update_clears_xbit
