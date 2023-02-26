@@ -93,9 +93,6 @@ csum_input(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 	if (csum->input_crc)
 		*csum->input_crc = crc32(*csum->input_crc, buf, len);
 
-	if (csum->input_sha1)
-		SHA1Update(csum->input_sha1, buf, len);
-
 	if (csum->input_ctx)
 		got_hash_update(csum->input_ctx, buf, len);
 }
@@ -105,9 +102,6 @@ csum_output(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 {
 	if (csum->output_crc)
 		*csum->output_crc = crc32(*csum->output_crc, buf, len);
-
-	if (csum->output_sha1)
-		SHA1Update(csum->output_sha1, buf, len);
 
 	if (csum->output_ctx)
 		got_hash_update(csum->output_ctx, buf, len);

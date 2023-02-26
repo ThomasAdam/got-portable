@@ -18,9 +18,6 @@ struct got_deflate_checksum {
 	/* If not NULL, mix output bytes into this CRC checksum. */
 	uint32_t *output_crc;
 
-	/* If not NULL, mix output bytes into this SHA1 context. */
-	SHA1_CTX *output_sha1;
-
 	/* If not NULL, mix output bytes into this hash context. */
 	struct got_hash *output_ctx;
 };
