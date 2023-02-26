@@ -240,7 +240,7 @@ typedef struct _SHA2_CTX {
 #include <openssl/sha.h>
 #endif
 
-#ifdef NEEDS_SHA1_DEFS
+#ifndef SHA1_DIGEST_LENGTH
 #define SHA1_DIGEST_LENGTH		SHA_DIGEST_LENGTH
 #define SHA1_DIGEST_STRING_LENGTH	(SHA1_DIGEST_LENGTH * 2 + 1)
 

@@ -88,24 +88,19 @@ fi
 AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
 
 # Check for SHA1_DIGEST_LENGTH
-if test "x$ac_cv_header_sha_h" = xyes; then
-AC_CHECK_DECL([SHA_DIGEST_LENGTH],
-	      [AC_DEFINE(HAVE_SHA_AS_SHA1)],
-	      [AC_DEFINE(NEEDS_SHA1_DEFS)],
-	      [#include <sha.h>])
-fi
-
-if test "x$ac_cv_header_sha1_h" = xyes; then
-AC_CHECK_DECL([SHA_DIGEST_LENGTH],
-	      [AC_DEFINE(HAVE_SHA1_AS_SHA1)],
-	      [AC_DEFINE(NEEDS_SHA1_DEFS)],
-	      [#include <sha1.h>])
-fi
-
-if test "x$ac_cv_header_sha_h" = xno || test "x$ac_cv_header_sha1_h" = xno
-then
-	AC_DEFINE(NEEDS_SHA1_DEFS)
-fi
+AC_CHECK_DECL([SHA1_DIGEST_LENGTH],
+	[AC_DEFINE(HAVE_SHA1_AS_SHA1)],
+	[
+		dnl maybe sha.h is available
+		AC_CHECK_DECL([SHA_DIGEST_LENGTH],
+			[AC_DEFINE(HAVE_SHA_AS_SHA1)],
+			[],
+			[#include <sha.h>])
+	],
+	[
+	#include <sys/types.h>
+	#include <sha1.h>
+	])
 
 # Checks for typ edefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
