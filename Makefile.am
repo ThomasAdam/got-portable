@@ -3,7 +3,7 @@ SUBDIRS = compat libexec got tog gotadmin template gotwebd
 
 include $(top_builddir)/Makefile.common
 
-EXTRA_DIST = CHANGES CHANGELOG
+EXTRA_DIST = CHANGES CHANGELOG LICENCE util/got-portable-ver.sh
 
 LDADD = $(LIBOBJS)
 if HOST_FREEBSD
