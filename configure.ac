@@ -248,7 +248,7 @@ case "$host_os" in
 		PLATFORM=netbsd
 		;;
 	*openbsd*)
-		AC_MSG_RESULT(netbsd)
+		AC_MSG_RESULT(openbsd)
 		PLATFORM=openbsd
 		;;
 	*dragonfly*)
