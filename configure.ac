@@ -563,7 +563,6 @@ if test "$PLATFORM" = "linux"; then
 			AM_CFLAGS="$LIBBSD_CFLAGS $AM_CFLAGS"
 			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
 			LIBS="$LIBBSD_LIBS $LIBS"
-			found_libbsd=yes
 			AC_DEFINE(HAVE_LIBBSD)
 		],
 		[
