@@ -247,6 +247,10 @@ case "$host_os" in
 		AC_MSG_RESULT(netbsd)
 		PLATFORM=netbsd
 		;;
+	*openbsd*)
+		AC_MSG_RESULT(netbsd)
+		PLATFORM=openbsd
+		;;
 	*dragonfly*)
 		AC_MSG_RESULT(dragonfly)
 		PLATFORM=dragonflybsd
@@ -261,6 +265,7 @@ AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
 AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
 AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
+AM_CONDITIONAL([HOST_OPENBSD], [test "$PLATFORM" = "openbsd"])
 AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 
 # Look for yacc.
