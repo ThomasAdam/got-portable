@@ -576,8 +576,7 @@ struct got_imsg_object_idlist {
 
 /* Structure for GOT_IMSG_COMMIT_TRAVERSAL_REQUEST  */
 struct got_imsg_commit_traversal_request {
-	uint8_t id[SHA1_DIGEST_LENGTH];
-	int idx;
+	struct got_imsg_packed_object iobj;
 	size_t path_len;
 	/* Followed by path_len bytes of path data */
 } __attribute__((__packed__));

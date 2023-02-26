@@ -602,33 +602,33 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_packed_object iobj;
+	struct got_imsg_commit_traversal_request ctreq;
 	struct got_object_qid *pid;
 	struct got_commit_object *commit = NULL, *pcommit = NULL;
 	struct got_parsed_tree_entry *entries = NULL, *pentries = NULL;
 	size_t nentries = 0, nentries_alloc = 0;
 	size_t pnentries = 0, pnentries_alloc = 0;
 	struct got_object_id id;
-	size_t datalen, path_len;
+	size_t datalen;
 	char *path = NULL;
 	const int min_alloc = 64;
 	int changed = 0, ncommits = 0, nallocated = 0;
 	struct got_object_id *commit_ids = NULL;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(iobj))
+	if (datalen < sizeof(ctreq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(&id, &iobj.id, sizeof(id));
+	memcpy(&ctreq, imsg->data, sizeof(ctreq));
+	memcpy(&id, &ctreq.iobj.id, sizeof(id));
 
-	path_len = datalen - sizeof(iobj) - 1;
-	if (path_len < 0)
+	if (datalen != sizeof(ctreq) + ctreq.path_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	if (path_len > 0) {
-		path = imsg->data + sizeof(iobj);
-		if (path[path_len] != '\0')
-			return got_error(GOT_ERR_PRIVSEP_LEN);
-	}
+	if (ctreq.path_len == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	path = strndup(imsg->data + sizeof(ctreq), ctreq.path_len);
+	if (path == NULL)
+		return got_error_from_errno("strndup");
 
 	nallocated = min_alloc;
 	commit_ids = reallocarray(NULL, nallocated, sizeof(*commit_ids));
@@ -767,6 +767,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	}
 	err = send_commit_traversal_done(ibuf);
 done:
+	free(path);
 	free(commit_ids);
 	if (commit)
 		got_object_commit_close(commit);

@@ -2650,17 +2650,24 @@ got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
     struct got_object_id *id, int idx, const char *path)
 {
 	struct ibuf *wbuf;
-	size_t path_len = strlen(path) + 1;
+	size_t path_len = strlen(path);
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_COMMIT_TRAVERSAL_REQUEST, 0, 0,
 	    sizeof(struct got_imsg_commit_traversal_request) + path_len);
 	if (wbuf == NULL)
 		return got_error_from_errno(
 		    "imsg_create COMMIT_TRAVERSAL_REQUEST");
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+	/*
+	 * Keep in sync with struct got_imsg_commit_traversal_request
+	 * and struct got_imsg_packed_object.
+	 */
+	if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_add "
 		    "COMMIT_TRAVERSAL_REQUEST");
 	if (imsg_add(wbuf, &idx, sizeof(idx)) == -1)
+		return got_error_from_errno("imsg_add "
+		    "COMMIT_TRAVERSAL_REQUEST");
+	if (imsg_add(wbuf, &path_len, sizeof(path_len)) == -1)
 		return got_error_from_errno("imsg_add "
 		    "COMMIT_TRAVERSAL_REQUEST");
 	if (imsg_add(wbuf, path, path_len) == -1)
