@@ -2506,6 +2506,25 @@ The available histedit script commands are as follows:
 .It Cm pick Ar commit Ta Use the specified commit as it is.
 .It Cm edit Ar commit Ta Use the specified commit but once changes have been
 merged into the work tree interrupt the histedit operation for amending.
+While the histedit operation is interrupted arbitrary files may be edited,
+and commands which manipulate the work tree can be used freely.
+The
+.Cm got add
+and
+.Cm got remove
+commands can be used to add new files or remove existing ones.
+The
+.Cm got revert -p
+command can be used to eliminate arbitrary changes from files in the work tree.
+The
+.Cm got stage -p
+command may be used to prepare a subset of changes for inclusion in the
+next commit.
+Finally, the
+.Cm got commit
+command can be used to insert arbitrary commits into the edited history.
+Regular editing of history must eventually be resumed by running
+.Cm got histedit -c .
 .It Cm fold Ar commit Ta Combine the specified commit with the next commit
 listed further below that will be used.
 .It Cm drop Ar commit Ta Remove this commit from the edited history.
