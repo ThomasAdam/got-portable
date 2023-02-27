@@ -24,6 +24,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/stat.h>
 

@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -38,8 +40,6 @@
 #include <paths.h>
 #include <regex.h>
 #include <getopt.h>
-
-#include "got_compat.h"
 
 #include "got_version.h"
 #include "got_error.h"

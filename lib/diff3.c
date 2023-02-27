@@ -64,6 +64,8 @@
  *	@(#)diff3.c	8.1 (Berkeley) 6/6/93
  */
 
+#include "got_compat.h"
+
 #include <sys/stat.h>
 #include <sys/queue.h>
 

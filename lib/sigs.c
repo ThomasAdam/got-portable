@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,7 +37,6 @@
 #include "got_opentemp.h"
 
 #include "got_sigs.h"
-#include "got_compat.h"
 #include "buf.h"
 
 #ifndef MIN

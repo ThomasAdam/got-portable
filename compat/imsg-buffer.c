@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "got_compat.h"
+#include "imsg.h"
 
 static int	ibuf_realloc(struct ibuf *, size_t);
 static void	ibuf_enqueue(struct msgbuf *, struct ibuf *);

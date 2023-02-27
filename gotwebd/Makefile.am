@@ -87,9 +87,17 @@ man8_MANS = gotwebd.8
 
 LDADD = -L$(top_builddir)/compat -L$(top_builddir)/template \
 	-lopenbsd-compat -lm
+LDADD += $(libbsd_LIBS) \
+	 $(libevent_LIBS) \
+	 $(zlib_LIBS) \
+	 $(libuuid_LIBS) \
+	 $(libutil_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
+
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(libevent_CFLAGS) $(zlib_CFLAGS) \
+	       $(libuuid_CFLAGS)
 
 #realinstall:
 #	if [ ! -d ${DESTDIR}${PUB_REPOS_DIR}/. ]; then \

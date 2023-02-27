@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include "got_compat.h"
 #include "got_error.h"
 #include "got_cancel.h"
 #include "got_object.h"

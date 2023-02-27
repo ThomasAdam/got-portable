@@ -42,6 +42,8 @@
  * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

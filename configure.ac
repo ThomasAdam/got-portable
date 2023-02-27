@@ -10,12 +10,12 @@ AM_INIT_AUTOMAKE([foreign subdir-objects])
 
 AC_CONFIG_HEADERS([include/got_compat.h])
 
-AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
+AC_DEFINE_UNQUOTED(VERSION, $VERSION)
 AC_SUBST(VERSION)
 AC_SUBST(GOT_RELEASE)
 
-AC_DEFINE([GOT_VERSION], [VERSION], [GoT version string])
-AC_DEFINE([GOT_VERSION_NUMBER], [VERSION], [Got version number])
+AC_DEFINE_UNQUOTED([GOT_VERSION], VERSION, [GoT version string])
+AC_DEFINE_UNQUOTED([GOT_VERSION_NUMBER], VERSION, [Got version number])
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
@@ -174,6 +174,7 @@ AC_CHECK_FUNCS([ \
 	memchr \
 	memmove \
 	memset \
+	mergesort \
 	mkdir \
 	munmap \
 	nl_langinfo \
@@ -190,7 +191,6 @@ AC_CHECK_FUNCS([ \
 	strcspn \
 	strdup \
 	strerror \
-	strlcpy \
 	strncasecmp \
 	strndup \
 	strrchr \
@@ -227,6 +227,7 @@ AC_REPLACE_FUNCS([ \
 	strsep \
 	strtonum \
 ])
+AM_CONDITIONAL([HAVE_CLOSEFROM], [test "x$ac_cv_func_closefrom" = xyes])
 
 # Always use our getopt because 1) glibc's doesn't enforce argument order 2)
 # musl does not set optarg to NULL for flags without arguments (although it is
@@ -414,7 +415,10 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM(
 # Look for imsg_init in libutil.
 AC_SEARCH_LIBS(imsg_init, util, found_imsg_init=yes, found_imsg_init=no)
 AM_CONDITIONAL([HAVE_IMSG], [test "x$found_imsg_init" = "xyes"])
-if test "x$found_imsg_init" = xno; then
+if test "x$found_imsg_init" = "xyes"; then
+	libutil_LIBS="$ac_cv_search_imsg_init"
+	AC_SUBST(libutil_LIBS)
+else
 	AC_LIBOBJ(imsg)
 	AC_LIBOBJ(imsg-buffer)
 fi
@@ -422,13 +426,15 @@ fi
 # libevent (for gotwebd).  Lifted from tmux.
 # Look for libevent. Try libevent_core or libevent with pkg-config first then
 # look for the library.
+found_libevent=no
 PKG_CHECK_MODULES(
 	LIBEVENT_CORE,
 	[libevent_core >= 2],
 	[
-		AM_CPPFLAGS="$LIBEVENT_CORE_CFLAGS $AM_CPPFLAGS"
-		CPPFLAGS="$AM_CPPFLAGS $SAVED_CPPFLAGS"
-		LIBS="$LIBEVENT_CORE_LIBS $LIBS"
+		libevent_CFLAGS="$LIBEVENT_CORE_CFLAGS"
+		libevent_LIBS="$LIBEVENT_CORE_LIBS"
+		AC_SUBST(libevent_CFLAGS)
+		AC_SUBST(libevent_LIBS)
 		found_libevent=yes
 	],
 	found_libevent=no
@@ -438,9 +444,10 @@ if test x$found_libevent = xno; then
 		LIBEVENT,
 		[libevent >= 2],
 		[
-			AM_CPPFLAGS="$LIBEVENT_CFLAGS $AM_CPPFLAGS"
-			CPPFLAGS="$AM_CPPFLAGS $SAVED_CPPFLAGS"
-			LIBS="$LIBEVENT_LIBS $LIBS"
+			libevent_CFLAGS="$LIBEVENT_CFLAGS"
+			libevent_LIBS="$LIBEVENT_LIBS"
+			AC_SUBST(libevent_CFLAGS)
+			AC_SUBST(libevent_LIBS)
 			found_libevent=yes
 		],
 		found_libevent=no
@@ -453,7 +460,14 @@ if test x$found_libevent = xno; then
 		found_libevent=yes,
 		found_libevent=no
 	)
+
+	if test "x$found_libevent" = "xyes"; then
+		libevent_LIBS="$ac_cv_search_event_init"
+		AC_SUBST(libevent_LIBS)
+	fi
 fi
+
+if test x$found_libevent = xno; then
 AC_CHECK_HEADER(
 	event2/event.h,
 	AC_DEFINE([HAVE_EVENT2_EVENT_H], [1], [libevent2 has event.h]),
@@ -465,6 +479,8 @@ AC_CHECK_HEADER(
 		)
 	]
 )
+fi
+
 if test "x$found_libevent" = xno; then
 	AC_MSG_ERROR("libevent not found")
 fi
@@ -474,9 +490,10 @@ PKG_CHECK_MODULES(
 	LIBCRYPTO,
 	libcrypto,
 	[
-	 	AM_CFLAGS="$LIBCRYPTO_CFLAGS $AM_CFLAGS"
-		CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-		LIBS="$LIBCRYPTO_LIBS $LIBS"
+		libcrypto_CFLAGS="$LIBCRYPTO_CORE_CFLAGS"
+		libcrypto_LIBS="$LIBCRYPTO_LIBS"
+		AC_SUBST(libcrypto_CFLAGS)
+		AC_SUBST(libcrypto_LIBS)
 		found_libcrypto=yes
 	],
 	[
@@ -488,9 +505,7 @@ if test "x$found_libcrypto" = "xyes"; then
 	AC_DEFINE([HAVE_LIBCRYPTO], [1], [libcrypto])
 fi
 
-AC_SEARCH_LIBS(uuid_create, , AC_DEFINE([HAVE_BSD_UUID], [1], [BSD UUID]))
-AC_SEARCH_LIBS(uuid_create, found_uuid=no, found_uuid=yes)
-AC_SEARCH_LIBS(mergesort, , AC_DEFINE([HAVE_BSD_MERGESORT], [1], [BSD Mergesort]))
+AC_CHECK_FUNC([uuid_create], [found_uuid=yes], [found_uuid=no])
 
 # Don't define HAVE_BSD_UUID on darwin (Apple) as this breaks the BSD API.
 # Instead, use the UUID implementation wrapper that's in compat/ plus uuid
@@ -502,9 +517,10 @@ else
 		LIBUUID,
 		uuid,
 		[
-			AM_CFLAGS="$LIBUUID_CFLAGS $AM_CFLAGS"
-			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-			LIBS="$LIBUUID_LIBS $LIBS"
+			libuuid_CFLAGS="$LIBUUID_CFLAGS"
+			libuuid_LIBS="$LIBUUID_LIBS"
+			AC_SUBST(libuuid_CFLAGS)
+			AC_SUBST(libuuid_LIBS)
 			found_libuuid=yes
 		],
 		[
@@ -528,9 +544,10 @@ PKG_CHECK_MODULES(
 	ZLIB,
 	zlib,
 	[
-	 	AM_CFLAGS="$ZLIB_CFLAGS $AM_CFLAGS"
-		CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-		LIBS="$ZLIB_LIBS $LIBS"
+		zlib_CFLAGS="$ZLIB_CFLAGS"
+		zlib_LIBS="$ZLIB_LIBS"
+		AC_SUBST(zlib_CFLAGS)
+		AC_SUBST(zlib_LIBS)
 		found_zlib=yes
 	],
 	[
@@ -554,9 +571,10 @@ if test "$PLATFORM" = "linux"; then
 		LIBMD,
 		libmd,
 		[
-			AM_CFLAGS="$LIBMD_CFLAGS $AM_CFLAGS"
-			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-			LIBS="$LIBMD_LIBS $LIBS"
+			libmd_CFLAGS="$LIBMD_CFLAGS"
+			libmd_LIBS="$LIBMD_LIBS"
+			AC_SUBST(libmd_CFLAGS)
+			AC_SUBST(libmd_LIBS)
 		],
 		[
 			AC_MSG_ERROR("*** couldn't find libmd via pkg-config")
@@ -566,9 +584,10 @@ if test "$PLATFORM" = "linux"; then
 		LIBBSD,
 		libbsd-overlay,
 		[
-			AM_CFLAGS="$LIBBSD_CFLAGS $AM_CFLAGS"
-			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-			LIBS="$LIBBSD_LIBS $LIBS"
+		 	libbsd_CFLAGS="$LIBBSD_CFLAGS"
+			libbsd_LIBS="$LIBBSD_LIBS"
+			AC_SUBST(libbsd_CFLAGS)
+			AC_SUBST(libbsd_LIBS)
 			AC_DEFINE([HAVE_LIBBSD], [1], [BSD UUID])
 		],
 		[
@@ -576,6 +595,12 @@ if test "$PLATFORM" = "linux"; then
 		]
 
 	)
+
+	# Add LIBBSD_{CFLAGS,LIBS} to the environment here, as libbsd puts its
+	# header files in a non-standard location, which means the overlay for
+	# <sys/tree.h> and <sys/queue.h> won't be found.
+	CFLAGS="$CFLAGS $LIBBSD_CFLAGS"
+	LIBS="$LIBS $LIBBSD_LIBS"
 fi
 
 # Look for a suitable queue.h.  We hope libbsd is enough, but that is missing
@@ -671,12 +696,12 @@ PKG_CHECK_MODULES(
 	found_ncurses=no
 )
 if test "x$found_ncurses" = xyes; then
-	AM_CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $LIBPANELW_CFLAGS $AM_CFLAGS"
-	CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $LIBPANELW_CFLAGS $CFLAGS"
-	LIBS="$LIBNCURSES_LIBS $LIBTINFO_LIBS $LIBPANELW_LIBS $LIBS"
+	libncurses_CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $LIBPANELW_CFLAGS"
+	libncurses_LIBS="$LIBNCURSES_LIBS $LIBTINFO_LIBS $LIBPANELW_LIBS"
+	AC_SUBST(libncurses_CFLAGS)
+	AC_SUBST(libncurses_LIBS)
 else
-	AC_CHECK_LIB(
-		ncursesw,
+	AC_SEARCH_LIBS(
 		setupterm,
 		found_ncurses=yes,
 		found_ncurses=no
@@ -684,10 +709,10 @@ else
 	if test "x$found_ncurses" = xyes; then
 		AC_CHECK_HEADER(
 			ncurses.h,
-			AM_CFLAGS="$LIBPANELW_CFLAGS $AM_CFLAGS"
-			CFLAGS="$LIBPANEL_CFLAGS $CFLAGS"
-			LIBS="$LIBS -lncursesw $LIBPANELW_LIBS",
-			found_ncurses=no
+			libncurses_CFLAGS="$LIBPANELW_CFLAGS $LIBPANEL_CFLAGS"
+			libncurses_LIBS="$LIBPANELW_LIBS -lncursesw"
+			AC_SUBST(libncurses_CFLAGS)
+			AC_SUBST(libncurses_LIBS)
 		)
 	fi
 fi
@@ -695,20 +720,20 @@ if test "x$found_ncurses" = xyes; then
 	AC_DEFINE([HAVE_NCURSES_H], [1], [NCurses])
 else
 	# No ncurses, try curses.
-	AC_CHECK_LIB(
-		cursesw,
+	AC_CHECK_FUNC(
 		setupterm,
 		found_curses=yes,
 		found_curses=no
 	)
 	AC_CHECK_HEADER(
 		curses.h,
-		,
+		found_curses=yes,
 		found_curses=no)
 	if test "x$found_curses" = xyes; then
-		AM_CFLAGS="$LIBPANELW_CFLAGS $AM_CFLAGS"
-		CFLAGS="$LIBPANEL_CFLAGS $CFLAGS"
-		LIBS="$LIBS -lcursesw $LIBPANELW_LIBS"
+		libncurses_CFLAGS="$LIBPANELW_CFLAGS $LIBPANEL_CFLAGS"
+		libncurses_LIBS="$LIBPANELW_LIBS -lncursesw"
+		AC_SUBST(libncurses_CFLAGS)
+		AC_SUBST(libncurses_LIBS)
 		AC_DEFINE([HAVE_CURSES_H], [1], [Curses_h])
 	else
 		AC_MSG_ERROR("curses not found")
@@ -723,6 +748,10 @@ AC_SUBST(AM_CFLAGS)
 CFLAGS="$SAVED_CFLAGS"
 AC_SUBST(AM_LDFLAGS)
 LDFLAGS="$SAVED_LDFLAGS"
+
+if test x"$PLATFORM" = "xopenbsd"; then
+	LIBS=""
+fi
 
 AH_BOTTOM([#include "got_compat2.h"])
 
@@ -760,6 +789,7 @@ Configured got-portable with:
  Prefix:       ${prefix}
  Executables:  ${executables}
  Bison:        $YACC
+ CFlags:       $CFLAGS
  Helpers:      ${helpers}
  Man pages:    ${manpages}
 "

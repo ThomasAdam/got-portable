@@ -39,7 +39,6 @@
 #include <string.h>
 
 #include "got_compat.h"
-#include "sha2.h"
 
 #define DEF_WEAK(x)     void __ssh_compat_weak_##x(void)
 

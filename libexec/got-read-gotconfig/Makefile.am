@@ -17,6 +17,9 @@ got_read_gotconfig_SOURCES = \
 got_read_gotconfig_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
+LDADD += $(libbsd_LIBS) $(zlib_LIBS) $(libutil_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
+
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(zlib_CFLAGS)

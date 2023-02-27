@@ -38,12 +38,11 @@
 #include <unistd.h>
 #include <ctype.h>
 
+#include "got_compat.h"
 #include "got_opentemp.h"
 
 #include "proc.h"
 #include "gotwebd.h"
-
-#include "got_compat.h"
 
 __dead void usage(void);
 

@@ -17,6 +17,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include "got_compat.h"
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -46,8 +47,6 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
-
-#include "got_compat.h"
 
 #include "proc.h"
 #include "gotwebd.h"

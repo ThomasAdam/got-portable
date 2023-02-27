@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -21,8 +23,6 @@
 #include <syslog.h>
 #include <errno.h>
 #include <time.h>
-
-#include "got_compat.h"
 
 static int	 debug;
 static int	 verbose;

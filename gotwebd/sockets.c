@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
@@ -54,8 +56,6 @@
 #include "proc.h"
 #include "gotwebd.h"
 #include "tmpl.h"
-
-#include "got_compat.h"
 
 #define SOCKS_BACKLOG 5
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))

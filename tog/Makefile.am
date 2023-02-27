@@ -60,6 +60,9 @@ man1_MANS = tog.1
 EXTRA_DIST = tog.1
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lpthread -lm
+LDADD += $(libbsd_LIBS) $(libncurses_LIBS) $(libuuid_LIBS) $(zlib_LIBS) $(libutil_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
+
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(libncurses_CFLAGS) $(libuuid_CFLAGS)

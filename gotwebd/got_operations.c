@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -36,8 +38,6 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
-
-#include "got_compat.h"
 
 #include "proc.h"
 #include "gotwebd.h"

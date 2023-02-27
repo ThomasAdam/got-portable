@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
@@ -30,8 +32,6 @@
 #include <libgen.h>
 #include <limits.h>
 #include <imsg.h>
-
-#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"
