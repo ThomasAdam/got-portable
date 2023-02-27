@@ -11745,16 +11745,16 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 {
 	const struct got_error *err = NULL;
 	char *line = NULL, *p, *end;
-	size_t i, size;
-	ssize_t len;
+	size_t i, linesize = 0;
+	ssize_t linelen;
 	int lineno = 0, lastcmd = -1;
 	const struct got_histedit_cmd *cmd;
 	struct got_object_id *commit_id = NULL;
 	struct got_histedit_list_entry *hle = NULL;
 
 	for (;;) {
-		len = getline(&line, &size, f);
-		if (len == -1) {
+		linelen = getline(&line, &linesize, f);
+		if (linelen == -1) {
 			const struct got_error *getline_err;
 			if (feof(f))
 				break;
@@ -11766,11 +11766,8 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		p = line;
 		while (isspace((unsigned char)p[0]))
 			p++;
-		if (p[0] == '#' || p[0] == '\0') {
-			free(line);
-			line = NULL;
+		if (p[0] == '#' || p[0] == '\0')
 			continue;
-		}
 		cmd = NULL;
 		for (i = 0; i < nitems(got_histedit_cmds); i++) {
 			cmd = &got_histedit_cmds[i];
@@ -11807,8 +11804,6 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 					break;
 				}
 			}
-			free(line);
-			line = NULL;
 			lastcmd = cmd->code;
 			continue;
 		} else {
@@ -11833,8 +11828,6 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		hle->commit_id = commit_id;
 		hle->logmsg = NULL;
 		commit_id = NULL;
-		free(line);
-		line = NULL;
 		TAILQ_INSERT_TAIL(histedit_cmds, hle, entry);
 		lastcmd = cmd->code;
 	}
