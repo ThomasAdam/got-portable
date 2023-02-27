@@ -8,9 +8,14 @@ AC_CONFIG_AUX_DIR(etc)
 AC_CONFIG_SRCDIR([lib/rcsutil.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 
+AC_CONFIG_HEADERS([include/got_compat.h])
+
 AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
 AC_SUBST(VERSION)
 AC_SUBST(GOT_RELEASE)
+
+AC_DEFINE([GOT_VERSION], [VERSION], [GoT version string])
+AC_DEFINE([GOT_VERSION_NUMBER], [VERSION], [Got version number])
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
@@ -82,18 +87,19 @@ AC_CHECK_HEADERS([ \
 ])
 
 if test "x$ac_cv_header_sha256_h" = xyes; then
-	AC_DEFINE(HAVE_SHA256)
+	AC_DEFINE([HAVE_SHA256], [1], [SHA256 support])
 fi
 
 AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
 
 # Check for SHA1_DIGEST_LENGTH
 AC_CHECK_DECL([SHA1_DIGEST_LENGTH],
-	[AC_DEFINE(HAVE_SHA1_AS_SHA1)],
+	[AC_DEFINE([HAVE_SHA1_AS_SHA1], [1], [SHA support is using SHA1])],
 	[
 		dnl maybe sha.h is available
 		AC_CHECK_DECL([SHA_DIGEST_LENGTH],
-			[AC_DEFINE(HAVE_SHA_AS_SHA1)],
+			[AC_DEFINE([HAVE_SHA_AS_SHA1], [1],
+				   [SHA support is using SHA])],
 			[],
 			[#include <sha.h>])
 	],
@@ -450,11 +456,11 @@ if test x$found_libevent = xno; then
 fi
 AC_CHECK_HEADER(
 	event2/event.h,
-	AC_DEFINE(HAVE_EVENT2_EVENT_H),
+	AC_DEFINE([HAVE_EVENT2_EVENT_H], [1], [libevent2 has event.h]),
 	[
 		AC_CHECK_HEADER(
 			event.h,
-			AC_DEFINE(HAVE_EVENT_H),
+			AC_DEFINE([HAVE_EVENT_H], [0], [libevent]),
 			found_libevent=no
 		)
 	]
@@ -479,18 +485,18 @@ PKG_CHECK_MODULES(
 )
 
 if test "x$found_libcrypto" = "xyes"; then
-	AC_DEFINE(HAVE_LIBCRYPTO)
+	AC_DEFINE([HAVE_LIBCRYPTO], [1], [libcrypto])
 fi
 
-AC_SEARCH_LIBS(uuid_create, , AC_DEFINE(HAVE_BSD_UUID))
+AC_SEARCH_LIBS(uuid_create, , AC_DEFINE([HAVE_BSD_UUID], [1], [BSD UUID]))
 AC_SEARCH_LIBS(uuid_create, found_uuid=no, found_uuid=yes)
-AC_SEARCH_LIBS(mergesort, , AC_DEFINE(HAVE_BSD_MERGESORT))
+AC_SEARCH_LIBS(mergesort, , AC_DEFINE([HAVE_BSD_MERGESORT], [1], [BSD Mergesort]))
 
 # Don't define HAVE_BSD_UUID on darwin (Apple) as this breaks the BSD API.
 # Instead, use the UUID implementation wrapper that's in compat/ plus uuid
 # ossp
 if test "x$found_uuid" = "xyes" -a "x$PLATFORM" != "darwin"; then
-	AC_DEFINE(HAVE_BSD_UUID)
+	AC_DEFINE([HAVE_BSD_UUID], [1], [BSD UUID])
 else
 	PKG_CHECK_MODULES(
 		LIBUUID,
@@ -563,7 +569,7 @@ if test "$PLATFORM" = "linux"; then
 			AM_CFLAGS="$LIBBSD_CFLAGS $AM_CFLAGS"
 			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
 			LIBS="$LIBBSD_LIBS $LIBS"
-			AC_DEFINE(HAVE_LIBBSD)
+			AC_DEFINE([HAVE_LIBBSD], [1], [BSD UUID])
 		],
 		[
 			AC_MSG_ERROR("*** couldn't find libbsd-overlay via pkg-config")
@@ -594,7 +600,7 @@ AC_CHECK_DECL(
 )
 
 if test "x$found_queue_h" = xyes; then
-	AC_DEFINE(HAVE_QUEUE_H)
+	AC_DEFINE([HAVE_QUEUE_H], [1], [sys/queue.h])
 else
 	AC_MSG_ERROR("*** sys/queue.h missing key defines ***)
 fi
@@ -607,7 +613,7 @@ AC_CHECK_DECL(
 )
 
 if test "x$found_sys_tree_h" = xyes; then
-	AC_DEFINE(HAVE_TREE_H)
+	AC_DEFINE([HAVE_TREE_H], [1], [sys/tree.h])
 else
 	AC_MSG_NOTICE("Using compat/tree.h")
 fi
@@ -625,8 +631,8 @@ AC_LINK_IFELSE([AC_LANG_SOURCE(
 			exit(0);
 		}
 	])],
-	[AC_DEFINE(HAVE___PROGNAME) AC_MSG_RESULT(yes)],
-	AC_MSG_RESULT(no)
+	[AC_DEFINE([HAVE___PROGNAME], [1], [___progname]) AC_MSG_RESULT(yes)],
+	[AC_MSG_RESULT(no)]
 )
 
 PKG_CHECK_MODULES(
@@ -686,7 +692,7 @@ else
 	fi
 fi
 if test "x$found_ncurses" = xyes; then
-	AC_DEFINE(HAVE_NCURSES_H)
+	AC_DEFINE([HAVE_NCURSES_H], [1], [NCurses])
 else
 	# No ncurses, try curses.
 	AC_CHECK_LIB(
@@ -703,7 +709,7 @@ else
 		AM_CFLAGS="$LIBPANELW_CFLAGS $AM_CFLAGS"
 		CFLAGS="$LIBPANEL_CFLAGS $CFLAGS"
 		LIBS="$LIBS -lcursesw $LIBPANELW_LIBS"
-		AC_DEFINE(HAVE_CURSES_H)
+		AC_DEFINE([HAVE_CURSES_H], [1], [Curses_h])
 	else
 		AC_MSG_ERROR("curses not found")
 	fi
@@ -717,6 +723,8 @@ AC_SUBST(AM_CFLAGS)
 CFLAGS="$SAVED_CFLAGS"
 AC_SUBST(AM_LDFLAGS)
 LDFLAGS="$SAVED_LDFLAGS"
+
+AH_BOTTOM([#include "got_compat2.h"])
 
 AC_CONFIG_FILES([Makefile
 		 compat/Makefile
