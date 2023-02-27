@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/types.h>
 
@@ -28,8 +30,6 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "got_compat.h"
 
 #include "got_version.h"
 #include "got_error.h"

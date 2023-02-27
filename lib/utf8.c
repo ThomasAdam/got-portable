@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 
 #include <err.h>
@@ -22,8 +24,6 @@
 #include <string.h>
 #include <wchar.h>
 #include <langinfo.h>
-
-#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_utf8.h"

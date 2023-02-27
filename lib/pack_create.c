@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
@@ -33,10 +35,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <zlib.h>
-
-#if defined(__FreeBSD__)
-#include <unistd.h>
-#endif
 
 #include "got_error.h"
 #include "got_cancel.h"

@@ -21,6 +21,8 @@
  */
 
 %{
+#include "got_compat.h"
+
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/queue.h>
@@ -49,7 +51,6 @@
 #include "proc.h"
 #include "gotwebd.h"
 #include "got_sockaddr.h"
-#include "got_compat.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {

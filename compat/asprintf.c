@@ -22,6 +22,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+int vasprintf(char **, const char *, va_list);
+
 int
 asprintf(char **ret, const char *fmt, ...)
 {

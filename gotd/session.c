@@ -16,7 +16,6 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/uio.h>

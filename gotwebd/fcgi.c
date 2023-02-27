@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <arpa/inet.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
@@ -33,8 +35,6 @@
 #include <unistd.h>
 
 #include "got_error.h"
-
-#include "got_compat.h"
 
 #include "proc.h"
 #include "gotwebd.h"

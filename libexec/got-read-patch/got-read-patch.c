@@ -34,6 +34,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include "got_compat.h"
 
 #include <sys/types.h>
 #include <sys/queue.h>
@@ -50,8 +51,6 @@
 
 #include "got_error.h"
 #include "got_object.h"
-
-#include "got_compat.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"

@@ -59,6 +59,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#ifndef __GNUC__
+#define __attribute__(a)
+#endif
+
+#ifndef __bounded__
+#define __bounded__(a, b, c)
+#endif
+
 /* For flock. */
 #ifndef O_EXLOCK
 #define O_EXLOCK 0
@@ -76,11 +84,6 @@
 /* POSIX doesn't define WAIT_ANY, so provide it if it's not found. */
 #ifndef WAIT_ANY
 #define WAIT_ANY (-1)
-#endif
-
-/* SOCK_NONBLOCK isn't available across BSDs... */
-#ifndef SOCK_NONBLOCK
-#define SOCK_NONBLOCK 00004000
 #endif
 
 /* On FreeBSD (and possibly others), EAI_NODATA was removed, in favour of
@@ -164,10 +167,10 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include <sys/queue.h>
 #endif
 
-#ifdef HAVE_TREE_H
-#include <sys/tree.h>
-#else
+#ifndef HAVE_TREE_H
 #include "compat/tree.h"
+#else
+#include <sys/tree.h>
 #endif
 
 #ifdef HAVE_UTIL_H
@@ -178,15 +181,18 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include <libutil.h>
 #endif
 
-#ifdef HAVE_IMSG
-#else
+#ifndef IOV_MAX
+# define IOV_MAX 1024
+#endif
+
+#ifndef HAVE_IMSG
 #include "compat/imsg.h"
 #endif
 
-#ifdef HAVE_SIPHASH
-#include <siphash.h>
-#else
+#ifndef HAVE_SIPHASH
 #include "compat/siphash.h"
+#else
+#include <siphash.h>
 #endif
 
 /* Include Apple-specific headers.  Mostly for crypto.*/
@@ -278,6 +284,11 @@ typedef struct _SHA2_CTX {
 # endif
 #endif
 
+/* SOCK_NONBLOCK isn't available across BSDs... */
+#if !defined(SOCK_NONBLOCK) && !defined(__linux__)
+#define SOCK_NONBLOCK 00004000
+#endif
+
 #ifndef HAVE_ASPRINTF
 /* asprintf.c */
 int		 asprintf(char **, const char *, ...);
@@ -297,10 +308,6 @@ int		 getdtablecount(void);
 #ifndef HAVE_CLOSEFROM
 /* closefrom.c */
 void		 closefrom(int);
-#endif
-
-#if defined (__FreeBSD__)
-#define closefrom(fd) (closefrom(fd), 0)
 #endif
 
 #ifndef HAVE_STRSEP
@@ -421,7 +428,7 @@ int	BSDgetopt(int, char *const *, const char *);
 	((tvp)->tv_sec cmp (uvp)->tv_sec))
 #endif
 
-#ifndef HAVE_BSD_MERGESORT
+#ifndef HAVE_MERGESORT
 /* mergesort.c */
 int mergesort(void *, size_t, size_t, int (*)(const void *, const void *));
 #endif

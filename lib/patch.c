@@ -19,6 +19,7 @@
  *     + support indented patches?
  *     + support other kinds of patches?
  */
+#include "got_compat.h"
 
 #include <sys/types.h>
 #include <sys/queue.h>

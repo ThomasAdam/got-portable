@@ -16,7 +16,6 @@
 
 #include <sys/queue.h>
 #include <sys/stat.h>
-#include <sys/tree.h>
 #include <sys/types.h>
 
 #include <event.h>

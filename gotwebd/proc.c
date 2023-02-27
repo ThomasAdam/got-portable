@@ -14,6 +14,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include "got_compat.h"
 
 #include <sys/types.h>
 #include <sys/queue.h>
@@ -31,8 +32,6 @@
 #include <event.h>
 
 #include "proc.h"
-
-#include "got_compat.h"
 
 void	 proc_exec(struct privsep *, struct privsep_proc *, unsigned int,
 	    int, char **);

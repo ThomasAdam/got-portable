@@ -69,6 +69,14 @@ man1_MANS = got.1
 man5_MANS = got.conf.5 git-repository.5 got-worktree.5
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
+LDADD += $(libuuid_LIBS) \
+	 $(zlib_LIBS) \
+	 $(libbsd_LIBS) \
+	 $(libutil_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
+
+AM_CPPFLAGS += $(libuuid_CFLAGS) \
+	       $(zlib_CFLAGS) \
+	       $(libbsd_CFLAGS)
