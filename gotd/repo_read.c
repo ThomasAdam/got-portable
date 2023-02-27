@@ -69,8 +69,8 @@ static struct repo_read_client {
 	int				 delta_cache_fd;
 	int				 report_progress;
 	int				 pack_pipe;
-	struct gotd_object_id_array	 want_ids;
-	struct gotd_object_id_array	 have_ids;
+	struct got_object_idset		*want_ids;
+	struct got_object_idset		*have_ids;
 } repo_read_client;
 
 static volatile sig_atomic_t sigint_received;
@@ -371,8 +371,9 @@ done:
 }
 
 static const struct got_error *
-record_object_id(struct gotd_object_id_array *array, struct got_object_id *id)
+append_object_id(struct got_object_id *id, void *data, void *arg)
 {
+	struct gotd_object_id_array *array = arg;
 	const size_t alloc_chunksz = 256;
 
 	if (array->ids == NULL) {
@@ -392,25 +393,9 @@ record_object_id(struct gotd_object_id_array *array, struct got_object_id *id)
 		array->nalloc += alloc_chunksz;
 	}
 
-	array->ids[array->nids] = got_object_id_dup(id);
-	if (array->ids[array->nids] == NULL)
-		return got_error_from_errno("got_object_id_dup");
+	array->ids[array->nids] = id;
 	array->nids++;
 	return NULL;
-}
-
-static void
-free_object_ids(struct gotd_object_id_array *array)
-{
-	size_t i;
-
-	for (i = 0; i < array->nids; i++)
-		free(array->ids[i]);
-	free(array->ids);
-
-	array->ids = NULL;
-	array->nalloc = 0;
-	array->nids = 0;
 }
 
 static const struct got_error *
@@ -447,9 +432,11 @@ recv_want(struct imsg *imsg)
 	    obj_type != GOT_OBJ_TYPE_TAG)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = record_object_id(&client->want_ids, &id);
-	if (err)
-		return err;
+	if (!got_object_idset_contains(client->want_ids, &id)) {
+		err = got_object_idset_add(client->want_ids, &id, NULL);
+		if (err)
+			return err;
+	}
 
 	gotd_imsg_send_ack(&id, &ibuf, PROC_REPO_READ, repo_read.pid);
 	imsg_clear(&ibuf);
@@ -499,9 +486,11 @@ recv_have(struct imsg *imsg)
 		goto done;
 	}
 
-	err = record_object_id(&client->have_ids, &id);
-	if (err)
-		return err;
+	if (!got_object_idset_contains(client->have_ids, &id)) {
+		err = got_object_idset_add(client->have_ids, &id, NULL);
+		if (err)
+			goto done;
+	}
 
 	gotd_imsg_send_ack(&id, &ibuf, PROC_REPO_READ, repo_read.pid);
 done:
@@ -622,8 +611,13 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct imsgbuf ibuf;
 	struct repo_read_pack_progress_arg pa;
 	struct got_ratelimit rl;
+	struct gotd_object_id_array want_ids;
+	struct gotd_object_id_array have_ids;
 
 	log_debug("packfile request received");
+
+	memset(&want_ids, 0, sizeof(want_ids));
+	memset(&have_ids, 0, sizeof(have_ids));
 
 	got_ratelimit_init(&rl, 2, 0);
 
@@ -643,9 +637,17 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	pa.ibuf = &ibuf;
 	pa.report_progress = client->report_progress;
 
+	err = got_object_idset_for_each(client->want_ids,
+	    append_object_id, &want_ids);
+	if (err)
+		goto done;
+	err = got_object_idset_for_each(client->have_ids,
+	   append_object_id, &have_ids);
+	if (err)
+		goto done;
+
 	err = got_pack_create(packsha1, client->pack_pipe, delta_cache,
-	    client->have_ids.ids, client->have_ids.nids,
-	    client->want_ids.ids, client->want_ids.nids,
+	    have_ids.ids, have_ids.nids, want_ids.ids, want_ids.nids,
 	    repo_read.repo, 0, 1, 0, pack_progress, &pa, &rl,
 	    check_cancelled, NULL);
 	if (err)
@@ -664,6 +666,8 @@ done:
 	if (delta_cache != NULL && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	imsg_clear(&ibuf);
+	free(want_ids.ids);
+	free(have_ids.ids);
 	return err;
 }
 
@@ -865,6 +869,16 @@ repo_read_main(const char *title, const char *repo_path,
 	client->fd = -1;
 	client->delta_cache_fd = -1;
 	client->pack_pipe = -1;
+	client->have_ids = got_object_idset_alloc();
+	if (client->have_ids == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+	client->want_ids = got_object_idset_alloc();
+	if (client->want_ids == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
 
 	repo_read.title = title;
 	repo_read.pid = getpid();
@@ -915,8 +929,10 @@ repo_read_shutdown(void)
 
 	log_debug("%s: shutting down", repo_read.title);
 
-	free_object_ids(&client->have_ids);
-	free_object_ids(&client->want_ids);
+	if (client->have_ids)
+		got_object_idset_free(client->have_ids);
+	if (client->want_ids)
+		got_object_idset_free(client->want_ids);
 	if (client->fd != -1)
 		close(client->fd);
 	if (client->delta_cache_fd != -1)
