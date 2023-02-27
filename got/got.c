@@ -308,7 +308,7 @@ get_editor(char **abspath)
 	}
 
 	if (*abspath == NULL) {
-		*abspath = strdup("/bin/ed");
+		*abspath = strdup("/usr/bin/vi");
 		if (*abspath == NULL)
 			return got_error_from_errno("strdup");
 	}
