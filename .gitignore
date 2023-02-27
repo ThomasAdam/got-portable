@@ -16,6 +16,7 @@
 **/install-sh
 **/missing
 **/obj
+**/stamp-h1
 **/tags
 **/ylwrap
 .ccls-cache/*
@@ -31,6 +32,8 @@ gotadmin/gotadmin
 gotwebd/gotwebd
 gotwebd/pages.c
 gotwebd/parse.c
+include/got_compat.h
+include/got_compat.h.in
 libexec/got-fetch-pack/got-fetch-pack
 libexec/got-index-pack/got-index-pack
 libexec/got-read-blob/got-read-blob

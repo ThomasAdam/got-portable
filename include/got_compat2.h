@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _GOT_COMPAT_H
-#define _GOT_COMPAT_H
+#ifndef _GOT_COMPAT_H_2
+#define _GOT_COMPAT_H_2
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
