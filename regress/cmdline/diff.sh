@@ -1787,6 +1787,37 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_file_to_dir() {
+	local testroot=`test_init diff_file_to_dir`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	git_rm $testroot/repo alpha
+	mkdir $testroot/repo/alpha
+	echo eta > $testroot/repo/alpha/eta
+	(cd $testroot/repo && git add alpha/eta)
+	git_commit $testroot/repo -m "changed alpha into directory"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
+	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	got diff -r $testroot/repo $commit_id0 $commit_id1 > $testroot/stdout
+	# Diff should not be empty
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		ret="xfail file to directory"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1803,3 +1834,4 @@ run_test test_diff_crlf
 run_test test_diff_worktree_newfile_xbit
 run_test test_diff_commit_diffstat
 run_test test_diff_worktree_diffstat
+run_test test_diff_file_to_dir
