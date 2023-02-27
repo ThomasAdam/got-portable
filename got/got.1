@@ -2504,8 +2504,8 @@ character are ignored entirely.
 The available histedit script commands are as follows:
 .Bl -column YXZ pick-commit
 .It Cm pick Ar commit Ta Use the specified commit as it is.
-.It Cm edit Ar commit Ta Use the specified commit but once changes have been
-merged into the work tree interrupt the histedit operation for amending.
+.It Cm edit Ar commit Ta Apply the changes from the specified commit, but
+then interrupt the histedit operation for amending, without creating a commit.
 While the histedit operation is interrupted arbitrary files may be edited,
 and commands which manipulate the work tree can be used freely.
 The
