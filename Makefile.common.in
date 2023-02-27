@@ -1,7 +1,8 @@
 AM_CFLAGS += \
 	    @AM_CFLAGS@ \
 	    -Wunused-variable \
-	    -Wwrite-strings
+	    -Wwrite-strings \
+	    -Wno-pointer-sign
 # Ideally, we should be enabling further flags, but this requires upstream
 # changes.  Leaving these here for now.
 #
@@ -14,8 +15,6 @@ AM_CFLAGS += \
 
 AM_CPPFLAGS += \
 	      @AM_CPPFLAGS@ \
-	      -DGOT_VERSION=@VERSION@ \
-	      -DGOT_VERSION_NUMBER=@VERSION@ \
 	      -DGOT_LIBEXECDIR="$(libexecdir)" \
 	      -I$(top_srcdir) \
 	      -I$(top_srcdir)/compat \
