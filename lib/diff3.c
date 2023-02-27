@@ -691,7 +691,7 @@ get_line(char **ret, FILE *b, size_t *n, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 	char *cp = NULL;
-	size_t size;
+	size_t size = 0;
 	ssize_t len;
 	char *new;
 
