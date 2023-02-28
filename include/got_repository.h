@@ -35,6 +35,9 @@ const char *got_repo_get_path_git_dir(struct got_repository *);
 /* Obtain the file descriptor of the repository's .git directory. */
 int got_repo_get_fd(struct got_repository *);
 
+/* Obtain the object format */
+enum got_hash_algorithm got_repo_get_object_format(struct got_repository *);
+
 /* Obtain the commit author name if parsed from gitconfig, else NULL. */
 const char *got_repo_get_gitconfig_author_name(struct got_repository *);
 
