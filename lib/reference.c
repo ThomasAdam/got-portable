@@ -152,9 +152,8 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 
 static const struct got_error *
 parse_ref_line(struct got_reference **ref, const char *name, const char *line,
-    time_t mtime)
+    time_t mtime, enum got_hash_algorithm algo)
 {
-	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_object_id id;
 
 	if (strncmp(line, "ref: ", 5) == 0) {
@@ -170,7 +169,8 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line,
 
 static const struct got_error *
 parse_ref_file(struct got_reference **ref, const char *name,
-    const char *absname, const char *abspath, int lock)
+    const char *absname, const char *abspath, int lock,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	FILE *f;
@@ -225,7 +225,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		linelen--;
 	}
 
-	err = parse_ref_line(ref, absname, line, sb.st_mtime);
+	err = parse_ref_line(ref, absname, line, sb.st_mtime, algo);
 	if (lock) {
 		if (err)
 			got_lockfile_unlock(lf, -1);
@@ -290,9 +290,8 @@ got_ref_alloc_symref(struct got_reference **ref, const char *name,
 
 static const struct got_error *
 parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
-    const char *line, time_t mtime)
+    const char *line, time_t mtime, enum got_hash_algorithm algo)
 {
-	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_object_id id;
 	const char *name;
 
@@ -316,7 +315,8 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 
 static const struct got_error *
 open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
-    int nsubdirs, const char *refname, time_t mtime)
+    int nsubdirs, const char *refname, time_t mtime,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	char *abs_refname;
@@ -345,7 +345,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 			    refname) == -1)
 				return got_error_from_errno("asprintf");
 			err = parse_packed_ref_line(ref, abs_refname, line,
-			    mtime);
+			    mtime, algo);
 			if (!ref_is_absolute)
 				free(abs_refname);
 			if (err || *ref != NULL)
@@ -361,7 +361,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 
 static const struct got_error *
 open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
-    const char *name, int lock)
+    const char *name, int lock, enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	char *path = NULL;
@@ -390,7 +390,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 		}
 	}
 
-	err = parse_ref_file(ref, name, absname, path, lock);
+	err = parse_ref_file(ref, name, absname, path, lock, algo);
 done:
 	if (!ref_is_absolute && !ref_is_well_known)
 		free(absname);
@@ -420,14 +420,15 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	}
 
 	if (well_known) {
-		err = open_ref(ref, path_refs, "", refname, lock);
+		err = open_ref(ref, path_refs, "", refname, lock,
+		    got_repo_get_object_format(repo));
 	} else {
 		FILE *f;
 
 		/* Search on-disk refs before packed refs! */
 		for (i = 0; i < nitems(subdirs); i++) {
 			err = open_ref(ref, path_refs, subdirs[i], refname,
-			    lock);
+			    lock, got_repo_get_object_format(repo));
 			if ((err && err->code != GOT_ERR_NOT_REF) || *ref)
 				goto done;
 		}
@@ -453,7 +454,8 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 				goto done;
 			}
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
-			    refname, sb.st_mtime);
+			    refname, sb.st_mtime,
+			    got_repo_get_object_format(repo));
 			if (!err) {
 				if (fclose(f) == EOF) {
 					err = got_error_from_errno("fclose");
@@ -916,7 +918,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		switch (type) {
 		case DT_REG:
 			err = open_ref(&ref, path_refs, subdir, dent->d_name,
-			    0);
+			    0, got_repo_get_object_format(repo));
 			if (err)
 				goto done;
 			if (ref) {
@@ -969,7 +971,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			err = got_error_from_errno("get_refs_dir_path");
 			goto done;
 		}
-		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
+		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0,
+		    got_repo_get_object_format(repo));
 		if (err)
 			goto done;
 		err = got_reflist_insert(&new, refs, ref, cmp_cb, cmp_arg);
@@ -985,7 +988,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			err = got_error_from_errno("get_refs_dir_path");
 			goto done;
 		}
-		err = open_ref(&ref, path_refs, "", refname, 0);
+		err = open_ref(&ref, path_refs, "", refname, 0,
+		    got_repo_get_object_format(repo));
 		if (err) {
 			if (err->code != GOT_ERR_NOT_REF)
 				goto done;
@@ -1068,7 +1072,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			if (linelen > 0 && line[linelen - 1] == '\n')
 				line[linelen - 1] = '\0';
 			err = parse_packed_ref_line(&ref, NULL, line,
-			    sb.st_mtime);
+			    sb.st_mtime, got_repo_get_object_format(repo));
 			if (err)
 				goto done;
 			if (ref) {
@@ -1321,7 +1325,8 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 		if (linelen > 0 && line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
-		err = parse_packed_ref_line(&ref, NULL, line, 0);
+		err = parse_packed_ref_line(&ref, NULL, line, 0,
+		    got_repo_get_object_format(repo));
 		if (err)
 			goto done;
 		if (ref == NULL)

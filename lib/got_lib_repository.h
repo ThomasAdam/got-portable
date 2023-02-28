@@ -63,6 +63,7 @@ struct got_repository {
 	char *path;
 	char *path_git_dir;
 	int gitdir_fd;
+	enum got_hash_algorithm algo;
 
 	struct got_pathlist_head packidx_paths;
 	struct timespec pack_path_mtime;
