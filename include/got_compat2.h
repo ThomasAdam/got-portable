@@ -397,7 +397,6 @@ int	BSDgetopt(int, char *const *, const char *);
 #define optreset           BSDoptreset
 #define optarg             BSDoptarg
 #endif
-#endif
 
 /* Check for some of the non-portable timespec*() functions.
  * This should largely come from libbsd for systems which
@@ -431,4 +430,5 @@ int	BSDgetopt(int, char *const *, const char *);
 #ifndef HAVE_MERGESORT
 /* mergesort.c */
 int mergesort(void *, size_t, size_t, int (*)(const void *, const void *));
+#endif
 #endif
