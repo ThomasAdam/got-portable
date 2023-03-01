@@ -55,7 +55,9 @@
 #include "got_lib_privsep.h"
 #include "got_lib_hash.h"
 
+#ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
