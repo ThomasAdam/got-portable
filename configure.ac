@@ -749,9 +749,13 @@ CFLAGS="$SAVED_CFLAGS"
 AC_SUBST(AM_LDFLAGS)
 LDFLAGS="$SAVED_LDFLAGS"
 
-if test x"$PLATFORM" = "xopenbsd"; then
-	LIBS=""
-fi
+# LIBS is designed to accumulate library dependencies as checks for them are
+# peformed, so that this can be included directly to ld(1).
+#
+# However, this hinders the splitting up of the library dependencies so that
+# they're targetted just where they're needed.  Flatting LIBS here ensures
+# that this happens appropriately.
+LIBS=""
 
 AH_BOTTOM([#include "got_compat2.h"])
 
