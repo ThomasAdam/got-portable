@@ -11,11 +11,16 @@ LDADD += -lmd
 LIBS += -lmd
 endif
 
-LIBS += -lm
+LIBS += -lm $(zlib_LIBS) $(libbsd_LIBS)
+AM_CPPFLAGS += $(libbsd_CFLAGS)
 
-TEST_TARGETS=regress-delta regress-deltify regress-fetch regress-idset \
+TEST_TARGETS=compat regress-delta regress-deltify regress-fetch regress-idset \
 	     regress-path regress-cmdline
 GOT_TEST_ROOT=/tmp
+
+.PHONY: compat
+compat:
+	$(MAKE) -C compat
 
 tests: $(TEST_TARGETS)
 
