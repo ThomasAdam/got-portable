@@ -641,7 +641,7 @@ newfile(const char *name, int secret)
 	}
 	nfile->stream = fopen(nfile->name, "r");
 	if (nfile->stream == NULL) {
-		/* no warning, we don't require a conf file */
+		log_warn("open %s", nfile->name);
 		free(nfile->name);
 		free(nfile);
 		return (NULL);
@@ -693,10 +693,8 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 	gotd->request_timeout.tv_usec = 0;
 
 	file = newfile(filename, 0);
-	if (file == NULL) {
-		/* just return, as we don't require a conf file */
-		return (0);
-	}
+	if (file == NULL)
+		return -1;
 
 	yyparse();
 	errors = file->errors;
