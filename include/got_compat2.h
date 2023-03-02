@@ -222,12 +222,12 @@ typedef struct _SHA2_CTX {
 #ifdef HAVE_SHA1_AS_SHA1
 #      include <sha1.h>
 #endif
-#ifdef HAVE_SHA2
+#ifdef HAVE_SHA2_H
 #    include <sha2.h>
 #else
 #    include "sha2.h"
 #endif
-#ifdef HAVE_SHA256
+#ifdef HAVE_SHA256_H
 #    include <sha256.h>
 #endif
 #endif
