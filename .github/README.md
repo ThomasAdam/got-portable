@@ -21,9 +21,7 @@ DEPENDENCIES
 Linux:
 
 * `libncurses` (for tog(1))
-* `libmd` (BSD's digest routines)
 * `libbsd` (BSD's arc4random routines)
-* `libcrypto` (often via 'libssl-dev' for SHA1 routines)
 * `libuuid` (for UUID generation)
 * `libz` (for Z compression)
 * `pkg-config` (for searching libraries)

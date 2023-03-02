@@ -59,6 +59,7 @@ fi
 AC_CHECK_HEADERS([ \
 	fcntl.h \
 	langinfo.h \
+	libutil.h \
 	limits.h \
 	linux/landlock.h \
 	locale.h \
@@ -78,6 +79,7 @@ AC_CHECK_HEADERS([ \
 	sys/param.h \
 	sys/poll.h \
 	sys/queue.h \
+	sys/select.h \
 	sys/socket.h \
 	sys/time.h \
 	sys/tree.h \
@@ -86,23 +88,57 @@ AC_CHECK_HEADERS([ \
 	wchar.h \
 ])
 
+AC_HEADER_DIRENT
+AC_CHECK_DECL([F_CLOSEM],
+	      HAVE_FCNTL_CLOSEM
+	      AC_DEFINE([HAVE_FCNTL_CLOSEM], [1],
+			[Use F_CLOSEM fcntl for closefrom]),
+			[],
+			[#include <limits.h>
+			 #include <fcntl.h>
+			]
+)
+
+AC_MSG_CHECKING([for /proc/pid/fd directory])
+if test -d "/proc/$$/fd" ; then
+	AC_DEFINE([HAVE_PROC_PID], [1], [Define if you have /proc/$pid/fd])
+	AC_MSG_RESULT([yes])
+else
+	AC_MSG_RESULT([no])
+fi
+
+AC_MSG_CHECKING([whether program_invocation_short_name is defined])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+	#include <argp.h>
+]], [[
+	program_invocation_short_name = "test";
+]])], [
+	AC_MSG_RESULT([yes])
+	AC_DEFINE([HAVE_PROGRAM_INVOCATION_SHORT_NAME], [1],
+		[Define if program_invocation_short_name is defined])
+], [
+	AC_MSG_RESULT([no])
+])
+
+# Look for prctl(PR_SET_NAME).
+AC_CHECK_DECL(
+	[PR_SET_NAME],
+	[AC_DEFINE([HAVE_PR_SET_NAME], [1], [Define if PR_SET_NAME is defined])],
+	[],
+	[#include <sys/prctl.h>]
+)
+
 AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
 
-# Check for SHA1_DIGEST_LENGTH
-AC_CHECK_DECL([SHA1_DIGEST_LENGTH],
-	[AC_DEFINE([HAVE_SHA1_AS_SHA1], [1], [SHA support is using SHA1])],
-	[
-		dnl maybe sha.h is available
-		AC_CHECK_DECL([SHA_DIGEST_LENGTH],
-			[AC_DEFINE([HAVE_SHA_AS_SHA1], [1],
-				   [SHA support is using SHA])],
-			[],
-			[#include <sha.h>])
-	],
-	[
-	#include <sys/types.h>
-	#include <sha1.h>
-	])
+AC_CHECK_MEMBERS([struct pollfd.fd], [], [], [[
+#include <sys/types.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
+#ifdef HAVE_SYS_POLL_H
+#include <sys/poll.h>
+#endif
+]])
 
 # Checks for typ edefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -163,6 +199,9 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_STRNLEN
 AC_CHECK_FUNCS([ \
+	SHA256Update \
+	SHA384Update \
+	SHA512Update \
 	dup2 \
 	flock \
 	getcwd \
@@ -194,12 +233,15 @@ AC_CHECK_FUNCS([ \
 	strstr \
 	strtol \
 	strtoul \
+	sysconf \
 	wcwidth \
 ])
 
 AM_CONDITIONAL([HAVE_SETPROCTITLE], [test "x$ac_cv_func_setproctitle" = xyes])
-AM_CONDITIONAL([HAVE_SETRESGID], [test "x$ac_cv_func_setresgid" = xyes])
-AM_CONDITIONAL([HAVE_SETRESUID], [test "x$ac_cv_func_setresuid" = xyes])
+
+if test "x$ac_cv_func_sysconf" = xyes; then
+	AC_DEFINE([HAVE_SYSCONF], [1], [Define to 1 if sysconf() present])
+fi
 
 # Siphash support.
 AC_CHECK_FUNCS([SipHash])
@@ -220,6 +262,7 @@ AC_REPLACE_FUNCS([ \
 	strlcat \
 	strlcpy \
 	strndup \
+	strnlen \
 	strsep \
 	strtonum \
 ])
@@ -412,11 +455,9 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM(
 AC_SEARCH_LIBS(imsg_init, util, found_imsg_init=yes, found_imsg_init=no)
 AM_CONDITIONAL([HAVE_IMSG], [test "x$found_imsg_init" = "xyes"])
 if test "x$found_imsg_init" = "xyes"; then
+	AC_DEFINE([HAVE_IMSG], [1], [Define to 1 if imsg is declared in libutil])
 	libutil_LIBS="$ac_cv_search_imsg_init"
 	AC_SUBST(libutil_LIBS)
-else
-	AC_LIBOBJ(imsg)
-	AC_LIBOBJ(imsg-buffer)
 fi
 
 # libevent (for gotwebd).  Lifted from tmux.
@@ -481,26 +522,6 @@ if test "x$found_libevent" = xno; then
 	AC_MSG_ERROR("libevent not found")
 fi
 
-# libcrypto (via libssl for SHA information)
-PKG_CHECK_MODULES(
-	LIBCRYPTO,
-	libcrypto,
-	[
-		libcrypto_CFLAGS="$LIBCRYPTO_CORE_CFLAGS"
-		libcrypto_LIBS="$LIBCRYPTO_LIBS"
-		AC_SUBST(libcrypto_CFLAGS)
-		AC_SUBST(libcrypto_LIBS)
-		found_libcrypto=yes
-	],
-	[
-	 	found_libcrypto=no
-	]
-)
-
-if test "x$found_libcrypto" = "xyes"; then
-	AC_DEFINE([HAVE_LIBCRYPTO], [1], [libcrypto])
-fi
-
 AC_CHECK_FUNC([uuid_create], [found_uuid=yes], [found_uuid=no])
 
 # Don't define HAVE_BSD_UUID on darwin (Apple) as this breaks the BSD API.
@@ -563,19 +584,6 @@ if test "x$found_zlib" = "xno"; then
 fi
 
 if test "$PLATFORM" = "linux"; then
-	PKG_CHECK_MODULES(
-		LIBMD,
-		libmd,
-		[
-			libmd_CFLAGS="$LIBMD_CFLAGS"
-			libmd_LIBS="$LIBMD_LIBS"
-			AC_SUBST(libmd_CFLAGS)
-			AC_SUBST(libmd_LIBS)
-		],
-		[
-			AC_MSG_ERROR("*** couldn't find libmd via pkg-config")
-		]
-	)
 	PKG_CHECK_MODULES(
 		LIBBSD,
 		libbsd-overlay,

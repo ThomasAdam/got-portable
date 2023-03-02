@@ -7,7 +7,6 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				libncurses5-dev \
 				pkg-config \
 				build-essential \
-				libmd-dev \
 				libssl-dev \
 				libbsd-dev \
 				libevent-dev \
