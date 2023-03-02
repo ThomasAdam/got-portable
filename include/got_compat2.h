@@ -216,10 +216,10 @@ typedef struct _SHA2_CTX {
 #endif
 
 #ifndef __APPLE__
-#ifdef HAVE_SHA_AS_SHA1
+#ifdef HAVE_SHA_H
 #  include <sha.h>
 #endif
-#ifdef HAVE_SHA1_AS_SHA1
+#ifdef HAVE_SHA1_H
 #      include <sha1.h>
 #endif
 #ifdef HAVE_SHA2_H
