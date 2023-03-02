@@ -2,9 +2,11 @@ noinst_LIBRARIES = libopenbsd-compat.a
 
 include $(top_builddir)/Makefile.common
 
+LDADD = $(libbsd_LIBS)
+AM_CPPFLAGS += $(libbsd_CFLAGS)
+
 libopenbsd_compat_a_SOURCES =  \
 	asprintf.c \
-	base64.c \
 	fmt_scaled.c \
 	freezero.c \
 	getdtablecount.c \
@@ -28,6 +30,11 @@ endif
 
 if HOST_DARWIN
 libopenbsd_compat_a_SOURCES += uuid.c bsd-poll.c bsd-poll.h
+endif
+
+if !HAVE_B64
+libopenbsd_compat_a_SOURCES += base64.c
+LDADD += $(libresolv_LIBS)
 endif
 
 if !HAVE_CLOSEFROM
@@ -67,9 +74,6 @@ if !HAVE_SHA2
 libopenbsd_compat_a_SOURCES += sha2.c sha2.h
 endif
 endif
-
-LDADD = $(libbsd_LIBS)
-AM_CPPFLAGS = $(libbsd_CFLAGS)
 
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \

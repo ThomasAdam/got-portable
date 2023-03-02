@@ -274,6 +274,67 @@ AM_CONDITIONAL([HAVE_CLOSEFROM], [test "x$ac_cv_func_closefrom" = xyes])
 # implementations.
 AC_LIBOBJ(getopt)
 
+# Check for b64_ntop. If we have b64_ntop, we assume b64_pton as well.
+AC_MSG_CHECKING(for b64_ntop)
+	AC_LINK_IFELSE([AC_LANG_PROGRAM(
+	[
+		#include <sys/types.h>
+		#include <netinet/in.h>
+		#include <resolv.h>
+	],
+	[
+		b64_ntop(NULL, 0, NULL, 0);
+	])],
+	found_b64_ntop=yes,
+	found_b64_ntop=no
+)
+AC_MSG_RESULT($found_b64_ntop)
+libresolv_LIBS=""
+if test "x$found_b64_ntop" = xno; then
+	AC_MSG_CHECKING(for b64_ntop with -lresolv)
+	LIBS="-lresolv"
+	AC_LINK_IFELSE([AC_LANG_PROGRAM(
+		[
+			#include <sys/types.h>
+			#include <netinet/in.h>
+			#include <resolv.h>
+		],
+		[
+			b64_ntop(NULL, 0, NULL, 0);
+		])],
+		found_b64_ntop=yes,
+		found_b64_ntop=no
+	)
+	AC_MSG_RESULT($found_b64_ntop)
+	libresolv_LIBS="$LIBS"
+fi
+if test "x$found_b64_ntop" = xno; then
+	AC_MSG_CHECKING(for b64_ntop with -lnetwork)
+	LIBS="-lresolv -lnetwork"
+	AC_LINK_IFELSE([AC_LANG_PROGRAM(
+		[
+			#include <sys/types.h>
+			#include <netinet/in.h>
+			#include <resolv.h>
+		],
+		[
+			b64_ntop(NULL, 0, NULL, 0);
+		])],
+		found_b64_ntop=yes,
+		found_b64_ntop=no
+	)
+	AC_MSG_RESULT($found_b64_ntop)
+	libresolv_LIBS="$LIBS"
+fi
+
+AM_CONDITIONAL([HAVE_B64], [test "x$found_b64_ntop" = xyes])
+if test "x$found_b64_ntop" = xyes; then
+	AC_DEFINE([HAVE_B64_NTOP], [1], [define if b64_ntop is present])
+	AC_SUBST(libresolv_LIBS)
+else
+	AC_LIBOBJ(base64)
+fi
+
 # Check the platform we're compiling on.
 AC_MSG_CHECKING(platform)
 case "$host_os" in
