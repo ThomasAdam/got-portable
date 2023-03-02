@@ -86,10 +86,6 @@ AC_CHECK_HEADERS([ \
 	wchar.h \
 ])
 
-if test "x$ac_cv_header_sha256_h" = xyes; then
-	AC_DEFINE([HAVE_SHA256], [1], [SHA256 support])
-fi
-
 AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
 
 # Check for SHA1_DIGEST_LENGTH
