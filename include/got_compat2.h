@@ -111,6 +111,13 @@
 #define cap_enter() (0)
 #endif
 
+#ifndef HAVE_B64_NTOP
+#undef b64_ntop
+#undef b64_pton
+int              b64_ntop(u_char const *, size_t, char *, size_t);
+int              b64_pton(char const *, u_char *, size_t);
+#endif
+
 #ifndef HAVE_SETRESGID
 #define setresgid(a, b, c) (0)
 #endif
