@@ -1402,7 +1402,7 @@ test_commit_symlink() {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sfh gamma epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s gamma epsilon.link)
 	rm $testroot/wt/epsilon/beta.link
 	echo "this is a regular file" > $testroot/wt/epsilon/beta.link
 	(cd $testroot/wt && ln -sf .got/bar dotgotbar.link)
@@ -1513,7 +1513,7 @@ test_commit_fix_bad_symlink() {
 	fi
 
 	# change "bad" symlink back into a "good" symlink
-	(cd $testroot/wt && ln -sfh alpha passwd.link)
+	(cd $testroot/wt && rm passwd.link && ln -s alpha passwd.link)
 
 	(cd $testroot/wt && got commit -m 'fix bad symlink' \
 		> $testroot/stdout)

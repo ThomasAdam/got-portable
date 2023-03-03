@@ -479,7 +479,7 @@ EOF
 	got checkout -b foo $testroot/repo $testroot/wt > /dev/null
 
 	(cd $testroot/repo && ln -sf beta alpha.link)
-	(cd $testroot/repo && ln -sfh gamma epsilon.link)
+	(cd $testroot/repo && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	(cd $testroot/repo && ln -sf .got/foo $testroot/repo/dotgotfoo.link)
 	(cd $testroot/repo && git rm -q nonexistent.link)
@@ -657,7 +657,7 @@ test_cherrypick_symlink_conflicts() {
 
 	(cd $testroot/repo && ln -sf beta alpha.link)
 	(cd $testroot/repo && ln -sf beta boo.link)
-	(cd $testroot/repo && ln -sfh gamma epsilon.link)
+	(cd $testroot/repo && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
 	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
@@ -674,9 +674,10 @@ test_cherrypick_symlink_conflicts() {
 	# modified symlink to file A vs modified symlink to file B
 	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
 	# modified symlink to dir A vs modified symlink to file B
-	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s beta epsilon.link)
 	# modeified symlink to file A vs modified symlink to dir B
-	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	(cd $testroot/wt && rm epsilon/beta.link && ln -s ../gamma \
+		epsilon/beta.link)
 	# added regular file A vs added bad symlink to file A
 	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
 	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
