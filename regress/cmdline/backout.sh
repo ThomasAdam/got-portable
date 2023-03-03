@@ -289,7 +289,7 @@ test_backout_logmsg_ref() {
 
 	for r in $wt_sorted; do
 		echo $sep >> $testroot/stdout.expected
-		if [ $r == $branch_rev ]; then
+		if [ $r = $branch_rev ]; then
 			echo "backout $r" >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date" >> $testroot/stdout.expected
@@ -399,7 +399,7 @@ test_backout_logmsg_ref() {
 	echo -n > $testroot/stdout.expected
 	for r in $wt2_sorted; do
 		echo $sep >> $testroot/stdout.expected
-		if [ $r == $branch2_rev ]; then
+		if [ $r = $branch2_rev ]; then
 			echo "backout $r" >> $testroot/stdout.expected
 			echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 			echo "date: $date" >> $testroot/stdout.expected
@@ -437,7 +437,7 @@ test_backout_logmsg_ref() {
 
 	for r in $wt_sorted; do
 		echo -n "backout $r" >> $testroot/wt.list
-		if [ $r == $branch_rev2 ]; then
+		if [ $r = $branch_rev2 ]; then
 			echo -n " (newbranch)" >> $testroot/wt.list
 		fi
 		echo >> $testroot/wt.list
@@ -446,14 +446,14 @@ test_backout_logmsg_ref() {
 
 	for r in $wt2_sorted; do
 		echo -n "backout $r" >> $testroot/wt2.list
-		if [ $r == $branch2_rev2 ]; then
+		if [ $r = $branch2_rev2 ]; then
 			echo -n " (newbranch2)" >> $testroot/wt2.list
 		fi
 		echo >> $testroot/wt2.list
 		echo "work tree: $wt2_uuid" >> $testroot/wt2.list
 	done
 
-	if [ $wt_uuid == $wt_first ]; then
+	if [ $wt_uuid = $wt_first ]; then
 		mv $testroot/wt.list $testroot/stdout.expected
 		cat $testroot/wt2.list >> $testroot/stdout.expected
 	else
