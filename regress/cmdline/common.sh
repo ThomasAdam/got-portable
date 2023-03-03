@@ -51,19 +51,6 @@ date()
 	command "$DATECMD" "$@"
 }
 
-ln()
-{
-	LNCMD="ln"
-	[ "$PLATFORM" != "linux" ] && {
-		command -v "gln" >/dev/null 2>&1 && {
-			LNCMD="gln"
-		} || {
-			echo "Couldn't find gln is GNU coreutils installed?"
-		}
-	}
-	command "$LNCMD" "$@"
-}
-
 sed()
 {
 	SEDCMD="sed"
