@@ -17,9 +17,9 @@
 #ifndef _GOT_COMPAT_H_2
 #define _GOT_COMPAT_H_2
 
-#include <sys/types.h>
-#include <sys/ioctl.h>
+#include <limits.h>
 #include <sys/uio.h>
+
 #if defined(__FreeBSD__)
 #include <sys/endian.h>
 #include <sys/capsicum.h>
@@ -52,13 +52,8 @@
 #else /* Linux, etc... */
 #include <endian.h>
 #include <grp.h>
-#endif
-
-#include <fnmatch.h>
-#include <limits.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
+#endif
 
 #ifndef __GNUC__
 #define __attribute__(a)
