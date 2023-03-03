@@ -1871,7 +1871,7 @@ EOF
 	local first=`printf '%s\n%s' $branch_rev $branch_rev2 | sort | head -1`
 	local second=`printf '%s\n%s' $branch_rev $branch_rev2 | sort | tail -1`
 
-	if [ $branch_rev == $first ]; then
+	if [ $branch_rev = $first ]; then
 		local first_msg=$branch_rev_logmsg
 		local second_msg=$branch_rev2_logmsg
 	else
