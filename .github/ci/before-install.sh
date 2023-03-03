@@ -23,8 +23,7 @@ if [ "$CIRRUS_OS" = "freebsd" ]; then
 		automake \
 		pkgconf \
 		git \
-		libevent \
-		coreutils
+		libevent
 fi
 
 if [ "$CIRRUS_OS" = "darwin" ]; then

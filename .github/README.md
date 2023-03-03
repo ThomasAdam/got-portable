@@ -33,21 +33,21 @@ FreeBSD:
 
 * `automake`
 * `pkgconf`
-* `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 NetBSD:
 
 * `automake`
 * `libuuid`
 * `ncuresesw`
-* `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 DragonFlyBSD:
 
 * `automake`
 * `pkgconf`
 * `openssl`
-* `GNU coreutils` (for running tests)
+* `libevent` (for gotwebd)
 
 Darwin (MacOS):
 
@@ -57,6 +57,7 @@ Darwin (MacOS):
 * `ncurses`
 * `openssl`
 * `ossp-uuid`
+* `libevent` (for gotwebd)
 
 TESTS (REGRESS)
 ===============
