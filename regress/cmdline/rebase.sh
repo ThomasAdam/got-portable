@@ -155,10 +155,10 @@ test_rebase_basic() {
 	(cd $testroot/repo && got rebase -l > $testroot/stdout)
 	local prev_LC_TIME="$LC_TIME"
 	export LC_TIME=C
-	d_orig2=`date -u -d "@$orig_author_time2" +"%a %b %e %X %Y UTC"`
+	d_orig2=`date -u -r $orig_author_time2 +"%a %b %e %X %Y UTC"`
 	export LC_TIME="$prev_LC_TIME"
-	d_new2=`date -u -d "@$new_author_time2" +"%G-%m-%d"`
-	d_0=`date -u -d "@$commit0_author_time" +"%G-%m-%d"`
+	d_new2=`date -u -r $new_author_time2 +"%G-%m-%d"`
+	d_0=`date -u -r $commit0_author_time +"%G-%m-%d"`
 	cat > $testroot/stdout.expected <<EOF
 -----------------------------------------------
 commit $orig_commit2 (formerly newbranch)

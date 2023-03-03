@@ -319,9 +319,9 @@ no" > /dev/null)
 	local commit_id2=`git_show_head $testroot/repo`
 	local author_time2=`git_show_author_time $testroot/repo`
 
-	d=`date -u -d "@${author_time1}" +"%G-%m-%d"`
+	d=`date -u -r $author_time1 +"%G-%m-%d"`
 	printf "$d %-7s test oneline\n" master > $testroot/stdout.expected
-	d=`date -u -d "@${author_time2}" +"%G-%m-%d"`
+	d=`date -u -r $author_time2 +"%G-%m-%d"`
 	printf "$d %.7s test oneline\n" $commit_id1 >> $testroot/stdout.expected
 
 	(cd $testroot/repo && got log -s | head -n 2 > $testroot/stdout)

@@ -38,7 +38,7 @@ export MALLOC_OPTIONS=S
 # commands are used.
 [ -z "$PLATFORM" -a "$(uname)" = "Linux" ] && PLATFORM="linux"
 
-date()
+[ "$(date -u -r 86400 +%F 2>/dev/null)" = 1970-01-02 ] || date()
 {
 	DATECMD="date"
 	[ "$PLATFORM" != "linux" ] && {
@@ -48,7 +48,17 @@ date()
 			echo "Couldn't find gdate is GNU coreutils installed?"
 		}
 	}
-	command "$DATECMD" "$@"
+
+	local flag r u
+	while getopts r:u flag; do
+		case $flag in
+		r)	r=$OPTARG ;;
+		u)	u=-u ;;
+		?)	exit 1 ;;
+		esac
+	done
+	shift $((OPTIND - 1))
+	command "$DATECMD" $u ${r+-d"@$r"} "$@"
 }
 
 sed()
