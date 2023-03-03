@@ -729,7 +729,7 @@ test_diff_symlinks_in_work_tree() {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sfT gamma epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
 	echo -n '.got/bar' > $testroot/wt/dotgotfoo.link
 	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
@@ -828,7 +828,7 @@ test_diff_symlinks_in_repo() {
 	local commit_id1=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && ln -sf beta alpha.link)
-	(cd $testroot/repo && ln -sfT gamma epsilon.link)
+	(cd $testroot/repo && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	(cd $testroot/repo && ln -sf .got/bar $testroot/repo/dotgotfoo.link)
 	(cd $testroot/repo && git rm -q nonexistent.link)

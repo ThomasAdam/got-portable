@@ -301,7 +301,7 @@ test_status_symlink() {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sfT gamma epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s gamma epsilon.link)
 
 	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
 	(cd $testroot/wt && ln -s ../beta epsilon/beta.link)

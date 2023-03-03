@@ -2439,7 +2439,7 @@ test_stage_symlink() {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sfT gamma epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/wt/dotgotfoo.link
 	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
@@ -2752,7 +2752,7 @@ test_stage_patch_symlink() {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sfT gamma epsilon.link)
+	(cd $testroot/wt && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/wt/dotgotfoo.link
 	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
