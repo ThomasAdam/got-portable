@@ -28,6 +28,8 @@ export GOT_TEST_ROOT="/tmp"
 export GOT_IGNORE_GITCONFIG=1
 export GOT_VERSION_STR=`got --version | cut -d ' ' -f2`
 
+export LC_ALL=C
+
 export MALLOC_OPTIONS=S
 
 git_init()
