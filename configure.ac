@@ -728,30 +728,41 @@ AC_LINK_IFELSE([AC_LANG_SOURCE(
 PKG_CHECK_MODULES(
 	LIBPANELW,
 	panelw,
+	LIBPANELW_LIBS="$LIBPANELW_LIBS"
 	found_panel=yes,
 	found_panel=no
 )
 
+if test "x$found_panel" = "xno"; then
 PKG_CHECK_MODULES(
 	LIBPANELW,
 	gnupanelw,
-	found_panel=yes,
+	[
+		LIBPANELW_LIBS="$LIBPANELW_LIBS"
+		found_panel=yes
+	],
 	found_panel=no
 )
+fi
 
+if test "x$found_panel" = "xno"; then
 PKG_CHECK_MODULES(
 	LIBPANELW,
 	panel,
-	found_panel=yes,
+	[
+		LIBPANELW_LIBS="$LIBPANELW_LIBS"
+		found_panel=yes
+	],
 	found_panel=no
 )
+fi
+
 if test "x$found_panel" = "xno"; then
 	AC_CHECK_LIB(panelw, update_panels, [],
 		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"]),
 		[-lncurses]
 	)
 
-	LIBPANELW_LIBS="-lpanelw"
 fi
 
 PKG_CHECK_MODULES(
@@ -796,7 +807,7 @@ else
 		found_curses=no)
 	if test "x$found_curses" = xyes; then
 		libncurses_CFLAGS="$LIBPANELW_CFLAGS $LIBPANEL_CFLAGS"
-		libncurses_LIBS="$LIBPANELW_LIBS -lncursesw"
+		libncurses_LIBS="$LIBPANELW_LIBS -lncursesw -lpanelw"
 		AC_SUBST(libncurses_CFLAGS)
 		AC_SUBST(libncurses_LIBS)
 		AC_DEFINE([HAVE_CURSES_H], [1], [Curses_h])
