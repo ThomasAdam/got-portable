@@ -26,8 +26,7 @@ int	 nodebug;
 static void __dead
 usage(void)
 {
-	fprintf(stderr, "usage: %s [file...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s [-G] [-o out] [file ...]\n", getprogname());
 	exit(1);
 }
 
