@@ -1285,61 +1285,55 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 		case GOTD_IMSG_LIST_REFS_INTERNAL:
 			err = list_refs(&imsg);
 			if (err)
-				log_warnx("%s: ls-refs: %s", repo_write.title,
-				    err->msg);
+				log_warnx("ls-refs: %s", err->msg);
 			break;
 		case GOTD_IMSG_REF_UPDATE:
 			err = recv_ref_update(&imsg);
 			if (err)
-				log_warnx("%s: ref-update: %s",
-				    repo_write.title, err->msg);
+				log_warnx("ref-update: %s", err->msg);
 			break;
 		case GOTD_IMSG_PACKFILE_PIPE:
 			err = receive_pack_pipe(&imsg, iev);
 			if (err) {
-				log_warnx("%s: receiving pack pipe: %s",
-				    repo_write.title, err->msg);
+				log_warnx("receiving pack pipe: %s", err->msg);
 				break;
 			}
 			break;
 		case GOTD_IMSG_PACKIDX_FILE:
 			err = receive_pack_idx(&imsg, iev);
 			if (err) {
-				log_warnx("%s: receiving pack index: %s",
-				    repo_write.title, err->msg);
+				log_warnx("receiving pack index: %s",
+				    err->msg);
 				break;
 			}
 			break;
 		case GOTD_IMSG_RECV_PACKFILE:
 			err = recv_packfile(&have_packfile, &imsg);
 			if (err) {
-				log_warnx("%s: receive packfile: %s",
-				    repo_write.title, err->msg);
+				log_warnx("receive packfile: %s", err->msg);
 				break;
 			}
 			if (have_packfile) {
 				err = verify_packfile();
 				if (err) {
-					log_warnx("%s: verify packfile: %s",
-					    repo_write.title, err->msg);
+					log_warnx("verify packfile: %s",
+					    err->msg);
 					break;
 				}
 				err = install_packfile(iev);
 				if (err) {
-					log_warnx("%s: install packfile: %s",
-					    repo_write.title, err->msg);
+					log_warnx("install packfile: %s",
+					    err->msg);
 					break;
 				}
 			}
 			err = update_refs(iev);
 			if (err) {
-				log_warnx("%s: update refs: %s",
-				    repo_write.title, err->msg);
+				log_warnx("update refs: %s", err->msg);
 			}
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", repo_write.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 
@@ -1426,8 +1420,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 			err = recv_connect(&imsg);
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", repo_write.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 

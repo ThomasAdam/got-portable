@@ -713,42 +713,36 @@ repo_read_dispatch_session(int fd, short event, void *arg)
 		case GOTD_IMSG_LIST_REFS_INTERNAL:
 			err = list_refs(&imsg);
 			if (err)
-				log_warnx("%s: ls-refs: %s", repo_read.title,
-				    err->msg);
+				log_warnx("ls-refs: %s", err->msg);
 			break;
 		case GOTD_IMSG_WANT:
 			err = recv_want(&imsg);
 			if (err)
-				log_warnx("%s: want-line: %s", repo_read.title,
-				    err->msg);
+				log_warnx("want-line: %s", err->msg);
 			break;
 		case GOTD_IMSG_HAVE:
 			err = recv_have(&imsg);
 			if (err)
-				log_warnx("%s: have-line: %s", repo_read.title,
-				    err->msg);
+				log_warnx("have-line: %s", err->msg);
 			break;
 		case GOTD_IMSG_SEND_PACKFILE:
 			err = receive_delta_cache_fd(&imsg, iev);
 			if (err)
-				log_warnx("%s: receiving delta cache: %s",
-				    repo_read.title, err->msg);
+				log_warnx("receiving delta cache: %s",
+				    err->msg);
 			break;
 		case GOTD_IMSG_PACKFILE_PIPE:
 			err = receive_pack_pipe(&imsg, iev);
 			if (err) {
-				log_warnx("%s: receiving pack pipe: %s",
-				    repo_read.title, err->msg);
+				log_warnx("receiving pack pipe: %s", err->msg);
 				break;
 			}
 			err = send_packfile(&imsg, iev);
 			if (err)
-				log_warnx("%s: sending packfile: %s",
-				    repo_read.title, err->msg);
+				log_warnx("sending packfile: %s", err->msg);
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", repo_read.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 
@@ -835,8 +829,7 @@ repo_read_dispatch(int fd, short event, void *arg)
 			err = recv_connect(&imsg);
 			break;
 		default:
-			log_debug("%s: unexpected imsg %d", repo_read.title,
-			    imsg.hdr.type);
+			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
 		}
 
