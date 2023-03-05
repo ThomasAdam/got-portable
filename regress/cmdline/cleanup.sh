@@ -286,7 +286,7 @@ test_cleanup_missing_pack_file() {
 
 	gotadmin pack -r $testroot/repo > $testroot/stdout
 	packname=`grep ^Wrote $testroot/stdout | cut -d ' ' -f2`
-	packhash=`echo $packname | command sed -e 's:^objects/pack/pack-::' \
+	packhash=`echo $packname | sed -e 's:^objects/pack/pack-::' \
 		-e 's/.pack$//'`
 
 	# Some freshly cloned Git repositories suffer from lonely pack index
