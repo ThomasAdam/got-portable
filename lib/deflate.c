@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 
 #include <errno.h>
@@ -23,7 +25,6 @@
 #include <zlib.h>
 #include <time.h>
 
-#include "got_compat.h"
 #include "got_error.h"
 #include "got_object.h"
 #include "got_path.h"

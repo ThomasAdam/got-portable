@@ -212,6 +212,9 @@ typedef struct _SHA2_CTX {
 	u_int64_t	bitcount[2];
 	u_int8_t	buffer[SHA512_BLOCK_LENGTH];
 } SHA2_CTX;
+#endif
+
+#if defined(__APPLE__) || defined(__NetBSD__)
 #define SHA256Init SHA256_Init
 #define SHA256Update SHA256_Update
 #define SHA256Final SHA256_Final
