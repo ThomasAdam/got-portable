@@ -40,28 +40,33 @@ export MALLOC_OPTIONS=S
 # commands are used.
 [ -z "$PLATFORM" -a "$(uname)" = "Linux" ] && PLATFORM="linux"
 
-[ "$(date -u -r 86400 +%F 2>/dev/null)" = 1970-01-02 ] || date()
-{
-	DATECMD="date"
-	[ "$PLATFORM" != "linux" ] && {
-		command -v "gdate" >/dev/null 2>&1 && {
-			DATECMD="gdate"
-		} || {
-			echo "Couldn't find gdate is GNU coreutils installed?"
-		}
-	}
-
-	local flag r u
-	while getopts r:u flag; do
-		case $flag in
-		r)	r=$OPTARG ;;
-		u)	u=-u ;;
-		?)	exit 1 ;;
-		esac
+if [ "$(date -u -r 86400 +%F 2>/dev/null)" != 1970-01-02 ]; then
+	DATECMD=
+	for p in date gdate; do
+		if [ "$($p -u -d @86400 +%F 2>/dev/null)" = 1970-01-02 ]; then
+			DATECMD=$p
+			break
+		fi
 	done
-	shift $((OPTIND - 1))
-	command "$DATECMD" $u ${r+-d"@$r"} "$@"
-}
+	if [ -z "$DATECMD" ]; then
+		echo "Couldn't find gdate, is GNU coreutils installed?" >&2
+		exit 1
+	fi
+
+	date()
+	{
+		local flag r u
+		while getopts r:u flag; do
+			case $flag in
+			r)	r=$OPTARG ;;
+			u)	u=-u ;;
+			?)	exit 1 ;;
+			esac
+		done
+		shift $((OPTIND - 1))
+		command "$DATECMD" $u ${r+-d"@$r"} "$@"
+	}
+fi
 
 sed()
 {
