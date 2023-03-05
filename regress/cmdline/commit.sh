@@ -1589,12 +1589,8 @@ test_commit_prepared_logmsg() {
 
 	echo 'test commit_prepared_logmsg' > $testroot/logmsg
 
-	cat > $testroot/editor.sh <<EOF
-#!/bin/sh
-SOPTS='-i ""'
-[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
-sed "\$SOPTS" -e 's/foo/bar/' "\$1"
-EOF
+	# a no-op editor script
+	> $testroot/editor.sh
 	chmod +x $testroot/editor.sh
 
 	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
