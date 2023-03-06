@@ -1611,10 +1611,7 @@ test_commit_prepared_logmsg() {
 	fi
 
 	local author_time=`git_show_author_time $testroot/repo`
-	local prev_LC_TIME="$LC_TIME"
-	export LC_TIME=C
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
 	echo "-----------------------------------------------" > $testroot/stdout.expected
 	echo "commit $head_rev (master)" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
@@ -1653,10 +1650,7 @@ test_commit_prepared_logmsg() {
 	fi
 
 	local author_time=`git_show_author_time $testroot/repo`
-	local prev_LC_TIME="$LC_TIME"
-	export LC_TIME=C
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
 	echo "commit $head_rev (master)" >> $testroot/stdout.expected

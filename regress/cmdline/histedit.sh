@@ -154,11 +154,7 @@ test_histedit_no_op() {
 	# We should have a backup of old commits
 	(cd $testroot/repo && got histedit -l > $testroot/stdout)
 	d_orig1=`date -u -r $old_author_time1 +"%G-%m-%d"`
-
-	local prev_LC_TIME="$LC_TIME"
-	export LC_TIME=C
 	d_orig2=`date -u -r $old_author_time2 +"%a %b %e %X %Y UTC"`
-	export LC_TIME="$prev_LC_TIME"
 	d_new2=`date -u -r $new_author_time2 +"%G-%m-%d"`
 	d_orig=`date -u -r $orig_author_time +"%G-%m-%d"`
 	cat > $testroot/stdout.expected <<EOF

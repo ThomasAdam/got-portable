@@ -151,20 +151,11 @@ test_tag_list() {
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 	local tagger_time=`git_show_tagger_time $testroot/repo $tag`
-	
-	local prev_LC_TIME=$LC_TIME
-	export LC_TIME=C
 	d1=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
-
 	tag_id2=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
 	local tagger_time2=`git_show_tagger_time $testroot/repo $tag2`
-	
-	prev_LC_TIME="$LC_TIME"
-	export LC_TIME=C
 	d2=`date -u -r $tagger_time2 +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
 
 	got tag -r $testroot/repo -l > $testroot/stdout
 
@@ -245,17 +236,11 @@ test_tag_list_lightweight() {
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 	local tagger_time=`git_show_author_time $testroot/repo $tag`
-	local prev_LC_TIME=$LC_TIME
-	export LC_TIME=C
 	d1=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
 	tag_id2=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
 	local tagger_time2=`git_show_author_time $testroot/repo $tag2`
-	
-	export LC_TIME=C
 	d2=`date -u -r $tagger_time2 +"%a %b %e %X %Y UTC"`
-	LC_TIME="$prev_LC_TIME"
 
 	got tag -r $testroot/repo -l > $testroot/stdout
 
