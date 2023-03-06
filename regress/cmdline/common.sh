@@ -32,14 +32,6 @@ export LC_ALL=C
 
 export MALLOC_OPTIONS=S
 
-# Check to see if PLATFORM has a value.  PLATFORM is populated when running
-# via `./configure && make` but this isn't guaranteed if an individual test is
-# run directly, such as `regress/cmdline/tag.sh`.  In such cases, PLATFORM
-# will be empty, but we still want to use it.  Since we test for non-linux
-# values, only set PLATFORM if we're running on Linu so that the correct
-# commands are used.
-[ -z "$PLATFORM" -a "$(uname)" = "Linux" ] && PLATFORM="linux"
-
 if [ "$(date -u -r 86400 +%F 2>/dev/null)" != 1970-01-02 ]; then
 	DATECMD=
 	for p in date gdate; do
@@ -67,39 +59,6 @@ if [ "$(date -u -r 86400 +%F 2>/dev/null)" != 1970-01-02 ]; then
 		command "$DATECMD" $u ${r+-d"@$r"} "$@"
 	}
 fi
-
-sed()
-{
-	SEDCMD="sed"
-
-	# On non-linux systems, the sed command can happily accept "-i ''" as
-	# a valid command to not save backup files for in-place edits.
-	# However, on linux, "-i ''" would be treated as "-i" with a blank
-	# argument, and hence, no file to edit in-place, which is an error.
-	#
-	# Therefore, scan the argument list and remove "-i ''", replacing it
-	# with just "-i".
-
-	[ "$PLATFORM" = "linux" ] && {
-		for w in "$@"
-		do
-			[ "$w" = "-i" ] && {
-				seen=1
-				continue
-			}
-
-			[ "$seen" = "1" -a -z "$w" ] && {
-				# Move past -i and ''
-				shift 2
-
-				command "$SEDCMD" -i "$@"
-				return
-			}
-		done
-	}
-	command "$SEDCMD" "$@"
-}
-
 
 git_init()
 {
