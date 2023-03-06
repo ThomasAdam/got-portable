@@ -16,6 +16,9 @@
 
 . ./common.sh
 
+# disable automatic packing for these tests
+export GOT_TEST_PACK=""
+
 test_stage_basic() {
 	local testroot=`test_init stage_basic`
 
