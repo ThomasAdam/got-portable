@@ -1852,7 +1852,10 @@ test_commit_logmsg_ref() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 's/# l/l/' "\$1"
+ed -s "\$1" <<-EOF
+	,s/# l/l/
+	w
+	EOF
 EOF
 	chmod +x $testroot/editor.sh
 

@@ -187,11 +187,17 @@ test_status_shows_local_mods_after_update() {
 		return 1
 	fi
 
-	sed -i 's/2/22/' $testroot/repo/numbers
+	ed -s $testroot/repo/numbers <<-\EOF
+	,s/2/22/
+	w
+	EOF
 	git_commit $testroot/repo -m "modified line 2"
 
 	# modify line 7; both changes should merge cleanly
-	sed -i 's/7/77/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/7/77/
+	w
+	EOF
 
 	echo "G  numbers" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
@@ -342,11 +348,17 @@ test_status_shows_no_mods_after_complete_merge() {
 		return 1
 	fi
 
-	sed -i 's/2/22/' $testroot/repo/numbers
+	ed -s $testroot/repo/numbers <<-\EOF
+	,s/2/22/
+	w
+	EOF
 	git_commit $testroot/repo -m "modified line 2"
 
 	# modify line 2 again; no local changes are left after merge
-	sed -i 's/2/22/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/2/22/
+	w
+	EOF
 
 	echo "G  numbers" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
@@ -396,11 +408,17 @@ test_status_shows_conflict() {
 		return 1
 	fi
 
-	sed -i 's/2/22/' $testroot/repo/numbers
+	ed -s $testroot/repo/numbers <<-\EOF
+	,s/2/22/
+	w
+	EOF
 	git_commit $testroot/repo -m "modified line 2"
 
 	# modify line 2 in a conflicting way
-	sed -i 's/2/77/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/2/77/
+	w
+	EOF
 
 	echo "C  numbers" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
