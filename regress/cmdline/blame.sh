@@ -248,7 +248,10 @@ test_blame_lines_shifted_up() {
 	local short_commit1=`trim_obj_id 32 $commit1`
 	local author_time=`git_show_author_time $testroot/repo`
 
-	sed -i -e '/^[345]$/d' $testroot/wt/alpha
+	ed -s $testroot/wt/alpha <<-\EOF
+	g/^[345]$/d
+	w
+	EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`
@@ -304,7 +307,10 @@ test_blame_lines_shifted_down() {
 	local short_commit1=`trim_obj_id 32 $commit1`
 	local author_time=`git_show_author_time $testroot/repo`
 
-	sed -i -e '/^8$/d' $testroot/wt/alpha
+	ed -s $testroot/wt/alpha <<-\EOF
+	g/^8$/d
+	w
+	EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`

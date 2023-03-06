@@ -360,7 +360,10 @@ test_fetch_branch() {
 	fi
 
 	# remove default branch information from got.conf
-	sed -i -e "/branch {/d" $testroot/repo-clone/got.conf
+	ed -s $testroot/repo-clone/got.conf <<-EOF
+	g/branch {/d
+	w
+	EOF
 
 	# make another change on 'foo' and fetch it without got.conf
 	(cd $testroot/repo && git checkout -q foo)
@@ -1610,7 +1613,10 @@ test_fetch_honor_wt_conf_bflag() {
 	# from repo: fetch got.conf branch which doesn't exist, so fallback
 	# to repo HEAD "boo"
 	# change default branch in got.conf from "master" to "foo"
-	sed -i "s/master/foo/" $testroot/repo-clone/got.conf
+	ed -s $testroot/repo-clone/got.conf <<-EOF
+	,s/master/foo/
+	w
+	EOF
 
 	got fetch -q -r $testroot/repo-clone > $testroot/stdout
 	ret=$?
@@ -1708,7 +1714,10 @@ test_fetch_honor_wt_conf_bflag() {
 
 	# from wt: fetch got.conf "master", wt "boo", and the repo's new HEAD
 	# "hoo" as it no longer matches our remote HEAD symref target "master"
-	sed -i "s/foo/master/" $testroot/repo-clone/got.conf
+	ed -s $testroot/repo-clone/got.conf <<-EOF
+	,s/foo/master/
+	w
+	EOF
 	echo "modified delta on master" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta on master"
 	local commit_id5=`git_show_head $testroot/repo`

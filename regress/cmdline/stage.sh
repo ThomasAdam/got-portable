@@ -1449,9 +1449,12 @@ test_stage_patch() {
 		return 1
 	fi
 
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	,s/^7$/b/
+	,s/^16$/c/
+	w
+	EOF
 
 	# don't stage any hunks
 	printf "n\nn\nn\n" > $testroot/patchscript
@@ -1736,9 +1739,12 @@ test_stage_patch_twice() {
 		return 1
 	fi
 
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	,s/^7$/b/
+	,s/^16$/c/
+	w
+	EOF
 
 	# stage middle hunk
 	printf "n\ny\nn\n" > $testroot/patchscript
@@ -2232,9 +2238,12 @@ test_stage_patch_quit() {
 		return 1
 	fi
 
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	,s/^7$/b/
+	,s/^16$/c/
+	w
+	EOF
 	(cd $testroot/wt && got rm zzz > /dev/null)
 
 	# stage first hunk and quit; and don't pass a path argument to
@@ -2341,9 +2350,12 @@ test_stage_patch_incomplete_script() {
 		return 1
 	fi
 
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	,s/^7$/b/
+	,s/^16$/c/
+	w
+	EOF
 
 	# stage first hunk and then stop responding; got should error out
 	printf "y\n" > $testroot/patchscript

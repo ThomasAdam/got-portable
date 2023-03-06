@@ -891,8 +891,11 @@ test_rebase_preserves_logmsg() {
 
 	(cd $testroot/wt && got log -c newbranch -l2 | grep -v ^date: \
 		> $testroot/log)
-	sed -i -e "s/$orig_commit1/$new_commit1/" $testroot/log.expected
-	sed -i -e "s/$orig_commit2/$new_commit2/" $testroot/log.expected
+	ed -s $testroot/log.expected <<-EOF
+	,s/$orig_commit1/$new_commit1/
+	,s/$orig_commit2/$new_commit2/
+	w
+	EOF
 	cmp -s $testroot/log.expected $testroot/log
 	ret=$?
 	if [ $ret -ne 0 ]; then

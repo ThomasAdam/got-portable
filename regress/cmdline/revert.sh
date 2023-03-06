@@ -384,9 +384,12 @@ test_revert_patch() {
 		return 1
 	fi
 
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	,s/^7$/b/
+	,s/^16$/c/
+	w
+	EOF
 
 	(cd $testroot/wt && got diff > $testroot/numbers.diff)
 
@@ -564,7 +567,10 @@ EOF
 	fi
 
 	# put first hunk back
-	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/a/
+	w
+	EOF
 
 	# revert middle hunk
 	printf "n\ny\nn\n" > $testroot/patchscript
@@ -866,7 +872,10 @@ test_revert_patch_one_change() {
 	# Ensure file size is changed. Avoids race condition causing test
 	# failures where 'got revert' does not see changes to revert if
 	# timestamps and size in stat info remain unchanged.
-	sed -i '' -e 's/^2$/aa/' $testroot/wt/numbers
+	ed -s $testroot/wt/numbers <<-\EOF
+	,s/^2$/aa/
+	w
+	EOF
 
 	# revert change with -p
 	printf "y\n" > $testroot/patchscript

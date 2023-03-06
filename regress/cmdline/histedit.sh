@@ -131,7 +131,10 @@ test_histedit_no_op() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit2 \
 		> $testroot/diff
-	sed -i '' -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	ed -s $testroot/diff.expected <<-EOF
+	,s/$old_commit2/$new_commit2/
+	w
+	EOF
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -340,7 +343,10 @@ test_histedit_swap() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit1 \
 		> $testroot/diff
-	sed -i '' -e "s/$old_commit2/$new_commit1/" $testroot/diff.expected
+	ed -s $testroot/diff.expected <<-EOF
+	,s/$old_commit2/$new_commit1/
+	w
+	EOF
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -445,8 +451,11 @@ test_histedit_drop() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit2 \
 		> $testroot/diff
-	sed -i '' -e "s/$old_commit1/$orig_commit/" $testroot/diff.expected
-	sed -i '' -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	ed -s $testroot/diff.expected <<-EOF
+	,s/$old_commit1/$orig_commit/
+	,s/$old_commit2/$new_commit2/
+	w
+	EOF
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1149,7 +1158,10 @@ test_histedit_path_prefix_edit() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit1 \
 		> $testroot/diff
-	sed -i '' -e "s/$old_commit1/$new_commit1/" $testroot/diff.expected
+	ed -s $testroot/diff.expected <<-EOF
+	,s/$old_commit1/$new_commit1/
+	w
+	EOF
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1564,9 +1576,10 @@ test_histedit_fold_only() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-SOPTS='-i ""'
-[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
-sed "\$SOPTS" -e 's/.*/committing folded changes/' "\$1"
+ed -s "\$1" <<-EOF
+	,s/.*/committing folded changes/
+	w
+	EOF
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -1682,9 +1695,10 @@ test_histedit_fold_only_empty_logmsg() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-SOPTS='-i ""'
-[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
-sed "\$SOPTS" -e 'd' "\$1"
+ed -s "\$1" <<-EOF
+	,d
+	w
+	EOF
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -1818,7 +1832,10 @@ test_histedit_edit_only() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 's/.*/committing edited changes 1/' "\$1"
+ed -s "\$1" <<-EOF
+	,s/.*/committing edited changes 1/
+	w
+	EOF
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -1847,7 +1864,10 @@ EOF
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 's/.*/committing edited changes 2/' "\$1"
+ed -s "\$1" <<-EOF
+	,s/.*/committing edited changes 2/
+	w
+	EOF
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -2243,7 +2263,10 @@ test_histedit_mesg_filemode_change() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 's/ x bit / executable bit /' "\$1"
+ed -s "\$1" <<-EOF
+	,s/ x bit / executable bit /
+	w
+	EOF
 EOF
 
 	chmod +x $testroot/editor.sh
