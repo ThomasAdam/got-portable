@@ -13,6 +13,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include "got_compat.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,7 +33,6 @@
 #include <unistd.h>
 #include <zlib.h>
 
-#include "got_compat.h"
 #include "got_error.h"
 #include "got_object.h"
 #include "got_path.h"
