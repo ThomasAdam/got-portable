@@ -199,9 +199,6 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_STRNLEN
 AC_CHECK_FUNCS([ \
-	SHA256Update \
-	SHA384Update \
-	SHA512Update \
 	dup2 \
 	flock \
 	getcwd \
@@ -374,6 +371,17 @@ AM_CONDITIONAL([HOST_DARWIN], [test "$PLATFORM" = "darwin"])
 AM_CONDITIONAL([HOST_NETBSD], [test "$PLATFORM" = "netbsd"])
 AM_CONDITIONAL([HOST_OPENBSD], [test "$PLATFORM" = "openbsd"])
 AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
+
+# On OpenBSD, these functions are already defined, yet looking for them in
+# this way on OpenBSD breaks <sha2.h> inclusion.
+# FIXME: this needs addressing.
+if test "x$PLATFORM" != "xopenbsd"; then
+	AC_CHECK_FUNCS([ \
+		SHA256Update \
+		SHA384Update \
+		SHA512Update \
+	])
+fi
 
 # Look for yacc.
 if test "YACC_OVERRIDE" = "yes" && test -n "$YACC" \

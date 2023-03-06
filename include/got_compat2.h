@@ -57,11 +57,11 @@
 
 #ifndef __GNUC__
 #define __attribute__(a)
-#endif
-
 #ifndef __bounded__
 #define __bounded__(a, b, c)
 #endif
+#endif
+
 
 /* For flock. */
 #ifndef O_EXLOCK
@@ -190,6 +190,8 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 
 #ifndef HAVE_IMSG
 #include "compat/imsg.h"
+#else
+#include <imsg.h>
 #endif
 
 #ifndef HAVE_SIPHASH
