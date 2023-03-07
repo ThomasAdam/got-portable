@@ -9,6 +9,8 @@ SRCS=		got-read-gotconfig.c error.c inflate.c object_parse.c \
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib -I${.CURDIR}
 YFLAGS =
 
+CLEANFILES = parse.h
+
 .if defined(PROFILE)
 LDADD = -lutil_p -lz_p
 .else
