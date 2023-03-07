@@ -1,3 +1,19 @@
+* got 0.85; 2023-03-07
+  see git repository history for per-change authorship information
+- gotwebd: add missing colon in diff view (patch by Josiah Frentsos)
+- more preparation for eventual sha256 object ID support
+- add test coverage for more tree conflict cases during merges
+- fall back to vi(1) instead of ed(1) if neither EDITOR nor VISUAL are set
+- in got.1, clarify what users are expected to do during 'histedit -e'
+- gotd requires a config file; don't fail silently when it cannot be read
+- regress: replace unportable ln -h option with rm && ln
+- regress: make cmdline tests POSIX /bin/sh compatible
+- gotd: remove more (all?) double process names in log
+- don't pass -d to yacc during the build (patch by Josiah Frentsos)
+- regress: override locale settings to force the "C" locale
+- regress: replace "sed -i" with ed(1) for portable in-place editing
+- fix gotd sometimes reading reused deltas from wrong pack file
+
 * got 0.84; 2023-02-22
   too many changes to list all here; see git repository history for more;
   and see git repository history for per-change authorship information
