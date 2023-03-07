@@ -12,6 +12,8 @@ LDADD = -lutil -lz
 DPADD = ${LIBZ} ${LIBUTIL}
 LDSTATIC = ${STATIC}
 
+CLEANFILES = parse.h
+
 .PATH:	${.CURDIR}/../../../lib ${.CURDIR}/../../../libexec/got-read-gotconfig
 
 .include <bsd.prog.mk>

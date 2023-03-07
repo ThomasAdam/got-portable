@@ -17,6 +17,8 @@ SRCS=		gotd.c auth.c repo_read.c repo_write.c log.c privsep_stub.c \
 		hash.c sigs.c pack_create_io.c pollfd.c reference_parse.c \
 		repo_imsg.c pack_index.c session.c
 
+CLEANFILES = parse.h
+
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}
