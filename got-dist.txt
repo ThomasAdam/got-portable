@@ -169,6 +169,7 @@
 /lib/got_lib_gitconfig.h
 /lib/got_lib_gitproto.h
 /lib/got_lib_gotconfig.h
+/lib/got_lib_hash.h
 /lib/got_lib_inflate.h
 /lib/got_lib_lockfile.h
 /lib/got_lib_object.h
@@ -185,9 +186,9 @@
 /lib/got_lib_privsep.h
 /lib/got_lib_ratelimit.h
 /lib/got_lib_repository.h
-/lib/got_lib_sha1.h
 /lib/got_lib_worktree.h
 /lib/gotconfig.c
+/lib/hash.c
 /lib/inflate.c
 /lib/lockfile.c
 /lib/murmurhash2.c
@@ -223,7 +224,6 @@
 /lib/repository_admin.c
 /lib/send.c
 /lib/serve.c
-/lib/sha1.c
 /lib/sigs.c
 /lib/sockaddr.c
 /lib/utf8.c
