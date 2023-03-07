@@ -1547,6 +1547,63 @@ test_histedit_fold_add_delete() {
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_fold_delete_add() {
+	local testroot=`test_init histedit_fold_delete_add`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git rm -q alpha)
+	git_commit $testroot/repo -m "removing alpha"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified alpha" >$testroot/repo/alpha
+	(cd $testroot/repo && git add alpha)
+	git_commit $testroot/repo -m "add back modified alpha"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "fold $old_commit1" > $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+	echo "mesg folded changes" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+	
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "D  alpha" > $testroot/stdout.expected
+	echo "$short_old_commit1 ->  fold commit: removing alpha" \
+		>> $testroot/stdout.expected
+	echo "A  alpha" >> $testroot/stdout.expected
+	echo "$short_old_commit2 -> $short_new_commit1: folded changes" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	#cmp -s $testroot/stdout.expected $testroot/stdout
+	#ret=$?
+	#if [ $ret -ne 0 ]; then
+	#	diff -u $testroot/stdout.expected $testroot/stdout
+	#	test_done "$testroot" "$ret"
+	#	return 1
+	#fi
+
+	if [ ! -e $testroot/wt/alpha ]; then
+		ret="xfail fold deleted and added file"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_histedit_fold_only() {
 	local testroot=`test_init histedit_fold_only`
 
@@ -2467,6 +2524,7 @@ run_test test_histedit_fold_last_commit_swap
 run_test test_histedit_split_commit
 run_test test_histedit_duplicate_commit_in_script
 run_test test_histedit_fold_add_delete
+run_test test_histedit_fold_delete_add
 run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
 run_test test_histedit_edit_only
