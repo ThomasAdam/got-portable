@@ -1932,6 +1932,9 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 			goto done;
 	}
 
+	/* Pinned pack may have moved to different cache slot. */
+	reuse_pack = got_repo_get_pinned_pack(repo);
+
 	err = genpack(packsha1, packfd, reuse_pack, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, force_refdelta, progress_cb, progress_arg, rl,
