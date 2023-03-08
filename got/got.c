@@ -518,6 +518,11 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 		err = got_error_from_errno2("write", *logmsg_path);
 		goto done;
 	}
+	if (close(fd) == -1) {
+		err = got_error_from_errno2("close", *logmsg_path);
+		goto done;
+	}
+	fd = -1;
 
 	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content,
 	    initial_content_len, 1);
@@ -7407,6 +7412,11 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 		err = got_error_from_errno2("write", *tagmsg_path);
 		goto done;
 	}
+	if (close(fd) == -1) {
+		err = got_error_from_errno2("close", *tagmsg_path);
+		goto done;
+	}
+	fd = -1;
 
 	err = get_editor(&editor);
 	if (err)
@@ -8911,6 +8921,12 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 		dprintf(fd, "# detailed changes can be viewed in %s\n",
 		    diff_path);
 	}
+
+	if (close(fd) == -1) {
+		err = got_error_from_errno2("close", a->logmsg_path);
+		goto done;
+	}
+	fd = -1;
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content,
 	    initial_content_len, a->prepared_log ? 0 : 1);
@@ -11661,7 +11677,7 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
 	int logmsg_len;
-	int fd;
+	int fd = -1;
 	struct got_histedit_list_entry *folded = NULL;
 
 	err = got_object_open_as_commit(&commit, repo, hle->commit_id);
@@ -11710,8 +11726,15 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err)
 		goto done;
 
-	write(fd, logmsg, logmsg_len);
-	close(fd);
+	if (write(fd, logmsg, logmsg_len) == -1) {
+		err = got_error_from_errno2("write", logmsg_path);
+		goto done;
+	}
+	if (close(fd) == -1) {
+		err = got_error_from_errno2("close", logmsg_path);
+		goto done;
+	}
+	fd = -1;
 
 	err = get_editor(&editor);
 	if (err)
@@ -11728,6 +11751,8 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 			err = got_error_from_errno("strdup");
 	}
 done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", logmsg_path);
 	if (logmsg_path && unlink(logmsg_path) != 0 && err == NULL)
 		err = got_error_from_errno2("unlink", logmsg_path);
 	free(logmsg_path);
