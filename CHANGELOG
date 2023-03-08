@@ -6,6 +6,26 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.85 (2023-03-08)
+
+* Changes from got-0.85.
+
+There's been a tonne of -portable-specific changes in this release which aim
+to make portability easier across the supported systems.  In particular,
+there's been a lot of header cleanups, and now that -portable is using
+config.h, this has allowed dependencies to be split out, so that ncurses is
+only linked where required (tog).  This should allow for multipacking where
+needed.
+
+There have also been some great improvements to regress (which is the test
+suite) to remove GNU-specific wrappers for date(1), sed(1), ln(1).
+
+There's too many commits to list here, but for the specifics, see the
+differences between '0.84.1..0.85'.
+
+Thanks in particular to Christian "naddy" Weisgerber for his help with this
+work, and this -portable release.
+
 # got-portable 0.84.1 (2023-02-24)
 
 This is a bug-fix -portable release to address the following:
