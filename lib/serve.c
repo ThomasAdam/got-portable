@@ -962,8 +962,6 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 				if (err)
 					goto done;
 				seen_have = 1;
-				if (have_ack)
-					curstate = STATE_EXPECT_DONE;
 			}
 		} else if (n == 5 && strncmp(buf, "done\n", 5) == 0) {
 			if (curstate != STATE_EXPECT_HAVE &&
