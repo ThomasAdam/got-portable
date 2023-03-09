@@ -66,9 +66,14 @@ To run the test suite:
  $ make tests
 ```
 
+Dependencies
+============
+
+* jot
+* ed
+
 NOTE: For Linux, you must have the jot(1) command which is typically in the
-`athena-jot` package, or similar.  For non-linux systems (as mentioned above),
-GNU Coreutils needs to be installed.
+`athena-jot` package, or similar.
 
 NOTE:  THIS ONLY WORKS AFTER `make install` DUE TO HOW PATHS TO LIBEXEC
        HELPERS ARE HARD-CODED INTO THE BINARIES.
