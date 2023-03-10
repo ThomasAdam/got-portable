@@ -91,9 +91,9 @@ BRANCHES + SUBMITTING PATCHES
 `got-portable` has two key branches:
 
 * `main` which tracks got upstream untainted.
-* `linux` which provides the portable version of GoT based from code on `main`
+* `portable` which provides the portable version of GoT based from code on `main`
 
-Patches for portable code fixes should be based from the `linux` branch and
+Patches for portable code fixes should be based from the `portable` branch and
 sent to the mailing list for review [2] or sent to me directly (see CONTACT).
 
 Portable-specific patches should have a shortlog in the form of:
@@ -141,7 +141,7 @@ topic branches which represent on-going work):
   changes from `upstream`.  This branch is continually reset to
   `upstream/main` whenever changes occur.
 
-* `linux` -- this is the *default* branch of the `-portable` repository which
+* `portable` -- this is the *default* branch of the `-portable` repository which
   contains portable-specific changes to make `GoT` compile across different
   OSes.
 
@@ -153,15 +153,15 @@ When updating `-portable` from upstream changes, the following actions happen:
 3. The difference between the local copy of `main` and `origin/main` is used
    to represent the set of commits which have *NOT* yet been merged to
    `-portable`.
-4. A topic-branch called `syncup` is created from the HEAD of the `linux`
+4. A topic-branch called `syncup` is created from the HEAD of the `portable`
    branch to hold the to-be-cherry-picked commits from step 3.
 5. These commits are then cherry-picked to the `syncup` branch.
 6. If there's any conflicts, they must be resolved.
 7. Once done, a sanity build is done in-situ to check there's nothing amiss.
-8. If that succeeds, the `syncup` branch is merged to `linux` and pushed to
+8. If that succeeds, the `syncup` branch is merged to `portable` and pushed to
    `gh` for verification against CI.
 9. If that fails, fixes continue and pushed up to `gh` as required.
-10. Once happy, both the `main` and `linux` branches can be merged to `origin`.
+10. Once happy, both the `main` and `portable` branches can be merged to `origin`.
 
 These steps are encapsulated in a script within `-portable`.  [Link](../maintscripts/sync-upstream.sh)
 
@@ -197,7 +197,7 @@ from the `0.75` version.
 The variable `GOT_RELEASE` needs be changed to `yes` so that the
 GOT_PORTABLE_VER is asserted correctly.
 
-Once the version is verified, the following should be run from the `linux`
+Once the version is verified, the following should be run from the `portable`
 branch -- and the repository should not have any outstanding modifications to
 the source:
 
