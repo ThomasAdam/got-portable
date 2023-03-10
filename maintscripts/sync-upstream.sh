@@ -4,6 +4,8 @@
 #
 # This script is under the same licence as gameoftrees itself.
 
+PORTABLE_BRANCH="portable"
+
 die()
 {
 	echo "$@" >&2
@@ -47,13 +49,13 @@ commitc="$(git rev-list --count main...origin/main)"
 	exit
 }
 
-# Create a branch from linux (which is where the result of the cherry-picks
-# will ultimately end up, but we do this work on a topic branch so that we can
-# perform CI on it, and not break the 'linux' branch.
+# Create a branch from $PORTABLE_BRANCH (which is where the result of the
+# cherry-picks will ultimately end up, but we do this work on a topic branch
+# so that we can perform CI on it, and not break the $PORTABLE_BRANCH branch.
 
 echo "Creating sync branch..."
 git branch -q -D syncup >/dev/null 2>&1
-git checkout -q linux && git checkout -q -b syncup || {
+git checkout -q "$PORTABLE_BRANCH" && git checkout -q -b syncup || {
 	die "Can't checkout syncup branch"
 }
 
@@ -92,10 +94,10 @@ git rev-list --reverse --first-parent main...origin/main | \
 		echo "   Passed!"
 		echo "Creating commit for portable changes..."
 		git commit -am "portable: remove include files found portably"
-		echo "...Merging branch to linux"
-		git checkout linux && git merge --ff-only - && {
+		echo "...Merging branch to $PORTABLE_BRANCH"
+		git checkout "$PORTABLE_BRANCH" && git merge --ff-only - && {
 			echo "Pushing to GH..."
-			git push gh || die "Couldn't push linux to GH"
+			git push gh || die "Couldn't push $PORTABLE_BRANCH to GH"
 			git checkout main && \
 			git push gh || die "Couldn't push main to GH"
 		}
@@ -103,4 +105,4 @@ git rev-list --reverse --first-parent main...origin/main | \
 }
 
 echo "Wait for Cirrus-CI..."
-echo "Then push main and linux to origin"
+echo "Then push main and $PORTABLE_BRANCH to origin"
