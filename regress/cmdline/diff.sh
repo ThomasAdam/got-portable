@@ -1796,6 +1796,7 @@ EOF
 test_diff_file_to_dir() {
 	local testroot=`test_init diff_file_to_dir`
 	local commit_id0=`git_show_head $testroot/repo`
+	local alpha_blobid=`get_blob_id $testroot/repo "" alpha`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1810,16 +1811,151 @@ test_diff_file_to_dir() {
 	(cd $testroot/repo && git add alpha/eta)
 	git_commit $testroot/repo -m "changed alpha into directory"
 	local commit_id1=`git_show_head $testroot/repo`
+	local alpha_eta_blobid=`get_blob_id $testroot/repo alpha eta`
 
-	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
-	echo "commit - $commit_id0" >> $testroot/stdout.expected
-	echo "commit + $commit_id1" >> $testroot/stdout.expected
+	cat <<EOF >$testroot/stdout.expected
+diff $commit_id0 $commit_id1
+commit - $commit_id0
+commit + $commit_id1
+blob - $alpha_blobid (mode 644)
+blob + /dev/null
+--- alpha
++++ /dev/null
+@@ -1 +0,0 @@
+-alpha
+blob - /dev/null
+blob + $alpha_eta_blobid (mode 644)
+--- /dev/null
++++ alpha/eta
+@@ -0,0 +1 @@
++eta
+EOF
 	got diff -r $testroot/repo $commit_id0 $commit_id1 > $testroot/stdout
-	# Diff should not be empty
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ $ret -eq 0 ]; then
-		ret="xfail file to directory"
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local author_time=`git_show_author_time $testroot/repo`
+	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	cat <<EOF >$testroot/stdout.expected
+-----------------------------------------------
+commit $commit_id1 (master)
+from: $GOT_AUTHOR
+date: $d
+ 
+ changed alpha into directory
+ 
+ D  alpha
+ A  alpha/eta
+
+EOF
+
+	got log -P -r $testroot/repo -l1 -c $commit_id1 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_diff_dir_to_file() {
+	local testroot=`test_init diff_file_to_dir`
+	local commit_id0=`git_show_head $testroot/repo`
+	local epsilon_zeta_blobid=`get_blob_id $testroot/repo epsilon zeta`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	git_rmdir $testroot/repo epsilon
+	echo epsilon > $testroot/repo/epsilon
+	(cd $testroot/repo && git add epsilon)
+	git_commit $testroot/repo -m "changed epsilon into file"
+	local commit_id1=`git_show_head $testroot/repo`
+	local epsilon_blobid=`get_blob_id $testroot/repo "" epsilon`
+
+	cat <<EOF >$testroot/stdout.expected
+diff $commit_id0 $commit_id1
+commit - $commit_id0
+commit + $commit_id1
+blob - $epsilon_zeta_blobid (mode 644)
+blob + /dev/null
+--- epsilon/zeta
++++ /dev/null
+@@ -1 +0,0 @@
+-zeta
+blob - /dev/null
+blob + $epsilon_blobid (mode 644)
+--- /dev/null
++++ epsilon
+@@ -0,0 +1 @@
++epsilon
+EOF
+	got diff -r $testroot/repo $commit_id0 $commit_id1 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local author_time=`git_show_author_time $testroot/repo`
+	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	cat <<EOF >$testroot/stdout.expected
+-----------------------------------------------
+commit $commit_id1 (master)
+from: $GOT_AUTHOR
+date: $d
+ 
+ changed epsilon into file
+ 
+ D  epsilon/zeta
+ A  epsilon
+
+EOF
+
+	got log -P -r $testroot/repo -l1 -c $commit_id1 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -1841,3 +1977,4 @@ run_test test_diff_worktree_newfile_xbit
 run_test test_diff_commit_diffstat
 run_test test_diff_worktree_diffstat
 run_test test_diff_file_to_dir
+run_test test_diff_dir_to_file

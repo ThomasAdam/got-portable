@@ -77,6 +77,13 @@ git_rm()
 	(cd $repo && git rm -q "$@")
 }
 
+git_rmdir()
+{
+	local repo="$1"
+	shift
+	(cd $repo && git rm -q -r "$@")
+}
+
 git_show_head()
 {
 	local repo="$1"
