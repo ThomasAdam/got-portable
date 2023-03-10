@@ -674,6 +674,78 @@ test_update_changes_file_to_dir() {
 	test_done "$testroot" "$ret"
 }
 
+test_update_changes_dir_to_file() {
+	local testroot=`test_init update_changes_dir_to_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	git_rmdir $testroot/repo epsilon
+	echo epsilon > $testroot/repo/epsilon
+	cp $testroot/repo/epsilon $testroot/content.expected
+	(cd $testroot/repo && git add epsilon)
+	git_commit $testroot/repo -m "changed epsilon into file"
+
+	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# The current behaviour is not perfect, but we accept it for now.
+	echo "~  epsilon" > $testroot/stdout.expected
+	echo "D  epsilon/zeta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	echo "File paths obstructed by a non-regular file: 1" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Updating again now restores the file which was obstructed by a
+	# directory in the previous update operation. Ideally, a single
+	# update operation would suffice.
+	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "A  epsilon" > $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/wt/epsilon
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/wt/epsilon
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_update_changes_modified_file_to_dir() {
 	local testroot=`test_init update_changes_modified_file_to_dir`
 
@@ -3178,6 +3250,7 @@ run_test test_update_creates_missing_parent
 run_test test_update_creates_missing_parent_with_subdir
 run_test test_update_file_in_subsubdir
 run_test test_update_changes_file_to_dir
+run_test test_update_changes_dir_to_file
 run_test test_update_changes_modified_file_to_dir
 run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
