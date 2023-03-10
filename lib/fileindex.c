@@ -128,7 +128,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 	}
 
 	if (blob_sha1) {
-		memcpy(ie->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+		memmove(ie->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
 		ie->flags &= ~GOT_FILEIDX_F_NO_BLOB;
 	} else
 		ie->flags |= GOT_FILEIDX_F_NO_BLOB;

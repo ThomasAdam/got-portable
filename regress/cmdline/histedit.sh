@@ -1590,18 +1590,20 @@ test_histedit_fold_delete_add() {
 	echo "Switching work tree to refs/heads/master" \
 		>> $testroot/stdout.expected
 
-	#cmp -s $testroot/stdout.expected $testroot/stdout
-	#ret=$?
-	#if [ $ret -ne 0 ]; then
-	#	diff -u $testroot/stdout.expected $testroot/stdout
-	#	test_done "$testroot" "$ret"
-	#	return 1
-	#fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	if [ ! -e $testroot/wt/alpha ]; then
-		ret="xfail fold deleted and added file"
+		echo "file alpha is missing on disk" >&2
+		test_done "$testroot" "1"
+		return 1
 	fi
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 test_histedit_fold_only() {
