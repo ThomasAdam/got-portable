@@ -637,7 +637,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 	c->request_started = 0;
 	c->sock->client_status = CLIENT_CONNECT;
 
-	event_set(&c->ev, s, EV_READ, fcgi_request, c);
+	event_set(&c->ev, s, EV_READ|EV_PERSIST, fcgi_request, c);
 	event_add(&c->ev, NULL);
 
 	evtimer_set(&c->tmo, fcgi_timeout, c);
