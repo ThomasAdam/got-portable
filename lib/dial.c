@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <err.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -200,6 +201,47 @@ done:
 	return err;
 }
 
+/*
+ * Escape a given path for the shell which will be started by sshd.
+ * In particular, git-shell is known to require single-quote characters
+ * around its repository path argument and will refuse to run otherwise.
+ */
+static const struct got_error *
+escape_path(char *buf, size_t bufsize, const char *path)
+{
+	const char	*p;
+	char		*q;
+
+	p = path;
+	q = buf;
+
+	if (bufsize > 1)
+		*q++ = '\'';
+
+	while (*p != '\0' && (q - buf < bufsize)) {
+		/* git escapes ! too */
+		if (*p != '\'' && *p != '!') {
+			*q++ = *p++;
+			continue;
+		}
+
+		if (q - buf + 4 >= bufsize)
+			break;
+		*q++ = '\'';
+		*q++ = '\\';
+		*q++ = *p++;
+		*q++ = '\'';
+	}
+
+	if (*p == '\0' && (q - buf + 1 < bufsize)) {
+		*q++ = '\'';
+		*q = '\0';
+		return NULL;
+	}
+
+	return got_error_fmt(GOT_ERR_NO_SPACE, "overlong path: %s", path);
+}
+
 const struct got_error *
 got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
     const char *port, const char *path, const char *direction, int verbosity)
@@ -207,11 +249,16 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
+	char escaped_path[PATH_MAX];
 	const char *argv[11];
 	int i = 0, j;
 
 	*newpid = -1;
 	*newfd = -1;
+
+	error = escape_path(escaped_path, sizeof(escaped_path), path);
+	if (error)
+		return error;
 
 	argv[i++] = GOT_DIAL_PATH_SSH;
 	if (port != NULL) {
@@ -228,7 +275,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 	argv[i++] = "--";
 	argv[i++] = (char *)host;
 	argv[i++] = (char *)cmd;
-	argv[i++] = (char *)path;
+	argv[i++] = (char *)escaped_path;
 	argv[i++] = NULL;
 	assert(i <= nitems(argv));
 
