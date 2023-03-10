@@ -2850,6 +2850,66 @@ done:
 	return err;
 }
 
+static const struct got_error *
+add_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_fileindex_entry *ie, const char *ondisk_path,
+    const char *path2, struct got_blob_object *blob2, mode_t mode2,
+    int restoring_missing_file, int reverting_versioned_file,
+    int path_is_unversioned, int allow_bad_symlinks,
+    struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	int is_bad_symlink = 0;
+
+	if (S_ISLNK(mode2)) {
+		err = install_symlink(&is_bad_symlink,
+		    worktree, ondisk_path, path2, blob2,
+		    restoring_missing_file,
+		    reverting_versioned_file,
+		    path_is_unversioned, allow_bad_symlinks,
+		    repo, progress_cb, progress_arg);
+	} else {
+		err = install_blob(worktree, ondisk_path, path2,
+		    mode2, GOT_DEFAULT_FILE_MODE, blob2,
+		    restoring_missing_file, reverting_versioned_file, 0,
+		    path_is_unversioned, repo, progress_cb, progress_arg);
+	}
+	if (err)
+		return err;
+	if (ie == NULL) {
+		/* Adding an unversioned file. */
+		err = got_fileindex_entry_alloc(&ie, path2);
+		if (err)
+			return err;
+		err = got_fileindex_entry_update(ie,
+		    worktree->root_fd, path2, NULL, NULL, 1);
+		if (err) {
+			got_fileindex_entry_free(ie);
+			return err;
+		}
+		err = got_fileindex_entry_add(fileindex, ie);
+		if (err) {
+			got_fileindex_entry_free(ie);
+			return err;
+		}
+	} else {
+		/* Re-adding a locally deleted file. */
+		err = got_fileindex_entry_update(ie,
+		    worktree->root_fd, path2, ie->blob_sha1,
+		    worktree->base_commit_id->sha1, 0);
+		if (err)
+			return err;
+	}
+
+	if (is_bad_symlink) {
+		got_fileindex_entry_filetype_set(ie,
+		    GOT_FILEIDX_MODE_BAD_SYMLINK);
+	}
+
+	return NULL;
+}
+
 struct merge_file_cb_arg {
     struct got_worktree *worktree;
     struct got_fileindex *fileindex;
@@ -3067,7 +3127,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (status != GOT_STATUS_NO_CHANGE &&
 			    status != GOT_STATUS_MODIFY &&
 			    status != GOT_STATUS_CONFLICT &&
-			    status != GOT_STATUS_ADD) {
+			    status != GOT_STATUS_ADD &&
+			    status != GOT_STATUS_DELETE) {
 				err = (*a->progress_cb)(a->progress_arg,
 				    status, path2);
 				goto done;
@@ -3089,52 +3150,28 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				    sb.st_mode, a->label_orig, blob2,
 				    a->commit_id2, repo, a->progress_cb,
 				    a->progress_arg);
-			} else {
+			} else if (status != GOT_STATUS_DELETE) {
 				err = got_error_path(ondisk_path,
 				    GOT_ERR_FILE_OBSTRUCTED);
 			}
 			if (err)
 				goto done;
 			if (status == GOT_STATUS_DELETE) {
-				err = got_fileindex_entry_update(ie,
-				    a->worktree->root_fd, path2, blob2->id.sha1,
-				    a->worktree->base_commit_id->sha1, 0);
+				/* Re-add file with content from new blob. */
+				err = add_file(a->worktree, a->fileindex, ie,
+				    ondisk_path, path2, blob2, mode2,
+				    0, 0, 0, a->allow_bad_symlinks,
+				    repo, a->progress_cb, a->progress_arg);
 				if (err)
 					goto done;
 			}
 		} else {
-			int is_bad_symlink = 0;
-			sb.st_mode = GOT_DEFAULT_FILE_MODE;
-			if (S_ISLNK(mode2)) {
-				err = install_symlink(&is_bad_symlink,
-				    a->worktree, ondisk_path, path2, blob2, 0,
-				    0, 1, a->allow_bad_symlinks, repo,
-				    a->progress_cb, a->progress_arg);
-			} else {
-				err = install_blob(a->worktree, ondisk_path, path2,
-				    mode2, sb.st_mode, blob2, 0, 0, 0, 1, repo,
-				    a->progress_cb, a->progress_arg);
-			}
+			err = add_file(a->worktree, a->fileindex, NULL,
+			     ondisk_path, path2, blob2, mode2,
+			     0, 0, 1, a->allow_bad_symlinks,
+			    repo, a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
-			err = got_fileindex_entry_alloc(&ie, path2);
-			if (err)
-				goto done;
-			err = got_fileindex_entry_update(ie,
-			    a->worktree->root_fd, path2, NULL, NULL, 1);
-			if (err) {
-				got_fileindex_entry_free(ie);
-				goto done;
-			}
-			err = got_fileindex_entry_add(a->fileindex, ie);
-			if (err) {
-				got_fileindex_entry_free(ie);
-				goto done;
-			}
-			if (is_bad_symlink) {
-				got_fileindex_entry_filetype_set(ie,
-				    GOT_FILEIDX_MODE_BAD_SYMLINK);
-			}
 		}
 	}
 done:
