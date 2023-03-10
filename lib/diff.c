@@ -669,11 +669,50 @@ done:
 }
 
 static const struct got_error *
-diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2,
+diff_kind_mismatch(struct got_tree_entry *te1, struct got_tree_entry *te2,
+    FILE *f1, FILE *f2, int fd1, int fd2,
     const char *label1, const char *label2, struct got_repository *repo,
-    got_diff_blob_cb cb, void *cb_arg)
+    got_diff_blob_cb cb, void *cb_arg, int diff_content)
 {
-	/* XXX TODO */
+	const struct got_error *err = NULL;
+
+	/* 
+	 * Handle files changing into directories and vice-versa.
+	 * Disregard edge cases with FIFOs, device nodes, etc for now.
+	 */
+	if (!S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
+		if (S_ISREG(te1->mode)) {
+			if (diff_content) {
+				err = diff_deleted_blob(&te1->id, f1, fd1,
+				    f2, label1, te1->mode, repo, cb, cb_arg);
+			} else {
+				err = cb(cb_arg, NULL, NULL, NULL, NULL,
+				    &te1->id, NULL, label1, NULL,
+				    te1->mode, 0, repo);
+			}
+			if (err)
+				return err;
+		}
+		return diff_added_tree(&te2->id, f1, f2, fd2, label2,
+		    repo, cb, cb_arg, diff_content);
+	} else if (S_ISDIR(te1->mode) && !S_ISDIR(te2->mode)) {
+		err = diff_deleted_tree(&te1->id, f1, fd1, f2,
+		    label1, repo, cb, cb_arg, diff_content);
+		if (err)
+			return err;
+		if (S_ISREG(te2->mode)) {
+			if (diff_content) {
+				err = diff_added_blob(&te2->id, f1, f2, fd2,
+				    label2, te2->mode, repo, cb, cb_arg);
+			} else {
+				err = cb(cb_arg, NULL, NULL, NULL, NULL, NULL,
+				    &te2->id, NULL, label2, 0, te2->mode, repo);
+			}
+			if (err)
+				return err;
+		}
+	}
+
 	return NULL;
 }
 
@@ -732,8 +771,8 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_entry *te2,
 	if (id_match)
 		return NULL;
 
-	return diff_kind_mismatch(&te1->id, &te2->id, label1, label2, repo,
-	    cb, cb_arg);
+	return diff_kind_mismatch(te1, te2, f1, f2, fd1, fd2,
+	    label1, label2, repo, cb, cb_arg, diff_content);
 }
 
 static const struct got_error *
