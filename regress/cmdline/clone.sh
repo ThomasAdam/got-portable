@@ -36,13 +36,10 @@ test_clone_basic() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	got log -l0 -p -r $testroot/repo > $testroot/log-repo-clone
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		echo "got log command failed unexpectedly" >&2
-		test_done "$testroot" "$ret"
-		return 1
-	fi
+	got log -l0 -p -r $testroot/repo-clone | \
+		sed 's@master, origin/master@master@g' \
+		> $testroot/log-repo-clone
+
 	cmp -s $testroot/log-repo $testroot/log-repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
