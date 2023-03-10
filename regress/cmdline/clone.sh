@@ -127,6 +127,36 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_clone_quoting() {
+	local testroot=`test_init clone_basic`
+
+	got log -l0 -p -r "$testroot/repo" > $testroot/log-repo
+
+	(cd "$testroot" && cp -R repo "rock'n roll.git")
+
+	got clone -q "ssh://127.0.0.1/$testroot/rock'n roll.git" \
+		"$testroot/rock-clone"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got log -l0 -p -r "$testroot/rock-clone" | \
+		sed 's@master, origin/master@master@g' \
+		>$testroot/log-repo-clone
+
+	cmp -s "$testroot/log-repo" "$testroot/log-repo-clone"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "log -p output of cloned repository differs" >&2
+		diff -u "$testroot/log-repo" "$testroot/log-repo-clone"
+		test_done "$testroot" "$ret"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_clone_list() {
 	local testroot=`test_init clone_list`
 	local testurl=ssh://127.0.0.1$testroot
@@ -834,6 +864,7 @@ EOF
 
 test_parseargs "$@"
 run_test test_clone_basic
+run_test test_clone_quoting
 run_test test_clone_list
 run_test test_clone_branch
 run_test test_clone_all
