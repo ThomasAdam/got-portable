@@ -1408,12 +1408,14 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW |
 	    O_CLOEXEC, mode);
 	if (fd == -1) {
-		if (errno == ENOENT) {
+		if (errno == ENOENT || errno == ENOTDIR) {
 			char *parent;
 			err = got_path_dirname(&parent, path);
 			if (err)
 				return err;
 			err = add_dir_on_disk(worktree, parent);
+			if (err && err->code == GOT_ERR_FILE_OBSTRUCTED)
+				err = got_error_path(path, err->code);
 			free(parent);
 			if (err)
 				return err;
@@ -1883,6 +1885,8 @@ sync_timestamps(int wt_fd, const char *path, unsigned char status,
 	return NULL;
 }
 
+static const struct got_error *remove_ondisk_file(const char *, const char *);
+
 static const struct got_error *
 update_blob(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
@@ -1913,7 +1917,7 @@ update_blob(struct got_worktree *worktree,
 			sb.st_mode = got_fileindex_perms_to_st(ie);
 	} else {
 		if (stat(ondisk_path, &sb) == -1) {
-			if (errno != ENOENT) {
+			if (errno != ENOENT && errno != ENOTDIR) {
 				err = got_error_from_errno2("stat",
 				    ondisk_path);
 				goto done;
@@ -1940,6 +1944,32 @@ update_blob(struct got_worktree *worktree,
 		err = (*progress_cb)(progress_arg, GOT_STATUS_CANNOT_UPDATE,
 		    path);
 		goto done;
+	}
+
+	if (S_ISDIR(te->mode)) { /* file changing into a directory */
+		if (status == GOT_STATUS_UNVERSIONED) {
+			err = (*progress_cb)(progress_arg, status, path);
+		} else if (status != GOT_STATUS_NO_CHANGE &&
+		    status != GOT_STATUS_DELETE &&
+		    status != GOT_STATUS_NONEXISTENT &&
+		    status != GOT_STATUS_MISSING) {
+			err = (*progress_cb)(progress_arg,
+			    GOT_STATUS_CANNOT_DELETE, path);
+		} else if (ie) {
+			if (status != GOT_STATUS_DELETE &&
+			    status != GOT_STATUS_NONEXISTENT &&
+			    status != GOT_STATUS_MISSING) {
+				err = remove_ondisk_file(worktree->root_path,
+				    ie->path);
+				if (err && !(err->code == GOT_ERR_ERRNO &&
+				    errno == ENOENT))
+					goto done;
+			}
+			got_fileindex_entry_remove(fileindex, ie);
+			err = (*progress_cb)(progress_arg, GOT_STATUS_DELETE,
+			    ie->path);
+		}
+		goto done; /* nothing else to do */
 	}
 
 	if (ie && status != GOT_STATUS_MISSING && S_ISREG(sb.st_mode) &&
