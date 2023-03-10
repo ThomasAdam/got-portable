@@ -97,14 +97,14 @@ fcgi_request(int fd, short events, void *arg)
 			c->buf_pos += parsed;
 			c->buf_len -= parsed;
 		}
-	} while (parsed > 0 && c->buf_len > 0);
 
-	/* Make space for further reads */
-	if (parsed != 0)
-		if (c->buf_len > 0) {
+		/* drop the parsed record */
+		if (parsed != 0 && c->buf_len > 0) {
 			bcopy(c->buf + c->buf_pos, c->buf, c->buf_len);
 			c->buf_pos = 0;
 		}
+	} while (parsed > 0 && c->buf_len > 0);
+
 	return;
 fail:
 	fcgi_cleanup_request(c);
@@ -506,7 +506,8 @@ fcgi_cleanup_request(struct request *c)
 
 	close(c->fd);
 	template_free(c->tp);
-	gotweb_free_transport(c->t);
+	if (c->t != NULL)
+		gotweb_free_transport(c->t);
 	free(c);
 }
 
