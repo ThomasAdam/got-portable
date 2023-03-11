@@ -186,6 +186,7 @@ struct got_repository;
 struct transport {
 	TAILQ_HEAD(repo_commits_head, repo_commit)	 repo_commits;
 	TAILQ_HEAD(repo_tags_head, repo_tag)		 repo_tags;
+	struct got_reflist_head	 refs;
 	struct got_repository	*repo;
 	struct repo_dir		*repo_dir;
 	struct querystring	*qs;
@@ -196,6 +197,11 @@ struct transport {
 	unsigned int		 next_disp;
 	unsigned int		 prev_disp;
 	unsigned int		 tag_count;
+	struct got_blob_object	*blob;
+	int			 fd;
+	FILE			*fp;
+	struct dirent		**repos;
+	int			 nrepos;
 };
 
 enum socket_priv_fds {
@@ -463,20 +469,19 @@ void gotweb_process_request(struct request *);
 void gotweb_free_transport(struct transport *);
 
 /* pages.tmpl */
-int	gotweb_render_header(struct template *);
-int	gotweb_render_footer(struct template *);
+int	gotweb_render_page(struct template *, int (*)(struct template *));
 int	gotweb_render_repo_table_hdr(struct template *);
 int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);
 int	gotweb_render_navs(struct template *);
 int	gotweb_render_commits(struct template *);
-int	gotweb_render_blob(struct template *, struct got_blob_object *);
+int	gotweb_render_blob(struct template *);
 int	gotweb_render_tree(struct template *);
 int	gotweb_render_tags(struct template *);
 int	gotweb_render_tag(struct template *);
-int	gotweb_render_diff(struct template *, FILE *);
+int	gotweb_render_diff(struct template *);
 int	gotweb_render_branches(struct template *, struct got_reflist_head *);
-int	gotweb_render_summary(struct template *, struct got_reflist_head *);
+int	gotweb_render_summary(struct template *);
 int	gotweb_render_blame(struct template *);
 int	gotweb_render_rss(struct template *);
 

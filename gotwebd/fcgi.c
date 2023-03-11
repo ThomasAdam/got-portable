@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_reference.h"
 
 #include "proc.h"
 #include "gotwebd.h"

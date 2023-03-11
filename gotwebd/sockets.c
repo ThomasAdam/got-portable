@@ -51,6 +51,7 @@
 
 #include "got_error.h"
 #include "got_opentemp.h"
+#include "got_reference.h"
 #include "got_repository.h"
 
 #include "proc.h"

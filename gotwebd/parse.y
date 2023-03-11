@@ -47,9 +47,11 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "got_sockaddr.h"
+#include "got_reference.h"
+
 #include "proc.h"
 #include "gotwebd.h"
-#include "got_sockaddr.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {

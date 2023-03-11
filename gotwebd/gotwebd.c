@@ -41,6 +41,7 @@
 #include <util.h>
 
 #include "got_opentemp.h"
+#include "got_reference.h"
 
 #include "proc.h"
 #include "gotwebd.h"

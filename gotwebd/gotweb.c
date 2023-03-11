@@ -85,7 +85,7 @@ static const struct got_error *gotweb_parse_querystring(struct querystring **,
     char *);
 static const struct got_error *gotweb_assign_querystring(struct querystring **,
     char *, char *);
-static const struct got_error *gotweb_render_index(struct request *);
+static int gotweb_render_index(struct template *);
 static const struct got_error *gotweb_init_repo_dir(struct repo_dir **,
     const char *);
 static const struct got_error *gotweb_load_got_path(struct request *c,
@@ -144,16 +144,11 @@ void
 gotweb_process_request(struct request *c)
 {
 	const struct got_error *error = NULL, *error2 = NULL;
-	struct got_blob_object *blob = NULL;
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
-	struct got_reflist_head refs;
-	FILE *fp = NULL;
 	uint8_t err[] = "gotwebd experienced an error: ";
-	int r, html = 0, fd = -1;
-
-	TAILQ_INIT(&refs);
+	int r, html = 0;
 
 	/* init the transport */
 	error = gotweb_init_transport(&c->t);
@@ -217,7 +212,8 @@ gotweb_process_request(struct request *c)
 		if (error)
 			goto done;
 
-		error2 = got_open_blob_for_output(&blob, &fd, &binary, c);
+		error2 = got_open_blob_for_output(&c->t->blob, &c->t->fd,
+		    &binary, c);
 		if (error2)
 			goto render;
 
@@ -230,12 +226,12 @@ gotweb_process_request(struct request *c)
 			goto done;
 
 		for (;;) {
-			error = got_object_blob_read_block(&len, blob);
+			error = got_object_blob_read_block(&len, c->t->blob);
 			if (error)
 				goto done;
 			if (len == 0)
 				break;
-			buf = got_object_blob_get_read_buf(blob);
+			buf = got_object_blob_get_read_buf(c->t->blob);
 			if (fcgi_gen_binary_response(c, buf, len) == -1)
 				goto done;
 		}
@@ -259,7 +255,8 @@ gotweb_process_request(struct request *c)
 		if (error)
 			goto done;
 
-		error2 = got_open_blob_for_output(&blob, &fd, &binary, c);
+		error2 = got_open_blob_for_output(&c->t->blob, &c->t->fd,
+		    &binary, c);
 		if (error2)
 			goto render;
 		if (binary) {
@@ -289,9 +286,6 @@ render:
 		goto done;
 	html = 1;
 
-	if (gotweb_render_header(c->tp) == -1)
-		goto err;
-
 	if (error2) {
 		error = error2;
 		goto err;
@@ -304,15 +298,15 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_blame(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_blame) == -1)
 			goto done;
 		break;
 	case BLOB:
-		if (gotweb_render_blob(c->tp, blob) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_blob) == -1)
 			goto err;
 		break;
 	case BRIEFS:
-		if (gotweb_render_briefs(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_briefs) == -1)
 			goto err;
 		break;
 	case COMMITS:
@@ -321,7 +315,7 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_commits(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_commits) == -1)
 			goto err;
 		break;
 	case DIFF:
@@ -330,23 +324,28 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		error = got_open_diff_for_output(&fp, &fd, c);
+		error = got_open_diff_for_output(&c->t->fp, &c->t->fd, c);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_diff(c->tp, fp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_diff) == -1)
 			goto err;
 		break;
 	case INDEX:
-		error = gotweb_render_index(c);
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
+		c->t->nrepos = scandir(srv->repos_path, &c->t->repos, NULL,
+		    alphasort);
+		if (c->t->nrepos == -1) {
+			c->t->repos = NULL;
+			error = got_error_from_errno2("scandir",
+			    srv->repos_path);
 			goto err;
 		}
+		if (gotweb_render_page(c->tp, gotweb_render_index) == -1)
+			goto err;
 		break;
 	case SUMMARY:
-		error = got_ref_list(&refs, c->t->repo, "refs/heads",
+		error = got_ref_list(&c->t->refs, c->t->repo, "refs/heads",
 		    got_ref_cmp_by_name, NULL);
 		if (error) {
 			log_warnx("%s: got_ref_list: %s", __func__,
@@ -361,7 +360,7 @@ render:
 			goto err;
 		}
 		qs->action = SUMMARY;
-		if (gotweb_render_summary(c->tp, &refs) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_summary) == -1)
 			goto done;
 		break;
 	case TAG:
@@ -375,7 +374,7 @@ render:
 			    "bad commit id");
 			goto err;
 		}
-		if (gotweb_render_tag(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_tag) == -1)
 			goto done;
 		break;
 	case TAGS:
@@ -384,7 +383,7 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_tags(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_tags) == -1)
 			goto done;
 		break;
 	case TREE:
@@ -393,7 +392,7 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_tree(c->tp) == -1)
+		if (gotweb_render_page(c->tp, gotweb_render_tree) == -1)
 			goto err;
 		break;
 	case ERR:
@@ -421,21 +420,7 @@ err:
 	if (html && fcgi_printf(c, "</div>\n") == -1)
 		return;
 done:
-	if (blob)
-		got_object_blob_close(blob);
-	if (fp) {
-		error = got_gotweb_flushfile(fp, fd);
-		if (error)
-			log_warnx("%s: got_gotweb_flushfile failure: %s",
-			    __func__, error->msg);
-		fd = -1;
-	}
-	if (fd != -1)
-		close(fd);
-	if (html && srv != NULL)
-		gotweb_render_footer(c->tp);
-
-	got_ref_list_free(&refs);
+	return;
 }
 
 struct server *
@@ -474,6 +459,7 @@ gotweb_init_transport(struct transport **t)
 
 	TAILQ_INIT(&(*t)->repo_commits);
 	TAILQ_INIT(&(*t)->repo_tags);
+	TAILQ_INIT(&(*t)->refs);
 
 	(*t)->repo = NULL;
 	(*t)->repo_dir = NULL;
@@ -482,6 +468,8 @@ gotweb_init_transport(struct transport **t)
 	(*t)->prev_id = NULL;
 	(*t)->next_disp = 0;
 	(*t)->prev_disp = 0;
+
+	(*t)->fd = -1;
 
 	return error;
 }
@@ -770,9 +758,12 @@ gotweb_free_repo_dir(struct repo_dir *repo_dir)
 void
 gotweb_free_transport(struct transport *t)
 {
+	const struct got_error *err;
 	struct repo_commit *rc = NULL, *trc = NULL;
 	struct repo_tag *rt = NULL, *trt = NULL;
+	int i;
 
+	got_ref_list_free(&t->refs);
 	TAILQ_FOREACH_SAFE(rc, &t->repo_commits, entry, trc) {
 		TAILQ_REMOVE(&t->repo_commits, rc, entry);
 		gotweb_free_repo_commit(rc);
@@ -786,6 +777,22 @@ gotweb_free_transport(struct transport *t)
 	free(t->more_id);
 	free(t->next_id);
 	free(t->prev_id);
+	if (t->blob)
+		got_object_blob_close(t->blob);
+	if (t->fp) {
+		err = got_gotweb_flushfile(t->fp, t->fd);
+		if (err)
+			log_warnx("%s: got_gotweb_flushfile failure: %s",
+			    __func__, err->msg);
+		t->fd = -1;
+	}
+	if (t->fd != -1)
+		close(t->fd);
+	if (t->repos) {
+		for (i = 0; i < t->nrepos; ++i)
+			free(t->repos[i]);
+		free(t->repos);
+	}
 	free(t);
 }
 
@@ -848,30 +855,24 @@ gotweb_get_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
 	}
 }
 
-static const struct got_error *
-gotweb_render_index(struct request *c)
+static int
+gotweb_render_index(struct template *tp)
 {
 	const struct got_error *error = NULL;
+	struct request *c = tp->tp_arg;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = NULL;
-	struct dirent **sd_dent = NULL;
-	unsigned int d_cnt, d_i, d_disp = 0;
+	struct dirent **sd_dent = t->repos;
+	unsigned int d_i, d_disp = 0;
 	unsigned int d_skipped = 0;
-	int type;
-
-	d_cnt = scandir(srv->repos_path, &sd_dent, NULL, alphasort);
-	if (d_cnt == -1) {
-		sd_dent = NULL;
-		error = got_error_from_errno2("scandir", srv->repos_path);
-		goto done;
-	}
+	int type, r;
 
 	if (gotweb_render_repo_table_hdr(c->tp) == -1)
-		goto done;
+		return -1;
 
-	for (d_i = 0; d_i < d_cnt; d_i++) {
+	for (d_i = 0; d_i < t->nrepos; d_i++) {
 		if (srv->max_repos > 0 && t->prev_disp == srv->max_repos)
 			break;
 
@@ -884,7 +885,7 @@ gotweb_render_index(struct request *c)
 		error = got_path_dirent_type(&type, srv->repos_path,
 		    sd_dent[d_i]);
 		if (error)
-			goto done;
+			continue;
 		if (type != DT_DIR) {
 			d_skipped++;
 			continue;
@@ -898,50 +899,45 @@ gotweb_render_index(struct request *c)
 
 		error = gotweb_init_repo_dir(&repo_dir, sd_dent[d_i]->d_name);
 		if (error)
-			goto done;
+			continue;
 
 		error = gotweb_load_got_path(c, repo_dir);
-		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
-			error = NULL;
+		if (error && error->code == GOT_ERR_LONELY_PACKIDX) {
+			if (error->code != GOT_ERR_NOT_GIT_REPO)
+				log_warnx("%s: %s: %s", __func__,
+				    sd_dent[d_i]->d_name, error->msg);
 			gotweb_free_repo_dir(repo_dir);
 			repo_dir = NULL;
 			d_skipped++;
 			continue;
 		}
-		if (error && error->code != GOT_ERR_LONELY_PACKIDX)
-			goto done;
 
 		d_disp++;
 		t->prev_disp++;
 
-		if (gotweb_render_repo_fragment(c->tp, repo_dir) == -1)
-			goto done;
-
+		r = gotweb_render_repo_fragment(c->tp, repo_dir);
 		gotweb_free_repo_dir(repo_dir);
-		repo_dir = NULL;
+		if (r == -1)
+			return -1;
+
 		t->next_disp++;
 		if (d_disp == srv->max_repos_display)
 			break;
 	}
-	t->repos_total = d_cnt - d_skipped;
+	t->repos_total = t->nrepos - d_skipped;
 
 	if (srv->max_repos_display == 0)
-		goto done;
+		return 0;
 	if (srv->max_repos > 0 && srv->max_repos < srv->max_repos_display)
-		goto done;
+		return 0;
 	if (t->repos_total <= srv->max_repos ||
 	    t->repos_total <= srv->max_repos_display)
-		goto done;
+		return 0;
 
 	if (gotweb_render_navs(c->tp) == -1)
-		goto done;
-done:
-	if (sd_dent) {
-		for (d_i = 0; d_i < d_cnt; d_i++)
-			free(sd_dent[d_i]);
-		free(sd_dent);
-	}
-	return error;
+		return -1;
+
+	return 0;
 }
 
 static inline int
