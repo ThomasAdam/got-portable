@@ -125,6 +125,20 @@ static inline int rss_author(struct template *, char *);
 </html>
 {{ end }}
 
+{{ define gotweb_render_error(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+!}
+<div id="err_content">
+  {{ if t->error }}
+    {{ t->error->msg }}
+  {{ else }}
+    See daemon logs for details
+  {{ end }}
+</div>
+{{ end }}
+
 {{ define gotweb_render_repo_table_hdr(struct template *tp) }}
 {!
 	struct request *c = tp->tp_arg;
