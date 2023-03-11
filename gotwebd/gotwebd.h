@@ -199,6 +199,7 @@ struct transport {
 	unsigned int		 next_disp;
 	unsigned int		 prev_disp;
 	unsigned int		 tag_count;
+	const struct got_error	*error;
 	struct got_blob_object	*blob;
 	int			 fd;
 	FILE			*fp;
@@ -472,6 +473,7 @@ void gotweb_free_transport(struct transport *);
 
 /* pages.tmpl */
 int	gotweb_render_page(struct template *, int (*)(struct template *));
+int	gotweb_render_error(struct template *);
 int	gotweb_render_repo_table_hdr(struct template *);
 int	gotweb_render_repo_fragment(struct template *, struct repo_dir *);
 int	gotweb_render_briefs(struct template *);

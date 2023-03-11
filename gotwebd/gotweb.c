@@ -142,12 +142,10 @@ gotweb_reply_file(struct request *c, const char *ctype, const char *file,
 void
 gotweb_process_request(struct request *c)
 {
-	const struct got_error *error = NULL, *error2 = NULL;
+	const struct got_error *error = NULL;
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
-	uint8_t err[] = "gotwebd experienced an error: ";
-	int r, html = 0;
 
 	/* init the transport */
 	error = gotweb_init_transport(&c->t);
@@ -187,15 +185,15 @@ gotweb_process_request(struct request *c)
 	if (qs->action == BLAME || qs->action == BLOB ||
 	    qs->action == BLOBRAW || qs->action == DIFF) {
 		if (qs->commit == NULL) {
-			error2 = got_error(GOT_ERR_QUERYSTRING);
-			goto render;
+			error = got_error(GOT_ERR_QUERYSTRING);
+			goto err;
 		}
 	}
 
 	if (qs->action != INDEX) {
 		error = gotweb_init_repo_dir(&repo_dir, qs->path);
 		if (error)
-			goto done;
+			goto err;
 		error = gotweb_load_got_path(c, repo_dir);
 		c->t->repo_dir = repo_dir;
 		if (error && error->code != GOT_ERR_LONELY_PACKIDX)
@@ -209,12 +207,12 @@ gotweb_process_request(struct request *c)
 
 		error = got_get_repo_commits(c, 1);
 		if (error)
-			goto done;
+			goto err;
 
-		error2 = got_open_blob_for_output(&c->t->blob, &c->t->fd,
+		error = got_open_blob_for_output(&c->t->blob, &c->t->fd,
 		    &binary, c);
-		if (error2)
-			goto render;
+		if (error)
+			goto err;
 
 		if (binary)
 			r = gotweb_reply_file(c, "application/octet-stream",
@@ -222,20 +220,20 @@ gotweb_process_request(struct request *c)
 		else
 			r = gotweb_reply(c, 200, "text/plain", NULL);
 		if (r == -1)
-			goto done;
+			return;
 
 		for (;;) {
 			error = got_object_blob_read_block(&len, c->t->blob);
 			if (error)
-				goto done;
+				break;
 			if (len == 0)
 				break;
 			buf = got_object_blob_get_read_buf(c->t->blob);
 			if (fcgi_gen_binary_response(c, buf, len) == -1)
-				goto done;
+				break;
 		}
 
-		goto done;
+		return;
 	}
 
 	if (qs->action == BLOB) {
@@ -252,15 +250,15 @@ gotweb_process_request(struct request *c)
 
 		error = got_get_repo_commits(c, 1);
 		if (error)
-			goto done;
+			goto err;
 
-		error2 = got_open_blob_for_output(&c->t->blob, &c->t->fd,
+		error = got_open_blob_for_output(&c->t->blob, &c->t->fd,
 		    &binary, c);
-		if (error2)
-			goto render;
+		if (error)
+			goto err;
 		if (binary) {
 			gotweb_reply(c, 302, NULL, &url);
-			goto done;
+			return;
 		}
 	}
 
@@ -268,26 +266,15 @@ gotweb_process_request(struct request *c)
 		const char *ctype = "application/rss+xml;charset=utf-8";
 
 		if (gotweb_reply_file(c, ctype, repo_dir->name, ".rss") == -1)
-			goto done;
+			return;
 
 		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
+			return;
 		}
-		if (gotweb_render_rss(c->tp) == -1)
-			goto err;
-		goto done;
-	}
-
-render:
-	if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-		goto done;
-	html = 1;
-
-	if (error2) {
-		error = error2;
-		goto err;
+		gotweb_render_rss(c->tp);
+		return;
 	}
 
 	switch(qs->action) {
@@ -297,26 +284,30 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_blame) == -1)
-			goto done;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_blame);
+		return;
 	case BLOB:
-		if (gotweb_render_page(c->tp, gotweb_render_blob) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_blob);
+		return;
 	case BRIEFS:
-		if (gotweb_render_page(c->tp, gotweb_render_briefs) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_briefs);
+		return;
 	case COMMITS:
 		error = got_get_repo_commits(c, srv->max_commits_display);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_commits) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_commits);
+		return;
 	case DIFF:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
@@ -328,9 +319,10 @@ render:
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_diff) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_diff);
+		return;
 	case INDEX:
 		c->t->nrepos = scandir(srv->repos_path, &c->t->repos, NULL,
 		    alphasort);
@@ -340,9 +332,10 @@ render:
 			    srv->repos_path);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_index) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_index);
+		return;
 	case SUMMARY:
 		error = got_ref_list(&c->t->refs, c->t->repo, "refs/heads",
 		    got_ref_cmp_by_name, NULL);
@@ -359,9 +352,10 @@ render:
 			goto err;
 		}
 		qs->action = SUMMARY;
-		if (gotweb_render_page(c->tp, gotweb_render_summary) == -1)
-			goto done;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_summary);
+		return;
 	case TAG:
 		error = got_get_repo_tags(c, 1);
 		if (error) {
@@ -373,53 +367,40 @@ render:
 			    "bad commit id");
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_tag) == -1)
-			goto done;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_tag);
+		return;
 	case TAGS:
 		error = got_get_repo_tags(c, srv->max_commits_display);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_tags) == -1)
-			goto done;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_tags);
+		return;
 	case TREE:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (gotweb_render_page(c->tp, gotweb_render_tree) == -1)
-			goto err;
-		break;
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_tree);
+		return;
 	case ERR:
 	default:
-		r = fcgi_printf(c, "<div id='err_content'>%s</div>\n",
-		    "Erorr: Bad Querystring");
-		if (r == -1)
-			goto err;
-		break;
+		error = got_error(GOT_ERR_BAD_QUERYSTRING);
 	}
 
-	goto done;
 err:
-	if (html && fcgi_printf(c, "<div id='err_content'>") == -1)
+	c->t->error = error;
+	if (gotweb_reply(c, 400, "text/html", NULL) == -1)
 		return;
-	if (fcgi_printf(c, "\n%s", err) == -1)
-		return;
-	if (error) {
-		if (fcgi_printf(c, "%s", error->msg) == -1)
-			return;
-	} else {
-		if (fcgi_printf(c, "see daemon logs for details") == -1)
-			return;
-	}
-	if (html && fcgi_printf(c, "</div>\n") == -1)
-		return;
-done:
-	return;
+	gotweb_render_page(c->tp, gotweb_render_error);
 }
 
 struct server *
