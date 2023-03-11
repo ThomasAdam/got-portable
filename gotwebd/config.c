@@ -35,6 +35,7 @@
 #include <errno.h>
 
 #include "got_opentemp.h"
+#include "got_reference.h"
 
 #include "got_compat.h"
 

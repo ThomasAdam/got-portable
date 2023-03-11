@@ -54,7 +54,8 @@ static inline int rss_author(struct template *, char *);
 
 !}
 
-{{ define gotweb_render_header(struct template *tp) }}
+{{ define gotweb_render_page(struct template *tp,
+    int (*body)(struct template *)) }}
 {!
 	struct request		*c = tp->tp_arg;
 	struct server		*srv = c->srv;
@@ -110,13 +111,7 @@ static inline int rss_author(struct template *, char *);
         </div>
       </div>
       <div id="content">
-{{ end }}
-
-{{ define gotweb_render_footer(struct template *tp) }}
-{!
-	struct request		*c = tp->tp_arg;
-	struct server		*srv = c->srv;
-!}
+        {{ render body(tp) }}
         <div id="site_owner_wrapper">
           <div id="site_owner">
             {{ if srv->show_site_owner }}
@@ -433,11 +428,11 @@ static inline int rss_author(struct template *, char *);
 </div>
 {{ end }}
 
-{{ define gotweb_render_blob(struct template *tp,
-    struct got_blob_object *blob) }}
+{{ define gotweb_render_blob(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
+	struct got_blob_object	*blob = t->blob;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 !}
 <div id="blob_title_wrapper">
@@ -711,10 +706,11 @@ static inline int rss_author(struct template *, char *);
 </div>
 {{ end }}
 
-{{ define gotweb_render_diff(struct template *tp, FILE *fp) }}
+{{ define gotweb_render_diff(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
+	FILE			*fp = t->fp;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 	char			*line = NULL;
 	size_t			 linesize = 0;
@@ -851,12 +847,12 @@ static inline int rss_author(struct template *, char *);
 </div>
 {{ end }}
 
-{{ define gotweb_render_summary(struct template *tp,
-    struct got_reflist_head *refs) }}
+{{ define gotweb_render_summary(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
 	struct server		*srv = c->srv;
 	struct transport	*t = c->t;
+	struct got_reflist_head	*refs = &t->refs;
 !}
 <div id="summary_wrapper">
   {{ if srv->show_repo_description }}
