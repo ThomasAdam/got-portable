@@ -1,3 +1,15 @@
+* got 0.86; 2023-03-12
+  see git repository history for per-change authorship information
+- fix race condition on NFS where log-message file's modify time may change
+- fix gotd sending too large pack files in some cases
+- support histedit fold operations which delete a file and then add it again
+- make diffing files which changed into dirs and vice-versa possible
+- handle files changing into directories during 'got update'
+- add quoting to repository path sent to server for git-shell compatibility
+- gotwebd: handle short reads and timeouts
+- gotwebd: provide gotweb_render_page() entrypoint for all pages
+- gotwebd: reply with non-200 HTTP status code on error
+
 * got 0.85; 2023-03-07
   see git repository history for per-change authorship information
 - gotwebd: add missing colon in diff view (patch by Josiah Frentsos)
