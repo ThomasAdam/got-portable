@@ -1603,6 +1603,16 @@ test_histedit_fold_delete_add() {
 		test_done "$testroot" "1"
 		return 1
 	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 	test_done "$testroot" "0"
 }
 
