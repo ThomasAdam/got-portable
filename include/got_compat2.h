@@ -390,7 +390,7 @@ int scan_scaled(char *, long long *);
 #define FMT_SCALED_STRSIZE	7  /* minus sign, 4 digits, suffix, null byte */
 #endif
 
-#ifndef HAVE_LIBBSD
+#if !defined(HAVE_LIBBSD) && !defined(HAVE_GETOPT_OPTRESET)
 /* getopt.c */
 extern int	BSDopterr;
 extern int	BSDoptind;

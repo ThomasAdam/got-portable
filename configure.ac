@@ -58,6 +58,7 @@ fi
 # Checks for header files.
 AC_CHECK_HEADERS([ \
 	fcntl.h \
+	getopt.h \
 	langinfo.h \
 	libutil.h \
 	limits.h \
@@ -129,6 +130,21 @@ AC_CHECK_DECL(
 )
 
 AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
+
+AC_CACHE_CHECK([whether getopt has optreset support],
+		ac_cv_have_getopt_optreset, [
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[ #include <getopt.h> ]],
+		[[ extern int optreset; optreset = 0; ]])],
+	[ ac_cv_have_getopt_optreset="yes" ],
+	[ ac_cv_have_getopt_optreset="no"
+	])
+])
+
+AM_CONDITIONAL([HAVE_GETOPT], [test "x$ac_cv_have_getopt_optreset" = "xyes"])
+if test "x$ac_cv_have_getopt_optreset" = "xyes" ; then
+	AC_DEFINE([HAVE_GETOPT_OPTRESET], [1],
+		[Define if your getopt(3) defines and uses optreset])
+fi
 
 AC_CHECK_MEMBERS([struct pollfd.fd], [], [], [[
 #include <sys/types.h>

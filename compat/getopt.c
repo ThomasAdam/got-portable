@@ -29,11 +29,11 @@
 
 /* OPENBSD ORIGINAL: lib/libc/stdlib/getopt.c */
 
+#include "got_compat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "got_compat.h"
 
 int	BSDopterr = 1,		/* if error message should be printed */
 	BSDoptind = 1,		/* index into parent argv vector */

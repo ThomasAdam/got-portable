@@ -10,7 +10,6 @@ libopenbsd_compat_a_SOURCES =  \
 	fmt_scaled.c \
 	freezero.c \
 	getdtablecount.c \
-	getopt.c \
 	getprogname.c \
 	merge.c \
 	reallocarray.c \
@@ -30,6 +29,10 @@ endif
 
 if HOST_DARWIN
 libopenbsd_compat_a_SOURCES += uuid.c bsd-poll.c bsd-poll.h
+endif
+
+if !HAVE_GETOPT
+libopenbsd_compat_a_SOURCES += getopt.c
 endif
 
 if !HAVE_B64
