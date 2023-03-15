@@ -20,8 +20,14 @@ SAVED_CFLAGS="$CFLAGS"
 test -n "$HOSTCC"	&& export CC="$HOSTCC"
 test -n "$HOSTCFLAGS"	&& export CFLAGS="$SAVED_CFLAGS $HOSTCFLAGS"
 
+YACC_OVERRIDE=yes
+
 AC_PROG_CC
-AC_PROG_YACC
+
+if test -z "$YACC"; then
+	YACC_OVERRIDE="no"
+	AC_PROG_YACC
+fi
 PKG_PROG_PKG_CONFIG
 
 PKG_CHECK_MODULES(LIBBSD, libbsd-overlay, [
