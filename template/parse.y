@@ -429,7 +429,7 @@ lgetc(int quotec)
 	if (c == EOF) {
 		/*
 		 * Fake EOL when hit EOF for the first time. This gets line
-		 * count rigchtif last line included file is syntactically
+		 * count right if last line in included file is syntactically
 		 * invalid and has no newline.
 		 */
 		if (file->eof_reached == 0) {
