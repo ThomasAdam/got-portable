@@ -233,6 +233,7 @@ static const struct got_error got_errors[] = {
 	    "make Git unhappy" },
 	{ GOT_ERR_UID, "bad user ID" },
 	{ GOT_ERR_GID, "bad group ID" },
+	{ GOT_ERR_NO_PROG, "command not found or not accessible" },
 };
 
 static struct got_custom_error {

@@ -177,15 +177,20 @@ main(int argc, char *argv[])
 	repo = gotd_find_repo_by_name(repo_name, &gotd);
 
 	/*
-	 * Invoke our custom Git server if it was found in PATH and
-	 * if the repository was found in gotd.conf.
-	 * Otherwise invoke native git(1) tooling.
+	 * Invoke our custom Git server if the repository was found
+	 * in gotd.conf. Otherwise invoke native git(1) tooling.
 	 */
 	switch (pid = fork()) {
 	case -1:
 		goto done;
 	case 0:
-		if (repo && myserver) {
+		if (repo) {
+			if (myserver == NULL) {
+				error = got_error_fmt(GOT_ERR_NO_PROG,
+				    "cannot run '%s'",
+				    GITWRAPPER_MY_SERVER_PROG);
+				goto done;
+			}
 			if (execl(myserver, command, repo_name,
 			    (char *)NULL) ==  -1) {
 				error = got_error_from_errno2("execl",
