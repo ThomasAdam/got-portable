@@ -130,12 +130,12 @@ got_serve_parse_command(char **command, char **repo_path, const char *gitcmd)
 		goto done;
 	}
 	pathlen = strlen(abspath);
-	canonpath = malloc(pathlen);
+	canonpath = malloc(pathlen + 1);
 	if (canonpath == NULL) {
 		err = got_error_from_errno("malloc");
 		goto done;
 	}
-	err = got_canonpath(abspath, canonpath, pathlen);
+	err = got_canonpath(abspath, canonpath, pathlen + 1);
 	if (err)
 		goto done;
 
