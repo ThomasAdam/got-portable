@@ -19,7 +19,7 @@ SRCS=		gitwrapper.c parse.y log.c serve.c auth.c listen.c pkt.c \
 
 CLEANFILES = parse.h
 
-MAN =		${PROG}.conf.5 ${PROG}.1
+MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}/../gotd
 
