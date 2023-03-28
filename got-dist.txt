@@ -5,6 +5,10 @@
 /Makefile.inc
 /README
 /TODO
+/gitwrapper
+/gitwrapper/Makefile
+/gitwrapper/gitwrapper.1
+/gitwrapper/gitwrapper.c
 /got
 /got-version.mk
 /got/Makefile

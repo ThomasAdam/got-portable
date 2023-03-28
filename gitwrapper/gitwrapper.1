@@ -1,0 +1,114 @@
+.\"
+.\" Copyright (c) 2023 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GITWRAPPER 1
+.Os
+.Sh NAME
+.Nm gitwrapper
+.Nd invoke an appropriate Git repository server
+.Sh SYNOPSIS
+.Nm Fl c Sq Cm git-receive-pack Ar repository-path
+.Nm Fl c Sq Cm git-upload-pack Ar repository-path
+.Sh DESCRIPTION
+At one time, the only Git repository server software easily available
+was built into
+.Xr git-upload-pack 1
+and
+.Xr git-receive-pack 1
+which are part of the
+.Xr git 1
+suite.
+As a result of this, most Git client implementations had the path and
+calling conventions expected by
+.Xr git 1
+compiled in.
+.Pp
+Times have changed, however.  On a modern system, the administrator may
+wish to use one of several available Git repository servers, such as
+.Xr gotd 8 .
+.Pp
+It would be difficult to modify all Git client software typically available
+on a system, so most of the authors of alternative Git servers have written
+their programs so that they use the same calling conventions as
+.Xr git-upload-pack 1
+and
+.Xr git-receive-pack 1
+and may be put into place in their stead.
+.Pp
+Although having drop-in replacements for
+.Xr git-upload-pack 1
+and
+.Xr git-receive-pack 1
+helps in installing alternative Git servers, it essentially makes the
+configuration of the system depend on hard installing new programs in /usr.
+This leads to configuration problems for many administrators, since they may
+wish to install a new Git server without altering the system provided /usr.
+(This may be, for example, to avoid having upgrade problems when a new
+version of the system is installed over the old.)  They may also have a
+shared /usr among several machines, and may wish to avoid placing implicit
+configuration information in a read-only /usr.
+.Pp
+The
+.Nm
+program is designed to replace
+.Xr git-upload-pack 1
+and
+.Xr git-receive-pack 1
+and to invoke an appropriate Git server based on configuration information
+placed in
+.Xr gotd.conf 5 .
+This permits the administrator to configure which Git server is to be
+invoked on the system at run-time.
+Git repositories which are listed in
+.Xr gotd.conf 5
+and exist on the filesystem will be served by
+.Xr gotsh 1 .
+Any other Git repositories will be served by
+.Xr git-upload-pack 1
+and
+.Xr git-receive-pack 1 .
+.Sh FILES
+Configuration for
+.Xr gotd 8
+is kept in
+.Pa /etc/gotd.conf.
+.Pp
+.Pa git-upload-pack
+and
+.Pa git-receive-pack
+are typically set up as a symlink to
+.Nm
+which is not usually invoked on its own.
+.Sh ENVIRONMENT
+.Bl -tag -width GOTD_CONF_PATH
+.It Ev GOTD_CONF_PATH
+Set the path to the configuration file for
+.Xr gotd 8 .
+If not specified, the default path
+.Pa /etc/gotd.conf
+will be used.
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr gotd.conf 5 ,
+.Xr gotd 8 ,
+.Xr mailwrapper 8
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org
+.Sh BUGS
+The entire reason this program exists is a crock. Instead, a command for
+invoking a Git server should be standardized or the Git protocol should
+be changed to make the path to the program discoverable by Git clients.

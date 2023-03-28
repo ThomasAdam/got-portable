@@ -73,6 +73,7 @@ This will install the following commands:
  gotd, the repository server program
  gotctl, the server control utility
  gotsh, the login shell for users accessing the server via the network
+ gitwrapper, like mailwrapper(8) but for git-upload-pack and git-receive-pack
 
 See the following manual page files for information about server setup:
 
@@ -80,6 +81,7 @@ See the following manual page files for information about server setup:
  $ man -l gotd/gotd.conf.5
  $ man -l gotctl/gotctl.8
  $ man -l gotsh/gotsh.1
+ $ man -l gitwrapper/gitwrapper.1
 
 See regress/gotd/README for information about running the server test suite.
 
