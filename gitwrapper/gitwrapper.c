@@ -196,7 +196,7 @@ main(int argc, char *argv[])
 				error = got_error_from_errno2("execl",
 				    myserver);
 				goto done;
-			 }
+			}
 		} else {
 			if (asprintf(&gitcommand, "%s/%s",
 			    GITWRAPPER_GIT_LIBEXEC_DIR, command) == -1) {
@@ -208,7 +208,7 @@ main(int argc, char *argv[])
 				error = got_error_from_errno2("execl",
 				    gitcommand);
 				goto done;
-			 }
+			}
 		}
 		_exit(127);
 	}
