@@ -7,7 +7,7 @@ SUBDIR += regress
 .endif
 
 .if make(clean) || make(obj) || make(release)
-SUBDIR += gotwebd gotd gotsh gotctl template
+SUBDIR += gotwebd gotd gotsh gotctl template gitwrapper
 .endif
 
 .if make(tags) || make(cleandir)
@@ -49,11 +49,13 @@ server:
 	${MAKE} -C gotctl
 	${MAKE} -C gotd
 	${MAKE} -C gotsh
+	${MAKE} -C gitwrapper
 
 server-install:
 	${MAKE} -C gotctl install
 	${MAKE} -C gotd install
 	${MAKE} -C gotsh install
+	${MAKE} -C gitwrapper install
 
 server-regress:
 	${MAKE} -C regress/gotd

@@ -892,3 +892,21 @@ symget(const char *nam)
 	}
 	return (NULL);
 }
+
+struct gotd_repo *
+gotd_find_repo_by_name(const char *repo_name, struct gotd *gotd)
+{
+	struct gotd_repo *repo;
+	size_t namelen;
+
+	TAILQ_FOREACH(repo, &gotd->repos, entry) {
+		namelen = strlen(repo->name);
+		if (strncmp(repo->name, repo_name, namelen) != 0)
+			continue;
+		if (repo_name[namelen] == '\0' ||
+		    strcmp(&repo_name[namelen], ".git") == 0)
+			return repo;
+	}
+
+	return NULL;
+}

@@ -499,24 +499,6 @@ stop_gotd(struct gotd_client *client)
 	return NULL;
 }
 
-static struct gotd_repo *
-find_repo_by_name(const char *repo_name)
-{
-	struct gotd_repo *repo;
-	size_t namelen;
-
-	TAILQ_FOREACH(repo, &gotd.repos, entry) {
-		namelen = strlen(repo->name);
-		if (strncmp(repo->name, repo_name, namelen) != 0)
-			continue;
-		if (repo_name[namelen] == '\0' ||
-		    strcmp(&repo_name[namelen], ".git") == 0)
-			return repo;
-	}
-
-	return NULL;
-}
-
 static const struct got_error *
 start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 {
@@ -541,7 +523,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		err = ensure_client_is_not_writing(client);
 		if (err)
 			return err;
-		repo = find_repo_by_name(ireq.repo_name);
+		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 		err = start_auth_child(client, GOTD_AUTH_READ, repo,
@@ -553,7 +535,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		err = ensure_client_is_not_reading(client);
 		if (err)
 			return err;
-		repo = find_repo_by_name(ireq.repo_name);
+		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 		err = start_auth_child(client,
@@ -1142,7 +1124,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		goto done;
 	}
 
-	repo = find_repo_by_name(client->auth->repo_name);
+	repo = gotd_find_repo_by_name(client->auth->repo_name, &gotd);
 	if (repo == NULL) {
 		err = got_error(GOT_ERR_NOT_GIT_REPO);
 		goto done;
@@ -1292,8 +1274,9 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 
 		if (do_start_repo_child) {
 			struct gotd_repo *repo;
+			const char *name = client->session->repo_name;
 
-			repo = find_repo_by_name(client->session->repo_name);
+			repo = gotd_find_repo_by_name(name, &gotd);
 			if (repo != NULL) {
 				enum gotd_procid proc_type;
 
