@@ -21,7 +21,6 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <sys/wait.h>
 
 #include <err.h>
 #include <errno.h>
@@ -104,13 +103,11 @@ main(int argc, char *argv[])
 	char *gitcommand = NULL;
 	struct gotd gotd;
 	struct gotd_repo *repo = NULL;
-	pid_t pid;
-	int st = -1;
 
 	log_init(1, LOG_USER); /* Log to stderr. */
 
 #ifndef PROFILE
-	if (pledge("stdio rpath proc exec unveil", NULL) == -1)
+	if (pledge("stdio rpath exec unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -140,7 +137,7 @@ main(int argc, char *argv[])
 		goto done;
 
 #ifndef PROFILE
-	if (pledge("stdio proc exec", NULL) == -1)
+	if (pledge("stdio exec", NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -180,43 +177,25 @@ main(int argc, char *argv[])
 	 * Invoke our custom Git server if the repository was found
 	 * in gotd.conf. Otherwise invoke native git(1) tooling.
 	 */
-	switch (pid = fork()) {
-	case -1:
-		goto done;
-	case 0:
-		if (repo) {
-			if (myserver == NULL) {
-				error = got_error_fmt(GOT_ERR_NO_PROG,
-				    "cannot run '%s'",
-				    GITWRAPPER_MY_SERVER_PROG);
-				goto done;
-			}
-			if (execl(myserver, command, repo_name,
-			    (char *)NULL) ==  -1) {
-				error = got_error_from_errno2("execl",
-				    myserver);
-				goto done;
-			}
-		} else {
-			if (asprintf(&gitcommand, "%s/%s",
-			    GITWRAPPER_GIT_LIBEXEC_DIR, command) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			if (execl(gitcommand, gitcommand, repo_path,
-			    (char *)NULL) == -1) {
-				error = got_error_from_errno2("execl",
-				    gitcommand);
-				goto done;
-			}
+	if (repo) {
+		if (myserver == NULL) {
+			error = got_error_fmt(GOT_ERR_NO_PROG,
+			    "cannot run '%s'",
+			    GITWRAPPER_MY_SERVER_PROG);
+			goto done;
 		}
-		_exit(127);
+		execl(myserver, command, repo_name, (char *)NULL);
+		error = got_error_from_errno2("execl", myserver);
+	} else {
+		if (asprintf(&gitcommand, "%s/%s",
+		    GITWRAPPER_GIT_LIBEXEC_DIR, command) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		execl(gitcommand, gitcommand, repo_path, (char *)NULL);
+		error = got_error_from_errno2("execl", gitcommand);
 	}
 
-	while (waitpid(pid, &st, 0) == -1) {
-		if (errno != EINTR)
-			break;
-	}
 done:
 	free(command);
 	free(repo_name);
