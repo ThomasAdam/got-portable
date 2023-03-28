@@ -36,8 +36,9 @@ calling conventions expected by
 .Xr git 1
 compiled in.
 .Pp
-Times have changed, however.  On a modern system, the administrator may
-wish to use one of several available Git repository servers, such as
+Times have changed, however.
+On a modern system, the administrator may wish to use one of several
+available Git repository servers, such as
 .Xr gotd 8 .
 .Pp
 It would be difficult to modify all Git client software typically available
@@ -53,13 +54,18 @@ Although having drop-in replacements for
 and
 .Xr git-receive-pack 1
 helps in installing alternative Git servers, it essentially makes the
-configuration of the system depend on hard installing new programs in /usr.
+configuration of the system depend on hard installing new programs in
+.Pa /usr .
 This leads to configuration problems for many administrators, since they may
-wish to install a new Git server without altering the system provided /usr.
+wish to install a new Git server without altering the system provided
+.Pa /usr .
 (This may be, for example, to avoid having upgrade problems when a new
-version of the system is installed over the old.)  They may also have a
-shared /usr among several machines, and may wish to avoid placing implicit
-configuration information in a read-only /usr.
+version of the system is installed over the old.)
+They may also have a shared
+.Pa /usr
+among several machines, and may wish to avoid placing implicit
+configuration information in a read-only
+.Pa /usr .
 .Pp
 The
 .Nm
@@ -80,18 +86,6 @@ Any other Git repositories will be served by
 .Xr git-upload-pack 1
 and
 .Xr git-receive-pack 1 .
-.Sh FILES
-Configuration for
-.Xr gotd 8
-is kept in
-.Pa /etc/gotd.conf.
-.Pp
-.Pa git-upload-pack
-and
-.Pa git-receive-pack
-are typically set up as a symlink to
-.Nm
-which is not usually invoked on its own.
 .Sh ENVIRONMENT
 .Bl -tag -width GOTD_CONF_PATH
 .It Ev GOTD_CONF_PATH
@@ -101,6 +95,18 @@ If not specified, the default path
 .Pa /etc/gotd.conf
 will be used.
 .El
+.Sh FILES
+Configuration for
+.Xr gotd 8
+is kept in
+.Pa /etc/gotd.conf .
+.Pp
+.Pa git-upload-pack
+and
+.Pa git-receive-pack
+are typically set up as a symlink to
+.Nm
+which is not usually invoked on its own.
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr gotd.conf 5 ,
@@ -109,6 +115,7 @@ will be used.
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .Sh BUGS
-The entire reason this program exists is a crock. Instead, a command for
-invoking a Git server should be standardized or the Git protocol should
-be changed to make the path to the program discoverable by Git clients.
+The entire reason this program exists is a crock.
+Instead, a command for invoking a Git server should be standardized or
+the Git protocol should be changed to make the path to the program
+discoverable by Git clients.
