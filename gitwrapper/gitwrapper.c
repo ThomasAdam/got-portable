@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 	confpath = getenv("GOTD_CONF_PATH");
 	if (confpath == NULL)
 		confpath = GOTD_CONF_PATH;
-	parse_config(confpath, PROC_GOTD, &gotd);
+	parse_config(confpath, PROC_GOTD, &gotd, 0);
 
 	error = apply_unveil(myserver);
 	if (error)

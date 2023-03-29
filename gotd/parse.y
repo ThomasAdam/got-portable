@@ -56,7 +56,7 @@ static struct file {
 	int			 lineno;
 	int			 errors;
 } *file;
-struct file	*newfile(const char *, int);
+struct file	*newfile(const char *, int, int);
 static void	 closefile(struct file *);
 int		 check_file_secrecy(int, const char *);
 int		 yyparse(void);
@@ -624,7 +624,7 @@ check_file_secrecy(int fd, const char *fname)
 }
 
 struct file *
-newfile(const char *name, int secret)
+newfile(const char *name, int secret, int required)
 {
 	struct file *nfile;
 
@@ -641,7 +641,8 @@ newfile(const char *name, int secret)
 	}
 	nfile->stream = fopen(nfile->name, "r");
 	if (nfile->stream == NULL) {
-		log_warn("open %s", nfile->name);
+		if (required)
+			log_warn("open %s", nfile->name);
 		free(nfile->name);
 		free(nfile);
 		return (NULL);
@@ -666,7 +667,7 @@ closefile(struct file *xfile)
 
 int
 parse_config(const char *filename, enum gotd_procid proc_id,
-    struct gotd *env)
+    struct gotd *env, int require_config_file)
 {
 	struct sym *sym, *next;
 	struct gotd_repo *repo;
@@ -692,9 +693,9 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 	gotd->request_timeout.tv_sec = GOTD_DEFAULT_REQUEST_TIMEOUT;
 	gotd->request_timeout.tv_usec = 0;
 
-	file = newfile(filename, 0);
+	file = newfile(filename, 0, require_config_file);
 	if (file == NULL)
-		return -1;
+		return require_config_file ? -1 : 0;
 
 	yyparse();
 	errors = file->errors;
