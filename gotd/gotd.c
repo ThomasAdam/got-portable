@@ -1752,7 +1752,7 @@ main(int argc, char **argv)
 	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
 		fatalx("need root privileges");
 
-	if (parse_config(confpath, proc_id, &gotd) != 0)
+	if (parse_config(confpath, proc_id, &gotd, 1) != 0)
 		return 1;
 
 	pw = getpwnam(gotd.user_name);

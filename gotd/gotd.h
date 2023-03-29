@@ -446,7 +446,7 @@ struct gotd_imsg_auth {
 	uint32_t client_id;
 };
 
-int parse_config(const char *, enum gotd_procid, struct gotd *);
+int parse_config(const char *, enum gotd_procid, struct gotd *, int);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
 
 /* imsg.c */
