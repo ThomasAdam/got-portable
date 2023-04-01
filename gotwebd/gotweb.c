@@ -146,6 +146,10 @@ gotweb_process_request(struct request *c)
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
+	const char *rss_ctype = "application/rss+xml;charset=utf-8";
+	const uint8_t *buf;
+	size_t len;
+	int r, binary = 0;
 
 	/* init the transport */
 	error = gotweb_init_transport(&c->t);
@@ -200,11 +204,7 @@ gotweb_process_request(struct request *c)
 			goto err;
 	}
 
-	if (qs->action == BLOBRAW) {
-		const uint8_t *buf;
-		size_t len;
-		int binary, r;
-
+	if (qs->action == BLOBRAW || qs->action == BLOB) {
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto err;
@@ -213,7 +213,40 @@ gotweb_process_request(struct request *c)
 		    &binary, c);
 		if (error)
 			goto err;
+	}
 
+	switch(qs->action) {
+	case BLAME:
+		error = got_get_repo_commits(c, 1);
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_blame);
+		return;
+	case BLOB:
+		if (binary) {
+			struct gotweb_url url = {
+				.index_page = -1,
+				.page = -1,
+				.action = BLOBRAW,
+				.path = qs->path,
+				.commit = qs->commit,
+				.folder = qs->folder,
+				.file = qs->file,
+			};
+
+			gotweb_reply(c, 302, NULL, &url);
+			return;
+		}
+
+		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
+			return;
+		gotweb_render_page(c->tp, gotweb_render_blob);
+		return;
+	case BLOBRAW:
 		if (binary)
 			r = gotweb_reply_file(c, "application/octet-stream",
 			    qs->file, NULL);
@@ -232,66 +265,6 @@ gotweb_process_request(struct request *c)
 			if (fcgi_gen_binary_response(c, buf, len) == -1)
 				break;
 		}
-
-		return;
-	}
-
-	if (qs->action == BLOB) {
-		int binary;
-		struct gotweb_url url = {
-			.index_page = -1,
-			.page = -1,
-			.action = BLOBRAW,
-			.path = qs->path,
-			.commit = qs->commit,
-			.folder = qs->folder,
-			.file = qs->file,
-		};
-
-		error = got_get_repo_commits(c, 1);
-		if (error)
-			goto err;
-
-		error = got_open_blob_for_output(&c->t->blob, &c->t->fd,
-		    &binary, c);
-		if (error)
-			goto err;
-		if (binary) {
-			gotweb_reply(c, 302, NULL, &url);
-			return;
-		}
-	}
-
-	if (qs->action == RSS) {
-		const char *ctype = "application/rss+xml;charset=utf-8";
-
-		if (gotweb_reply_file(c, ctype, repo_dir->name, ".rss") == -1)
-			return;
-
-		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
-			return;
-		}
-		gotweb_render_rss(c->tp);
-		return;
-	}
-
-	switch(qs->action) {
-	case BLAME:
-		error = got_get_repo_commits(c, 1);
-		if (error) {
-			log_warnx("%s: %s", __func__, error->msg);
-			goto err;
-		}
-		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_blame);
-		return;
-	case BLOB:
-		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_blob);
 		return;
 	case BRIEFS:
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
@@ -335,6 +308,15 @@ gotweb_process_request(struct request *c)
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
 			return;
 		gotweb_render_page(c->tp, gotweb_render_index);
+		return;
+	case RSS:
+		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
+		if (error)
+			goto err;
+		if (gotweb_reply_file(c, rss_ctype, repo_dir->name, ".rss")
+		    == -1)
+			return;
+		gotweb_render_rss(c->tp);
 		return;
 	case SUMMARY:
 		error = got_ref_list(&c->t->refs, c->t->repo, "refs/heads",
