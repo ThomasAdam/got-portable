@@ -4977,9 +4977,9 @@ search_next_view_match(struct tog_view *view)
 
 	if (*match) {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = *match + 1;
+			lineno = *first + 1;
 		else
-			lineno = *match - 1;
+			lineno = *first - 1;
 	} else
 		lineno = *first - 1 + *selected;
 
