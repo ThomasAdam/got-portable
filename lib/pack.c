@@ -328,8 +328,7 @@ checksum:
 		got_hash_update(&ctx, h->trailer->packfile_sha1,
 		    SHA1_DIGEST_LENGTH);
 		got_hash_final(&ctx, hash);
-		if (got_hash_cmp(ctx.algo, hash, h->trailer->packidx_sha1)
-		    != 0)
+		if (got_hash_cmp(ctx.algo, hash, h->trailer->packidx_sha1) != 0)
 			err = got_error(GOT_ERR_PACKIDX_CSUM);
 	}
 done:
