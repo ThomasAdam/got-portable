@@ -1,0 +1,2 @@
+<!doctype html><html><head><title> *hello* </title></head><body> <h1> *hello* </h1> | other stuff<script>function greet() {console.log("hello, world");}(function() {greet();})();</script></body></html>
+<!doctype html><html><head><title>&lt;hello&gt;</title></head><body> <h1>&lt;hello&gt;</h1> | other stuff<script>function greet() {console.log("hello, world");}(function() {greet();})();</script></body></html>
