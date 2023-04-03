@@ -1,0 +1,33 @@
+{!
+#include <stdlib.h>
+
+#include "tmpl.h"
+
+int base(struct template *, const char *);
+
+!}
+
+{{ define base(struct template *tp, const char *title) }}
+{! char *foo = NULL; !}
+<!doctype html>
+<html>
+	<head>
+		<title>{{ title }}</title>
+	</head>
+	<body> {! /* TODO: frobnicate this line! */ !}
+		<h1>{{ title }}</h1>
+		{{ " | " }}
+		{{ "other stuff" }}
+		<script>
+			function greet() {
+				console.log("hello, world");
+			}
+			(function() {
+				greet();
+			})();
+		</script>
+	</body>
+</html>
+{{ finally }}
+{! free(foo); !}
+{{ end }}

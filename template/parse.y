@@ -552,14 +552,15 @@ newblock:
 			} else if (c == '{') {
 				starting = 1;
 				continue;
-			}
+			} else if (c == '\n')
+				break;
 
 			*p++ = c;
 			if ((size_t)(p - buf) >= sizeof(buf)) {
 				yyerror("string too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && c != '\n');
+		} while ((c = lgetc(0)) != EOF);
 		*p = '\0';
 		if (c == EOF) {
 			yyerror("unterminated block");
@@ -586,14 +587,15 @@ newblock:
 			} else if (c == '!') {
 				ending = 1;
 				continue;
-			}
+			} else if (c == '\n')
+				break;
 
 			*p++ = c;
 			if ((size_t)(p - buf) >= sizeof(buf)) {
 				yyerror("line too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && c != '\n');
+		} while ((c = lgetc(0)) != EOF);
 		*p = '\0';
 
 		if (c == EOF) {
