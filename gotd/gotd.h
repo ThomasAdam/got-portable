@@ -85,6 +85,9 @@ struct gotd_repo {
 	char path[PATH_MAX];
 
 	struct gotd_access_rule_list rules;
+	struct got_pathlist_head protected_tag_namespaces;
+	struct got_pathlist_head protected_branch_namespaces;
+	struct got_pathlist_head protected_branches;
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
 
@@ -448,6 +451,7 @@ struct gotd_imsg_auth {
 
 int parse_config(const char *, enum gotd_procid, struct gotd *, int);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
+struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 
 /* imsg.c */
 const struct got_error *gotd_imsg_flush(struct imsgbuf *);

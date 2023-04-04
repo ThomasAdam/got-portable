@@ -33,6 +33,7 @@
 
 #include "got_error.h"
 #include "got_version.h"
+#include "got_path.h"
 
 #include "got_lib_gitproto.h"
 

@@ -110,6 +110,33 @@ got_object_id_hex(struct got_object_id *id, char *buf, size_t len)
 	return got_sha1_digest_to_str(id->sha1, buf, len);
 }
 
+const struct got_error *
+got_object_type_label(const char **label, int obj_type)
+{
+	const struct got_error *err = NULL;
+
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_BLOB:
+		*label = GOT_OBJ_LABEL_BLOB;
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		*label = GOT_OBJ_LABEL_TREE;
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		*label = GOT_OBJ_LABEL_COMMIT;
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		*label = GOT_OBJ_LABEL_TAG;
+		break;
+	default:
+		*label = NULL;
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		break;
+	}
+
+	return err;
+}
+
 void
 got_object_close(struct got_object *obj)
 {

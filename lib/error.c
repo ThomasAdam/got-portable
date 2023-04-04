@@ -226,8 +226,8 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_BAD_REQUEST, "unexpected request received" },
 	{ GOT_ERR_CLIENT_ID, "unknown client identifier" },
 	{ GOT_ERR_REPO_TEMPFILE, "no repository tempfile available" },
-	{ GOT_ERR_REFS_PROTECTED, "reference namespace may not be modified" },
-	{ GOT_ERR_REF_PROTECTED," reference may not be modified" },
+	{ GOT_ERR_REFS_PROTECTED, "reference namespace is protected" },
+	{ GOT_ERR_REF_PROTECTED, "reference is protected" },
 	{ GOT_ERR_REF_BUSY, "reference cannot be updated; please try again" },
 	{ GOT_ERR_COMMIT_BAD_AUTHOR, "commit author formatting would "
 	    "make Git unhappy" },

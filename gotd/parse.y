@@ -44,6 +44,7 @@
 
 #include "got_error.h"
 #include "got_path.h"
+#include "got_reference.h"
 
 #include "log.h"
 #include "gotd.h"
@@ -92,6 +93,14 @@ static int			 conf_limit_user_connections(const char *, int);
 static struct gotd_repo		*conf_new_repo(const char *);
 static void			 conf_new_access_rule(struct gotd_repo *,
 				    enum gotd_access, int, char *);
+static int			 conf_protect_ref_namespace(
+				    struct got_pathlist_head *, char *);
+static int			 conf_protect_tag_namespace(struct gotd_repo *,
+				    char *);
+static int			 conf_protect_branch_namespace(
+				    struct gotd_repo *, char *);
+static int			 conf_protect_branch(struct gotd_repo *,
+				    char *);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
@@ -107,6 +116,7 @@ typedef struct {
 
 %token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
+%token	PROTECT NAMESPACE BRANCH TAG
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -229,6 +239,44 @@ conflags	: REQUEST TIMEOUT timeout		{
 		}
 		;
 
+protect		: PROTECT '{' optnl protectflags_l '}'
+		| PROTECT protectflags
+
+protectflags_l	: protectflags optnl protectflags_l
+		| protectflags optnl
+		;
+
+protectflags	: TAG NAMESPACE STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_REPO_WRITE) {
+				if (conf_protect_tag_namespace(new_repo, $3)) {
+					free($3);
+					YYERROR;
+				}
+			}
+		}
+		| BRANCH NAMESPACE STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_REPO_WRITE) {
+				if (conf_protect_branch_namespace(new_repo,
+				    $3)) {
+					free($3);
+					YYERROR;
+				}
+				free($3);
+			}
+		}
+		| BRANCH STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_REPO_WRITE) {
+				if (conf_protect_branch(new_repo, $2)) {
+					free($2);
+					YYERROR;
+				}
+			}
+		}
+		;
+
 repository	: REPOSITORY STRING {
 			struct gotd_repo *repo;
 
@@ -241,7 +289,8 @@ repository	: REPOSITORY STRING {
 			}
 
 			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_AUTH) {
+			    gotd_proc_id == PROC_AUTH ||
+			    gotd_proc_id == PROC_REPO_WRITE) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -251,7 +300,8 @@ repository	: REPOSITORY STRING {
 
 repoopts1	: PATH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_AUTH) {
+			    gotd_proc_id == PROC_AUTH ||
+			    gotd_proc_id == PROC_REPO_WRITE) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -285,6 +335,7 @@ repoopts1	: PATH STRING {
 				    GOTD_ACCESS_DENIED, 0, $2);
 			}
 		}
+		| protect
 		;
 
 repoopts2	: repoopts2 repoopts1 nl
@@ -332,17 +383,21 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{ "branch",			BRANCH },
 		{ "connection",			CONNECTION },
 		{ "deny",			DENY },
 		{ "limit",			LIMIT },
 		{ "listen",			LISTEN },
+		{ "namespace",			NAMESPACE },
 		{ "on",				ON },
 		{ "path",			PATH },
 		{ "permit",			PERMIT },
+		{ "protect",			PROTECT },
 		{ "repository",			REPOSITORY },
 		{ "request",			REQUEST },
 		{ "ro",				RO },
 		{ "rw",				RW },
+		{ "tag",			TAG },
 		{ "timeout",			TIMEOUT },
 		{ "user",			USER },
 	};
@@ -811,6 +866,9 @@ conf_new_repo(const char *name)
 		fatalx("%s: calloc", __func__);
 
 	STAILQ_INIT(&repo->rules);
+	TAILQ_INIT(&repo->protected_tag_namespaces);
+	TAILQ_INIT(&repo->protected_branch_namespaces);
+	TAILQ_INIT(&repo->protected_branches);
 
 	if (strlcpy(repo->name, name, sizeof(repo->name)) >=
 	    sizeof(repo->name))
@@ -837,6 +895,94 @@ conf_new_access_rule(struct gotd_repo *repo, enum gotd_access access,
 	rule->identifier = identifier;
 
 	STAILQ_INSERT_TAIL(&repo->rules, rule, entry);
+}
+
+static int
+refname_is_valid(char *refname)
+{
+	if (strlen(refname) < 5 || strncmp(refname, "refs/", 5) != 0) {
+		yyerror("reference name must begin with \"refs/\": %s",
+		    refname);
+		return 0;
+	}
+
+	if (!got_ref_name_is_valid(refname)) {
+		yyerror("invalid reference name: %s", refname);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int
+conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
+{
+	const struct got_error *error;
+	char *s;
+
+	got_path_strip_trailing_slashes(namespace);
+	if (!refname_is_valid(namespace))
+		return -1;
+	if (asprintf(&s, "%s/", namespace) == -1) {
+		yyerror("asprintf: %s", strerror(errno));
+		return -1;
+	}
+
+	error = got_pathlist_insert(NULL, refs, s, NULL);
+	if (error) {
+		yyerror("got_pathlist_insert: %s", error->msg);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+conf_protect_tag_namespace(struct gotd_repo *repo, char *namespace)
+{
+	return conf_protect_ref_namespace(&repo->protected_tag_namespaces,
+	    namespace);
+}
+
+static int
+conf_protect_branch_namespace(struct gotd_repo *repo, char *namespace)
+{
+	return conf_protect_ref_namespace(&repo->protected_branch_namespaces,
+	    namespace);
+}
+
+static int
+conf_protect_branch(struct gotd_repo *repo, char *branchname)
+{
+	const struct got_error *error;
+	char *refname;
+
+	if (strncmp(branchname, "refs/heads/", 11) != 0) {
+		if (asprintf(&refname, "refs/heads/%s", branchname) == -1) {
+			yyerror("asprintf: %s", strerror(errno));
+			return -1;
+		}
+	} else {
+		refname = strdup(branchname);
+		if (refname == NULL) {
+			yyerror("strdup: %s", strerror(errno));
+			return -1;
+		}
+	}
+
+	if (!refname_is_valid(refname)) {
+		free(refname);
+		return -1;
+	}
+
+	error = got_pathlist_insert(NULL, &repo->protected_branches,
+	    refname, NULL);
+	if (error) {
+		yyerror("got_pathlist_insert: %s", error->msg);
+		return -1;
+	}
+
+	return 0;
 }
 
 int
@@ -906,6 +1052,19 @@ gotd_find_repo_by_name(const char *repo_name, struct gotd *gotd)
 			continue;
 		if (repo_name[namelen] == '\0' ||
 		    strcmp(&repo_name[namelen], ".git") == 0)
+			return repo;
+	}
+
+	return NULL;
+}
+
+struct gotd_repo *
+gotd_find_repo_by_path(const char *repo_path, struct gotd *gotd)
+{
+	struct gotd_repo *repo;
+
+	TAILQ_FOREACH(repo, &gotd->repos, entry) {
+		if (strcmp(repo->path, repo_path) == 0)
 			return repo;
 	}
 

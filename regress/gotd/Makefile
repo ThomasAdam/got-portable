@@ -3,7 +3,8 @@
 REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
-	test_repo_write test_repo_write_empty test_request_bad
+	test_repo_write test_repo_write_empty test_request_bad \
+	test_repo_write_protected
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
@@ -134,6 +135,19 @@ start_gotd_rw: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_rw_protected: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo '    protect branch "foo"' >> $(PWD)/gotd.conf
+	@echo '    protect tag namespace "refs/tags/"' >> $(PWD)/gotd.conf
+	@echo '    protect branch "refs/heads/main"' >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
@@ -187,6 +201,12 @@ test_repo_write: prepare_test_repo start_gotd_rw
 test_repo_write_empty: prepare_test_repo_empty start_gotd_rw
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_write_empty.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
+
+test_repo_write_protected: prepare_test_repo start_gotd_rw_protected
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./repo_write_protected.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 	

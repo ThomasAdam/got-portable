@@ -86,7 +86,28 @@ got_object_open_from_packfile(struct got_object **obj, struct got_object_id *id,
     struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
     struct got_repository *repo)
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *err;
+
+	*obj = got_repo_get_cached_object(repo, id);
+	if (*obj != NULL) {
+		(*obj)->refcnt++;
+		return NULL;
+	}
+
+	err = got_packfile_open_object(obj, pack, packidx, obj_idx, id);
+	if (err)
+		return err;
+	(*obj)->refcnt++;
+
+	err = got_repo_cache_object(repo, id, *obj);
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
+		return err;
+	}
+	(*obj)->refcnt++;
+	return NULL;
 }
 
 const struct got_error *
