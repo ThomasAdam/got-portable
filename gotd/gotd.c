@@ -1697,6 +1697,7 @@ main(int argc, char **argv)
 	enum gotd_procid proc_id = PROC_GOTD;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 	int *pack_fds = NULL, *temp_fds = NULL;
+	struct gotd_repo *repo = NULL;
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
@@ -1894,7 +1895,13 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		apply_unveil_repo_readonly(repo_path);
-		repo_write_main(title, repo_path, pack_fds, temp_fds);
+		repo = gotd_find_repo_by_path(repo_path, &gotd);
+		if (repo == NULL)
+			fatalx("no repository for path %s", repo_path);
+		repo_write_main(title, repo_path, pack_fds, temp_fds,
+		    &repo->protected_tag_namespaces,
+		    &repo->protected_branch_namespaces,
+		    &repo->protected_branches);
 		/* NOTREACHED */
 		exit(0);
 	default:

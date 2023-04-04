@@ -14,5 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void repo_write_main(const char *, const char *, int *, int *);
+void repo_write_main(const char *, const char *, int *, int *,
+    struct got_pathlist_head *, struct got_pathlist_head *,
+    struct got_pathlist_head *);
 void repo_write_shutdown(void);

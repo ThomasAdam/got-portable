@@ -44,6 +44,8 @@
 #include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
+#include "got_lib_object_idset.h"
+#include "got_lib_object_parse.h"
 #include "got_lib_ratelimit.h"
 #include "got_lib_pack.h"
 #include "got_lib_pack_index.h"
@@ -66,6 +68,9 @@ static struct repo_write {
 	int *temp_fds;
 	int session_fd;
 	struct gotd_imsgev session_iev;
+	struct got_pathlist_head *protected_tag_namespaces;
+	struct got_pathlist_head *protected_branch_namespaces;
+	struct got_pathlist_head *protected_branches;
 } repo_write;
 
 struct gotd_ref_update {
@@ -309,7 +314,7 @@ done:
 }
 
 static const struct got_error *
-protect_ref_namespace(struct got_reference *ref, const char *namespace)
+validate_namespace(const char *namespace)
 {
 	size_t len = strlen(namespace);
 
@@ -319,10 +324,276 @@ protect_ref_namespace(struct got_reference *ref, const char *namespace)
 		    "reference namespace '%s'", namespace);
 	}
 
-	if (strncmp(namespace, got_ref_get_name(ref), len) == 0)
+	return NULL;
+}
+
+static const struct got_error *
+protect_ref_namespace(const char *refname, const char *namespace)
+{
+	const struct got_error *err;
+
+	err = validate_namespace(namespace);
+	if (err)
+		return err;
+
+	if (strncmp(namespace, refname, strlen(namespace)) == 0)
 		return got_error_fmt(GOT_ERR_REFS_PROTECTED, "%s", namespace);
 
 	return NULL;
+}
+
+static const struct got_error *
+verify_object_type(struct got_object_id *id, int expected_obj_type,
+    struct got_pack *pack, struct got_packidx *packidx)
+{
+	const struct got_error *err;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	struct got_object *obj;
+	int idx;
+	const char *typestr;
+
+	idx = got_packidx_get_object_idx(packidx, id);
+	if (idx == -1) {
+		got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
+		return got_error_fmt(GOT_ERR_BAD_PACKFILE,
+		    "object %s is missing from pack file", hex);
+	}
+
+	err = got_object_open_from_packfile(&obj, id, pack, packidx,
+	    idx, repo_write.repo);
+	if (err)
+		return err;
+
+	if (obj->type != expected_obj_type) {
+		got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
+		got_object_type_label(&typestr, expected_obj_type);
+		err = got_error_fmt(GOT_ERR_OBJ_TYPE,
+		    "%s is not pointing at a %s object", hex, typestr);
+	}
+	got_object_close(obj);
+	return err;
+}
+
+static const struct got_error *
+protect_tag_namespace(const char *namespace, struct got_pack *pack,
+    struct got_packidx *packidx, struct gotd_ref_update *ref_update)
+{
+	const struct got_error *err;
+
+	err = validate_namespace(namespace);
+	if (err)
+		return err;
+
+	if (strncmp(namespace, got_ref_get_name(ref_update->ref),
+	    strlen(namespace)) != 0)
+		return NULL;
+
+	if (!ref_update->ref_is_new)
+		return got_error_fmt(GOT_ERR_REFS_PROTECTED, "%s", namespace);
+
+	return verify_object_type(&ref_update->new_id, GOT_OBJ_TYPE_TAG,
+	    pack, packidx);
+}
+
+static const struct got_error *
+protect_require_yca(struct got_object_id *tip_id,
+    size_t max_commits_to_traverse, struct got_pack *pack,
+    struct got_packidx *packidx, struct got_reference *ref)
+{
+	const struct got_error *err;
+	uint8_t *buf = NULL;
+	size_t len;
+	struct got_object_id *expected_yca_id = NULL;
+	struct got_object *obj = NULL;
+	struct got_commit_object *commit = NULL;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	const struct got_object_id_queue *parent_ids;
+	struct got_object_id_queue ids;
+	struct got_object_qid *pid, *qid;
+	struct got_object_idset *traversed_set = NULL;
+	int found_yca = 0, obj_type;
+
+	STAILQ_INIT(&ids);
+
+	err = got_ref_resolve(&expected_yca_id, repo_write.repo, ref);
+	if (err)
+		return err;
+	
+	err = got_object_get_type(&obj_type, repo_write.repo, expected_yca_id);
+	if (err)
+		goto done;
+
+	if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+		got_sha1_digest_to_str(expected_yca_id->sha1, hex, sizeof(hex));
+		err = got_error_fmt(GOT_ERR_OBJ_TYPE,
+		    "%s is not pointing at a commit object", hex);
+		goto done;
+	}
+
+	traversed_set = got_object_idset_alloc();
+	if (traversed_set == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	err = got_object_qid_alloc(&qid, tip_id);
+	if (err)
+		goto done;
+	STAILQ_INSERT_TAIL(&ids, qid, entry);
+	while (!STAILQ_EMPTY(&ids)) {
+		err = check_cancelled(NULL);
+		if (err)
+			break;
+
+		qid = STAILQ_FIRST(&ids);
+		if (got_object_id_cmp(&qid->id, expected_yca_id) == 0) {
+			found_yca = 1;
+			break;
+		}
+
+		if (got_object_idset_num_elements(traversed_set) >=
+		    max_commits_to_traverse)
+			break;
+
+		if (got_object_idset_contains(traversed_set, &qid->id)) {
+			STAILQ_REMOVE_HEAD(&ids, entry);
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
+		err = got_object_idset_add(traversed_set, &qid->id, NULL);
+		if (err)
+			goto done;
+
+		err = got_object_open(&obj, repo_write.repo, &qid->id);
+		if (err && err->code != GOT_ERR_NO_OBJ)
+			goto done;
+		err = NULL;
+		if (obj) {
+			err = got_object_commit_open(&commit, repo_write.repo,
+			    obj);
+			if (err)
+				goto done;
+		} else {
+			int idx;
+
+			idx = got_packidx_get_object_idx(packidx, &qid->id);
+			if (idx == -1) {
+				got_sha1_digest_to_str(qid->id.sha1,
+				    hex, sizeof(hex));
+				err = got_error_fmt(GOT_ERR_BAD_PACKFILE,
+				    "object %s is missing from pack file", hex);
+				goto done;
+			}
+
+			err = got_object_open_from_packfile(&obj, &qid->id,
+				pack, packidx, idx, repo_write.repo);
+			if (err)
+				goto done;
+
+			if (obj->type != GOT_OBJ_TYPE_COMMIT) {
+				got_sha1_digest_to_str(qid->id.sha1,
+				    hex, sizeof(hex));
+				err = got_error_fmt(GOT_ERR_OBJ_TYPE,
+				    "%s is not pointing at a commit object",
+				    hex);
+				goto done;
+			}
+
+			err = got_packfile_extract_object_to_mem(&buf, &len,
+			    obj, pack);
+			if (err)
+				goto done;
+
+			err = got_object_parse_commit(&commit, buf, len);
+			if (err)
+				goto done;
+
+			free(buf);
+			buf = NULL;
+		}
+
+		got_object_close(obj);
+		obj = NULL;
+
+		STAILQ_REMOVE_HEAD(&ids, entry);
+		got_object_qid_free(qid);
+		qid = NULL;
+
+		if (got_object_commit_get_nparents(commit) == 0)
+			break;
+
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		STAILQ_FOREACH(pid, parent_ids, entry) {
+			err = check_cancelled(NULL);
+			if (err)
+				goto done;
+			err = got_object_qid_alloc(&qid, &pid->id);
+			if (err)
+				goto done;
+			STAILQ_INSERT_TAIL(&ids, qid, entry);
+			qid = NULL;
+		}
+		got_object_commit_close(commit);
+		commit = NULL;
+	}
+
+	if (!found_yca) {
+		err = got_error_fmt(GOT_ERR_REF_PROTECTED, "%s",
+		    got_ref_get_name(ref));
+	}
+done:
+	got_object_idset_free(traversed_set);
+	got_object_id_queue_free(&ids);
+	free(buf);
+	if (obj)
+		got_object_close(obj);
+	if (commit)
+		got_object_commit_close(commit);
+	free(expected_yca_id);
+	return err;
+}
+
+static const struct got_error *
+protect_branch_namespace(const char *namespace, struct got_pack *pack,
+    struct got_packidx *packidx, struct gotd_ref_update *ref_update)
+{
+	const struct got_error *err;
+
+	err = validate_namespace(namespace);
+	if (err)
+		return err;
+
+	if (strncmp(namespace, got_ref_get_name(ref_update->ref),
+	    strlen(namespace)) != 0)
+		return NULL;
+
+	if (ref_update->ref_is_new) {
+		return verify_object_type(&ref_update->new_id,
+		    GOT_OBJ_TYPE_COMMIT, pack, packidx);
+	}
+
+	return protect_require_yca(&ref_update->new_id,
+	    be32toh(packidx->hdr.fanout_table[0xff]), pack, packidx,
+	    ref_update->ref);
+}
+
+static const struct got_error *
+protect_branch(const char *refname, struct got_pack *pack,
+    struct got_packidx *packidx, struct gotd_ref_update *ref_update)
+{
+	if (strcmp(refname, got_ref_get_name(ref_update->ref)) != 0)
+		return NULL;
+
+	/* Always allow new branches to be created. */
+	if (ref_update->ref_is_new) {
+		return verify_object_type(&ref_update->new_id,
+		    GOT_OBJ_TYPE_COMMIT, pack, packidx);
+	}
+
+	return protect_require_yca(&ref_update->new_id,
+	    be32toh(packidx->hdr.fanout_table[0xff]), pack, packidx,
+	    ref_update->ref);
 }
 
 static const struct got_error *
@@ -367,6 +638,12 @@ recv_ref_update(struct imsg *imsg)
 	if (err) {
 		if (err->code != GOT_ERR_NOT_REF)
 			goto done;
+		if (memcmp(ref_update->new_id.sha1,
+		    zero_id, sizeof(zero_id)) == 0) {
+			err = got_error_fmt(GOT_ERR_BAD_OBJ_ID,
+			    "%s", refname);
+			goto done;
+		}
 		err = got_ref_alloc(&ref, refname, &ref_update->new_id);
 		if (err)
 			goto done;
@@ -386,10 +663,10 @@ recv_ref_update(struct imsg *imsg)
 		goto done;
 	}
 
-	err = protect_ref_namespace(ref, "refs/got/");
+	err = protect_ref_namespace(got_ref_get_name(ref), "refs/got/");
 	if (err)
 		goto done;
-	err = protect_ref_namespace(ref, "refs/remotes/");
+	err = protect_ref_namespace(got_ref_get_name(ref), "refs/remotes/");
 	if (err)
 		goto done;
 
@@ -1046,7 +1323,9 @@ verify_packfile(void)
 	struct got_packidx *packidx = NULL;
 	struct stat sb;
 	char *id_str = NULL;
-	int idx = -1;
+	struct got_object *obj = NULL;
+	struct got_pathlist_entry *pe;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	if (STAILQ_EMPTY(&client->ref_updates)) {
 		return got_error_msg(GOT_ERR_BAD_REQUEST,
@@ -1079,16 +1358,50 @@ verify_packfile(void)
 		if (ref_update->delete_ref)
 			continue;
 
-		err = got_object_id_str(&id_str, &ref_update->new_id);
-		if (err)
-			goto done;
+		TAILQ_FOREACH(pe, repo_write.protected_tag_namespaces, entry) {
+			err = protect_tag_namespace(pe->path, &client->pack,
+			    packidx, ref_update);
+			if (err)
+				goto done;
+		}
 
-		idx = got_packidx_get_object_idx(packidx, &ref_update->new_id);
-		if (idx == -1) {
-			err = got_error_fmt(GOT_ERR_BAD_PACKFILE,
-			    "advertised object %s is missing from pack file",
-			    id_str);
+		/*
+		 * Objects which already exist in our repository need
+		 * not be present in the pack file.
+		 */
+		err = got_object_open(&obj, repo_write.repo,
+		    &ref_update->new_id);
+		if (err && err->code != GOT_ERR_NO_OBJ)
 			goto done;
+		err = NULL;
+		if (obj) {
+			got_object_close(obj);
+			obj = NULL;
+		} else {
+			int idx = got_packidx_get_object_idx(packidx,
+			    &ref_update->new_id);
+			if (idx == -1) {
+				got_sha1_digest_to_str(ref_update->new_id.sha1,
+				    hex, sizeof(hex));
+				err = got_error_fmt(GOT_ERR_BAD_PACKFILE,
+				    "object %s is missing from pack file",
+				    hex);
+				goto done;
+			}
+		}
+
+		TAILQ_FOREACH(pe, repo_write.protected_branch_namespaces,
+		    entry) {
+			err = protect_branch_namespace(pe->path,
+			    &client->pack, packidx, ref_update);
+			if (err)
+				goto done;
+		}
+		TAILQ_FOREACH(pe, repo_write.protected_branches, entry) {
+			err = protect_branch(pe->path, &client->pack,
+			    packidx, ref_update);
+			if (err)
+				goto done;
 		}
 	}
 
@@ -1097,7 +1410,48 @@ done:
 	if (close_err && err == NULL)
 		err = close_err;
 	free(id_str);
+	if (obj)
+		got_object_close(obj);
 	return err;
+}
+
+static const struct got_error *
+protect_refs_from_deletion(void)
+{
+	const struct got_error *err = NULL;
+	struct repo_write_client *client = &repo_write_client;
+	struct gotd_ref_update *ref_update;
+	struct got_pathlist_entry *pe;
+	const char *refname;
+
+	STAILQ_FOREACH(ref_update, &client->ref_updates, entry) {
+		if (!ref_update->delete_ref)
+			continue;
+
+		refname = got_ref_get_name(ref_update->ref);
+
+		TAILQ_FOREACH(pe, repo_write.protected_tag_namespaces, entry) {
+			err = protect_ref_namespace(refname, pe->path);
+			if (err)
+				return err;
+		}
+
+		TAILQ_FOREACH(pe, repo_write.protected_branch_namespaces,
+		    entry) {
+			err = protect_ref_namespace(refname, pe->path);
+			if (err)
+				return err;
+		}
+
+		TAILQ_FOREACH(pe, repo_write.protected_branches, entry) {
+			if (strcmp(refname, pe->path) == 0) {
+				return got_error_fmt(GOT_ERR_REF_PROTECTED,
+				    "%s", refname);
+			}
+		}
+	}
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -1307,6 +1661,9 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			}
 			break;
 		case GOTD_IMSG_RECV_PACKFILE:
+			err = protect_refs_from_deletion();
+			if (err)
+				break;
 			err = recv_packfile(&have_packfile, &imsg);
 			if (err) {
 				log_warnx("receive packfile: %s", err->msg);
@@ -1443,7 +1800,10 @@ repo_write_dispatch(int fd, short event, void *arg)
 
 void
 repo_write_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds)
+    int *pack_fds, int *temp_fds,
+    struct got_pathlist_head *protected_tag_namespaces,
+    struct got_pathlist_head *protected_branch_namespaces,
+    struct got_pathlist_head *protected_branches)
 {
 	const struct got_error *err = NULL;
 	struct repo_write_client *client = &repo_write_client;
@@ -1460,6 +1820,9 @@ repo_write_main(const char *title, const char *repo_path,
 	repo_write.temp_fds = temp_fds;
 	repo_write.session_fd = -1;
 	repo_write.session_iev.ibuf.fd = -1;
+	repo_write.protected_tag_namespaces = protected_tag_namespaces;
+	repo_write.protected_branch_namespaces = protected_branch_namespaces;
+	repo_write.protected_branches = protected_branches;
 
 	STAILQ_INIT(&repo_write_client.ref_updates);
 

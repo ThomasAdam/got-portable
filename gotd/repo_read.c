@@ -35,6 +35,7 @@
 #include "got_repository.h"
 #include "got_reference.h"
 #include "got_repository_admin.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"

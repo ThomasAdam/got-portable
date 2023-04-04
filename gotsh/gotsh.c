@@ -29,6 +29,7 @@
 
 #include "got_error.h"
 #include "got_serve.h"
+#include "got_path.h"
 
 #include "gotd.h"
 

@@ -23,6 +23,8 @@ struct got_pathlist_head;
  */
 char *got_object_id_hex(struct got_object_id *, char *, size_t);
 
+const struct got_error *got_object_type_label(const char **, int);
+
 const struct got_error *got_object_qid_alloc_partial(struct got_object_qid **);
 struct got_commit_object *got_object_commit_alloc_partial(void);
 struct got_tree_entry *got_alloc_tree_entry_partial(void);

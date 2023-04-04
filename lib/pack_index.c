@@ -102,33 +102,6 @@ putbe32(char *b, uint32_t n)
 }
 
 static const struct got_error *
-get_obj_type_label(const char **label, int obj_type)
-{
-	const struct got_error *err = NULL;
-
-	switch (obj_type) {
-	case GOT_OBJ_TYPE_BLOB:
-		*label = GOT_OBJ_LABEL_BLOB;
-		break;
-	case GOT_OBJ_TYPE_TREE:
-		*label = GOT_OBJ_LABEL_TREE;
-		break;
-	case GOT_OBJ_TYPE_COMMIT:
-		*label = GOT_OBJ_LABEL_COMMIT;
-		break;
-	case GOT_OBJ_TYPE_TAG:
-		*label = GOT_OBJ_LABEL_TAG;
-		break;
-	default:
-		*label = NULL;
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		break;
-	}
-
-	return err;
-}
-
-static const struct got_error *
 read_checksum(uint32_t *crc, struct got_hash *ctx, int fd, size_t len)
 {
 	uint8_t buf[8192];
@@ -238,7 +211,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		if (err)
 			break;
 		got_hash_init(&ctx, GOT_HASH_SHA1);
-		err = get_obj_type_label(&obj_label, obj->type);
+		err = got_object_type_label(&obj_label, obj->type);
 		if (err) {
 			free(data);
 			break;
@@ -437,7 +410,7 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 	err = got_delta_chain_get_base_type(&base_obj_type, &deltas);
 	if (err)
 		goto done;
-	err = get_obj_type_label(&obj_label, base_obj_type);
+	err = got_object_type_label(&obj_label, base_obj_type);
 	if (err)
 		goto done;
 	if (asprintf(&header, "%s %zd", obj_label, len) == -1) {
