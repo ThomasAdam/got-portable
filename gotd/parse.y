@@ -22,6 +22,8 @@
  */
 
 %{
+#include "got_compat.h"
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/queue.h>
@@ -34,8 +36,6 @@
 #include <imsg.h>
 #include <limits.h>
 #include <pwd.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>

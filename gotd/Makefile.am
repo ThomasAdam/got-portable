@@ -23,6 +23,7 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/gitconfig.c \
 	$(top_srcdir)/lib/gotconfig.c \
+	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/lockfile.c \
 	$(top_srcdir)/lib/murmurhash2.c \
@@ -32,6 +33,7 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/object_idset.c \
 	$(top_srcdir)/lib/object_open_io.c \
 	$(top_srcdir)/lib/object_parse.c \
+	$(top_srcdir)/lib/object_qid.c \
 	$(top_srcdir)/lib/opentemp.c \
 	$(top_srcdir)/lib/pack.c \
 	$(top_srcdir)/lib/pack_create.c \
@@ -45,7 +47,6 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/reference.c \
 	$(top_srcdir)/lib/reference_parse.c \
 	$(top_srcdir)/lib/repository.c \
-	$(top_srcdir)/lib/sha1.c \
 	$(top_srcdir)/lib/sigs.c
        
 gotd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
@@ -55,6 +56,15 @@ man5_MANS = gotd.conf.5
 man8_MANS = gotd.8
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
+LDADD += $(libuuid_LIBS) \
+	 $(zlib_LIBS) \
+	 $(libbsd_LIBS) \
+	 $(libevent_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
+
+AM_CPPFLAGS += $(libuuid_CFLAGS) \
+	       $(zlib_CFLAGS) \
+	       $(libbsd_CFLAGS) \
+	       $(libevent_CFLAGS)

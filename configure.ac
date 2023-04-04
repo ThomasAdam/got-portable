@@ -893,6 +893,7 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-read-patch/Makefile
 		 libexec/got-read-tag/Makefile
 		 libexec/got-send-pack/Makefile
+		 gitwrapper/Makefile
 		 got/Makefile
 		 gotadmin/Makefile
 		 gotwebd/Makefile

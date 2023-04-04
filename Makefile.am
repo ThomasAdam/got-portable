@@ -2,7 +2,7 @@ SUBDIRS = compat libexec got tog gotadmin template gotwebd cvg
 # TODO: gotd gotsh template
 
 if GOTD_ENABLED
-SUBDIRS += gotd gotsh gotctl
+SUBDIRS += gotd gotsh gotctl gitwrapper
 endif
 
 include $(top_builddir)/Makefile.common
