@@ -17,6 +17,12 @@
 #ifndef _GOT_COMPAT_H_2
 #define _GOT_COMPAT_H_2
 
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#else
+#include <inttypes.h>
+#endif
+
 #include <limits.h>
 #include <sys/uio.h>
 
@@ -165,12 +171,6 @@ void uuid_from_string(const char *, uuid_t *, uint32_t *);
 void uuid_to_string(uuid_t *, char **, uint32_t *);
 #else
 #include <uuid.h>
-#endif
-
-#ifdef HAVE_STDINT_H
-#include <stdint.h>
-#else
-#include <inttypes.h>
 #endif
 
 #ifdef HAVE_QUEUE_H

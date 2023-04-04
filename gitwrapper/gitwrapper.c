@@ -18,6 +18,8 @@
  * Resolve path namespace conflicts for git-upload-pack and git-receive-pack.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -25,15 +27,11 @@
 #include <err.h>
 #include <errno.h>
 #include <event.h>
-#include <imsg.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <syslog.h>
-#include <util.h>
 #include <unistd.h>
 
 #include "got_error.h"

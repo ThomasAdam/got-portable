@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -1564,6 +1566,11 @@ static void
 start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 {
 	struct gotd_child_proc *proc;
+	int sock_flags = SOCK_STREAM|SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
