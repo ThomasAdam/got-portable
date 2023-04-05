@@ -916,6 +916,7 @@ static int
 conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
 {
 	const struct got_error *error;
+	struct got_pathlist_entry *new;
 	char *s;
 
 	got_path_strip_trailing_slashes(namespace);
@@ -926,9 +927,13 @@ conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
 		return -1;
 	}
 
-	error = got_pathlist_insert(NULL, refs, s, NULL);
-	if (error) {
-		yyerror("got_pathlist_insert: %s", error->msg);
+	error = got_pathlist_insert(&new, refs, s, NULL);
+	if (error || new == NULL) {
+		free(s);
+		if (error)
+			yyerror("got_pathlist_insert: %s", error->msg);
+		else
+			yyerror("duplicate protect namespace %s", namespace);
 		return -1;
 	}
 
@@ -953,6 +958,7 @@ static int
 conf_protect_branch(struct gotd_repo *repo, char *branchname)
 {
 	const struct got_error *error;
+	struct got_pathlist_entry *new;
 	char *refname;
 
 	if (strncmp(branchname, "refs/heads/", 11) != 0) {
@@ -973,10 +979,14 @@ conf_protect_branch(struct gotd_repo *repo, char *branchname)
 		return -1;
 	}
 
-	error = got_pathlist_insert(NULL, &repo->protected_branches,
+	error = got_pathlist_insert(&new, &repo->protected_branches,
 	    refname, NULL);
-	if (error) {
-		yyerror("got_pathlist_insert: %s", error->msg);
+	if (error || new == NULL) {
+		free(refname);
+		if (error)
+			yyerror("got_pathlist_insert: %s", error->msg);
+		else
+			yyerror("duplicate protect branch %s", branchname);
 		return -1;
 	}
 
