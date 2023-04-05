@@ -254,6 +254,7 @@ protectflags	: TAG NAMESPACE STRING {
 					YYERROR;
 				}
 			}
+			free($3);
 		}
 		| BRANCH NAMESPACE STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -263,8 +264,8 @@ protectflags	: TAG NAMESPACE STRING {
 					free($3);
 					YYERROR;
 				}
-				free($3);
 			}
+			free($3);
 		}
 		| BRANCH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -274,6 +275,7 @@ protectflags	: TAG NAMESPACE STRING {
 					YYERROR;
 				}
 			}
+			free($2);
 		}
 		;
 
@@ -320,20 +322,23 @@ repoopts1	: PATH STRING {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
-			}
+			} else
+				free($3);
 		}
 		| PERMIT RW STRING {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED,
 				    GOTD_AUTH_READ | GOTD_AUTH_WRITE, $3);
-			}
+			} else
+				free($3);
 		}
 		| DENY STRING {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_DENIED, 0, $2);
-			}
+			} else
+				free($2);
 		}
 		| protect
 		;
