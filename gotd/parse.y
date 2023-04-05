@@ -93,7 +93,7 @@ static int			 conf_limit_user_connections(const char *, int);
 static struct gotd_repo		*conf_new_repo(const char *);
 static void			 conf_new_access_rule(struct gotd_repo *,
 				    enum gotd_access, int, char *);
-static int			 conf_protect_ref_namespace(
+static int			 conf_protect_ref_namespace(char **,
 				    struct got_pathlist_head *, char *);
 static int			 conf_protect_tag_namespace(struct gotd_repo *,
 				    char *);
@@ -920,11 +920,14 @@ refname_is_valid(char *refname)
 }
 
 static int
-conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
+conf_protect_ref_namespace(char **new, struct got_pathlist_head *refs,
+    char *namespace)
 {
 	const struct got_error *error;
-	struct got_pathlist_entry *new;
+	struct got_pathlist_entry *pe;
 	char *s;
+
+	*new = NULL;
 
 	got_path_strip_trailing_slashes(namespace);
 	if (!refname_is_valid(namespace))
@@ -934,8 +937,8 @@ conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
 		return -1;
 	}
 
-	error = got_pathlist_insert(&new, refs, s, NULL);
-	if (error || new == NULL) {
+	error = got_pathlist_insert(&pe, refs, s, NULL);
+	if (error || pe == NULL) {
 		free(s);
 		if (error)
 			yyerror("got_pathlist_insert: %s", error->msg);
@@ -944,21 +947,48 @@ conf_protect_ref_namespace(struct got_pathlist_head *refs, char *namespace)
 		return -1;
 	}
 
+	*new = s;
 	return 0;
 }
 
 static int
 conf_protect_tag_namespace(struct gotd_repo *repo, char *namespace)
 {
-	return conf_protect_ref_namespace(&repo->protected_tag_namespaces,
-	    namespace);
+	struct got_pathlist_entry *pe;
+	char *new;
+
+	if (conf_protect_ref_namespace(&new, &repo->protected_tag_namespaces,
+	    namespace) == -1)
+		return -1;
+
+	TAILQ_FOREACH(pe, &repo->protected_branch_namespaces, entry) {
+		if (strcmp(pe->path, new) == 0) {
+			yyerror("duplicate protect namespace %s", namespace);
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 static int
 conf_protect_branch_namespace(struct gotd_repo *repo, char *namespace)
 {
-	return conf_protect_ref_namespace(&repo->protected_branch_namespaces,
-	    namespace);
+	struct got_pathlist_entry *pe;
+	char *new;
+
+	if (conf_protect_ref_namespace(&new,
+	    &repo->protected_branch_namespaces, namespace) == -1)
+		return -1;
+
+	TAILQ_FOREACH(pe, &repo->protected_tag_namespaces, entry) {
+		if (strcmp(pe->path, new) == 0) {
+			yyerror("duplicate protect namespace %s", namespace);
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 static int
