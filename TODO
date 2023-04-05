@@ -77,9 +77,9 @@ gotd:
 - implement stress-tests to observe and fix misbehaviour under load
 - listener's fd-reserve limit needs to be reviewed and perhaps adjusted 
 - implement pre-commit checks (in lieu of hook scripts):
-  1. deny branch history rewriting ('got send -f') via gotd.conf
+  1. deny branch history rewriting ('got send -f') via gotd.conf [done]
   2. allow/deny creation/deletion of references via gotd.conf
-  3. deny modifications within a given reference namespace via gotd.conf
+  3. deny modifications within a given reference namespace via gotd.conf [done]
   4. entirely hide a given reference namespace from clients via gotd.conf
   5. allow/deny addition of binary files to a repo via gotd.conf
   6. enforce a particular blob size limit via gotd.conf
@@ -92,11 +92,9 @@ gotd:
 - keep track of available repository disk space and fail gracefully when
   uploaded pack files would fill up the disk too much, keeping a reserve
 - reuse packed non-delta objects directly (without re-deltification) for speed
-- create packfiles with filemode 444, like git does
 
 gotadmin:
 - teach 'gotadmin cleanup' to remove redundant pack files
 - add support for generating git-fast-export streams from a repository
 - add support for importing git-fast-export streams into a repository
-- create packfiles with filemode 444, like git does
 - speed up 'gotadmin pack -a' is too slow on repositories with many pack files
