@@ -941,7 +941,7 @@ conf_protect_ref_namespace(char **new, struct got_pathlist_head *refs,
 		if (error)
 			yyerror("got_pathlist_insert: %s", error->msg);
 		else
-			yyerror("duplicate protect namespace %s", namespace);
+			yyerror("duplicate protected namespace %s", namespace);
 		return -1;
 	}
 
@@ -961,7 +961,7 @@ conf_protect_tag_namespace(struct gotd_repo *repo, char *namespace)
 
 	TAILQ_FOREACH(pe, &repo->protected_branch_namespaces, entry) {
 		if (strcmp(pe->path, new) == 0) {
-			yyerror("duplicate protect namespace %s", namespace);
+			yyerror("duplicate protected namespace %s", namespace);
 			return -1;
 		}
 	}
@@ -981,7 +981,7 @@ conf_protect_branch_namespace(struct gotd_repo *repo, char *namespace)
 
 	TAILQ_FOREACH(pe, &repo->protected_tag_namespaces, entry) {
 		if (strcmp(pe->path, new) == 0) {
-			yyerror("duplicate protect namespace %s", namespace);
+			yyerror("duplicate protected namespace %s", namespace);
 			return -1;
 		}
 	}
