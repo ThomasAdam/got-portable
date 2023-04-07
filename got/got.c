@@ -968,6 +968,11 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (preserve_logmsg) {
 		fprintf(stderr, "%s: log message preserved in %s\n",
 		    getprogname(), logmsg_path);
@@ -3214,6 +3219,11 @@ done:
 		got_ref_close(head_ref);
 	if (ref)
 		got_ref_close(ref);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	free(commit_id_str);
 	free(commit_id);
@@ -3454,7 +3464,11 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 	    "'got checkout'.\n"
 	    "The got(1) manual page contains more information.", cmdname);
 	err = got_error_msg(GOT_ERR_NOT_WORKTREE, msg);
-	got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (close_err == NULL)
+			err = close_err;
+	}
 	if (pack_fds) {
 		const struct got_error *pack_err =
 		    got_repo_pack_fds_close(pack_fds);
@@ -3646,6 +3660,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
 	}
 	free(worktree_path);
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
@@ -6389,6 +6408,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
 	}
 
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
