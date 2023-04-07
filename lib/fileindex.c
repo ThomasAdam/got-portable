@@ -752,8 +752,10 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		if (err)
 			return err;
 		err = add_entry(fileindex, ie);
-		if (err)
+		if (err) {
+			got_fileindex_entry_free(ie);
 			return err;
+		}
 	}
 
 	n = fread(sha1_expected, 1, sizeof(sha1_expected), infile);
