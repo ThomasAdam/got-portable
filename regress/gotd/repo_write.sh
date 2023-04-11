@@ -458,8 +458,95 @@ EOF
 	test_done "$testroot" 0
 }
 
+test_rewind_branch() {
+	local testroot=`test_init rewind_branch 1`
+
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch foo) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got branch failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo modified alpha > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	if ! got send -q -r $testroot/repo-clone -b foo; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	local foo_id=`git_show_branch_head "$testroot/repo-clone" foo`
+	local main_id=`git_show_branch_head "$testroot/repo-clone" main`
+	local tag_id=`got ref -r "$testroot/repo-clone" -l refs/tags/1.0 | \
+		awk '{print $2}'`
+
+	(cd $testroot/wt && got update -c $main_id) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -d) >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got histedit failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	if ! got send -q -r $testroot/repo-clone -f -b foo; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
+	cat <<EOF >$testroot/refs.expected
+HEAD: refs/heads/main
+HEAD: $main_id
+refs/heads/foo: $main_id
+refs/heads/main: $main_id
+refs/tags/1.0: $tag_id
+EOF
+	if ! cmp -s $testroot/refs.expected $testroot/refs; then
+		diff -u $testroot/refs.expected $testroot/refs
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_fetch_more_history
 run_test test_send_new_empty_branch
 run_test test_delete_branch
+run_test test_rewind_branch

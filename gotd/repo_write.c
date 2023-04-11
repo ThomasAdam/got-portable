@@ -97,6 +97,7 @@ static struct repo_write_client {
 	int				 nref_updates;
 	int				 nref_del;
 	int				 nref_new;
+	int				 nref_move;
 } repo_write_client;
 
 static volatile sig_atomic_t sigint_received;
@@ -265,6 +266,7 @@ list_refs(struct imsg *imsg)
 	client->nref_updates = 0;
 	client->nref_del = 0;
 	client->nref_new = 0;
+	client->nref_move = 0;
 
 	imsg_init(&ibuf, client_fd);
 
@@ -971,6 +973,24 @@ validate_object_type(int obj_type)
 }
 
 static const struct got_error *
+ensure_all_objects_exist_locally(struct gotd_ref_updates *ref_updates)
+{
+	const struct got_error *err = NULL;
+	struct gotd_ref_update *ref_update;
+	struct got_object *obj;
+
+	STAILQ_FOREACH(ref_update, ref_updates, entry) {
+		err = got_object_open(&obj, repo_write.repo,
+		    &ref_update->new_id);
+		if (err)
+			return err;
+		got_object_close(obj);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
     int infd, int outfd)
 {
@@ -1019,8 +1039,20 @@ recv_packdata(off_t *outsize, uint32_t *nobj, uint8_t *sha1,
 		    client->nref_updates == client->nref_new)
 			return NULL;
 
-		return got_error_msg(GOT_ERR_BAD_PACKFILE,
-		    "bad packfile with zero objects");
+		/*
+		 * Clients which only move existing refs will send us an empty
+		 * pack file. All referenced objects must exist locally.
+		 */
+		err = ensure_all_objects_exist_locally(&client->ref_updates);
+		if (err) {
+			if (err->code != GOT_ERR_NO_OBJ)
+				return err;
+			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "bad packfile with zero objects");
+		}
+
+		client->nref_move = client->nref_updates;
+		return NULL;
 	}
 
 	log_debug("expecting %d objects", *nobj);
@@ -1269,6 +1301,16 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	if (nobj == 0 &&
 	    client->nref_del > 0 &&
 	    client->nref_updates == client->nref_del)
+		goto done;
+
+	/*
+	 * Clients which only move existing refs will send us an empty
+	 * pack file. All referenced objects must exist locally.
+	 */
+	if (nobj == 0 &&
+	    pack_filesize == sizeof(struct got_packfile_hdr) &&
+	    client->nref_move > 0 &&
+	    client->nref_updates == client->nref_move)
 		goto done;
 
 	pack->filesize = pack_filesize;
