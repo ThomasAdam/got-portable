@@ -30,6 +30,10 @@ DPADD = ${LIBZ} ${LIBUTIL}
 NOMAN = Yes
 .endif
 
+.if defined(TOG_REGRESS)
+CPPFLAGS += -DTOG_REGRESS
+.endif
+
 realinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
 	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}

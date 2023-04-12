@@ -611,6 +611,17 @@ struct tog_key_map {
 	enum tog_keymap_type	 type;
 };
 
+/* curses io for tog regress */
+struct tog_io {
+	FILE	*cin;
+	FILE	*cout;
+	FILE	*f;
+};
+
+#define TOG_SCREEN_DUMP		"SCREENDUMP"
+#define TOG_SCREEN_DUMP_LEN	(sizeof(TOG_SCREEN_DUMP) - 1)
+#define TOG_KEY_SCRDUMP		SHRT_MIN
+
 /*
  * We implement two types of views: parent views and child views.
  *
@@ -1413,6 +1424,122 @@ switch_split(struct tog_view *view)
 }
 
 /*
+ * Strip trailing whitespace from str starting at byte *n;
+ * if *n < 0, use strlen(str). Return new str length in *n.
+ */
+static void
+strip_trailing_ws(char *str, int *n)
+{
+	size_t x = *n;
+
+	if (str == NULL || *str == '\0')
+		return;
+
+	if (x < 0)
+		x = strlen(str);
+
+	while (x-- > 0 && isspace((unsigned char)str[x]))
+		str[x] = '\0';
+
+	*n = x + 1;
+}
+
+/*
+ * Extract visible substring of line y from the curses screen
+ * and strip trailing whitespace. If vline is set and locale is
+ * UTF-8, overwrite line[vline] with '|' because the ACS_VLINE
+ * character is written out as 'x'. Write the line to file f.
+ */
+static const struct got_error *
+view_write_line(FILE *f, int y, int vline)
+{
+	char	line[COLS * MB_LEN_MAX];  /* allow for multibyte chars */
+	int	r, w;
+
+	r = mvwinnstr(curscr, y, 0, line, sizeof(line));
+	if (r == ERR)
+		return got_error_fmt(GOT_ERR_RANGE,
+		    "failed to extract line %d", y);
+
+	/*
+	 * In some views, lines are padded with blanks to COLS width.
+	 * Strip them so we can diff without the -b flag when testing.
+	 */
+	strip_trailing_ws(line, &r);
+
+	if (vline > 0 && got_locale_is_utf8())
+		line[vline] = '|';
+
+	w = fprintf(f, "%s\n", line);
+	if (w != r + 1)		/* \n */
+		return got_ferror(f, GOT_ERR_IO);
+
+	return NULL;
+}
+
+/*
+ * Capture the visible curses screen by writing each line to the
+ * file at the path set via the TOG_SCR_DUMP environment variable.
+ */
+static const struct got_error *
+screendump(struct tog_view *view)
+{
+	const struct got_error	*err;
+	FILE			*f = NULL;
+	const char		*path;
+	int			 i;
+
+	path = getenv("TOG_SCR_DUMP");
+	if (path == NULL || *path == '\0')
+		return got_error_msg(GOT_ERR_BAD_PATH,
+		    "TOG_SCR_DUMP path not set to capture screen dump");
+	f = fopen(path, "wex");
+	if (f == NULL)
+		return got_error_from_errno_fmt("fopen: %s", path);
+
+	if ((view->child && view->child->begin_x) ||
+	    (view->parent && view->begin_x)) {
+		int ncols = view->child ? view->ncols : view->parent->ncols;
+
+		/* vertical splitscreen */
+		for (i = 0; i < view->nlines; ++i) {
+			err = view_write_line(f, i, ncols - 1);
+			if (err)
+				goto done;
+		}
+	} else {
+		int hline = 0;
+
+		/* fullscreen or horizontal splitscreen */
+		if ((view->child && view->child->begin_y) ||
+		    (view->parent && view->begin_y))	/* hsplit */
+			hline = view->child ?
+			    view->child->begin_y : view->begin_y;
+
+		for (i = 0; i < view->lines; i++) {
+			if (hline && got_locale_is_utf8() && i == hline - 1) {
+				int c;
+
+				/* ACS_HLINE writes out as 'q', overwrite it */
+				for (c = 0; c < view->cols; ++c)
+					fputc('-', f);
+				fputc('\n', f);
+				continue;
+			}
+
+			err = view_write_line(f, i, 0);
+			if (err)
+				goto done;
+		}
+	}
+
+done:
+	if (f && fclose(f) == EOF && err == NULL)
+		err = got_ferror(f, GOT_ERR_IO);
+	return err;
+}
+
+/*
  * Compute view->count from numeric input. Assign total to view->count and
  * return first non-numeric key entered.
  */
@@ -1489,9 +1616,48 @@ action_report(struct tog_view *view)
 		view->action = NULL;
 }
 
+/*
+ * Read the next line from the test script and assign
+ * key instruction to *ch. If at EOF, set the *done flag.
+ */
+static const struct got_error *
+tog_read_script_key(FILE *script, int *ch, int *done)
+{
+	const struct got_error	*err = NULL;
+	char			*line = NULL;
+	size_t			 linesz = 0;
+
+	if (getline(&line, &linesz, script) == -1) {
+		if (feof(script)) {
+			*done = 1;
+			goto done;
+		} else {
+			err = got_ferror(script, GOT_ERR_IO);
+			goto done;
+		}
+	} else if (strncasecmp(line, "KEY_ENTER", 9) == 0)
+		*ch = KEY_ENTER;
+	else if (strncasecmp(line, "KEY_RIGHT", 9) == 0)
+		*ch = KEY_RIGHT;
+	else if (strncasecmp(line, "KEY_LEFT", 8) == 0)
+		*ch = KEY_LEFT;
+	else if (strncasecmp(line, "KEY_DOWN", 8) == 0)
+		*ch = KEY_DOWN;
+	else if (strncasecmp(line, "KEY_UP", 6) == 0)
+		*ch = KEY_UP;
+	else if (strncasecmp(line, TOG_SCREEN_DUMP, TOG_SCREEN_DUMP_LEN) == 0)
+		*ch = TOG_KEY_SCRDUMP;
+	else
+		*ch = *line;
+
+done:
+	free(line);
+	return err;
+}
+
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
-    struct tog_view_list_head *views, int fast_refresh)
+    struct tog_view_list_head *views, struct tog_io *tog_io, int fast_refresh)
 {
 	const struct got_error *err = NULL;
 	struct tog_view *v;
@@ -1527,11 +1693,16 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_unlock");
-	/* If we have an unfinished count, let C-g or backspace abort. */
-	if (view->count && --view->count) {
+
+	if (tog_io && tog_io->f) {
+		err = tog_read_script_key(tog_io->f, &ch, done);
+		if (err)
+			return err;
+	} else if (view->count && --view->count) {
 		cbreak();
 		nodelay(view->window, TRUE);
 		ch = wgetch(view->window);
+		/* let C-g or backspace abort unfinished count */
 		if (ch == CTRL('g') || ch == KEY_BACKSPACE)
 			view->count = 0;
 		else
@@ -1721,6 +1892,9 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			}
 		}
 		break;
+	case TOG_KEY_SCRDUMP:
+		err = screendump(view);
+		break;
 	default:
 		err = view->input(new, view, ch);
 		break;
@@ -1744,7 +1918,24 @@ view_needs_focus_indication(struct tog_view *view)
 }
 
 static const struct got_error *
-view_loop(struct tog_view *view)
+tog_io_close(struct tog_io *tog_io)
+{
+	const struct got_error *err = NULL;
+
+	if (tog_io->cin && fclose(tog_io->cin) == EOF)
+		err = got_ferror(tog_io->cin, GOT_ERR_IO);
+	if (tog_io->cout && fclose(tog_io->cout) == EOF && err == NULL)
+		err = got_ferror(tog_io->cout, GOT_ERR_IO);
+	if (tog_io->f && fclose(tog_io->f) == EOF && err == NULL)
+		err = got_ferror(tog_io->f, GOT_ERR_IO);
+	free(tog_io);
+	tog_io = NULL;
+
+	return err;
+}
+
+static const struct got_error *
+view_loop(struct tog_view *view, struct tog_io *tog_io)
 {
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
@@ -1778,7 +1969,8 @@ view_loop(struct tog_view *view)
 		if (fast_refresh && --fast_refresh == 0)
 			halfdelay(10); /* switch to once per second */
 
-		err = view_input(&new_view, &done, view, &views, fast_refresh);
+		err = view_input(&new_view, &done, view, &views, tog_io,
+		    fast_refresh);
 		if (err)
 			break;
 
@@ -3965,9 +4157,68 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 	return NULL;
 }
 
-static void
-init_curses(void)
+static const struct got_error *
+init_mock_term(struct tog_io **tog_io, const char *test_script_path)
 {
+	const struct got_error	*err = NULL;
+	struct tog_io		*io;
+
+	if (*tog_io)
+		*tog_io = NULL;
+
+	if (test_script_path == NULL || *test_script_path == '\0')
+		return got_error_msg(GOT_ERR_IO, "GOT_TOG_TEST not defined");
+
+	io = calloc(1, sizeof(*io));
+	if (io == NULL)
+		return got_error_from_errno("calloc");
+
+	io->f = fopen(test_script_path, "re");
+	if (io->f == NULL) {
+		err = got_error_from_errno_fmt("fopen: %s",
+		    test_script_path);
+		goto done;
+	}
+
+	/* test mode, we don't want any output */
+	io->cout = fopen("/dev/null", "w+");
+	if (io->cout == NULL) {
+		err = got_error_from_errno("fopen: /dev/null");
+		goto done;
+	}
+
+	io->cin = fopen("/dev/tty", "r+");
+	if (io->cin == NULL) {
+		err = got_error_from_errno("fopen: /dev/tty");
+		goto done;
+	}
+
+	if (fseeko(io->f, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
+
+	/*
+	 * XXX Perhaps we should define "xterm" as the terminal
+	 * type for standardised testing instead of using $TERM?
+	 */
+	if (newterm(NULL, io->cout, io->cin) == NULL)
+		err = got_error_msg(GOT_ERR_IO,
+		    "newterm: failed to initialise curses");
+done:
+	if (err)
+		tog_io_close(io);
+	else
+		*tog_io = io;
+	return err;
+}
+
+static const struct got_error *
+init_curses(struct tog_io **tog_io)
+{
+	const struct got_error	*err = NULL;
+	const char		*test_script_path;
+
 	/*
 	 * Override default signal handlers before starting ncurses.
 	 * This should prevent ncurses from installing its own
@@ -3979,7 +4230,14 @@ init_curses(void)
 	signal(SIGINT, tog_sigint);
 	signal(SIGTERM, tog_sigterm);
 
-	initscr();
+	test_script_path = getenv("GOT_TOG_TEST");
+	if (test_script_path != NULL) {
+		err = init_mock_term(tog_io, test_script_path);
+		if (err)
+			return err;
+	} else
+		initscr();
+
 	cbreak();
 	halfdelay(1); /* Do fast refresh while initial view is loading. */
 	noecho();
@@ -3991,6 +4249,8 @@ init_curses(void)
 		start_color();
 		use_default_colors();
 	}
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -4029,7 +4289,7 @@ get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
 static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
-	const struct got_error *error;
+	const struct got_error *io_err, *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *start_id = NULL;
@@ -4039,6 +4299,7 @@ cmd_log(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch, log_branches = 0;
 	struct tog_view *view;
+	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "bc:r:")) != -1) {
@@ -4098,7 +4359,9 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	init_curses();
+	error = init_curses(&tog_io);
+	if (error)
+		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo),
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
@@ -4145,7 +4408,7 @@ cmd_log(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view);
+	error = view_loop(view, tog_io);
 done:
 	free(in_repo_path);
 	free(repo_path);
@@ -4166,6 +4429,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (tog_io != NULL) {
+		io_err = tog_io_close(tog_io);
+		if (error == NULL)
+			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -5536,7 +5804,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *io_err, *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
@@ -5547,6 +5815,7 @@ cmd_diff(int argc, char *argv[])
 	int ch, force_text_diff = 0;
 	const char *errstr;
 	struct tog_view *view;
+	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "aC:r:w")) != -1) {
@@ -5614,7 +5883,9 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	init_curses();
+	error = init_curses(&tog_io);
+	if (error)
+		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -5643,7 +5914,7 @@ cmd_diff(int argc, char *argv[])
 	    ignore_whitespace, force_text_diff, NULL,  repo);
 	if (error)
 		goto done;
-	error = view_loop(view);
+	error = view_loop(view, tog_io);
 done:
 	free(label1);
 	free(label2);
@@ -5661,6 +5932,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (tog_io != NULL) {
+		io_err = tog_io_close(tog_io);
+		if (error == NULL)
+			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -6635,7 +6911,7 @@ reset_blame_view(struct tog_view *view)
 static const struct got_error *
 cmd_blame(int argc, char *argv[])
 {
-	const struct got_error *error;
+	const struct got_error *io_err, *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
@@ -6645,6 +6921,7 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view;
+	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
@@ -6701,7 +6978,9 @@ cmd_blame(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	init_curses();
+	error = init_curses(&tog_io);
+	if (error)
+		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -6750,7 +7029,7 @@ cmd_blame(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view);
+	error = view_loop(view, tog_io);
 done:
 	free(repo_path);
 	free(in_repo_path);
@@ -6771,6 +7050,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (tog_io != NULL) {
+		io_err = tog_io_close(tog_io);
+		if (error == NULL)
+			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -7604,7 +7888,7 @@ usage_tree(void)
 static const struct got_error *
 cmd_tree(int argc, char *argv[])
 {
-	const struct got_error *error;
+	const struct got_error *io_err, *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
@@ -7616,6 +7900,7 @@ cmd_tree(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch;
 	struct tog_view *view;
+	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
@@ -7672,7 +7957,9 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	init_curses();
+	error = init_curses(&tog_io);
+	if (error)
+		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -7725,7 +8012,7 @@ cmd_tree(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view);
+	error = view_loop(view, tog_io);
 done:
 	free(repo_path);
 	free(cwd);
@@ -7743,6 +8030,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (tog_io != NULL) {
+		io_err = tog_io_close(tog_io);
+		if (error == NULL)
+			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -8491,12 +8783,13 @@ usage_ref(void)
 static const struct got_error *
 cmd_ref(int argc, char *argv[])
 {
-	const struct got_error *error;
+	const struct got_error *io_err, *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
 	int ch;
 	struct tog_view *view;
+	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
@@ -8545,7 +8838,9 @@ cmd_ref(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	init_curses();
+	error = init_curses(&tog_io);
+	if (error)
+		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -8570,7 +8865,7 @@ cmd_ref(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view);
+	error = view_loop(view, tog_io);
 done:
 	free(repo_path);
 	free(cwd);
@@ -8584,6 +8879,11 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
+	}
+	if (tog_io != NULL) {
+		io_err = tog_io_close(tog_io);
+		if (error == NULL)
+			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -9463,7 +9763,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_CTYPE, "");
 
-#ifndef PROFILE
+#if !defined(PROFILE) && !defined(TOG_REGRESS)
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
