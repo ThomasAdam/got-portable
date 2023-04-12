@@ -1994,6 +1994,12 @@ update_blob(struct got_worktree *worktree,
 		    memcmp(ie->blob_sha1, te->id.sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			/* Different commit but the same blob. */
+			if (got_fileindex_entry_has_commit(ie)) {
+				/* Update the base commit ID of this file. */
+				memcpy(ie->commit_sha1,
+				    worktree->base_commit_id->sha1,
+				    sizeof(ie->commit_sha1));
+			}
 			err = sync_timestamps(worktree->root_fd,
 			    path, status, ie, &sb);
 			if (err)
