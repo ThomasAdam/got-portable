@@ -3885,6 +3885,73 @@ add_ignores_from_parent_paths(struct got_pathlist_head *ignores,
 	return err;
 }
 
+struct find_missing_children_args {
+	const char *parent_path;
+	size_t parent_len;
+	struct got_pathlist_head *children;
+	got_cancel_cb cancel_cb;
+	void *cancel_arg;
+
+};
+
+static const struct got_error *
+find_missing_children(void *arg, struct got_fileindex_entry *ie)
+{
+	const struct got_error *err = NULL;
+	struct find_missing_children_args *a = arg;
+
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
+
+	if (got_path_is_child(ie->path, a->parent_path, a->parent_len))
+		err = got_pathlist_append(a->children, ie->path, NULL);
+
+	return err;
+}
+
+static const struct got_error *
+report_children(struct got_pathlist_head *children,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_repository *repo, int is_root_dir, int report_unchanged,
+    struct got_pathlist_head *ignores, int no_ignores, 
+    got_worktree_status_cb status_cb, void *status_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	char *ondisk_path = NULL;
+
+	TAILQ_FOREACH(pe, children, entry) {
+		if (cancel_cb) {
+			err = cancel_cb(cancel_arg);
+			if (err)
+				break;
+		}
+
+		if (asprintf(&ondisk_path, "%s%s%s", worktree->root_path,
+		    !is_root_dir ? "/" : "", pe->path) == -1) {
+			err = got_error_from_errno("asprintf");
+			ondisk_path = NULL;
+			break;
+		}
+
+		err = report_single_file_status(pe->path, ondisk_path,
+		    fileindex, status_cb, status_arg, repo, report_unchanged,
+		    ignores, no_ignores);
+		if (err)
+			break;
+
+		free(ondisk_path);
+		ondisk_path = NULL;
+	}
+
+	free(ondisk_path);
+	return err;
+}
+
 static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
@@ -3897,10 +3964,11 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
-	struct got_pathlist_head ignores;
+	struct got_pathlist_head ignores, missing_children;
 	struct got_fileindex_entry *ie;
 
 	TAILQ_INIT(&ignores);
+	TAILQ_INIT(&missing_children);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
@@ -3912,6 +3980,17 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		    fileindex, status_cb, status_arg, repo,
 		    report_unchanged, &ignores, no_ignores);
 		goto done;
+	} else {
+		struct find_missing_children_args fmca;
+		fmca.parent_path = path;
+		fmca.parent_len = strlen(path);
+		fmca.children = &missing_children;
+		fmca.cancel_cb = cancel_cb;
+		fmca.cancel_arg = cancel_arg;
+		err = got_fileindex_for_each_entry_safe(fileindex,
+		    find_missing_children, &fmca);
+		if (err)
+			goto done;
 	}
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
@@ -3926,9 +4005,21 @@ worktree_status(struct got_worktree *worktree, const char *path,
 				if (err)
 					goto done;
 			}
-			err = report_single_file_status(path, ondisk_path,
-			    fileindex, status_cb, status_arg, repo,
-			    report_unchanged, &ignores, no_ignores);
+			if (TAILQ_EMPTY(&missing_children)) {
+				err = report_single_file_status(path,
+				    ondisk_path, fileindex,
+				    status_cb, status_arg, repo,
+				    report_unchanged, &ignores, no_ignores);
+				if (err)
+					goto done;
+			} else {
+				err = report_children(&missing_children,
+				    worktree, fileindex, repo,
+				    (path[0] == '\0'), report_unchanged,
+				    &ignores, no_ignores,
+				    status_cb, status_arg,
+				    cancel_cb, cancel_arg);
+			}
 		}
 	} else {
 		fdiff_cb.diff_old_new = status_old_new;

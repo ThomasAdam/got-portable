@@ -648,7 +648,7 @@ test_rm_nonexistent_directory() {
 		return 1
 	fi
 
-	echo "got: epsilon: No such file or directory" \
+	echo "got: epsilon/zeta: No such file or directory" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
@@ -668,7 +668,7 @@ test_rm_nonexistent_directory() {
 		return 1
 	fi
 
-	echo -n '' > $testroot/stdout.expected
+	echo 'D  epsilon/zeta' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
