@@ -369,6 +369,41 @@ test_revert_directory_unknown() {
 	test_done "$testroot" "$ret"
 }
 
+test_revert_missing_directory() {
+	local testroot=`test_init revert_missing_directory`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm -r $testroot/wt/epsilon
+
+	(cd $testroot/wt && got revert -R epsilon > $testroot/stdout)
+
+	echo 'R  epsilon/zeta' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_revert_patch() {
 	local testroot=`test_init revert_patch`
 
@@ -1533,6 +1568,7 @@ run_test test_revert_file_in_new_subdir
 run_test test_revert_no_arguments
 run_test test_revert_directory
 run_test test_revert_directory_unknown
+run_test test_revert_missing_directory
 run_test test_revert_patch
 run_test test_revert_patch_added
 run_test test_revert_patch_removed
