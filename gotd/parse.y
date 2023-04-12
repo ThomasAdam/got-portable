@@ -311,9 +311,19 @@ repoopts1	: PATH STRING {
 					YYERROR;
 				}
 				if (realpath($2, new_repo->path) == NULL) {
-					yyerror("realpath %s: %s", $2, strerror(errno));
-					free($2);
-					YYERROR;
+					yyerror("realpath %s: %s", $2,
+					    strerror(errno));
+					/*
+					 * Give admin a chance to create
+					 * missing repositories at run-time.
+					 */
+					if (errno != ENOENT) {
+						free($2);
+						YYERROR;
+					} else if (strlcpy(new_repo->path, $2,
+					    sizeof(new_repo->path)) >=
+					    sizeof(new_repo->path))
+						yyerror("path too long");
 				}
 			}
 			free($2);
