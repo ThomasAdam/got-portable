@@ -1899,12 +1899,7 @@ test_update_modified_submodules() {
 	(cd $testroot/repo && git add repo2)
 	git_commit $testroot/repo -m "modified submodule link"
 
-	# This update only records the new base commit. Otherwise it is a
-	# no-op change because Got's file index does not track submodules.
-	echo -n "Updated to refs/heads/master: " > $testroot/stdout.expected
-	git_show_head $testroot/repo >> $testroot/stdout.expected
-	echo >> $testroot/stdout.expected
-
+	echo "Already up-to-date" > $testroot/stdout.expected
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
