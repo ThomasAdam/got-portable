@@ -52,6 +52,19 @@ store test data in a directory other than /tmp, such as ~/got-test, run:
  $ mkdir ~/got-test
  $ make regress GOT_TEST_ROOT=~/got-test
 
+To run the tog automated test suite compile a tog regress build,
+which cannot make use of pledge(2).
+
+ $ make -C tog clean
+ $ make tog-regress
+ $ make install
+
+Like Got, either individual tests or the entire suite can be run:
+
+ $ cd regress/tog
+ $ make		# run all tests
+ $ ./log.sh	# run log view tests
+
 Man page files in the Got source tree can be viewed with 'man -l':
 
  $ man -l got/got.1
@@ -151,7 +164,6 @@ exist in the regress/ directory. Most such tests are unit tests; it is
 unlikely that a problem found during regular usage will require a test
 to be written in C.
 
-Some areas of code, such as the tog UI, are not covered by automated tests.
 Please always try to find a way to trigger your problem via the command line
 interface before reporting a problem without a written test case included.
 If writing an automated test really turns out to be impossible, please
