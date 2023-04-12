@@ -7251,11 +7251,6 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = got_object_open_as_commit(&commit, repo,
-	    worktree->base_commit_id);
-	if (err)
-		goto done;
-
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(new_base_branch), 0);
 	if (err)
@@ -7275,6 +7270,11 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 		goto done;
 
 	err = got_worktree_set_base_commit_id(worktree, repo, commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
 	if (err)
 		goto done;
 
@@ -7622,11 +7622,6 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = got_object_open_as_commit(&commit, repo,
-	    worktree->base_commit_id);
-	if (err)
-		goto done;
-
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(branch), 0);
 	if (err)
@@ -7637,6 +7632,11 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 		goto done;
 
 	err = got_worktree_set_base_commit_id(worktree, repo, base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_commit(&commit, repo,
+	    worktree->base_commit_id);
 	if (err)
 		goto done;
 

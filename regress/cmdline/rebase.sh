@@ -413,10 +413,15 @@ test_rebase_abort() {
 	local init_commit=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
-	echo "modified alpha on branch" > $testroot/repo/alpha
-	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	echo "modified beta on branch" > $testroot/repo/beta
+	git_commit $testroot/repo -m "committing to beta on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local orig_commit2=`git_show_head $testroot/repo`
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -436,9 +441,17 @@ test_rebase_abort() {
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
 		2> $testroot/stderr)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	new_commit1=$(cd $testroot/wt && got info beta | \
+		grep '^based on commit:' | cut -d' ' -f4)
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	
+	echo "G  beta" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> $short_new_commit1" \
+		>> $testroot/stdout.expected
+	echo ": committing to beta on newbranch" >> $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
-	echo -n "$short_orig_commit1 -> merge conflict" \
+	echo -n "$short_orig_commit2 -> merge conflict" \
 		>> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -461,12 +474,12 @@ test_rebase_abort() {
 
 	echo '<<<<<<<' > $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
-	echo "||||||| 3-way merge base: commit $init_commit" \
+	echo "||||||| 3-way merge base: commit $orig_commit1" \
 		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
-	echo ">>>>>>> merged change: commit $orig_commit1" \
+	echo ">>>>>>> merged change: commit $orig_commit2" \
 		>> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
@@ -496,6 +509,7 @@ test_rebase_abort() {
 	echo "Switching work tree to refs/heads/master" \
 		> $testroot/stdout.expected
 	echo 'R  alpha' >> $testroot/stdout.expected
+	echo 'U  beta' >> $testroot/stdout.expected
 	echo "Rebase of refs/heads/newbranch aborted" \
 		>> $testroot/stdout.expected
 
@@ -519,8 +533,51 @@ test_rebase_abort() {
 
 	(cd $testroot/wt && got log -l3 -c newbranch \
 		| grep ^commit > $testroot/stdout)
-	echo "commit $orig_commit1 (newbranch)" > $testroot/stdout.expected
+	echo "commit $orig_commit2 (newbranch)" > $testroot/stdout.expected
+	echo "commit $orig_commit1" >> $testroot/stdout.expected
 	echo "commit $init_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got info .| \
+		grep '^based on commit:' | sort | uniq > $testroot/stdout)
+	echo "based on commit: $master_commit" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "?  unversioned-file" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat $testroot/wt/beta > $testroot/content
+	echo 'beta' > $testroot/content.expected
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# A subsequent update should be a no-op.
+	(cd $testroot/wt && got update > $testroot/stdout)
+	echo 'Already up-to-date' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
