@@ -3888,7 +3888,6 @@ struct find_missing_children_args {
 	struct got_pathlist_head *children;
 	got_cancel_cb cancel_cb;
 	void *cancel_arg;
-
 };
 
 static const struct got_error *
@@ -4016,6 +4015,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 				    &ignores, no_ignores,
 				    status_cb, status_arg,
 				    cancel_cb, cancel_arg);
+				if (err)
+					goto done;
 			}
 		}
 	} else {
