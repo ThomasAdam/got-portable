@@ -265,6 +265,7 @@ main(int argc, char *argv[])
 		      error->code == GOT_ERR_ERRNO && errno == EPIPE) &&
 		    !(sigint_received &&
 		      error->code == GOT_ERR_ERRNO && errno == EINTR)) {
+			fflush(stdout);
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}
