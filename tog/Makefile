@@ -25,7 +25,7 @@ LDADD = -lpanel_p -lncursesw_p -lutil_p -lz_p -lpthread_p -lm_p -lc_p
 .else
 LDADD = -lpanel -lncursesw -lutil -lz -lpthread -lm
 .endif
-DPADD = ${LIBZ} ${LIBUTIL}
+DPADD = ${LIBZ} ${LIBUTIL} ${LIBM}
 
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes

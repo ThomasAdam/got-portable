@@ -41,7 +41,7 @@ CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}
 CPPFLAGS +=	-I${.CURDIR}/../template
 LDADD +=	-lz -levent -lutil -lm
 YFLAGS =
-DPADD =		${LIBEVENT} ${LIBUTIL}
+DPADD =		${LIBEVENT} ${LIBUTIL} ${LIBM}
 #CFLAGS +=	-DGOT_NO_OBJ_CACHE
 
 .if ${GOT_RELEASE} != "Yes"

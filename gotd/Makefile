@@ -29,7 +29,7 @@ LDADD = -lutil_p -lz_p -lm_p -lc_p -levent_p
 .else
 LDADD = -lutil -lz -lm -levent
 .endif
-DPADD = ${LIBZ} ${LIBUTIL}
+DPADD = ${LIBZ} ${LIBUTIL} ${LIBM} ${LIBEVENT}
 
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
