@@ -4,7 +4,8 @@
 
 PROG=		gotsh
 SRCS=		gotsh.c error.c pkt.c hash.c serve.c path.c gitproto.c \
-		imsg.c inflate.c object_parse.c pollfd.c reference_parse.c
+		imsg.c inflate.c object_parse.c pollfd.c reference_parse.c \
+		dial.c
 
 MAN =		${PROG}.1
 

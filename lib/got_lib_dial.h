@@ -15,12 +15,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define GOT_DIAL_DIRECTION_SEND		"receive"
-#define GOT_DIAL_DIRECTION_FETCH	"upload"
+#define GOT_DIAL_CMD_SEND	"git-receive-pack"
+#define GOT_DIAL_CMD_FETCH	"git-upload-pack"
 
 const struct got_error *got_dial_git(int *newfd, const char *host,
-    const char *port, const char *path, const char *direction);
+    const char *port, const char *path, const char *command);
 
 const struct got_error *got_dial_ssh(pid_t *newpid, int *newfd,
     const char *host, const char *port, const char *path,
-    const char *direction, int verbosity);
+    const char *command, int verbosity);
+
+const struct got_error *got_dial_parse_command(char **command,
+    char **repo_path, const char *gitcmd);

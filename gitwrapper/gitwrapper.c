@@ -38,7 +38,8 @@
 
 #include "got_error.h"
 #include "got_path.h"
-#include "got_serve.h"
+
+#include "got_lib_dial.h"
 
 #include "gotd.h"
 #include "log.h"
@@ -56,7 +57,7 @@ __dead static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s -c '%s|%s repository-path'\n",
-	    getprogname(), GOT_SERVE_CMD_SEND, GOT_SERVE_CMD_FETCH);
+	    getprogname(), GOT_DIAL_CMD_SEND, GOT_DIAL_CMD_FETCH);
 	exit(1);
 }
 
@@ -68,9 +69,9 @@ static const struct got_error *
 apply_unveil(const char *myserver)
 {
 	const char *fetchcmd = GITWRAPPER_GIT_LIBEXEC_DIR "/" \
-		GOT_SERVE_CMD_FETCH;
+		GOT_DIAL_CMD_FETCH;
 	const char *sendcmd = GITWRAPPER_GIT_LIBEXEC_DIR "/" \
-		GOT_SERVE_CMD_SEND;
+		GOT_DIAL_CMD_SEND;
 
 #ifdef PROFILE
 	if (unveil("gmon.out", "rwc") != 0)
@@ -141,8 +142,8 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	if (strcmp(getprogname(), GOT_SERVE_CMD_SEND) == 0 ||
-	    strcmp(getprogname(), GOT_SERVE_CMD_FETCH) == 0) {
+	if (strcmp(getprogname(), GOT_DIAL_CMD_SEND) == 0 ||
+	    strcmp(getprogname(), GOT_DIAL_CMD_FETCH) == 0) {
 		if (argc != 2)
 			usage();
 		command = strdup(getprogname());
@@ -163,7 +164,7 @@ main(int argc, char *argv[])
 		if (argc != 3 || strcmp(argv[1], "-c") != 0)
 			usage();
 		repo_path = argv[2];
-		error = got_serve_parse_command(&command, &repo_name,
+		error = got_dial_parse_command(&command, &repo_name,
 		    repo_path);
 		if (error && error->code == GOT_ERR_BAD_PACKET)
 			usage();

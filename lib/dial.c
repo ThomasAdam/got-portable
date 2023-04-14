@@ -248,7 +248,7 @@ escape_path(char *buf, size_t bufsize, const char *path)
 
 const struct got_error *
 got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
-    const char *port, const char *path, const char *direction, int verbosity)
+    const char *port, const char *path, const char *command, int verbosity)
 {
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
@@ -293,15 +293,13 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 		close(pfd[1]);
 		return error;
 	} else if (pid == 0) {
-		int n;
 		if (close(pfd[1]) == -1)
 			err(1, "close");
 		if (dup2(pfd[0], 0) == -1)
 			err(1, "dup2");
 		if (dup2(pfd[0], 1) == -1)
 			err(1, "dup2");
-		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
-		if (n < 0 || n >= ssizeof(cmd))
+		if (strlcpy(cmd, command, sizeof(cmd)) >= sizeof(cmd))
 			err(1, "snprintf");
 		if (execv(GOT_DIAL_PATH_SSH, (char *const *)argv) == -1)
 			err(1, "execv");
@@ -317,7 +315,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 
 const struct got_error *
 got_dial_git(int *newfd, const char *host, const char *port,
-    const char *path, const char *direction)
+    const char *path, const char *command)
 {
 	const struct got_error *err = NULL;
 	struct addrinfo hints, *servinfo, *p;
@@ -355,7 +353,7 @@ got_dial_git(int *newfd, const char *host, const char *port,
 	if (p == NULL)
 		goto done;
 
-	if (asprintf(&cmd, "git-%s-pack %s", direction, path) == -1) {
+	if (asprintf(&cmd, "%s %s", command, path) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -370,5 +368,102 @@ done:
 			close(fd);
 	} else
 		*newfd = fd;
+	return err;
+}
+
+const struct got_error *
+got_dial_parse_command(char **command, char **repo_path, const char *gitcmd)
+{
+	const struct got_error *err = NULL;
+	size_t len, cmdlen, pathlen;
+	char *path0 = NULL, *path, *abspath = NULL, *canonpath = NULL;
+	const char *relpath;
+
+	*command = NULL;
+	*repo_path = NULL;
+
+	len = strlen(gitcmd);
+
+	if (len >= strlen(GOT_DIAL_CMD_SEND) &&
+	    strncmp(gitcmd, GOT_DIAL_CMD_SEND,
+	    strlen(GOT_DIAL_CMD_SEND)) == 0)
+		cmdlen = strlen(GOT_DIAL_CMD_SEND);
+	else if (len >= strlen(GOT_DIAL_CMD_FETCH) &&
+	    strncmp(gitcmd, GOT_DIAL_CMD_FETCH,
+	    strlen(GOT_DIAL_CMD_FETCH)) == 0)
+		cmdlen = strlen(GOT_DIAL_CMD_FETCH);
+	else
+		return got_error(GOT_ERR_BAD_PACKET);
+
+	if (len <= cmdlen + 1 || gitcmd[cmdlen] != ' ')
+		return got_error(GOT_ERR_BAD_PACKET);
+
+	if (memchr(&gitcmd[cmdlen + 1], '\0', len - cmdlen) == NULL)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	/* Forbid linefeeds in paths, like Git does. */
+	if (memchr(&gitcmd[cmdlen + 1], '\n', len - cmdlen) != NULL)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	path0 = strdup(&gitcmd[cmdlen + 1]);
+	if (path0 == NULL)
+		return got_error_from_errno("strdup");
+	path = path0;
+	pathlen = strlen(path);
+
+	/*
+	 * Git clients send a shell command.
+	 * Trim spaces and quotes around the path.
+	 */
+	while (path[0] == '\'' || path[0] == '\"' || path[0] == ' ') {
+		path++;
+		pathlen--;
+	}
+	while (pathlen > 0 &&
+	    (path[pathlen - 1] == '\'' || path[pathlen - 1] == '\"' ||
+	    path[pathlen - 1] == ' ')) {
+		path[pathlen - 1] = '\0';
+		pathlen--;
+	}
+
+	/* Deny an empty repository path. */
+	if (path[0] == '\0' || got_path_is_root_dir(path)) {
+		err = got_error(GOT_ERR_NOT_GIT_REPO);
+		goto done;
+	}
+
+	if (asprintf(&abspath, "/%s", path) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	pathlen = strlen(abspath);
+	canonpath = malloc(pathlen + 1);
+	if (canonpath == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	err = got_canonpath(abspath, canonpath, pathlen + 1);
+	if (err)
+		goto done;
+
+	relpath = canonpath;
+	while (relpath[0] == '/')
+		relpath++;
+	*repo_path = strdup(relpath);
+	if (*repo_path == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	*command = strndup(gitcmd, cmdlen);
+	if (*command == NULL)
+		err = got_error_from_errno("strndup");
+done:
+	free(path0);
+	free(abspath);
+	free(canonpath);
+	if (err) {
+		free(*repo_path);
+		*repo_path = NULL;
+	}
 	return err;
 }

@@ -8,14 +8,10 @@ BINDIR ?=	${PREFIX}/bin
 .endif
 
 PROG=		gitwrapper
-SRCS=		gitwrapper.c parse.y log.c serve.c auth.c listen.c pkt.c \
-		error.c gitproto.c hash.c reference.c object.c object_parse.c \
-		path.c object_idset.c object_create.c inflate.c opentemp.c \
-		lockfile.c repository.c gotconfig.c pack.c bloom.c buf.c \
-		object_cache.c privsep_stub.c pollfd.c imsg.c \
-		reference_parse.c object_open_io.c sigs.c deflate.c \
-		read_gotconfig.c read_gitconfig.c delta_cache.c delta.c \
-		murmurhash2.c date.c gitconfig.c
+
+SRCS=		gitwrapper.c parse.y log.c dial.c path.c error.c auth.c \
+		listen.c reference_parse.c hash.c object_parse.c imsg.c \
+		inflate.c pollfd.c
 
 CLEANFILES = parse.h
 

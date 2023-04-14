@@ -88,10 +88,10 @@ got_send_connect(pid_t *sendpid, int *sendfd, const char *proto,
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
 		err = got_dial_ssh(sendpid, sendfd, host, port, server_path,
-		    GOT_DIAL_DIRECTION_SEND, verbosity);
+		    GOT_DIAL_CMD_SEND, verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = got_dial_git(sendfd, host, port, server_path,
-		    GOT_DIAL_DIRECTION_SEND);
+		    GOT_DIAL_CMD_SEND);
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
 		err = got_error_path(proto, GOT_ERR_NOT_IMPL);
 	else
