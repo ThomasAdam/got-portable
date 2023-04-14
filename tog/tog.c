@@ -616,7 +616,8 @@ struct tog_io {
 	FILE	*cin;
 	FILE	*cout;
 	FILE	*f;
-};
+} tog_io;
+static int using_mock_io;
 
 #define TOG_SCREEN_DUMP		"SCREENDUMP"
 #define TOG_SCREEN_DUMP_LEN	(sizeof(TOG_SCREEN_DUMP) - 1)
@@ -1333,7 +1334,7 @@ view_search_start(struct tog_view *view, int fast_refresh)
 	cbreak();
 	noecho();
 	nodelay(v->window, TRUE);
-	if (!fast_refresh)
+	if (!fast_refresh && !using_mock_io)
 		halfdelay(10);
 	if (ret == ERR)
 		return NULL;
@@ -1657,7 +1658,7 @@ done:
 
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
-    struct tog_view_list_head *views, struct tog_io *tog_io, int fast_refresh)
+    struct tog_view_list_head *views, int fast_refresh)
 {
 	const struct got_error *err = NULL;
 	struct tog_view *v;
@@ -1694,8 +1695,8 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_unlock");
 
-	if (tog_io && tog_io->f) {
-		err = tog_read_script_key(tog_io->f, &ch, done);
+	if (using_mock_io) {
+		err = tog_read_script_key(tog_io.f, &ch, done);
 		if (err)
 			return err;
 	} else if (view->count && --view->count) {
@@ -1918,24 +1919,22 @@ view_needs_focus_indication(struct tog_view *view)
 }
 
 static const struct got_error *
-tog_io_close(struct tog_io *tog_io)
+tog_io_close(void)
 {
 	const struct got_error *err = NULL;
 
-	if (tog_io->cin && fclose(tog_io->cin) == EOF)
-		err = got_ferror(tog_io->cin, GOT_ERR_IO);
-	if (tog_io->cout && fclose(tog_io->cout) == EOF && err == NULL)
-		err = got_ferror(tog_io->cout, GOT_ERR_IO);
-	if (tog_io->f && fclose(tog_io->f) == EOF && err == NULL)
-		err = got_ferror(tog_io->f, GOT_ERR_IO);
-	free(tog_io);
-	tog_io = NULL;
+	if (tog_io.cin && fclose(tog_io.cin) == EOF)
+		err = got_ferror(tog_io.cin, GOT_ERR_IO);
+	if (tog_io.cout && fclose(tog_io.cout) == EOF && err == NULL)
+		err = got_ferror(tog_io.cout, GOT_ERR_IO);
+	if (tog_io.f && fclose(tog_io.f) == EOF && err == NULL)
+		err = got_ferror(tog_io.f, GOT_ERR_IO);
 
 	return err;
 }
 
 static const struct got_error *
-view_loop(struct tog_view *view, struct tog_io *tog_io)
+view_loop(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
@@ -1966,11 +1965,10 @@ view_loop(struct tog_view *view, struct tog_io *tog_io)
 	while (!TAILQ_EMPTY(&views) && !done && !tog_thread_error &&
 	    !tog_fatal_signal_received()) {
 		/* Refresh fast during initialization, then become slower. */
-		if (fast_refresh && --fast_refresh == 0)
+		if (fast_refresh && --fast_refresh == 0 && !using_mock_io)
 			halfdelay(10); /* switch to once per second */
 
-		err = view_input(&new_view, &done, view, &views, tog_io,
-		    fast_refresh);
+		err = view_input(&new_view, &done, view, &views, fast_refresh);
 		if (err)
 			break;
 
@@ -2714,7 +2712,7 @@ draw_commits(struct tog_view *view)
 		}
 	}
 
-	if (s->thread_args.commits_needed == 0)
+	if (s->thread_args.commits_needed == 0 && !using_mock_io)
 		halfdelay(10); /* disable fast refresh */
 
 	if (s->thread_args.commits_needed > 0 || s->thread_args.load_all) {
@@ -2889,7 +2887,8 @@ trigger_log_thread(struct tog_view *view, int wait)
 	struct tog_log_thread_args *ta = &view->state.log.thread_args;
 	int errcode;
 
-	halfdelay(1); /* fast refresh while loading commits */
+	if (!using_mock_io)
+		halfdelay(1); /* fast refresh while loading commits */
 
 	while (!ta->log_complete && !tog_thread_error &&
 	    (ta->commits_needed > 0 || ta->load_all)) {
@@ -4158,42 +4157,34 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 }
 
 static const struct got_error *
-init_mock_term(struct tog_io **tog_io, const char *test_script_path)
+init_mock_term(const char *test_script_path)
 {
 	const struct got_error	*err = NULL;
-	struct tog_io		*io;
-
-	if (*tog_io)
-		*tog_io = NULL;
 
 	if (test_script_path == NULL || *test_script_path == '\0')
 		return got_error_msg(GOT_ERR_IO, "GOT_TOG_TEST not defined");
 
-	io = calloc(1, sizeof(*io));
-	if (io == NULL)
-		return got_error_from_errno("calloc");
-
-	io->f = fopen(test_script_path, "re");
-	if (io->f == NULL) {
+	tog_io.f = fopen(test_script_path, "re");
+	if (tog_io.f == NULL) {
 		err = got_error_from_errno_fmt("fopen: %s",
 		    test_script_path);
 		goto done;
 	}
 
 	/* test mode, we don't want any output */
-	io->cout = fopen("/dev/null", "w+");
-	if (io->cout == NULL) {
+	tog_io.cout = fopen("/dev/null", "w+");
+	if (tog_io.cout == NULL) {
 		err = got_error_from_errno("fopen: /dev/null");
 		goto done;
 	}
 
-	io->cin = fopen("/dev/tty", "r+");
-	if (io->cin == NULL) {
+	tog_io.cin = fopen("/dev/tty", "r+");
+	if (tog_io.cin == NULL) {
 		err = got_error_from_errno("fopen: /dev/tty");
 		goto done;
 	}
 
-	if (fseeko(io->f, 0L, SEEK_SET) == -1) {
+	if (fseeko(tog_io.f, 0L, SEEK_SET) == -1) {
 		err = got_error_from_errno("fseeko");
 		goto done;
 	}
@@ -4202,23 +4193,20 @@ init_mock_term(struct tog_io **tog_io, const char *test_script_path)
 	 * XXX Perhaps we should define "xterm" as the terminal
 	 * type for standardised testing instead of using $TERM?
 	 */
-	if (newterm(NULL, io->cout, io->cin) == NULL)
+	if (newterm(NULL, tog_io.cout, tog_io.cin) == NULL)
 		err = got_error_msg(GOT_ERR_IO,
 		    "newterm: failed to initialise curses");
+
+	using_mock_io = 1;
 done:
 	if (err)
-		tog_io_close(io);
-	else
-		*tog_io = io;
+		tog_io_close();
 	return err;
 }
 
-static const struct got_error *
-init_curses(struct tog_io **tog_io)
+static void
+init_curses(void)
 {
-	const struct got_error	*err = NULL;
-	const char		*test_script_path;
-
 	/*
 	 * Override default signal handlers before starting ncurses.
 	 * This should prevent ncurses from installing its own
@@ -4230,16 +4218,13 @@ init_curses(struct tog_io **tog_io)
 	signal(SIGINT, tog_sigint);
 	signal(SIGTERM, tog_sigterm);
 
-	test_script_path = getenv("GOT_TOG_TEST");
-	if (test_script_path != NULL) {
-		err = init_mock_term(tog_io, test_script_path);
-		if (err)
-			return err;
-	} else
-		initscr();
+	if (using_mock_io) /* In test mode we use a fake terminal */
+		return;
+
+	initscr();
 
 	cbreak();
-	halfdelay(1); /* Do fast refresh while initial view is loading. */
+	halfdelay(1); /* Fast refresh while initial view is loading. */
 	noecho();
 	nonl();
 	intrflush(stdscr, FALSE);
@@ -4250,7 +4235,7 @@ init_curses(struct tog_io **tog_io)
 		use_default_colors();
 	}
 
-	return NULL;
+	return;
 }
 
 static const struct got_error *
@@ -4299,7 +4284,6 @@ cmd_log(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch, log_branches = 0;
 	struct tog_view *view;
-	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "bc:r:")) != -1) {
@@ -4359,9 +4343,7 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = init_curses(&tog_io);
-	if (error)
-		goto done;
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo),
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
@@ -4408,7 +4390,7 @@ cmd_log(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view, tog_io);
+	error = view_loop(view);
 done:
 	free(in_repo_path);
 	free(repo_path);
@@ -4430,8 +4412,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (tog_io != NULL) {
-		io_err = tog_io_close(tog_io);
+	if (using_mock_io) {
+		io_err = tog_io_close();
 		if (error == NULL)
 			error = io_err;
 	}
@@ -5411,7 +5393,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->parent_view = parent_view;
 	s->repo = repo;
 
-	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+	if (has_colors() && getenv("TOG_COLORS") != NULL && !using_mock_io) {
 		int rc;
 
 		rc = init_pair(GOT_DIFF_LINE_MINUS,
@@ -5815,7 +5797,6 @@ cmd_diff(int argc, char *argv[])
 	int ch, force_text_diff = 0;
 	const char *errstr;
 	struct tog_view *view;
-	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "aC:r:w")) != -1) {
@@ -5883,9 +5864,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = init_curses(&tog_io);
-	if (error)
-		goto done;
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -5914,7 +5893,7 @@ cmd_diff(int argc, char *argv[])
 	    ignore_whitespace, force_text_diff, NULL,  repo);
 	if (error)
 		goto done;
-	error = view_loop(view, tog_io);
+	error = view_loop(view);
 done:
 	free(label1);
 	free(label2);
@@ -5933,8 +5912,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (tog_io != NULL) {
-		io_err = tog_io_close(tog_io);
+	if (using_mock_io) {
+		io_err = tog_io_close();
 		if (error == NULL)
 			error = io_err;
 	}
@@ -6570,10 +6549,11 @@ show_blame_view(struct tog_view *view)
 		if (errcode)
 			return got_error_set_errno(errcode, "pthread_create");
 
-		halfdelay(1); /* fast refresh while annotating  */
+		if (!using_mock_io)
+			halfdelay(1); /* fast refresh while annotating  */
 	}
 
-	if (s->blame_complete)
+	if (s->blame_complete && !using_mock_io)
 		halfdelay(10); /* disable fast refresh */
 
 	err = draw_blame(view);
@@ -6921,7 +6901,6 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view;
-	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
@@ -6978,9 +6957,7 @@ cmd_blame(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = init_curses(&tog_io);
-	if (error)
-		goto done;
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -7029,7 +7006,7 @@ cmd_blame(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view, tog_io);
+	error = view_loop(view);
 done:
 	free(repo_path);
 	free(in_repo_path);
@@ -7051,8 +7028,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (tog_io != NULL) {
-		io_err = tog_io_close(tog_io);
+	if (using_mock_io) {
+		io_err = tog_io_close();
 		if (error == NULL)
 			error = io_err;
 	}
@@ -7900,7 +7877,6 @@ cmd_tree(int argc, char *argv[])
 	const char *head_ref_name = NULL;
 	int ch;
 	struct tog_view *view;
-	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
@@ -7957,9 +7933,7 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = init_curses(&tog_io);
-	if (error)
-		goto done;
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -8012,7 +7986,7 @@ cmd_tree(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view, tog_io);
+	error = view_loop(view);
 done:
 	free(repo_path);
 	free(cwd);
@@ -8031,8 +8005,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (tog_io != NULL) {
-		io_err = tog_io_close(tog_io);
+	if (using_mock_io) {
+		io_err = tog_io_close();
 		if (error == NULL)
 			error = io_err;
 	}
@@ -8789,7 +8763,6 @@ cmd_ref(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	int ch;
 	struct tog_view *view;
-	struct tog_io *tog_io = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
@@ -8838,9 +8811,7 @@ cmd_ref(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = init_curses(&tog_io);
-	if (error)
-		goto done;
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -8865,7 +8836,7 @@ cmd_ref(int argc, char *argv[])
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
-	error = view_loop(view, tog_io);
+	error = view_loop(view);
 done:
 	free(repo_path);
 	free(cwd);
@@ -8880,8 +8851,8 @@ done:
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (tog_io != NULL) {
-		io_err = tog_io_close(tog_io);
+	if (using_mock_io) {
+		io_err = tog_io_close();
 		if (error == NULL)
 			error = io_err;
 	}
@@ -9760,10 +9731,24 @@ main(int argc, char *argv[])
 	    { NULL, 0, NULL, 0}
 	};
 	char *diff_algo_str = NULL;
+	const char *test_script_path;
 
 	setlocale(LC_CTYPE, "");
 
-#if !defined(PROFILE) && !defined(TOG_REGRESS)
+	/*
+	 * Test mode init must happen before pledge() because "tty" will
+	 * not allow TTY-related ioctls to occur via regular files.
+	 */
+	test_script_path = getenv("GOT_TOG_TEST");
+	if (test_script_path != NULL) {
+		error = init_mock_term(test_script_path);
+		if (error) {
+			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+			return 1;
+		}
+	}
+
+#if !defined(PROFILE)
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");

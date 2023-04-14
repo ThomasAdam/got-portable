@@ -61,6 +61,6 @@ server-regress:
 	${MAKE} -C regress/gotd
 
 tog-regress:
-	${MAKE} TOG_REGRESS=1
+	${MAKE} -C regress/tog
 
 .include <bsd.subdir.mk>
