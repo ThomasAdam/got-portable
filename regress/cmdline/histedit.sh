@@ -902,20 +902,15 @@ test_histedit_abort() {
 		fi
 	done
 
-	echo "new file on master" > $testroot/content.expected
-	cat $testroot/wt/epsilon/new > $testroot/content
-	cmp -s $testroot/content.expected $testroot/content
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/content.expected $testroot/content
-		test_done "$testroot" "$ret"
+	if [ -e $testroot/wt/epsilon/new ]; then
+		echo "removed file new still exists on disk" >&2
+		test_done "$testroot" "1"
 		return 1
 	fi
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "?  epsilon/new" > $testroot/stdout.expected
-	echo "?  unversioned-file" >> $testroot/stdout.expected
+	echo "?  unversioned-file" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then

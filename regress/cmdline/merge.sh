@@ -673,9 +673,14 @@ test_merge_abort() {
 		return 1
 	fi
 
+	# unrelated added file added during conflict resolution
+	touch $testroot/wt/added-file
+	(cd $testroot/wt && got add added-file > /dev/null)
+
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	echo "A  added-file" > $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
 	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "M  gamma/delta" >> $testroot/stdout.expected
@@ -697,11 +702,13 @@ test_merge_abort() {
 		return 1
 	fi
 
-	echo "R  alpha" > $testroot/stdout.expected
+	echo "R  added-file" > $testroot/stdout.expected
+	echo "R  alpha" >> $testroot/stdout.expected
 	echo "R  beta" >> $testroot/stdout.expected
 	echo "R  epsilon/new" >> $testroot/stdout.expected
 	echo "R  gamma/delta" >> $testroot/stdout.expected
 	echo "R  symlink" >> $testroot/stdout.expected
+	echo "G  added-file" >> $testroot/stdout.expected
 	echo "Merge of refs/heads/newbranch aborted" \
 		>> $testroot/stdout.expected
 
@@ -757,7 +764,8 @@ test_merge_abort() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "?  unversioned-file" > $testroot/stdout.expected
+	echo "?  added-file" > $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
