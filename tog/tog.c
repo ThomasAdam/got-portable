@@ -3592,8 +3592,10 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	if (in_repo_path != s->in_repo_path) {
 		free(s->in_repo_path);
 		s->in_repo_path = strdup(in_repo_path);
-		if (s->in_repo_path == NULL)
-			return got_error_from_errno("strdup");
+		if (s->in_repo_path == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 
 	/* The commit queue only contains commits being displayed. */
@@ -3695,8 +3697,11 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.limit_regex = &s->limit_regex;
 	s->thread_args.limit_commits = &s->limit_commits;
 done:
-	if (err)
-		close_log_view(view);
+	if (err) {
+		if (view->close == NULL)
+			close_log_view(view);
+		view_close(view);
+	}
 	return err;
 }
 
@@ -5326,16 +5331,19 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->fd2 = -1;
 
 	if (id1 != NULL && id2 != NULL) {
-	    int type1, type2;
-	    err = got_object_get_type(&type1, repo, id1);
-	    if (err)
-		return err;
-	    err = got_object_get_type(&type2, repo, id2);
-	    if (err)
-		return err;
+		int type1, type2;
 
-	    if (type1 != type2)
-		return got_error(GOT_ERR_OBJ_TYPE);
+		err = got_object_get_type(&type1, repo, id1);
+		if (err)
+			goto done;
+		err = got_object_get_type(&type2, repo, id2);
+		if (err)
+			goto done;
+
+		if (type1 != type2) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
 	}
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
@@ -5348,8 +5356,10 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 
 	if (id1) {
 		s->id1 = got_object_id_dup(id1);
-		if (s->id1 == NULL)
-			return got_error_from_errno("got_object_id_dup");
+		if (s->id1 == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
 	} else
 		s->id1 = NULL;
 
@@ -5439,8 +5449,11 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->search_setup = search_setup_diff_view;
 	view->search_next = search_next_view_match;
 done:
-	if (err)
-		close_diff_view(view);
+	if (err) {
+		if (view->close == NULL)
+			close_diff_view(view);
+		view_close(view);
+	}
 	return err;
 }
 
@@ -6891,7 +6904,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	char *commit_id_str = NULL;
 	int ch;
-	struct tog_view *view;
+	struct tog_view *view = NULL;
 	int *pack_fds = NULL;
 
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
@@ -7004,6 +7017,11 @@ done:
 	free(link_target);
 	free(cwd);
 	free(commit_id);
+	if (error != NULL && view != NULL) {
+		if (view->close == NULL)
+			close_blame_view(view);
+		view_close(view);
+	}
 	if (commit)
 		got_object_commit_close(commit);
 	if (worktree)
@@ -7373,8 +7391,10 @@ open_tree_view(struct tog_view *view, struct got_object_id *commit_id,
 	STAILQ_INIT(&s->colors);
 
 	s->commit_id = got_object_id_dup(commit_id);
-	if (s->commit_id == NULL)
-		return got_error_from_errno("got_object_id_dup");
+	if (s->commit_id == NULL) {
+		err = got_error_from_errno("got_object_id_dup");
+		goto done;
+	}
 
 	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
@@ -7448,8 +7468,11 @@ done:
 	free(commit_id_str);
 	if (commit)
 		got_object_commit_close(commit);
-	if (err)
-		close_tree_view(view);
+	if (err) {
+		if (view->close == NULL)
+			close_tree_view(view);
+		view_close(view);
+	}
 	return err;
 }
 
@@ -8051,7 +8074,7 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 
 	err = ref_view_load_refs(s);
 	if (err)
-		return err;
+		goto done;
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "^refs/heads/",
@@ -8085,8 +8108,11 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 	view->search_start = search_start_ref_view;
 	view->search_next = search_next_ref_view;
 done:
-	if (err)
-		free_colors(&s->colors);
+	if (err) {
+		if (view->close == NULL)
+			close_ref_view(view);
+		view_close(view);
+	}
 	return err;
 }
 
