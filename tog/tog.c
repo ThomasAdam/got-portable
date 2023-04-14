@@ -546,6 +546,7 @@ struct tog_help_view_state {
 	KEY_("+", "Increase size of the focussed split"), \
 	KEY_("Tab", "Switch focus between views"), \
 	KEY_("F", "Toggle fullscreen mode"), \
+	KEY_("S", "Switch split-screen layout"), \
 	KEY_("/", "Open prompt to enter search term"), \
 	KEY_("n", "Find next line/token matching the current search term"), \
 	KEY_("N", "Find previous line/token matching the current search term"),\
