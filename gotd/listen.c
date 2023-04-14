@@ -180,26 +180,6 @@ find_uid_connection_counter(uid_t euid)
 	return NULL;
 }
 
-struct gotd_uid_connection_limit *
-gotd_find_uid_connection_limit(struct gotd_uid_connection_limit *limits,
-    size_t nlimits, uid_t uid)
-{
-	/* This array is always sorted to allow for binary search. */
-	int i, left = 0, right = nlimits - 1;
-
-	while (left <= right) {
-		i = ((left + right) / 2);
-		if (limits[i].uid == uid)
-			return &limits[i];
-		if (limits[i].uid > uid)
-			left = i + 1;
-		else
-			right = i - 1;
-	}
-
-	return NULL;
-}
-
 static const struct got_error *
 disconnect(struct gotd_listen_client *client)
 {
