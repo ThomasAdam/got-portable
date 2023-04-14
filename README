@@ -28,7 +28,7 @@ A Got release tarball will install files under /usr/local by default.
 A build started in Got's Git repository will install files under ~/bin.
 
 Tests will pass only after 'make install' because they rely on installed
-binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
+binaries in $PATH. Any tests written as shell scripts also depend on git(1).
 Tests which use the got clone, fetch, and send commands will fail if
 'ssh 127.0.0.1' does not succeed non-interactively.
 
@@ -52,12 +52,9 @@ store test data in a directory other than /tmp, such as ~/got-test, run:
  $ mkdir ~/got-test
  $ make regress GOT_TEST_ROOT=~/got-test
 
-To run the tog automated test suite compile a tog regress build,
-which cannot make use of pledge(2).
+To run the tog automated test suite:
 
- $ make -C tog clean
  $ make tog-regress
- $ make install
 
 Like Got, either individual tests or the entire suite can be run:
 
