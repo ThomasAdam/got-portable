@@ -4697,6 +4697,7 @@ struct revert_file_args {
 	void *patch_arg;
 	struct got_repository *repo;
 	int unlink_added_files;
+	struct got_pathlist_head *added_files_to_unlink;
 };
 
 static const struct got_error *
@@ -4999,16 +5000,33 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			goto done;
 		got_fileindex_entry_remove(a->fileindex, ie);
 		if (a->unlink_added_files) {
-			if (asprintf(&ondisk_path, "%s/%s",
-			    got_worktree_get_root_path(a->worktree),
-			    relpath) == -1) {
-				err = got_error_from_errno("asprintf");
-				goto done;
+			int do_unlink = a->added_files_to_unlink ? 0 : 1;
+
+			if (a->added_files_to_unlink) {
+				struct got_pathlist_entry *pe;
+
+				TAILQ_FOREACH(pe, a->added_files_to_unlink,
+				    entry) {
+					if (got_path_cmp(pe->path, relpath,
+					    pe->path_len, strlen(relpath)))
+						continue;
+					do_unlink = 1;
+					break;
+				}
 			}
-			if (unlink(ondisk_path) == -1) {
-				err = got_error_from_errno2("unlink",
-				    ondisk_path);
-				break;
+
+			if (do_unlink) {
+				if (asprintf(&ondisk_path, "%s/%s",
+				    got_worktree_get_root_path(a->worktree),
+				    relpath) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
+				if (unlink(ondisk_path) == -1) {
+					err = got_error_from_errno2("unlink",
+					    ondisk_path);
+					break;
+				}
 			}
 		}
 		break;
@@ -7325,6 +7343,133 @@ done:
 	return err;
 }
 
+static const struct got_error *
+get_paths_changed_between_commits(struct got_pathlist_head *paths,
+    struct got_object_id *id1, struct got_object_id *id2,
+    struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_commit_object	*commit1 = NULL, *commit2 = NULL;
+	struct got_tree_object		*tree1 = NULL, *tree2 = NULL;
+
+	if (id1) {
+		err = got_object_open_as_commit(&commit1, repo, id1);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&tree1, repo,
+		    got_object_commit_get_tree_id(commit1));
+		if (err)
+			goto done;
+	}
+
+	if (id2) {
+		err = got_object_open_as_commit(&commit2, repo, id2);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&tree2, repo,
+		    got_object_commit_get_tree_id(commit2));
+		if (err)
+			goto done;
+	}
+
+	err = got_diff_tree(tree1, tree2, NULL, NULL, -1, -1, "", "", repo,
+	    got_diff_tree_collect_changed_paths, paths, 0);
+	if (err)
+		goto done;
+done:
+	if (commit1)
+		got_object_commit_close(commit1);
+	if (commit2)
+		got_object_commit_close(commit2);
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
+get_paths_added_between_commits(struct got_pathlist_head *added_paths,
+    struct got_object_id *id1, struct got_object_id *id2,
+    const char *path_prefix, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_pathlist_head merged_paths;
+	struct got_pathlist_entry *pe;
+	char *abspath = NULL, *wt_path = NULL;
+
+	TAILQ_INIT(&merged_paths);
+
+	err = get_paths_changed_between_commits(&merged_paths, id1, id2, repo);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(pe, &merged_paths, entry) {
+		struct got_diff_changed_path *change = pe->data;
+
+		if (change->status != GOT_STATUS_ADD)
+			continue;
+
+		if (got_path_is_root_dir(path_prefix)) {
+			wt_path = strdup(pe->path);
+			if (wt_path == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		} else {
+			if (asprintf(&abspath, "/%s", pe->path) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			err = got_path_skip_common_ancestor(&wt_path,
+			    path_prefix, abspath);
+			if (err)
+				goto done;
+			free(abspath);
+			abspath = NULL;
+		}
+
+		err = got_pathlist_append(added_paths, wt_path, NULL);
+		if (err)
+			goto done;
+		wt_path = NULL;
+	}
+
+done:
+	got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_ALL);
+	free(abspath);
+	free(wt_path);
+	return err;
+}
+
+static const struct got_error *
+get_paths_added_in_commit(struct got_pathlist_head *added_paths,
+    struct got_object_id *id, const char *path_prefix,
+    struct got_repository *repo)
+{
+	const struct got_error		*err;
+	struct got_commit_object	*commit = NULL;
+	struct got_object_qid		*pid;
+
+	err = got_object_open_as_commit(&commit, repo, id);
+	if (err)
+		goto done;
+
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
+
+	err = get_paths_added_between_commits(added_paths,
+	    pid ? &pid->id : NULL, id, path_prefix, repo);
+	if (err)
+		goto done;
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
 const struct got_error *
 got_worktree_rebase_abort(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
@@ -7334,14 +7479,43 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_object_id *merged_commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	char *fileindex_path = NULL;
+	char *commit_ref_name = NULL;
+	struct got_reference *commit_ref = NULL;
 	struct revert_file_args rfa;
 	struct got_object_id *tree_id = NULL;
+	struct got_pathlist_head added_paths;
+
+	TAILQ_INIT(&added_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&merged_commit_id, repo, commit_ref);
+	if (err)
+		goto done;
+
+	/*
+	 * Determine which files in added status can be safely removed
+	 * from disk while reverting changes in the work tree.
+	 * We want to avoid deleting unrelated files which were added by
+	 * the user for conflict resolution purposes.
+	 */
+	err = get_paths_added_in_commit(&added_paths, merged_commit_id,
+	    got_worktree_get_path_prefix(worktree), repo);
+	if (err)
+		goto done;
 
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(new_base_branch), 0);
@@ -7390,7 +7564,8 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	rfa.patch_cb = NULL;
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
-	rfa.unlink_added_files = 0;
+	rfa.unlink_added_files = 1;
+	rfa.added_files_to_unlink = &added_paths;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
@@ -7403,14 +7578,19 @@ sync:
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	got_pathlist_free(&added_paths, GOT_PATHLIST_FREE_PATH);
 	got_ref_close(resolved);
 	free(tree_id);
 	free(commit_id);
+	free(merged_commit_id);
 	if (commit)
 		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
+	free(commit_ref_name);
+	if (commit_ref)
+		got_ref_close(commit_ref);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -7706,13 +7886,48 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	char *fileindex_path = NULL;
+	struct got_object_id *merged_commit_id = NULL;
 	struct got_commit_object *commit = NULL;
+	char *commit_ref_name = NULL;
+	struct got_reference *commit_ref = NULL;
 	struct got_object_id *tree_id = NULL;
 	struct revert_file_args rfa;
+	struct got_pathlist_head added_paths;
+
+	TAILQ_INIT(&added_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err) {
+		if (err->code != GOT_ERR_NOT_REF)
+			goto done;
+		/* Can happen on early abort due to invalid histedit script. */
+		commit_ref = NULL;
+	}
+
+	if (commit_ref) {
+		err = got_ref_resolve(&merged_commit_id, repo, commit_ref);
+		if (err)
+			goto done;
+
+		/*
+		 * Determine which files in added status can be safely removed
+		 * from disk while reverting changes in the work tree.
+		 * We want to avoid deleting unrelated files added by the
+		 * user during conflict resolution or during histedit -e.
+		 */
+		err = get_paths_added_in_commit(&added_paths, merged_commit_id,
+		    got_worktree_get_path_prefix(worktree), repo);
+		if (err)
+			goto done;
+	}
 
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(branch), 0);
@@ -7752,7 +7967,8 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	rfa.patch_cb = NULL;
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
-	rfa.unlink_added_files = 0;
+	rfa.unlink_added_files = 1;
+	rfa.added_files_to_unlink = &added_paths;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
@@ -7765,9 +7981,14 @@ sync:
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	got_ref_close(resolved);
+	if (resolved)
+		got_ref_close(resolved);
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	free(merged_commit_id);
 	free(tree_id);
 	free(fileindex_path);
+	free(commit_ref_name);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -8445,11 +8666,41 @@ got_worktree_merge_abort(struct got_worktree *worktree,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
-	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	char *fileindex_path = NULL;
 	struct revert_file_args rfa;
+	char *commit_ref_name = NULL;
+	struct got_reference *commit_ref = NULL;
+	struct got_object_id *merged_commit_id = NULL;
 	struct got_object_id *tree_id = NULL;
+	struct got_pathlist_head added_paths;
+
+	TAILQ_INIT(&added_paths);
+
+	err = get_merge_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&merged_commit_id, repo, commit_ref);
+	if (err)
+		goto done;
+
+	/*
+	 * Determine which files in added status can be safely removed
+	 * from disk while reverting changes in the work tree.
+	 * We want to avoid deleting unrelated files which were added by
+	 * the user for conflict resolution purposes.
+	 */
+	err = get_paths_added_between_commits(&added_paths,
+	    got_worktree_get_base_commit_id(worktree), merged_commit_id,
+	    got_worktree_get_path_prefix(worktree), repo);
+	if (err)
+		goto done;
+
 
 	err = got_object_open_as_commit(&commit, repo,
 	    worktree->base_commit_id);
@@ -8477,6 +8728,7 @@ got_worktree_merge_abort(struct got_worktree *worktree,
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
 	rfa.unlink_added_files = 1;
+	rfa.added_files_to_unlink = &added_paths;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
@@ -8490,12 +8742,15 @@ sync:
 		err = sync_err;
 done:
 	free(tree_id);
-	free(commit_id);
+	free(merged_commit_id);
 	if (commit)
 		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	free(commit_ref_name);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)

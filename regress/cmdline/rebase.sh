@@ -419,7 +419,10 @@ test_rebase_abort() {
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo \
+		-m "changing alpha and adding new on newbranch"
 	local orig_commit2=`git_show_head $testroot/repo`
 	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
 
@@ -450,10 +453,12 @@ test_rebase_abort() {
 		>> $testroot/stdout.expected
 	echo ": committing to beta on newbranch" >> $testroot/stdout.expected
 	echo "C  alpha" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit2 -> merge conflict" \
 		>> $testroot/stdout.expected
-	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
+	echo ": changing alpha and adding new on newbranch" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -490,9 +495,15 @@ test_rebase_abort() {
 		return 1
 	fi
 
+	# unrelated file in work tree added during conflict resolution
+	touch $testroot/wt/added-file
+	(cd $testroot/wt && got add added-file > /dev/null)
+
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	echo "A  added-file" > $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -508,7 +519,10 @@ test_rebase_abort() {
 
 	echo "Switching work tree to refs/heads/master" \
 		> $testroot/stdout.expected
+	echo 'R  added-file' >> $testroot/stdout.expected
 	echo 'R  alpha' >> $testroot/stdout.expected
+	echo 'R  epsilon/new' >> $testroot/stdout.expected
+	echo 'G  added-file' >> $testroot/stdout.expected
 	echo 'U  beta' >> $testroot/stdout.expected
 	echo "Rebase of refs/heads/newbranch aborted" \
 		>> $testroot/stdout.expected
@@ -556,7 +570,8 @@ test_rebase_abort() {
 	fi
 
 	(cd $testroot/wt && got status > $testroot/stdout)
-	echo "?  unversioned-file" > $testroot/stdout.expected
+	echo "?  added-file" > $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
