@@ -15,7 +15,7 @@ LIBS += -lm $(zlib_LIBS) $(libbsd_LIBS) $(libmd_LIBS)
 AM_CPPFLAGS += $(libbsd_CFLAGS) $(libmd_CFLAGS)
 
 TEST_TARGETS=compat regress-delta regress-deltify regress-fetch regress-idset \
-	     regress-path regress-cmdline
+	     regress-path regress-tog regress-cmdline
 GOT_TEST_ROOT=/tmp
 
 .PHONY: compat
@@ -263,3 +263,7 @@ regress-path:
 		$(top_srcdir)/regress/path/path_test.c \
 		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
 			$(top_builddir)/regress/path/path_test
+
+regress-tog:
+	(cd $(top_builddir)/regress/tog || exit $$?; 	\
+	./log.sh -q -r "$(GOT_TEST_ROOT)");
