@@ -15,7 +15,7 @@ LDADD = -lutil_p -levent_p
 .else
 LDADD = -lutil -levent
 .endif
-DPADD = ${LIBUTIL}
+DPADD = ${LIBUTIL} ${LIBEVENT}
 
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
