@@ -454,6 +454,7 @@ struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(
     struct gotd_uid_connection_limit *limits, size_t nlimits, uid_t uid);
+int gotd_parseuid(const char *s, uid_t *uid);
 
 /* imsg.c */
 const struct got_error *gotd_imsg_flush(struct imsgbuf *);
