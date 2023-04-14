@@ -33,6 +33,7 @@
 #include <event.h>
 #include <imsg.h>
 #include <limits.h>
+#include <pwd.h>
 #include <sha1.h>
 #include <sha2.h>
 #include <stdarg.h>
@@ -834,7 +835,7 @@ conf_limit_user_connections(const char *user, int maximum)
 		return -1;
 	}
 
-	if (gotd_auth_parseuid(user, &uid) == -1) {
+	if (gotd_parseuid(user, &uid) == -1) {
 		yyerror("%s: no such user", user);
 		return -1;
 	}
@@ -1144,4 +1145,22 @@ gotd_find_uid_connection_limit(struct gotd_uid_connection_limit *limits,
 	}
 
 	return NULL;
+}
+
+int
+gotd_parseuid(const char *s, uid_t *uid)
+{
+	struct passwd *pw;
+	const char *errstr;
+
+	if ((pw = getpwnam(s)) != NULL) {
+		*uid = pw->pw_uid;
+		if (*uid == UID_MAX)
+			return -1;
+		return 0;
+	}
+	*uid = strtonum(s, 0, UID_MAX - 1, &errstr);
+	if (errstr)
+		return -1;
+	return 0;
 }
