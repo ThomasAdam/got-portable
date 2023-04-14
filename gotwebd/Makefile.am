@@ -91,13 +91,14 @@ LDADD += $(libbsd_LIBS) \
 	 $(libevent_LIBS) \
 	 $(zlib_LIBS) \
 	 $(libuuid_LIBS) \
-	 $(libutil_LIBS)
+	 $(libutil_LIBS) \
+	 $(libmd_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
 
 AM_CPPFLAGS += $(libbsd_CFLAGS) $(libevent_CFLAGS) $(zlib_CFLAGS) \
-	       $(libuuid_CFLAGS)
+	       $(libuuid_CFLAGS) $(libmd_CFLAGS)
 
 #realinstall:
 #	if [ ! -d ${DESTDIR}${PUB_REPOS_DIR}/. ]; then \

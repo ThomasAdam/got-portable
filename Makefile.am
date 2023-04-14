@@ -11,8 +11,8 @@ LDADD += -lmd
 LIBS += -lmd
 endif
 
-LIBS += -lm $(zlib_LIBS) $(libbsd_LIBS)
-AM_CPPFLAGS += $(libbsd_CFLAGS)
+LIBS += -lm $(zlib_LIBS) $(libbsd_LIBS) $(libmd_LIBS)
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(libmd_CFLAGS)
 
 TEST_TARGETS=compat regress-delta regress-deltify regress-fetch regress-idset \
 	     regress-path regress-cmdline

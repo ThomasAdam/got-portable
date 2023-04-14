@@ -690,6 +690,20 @@ if test "$PLATFORM" = "linux"; then
 	# <sys/tree.h> and <sys/queue.h> won't be found.
 	CFLAGS="$CFLAGS $LIBBSD_CFLAGS"
 	LIBS="$LIBS $LIBBSD_LIBS"
+
+	PKG_CHECK_MODULES(
+		LIBMD,
+		libmd,
+		[
+		     libmd_CFLAGS="$LIBMD_CFLAGS"
+		     libmd_LIBS="$LIBMD_LIBS"
+		     AC_SUBST(libmd_CFLAGS)
+		     AC_SUBST(libmd_LIBS)
+		], []
+	)
+	CFLAGS="$CFLAGS $LIBMD_CFLAGS"
+	LIBS="$LIBS $LIBMD_LIBS"
+
 fi
 
 # Look for a suitable queue.h.  We hope libbsd is enough, but that is missing

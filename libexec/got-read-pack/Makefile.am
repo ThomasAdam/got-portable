@@ -20,9 +20,9 @@ got_read_pack_SOURCES = got-read-pack.c \
 got_read_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
-LDADD += $(zlib_LIBS) $(libbsd_LIBS) $(libutil_LIBS)
+LDADD += $(zlib_LIBS) $(libbsd_LIBS) $(libutil_LIBS) $(libmd_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
 
-AM_CPPFLAGS += $(zlib_CFLAGS) $(libbsd_CFLAGS)
+AM_CPPFLAGS += $(zlib_CFLAGS) $(libbsd_CFLAGS) $(libmd_CFLAGS)

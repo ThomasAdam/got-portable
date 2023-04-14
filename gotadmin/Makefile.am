@@ -45,9 +45,11 @@ EXTRA_DIST = gotadmin.1
 man1_MANS = gotadmin.1
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
-LDADD += $(libbsd_LIBS) $(zlib_LIBS) $(libuuid_LIBS) $(libutil_LIBS)
+LDADD += $(libbsd_LIBS) $(zlib_LIBS) $(libuuid_LIBS) $(libutil_LIBS) \
+	 $(libmd_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
 
-AM_CPPFLAGS += $(libbsd_CFLAGS) $(zlib_CFLAGS) $(libuuid_CFLAGS)
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(zlib_CFLAGS) $(libuuid_CFLAGS) \
+	       $(libmd_CFLAGS)

@@ -19,6 +19,7 @@ Linux:
 
 * `libncurses` (for tog(1))
 * `libbsd` (BSD's arc4random routines)
+* `libmd` (SHA256 routines)
 * `libuuid` (for UUID generation)
 * `libz` (for Z compression)
 * `pkg-config` (for searching libraries)

@@ -72,11 +72,13 @@ LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
 LDADD += $(libuuid_LIBS) \
 	 $(zlib_LIBS) \
 	 $(libbsd_LIBS) \
-	 $(libutil_LIBS)
+	 $(libutil_LIBS) \
+	 $(libmd_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
 
 AM_CPPFLAGS += $(libuuid_CFLAGS) \
 	       $(zlib_CFLAGS) \
-	       $(libbsd_CFLAGS)
+	       $(libbsd_CFLAGS) \
+	       $(libmd_CLFAGS)
