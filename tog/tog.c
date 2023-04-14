@@ -4189,10 +4189,7 @@ init_mock_term(const char *test_script_path)
 		goto done;
 	}
 
-	/*
-	 * XXX Perhaps we should define "xterm" as the terminal
-	 * type for standardised testing instead of using $TERM?
-	 */
+	/* use local TERM so we test in different environments */
 	if (newterm(NULL, tog_io.cout, tog_io.cin) == NULL)
 		err = got_error_msg(GOT_ERR_IO,
 		    "newterm: failed to initialise curses");
@@ -4274,7 +4271,7 @@ get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
 static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
-	const struct got_error *io_err, *error;
+	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *start_id = NULL;
@@ -4411,11 +4408,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-	}
-	if (using_mock_io) {
-		io_err = tog_io_close();
-		if (error == NULL)
-			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -5786,7 +5778,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
-	const struct got_error *io_err, *error;
+	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
@@ -5911,11 +5903,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-	}
-	if (using_mock_io) {
-		io_err = tog_io_close();
-		if (error == NULL)
-			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -6891,7 +6878,7 @@ reset_blame_view(struct tog_view *view)
 static const struct got_error *
 cmd_blame(int argc, char *argv[])
 {
-	const struct got_error *io_err, *error;
+	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
@@ -7027,11 +7014,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-	}
-	if (using_mock_io) {
-		io_err = tog_io_close();
-		if (error == NULL)
-			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -7865,7 +7847,7 @@ usage_tree(void)
 static const struct got_error *
 cmd_tree(int argc, char *argv[])
 {
-	const struct got_error *io_err, *error;
+	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
@@ -8004,11 +7986,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-	}
-	if (using_mock_io) {
-		io_err = tog_io_close();
-		if (error == NULL)
-			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -8757,7 +8734,7 @@ usage_ref(void)
 static const struct got_error *
 cmd_ref(int argc, char *argv[])
 {
-	const struct got_error *io_err, *error;
+	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
@@ -8850,11 +8827,6 @@ done:
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
-	}
-	if (using_mock_io) {
-		io_err = tog_io_close();
-		if (error == NULL)
-			error = io_err;
 	}
 	tog_free_refs();
 	return error;
@@ -9722,7 +9694,7 @@ done:
 int
 main(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *io_err, *error = NULL;
 	const struct tog_cmd *cmd = NULL;
 	int ch, hflag = 0, Vflag = 0;
 	char **cmd_argv = NULL;
@@ -9821,6 +9793,11 @@ main(int argc, char *argv[])
 			error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
 	}
 
+	if (using_mock_io) {
+		io_err = tog_io_close();
+		if (error == NULL)
+			error = io_err;
+	}
 	endwin();
 	if (cmd_argv) {
 		int i;
