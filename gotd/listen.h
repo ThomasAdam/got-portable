@@ -14,9 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(
-    struct gotd_uid_connection_limit *limits, size_t nlimits, uid_t uid);
-
 void listen_main(const char *title, int gotd_socket,
     struct gotd_uid_connection_limit *connection_limits,
     size_t nconnection_limits);
