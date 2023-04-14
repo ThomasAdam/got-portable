@@ -18,13 +18,6 @@ MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}/../gotd
 
-.if defined(PROFILE)
-LDADD = -lutil_p -lz_p -lm_p -lc_p -levent_p
-.else
-LDADD = -lutil -lz -lm -levent
-.endif
-DPADD = ${LIBZ} ${LIBUTIL}
-
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
 .endif
