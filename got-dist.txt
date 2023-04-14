@@ -182,6 +182,7 @@
 /lib/got_lib_object_idcache.h
 /lib/got_lib_object_idset.h
 /lib/got_lib_object_parse.h
+/lib/got_lib_object_qid.h
 /lib/got_lib_pack.h
 /lib/got_lib_pack_create.h
 /lib/got_lib_pack_index.h
@@ -204,6 +205,7 @@
 /lib/object_open_io.c
 /lib/object_open_privsep.c
 /lib/object_parse.c
+/lib/object_qid.c
 /lib/opentemp.c
 /lib/pack.c
 /lib/pack_create.c
@@ -331,6 +333,7 @@
 /regress/gotd/repo_read_access_denied.sh
 /regress/gotd/repo_write.sh
 /regress/gotd/repo_write_empty.sh
+/regress/gotd/repo_write_protected.sh
 /regress/gotd/request_bad.sh
 /regress/idset
 /regress/idset/Makefile
@@ -353,10 +356,16 @@
 /regress/template/06.expected
 /regress/template/07-printf.tmpl
 /regress/template/07.expected
+/regress/template/08-dangling.tmpl
+/regress/template/08.expected
 /regress/template/Makefile
 /regress/template/lists.h
 /regress/template/runbase.c
 /regress/template/runlist.c
+/regress/tog
+/regress/tog/Makefile
+/regress/tog/common.sh
+/regress/tog/log.sh
 /template
 /template/Makefile
 /template/parse.y
