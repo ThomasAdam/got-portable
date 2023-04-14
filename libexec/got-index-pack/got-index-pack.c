@@ -37,6 +37,7 @@
 #include "got_lib_delta_cache.h"
 #include "got_lib_hash.h"
 #include "got_lib_object.h"
+#include "got_lib_object_qid.h"
 #include "got_lib_privsep.h"
 #include "got_lib_ratelimit.h"
 #include "got_lib_pack.h"

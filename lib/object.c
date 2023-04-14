@@ -175,41 +175,6 @@ got_object_resolve_id_str(struct got_object_id **id,
 	return NULL;
 }
 
-const struct got_error *
-got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
-{
-	*qid = calloc(1, sizeof(**qid));
-	if (*qid == NULL)
-		return got_error_from_errno("calloc");
-
-	memcpy(&(*qid)->id, id, sizeof((*qid)->id));
-	return NULL;
-}
-
-const struct got_error *
-got_object_id_queue_copy(const struct got_object_id_queue *src,
-    struct got_object_id_queue *dest)
-{
-	const struct got_error *err;
-	struct got_object_qid *qid;
-
-	STAILQ_FOREACH(qid, src, entry) {
-		struct got_object_qid *new;
-		/*
-		 * Deep-copy the object ID only. Let the caller deal
-		 * with setting up the new->data pointer if needed.
-		 */
-		err = got_object_qid_alloc(&new, &qid->id);
-		if (err) {
-			got_object_id_queue_free(dest);
-			return err;
-		}
-		STAILQ_INSERT_TAIL(dest, new, entry);
-	}
-
-	return NULL;
-}
-
 int
 got_object_tree_get_nentries(struct got_tree_object *tree)
 {
