@@ -48,6 +48,7 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
+#include "got_lib_object_qid.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"
@@ -55,60 +56,6 @@
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
-
-struct got_object_id *
-got_object_id_dup(struct got_object_id *id1)
-{
-	struct got_object_id *id2;
-
-	id2 = malloc(sizeof(*id2));
-	if (id2 == NULL)
-		return NULL;
-	memcpy(id2, id1, sizeof(*id2));
-	return id2;
-}
-
-int
-got_object_id_cmp(const struct got_object_id *id1,
-    const struct got_object_id *id2)
-{
-	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
-}
-
-const struct got_error *
-got_object_qid_alloc_partial(struct got_object_qid **qid)
-{
-	*qid = malloc(sizeof(**qid));
-	if (*qid == NULL)
-		return got_error_from_errno("malloc");
-
-	(*qid)->data = NULL;
-	return NULL;
-}
-
-const struct got_error *
-got_object_id_str(char **outbuf, struct got_object_id *id)
-{
-	static const size_t len = GOT_OBJECT_ID_HEX_MAXLEN;
-
-	*outbuf = malloc(len);
-	if (*outbuf == NULL)
-		return got_error_from_errno("malloc");
-
-	if (got_object_id_hex(id, *outbuf, len) == NULL) {
-		free(*outbuf);
-		*outbuf = NULL;
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
-	}
-
-	return NULL;
-}
-
-char *
-got_object_id_hex(struct got_object_id *id, char *buf, size_t len)
-{
-	return got_sha1_digest_to_str(id->sha1, buf, len);
-}
 
 const struct got_error *
 got_object_type_label(const char **label, int obj_type)
@@ -185,24 +132,6 @@ got_object_raw_close(struct got_raw_object *obj)
 	}
 	free(obj);
 	return err;
-}
-
-void
-got_object_qid_free(struct got_object_qid *qid)
-{
-	free(qid);
-}
-
-void
-got_object_id_queue_free(struct got_object_id_queue *ids)
-{
-	struct got_object_qid *qid;
-
-	while (!STAILQ_EMPTY(ids)) {
-		qid = STAILQ_FIRST(ids);
-		STAILQ_REMOVE_HEAD(ids, entry);
-		got_object_qid_free(qid);
-	}
 }
 
 const struct got_error *

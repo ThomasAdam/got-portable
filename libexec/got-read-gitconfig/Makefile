@@ -4,7 +4,7 @@
 
 PROG=		got-read-gitconfig
 SRCS=		got-read-gitconfig.c error.c inflate.c object_parse.c \
-		path.c privsep.c hash.c gitconfig.c pollfd.c
+		path.c privsep.c hash.c gitconfig.c pollfd.c object_qid.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 

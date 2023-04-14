@@ -4,7 +4,7 @@
 
 PROG=		got-read-object
 SRCS=		got-read-object.c error.c inflate.c object_parse.c \
-		path.c privsep.c hash.c pollfd.c
+		object_qid.c path.c privsep.c hash.c pollfd.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 

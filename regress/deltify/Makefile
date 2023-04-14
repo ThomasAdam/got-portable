@@ -2,7 +2,7 @@
 
 PROG = deltify_test
 SRCS = deltify.c error.c opentemp.c hash.c deltify_test.c murmurhash2.c \
-	object_parse.c inflate.c path.c pollfd.c
+	object_parse.c inflate.c path.c pollfd.c object_qid.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lz

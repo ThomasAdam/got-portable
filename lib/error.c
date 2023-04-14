@@ -33,6 +33,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_hash.h"
 #include "got_lib_object_parse.h"
 
 #ifndef nitems

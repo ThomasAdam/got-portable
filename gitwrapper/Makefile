@@ -10,8 +10,7 @@ BINDIR ?=	${PREFIX}/bin
 PROG=		gitwrapper
 
 SRCS=		gitwrapper.c parse.y log.c dial.c path.c error.c \
-		reference_parse.c hash.c object_parse.c imsg.c \
-		inflate.c pollfd.c
+		reference_parse.c hash.c object_qid.c
 
 CLEANFILES = parse.h
 

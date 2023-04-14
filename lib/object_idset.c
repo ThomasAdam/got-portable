@@ -34,6 +34,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_qid.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_object_parse.h"
 
