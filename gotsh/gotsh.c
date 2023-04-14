@@ -33,6 +33,8 @@
 #include "got_serve.h"
 #include "got_path.h"
 
+#include "got_lib_dial.h"
+
 #include "gotd.h"
 
 static int chattygot;
@@ -41,7 +43,7 @@ __dead static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s -c '%s|%s repository-path'\n",
-	    getprogname(), GOT_SERVE_CMD_SEND, GOT_SERVE_CMD_FETCH);
+	    getprogname(), GOT_DIAL_CMD_SEND, GOT_DIAL_CMD_FETCH);
 	exit(1);
 }
 
@@ -83,17 +85,17 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (strcmp(argv[0], GOT_SERVE_CMD_SEND) == 0 ||
-	    strcmp(argv[0], GOT_SERVE_CMD_FETCH) == 0) {
+	if (strcmp(argv[0], GOT_DIAL_CMD_SEND) == 0 ||
+	    strcmp(argv[0], GOT_DIAL_CMD_FETCH) == 0) {
 		if (argc != 2)
 			usage();
 		if (asprintf(&gitcmd, "%s %s", argv[0], argv[1]) == -1)
 			err(1, "asprintf");
-		error = got_serve_parse_command(&command, &repo_path, gitcmd);
+		error = got_dial_parse_command(&command, &repo_path, gitcmd);
 	} else {
 		if (argc != 3 || strcmp(argv[1], "-c") != 0)
 			usage();
-		error = got_serve_parse_command(&command, &repo_path, argv[2]);
+		error = got_dial_parse_command(&command, &repo_path, argv[2]);
 	}
 	if (error && error->code == GOT_ERR_BAD_PACKET)
 		usage();

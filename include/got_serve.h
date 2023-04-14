@@ -14,9 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define GOT_SERVE_CMD_SEND "git-receive-pack"
-#define GOT_SERVE_CMD_FETCH "git-upload-pack"
-
-const struct got_error *got_serve_parse_command(char **, char **, const char *);
 const struct got_error *got_serve(int infd, int outfd, const char *command,
     const char *repo_path, int gotd_sock, int chattygot);

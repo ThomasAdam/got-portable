@@ -88,10 +88,10 @@ got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
 		err = got_dial_ssh(fetchpid, fetchfd, host, port,
-		    server_path, GOT_DIAL_DIRECTION_FETCH, verbosity);
+		    server_path, GOT_DIAL_CMD_FETCH, verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = got_dial_git(fetchfd, host, port, server_path,
-		    GOT_DIAL_DIRECTION_FETCH);
+		    GOT_DIAL_CMD_FETCH);
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
 		err = got_error_path(proto, GOT_ERR_NOT_IMPL);
 	else
