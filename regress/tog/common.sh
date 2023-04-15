@@ -62,7 +62,7 @@ widechar_commit()
 
 set_test_env()
 {
-	export GOT_TOG_TEST=$1
+	export TOG_TEST_SCRIPT=$1
 	export TOG_SCR_DUMP=$2
 
 	if [ -n "${3}" ]; then

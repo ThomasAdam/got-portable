@@ -31,7 +31,7 @@ test_diff_contiguous_commits()
 	local head_id_truncated=`trim_obj_id 13 $head_id`
 	local alpha_id=`get_blob_id $testroot/repo "" alpha`
 
-	cat <<EOF >$testroot/diff_contiguous_commits
+	cat <<EOF >$TOG_TEST_SCRIPT
 SCREENDUMP
 EOF
 
@@ -94,7 +94,7 @@ test_diff_arbitrary_commits()
 	local alpha_id=`get_blob_id $testroot/repo "" alpha`
 	local new_id=`get_blob_id $testroot/repo "" new`
 
-	cat <<EOF >$testroot/diff_arbitrary_commits
+	cat <<EOF >$TOG_TEST_SCRIPT
 SCREENDUMP
 EOF
 
