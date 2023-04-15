@@ -88,7 +88,7 @@ test_init()
 
 	testroot=`mktemp -d "$GOT_TEST_ROOT/tog-test-$testname-XXXXXXXX"`
 
-	set_test_env $testroot/log_test $testroot/view $columns $lines
+	set_test_env $testroot/$testname $testroot/view $columns $lines
 
 	mkdir $testroot/repo
 	git_init $testroot/repo
