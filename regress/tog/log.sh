@@ -25,7 +25,7 @@ test_log_hsplit_diff()
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local ymd=`date -u -r $author_time +"%G-%m-%d"`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_hsplit_diff
 KEY_ENTER	open diff view of selected commit
 S		toggle horizontal split
 SCREENDUMP
@@ -82,7 +82,7 @@ test_log_vsplit_diff()
 	local blobid_alpha=`get_blob_id $testroot/repo "" alpha`
 	local blobid_beta=`get_blob_id $testroot/repo "" beta`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_vsplit_diff
 KEY_ENTER	open diff view of selected commit in vertical split
 SCREENDUMP
 EOF
@@ -146,7 +146,7 @@ test_log_show_author()
 	local commit1=`git_show_head $testroot/repo`
 	local id1_len8=`trim_obj_id 32 $commit1`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_show_author
 @		toggle show author
 SCREENDUMP
 EOF
@@ -186,7 +186,7 @@ test_log_scroll_right()
 
 	local commit1=`git_show_head $testroot/repo`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_scroll_right
 l		scroll right
 l		scroll right
 SCREENDUMP
@@ -219,7 +219,7 @@ test_log_hsplit_ref()
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local ymd=`date -u -r $author_time +"%G-%m-%d"`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_hsplit_ref
 R		open ref view
 S		toggle horizontal split
 -		reduce size of ref view split
@@ -260,7 +260,7 @@ test_log_hsplit_tree()
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local ymd=`date -u -r $author_time +"%G-%m-%d"`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_hsplit_tree
 T		open tree view
 S		toggle horizontal split
 j		move selection cursor down one entry to "beta"
@@ -306,7 +306,7 @@ test_log_logmsg_widechar()
 	local commit1=`git_show_parent_commit $testroot/repo`
 	local blobid=`get_blob_id $testroot/repo "" $(widechar_filename)`
 
-	cat <<EOF >$testroot/log_test
+	cat <<EOF >$testroot/log_logmsg_widechar
 KEY_ENTER	open selected commit in diff view
 F		toggle fullscreen
 SCREENDUMP
