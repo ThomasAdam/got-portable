@@ -4172,7 +4172,7 @@ init_mock_term(const char *test_script_path)
 	const struct got_error	*err = NULL;
 
 	if (test_script_path == NULL || *test_script_path == '\0')
-		return got_error_msg(GOT_ERR_IO, "GOT_TOG_TEST not defined");
+		return got_error_msg(GOT_ERR_IO, "TOG_TEST_SCRIPT not defined");
 
 	tog_io.f = fopen(test_script_path, "re");
 	if (tog_io.f == NULL) {
@@ -9742,7 +9742,7 @@ main(int argc, char *argv[])
 	 * Test mode init must happen before pledge() because "tty" will
 	 * not allow TTY-related ioctls to occur via regular files.
 	 */
-	test_script_path = getenv("GOT_TOG_TEST");
+	test_script_path = getenv("TOG_TEST_SCRIPT");
 	if (test_script_path != NULL) {
 		error = init_mock_term(test_script_path);
 		if (error) {
