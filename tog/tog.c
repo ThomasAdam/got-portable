@@ -1707,8 +1707,10 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 
 	if (using_mock_io) {
 		err = tog_read_script_key(tog_io.f, &ch, done);
-		if (err)
+		if (err) {
+			errcode = pthread_mutex_lock(&tog_mutex);
 			return err;
+		}
 	} else if (view->count && --view->count) {
 		cbreak();
 		nodelay(view->window, TRUE);
