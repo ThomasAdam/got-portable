@@ -621,6 +621,7 @@ struct tog_io {
 	FILE	*cin;
 	FILE	*cout;
 	FILE	*f;
+	int	 wait_for_ui;
 } tog_io;
 static int using_mock_io;
 
@@ -1633,6 +1634,11 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 	char			*line = NULL;
 	size_t			 linesz = 0;
 
+	*ch = -1;
+
+	if (tog_io.wait_for_ui)
+		goto done;
+
 	if (getline(&line, &linesz, script) == -1) {
 		if (feof(script)) {
 			*done = 1;
@@ -1641,7 +1647,10 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 			err = got_ferror(script, GOT_ERR_IO);
 			goto done;
 		}
-	} else if (strncasecmp(line, "KEY_ENTER", 9) == 0)
+	}
+	if (strncasecmp(line, "WAIT_FOR_UI", 11) == 0)
+		tog_io.wait_for_ui = 1;
+	else if (strncasecmp(line, "KEY_ENTER", 9) == 0)
 		*ch = KEY_ENTER;
 	else if (strncasecmp(line, "KEY_RIGHT", 9) == 0)
 		*ch = KEY_RIGHT;
@@ -6115,6 +6124,11 @@ draw_blame(struct tog_view *view)
 	s->last_displayed_line = lineno;
 
 	view_border(view);
+
+	if (tog_io.wait_for_ui) {
+		if (s->blame_complete)
+			tog_io.wait_for_ui = 0;
+	}
 
 	return NULL;
 }
