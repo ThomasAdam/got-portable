@@ -6997,12 +6997,6 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = view_open(0, 0, 0, 0, TOG_VIEW_BLAME);
-	if (view == NULL) {
-		error = got_error_from_errno("view_open");
-		goto done;
-	}
-
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
@@ -7012,10 +7006,19 @@ cmd_blame(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	view = view_open(0, 0, 0, 0, TOG_VIEW_BLAME);
+	if (view == NULL) {
+		error = got_error_from_errno("view_open");
+		goto done;
+	}
 	error = open_blame_view(view, link_target ? link_target : in_repo_path,
 	    commit_id, repo);
-	if (error)
+	if (error != NULL) {
+		if (view->close == NULL)
+			close_blame_view(view);
+		view_close(view);
 		goto done;
+	}
 	if (worktree) {
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
@@ -7028,11 +7031,6 @@ done:
 	free(link_target);
 	free(cwd);
 	free(commit_id);
-	if (error != NULL && view != NULL) {
-		if (view->close == NULL)
-			close_blame_view(view);
-		view_close(view);
-	}
 	if (commit)
 		got_object_commit_close(commit);
 	if (worktree)
