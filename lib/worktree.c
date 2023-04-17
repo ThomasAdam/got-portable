@@ -8387,12 +8387,6 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	if (TAILQ_EMPTY(&commitable_paths)) {
-		err = got_error_fmt(GOT_ERR_COMMIT_NO_CHANGES,
-		    "merge of %s cannot proceed", branch_name);
-		goto done;
-	}
-
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
 		const char *ct_path = ct->in_repo_path;
