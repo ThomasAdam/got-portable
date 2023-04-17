@@ -6252,7 +6252,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = got_object_qid_alloc(&pid, worktree->base_commit_id);
+	err = got_object_qid_alloc(&pid, head_commit_id);
 	if (err)
 		goto done;
 	STAILQ_INSERT_TAIL(&parent_ids, pid, entry);
