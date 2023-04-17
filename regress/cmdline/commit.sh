@@ -2077,6 +2077,41 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_commit_from_different_worktrees() {
+	local testroot=$(test_init commit_from_different_worktrees)
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout $testroot/repo $testroot/wt2 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/wt2/new
+	(cd $testroot/wt2 && got add new >/dev/null)
+	(cd $testroot/wt2 && got commit -m 'add new file from wt2' > \
+	    $testroot/stdout)
+	local wt2_head_id=$(git_show_head $testroot/repo)
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'mod alpha in wt' > $testroot/stdout)
+	local wt1_parent_id=$(git_show_parent_commit $testroot/repo)
+
+	if [ $wt2_head_id != $wt1_parent_id ]; then
+		echo "commit lost from different work tree" >&2
+		test_done "$testroot" "1"
+	fi
+
+	test_done "$testroot" "0"
+}
+
 test_parseargs "$@"
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -2108,3 +2143,4 @@ run_test test_commit_large_file
 run_test test_commit_gitignore
 run_test test_commit_bad_author
 run_test test_commit_logmsg_ref
+run_test test_commit_from_different_worktrees
