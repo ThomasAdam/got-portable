@@ -1045,7 +1045,7 @@ test_merge_no_op() {
 	(cd $testroot/repo && git checkout -q -b newbranch)
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
-	local branch_commitk=`git_show_branch_head $testroot/repo newbranch`
+	local branch_commit=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1122,15 +1122,13 @@ test_merge_no_op() {
 	(cd $testroot/wt && got merge -c > $testroot/stdout \
 		2> $testroot/stderr)
 	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "got merge succeeded unexpectedly" >&2
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	echo -n "got: merge of refs/heads/newbranch cannot proceed: " \
-		> $testroot/stderr.expected
-	echo "no changes to commit" >> $testroot/stderr.expected
+	echo -n '' > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1139,9 +1137,35 @@ test_merge_no_op() {
 		return 1
 	fi
 
+	local merge_commit=`git_show_head $testroot/repo`
+	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
+		> $testroot/stdout.expected
+	echo $merge_commit >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# We should have created a merge commit with two parents.
+	got log -r $testroot/repo -l1 -c $merge_commit | grep ^parent \
+		> $testroot/stdout
+	echo "parent 1: $master_commit" > $testroot/stdout.expected
+	echo "parent 2: $branch_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
