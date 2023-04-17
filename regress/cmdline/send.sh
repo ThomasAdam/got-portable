@@ -322,6 +322,45 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_merge_commit() {
+	local testroot=`test_init send_merge_commit`
+	local testurl=ssh://127.0.0.1/$testroot
+
+	if ! got clone -q "$testurl/repo" "$testroot/repo-clone"; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo 'upstream change' > $testroot/repo/alpha
+	git_commit $testroot/repo -m 'upstream change'
+
+	got checkout $testroot/repo-clone $testroot/wt-clone > /dev/null
+	echo 'downstream change' > $testroot/wt-clone/beta
+	(cd $testroot/wt-clone && got commit -m 'downstream change' > /dev/null)
+
+	got fetch -q -r $testroot/repo-clone
+	(cd $testroot/wt-clone && got update > /dev/null)
+	(cd $testroot/wt-clone && got merge origin/master > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
+
+	got send -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_send_delete() {
 	local testroot=`test_init send_delete`
 	local testurl=ssh://127.0.0.1/$testroot
@@ -1583,6 +1622,7 @@ test_parseargs "$@"
 run_test test_send_basic
 run_test test_send_rebase_required
 run_test test_send_rebase_required_overwrite
+run_test test_send_merge_commit
 run_test test_send_delete
 run_test test_send_clone_and_send
 run_test test_send_tags
