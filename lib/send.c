@@ -162,7 +162,7 @@ insert_ref(struct got_reflist_head *refs, const char *refname,
 }
 
 static const struct got_error *
-check_linear_ancestry(const char *refname, struct got_object_id *my_id,
+check_common_ancestry(const char *refname, struct got_object_id *my_id,
     struct got_object_id *their_id, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -178,26 +178,12 @@ check_linear_ancestry(const char *refname, struct got_object_id *my_id,
 		    "bad object type on server for %s", refname);
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    my_id, their_id, 1, repo, cancel_cb, cancel_arg);
+	    my_id, their_id, 0, repo, cancel_cb, cancel_arg);
 	if (err)
 		return err;
 	if (yca_id == NULL)
 		return got_error_fmt(GOT_ERR_SEND_ANCESTRY, "%s", refname);
 
-	/*
-	 * Require a straight line of history between the two commits,
-	 * with their commit being older than my commit.
-	 *
-	 * Non-linear situations such as this require a rebase:
-	 *
-	 * (theirs) D       F (mine)
-	 *           \     /
-	 *            C   E
-	 *             \ /
-	 *              B (yca)
-	 *              |
-	 *              A
-	 */
 	if (got_object_id_cmp(their_id, yca_id) != 0)
 		err = got_error_fmt(GOT_ERR_SEND_ANCESTRY, "%s", refname);
 
@@ -581,7 +567,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 				err = got_ref_resolve(&my_id, repo, my_ref);
 				if (err)
 					goto done;
-				err = check_linear_ancestry(refname, my_id,
+				err = check_common_ancestry(refname, my_id,
 				    their_id, repo, cancel_cb, cancel_arg);
 				free(my_id);
 				my_id = NULL;
