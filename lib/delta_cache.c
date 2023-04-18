@@ -64,6 +64,7 @@ struct got_delta_cache {
 	int cache_miss;
 	int cache_evict;
 	int cache_toolarge;
+	int cache_maxtoolarge;
 	unsigned int flags;
 #define GOT_DELTA_CACHE_F_NOMEM	0x01
 	SIPHASH_KEY key;
@@ -103,9 +104,10 @@ got_delta_cache_free(struct got_delta_cache *cache)
 
 #ifdef GOT_DELTA_CACHE_DEBUG
 	fprintf(stderr, "%s: delta cache: %u elements, %d searches, %d hits, "
-	    "%d missed, %d evicted, %d too large\n", getprogname(),
+	    "%d missed, %d evicted, %d too large (max %d)\n", getprogname(),
 	    cache->totelem, cache->cache_search, cache->cache_hit,
-	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge);
+	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge,
+	    cache->cache_maxtoolarge);
 #endif
 	for (i = 0; i < cache->nbuckets; i++) {
 		struct got_delta_cache_head *head;
@@ -203,6 +205,8 @@ got_delta_cache_add(struct got_delta_cache *cache,
 
 	if (delta_len > GOT_DELTA_CACHE_MAX_DELTA_SIZE) {
 		cache->cache_toolarge++;
+		if (delta_len > cache->cache_maxtoolarge)
+			cache->cache_maxtoolarge = delta_len;
 		return got_error(GOT_ERR_NO_SPACE);
 	}
 
