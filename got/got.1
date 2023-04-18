@@ -3636,6 +3636,13 @@ then the following commands can be used to achieve this:
 .Dl $ got histedit -f
 .Dl $ got send -f -b master origin
 .Pp
+In addition to reviewing the pull request in the web user interface,
+Jelmer can fetch the pull request's branch into his local repository
+and create a local branch which contains the proposed changes:
+.Pp
+.Dl $ got fetch -R refs/pull/1046/head origin
+.Dl $ got branch -c refs/remotes/origin/pull/1046/head pr1046
+.Pp
 Once Jelmer has accepted the pull request, Stefan can fetch the
 merged changes, and possibly several other new changes, by running:
 .Pp
