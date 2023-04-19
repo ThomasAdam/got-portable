@@ -364,7 +364,9 @@
 /regress/template/runlist.c
 /regress/tog
 /regress/tog/Makefile
+/regress/tog/blame.sh
 /regress/tog/common.sh
+/regress/tog/diff.sh
 /regress/tog/log.sh
 /template
 /template/Makefile
