@@ -1,3 +1,21 @@
+* got 0.87; 2023-04-19
+  see git repository history for per-change authorship information
+- add gitwrapper(1)
+- tog: resume blame and diff search from the first line
+- fix crash in got log due to NULL-deref in got_object_blob_close
+- add support for protecting references against 'got send -f' to gotd
+- fix spurious empty packfile error from gotd when rewinding a branch
+- tog: implement automated test harness
+- update the base commit ID of unmodified files if the blob ID matches
+- fix rebase/histedit -a leaving some files on the temporary branch
+- make 'got revert' and 'got rm' work on non-existent directories
+- got: flush stdout before printing the error in main()
+- when aborting rebase/histedit/merge, unlink files added by merged changes
+- fix 'got commit' using a bad parent commit ID when worktree is out-of-date
+- allow no-op merge commits to be created
+- fix sending merge commits
+- show how to fetch a pull request in got.1 pull request example section
+
 * got 0.86; 2023-03-12
   see git repository history for per-change authorship information
 - fix race condition on NFS where log-message file's modify time may change
