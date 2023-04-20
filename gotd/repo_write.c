@@ -1591,7 +1591,7 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct gotd_imsg_packfile_pipe ireq;
 	size_t datalen;
 
-	log_debug("receving pack pipe descriptor");
+	log_debug("receiving pack pipe descriptor");
 
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
@@ -1615,7 +1615,7 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct gotd_imsg_packidx_file ireq;
 	size_t datalen;
 
-	log_debug("receving pack index output file");
+	log_debug("receiving pack index output file");
 
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);

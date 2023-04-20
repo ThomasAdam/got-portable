@@ -560,7 +560,7 @@ receive_delta_cache_fd(struct imsg *imsg,
 	struct gotd_imsg_send_packfile ireq;
 	size_t datalen;
 
-	log_debug("receving delta cache file");
+	log_debug("receiving delta cache file");
 
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
@@ -585,7 +585,7 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct gotd_imsg_packfile_pipe ireq;
 	size_t datalen;
 
-	log_debug("receving pack pipe descriptor");
+	log_debug("receiving pack pipe descriptor");
 
 	if (imsg->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
