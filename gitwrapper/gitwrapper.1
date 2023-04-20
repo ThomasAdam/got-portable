@@ -85,7 +85,13 @@ and exist on the filesystem will be served by
 Any other Git repositories will be served by
 .Xr git-upload-pack 1
 and
-.Xr git-receive-pack 1 .
+.Xr git-receive-pack 1
+as found in Git's
+.Pa libexec
+directory, which is
+.Pa /usr/local/libexec/git/
+by default on
+.Ox .
 .Sh ENVIRONMENT
 .Bl -tag -width GOTD_CONF_PATH
 .It Ev GOTD_CONF_PATH
