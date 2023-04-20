@@ -42,7 +42,10 @@ If users require a different login shell,
 can be installed in the command search path under the names
 .Cm git-receive-pack
 and
-.Cm git-upload-pack .
+.Cm git-upload-pack ,
+or
+.Xr gitwrapper 1
+can be used to select the appropriate command to run automatically.
 .Pp
 The users can then interact with
 .Xr gotd 8
@@ -137,6 +140,7 @@ Match User anonymous
     PermitTTY no
 .Ed
 .Sh SEE ALSO
+.Xr gitwrapper 1 ,
 .Xr got 1 ,
 .Xr ssh 1 ,
 .Xr gotd.conf 5 ,
