@@ -17,8 +17,11 @@
 
 . ../cmdline/common.sh
 
+unset TOG_COLORS
+unset TOG_DIFF_ALGORITHM
 unset TOG_VIEW_SPLIT_MODE
 unset LC_ALL
+export TERM=vt220
 export LC_ALL=C.UTF-8
 export COLUMNS=80
 export LINES=24

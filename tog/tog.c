@@ -622,9 +622,7 @@ struct tog_io {
 } tog_io;
 static int using_mock_io;
 
-#define TOG_SCREEN_DUMP		"SCREENDUMP"
-#define TOG_SCREEN_DUMP_LEN	(sizeof(TOG_SCREEN_DUMP) - 1)
-#define TOG_KEY_SCRDUMP		SHRT_MIN
+#define TOG_KEY_SCRDUMP	SHRT_MIN
 
 /*
  * We implement two types of views: parent views and child views.
@@ -1450,9 +1448,9 @@ strip_trailing_ws(char *str, int *n)
 
 /*
  * Extract visible substring of line y from the curses screen
- * and strip trailing whitespace. If vline is set and locale is
- * UTF-8, overwrite line[vline] with '|' because the ACS_VLINE
- * character is written out as 'x'. Write the line to file f.
+ * and strip trailing whitespace. If vline is set, overwrite
+ * line[vline] with '|' because the ACS_VLINE character is
+ * written out as 'x'. Write the line to file f.
  */
 static const struct got_error *
 view_write_line(FILE *f, int y, int vline)
@@ -1471,7 +1469,7 @@ view_write_line(FILE *f, int y, int vline)
 	 */
 	strip_trailing_ws(line, &r);
 
-	if (vline > 0 && got_locale_is_utf8())
+	if (vline > 0)
 		line[vline] = '|';
 
 	w = fprintf(f, "%s\n", line);
@@ -1521,7 +1519,7 @@ screendump(struct tog_view *view)
 			    view->child->begin_y : view->begin_y;
 
 		for (i = 0; i < view->lines; i++) {
-			if (hline && got_locale_is_utf8() && i == hline - 1) {
+			if (hline && i == hline - 1) {
 				int c;
 
 				/* ACS_HLINE writes out as 'q', overwrite it */
@@ -1655,7 +1653,7 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 		*ch = KEY_DOWN;
 	else if (strncasecmp(line, "KEY_UP", 6) == 0)
 		*ch = KEY_UP;
-	else if (strncasecmp(line, TOG_SCREEN_DUMP, TOG_SCREEN_DUMP_LEN) == 0)
+	else if (strncasecmp(line, "SCREENDUMP", 10) == 0)
 		*ch = TOG_KEY_SCRDUMP;
 	else
 		*ch = *line;
@@ -4205,7 +4203,6 @@ init_mock_term(const char *test_script_path)
 		goto done;
 	}
 
-	/* use local TERM so we test in different environments */
 	if (newterm(NULL, tog_io.cout, tog_io.cin) == NULL)
 		err = got_error_msg(GOT_ERR_IO,
 		    "newterm: failed to initialise curses");
