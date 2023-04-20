@@ -436,6 +436,7 @@ struct tog_blame_thread_args {
 	int *complete;
 	got_cancel_cb cancel_cb;
 	void *cancel_arg;
+	pthread_cond_t blame_complete;
 };
 
 struct tog_blame {
@@ -1636,9 +1637,6 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 
 	*ch = -1;
 
-	if (tog_io.wait_for_ui)
-		goto done;
-
 	if (getline(&line, &linesz, script) == -1) {
 		if (feof(script)) {
 			*done = 1;
@@ -1648,6 +1646,7 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 			goto done;
 		}
 	}
+
 	if (strncasecmp(line, "WAIT_FOR_UI", 11) == 0)
 		tog_io.wait_for_ui = 1;
 	else if (strncasecmp(line, "KEY_ENTER", 9) == 0)
@@ -4216,6 +4215,7 @@ init_mock_term(const char *test_script_path)
 		    "newterm: failed to initialise curses");
 
 	using_mock_io = 1;
+
 done:
 	if (err)
 		tog_io_close();
@@ -6006,6 +6006,16 @@ draw_blame(struct tog_view *view)
 	if (view->gline > blame->nlines)
 		view->gline = blame->nlines;
 
+	if (tog_io.wait_for_ui) {
+		struct tog_blame_thread_args *bta = &s->blame.thread_args;
+		int rc;
+
+		rc = pthread_cond_wait(&bta->blame_complete, &tog_mutex);
+		if (rc)
+			return got_error_set_errno(rc, "pthread_cond_wait");
+		tog_io.wait_for_ui = 0;
+	}
+
 	if (asprintf(&line, "[%d/%d] %s%s", view->gline ? view->gline :
 	    s->first_displayed_line - 1 + s->selected_line, blame->nlines,
 	    s->blame_complete ? "" : "annotating... ", s->path) == -1) {
@@ -6127,11 +6137,6 @@ draw_blame(struct tog_view *view)
 
 	view_border(view);
 
-	if (tog_io.wait_for_ui) {
-		if (s->blame_complete)
-			tog_io.wait_for_ui = 0;
-	}
-
 	return NULL;
 }
 
@@ -6228,6 +6233,13 @@ blame_thread(void *arg)
 		err = close_err;
 	ta->repo = NULL;
 	*ta->complete = 1;
+
+	if (tog_io.wait_for_ui) {
+		errcode = pthread_cond_signal(&ta->blame_complete);
+		if (errcode && err == NULL)
+			err = got_error_set_errno(errcode,
+			    "pthread_cond_signal");
+	}
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode && err == NULL)
@@ -6509,6 +6521,15 @@ open_blame_view(struct tog_view *view, char *path,
 	view->search_setup = search_setup_blame_view;
 	view->search_next = search_next_view_match;
 
+	if (using_mock_io) {
+		struct tog_blame_thread_args *bta = &s->blame.thread_args;
+		int rc;
+
+		rc = pthread_cond_init(&bta->blame_complete, NULL);
+		if (rc)
+			return got_error_set_errno(rc, "pthread_cond_init");
+	}
+
 	return run_blame(view);
 }
 
@@ -6526,6 +6547,15 @@ close_blame_view(struct tog_view *view)
 		blamed_commit = STAILQ_FIRST(&s->blamed_commits);
 		STAILQ_REMOVE_HEAD(&s->blamed_commits, entry);
 		got_object_qid_free(blamed_commit);
+	}
+
+	if (using_mock_io) {
+		struct tog_blame_thread_args *bta = &s->blame.thread_args;
+		int rc;
+
+		rc = pthread_cond_destroy(&bta->blame_complete);
+		if (rc && err == NULL)
+			err = got_error_set_errno(rc, "pthread_cond_destroy");
 	}
 
 	free(s->path);
