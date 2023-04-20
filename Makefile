@@ -60,7 +60,4 @@ server-install:
 server-regress:
 	${MAKE} -C regress/gotd
 
-tog-regress:
-	${MAKE} -C regress/tog
-
 .include <bsd.subdir.mk>

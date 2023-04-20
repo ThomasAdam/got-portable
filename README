@@ -51,11 +51,8 @@ store test data in a directory other than /tmp, such as ~/got-test, run:
  $ mkdir ~/got-test
  $ make regress GOT_TEST_ROOT=~/got-test
 
-To run the tog automated test suite:
-
- $ make tog-regress
-
-Like Got, either individual tests or the entire suite can be run:
+The tog automated test suite is also run with 'make regress'.
+Like Got, however, individual tests or the entire suite can be run:
 
  $ cd regress/tog
  $ make		# run all tests
