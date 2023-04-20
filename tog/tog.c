@@ -985,11 +985,10 @@ view_border(struct tog_view *view)
 	view_above = panel_userptr(panel);
 	if (view->mode == TOG_VIEW_SPLIT_HRZN)
 		mvwhline(view->window, view_above->begin_y - 1,
-		    view->begin_x, got_locale_is_utf8() ?
-		    ACS_HLINE : '-', view->ncols);
+		    view->begin_x, ACS_HLINE, view->ncols);
 	else
 		mvwvline(view->window, view->begin_y, view_above->begin_x - 1,
-		    got_locale_is_utf8() ? ACS_VLINE : '|', view->nlines);
+		    ACS_VLINE, view->nlines);
 }
 
 static const struct got_error *view_init_hsplit(struct tog_view *, int);
