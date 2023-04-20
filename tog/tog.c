@@ -1623,13 +1623,17 @@ action_report(struct tog_view *view)
  * key instruction to *ch. If at EOF, set the *done flag.
  */
 static const struct got_error *
-tog_read_script_key(FILE *script, int *ch, int *done)
+tog_read_script_key(FILE *script, struct tog_view *view, int *ch, int *done)
 {
 	const struct got_error	*err = NULL;
 	char			*line = NULL;
 	size_t			 linesz = 0;
 
-	*ch = -1;
+	if (view->count && --view->count) {
+		*ch = view->ch;
+		return NULL;
+	} else
+		*ch = -1;
 
 	if (getline(&line, &linesz, script) == -1) {
 		if (feof(script)) {
@@ -1655,7 +1659,16 @@ tog_read_script_key(FILE *script, int *ch, int *done)
 		*ch = KEY_UP;
 	else if (strncasecmp(line, "SCREENDUMP", 10) == 0)
 		*ch = TOG_KEY_SCRDUMP;
-	else
+	else if (isdigit((unsigned char)*line)) {
+		char *t = line;
+
+		while (isdigit((unsigned char)*t))
+			++t;
+		view->ch = *ch = *t;
+		*t = '\0';
+		/* ignore error, view->count is 0 if instruction is invalid */
+		view->count = strtonum(line, 0, INT_MAX, NULL);
+	} else
 		*ch = *line;
 
 done:
@@ -1703,7 +1716,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		return got_error_set_errno(errcode, "pthread_mutex_unlock");
 
 	if (using_mock_io) {
-		err = tog_read_script_key(tog_io.f, &ch, done);
+		err = tog_read_script_key(tog_io.f, view, &ch, done);
 		if (err) {
 			errcode = pthread_mutex_lock(&tog_mutex);
 			return err;
