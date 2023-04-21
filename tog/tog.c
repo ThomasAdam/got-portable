@@ -4190,6 +4190,7 @@ static const struct got_error *
 init_mock_term(const char *test_script_path)
 {
 	const struct got_error	*err = NULL;
+	int in;
 
 	if (test_script_path == NULL || *test_script_path == '\0')
 		return got_error_msg(GOT_ERR_IO, "TOG_TEST_SCRIPT not defined");
@@ -4204,13 +4205,19 @@ init_mock_term(const char *test_script_path)
 	/* test mode, we don't want any output */
 	tog_io.cout = fopen("/dev/null", "w+");
 	if (tog_io.cout == NULL) {
-		err = got_error_from_errno("fopen: /dev/null");
+		err = got_error_from_errno2("fopen", "/dev/null");
 		goto done;
 	}
 
-	tog_io.cin = fopen("/dev/tty", "r+");
+	in = dup(fileno(tog_io.cout));
+	if (in == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
+	tog_io.cin = fdopen(in, "r");
 	if (tog_io.cin == NULL) {
-		err = got_error_from_errno("fopen: /dev/tty");
+		err = got_error_from_errno("fdopen");
+		close(in);
 		goto done;
 	}
 
