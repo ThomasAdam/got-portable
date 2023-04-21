@@ -9805,16 +9805,14 @@ main(int argc, char *argv[])
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}
-	}
+	} else if (!isatty(STDIN_FILENO))
+		errx(1, "standard input is not a tty");
 
 #if !defined(PROFILE)
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
-
-	if (!isatty(STDIN_FILENO))
-		errx(1, "standard input is not a tty");
 
 	while ((ch = getopt_long(argc, argv, "+hV", longopts, NULL)) != -1) {
 		switch (ch) {
