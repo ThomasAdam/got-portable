@@ -618,6 +618,7 @@ struct tog_io {
 	FILE	*cin;
 	FILE	*cout;
 	FILE	*f;
+	FILE	*sdump;
 	int	 wait_for_ui;
 } tog_io;
 static int using_mock_io;
@@ -1486,17 +1487,11 @@ static const struct got_error *
 screendump(struct tog_view *view)
 {
 	const struct got_error	*err;
-	FILE			*f = NULL;
-	const char		*path;
 	int			 i;
 
-	path = getenv("TOG_SCR_DUMP");
-	if (path == NULL || *path == '\0')
-		return got_error_msg(GOT_ERR_BAD_PATH,
-		    "TOG_SCR_DUMP path not set to capture screen dump");
-	f = fopen(path, "wex");
-	if (f == NULL)
-		return got_error_from_errno_fmt("fopen: %s", path);
+	err = got_opentemp_truncate(tog_io.sdump);
+	if (err)
+		return err;
 
 	if ((view->child && view->child->begin_x) ||
 	    (view->parent && view->begin_x)) {
@@ -1504,7 +1499,7 @@ screendump(struct tog_view *view)
 
 		/* vertical splitscreen */
 		for (i = 0; i < view->nlines; ++i) {
-			err = view_write_line(f, i, ncols - 1);
+			err = view_write_line(tog_io.sdump, i, ncols - 1);
 			if (err)
 				goto done;
 		}
@@ -1523,20 +1518,18 @@ screendump(struct tog_view *view)
 
 				/* ACS_HLINE writes out as 'q', overwrite it */
 				for (c = 0; c < view->cols; ++c)
-					fputc('-', f);
-				fputc('\n', f);
+					fputc('-', tog_io.sdump);
+				fputc('\n', tog_io.sdump);
 				continue;
 			}
 
-			err = view_write_line(f, i, 0);
+			err = view_write_line(tog_io.sdump, i, 0);
 			if (err)
 				goto done;
 		}
 	}
 
 done:
-	if (f && fclose(f) == EOF && err == NULL)
-		err = got_ferror(f, GOT_ERR_IO);
 	return err;
 }
 
@@ -1950,6 +1943,8 @@ tog_io_close(void)
 		err = got_ferror(tog_io.cout, GOT_ERR_IO);
 	if (tog_io.f && fclose(tog_io.f) == EOF && err == NULL)
 		err = got_ferror(tog_io.f, GOT_ERR_IO);
+	if (tog_io.sdump && fclose(tog_io.sdump) == EOF && err == NULL)
+		err = got_ferror(tog_io.sdump, GOT_ERR_IO);
 
 	return err;
 }
@@ -4186,6 +4181,7 @@ static const struct got_error *
 init_mock_term(const char *test_script_path)
 {
 	const struct got_error	*err = NULL;
+	const char *screen_dump_path;
 	int in;
 
 	if (test_script_path == NULL || *test_script_path == '\0')
@@ -4214,6 +4210,15 @@ init_mock_term(const char *test_script_path)
 	if (tog_io.cin == NULL) {
 		err = got_error_from_errno("fdopen");
 		close(in);
+		goto done;
+	}
+
+	screen_dump_path = getenv("TOG_SCR_DUMP");
+	if (screen_dump_path == NULL || *screen_dump_path == '\0')
+		return got_error_msg(GOT_ERR_IO, "TOG_SCR_DUMP not defined");
+	tog_io.sdump = fopen(screen_dump_path, "wex");
+	if (tog_io.sdump == NULL) {
+		err = got_error_from_errno2("fopen", screen_dump_path);
 		goto done;
 	}
 
