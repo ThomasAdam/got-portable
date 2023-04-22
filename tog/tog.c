@@ -125,7 +125,7 @@ enum tog_view_mode {
 	TOG_VIEW_SPLIT_HRZN
 };
 
-#define HSPLIT_SCALE	0.3  /* default horizontal split scale */
+#define HSPLIT_SCALE	0.3f  /* default horizontal split scale */
 
 #define TOG_EOF_STRING	"(END)"
 
