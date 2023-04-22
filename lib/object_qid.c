@@ -19,8 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
-#include <sha2.h>
 
 #include "got_object.h"
 #include "got_error.h"
