@@ -1649,6 +1649,8 @@ tog_read_script_key(FILE *script, struct tog_view *view, int *ch, int *done)
 		*ch = KEY_DOWN;
 	else if (strncasecmp(line, "KEY_UP", 6) == 0)
 		*ch = KEY_UP;
+	else if (strncasecmp(line, "TAB", 3) == 0)
+		*ch = '\t';
 	else if (strncasecmp(line, "SCREENDUMP", 10) == 0)
 		*ch = TOG_KEY_SCRDUMP;
 	else if (isdigit((unsigned char)*line)) {
