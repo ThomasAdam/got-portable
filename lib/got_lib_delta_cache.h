@@ -21,4 +21,7 @@ void got_delta_cache_free(struct got_delta_cache *);
 
 const struct got_error *got_delta_cache_add(struct got_delta_cache *, off_t,
     uint8_t *, size_t);
-void got_delta_cache_get(uint8_t **, size_t *, struct got_delta_cache *, off_t);
+const struct got_error *got_delta_cache_add_fulltext(struct got_delta_cache *,
+    off_t , uint8_t *, size_t);
+void got_delta_cache_get(uint8_t **, size_t *, uint8_t **, size_t *,
+    struct got_delta_cache *, off_t);

@@ -40,15 +40,19 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_DELTA_CACHE_MIN_BUCKETS	64
-#define GOT_DELTA_CACHE_MAX_BUCKETS	2048
-#define GOT_DELTA_CACHE_MAX_CHAIN	2
-#define GOT_DELTA_CACHE_MAX_DELTA_SIZE	1024
+#define GOT_DELTA_CACHE_MIN_BUCKETS		64
+#define GOT_DELTA_CACHE_MAX_BUCKETS		2048
+#define GOT_DELTA_CACHE_MAX_CHAIN		2
+#define GOT_DELTA_CACHE_MAX_DELTA_SIZE		1024
+#define GOT_DELTA_CACHE_MAX_FULLTEXT_SIZE	524288
+
 
 struct got_cached_delta {
 	off_t offset;
 	uint8_t *data;
 	size_t len;
+	uint8_t *fulltext;
+	size_t fulltext_len;
 };
 
 struct got_delta_cache_head {
@@ -62,10 +66,13 @@ struct got_delta_cache {
 	unsigned int totelem;
 	int cache_search;
 	int cache_hit;
+	int cache_hit_fulltext;
 	int cache_miss;
 	int cache_evict;
 	int cache_toolarge;
+	int cache_toolarge_fulltext;
 	int cache_maxtoolarge;
+	int cache_maxtoolarge_fulltext;
 	unsigned int flags;
 #define GOT_DELTA_CACHE_F_NOMEM	0x01
 	SIPHASH_KEY key;
@@ -105,10 +112,14 @@ got_delta_cache_free(struct got_delta_cache *cache)
 
 #ifdef GOT_DELTA_CACHE_DEBUG
 	fprintf(stderr, "%s: delta cache: %u elements, %d searches, %d hits, "
-	    "%d missed, %d evicted, %d too large (max %d)\n", getprogname(),
-	    cache->totelem, cache->cache_search, cache->cache_hit,
+	    "%d fulltext hits, %d missed, %d evicted, %d too large (max %d), "
+	    "%d too large fulltext (max %d)\n",
+	    getprogname(), cache->totelem, cache->cache_search,
+	    cache->cache_hit, cache->cache_hit_fulltext,
 	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge,
-	    cache->cache_maxtoolarge);
+	    cache->cache_maxtoolarge,
+	    cache->cache_toolarge_fulltext,
+	    cache->cache_maxtoolarge_fulltext);
 #endif
 	for (i = 0; i < cache->nbuckets; i++) {
 		struct got_delta_cache_head *head;
@@ -222,6 +233,7 @@ got_delta_cache_add(struct got_delta_cache *cache,
 	if (head->nchain >= nitems(head->entries)) {
 		delta = &head->entries[head->nchain - 1];
 		free(delta->data);
+		free(delta->fulltext);
 		memset(delta, 0, sizeof(*delta));
 		head->nchain--;
 		cache->totelem--;
@@ -232,6 +244,8 @@ got_delta_cache_add(struct got_delta_cache *cache,
 	delta->offset = delta_data_offset;
 	delta->data = delta_data;
 	delta->len = delta_len;
+	delta->fulltext = NULL;
+	delta->fulltext_len = 0;
 	head->nchain++;
 	cache->totelem++;
 
@@ -239,8 +253,56 @@ got_delta_cache_add(struct got_delta_cache *cache,
 #endif
 }
 
+const struct got_error *
+got_delta_cache_add_fulltext(struct got_delta_cache *cache,
+    off_t delta_data_offset, uint8_t *fulltext, size_t fulltext_len)
+{
+#ifdef GOT_NO_DELTA_CACHE
+	return got_error(GOT_ERR_NO_SPACE);
+#else
+	struct got_cached_delta *delta;
+	struct got_delta_cache_head *head;
+	uint64_t idx;
+	int i;
+
+	if (fulltext_len > GOT_DELTA_CACHE_MAX_FULLTEXT_SIZE) {
+		cache->cache_toolarge_fulltext++;
+		if (fulltext_len > cache->cache_maxtoolarge)
+			cache->cache_maxtoolarge_fulltext = fulltext_len;
+		return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	idx = delta_cache_hash(cache, delta_data_offset) % cache->nbuckets;
+	head = &cache->buckets[idx];
+
+	for (i = 0; i < head->nchain; i++) {
+		delta = &head->entries[i];
+		if (delta->offset != delta_data_offset)
+			continue;
+		if (i > 0) {
+			struct got_cached_delta tmp;
+			memcpy(&tmp, &head->entries[0], sizeof(tmp));
+			memcpy(&head->entries[0], &head->entries[i],
+			    sizeof(head->entries[0]));
+			memcpy(&head->entries[i], &tmp,
+			    sizeof(head->entries[i]));
+			delta = &head->entries[0];
+		}
+		delta->fulltext = malloc(fulltext_len);
+		if (delta->fulltext == NULL)
+			return got_error_from_errno("malloc");
+		memcpy(delta->fulltext, fulltext, fulltext_len);
+		delta->fulltext_len = fulltext_len;
+		break;
+	}
+
+	return NULL;
+#endif
+}
+
 void
 got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
+    uint8_t **fulltext, size_t *fulltext_len,
     struct got_delta_cache *cache, off_t delta_data_offset)
 {
 	uint64_t idx;
@@ -254,6 +316,10 @@ got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
 	cache->cache_search++;
 	*delta_data = NULL;
 	*delta_len = 0;
+	if (fulltext)
+		*fulltext = NULL;
+	if (fulltext_len)
+		*fulltext_len = 0;
 	for (i = 0; i < head->nchain; i++) {
 		delta = &head->entries[i];
 		if (delta->offset != delta_data_offset)
@@ -270,6 +336,13 @@ got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
 		}
 		*delta_data = delta->data;
 		*delta_len = delta->len;
+		if (fulltext && fulltext_len &&
+		    delta->fulltext && delta->fulltext_len) {
+			*fulltext = delta->fulltext;
+			*fulltext_len = delta->fulltext_len;
+			cache->cache_hit_fulltext++;
+		}
+
 		return;
 	}
 
