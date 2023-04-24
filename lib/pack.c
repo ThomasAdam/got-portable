@@ -1313,7 +1313,8 @@ got_pack_get_delta_chain_max_size(uint64_t *max_size,
 
 			if (pack->delta_cache) {
 				got_delta_cache_get(&delta_buf, &delta_len,
-				    pack->delta_cache, delta->data_offset);
+				    NULL, NULL, pack->delta_cache,
+				    delta->data_offset);
 			}
 			if (delta_buf == NULL) {
 				cached = 0;
@@ -1367,7 +1368,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	uint8_t *base_buf = NULL, *accum_buf = NULL;
-	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0, delta_len;
+	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0;
 	/* We process small enough files entirely in memory for speed. */
 	const size_t max_bufsize = GOT_DELTA_RESULT_SIZE_CACHED_MAX;
 	uint64_t max_size = 0;
@@ -1378,6 +1379,23 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 	if (STAILQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
+	if (pack->delta_cache) {
+		uint8_t *delta_buf = NULL, *fulltext = NULL;
+		size_t delta_len, fulltext_len;
+
+		delta = STAILQ_LAST(&deltas->entries, got_delta, entry);
+		got_delta_cache_get(&delta_buf, &delta_len,
+		    &fulltext, &fulltext_len,
+		    pack->delta_cache, delta->data_offset);
+		if (fulltext) {
+			size_t w = fwrite(fulltext, 1, fulltext_len, outfile);
+			if (w != fulltext_len)
+				return got_ferror(outfile, GOT_ERR_IO);
+			*result_size = fulltext_len;
+			return NULL;
+		}
+	}
+
 	if (fseeko(base_file, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 	if (fseeko(accum_file, 0L, SEEK_SET) == -1)
@@ -1385,7 +1403,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 	/* Deltas are ordered in ascending order. */
 	STAILQ_FOREACH(delta, &deltas->entries, entry) {
-		uint8_t *delta_buf = NULL;
+		uint8_t *delta_buf = NULL, *fulltext = NULL;
+		size_t delta_len, fulltext_len;
 		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
@@ -1472,6 +1491,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 		if (pack->delta_cache) {
 			got_delta_cache_get(&delta_buf, &delta_len,
+			    &fulltext, &fulltext_len,
 			    pack->delta_cache, delta->data_offset);
 		}
 		if (delta_buf == NULL) {
@@ -1503,6 +1523,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			max_size = base_size;
 		if (result_size > max_size)
 			max_size = result_size;
+		if (fulltext_len > max_size)
+			max_size = fulltext_len;
 
 		if (base_buf && max_size > max_bufsize) {
 			/* Switch from buffers to temporary files. */
@@ -1545,21 +1567,41 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 		}
 
 		if (base_buf) {
-			err = got_delta_apply_in_mem(base_buf, base_bufsz,
-			    delta_buf, delta_len, accum_buf,
-			    &accum_size, max_size);
+			if (fulltext) {
+				memcpy(accum_buf, fulltext, fulltext_len);
+				accum_size = fulltext_len;
+				err = NULL;
+			} else {
+				err = got_delta_apply_in_mem(base_buf, base_bufsz,
+				    delta_buf, delta_len, accum_buf,
+				    &accum_size, max_size);
+			}
 			n++;
+			if (!cached)
+				free(delta_buf);
+			if (err)
+				goto done;
+			if (fulltext == NULL) {
+				err = got_delta_cache_add_fulltext(
+				    pack->delta_cache, delta->data_offset,
+				    accum_buf, accum_size);
+				if (err) {
+					if (err->code != GOT_ERR_NO_SPACE)
+						goto done;
+					err = NULL;
+				}
+			}
 		} else {
 			err = got_delta_apply(base_file, delta_buf,
 			    delta_len,
 			    /* Final delta application writes to output file. */
 			    ++n < deltas->nentries ? accum_file : outfile,
 			    &accum_size);
+			if (!cached)
+				free(delta_buf);
+			if (err)
+				goto done;
 		}
-		if (!cached)
-			free(delta_buf);
-		if (err)
-			goto done;
 
 		if (n < deltas->nentries) {
 			/* Accumulated delta becomes the new base. */
@@ -1601,7 +1643,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	uint8_t *base_buf = NULL, *accum_buf = NULL;
-	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0, delta_len;
+	size_t base_bufsz = 0, accum_bufsz = 0, accum_size = 0;
 	uint64_t max_size = 0;
 	int n = 0;
 
@@ -1611,9 +1653,28 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	if (STAILQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
+	if (pack->delta_cache) {
+		uint8_t *delta_buf = NULL, *fulltext = NULL;
+		size_t delta_len, fulltext_len;
+
+		delta = STAILQ_LAST(&deltas->entries, got_delta, entry);
+		got_delta_cache_get(&delta_buf, &delta_len,
+		    &fulltext, &fulltext_len,
+		    pack->delta_cache, delta->data_offset);
+		if (fulltext) {
+			*outbuf = malloc(fulltext_len);
+			if (*outbuf == NULL)
+				return got_error_from_errno("malloc");
+			memcpy(*outbuf, fulltext, fulltext_len);
+			*outlen = fulltext_len;
+			return NULL;
+		}
+	}
+
 	/* Deltas are ordered in ascending order. */
 	STAILQ_FOREACH(delta, &deltas->entries, entry) {
-		uint8_t *delta_buf = NULL;
+		uint8_t *delta_buf = NULL, *fulltext = NULL;
+		size_t delta_len, fulltext_len = 0;
 		uint64_t base_size, result_size = 0;
 		int cached = 1;
 		if (n == 0) {
@@ -1634,10 +1695,26 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				goto done;
 			}
 
+			if (pack->delta_cache) {
+				got_delta_cache_get(&delta_buf, &delta_len,
+				    &fulltext, &fulltext_len,
+				    pack->delta_cache, delta_data_offset);
+			}
+
 			if (delta->size > max_size)
 				max_size = delta->size;
+			if (delta->size > fulltext_len)
+				max_size = fulltext_len;
 
-			if (pack->map) {
+			if (fulltext) {
+				base_buf = malloc(fulltext_len);
+				if (base_buf == NULL) {
+					err = got_error_from_errno("malloc");
+					goto done;
+				}
+				memcpy(base_buf, fulltext, fulltext_len);
+				base_bufsz = fulltext_len;
+			} else if (pack->map) {
 				size_t mapoff;
 
 				if (delta_data_offset > SIZE_MAX) {
@@ -1664,11 +1741,30 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			if (err)
 				goto done;
 			n++;
+
+			if (pack->delta_cache && fulltext == NULL) {
+				err = got_delta_cache_add(pack->delta_cache,
+				    delta_data_offset, NULL, 0);
+				if (err) {
+					if (err->code != GOT_ERR_NO_SPACE)
+						goto done;
+					err = NULL;
+				} else {
+					err = got_delta_cache_add_fulltext(
+					    pack->delta_cache,
+					    delta_data_offset,
+					    fulltext, fulltext_len);
+					if (err && err->code != GOT_ERR_NO_SPACE)
+						goto done;
+					err = NULL;
+				}
+			}
 			continue;
 		}
 
 		if (pack->delta_cache) {
 			got_delta_cache_get(&delta_buf, &delta_len,
+			    &fulltext, &fulltext_len,
 			    pack->delta_cache, delta->data_offset);
 		}
 		if (delta_buf == NULL) {
@@ -1700,6 +1796,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			max_size = base_size;
 		if (result_size > max_size)
 			max_size = result_size;
+		if (fulltext_len > max_size)
+			max_size = fulltext_len;
 
 		if (max_size > base_bufsz) {
 			uint8_t *p = realloc(base_buf, max_size);
@@ -1725,14 +1823,30 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			accum_bufsz = max_size;
 		}
 
-		err = got_delta_apply_in_mem(base_buf, base_bufsz,
-		    delta_buf, delta_len, accum_buf,
-		    &accum_size, max_size);
+		if (fulltext) {
+			memcpy(accum_buf, fulltext, fulltext_len);
+			accum_size = fulltext_len;
+			err = NULL;
+		} else {
+			err = got_delta_apply_in_mem(base_buf, base_bufsz,
+			    delta_buf, delta_len, accum_buf,
+			    &accum_size, max_size);
+		}
 		if (!cached)
 			free(delta_buf);
 		n++;
 		if (err)
 			goto done;
+
+		if (fulltext == NULL) {
+			err = got_delta_cache_add_fulltext(pack->delta_cache,
+			    delta->data_offset, accum_buf, accum_size);
+			if (err) {
+				if (err->code != GOT_ERR_NO_SPACE)
+					goto done;
+				err = NULL;
+			}
+		}
 
 		if (n < deltas->nentries) {
 			/* Accumulated delta becomes the new base. */
