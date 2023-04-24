@@ -759,9 +759,9 @@ got_object_tree_close(struct got_tree_object *tree)
 	free(tree);
 }
 
-static const struct got_error *
-parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen, char *buf,
-    size_t maxlen)
+const struct got_error *
+got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
+    char *buf, size_t maxlen)
 {
 	char *p, *space;
 
@@ -833,7 +833,7 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 		}
 
 		pte = &(*entries)[*nentries];
-		err = parse_tree_entry(pte, &elen, buf, remain);
+		err = got_object_parse_tree_entry(pte, &elen, buf, remain);
 		if (err)
 			goto done;
 		buf += elen;

@@ -183,20 +183,21 @@ done:
 }
 
 static const struct got_error *
-open_tree(uint8_t **buf, struct got_parsed_tree_entry **entries, size_t *nentries,
-    size_t *nentries_alloc, struct got_pack *pack, struct got_packidx *packidx,
-    int obj_idx, struct got_object_id *id, struct got_object_cache *objcache)
+open_tree(uint8_t **buf, size_t *len,
+    struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
+    struct got_object_id *id, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
-	size_t len;
+	int cached = 0;
 
 	*buf = NULL;
-	*nentries = 0;
+	*len = 0;
 
 	obj = got_object_cache_get(objcache, id);
 	if (obj) {
 		obj->refcnt++;
+		cached = 1;
 	} else {
 		err = open_object(&obj, pack, packidx, obj_idx, id,
 		    objcache);
@@ -204,14 +205,12 @@ open_tree(uint8_t **buf, struct got_parsed_tree_entry **entries, size_t *nentrie
 			return err;
 	}
 
-	err = got_packfile_extract_object_to_mem(buf, &len, obj, pack);
+	err = got_packfile_extract_object_to_mem(buf, len, obj, pack);
 	if (err)
 		goto done;
 
-	obj->size = len;
-
-	err = got_object_parse_tree(entries, nentries, nentries_alloc,
-	    *buf, len);
+	if (!cached)
+		obj->size = *len;
 done:
 	got_object_close(obj);
 	if (err) {
@@ -230,6 +229,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
 	uint8_t *buf = NULL;
+	size_t len = 0;
 	struct got_object_id id;
 	size_t datalen;
 
@@ -239,20 +239,24 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(&id, &iobj.id, sizeof(id));
 
-	err = open_tree(&buf, entries, nentries, nentries_alloc,
-	    pack, packidx, iobj.idx, &id, objcache);
+	err = open_tree(&buf, &len, pack, packidx, iobj.idx, &id, objcache);
 	if (err)
 		return err;
 
+	err = got_object_parse_tree(entries, nentries, nentries_alloc,
+	    buf, len);
+	if (err)
+		goto done;
+
 	err = got_privsep_send_tree(ibuf, *entries, *nentries);
-	free(buf);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
 		else
 			got_privsep_send_error(ibuf, err);
 	}
-
+done:
+	free(buf);
 	return err;
 }
 
@@ -430,40 +434,22 @@ done:
 	return err;
 }
 
-static struct got_parsed_tree_entry *
-find_entry_by_name(struct got_parsed_tree_entry *entries, int nentries,
-    const char *name, size_t len)
-{
-	struct got_parsed_tree_entry *pte;
-	int cmp, i;
-
-	/* Note that tree entries are sorted in strncmp() order. */
-	for (i = 0; i < nentries; i++) {
-		pte = &entries[i];
-		cmp = strncmp(pte->name, name, len);
-		if (cmp < 0)
-			continue;
-		if (cmp > 0)
-			break;
-		if (pte->name[len] == '\0')
-			return pte;
-	}
-	return NULL;
-}
-
 static const struct got_error *
-tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
-    struct got_parsed_tree_entry **entries1, size_t *nentries1,
-    size_t *nentries_alloc1,
-    struct got_parsed_tree_entry **entries2, size_t *nentries2,
-    size_t *nentries_alloc2,
-    const char *path, struct got_pack *pack, struct got_packidx *packidx,
+tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
+    uint8_t **buf2, size_t *len2, const char *path,
+    struct got_pack *pack, struct got_packidx *packidx,
     struct imsgbuf *ibuf, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
-	struct got_parsed_tree_entry *pte1 = NULL, *pte2 = NULL;
+	struct got_parsed_tree_entry pte1, pte2;
 	const char *seg, *s;
 	size_t seglen;
+	size_t remain1 = *len1, remain2 = *len2, elen;
+	uint8_t *next_entry1 = *buf1;
+	uint8_t *next_entry2 = *buf2;
+
+	memset(&pte1, 0, sizeof(pte1));
+	memset(&pte2, 0, sizeof(pte2));
 
 	*changed = 0;
 
@@ -484,24 +470,67 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 				continue;
 		}
 
-		pte1 = find_entry_by_name(*entries1, *nentries1, seg, seglen);
-		if (pte1 == NULL) {
+		/*
+		 * As an optimization we compare entries in on-disk order
+		 * rather than in got_path_cmp() order. We only need to
+		 * find out if any entries differ. Parsing all entries and
+		 * sorting them slows us down significantly when tree objects
+		 * have thousands of entries. We can assume that on-disk entry
+		 * ordering is stable, as per got_object_tree_create() and
+		 * sort_tree_entries_the_way_git_likes_it(). Other orderings
+		 * are incompatible with Git and would yield false positives
+		 * here, too.
+		 */
+		while (remain1 > 0) {
+			err = got_object_parse_tree_entry(&pte1, &elen,
+			    next_entry1, remain1);
+			if (err)
+				return err;
+			next_entry1 += elen;
+			remain1 -= elen;
+			if (strncmp(pte1.name, seg, seglen) != 0 ||
+			    pte1.name[seglen] != '\0') {
+				memset(&pte1, 0, sizeof(pte1));
+				continue;
+			} else
+				break;
+		}
+		if (pte1.name == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			break;
 		}
 
-		pte2 = find_entry_by_name(*entries2, *nentries2, seg, seglen);
-		if (pte2 == NULL) {
+		if (remain2 == 0) {
 			*changed = 1;
 			break;
 		}
 
-		if (pte1->mode != pte2->mode) {
+		while (remain2 > 0) {
+			err = got_object_parse_tree_entry(&pte2, &elen,
+			    next_entry2, remain2);
+			if (err)
+				return err;
+			next_entry2 += elen;
+			remain2 -= elen;
+			if (strncmp(pte2.name, seg, seglen) != 0 ||
+			    pte2.name[seglen] != '\0') {
+				memset(&pte2, 0, sizeof(pte2));
+				continue;
+			} else
+				break;
+		}
+
+		if (pte2.name == NULL) {
 			*changed = 1;
 			break;
 		}
 
-		if (memcmp(pte1->id, pte2->id, SHA1_DIGEST_LENGTH) == 0) {
+		if (pte1.mode != pte2.mode) {
+			*changed = 1;
+			break;
+		}
+
+		if (memcmp(pte1.id, pte2.id, SHA1_DIGEST_LENGTH) == 0) {
 			*changed = 0;
 			break;
 		}
@@ -518,37 +547,37 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 			struct got_object_id id1, id2;
 			int idx;
 
-			memcpy(id1.sha1, pte1->id, SHA1_DIGEST_LENGTH);
+			memcpy(id1.sha1, pte1.id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx(packidx, &id1);
 			if (idx == -1) {
 				err = got_error_no_obj(&id1);
 				break;
 			}
-			*nentries1 = 0;
 			free(*buf1);
 			*buf1 = NULL;
-			err = open_tree(buf1, entries1, nentries1,
-			    nentries_alloc1, pack, packidx, idx, &id1,
+			err = open_tree(buf1, len1, pack, packidx, idx, &id1,
 			    objcache);
-			pte1 = NULL;
+			memset(&pte1, 0, sizeof(pte1));
 			if (err)
 				break;
+			next_entry1 = *buf1;
+			remain1 = *len1;
 
-			memcpy(id2.sha1, pte2->id, SHA1_DIGEST_LENGTH);
+			memcpy(id2.sha1, pte2.id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx(packidx, &id2);
 			if (idx == -1) {
 				err = got_error_no_obj(&id2);
 				break;
 			}
-			*nentries2 = 0;
 			free(*buf2);
 			*buf2 = NULL;
-			err = open_tree(buf2, entries2, nentries2,
-			    nentries_alloc2, pack, packidx, idx, &id2,
+			err = open_tree(buf2, len2, pack, packidx, idx, &id2,
 			    objcache);
-			pte2 = NULL;
+			memset(&pte2, 0, sizeof(pte2));
 			if (err)
 				break;
+			next_entry2 = *buf2;
+			remain2 = *len2;
 		}
 	}
 
@@ -604,9 +633,6 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	struct got_imsg_commit_traversal_request ctreq;
 	struct got_object_qid *pid;
 	struct got_commit_object *commit = NULL, *pcommit = NULL;
-	struct got_parsed_tree_entry *entries = NULL, *pentries = NULL;
-	size_t nentries = 0, nentries_alloc = 0;
-	size_t pnentries = 0, pnentries_alloc = 0;
 	struct got_object_id id;
 	size_t datalen;
 	char *path = NULL;
@@ -705,6 +731,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		} else {
 			int pidx;
 			uint8_t *buf = NULL, *pbuf = NULL;
+			size_t len = 0, plen = 0;
 
 			idx = got_packidx_get_object_idx(packidx,
 			    commit->tree_id);
@@ -715,27 +742,23 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			if (pidx == -1)
 				break;
 
-			err = open_tree(&buf, &entries, &nentries,
-			    &nentries_alloc, pack, packidx, idx,
+			err = open_tree(&buf, &len, pack, packidx, idx,
 			    commit->tree_id, objcache);
 			if (err)
 				goto done;
-			err = open_tree(&pbuf, &pentries, &pnentries,
-			    &pnentries_alloc, pack, packidx, pidx,
+
+			err = open_tree(&pbuf, &plen, pack, packidx, pidx,
 			    pcommit->tree_id, objcache);
 			if (err) {
 				free(buf);
 				goto done;
 			}
 
-			err = tree_path_changed(&changed, &buf, &pbuf,
-			    &entries, &nentries, &nentries_alloc,
-			    &pentries, &pnentries, &pnentries_alloc,
-			    path, pack, packidx, ibuf, objcache);
+			err = tree_path_changed(&changed, &buf, &len,
+			    &pbuf, &plen, path, pack, packidx, ibuf,
+			    objcache);
 
-			nentries = 0;
 			free(buf);
-			pnentries = 0;
 			free(pbuf);
 			if (err) {
 				if (err->code != GOT_ERR_NO_OBJ)
@@ -772,8 +795,6 @@ done:
 		got_object_commit_close(commit);
 	if (pcommit)
 		got_object_commit_close(pcommit);
-	free(entries);
-	free(pentries);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -1183,6 +1204,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 	struct got_object_id_queue ids;
 	struct got_object_qid *qid;
 	uint8_t *buf = NULL;
+	size_t len = 0;
 	struct got_parsed_tree_entry *entries = NULL;
 	size_t nentries = 0, nentries_alloc = 0, i;
 	struct enumerated_tree *tree;
@@ -1223,12 +1245,17 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 			break;
 		}
 
-		err = open_tree(&buf, &entries, &nentries, &nentries_alloc,
-		    pack, packidx, idx, &qid->id, objcache);
+		err = open_tree(&buf, &len, pack, packidx, idx, &qid->id,
+		    objcache);
 		if (err) {
 			if (err->code != GOT_ERR_NO_OBJ)
 				goto done;
 		}
+
+		err = got_object_parse_tree(&entries, &nentries,
+		    &nentries_alloc, buf, len);
+		if (err)
+			goto done;
 
 		err = got_object_idset_add(idset, &qid->id, NULL);
 		if (err)
