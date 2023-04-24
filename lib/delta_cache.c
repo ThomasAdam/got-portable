@@ -280,6 +280,7 @@ got_delta_cache_add_fulltext(struct got_delta_cache *cache,
 			continue;
 		if (i > 0) {
 			struct got_cached_delta tmp;
+
 			memcpy(&tmp, &head->entries[0], sizeof(tmp));
 			memcpy(&head->entries[0], &head->entries[i],
 			    sizeof(head->entries[0]));

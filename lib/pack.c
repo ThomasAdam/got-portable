@@ -1388,7 +1388,9 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 		    &fulltext, &fulltext_len,
 		    pack->delta_cache, delta->data_offset);
 		if (fulltext) {
-			size_t w = fwrite(fulltext, 1, fulltext_len, outfile);
+			size_t w;
+
+			w = fwrite(fulltext, 1, fulltext_len, outfile);
 			if (w != fulltext_len)
 				return got_ferror(outfile, GOT_ERR_IO);
 			*result_size = fulltext_len;
@@ -1572,9 +1574,9 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 				accum_size = fulltext_len;
 				err = NULL;
 			} else {
-				err = got_delta_apply_in_mem(base_buf, base_bufsz,
-				    delta_buf, delta_len, accum_buf,
-				    &accum_size, max_size);
+				err = got_delta_apply_in_mem(base_buf,
+				    base_bufsz, delta_buf, delta_len,
+				    accum_buf, &accum_size, max_size);
 			}
 			n++;
 			if (!cached)
@@ -1754,7 +1756,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 					    pack->delta_cache,
 					    delta_data_offset,
 					    fulltext, fulltext_len);
-					if (err && err->code != GOT_ERR_NO_SPACE)
+					if (err &&
+					    err->code != GOT_ERR_NO_SPACE)
 						goto done;
 					err = NULL;
 				}
