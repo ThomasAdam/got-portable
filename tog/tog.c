@@ -1856,10 +1856,17 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			if (err)
 				break;
 		}
-		if (view->parent)
+		if (view->parent) {
+			if (view->parent->resize) {
+				err = view->parent->resize(view->parent, 0);
+				if (err != NULL)
+					break;
+			}
 			err = offset_selection_down(view->parent);
-		if (!err)
-			err = offset_selection_down(view);
+			if (err != NULL)
+				break;
+		}
+		err = offset_selection_down(view);
 		break;
 	case 'S':
 		view->count = 0;
