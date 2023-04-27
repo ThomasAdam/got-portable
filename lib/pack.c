@@ -1755,7 +1755,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 					err = got_delta_cache_add_fulltext(
 					    pack->delta_cache,
 					    delta_data_offset,
-					    fulltext, fulltext_len);
+					    base_buf, base_bufsz);
 					if (err &&
 					    err->code != GOT_ERR_NO_SPACE)
 						goto done;
