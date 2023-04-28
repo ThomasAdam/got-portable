@@ -1396,6 +1396,8 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			w = fwrite(fulltext, 1, fulltext_len, outfile);
 			if (w != fulltext_len)
 				return got_ferror(outfile, GOT_ERR_IO);
+			if (fflush(outfile) != 0)
+				return got_error_from_errno("fflush");
 			*result_size = fulltext_len;
 			return NULL;
 		}
