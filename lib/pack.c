@@ -1490,6 +1490,24 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 			n++;
 			if (base_buf == NULL)
 				rewind(base_file);
+			else if (pack->delta_cache && fulltext == NULL) {
+				err = got_delta_cache_add(pack->delta_cache,
+				    delta_data_offset, NULL, 0);
+				if (err) {
+					if (err->code != GOT_ERR_NO_SPACE)
+						goto done;
+					err = NULL;
+				} else {
+					err = got_delta_cache_add_fulltext(
+					    pack->delta_cache,
+					    delta_data_offset,
+					    base_buf, base_bufsz);
+					if (err &&
+					    err->code != GOT_ERR_NO_SPACE)
+						goto done;
+					err = NULL;
+				}
+			}
 			continue;
 		}
 
