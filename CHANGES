@@ -1,3 +1,13 @@
+* got 0.88; 2023-04-29
+  see git repository history for per-change authorship information
+- tog: always use alternate charset for vertical/horizontal line
+- several tog regression test suite improvements
+- run the tog tests as part of the default regress set
+- tog: resize log view if toggling fullscreen from child view
+- when finding changed paths iterate tree entries in on-disk order for speed
+- cache fulltext data in delta cache to improve speed with long delta chains
+- gotwebd: fix logic error in gotweb_render_index
+
 * got 0.87; 2023-04-19
   see git repository history for per-change authorship information
 - add gitwrapper(1)
