@@ -368,6 +368,7 @@
 /regress/tog/common.sh
 /regress/tog/diff.sh
 /regress/tog/log.sh
+/regress/tog/tree.sh
 /template
 /template/Makefile
 /template/parse.y
