@@ -1118,7 +1118,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 			disconnect_on_error(client, err);
 		else
 			disconnect(client);
-		goto done;
+		return;
 	}
 
 	repo = gotd_find_repo_by_name(client->auth->repo_name, &gotd);
