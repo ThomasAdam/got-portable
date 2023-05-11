@@ -8165,6 +8165,12 @@ patch_from_stdin(int *patchfd)
 	return err;
 }
 
+struct got_patch_progress_arg {
+	int did_something;
+	int conflicts;
+	int rejects;
+};
+
 static const struct got_error *
 patch_progress(void *arg, const char *old, const char *new,
     unsigned char status, const struct got_error *error, int old_from,
@@ -8172,12 +8178,23 @@ patch_progress(void *arg, const char *old, const char *new,
     int ws_mangled, const struct got_error *hunk_err)
 {
 	const char *path = new == NULL ? old : new;
+	struct got_patch_progress_arg *a = arg;
 
 	while (*path == '/')
 		path++;
 
-	if (status != 0)
+	if (status != GOT_STATUS_NO_CHANGE &&
+	    status != 0 /* per-hunk progress */) {
 		printf("%c  %s\n", status, path);
+		a->did_something = 1;
+	}
+
+	if (hunk_err == NULL) {
+		if (status == GOT_STATUS_CANNOT_UPDATE)
+			a->rejects++;
+		else if (status == GOT_STATUS_CONFLICT)
+			a->conflicts++;
+	}
 
 	if (error != NULL)
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
@@ -8196,6 +8213,21 @@ patch_progress(void *arg, const char *old, const char *new,
 	return NULL;
 }
 
+static void
+print_patch_progress_stats(struct got_patch_progress_arg *ppa)
+{
+	if (!ppa->did_something)
+		return;
+
+	if (ppa->conflicts > 0)
+		printf("Files with merge conflicts: %d\n", ppa->conflicts);
+
+	if (ppa->rejects > 0) {
+		printf("Files where patch failed to apply: %d\n",
+		    ppa->rejects);
+	}
+}
+
 static const struct got_error *
 cmd_patch(int argc, char *argv[])
 {
@@ -8211,6 +8243,7 @@ cmd_patch(int argc, char *argv[])
 	int ch, nop = 0, strip = -1, reverse = 0;
 	int patchfd;
 	int *pack_fds = NULL;
+	struct got_patch_progress_arg ppa;
 
 	TAILQ_INIT(&refs);
 
@@ -8301,9 +8334,10 @@ cmd_patch(int argc, char *argv[])
 			goto done;
 	}
 
+	memset(&ppa, 0, sizeof(ppa));
 	error = got_patch(patchfd, worktree, repo, nop, strip, reverse,
-	    commit_id, &patch_progress, NULL, check_cancelled, NULL);
-
+	    commit_id, patch_progress, &ppa, check_cancelled, NULL);
+	print_patch_progress_stats(&ppa);
 done:
 	got_ref_list_free(&refs);
 	free(commit_id);
