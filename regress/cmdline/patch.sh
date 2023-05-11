@@ -202,6 +202,7 @@ EOF
 @@ -1,1 +1,2 @@ hunk failed to apply
 #  numbers
 @@ -1,9 +0,0 @@ hunk failed to apply
+Files where patch failed to apply: 2
 EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -561,6 +562,7 @@ EOF
 #  iota
 #  kappa
 #  lambda
+Files where patch failed to apply: 5
 EOF
 
 	cat <<EOF > $testroot/stderr.expected
@@ -1528,6 +1530,7 @@ test_patch_merge_conflict() {
 
 	echo 'C  alpha' > $testroot/stdout.expected
 	echo 'C  numbers' >> $testroot/stdout.expected
+	echo 'Files with merge conflicts: 2' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
