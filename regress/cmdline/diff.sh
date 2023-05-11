@@ -1308,7 +1308,7 @@ test_diff_crlf() {
 		return 1
 	fi
 
-	printf 'test\r\n' > $testroot/wt/crlf
+	printf 'one\r\ntwo\r\nthree\r\n' > $testroot/wt/crlf
 	(cd $testroot/wt && got add crlf && got commit -m +crlf) >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1316,14 +1316,16 @@ test_diff_crlf() {
 		return 1
 	fi
 
-	printf 'test 2\r\n' > $testroot/wt/crlf
-	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > $testroot/stdout)
-	cat <<EOF > $testroot/stdout.expected
---- crlf
-+++ crlf
-@@ -1 +1 @@
--test
-+test 2
+	printf 'one\r\ntwain\r\nthree\r\n' > $testroot/wt/crlf
+	(cd $testroot/wt && got diff | sed -n '/^---/,$l' > $testroot/stdout)
+	cat <<\EOF > $testroot/stdout.expected
+--- crlf$
++++ crlf$
+@@ -1,3 +1,3 @@$
+ one\r$
+-two\r$
++twain\r$
+ three\r$
 EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
