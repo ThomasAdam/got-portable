@@ -1522,7 +1522,7 @@ test_patch_merge_conflict() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got patch merged a diff that should conflict" >&2
-		test_done $testroot 0
+		test_done $testroot 1
 		return 1
 	fi
 
