@@ -90,13 +90,6 @@ diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 				return rc;
 			if (ch == '\n')
 				len--;
-			if (len) {
-				rc = get_atom_byte(&ch, atom, len - 1);
-				if (rc)
-					return rc;
-				if (ch == '\r')
-					len--;
-			}
 		}
 
 		for (i = 0; i < len; i++) {
