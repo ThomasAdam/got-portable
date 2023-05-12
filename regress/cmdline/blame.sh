@@ -908,7 +908,7 @@ EOF
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
 	local short_commit1=`trim_obj_id 32 $commit1`
-	local author_time=`git_show_author_time $testroot/repo`
+	local author_time1=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
 A
@@ -921,6 +921,7 @@ EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`
+	local author_time2=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
 A
@@ -934,7 +935,7 @@ EOF
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
 	local short_commit3=`trim_obj_id 32 $commit3`
-	local author_time=`git_show_author_time $testroot/repo`
+	local author_time3=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
 A
@@ -947,7 +948,7 @@ EOF
 	(cd $testroot/wt && got commit -m "change 4" > /dev/null)
 	local commit4=`git_show_head $testroot/repo`
 	local short_commit4=`trim_obj_id 32 $commit4`
-	local author_time=`git_show_author_time $testroot/repo`
+	local author_time4=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
 X
@@ -961,18 +962,21 @@ EOF
 	(cd $testroot/wt && got commit -m "change 5" > /dev/null)
 	local commit5=`git_show_head $testroot/repo`
 	local short_commit5=`trim_obj_id 32 $commit5`
-	local author_time=`git_show_author_time $testroot/repo`
+	local author_time5=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	d=`date -u -r $author_time +"%G-%m-%d"`
-	echo "1) $short_commit5 $d $GOT_AUTHOR_8 X" > $testroot/stdout.expected
-	echo "2) $short_commit1 $d $GOT_AUTHOR_8 A" >> $testroot/stdout.expected
-	echo "3) $short_commit1 $d $GOT_AUTHOR_8 B" >> $testroot/stdout.expected
-	echo "4) $short_commit1 $d $GOT_AUTHOR_8 C" >> $testroot/stdout.expected
-	echo "5) $short_commit2 $d $GOT_AUTHOR_8 P" >> $testroot/stdout.expected
-	echo "6) $short_commit4 $d $GOT_AUTHOR_8 Y" >> $testroot/stdout.expected
-	echo "7) $short_commit2 $d $GOT_AUTHOR_8 Q" >> $testroot/stdout.expected
+	d1=`date -u -r $author_time1 +"%G-%m-%d"`
+	d2=`date -u -r $author_time2 +"%G-%m-%d"`
+	d4=`date -u -r $author_time4 +"%G-%m-%d"`
+	d5=`date -u -r $author_time5 +"%G-%m-%d"`
+	echo "1) $short_commit5 $d5 $GOT_AUTHOR_8 X" > $testroot/stdout.expected
+	echo "2) $short_commit1 $d1 $GOT_AUTHOR_8 A" >> $testroot/stdout.expected
+	echo "3) $short_commit1 $d1 $GOT_AUTHOR_8 B" >> $testroot/stdout.expected
+	echo "4) $short_commit1 $d1 $GOT_AUTHOR_8 C" >> $testroot/stdout.expected
+	echo "5) $short_commit2 $d2 $GOT_AUTHOR_8 P" >> $testroot/stdout.expected
+	echo "6) $short_commit4 $d4 $GOT_AUTHOR_8 Y" >> $testroot/stdout.expected
+	echo "7) $short_commit2 $d5 $GOT_AUTHOR_8 Q" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
