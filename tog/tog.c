@@ -2496,36 +2496,30 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	/* Prepend reference labels to log message if possible .*/
 	refs = got_reflist_object_id_map_lookup(tog_refs_idmap, id);
 	if (refs) {
-		char *refs_str, *p, *newlogmsg;
+		char *refs_str, *newlogmsg;
 		wchar_t *ws;
 
 		err = build_refs_str(&refs_str, refs, id, s->repo);
 		if (err)
 			goto done;
-
-		if (asprintf(&p, "[%s]", refs_str) == -1) {
-			err = got_error_from_errno("asprintf");
-			free(refs_str);
-			goto done;
-		}
-		free(refs_str);
-		refs_str = NULL;
 	
 		/*
 		 * The length of this wide-char sub-string will be
 		 * needed later for colorization.
 		 */
-		err = mbs2ws(&ws, &wrefstr_len, p);
+		err = mbs2ws(&ws, &wrefstr_len, refs_str);
 		if (err)
 			goto done;
 		free(ws);
 
-		if (asprintf(&newlogmsg, "%s %s", p, logmsg) == -1) {
+		wrefstr_len += 2; /* account for '[' and ']' */
+
+		if (asprintf(&newlogmsg, "[%s] %s", refs_str, logmsg) == -1) {
 			err = got_error_from_errno("asprintf");
-			free(p);
+			free(refs_str);
 			goto done;
 		}
-		free(p);
+		free(refs_str);
 
 		free(logmsg0);
 		logmsg0 = newlogmsg;
