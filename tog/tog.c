@@ -2409,12 +2409,14 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	char *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
 	int author_width, logmsg_width;
+	size_t wrefstr_len = 0;
 	char *newline, *line = NULL;
 	int col, limit, scrollx;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
 	struct tog_color *tc;
+	struct got_reflist_head *refs;
 
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
@@ -2494,6 +2496,46 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	newline = strchr(logmsg, '\n');
 	if (newline)
 		*newline = '\0';
+
+	/* Prepend reference labels to log message if possible .*/
+	refs = got_reflist_object_id_map_lookup(tog_refs_idmap, id);
+	if (refs) {
+		char *refs_str, *p, *newlogmsg;
+		wchar_t *ws;
+
+		err = build_refs_str(&refs_str, refs, id, s->repo);
+		if (err)
+			goto done;
+
+		if (asprintf(&p, "[%s]", refs_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(refs_str);
+			goto done;
+		}
+		free(refs_str);
+		refs_str = NULL;
+	
+		/*
+		 * The length of this wide-char sub-string will be
+		 * needed later for colorization.
+		 */
+		err = mbs2ws(&ws, &wrefstr_len, p);
+		if (err)
+			goto done;
+		free(ws);
+
+		if (asprintf(&newlogmsg, "%s %s", p, logmsg) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(p);
+			goto done;
+		}
+		free(p);
+
+		free(logmsg0);
+		logmsg0 = newlogmsg;
+		logmsg = logmsg0;
+	}
+
 	limit = avail - col;
 	if (view->child && !view_is_hsplit_top(view) && limit > 0)
 		limit--;	/* for the border */
@@ -2501,7 +2543,19 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	    limit, col, 1);
 	if (err)
 		goto done;
-	waddwstr(view->window, &wlogmsg[scrollx]);
+	if (wrefstr_len > 0 && scrollx < wrefstr_len) {
+		tc = get_color(&s->colors, TOG_COLOR_COMMIT);
+		if (tc)
+			wattr_on(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
+		waddnwstr(view->window, &wlogmsg[scrollx],
+		    wrefstr_len - scrollx);
+		if (tc)
+			wattr_off(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
+		waddwstr(view->window, &wlogmsg[wrefstr_len]);
+	} else
+		waddwstr(view->window, &wlogmsg[scrollx]);
 	col += MAX(logmsg_width, 0);
 	while (col < avail) {
 		waddch(view->window, ' ');

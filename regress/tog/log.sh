@@ -33,7 +33,7 @@ EOF
 
 	cat <<EOF >$testroot/view.expected
 commit $head_id [1/1] master
-$ymd flan_hacker  adding the test tree
+$ymd flan_hacker  [master] adding the test tree
 
 
 
@@ -89,7 +89,7 @@ EOF
 
 	cat <<EOF >$testroot/view.expected
 commit $head_id [1/1] master |[1/40] diff /dev/null $head_id
-$ymd flan_hacker  adding the test tree                 |commit $head_id (master)
+$ymd flan_hacker  [master] adding the test tree        |commit $head_id (master)
                                                              |from: Flan Hacker <flan_hacker@openbsd.org>
                                                              |date: $date
                                                              |
@@ -153,7 +153,7 @@ EOF
 
 	cat <<EOF >$testroot/view.expected
 commit $commit1 [1/2] master
-$ymd $id1_len8 john         author
+$ymd $id1_len8 john         [master] author
 $ymd $head_id_len8 flan_hacker  adding the test tree
 :show commit author
 EOF
@@ -179,7 +179,7 @@ test_log_scroll_right()
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local ymd=`date -u -r $author_time +"%G-%m-%d"`
 	local msg="scroll this log message to the right four characters"
-	local scrolled_msg="ll this log message to the right four characters"
+	local scrolled_msg="ter] scroll this log message to the right four character"
 
 	echo "mod alpha" > $testroot/repo/alpha
 	cd $testroot/repo && git add . && git commit -m "$msg" > /dev/null
@@ -228,7 +228,7 @@ EOF
 
 	cat <<EOF >$testroot/view.expected
 commit $head_id [1/1] master
-$ymd flan_hacker  adding the test tree
+$ymd flan_hacker  [master] adding the test tree
 
 --------------------------------------------------------------------------------
 references [1/2]
@@ -270,7 +270,7 @@ EOF
 
 	cat <<EOF >$testroot/view.expected
 commit $head_id [1/1] master
-$ymd flan_hacker  adding the test tree
+$ymd flan_hacker  [master] adding the test tree
 
 --------------------------------------------------------------------------------
 commit $head_id
