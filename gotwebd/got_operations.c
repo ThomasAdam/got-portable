@@ -63,9 +63,6 @@ got_gotweb_closefile(FILE *f)
 	if (err == NULL && ftruncate(fileno(f), 0) == -1)
 		err = got_error_from_errno("ftruncate");
 
-	if (err == NULL && fsync(fileno(f)) == -1)
-		err = got_error_from_errno("fsync");
-
 	if (fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 
