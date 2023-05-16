@@ -53,7 +53,7 @@ static const struct got_error *got_gotweb_blame_cb(void *, int, int,
     struct got_commit_object *,struct got_object_id *);
 
 const struct got_error *
-got_gotweb_flushfile(FILE *f)
+got_gotweb_closefile(FILE *f)
 {
 	const struct got_error *err = NULL;
 
@@ -1127,17 +1127,17 @@ done:
 	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (bca.f) {
-		const struct got_error *bca_err = got_gotweb_flushfile(bca.f);
+		const struct got_error *bca_err = got_gotweb_closefile(bca.f);
 		if (error == NULL)
 			error = bca_err;
 	}
 	if (f1) {
-		const struct got_error *f1_err = got_gotweb_flushfile(f1);
+		const struct got_error *f1_err = got_gotweb_closefile(f1);
 		if (error == NULL)
 			error = f1_err;
 	}
 	if (f2) {
-		const struct got_error *f2_err = got_gotweb_flushfile(f2);
+		const struct got_error *f2_err = got_gotweb_closefile(f2);
 		if (error == NULL)
 			error = f2_err;
 	}
@@ -1254,17 +1254,17 @@ done:
 	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (f1) {
-		const struct got_error *f1_err = got_gotweb_flushfile(f1);
+		const struct got_error *f1_err = got_gotweb_closefile(f1);
 		if (error == NULL)
 			error = f1_err;
 	}
 	if (f2) {
-		const struct got_error *f2_err = got_gotweb_flushfile(f2);
+		const struct got_error *f2_err = got_gotweb_closefile(f2);
 		if (error == NULL)
 			error = f2_err;
 	}
 	if (error && f3) {
-		got_gotweb_flushfile(f3);
+		got_gotweb_closefile(f3);
 		*fp = NULL;
 	}
 	got_ref_list_free(&refs);

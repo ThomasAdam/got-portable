@@ -743,9 +743,9 @@ gotweb_free_transport(struct transport *t)
 	if (t->blob)
 		got_object_blob_close(t->blob);
 	if (t->fp) {
-		err = got_gotweb_flushfile(t->fp);
+		err = got_gotweb_closefile(t->fp);
 		if (err)
-			log_warnx("%s: got_gotweb_flushfile failure: %s",
+			log_warnx("%s: got_gotweb_closefile failure: %s",
 			    __func__, err->msg);
 	}
 	if (t->fd != -1 && close(t->fd) == -1)
