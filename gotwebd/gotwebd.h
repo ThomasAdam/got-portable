@@ -508,15 +508,14 @@ int fcgi_printf(struct request *, const char *, ...)
 int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 
 /* got_operations.c */
-const struct got_error *got_gotweb_flushfile(FILE *, int);
+const struct got_error *got_gotweb_flushfile(FILE *);
 const struct got_error *got_get_repo_owner(char **, struct request *);
 const struct got_error *got_get_repo_age(time_t *, struct request *,
     const char *);
 const struct got_error *got_get_repo_commits(struct request *, int);
 const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
-const struct got_error *got_open_diff_for_output(FILE **, int *,
-    struct request *);
+const struct got_error *got_open_diff_for_output(FILE **, struct request *);
 int got_output_repo_tree(struct request *,
     int (*)(struct template *, struct got_tree_entry *));
 const struct got_error *got_open_blob_for_output(struct got_blob_object **,

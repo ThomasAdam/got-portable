@@ -287,7 +287,7 @@ gotweb_process_request(struct request *c)
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		error = got_open_diff_for_output(&c->t->fp, &c->t->fd, c);
+		error = got_open_diff_for_output(&c->t->fp, c);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
@@ -742,11 +742,10 @@ gotweb_free_transport(struct transport *t)
 	if (t->blob)
 		got_object_blob_close(t->blob);
 	if (t->fp) {
-		err = got_gotweb_flushfile(t->fp, t->fd);
+		err = got_gotweb_flushfile(t->fp);
 		if (err)
 			log_warnx("%s: got_gotweb_flushfile failure: %s",
 			    __func__, err->msg);
-		t->fd = -1;
 	}
 	if (t->fd != -1)
 		close(t->fd);
