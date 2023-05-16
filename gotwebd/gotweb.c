@@ -423,14 +423,6 @@ gotweb_init_transport(struct transport **t)
 	TAILQ_INIT(&(*t)->repo_tags);
 	TAILQ_INIT(&(*t)->refs);
 
-	(*t)->repo = NULL;
-	(*t)->repo_dir = NULL;
-	(*t)->qs = NULL;
-	(*t)->next_id = NULL;
-	(*t)->prev_id = NULL;
-	(*t)->next_disp = 0;
-	(*t)->prev_disp = 0;
-
 	(*t)->fd = -1;
 
 	return error;
