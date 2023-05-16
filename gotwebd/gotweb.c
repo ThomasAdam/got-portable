@@ -747,8 +747,8 @@ gotweb_free_transport(struct transport *t)
 			log_warnx("%s: got_gotweb_flushfile failure: %s",
 			    __func__, err->msg);
 	}
-	if (t->fd != -1)
-		close(t->fd);
+	if (t->fd != -1 && close(t->fd) == -1)
+		log_warn("%s: close", __func__);
 	if (t->repos) {
 		for (i = 0; i < t->nrepos; ++i)
 			free(t->repos[i]);
