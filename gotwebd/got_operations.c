@@ -55,19 +55,21 @@ static const struct got_error *got_gotweb_blame_cb(void *, int, int,
 const struct got_error *
 got_gotweb_flushfile(FILE *f)
 {
+	const struct got_error *err = NULL;
+
 	if (fseek(f, 0, SEEK_SET) == -1)
-		return got_error_from_errno("fseek");
+		err = got_error_from_errno("fseek");
 
-	if (ftruncate(fileno(f), 0) == -1)
-		return got_error_from_errno("ftruncate");
+	if (err == NULL && ftruncate(fileno(f), 0) == -1)
+		err = got_error_from_errno("ftruncate");
 
-	if (fsync(fileno(f)) == -1)
-		return got_error_from_errno("fsync");
+	if (err == NULL && fsync(fileno(f)) == -1)
+		err = got_error_from_errno("fsync");
 
-	if (fclose(f) == EOF)
-		return got_error_from_errno("fclose");
+	if (fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
