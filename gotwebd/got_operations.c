@@ -1011,7 +1011,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct blame_cb_args bca;
-	int i, obj_type, fd2 = -1, fd3 = -1, fd4 = -1;
+	int i, obj_type, blobfd = -1, fd1 = -1, fd2 = -1;
 	off_t filesize;
 	FILE *f1 = NULL, *f2 = NULL;
 
@@ -1056,11 +1056,11 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	if (error)
 		goto done;
 
-	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_2], &fd2);
+	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_2], &blobfd);
 	if (error)
 		goto done;
 
-	error = got_object_open_as_blob(&blob, repo, obj_id, BUF, fd2);
+	error = got_object_open_as_blob(&blob, repo, obj_id, BUF, blobfd);
 	if (error)
 		goto done;
 
@@ -1088,11 +1088,11 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	bca.repo = repo;
 	bca.c = c;
 
-	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_3], &fd3);
+	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_3], &fd1);
 	if (error)
 		goto done;
 
-	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_4], &fd4);
+	error = got_gotweb_dupfd(&c->priv_fd[BLAME_FD_4], &fd2);
 	if (error)
 		goto done;
 
@@ -1106,7 +1106,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 
 	error = got_blame(in_repo_path, commit_id, repo,
 	    GOT_DIFF_ALGORITHM_MYERS, got_gotweb_blame_cb, &bca, NULL, NULL,
-	    fd3, fd4, f1, f2);
+	    fd1, fd2, f1, f2);
 
 done:
 	if (bca.lines) {
@@ -1118,11 +1118,11 @@ done:
 		}
 	}
 	free(bca.lines);
+	if (blobfd != -1 && close(blobfd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
+		error = got_error_from_errno("close");
 	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	if (fd3 != -1 && close(fd3) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	if (fd4 != -1 && close(fd4) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (bca.f) {
 		const struct got_error *bca_err = got_gotweb_flushfile(bca.f);
@@ -1161,7 +1161,7 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_reflist_head refs;
 	FILE *f1 = NULL, *f2 = NULL, *f3 = NULL;
-	int obj_type, fd4 = -1, fd5 = -1;
+	int obj_type, fd1 = -1, fd2 = -1;
 
 	*fp = NULL;
 
@@ -1199,28 +1199,28 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 	if (error)
 		goto done;
 
-	error = got_gotweb_dupfd(&c->priv_fd[DIFF_FD_4], &fd4);
+	error = got_gotweb_dupfd(&c->priv_fd[DIFF_FD_4], &fd1);
 	if (error)
 		goto done;
 
-	error = got_gotweb_dupfd(&c->priv_fd[DIFF_FD_5], &fd5);
+	error = got_gotweb_dupfd(&c->priv_fd[DIFF_FD_5], &fd2);
 	if (error)
 		goto done;
 
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd4, fd5,
+		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd1, fd2,
 		     id1, id2, NULL, NULL, GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
 		     NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd4, fd5,
+		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd1, fd2,
 		    id1, id2, NULL, "", "",  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
 		    NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = got_diff_objects_as_commits(NULL, NULL, f1, f2, fd4,
-		    fd5, id1, id2, NULL,  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
+		error = got_diff_objects_as_commits(NULL, NULL, f1, f2, fd1,
+		    fd2, id1, id2, NULL,  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
 		    NULL, repo, f3);
 		break;
 	default:
@@ -1247,9 +1247,9 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 	*fp = f3;
 
 done:
-	if (fd4 != -1 && close(fd4) == -1 && error == NULL)
+	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
 		error = got_error_from_errno("close");
-	if (fd5 != -1 && close(fd5) == -1 && error == NULL)
+	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (f1) {
 		const struct got_error *f1_err = got_gotweb_flushfile(f1);
