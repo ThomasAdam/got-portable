@@ -48,41 +48,40 @@ static const struct got_error *got_get_repo_commit(struct request *,
     struct repo_commit *, struct got_commit_object *, struct got_reflist_head *,
     struct got_object_id *);
 static const struct got_error *got_gotweb_dupfd(int *, int *);
-static const struct got_error *got_gotweb_openfile(FILE **, int *, int *);
+static const struct got_error *got_gotweb_openfile(FILE **, int *);
 static const struct got_error *got_gotweb_blame_cb(void *, int, int,
     struct got_commit_object *,struct got_object_id *);
 
 const struct got_error *
-got_gotweb_flushfile(FILE *f, int fd)
+got_gotweb_flushfile(FILE *f)
 {
 	if (fseek(f, 0, SEEK_SET) == -1)
 		return got_error_from_errno("fseek");
 
-	if (ftruncate(fd, 0) == -1)
+	if (ftruncate(fileno(f), 0) == -1)
 		return got_error_from_errno("ftruncate");
 
-	if (fsync(fd) == -1)
+	if (fsync(fileno(f)) == -1)
 		return got_error_from_errno("fsync");
 
-	if (f && fclose(f) == EOF)
+	if (fclose(f) == EOF)
 		return got_error_from_errno("fclose");
-
-	if (fd != -1 && close(fd) != -1)
-		return got_error_from_errno("close");
 
 	return NULL;
 }
 
 static const struct got_error *
-got_gotweb_openfile(FILE **f, int *priv_fd, int *fd)
+got_gotweb_openfile(FILE **f, int *priv_fd)
 {
-	*fd = dup(*priv_fd);
-	if (*fd == -1)
+	int fd;
+
+	fd = dup(*priv_fd);
+	if (fd == -1)
 		return got_error_from_errno("dup");
 
-	*f = fdopen(*fd, "w+");
+	*f = fdopen(fd, "w+");
 	if (*f == NULL) {
-		close(*fd);
+		close(fd);
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 	}
 
@@ -1012,8 +1011,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	struct blame_cb_args bca;
-	int i, obj_type, fd1 = -1, fd2 = -1, fd3 = -1, fd4 = -1, fd5 = -1;
-	int fd6 = -1;
+	int i, obj_type, fd2 = -1, fd3 = -1, fd4 = -1;
 	off_t filesize;
 	FILE *f1 = NULL, *f2 = NULL;
 
@@ -1054,7 +1052,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 		goto done;
 	}
 
-	error = got_gotweb_openfile(&bca.f, &c->priv_fd[BLAME_FD_1], &fd1);
+	error = got_gotweb_openfile(&bca.f, &c->priv_fd[BLAME_FD_1]);
 	if (error)
 		goto done;
 
@@ -1098,11 +1096,11 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	if (error)
 		goto done;
 
-	error = got_gotweb_openfile(&f1, &c->priv_fd[BLAME_FD_5], &fd5);
+	error = got_gotweb_openfile(&f1, &c->priv_fd[BLAME_FD_5]);
 	if (error)
 		goto done;
 
-	error = got_gotweb_openfile(&f2, &c->priv_fd[BLAME_FD_6], &fd6);
+	error = got_gotweb_openfile(&f2, &c->priv_fd[BLAME_FD_6]);
 	if (error)
 		goto done;
 
@@ -1127,20 +1125,17 @@ done:
 	if (fd4 != -1 && close(fd4) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (bca.f) {
-		const struct got_error *bca_err =
-		    got_gotweb_flushfile(bca.f, fd1);
+		const struct got_error *bca_err = got_gotweb_flushfile(bca.f);
 		if (error == NULL)
 			error = bca_err;
 	}
 	if (f1) {
-		const struct got_error *f1_err =
-		    got_gotweb_flushfile(f1, fd5);
+		const struct got_error *f1_err = got_gotweb_flushfile(f1);
 		if (error == NULL)
 			error = f1_err;
 	}
 	if (f2) {
-		const struct got_error *f2_err =
-		    got_gotweb_flushfile(f2, fd6);
+		const struct got_error *f2_err = got_gotweb_flushfile(f2);
 		if (error == NULL)
 			error = f2_err;
 	}
@@ -1157,7 +1152,7 @@ done:
 }
 
 const struct got_error *
-got_open_diff_for_output(FILE **fp, int *fd, struct request *c)
+got_open_diff_for_output(FILE **fp, struct request *c)
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
@@ -1166,22 +1161,21 @@ got_open_diff_for_output(FILE **fp, int *fd, struct request *c)
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_reflist_head refs;
 	FILE *f1 = NULL, *f2 = NULL, *f3 = NULL;
-	int obj_type, fd1, fd2, fd3, fd4 = -1, fd5 = -1;
+	int obj_type, fd4 = -1, fd5 = -1;
 
 	*fp = NULL;
-	*fd = -1;
 
 	TAILQ_INIT(&refs);
 
-	error = got_gotweb_openfile(&f1, &c->priv_fd[DIFF_FD_1], &fd1);
+	error = got_gotweb_openfile(&f1, &c->priv_fd[DIFF_FD_1]);
 	if (error)
 		return error;
 
-	error = got_gotweb_openfile(&f2, &c->priv_fd[DIFF_FD_2], &fd2);
+	error = got_gotweb_openfile(&f2, &c->priv_fd[DIFF_FD_2]);
 	if (error)
 		return error;
 
-	error = got_gotweb_openfile(&f3, &c->priv_fd[DIFF_FD_3], &fd3);
+	error = got_gotweb_openfile(&f3, &c->priv_fd[DIFF_FD_3]);
 	if (error)
 		return error;
 
@@ -1251,7 +1245,6 @@ got_open_diff_for_output(FILE **fp, int *fd, struct request *c)
 	}
 
 	*fp = f3;
-	*fd = fd3;
 
 done:
 	if (fd4 != -1 && close(fd4) == -1 && error == NULL)
@@ -1259,21 +1252,18 @@ done:
 	if (fd5 != -1 && close(fd5) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (f1) {
-		const struct got_error *f1_err =
-		    got_gotweb_flushfile(f1, fd1);
+		const struct got_error *f1_err = got_gotweb_flushfile(f1);
 		if (error == NULL)
 			error = f1_err;
 	}
 	if (f2) {
-		const struct got_error *f2_err =
-		    got_gotweb_flushfile(f2, fd2);
+		const struct got_error *f2_err = got_gotweb_flushfile(f2);
 		if (error == NULL)
 			error = f2_err;
 	}
 	if (error && f3) {
-		got_gotweb_flushfile(f3, fd3);
+		got_gotweb_flushfile(f3);
 		*fp = NULL;
-		*fd = -1;
 	}
 	got_ref_list_free(&refs);
 	free(id1);
