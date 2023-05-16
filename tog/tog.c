@@ -2405,6 +2405,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	struct tog_log_view_state *s = &view->state.log;
 	const struct got_error *err = NULL;
 	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
+	char *refs_str = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
@@ -2499,13 +2500,13 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 	/* Prepend reference labels to log message if possible .*/
 	refs = got_reflist_object_id_map_lookup(tog_refs_idmap, id);
-	if (refs) {
-		char *refs_str, *newlogmsg;
-		wchar_t *ws;
-
+	if (refs)
 		err = build_refs_str(&refs_str, refs, id, s->repo);
-		if (err)
-			goto done;
+	if (err)
+		goto done;
+	if (refs_str) {
+		char *newlogmsg;
+		wchar_t *ws;
 	
 		/*
 		 * The length of this wide-char sub-string will be
@@ -2520,10 +2521,8 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 		if (asprintf(&newlogmsg, "[%s] %s", refs_str, logmsg) == -1) {
 			err = got_error_from_errno("asprintf");
-			free(refs_str);
 			goto done;
 		}
-		free(refs_str);
 
 		free(logmsg0);
 		logmsg0 = newlogmsg;
@@ -2558,6 +2557,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 done:
 	free(logmsg0);
 	free(wlogmsg);
+	free(refs_str);
 	free(author);
 	free(wauthor);
 	free(line);
