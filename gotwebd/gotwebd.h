@@ -508,7 +508,7 @@ int fcgi_printf(struct request *, const char *, ...)
 int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
 
 /* got_operations.c */
-const struct got_error *got_gotweb_flushfile(FILE *);
+const struct got_error *got_gotweb_closefile(FILE *);
 const struct got_error *got_get_repo_owner(char **, struct request *);
 const struct got_error *got_get_repo_age(time_t *, struct request *,
     const char *);
