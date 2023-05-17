@@ -62,7 +62,7 @@ config_init(struct gotwebd *env)
 		TAILQ_INIT(&env->servers);
 		TAILQ_INIT(&env->sockets);
 	}
-	 return 0;
+	return 0;
 }
 
 int
@@ -73,7 +73,7 @@ config_getcfg(struct gotwebd *env, struct imsg *imsg)
 		proc_compose(env->gotwebd_ps, PROC_GOTWEBD,
 		    IMSG_CFG_DONE, NULL, 0);
 
-	 return 0;
+	return 0;
 }
 
 int
@@ -86,7 +86,7 @@ config_setserver(struct gotwebd *env, struct server *srv)
 	if (proc_compose(ps, PROC_SOCKS, IMSG_CFG_SRV, &ssrv, sizeof(ssrv))
 	    == -1)
 		fatal("proc_compose");
-	 return 0;
+	return 0;
 }
 
 int
@@ -121,7 +121,7 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 
 	TAILQ_INSERT_TAIL(&env->servers, srv, entry);
 
-	 return 0;
+	return 0;
 }
 
 int
@@ -183,7 +183,7 @@ config_setsock(struct gotwebd *env, struct socket *sock)
 		sock->fd = -1;
 	}
 
-	 return 0;
+	return 0;
 }
 
 int
@@ -229,7 +229,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	    strlen(sock->conf.unix_socket_name) ?
 	    sock->conf.unix_socket_name : "none");
 
-	 return 0;
+	return 0;
 }
 
 int
@@ -323,7 +323,7 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 	}
 
 	if (match)
-		 return 0;
+		return 0;
 	else
 		return 1;
 }
