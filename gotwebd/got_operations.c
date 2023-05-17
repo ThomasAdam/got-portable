@@ -782,7 +782,8 @@ got_output_repo_tree(struct request *c,
 	free(commit_id);
 	free(tree_id);
 	if (error) {
-		log_warnx("%s: %s", __func__, error->msg);
+		if (error->code != GOT_ERR_CANCELLED)
+			log_warnx("%s: %s", __func__, error->msg);
 		return -1;
 	}
 	return 0;
@@ -901,8 +902,9 @@ got_output_blob_by_lines(struct template *tp, struct got_blob_object *blob,
 	free(line);
 
 	if (err) {
-		log_warnx("%s: got_object_blob_getline failed: %s",
-		    __func__, err->msg);
+		if (err->code != GOT_ERR_CANCELLED)
+			log_warnx("%s: got_object_blob_getline failed: %s",
+			    __func__, err->msg);
 		return -1;
 	}
 	return 0;

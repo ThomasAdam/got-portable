@@ -435,7 +435,8 @@ send_response(struct request *c, int type, const uint8_t *data,
 				nanosleep(&ts, NULL);
 				continue;
 			}
-			log_warn("%s: write failure", __func__);
+			log_debug("%s: write failure: %s", __func__,
+			    strerror(errno));
 			c->sock->client_status = CLIENT_DISCONNECT;
 			return -1;
 		}
