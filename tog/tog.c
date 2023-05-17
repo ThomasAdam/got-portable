@@ -2326,6 +2326,9 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 
 	*refs_str = NULL;
 
+	if (refs == NULL)
+		return NULL;
+
 	TAILQ_FOREACH(re, refs, entry) {
 		struct got_tag_object *tag = NULL;
 		struct got_object_id *ref_id;
@@ -2500,8 +2503,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 	/* Prepend reference labels to log message if possible .*/
 	refs = got_reflist_object_id_map_lookup(tog_refs_idmap, id);
-	if (refs)
-		err = build_refs_str(&refs_str, refs, id, s->repo);
+	err = build_refs_str(&refs_str, refs, id, s->repo);
 	if (err)
 		goto done;
 	if (refs_str) {
@@ -2781,12 +2783,10 @@ draw_commits(struct tog_view *view)
 			return err;
 		refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
 		    s->selected_entry->id);
-		if (refs) {
-			err = build_refs_str(&refs_str, refs,
-			    s->selected_entry->id, s->repo);
-			if (err)
-				goto done;
-		}
+		err = build_refs_str(&refs_str, refs, s->selected_entry->id,
+		    s->repo);
+		if (err)
+			goto done;
 	}
 
 	if (s->thread_args.commits_needed == 0 && !using_mock_io)
@@ -4969,11 +4969,9 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 	off_t outoff = 0;
 	int n;
 
-	if (refs) {
-		err = build_refs_str(&refs_str, refs, commit_id, repo);
-		if (err)
-			return err;
-	}
+	err = build_refs_str(&refs_str, refs, commit_id, repo);
+	if (err)
+		return err;
 
 	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
