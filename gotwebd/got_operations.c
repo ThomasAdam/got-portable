@@ -771,7 +771,7 @@ got_output_repo_tree(struct request *c,
 			break;
 		}
 	}
-done:
+ done:
 	free(escaped_name);
 	free(path);
 	got_ref_list_free(&refs);
