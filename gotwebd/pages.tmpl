@@ -919,11 +919,11 @@ static inline int rss_author(struct template *, char *);
     {{ "\n" }}
     {!
 	err = got_output_file_blame(c, &blame_line);
-	if (err) {
+	if (err && err->code != GOT_ERR_CANCELLED)
 		log_warnx("%s: got_output_file_blame: %s", __func__,
 		    err->msg);
+	if (err)
 		return (-1);
-	}
     !}
   </div>
 </div>
