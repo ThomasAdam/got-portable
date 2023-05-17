@@ -177,7 +177,7 @@ got_get_repo_age(time_t *repo_age, struct request *c, const char *refname)
 
 	if (cmp_time != 0)
 		*repo_age = cmp_time;
-done:
+ done:
 	got_ref_list_free(&refs);
 	return error;
 }
@@ -441,7 +441,7 @@ got_get_repo_commits(struct request *c, int limit)
 			commit = NULL;
 		}
 	}
-done:
+ done:
 	if (ref)
 		got_ref_close(ref);
 	if (commit)
@@ -667,7 +667,7 @@ got_get_repo_tags(struct request *c, int limit)
 		}
 	}
 
-done:
+ done:
 	/*
 	 * we have tailq populated, so find previous commit id
 	 * for navigation through briefs and commits
@@ -697,7 +697,7 @@ done:
 			c_cnt++;
 		}
 	}
-err:
+ err:
 	if (commit)
 		got_object_commit_close(commit);
 	if (tag)
@@ -992,7 +992,7 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
 	}
-done:
+ done:
 	free(line);
 	return err;
 }
@@ -1107,7 +1107,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	    GOT_DIFF_ALGORITHM_MYERS, got_gotweb_blame_cb, &bca, NULL, NULL,
 	    fd1, fd2, f1, f2);
 
-done:
+ done:
 	if (bca.lines) {
 		free(bca.line_offsets);
 		for (i = 0; i < bca.nlines; i++) {
@@ -1245,7 +1245,7 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 
 	*fp = f3;
 
-done:
+ done:
 	if (fd1 != -1 && close(fd1) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (fd2 != -1 && close(fd2) == -1 && error == NULL)
