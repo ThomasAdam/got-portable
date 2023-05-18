@@ -1230,16 +1230,6 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 	if (error)
 		goto done;
 
-	if (fseek(f1, 0, SEEK_SET) == -1) {
-		error = got_ferror(f1, GOT_ERR_IO);
-		goto done;
-	}
-
-	if (fseek(f2, 0, SEEK_SET) == -1) {
-		error = got_ferror(f2, GOT_ERR_IO);
-		goto done;
-	}
-
 	if (fseek(f3, 0, SEEK_SET) == -1) {
 		error = got_ferror(f3, GOT_ERR_IO);
 		goto done;
