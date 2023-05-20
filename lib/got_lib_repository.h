@@ -31,7 +31,7 @@
 #define GOT_PACK_CACHE_SIZE	32
 
 /*
- * While in gotd(8) chroot, a repository needs this many temporary files.
+ * An open repository needs this many temporary files.
  * This limit sets an upper bound on how many raw objects or blobs can
  * be kept open in parallel.
  */
@@ -81,7 +81,7 @@ struct got_repository {
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
-	/* Open file handles for storing temporary data in gotd(8) chroot. */
+	/* Open file handles for temporary files. */
 	int tempfiles[GOT_REPO_NUM_TEMPFILES];
 	uint32_t tempfile_use_mask;
 
