@@ -78,7 +78,10 @@ struct got_repository {
 	 */
 	struct got_packidx_bloom_filter_tree packidx_bloom_filters;
 
-	/* Open file handles for pack files. */
+	/*
+	 * Open file handles for pack files. Each struct got_pack uses
+	 * a number of file descriptors. See struct got_pack for details.
+	 */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
 	/* Open file handles for temporary files. */
