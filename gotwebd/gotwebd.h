@@ -113,7 +113,7 @@
 #define FCGI_OVERLOADED		2
 #define FCGI_UNKNOWN_ROLE	3
 
-#define GOTWEB_PACK_NUM_TEMPFILES     32
+#define GOTWEB_PACK_NUM_TEMPFILES     (32 * 2)
 
 /* Forward declaration */
 struct got_blob_object;
