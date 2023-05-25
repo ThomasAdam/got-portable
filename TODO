@@ -75,7 +75,7 @@ gotd:
 - client connection timeout handling needs to be checked by regress tests,
   and is likely in need of improvement
 - implement stress-tests to observe and fix misbehaviour under load
-- listener's fd-reserve limit needs to be reviewed and perhaps adjusted 
+- listener's fd-reserve limit needs to be reviewed and perhaps adjusted
 - implement pre-commit checks (in lieu of hook scripts):
   1. deny branch history rewriting ('got send -f') via gotd.conf [done]
   2. allow/deny creation/deletion of references via gotd.conf
