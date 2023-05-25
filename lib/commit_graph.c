@@ -642,6 +642,13 @@ find_yca_add_id(struct got_object_id **yca_id, struct got_commit_graph *graph,
 	return got_object_idset_add(commit_ids, &id, NULL);
 }
 
+/*
+ * Sets *yca_id to the youngest common ancestor of commit_id and
+ * commit_id2. Returns got_error(GOT_ERR_ANCESTRY) if they have no
+ * common ancestors.
+ *
+ * If first_parent_traversal is nonzero, only linear history is considered.
+ */
 const struct got_error *
 got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
     struct got_object_id *commit_id, struct got_object_id *commit_id2,

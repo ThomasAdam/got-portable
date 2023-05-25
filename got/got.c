@@ -2901,26 +2901,18 @@ check_linear_ancestry(struct got_object_id *commit_id,
 
 static const struct got_error *
 check_same_branch(struct got_object_id *commit_id,
-    struct got_reference *head_ref, struct got_object_id *yca_id,
-    struct got_repository *repo)
+    struct got_reference *head_ref, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL;
 	struct got_object_id *head_commit_id = NULL;
-	int is_same_branch = 0;
 
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
 	if (err)
 		goto done;
 
-	if (got_object_id_cmp(head_commit_id, commit_id) == 0) {
-		is_same_branch = 1;
+	if (got_object_id_cmp(head_commit_id, commit_id) == 0)
 		goto done;
-	}
-	if (yca_id && got_object_id_cmp(commit_id, yca_id) == 0) {
-		is_same_branch = 1;
-		goto done;
-	}
 
 	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
@@ -2938,23 +2930,17 @@ check_same_branch(struct got_object_id *commit_id,
 		    check_cancelled, NULL);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED)
-				err = NULL;
+				err = got_error(GOT_ERR_ANCESTRY);
 			break;
 		}
 
-		if (yca_id && got_object_id_cmp(&id, yca_id) == 0)
+		if (got_object_id_cmp(&id, commit_id) == 0)
 			break;
-		if (got_object_id_cmp(&id, commit_id) == 0) {
-			is_same_branch = 1;
-			break;
-		}
 	}
 done:
 	if (graph)
 		got_commit_graph_close(graph);
 	free(head_commit_id);
-	if (!err && !is_same_branch)
-		err = got_error(GOT_ERR_ANCESTRY);
 	return err;
 }
 
@@ -3157,7 +3143,7 @@ cmd_checkout(int argc, char *argv[])
 			}
 			goto done;
 		}
-		error = check_same_branch(commit_id, head_ref, NULL, repo);
+		error = check_same_branch(commit_id, head_ref, repo);
 		if (error) {
 			if (error->code == GOT_ERR_ANCESTRY) {
 				error = checkout_ancestry_error(
@@ -3613,7 +3599,7 @@ cmd_update(int argc, char *argv[])
 		free(head_commit_id);
 		if (error != NULL)
 			goto done;
-		error = check_same_branch(commit_id, head_ref, NULL, repo);
+		error = check_same_branch(commit_id, head_ref, repo);
 		if (error)
 			goto done;
 		error = switch_head_ref(head_ref, commit_id, worktree, repo);
@@ -3627,7 +3613,7 @@ cmd_update(int argc, char *argv[])
 				error = got_error(GOT_ERR_BRANCH_MOVED);
 			goto done;
 		}
-		error = check_same_branch(commit_id, head_ref, NULL, repo);
+		error = check_same_branch(commit_id, head_ref, repo);
 		if (error)
 			goto done;
 	}
@@ -11323,12 +11309,7 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		}
 
-		error = check_same_branch(base_commit_id, branch, yca_id, repo);
-		if (error) {
-			if (error->code != GOT_ERR_ANCESTRY)
-				goto done;
-			error = NULL;
-		} else {
+		if (got_object_id_cmp(base_commit_id, yca_id) == 0) {
 			struct got_pathlist_head paths;
 			printf("%s is already based on %s\n",
 			    got_ref_get_name(branch),
@@ -13322,24 +13303,16 @@ cmd_merge(int argc, char *argv[])
 		    GOT_ERR_MERGE_PATH, repo);
 		if (error)
 			goto done;
-		if (yca_id) {
-			error = check_same_branch(wt_branch_tip, branch,
-			    yca_id, repo);
-			if (error) {
-				if (error->code != GOT_ERR_ANCESTRY)
-					goto done;
-				error = NULL;
-			} else {
-				static char msg[512];
-				snprintf(msg, sizeof(msg),
-				    "cannot create a merge commit because "
-				    "%s is based on %s; %s can be integrated "
-				    "with 'got integrate' instead", branch_name,
-				    got_worktree_get_head_ref_name(worktree),
-				    branch_name);
-				error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
-				goto done;
-			}
+		if (yca_id && got_object_id_cmp(wt_branch_tip, yca_id) == 0) {
+			static char msg[512];
+			snprintf(msg, sizeof(msg),
+			    "cannot create a merge commit because %s is based "
+			    "on %s; %s can be integrated with 'got integrate' "
+			    "instead", branch_name,
+			    got_worktree_get_head_ref_name(worktree),
+			    branch_name);
+			error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
+			goto done;
 		}
 		error = got_worktree_merge_prepare(&fileindex, worktree,
 		    branch, repo);
