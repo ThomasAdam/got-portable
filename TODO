@@ -92,6 +92,8 @@ gotd:
 - keep track of available repository disk space and fail gracefully when
   uploaded pack files would fill up the disk too much, keeping a reserve
 - reuse packed non-delta objects directly (without re-deltification) for speed
+- if no permit statement is given in gotd.conf it is possible to send a branch
+  into an empty repository regardless; this should return EPERM instead
 
 gotadmin:
 - teach 'gotadmin cleanup' to remove redundant pack files
