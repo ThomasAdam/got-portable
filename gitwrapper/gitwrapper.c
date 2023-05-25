@@ -77,13 +77,13 @@ apply_unveil(const char *myserver)
 	if (unveil("gmon.out", "rwc") != 0)
 		return got_error_from_errno2("unveil", "gmon.out");
 #endif
-	if (unveil(fetchcmd, "x") != 0)
+	if (unveil(fetchcmd, "x") != 0 && errno != ENOENT)
 		return got_error_from_errno2("unveil", fetchcmd);
 
-	if (unveil(sendcmd, "x") != 0)
+	if (unveil(sendcmd, "x") != 0 && errno != ENOENT)
 		return got_error_from_errno2("unveil", sendcmd);
 
-	if (myserver && unveil(myserver, "x") != 0)
+	if (myserver && unveil(myserver, "x") != 0 && errno != ENOENT)
 		return got_error_from_errno2("unveil", myserver);
 
 	if (unveil(NULL, NULL) != 0)
