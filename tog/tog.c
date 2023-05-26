@@ -2509,7 +2509,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (refs_str) {
 		char *newlogmsg;
 		wchar_t *ws;
-	
+
 		/*
 		 * The length of this wide-char sub-string will be
 		 * needed later for colorization.
@@ -2544,11 +2544,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
 		waddnwstr(view->window, &wlogmsg[scrollx],
-		    wrefstr_len - scrollx);
+		    MIN(logmsg_width, wrefstr_len - scrollx));
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		waddwstr(view->window, &wlogmsg[wrefstr_len]);
+		if (col + MIN(logmsg_width, wrefstr_len - scrollx) < avail)
+			waddwstr(view->window, &wlogmsg[wrefstr_len]);
 	} else
 		waddwstr(view->window, &wlogmsg[scrollx]);
 	col += MAX(logmsg_width, 0);
