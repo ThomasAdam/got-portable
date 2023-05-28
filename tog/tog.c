@@ -2339,8 +2339,7 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			continue;
 		if (strncmp(name, "refs/", 5) == 0)
 			name += 5;
-		if (strncmp(name, "got/", 4) == 0 &&
-		    strncmp(name, "got/backup/", 11) != 0)
+		if (strncmp(name, "got/", 4) == 0)
 			continue;
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
