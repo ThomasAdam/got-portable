@@ -100,13 +100,9 @@ int		 get_addrs(const char *, struct server *, in_port_t);
 int		 addr_dup_check(struct addresslist *, struct address *,
 		    const char *, const char *);
 int		 add_addr(struct server *, struct address *);
-struct address	*host_v4(const char *);
-struct address	*host_v6(const char *);
-int		 host_dns(const char *, struct server *,
+int		 host(const char *, struct server *,
 		    int, in_port_t, const char *, int);
 int		 host_if(const char *, struct server *,
-		    int, in_port_t, const char *, int);
-int		 host(const char *, struct server *,
 		    int, in_port_t, const char *, int);
 int		 is_if_in_group(const char *, const char *);
 
@@ -1002,50 +998,8 @@ getservice(const char *n)
 	return (unsigned short)llval;
 }
 
-struct address *
-host_v4(const char *s)
-{
-	struct in_addr ina;
-	struct sockaddr_in *sain;
-	struct address *h;
-
-	memset(&ina, 0, sizeof(ina));
-	if (inet_pton(AF_INET, s, &ina) != 1)
-		return (NULL);
-
-	if ((h = calloc(1, sizeof(*h))) == NULL)
-		fatal(__func__);
-	sain = (struct sockaddr_in *)&h->ss;
-	got_sockaddr_inet_init(sain, &ina);
-	return (h);
-}
-
-struct address *
-host_v6(const char *s)
-{
-	struct addrinfo hints, *res;
-	struct sockaddr_in6 *sa_in6, *ra;
-	struct address *h = NULL;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_DGRAM; /* dummy */
-	hints.ai_flags = AI_NUMERICHOST;
-	if (getaddrinfo(s, "0", &hints, &res) == 0) {
-		if ((h = calloc(1, sizeof(*h))) == NULL)
-			fatal(__func__);
-		sa_in6 = (struct sockaddr_in6 *)&h->ss;
-		ra = (struct sockaddr_in6 *)res->ai_addr;
-		got_sockaddr_inet6_init(sa_in6, &ra->sin6_addr,
-		    ra->sin6_scope_id);
-		freeaddrinfo(res);
-	}
-
-	return (h);
-}
-
 int
-host_dns(const char *s, struct server *new_srv, int max,
+host(const char *s, struct server *new_srv, int max,
     in_port_t port, const char *ifname, int ipproto)
 {
 	struct addrinfo hints, *res0, *res;
@@ -1188,41 +1142,6 @@ host_if(const char *s, struct server *new_srv, int max,
 	}
 	freeifaddrs(ifap);
 	return (cnt);
-}
-
-int
-host(const char *s, struct server *new_srv, int max,
-    in_port_t port, const char *ifname, int ipproto)
-{
-	struct address *h;
-
-	h = host_v4(s);
-
-	/* IPv6 address? */
-	if (h == NULL)
-		h = host_v6(s);
-
-	if (h != NULL) {
-		if (port)
-			h->port = port;
-		if (ifname != NULL) {
-			if (strlcpy(h->ifname, ifname, sizeof(h->ifname)) >=
-			    sizeof(h->ifname)) {
-				log_warnx("%s: interface name truncated",
-				    __func__);
-				free(h);
-				return (-1);
-			}
-		}
-		if (ipproto != -1)
-			h->ipproto = ipproto;
-
-		if (add_addr(new_srv, h))
-			return -1;
-		return (1);
-	}
-
-	return (host_dns(s, new_srv, max, port, ifname, ipproto));
 }
 
 int
