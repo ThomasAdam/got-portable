@@ -2834,6 +2834,9 @@ draw_commits(struct tog_view *view)
 		}
 	}
 
+	free(refs_str);
+	refs_str = NULL;
+
 	if (s->in_repo_path && strcmp(s->in_repo_path, "/") != 0) {
 		if (asprintf(&header, "commit %s %s%s", id_str ? id_str :
 		    "........................................",
@@ -2910,6 +2913,8 @@ draw_commits(struct tog_view *view)
 			err = format_line(&ws, &width, NULL, refs_str,
 			    0, INT_MAX, date_display_cols + author_cols, 0);
 			free(ws);
+			free(refs_str);
+			refs_str = NULL;
 			if (err)
 				goto done;
 			refstr_cols = width + 3; /* account for [ ] + space */
