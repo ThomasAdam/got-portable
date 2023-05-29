@@ -1011,8 +1011,8 @@ host(const char *s, struct server *new_srv, int max,
 		return (cnt);
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM; /* DUMMY */
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM; /* DUMMY */
 	hints.ai_flags = AI_ADDRCONFIG;
 	error = getaddrinfo(s, NULL, &hints, &res0);
 	if (error == EAI_AGAIN || error == EAI_NODATA || error == EAI_NONAME)
