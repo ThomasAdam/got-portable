@@ -230,7 +230,6 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 
 	memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
 	acp->ipproto = a->ipproto;
-	acp->prefixlen = a->prefixlen;
 	acp->port = a->port;
 	if (strlen(a->ifname) != 0) {
 		if (strlcpy(acp->ifname, a->ifname,
