@@ -689,6 +689,26 @@ test_rm_nonexistent_directory() {
 	test_done "$testroot" "$ret"
 }
 
+test_rm_asterisk() {
+	local testroot=`test_init rm_asterisk`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt/epsilon && got rm * > /dev/null)
+
+	if [ ! -e $testroot/wt/epsilon ]; then
+		echo "epsilon directory doesn't exist" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
 
 test_parseargs "$@"
 run_test test_rm_basic
@@ -701,3 +721,4 @@ run_test test_rm_subtree
 run_test test_rm_symlink
 run_test test_rm_status_code
 run_test test_rm_nonexistent_directory
+run_test test_rm_asterisk
