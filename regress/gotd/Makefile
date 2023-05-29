@@ -13,7 +13,7 @@ CLEANFILES=gotd.conf
 GOTD_TEST_ROOT=/tmp
 GOTD_DEVUSER?=gotdev
 GOTD_DEVUSER_HOME!=userinfo $(GOTD_DEVUSER) | awk '/^dir/ {print $$2}'
-GOTD_TEST_REPO!?=mktemp -d "$(GOTD_TEST_ROOT)/gotd-test-repo-XXXXXXXXX"
+GOTD_TEST_REPO!?=mktemp -d "$(GOTD_TEST_ROOT)/gotd-test-repo-XXXXXXXXXX"
 GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/test-repo
 
 GOTD_TEST_USER?=${DOAS_USER}

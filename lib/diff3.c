@@ -310,15 +310,15 @@ got_merge_diff3(int *overlapcnt, int outfd, FILE *f1, FILE *f2,
 	if (err)
 		goto out;
 
-	if (asprintf(&path1, GOT_TMPDIR_STR "/got-diff1.XXXXXXXX") == -1) {
+	if (asprintf(&path1, GOT_TMPDIR_STR "/got-diff1.XXXXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	if (asprintf(&path2, GOT_TMPDIR_STR "/got-diff2.XXXXXXXX") == -1) {
+	if (asprintf(&path2, GOT_TMPDIR_STR "/got-diff2.XXXXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	if (asprintf(&path3, GOT_TMPDIR_STR "/got-diff3.XXXXXXXX") == -1) {
+	if (asprintf(&path3, GOT_TMPDIR_STR "/got-diff3.XXXXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}

@@ -89,7 +89,7 @@ test_init()
 		return 1
 	fi
 
-	testroot=`mktemp -d "$GOT_TEST_ROOT/tog-test-$testname-XXXXXXXX"`
+	testroot=`mktemp -d "$GOT_TEST_ROOT/tog-test-$testname-XXXXXXXXXX"`
 
 	set_test_env $testroot/$testname $testroot/view $columns $lines
 
