@@ -2410,11 +2410,10 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	char *refs_str = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author = NULL;
-	wchar_t *wlogmsg = NULL, *wauthor = NULL;
-	int author_width, logmsg_width;
-	size_t wrefstr_len = 0;
+	wchar_t *wrefstr = NULL, *wlogmsg = NULL, *wauthor = NULL;
+	int author_width, refstr_width, logmsg_width;
 	char *newline, *line = NULL;
-	int col, limit, scrollx;
+	int col, limit, scrollx, logmsg_x;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
@@ -2500,57 +2499,70 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (newline)
 		*newline = '\0';
 
+	limit = avail - col;
+	if (view->child && !view_is_hsplit_top(view) && limit > 0)
+		limit--;	/* for the border */
+
 	/* Prepend reference labels to log message if possible .*/
 	refs = got_reflist_object_id_map_lookup(tog_refs_idmap, id);
 	err = build_refs_str(&refs_str, refs, id, s->repo);
 	if (err)
 		goto done;
 	if (refs_str) {
-		char *newlogmsg;
-		wchar_t *ws;
+		char *rs;
 
-		/*
-		 * The length of this wide-char sub-string will be
-		 * needed later for colorization.
-		 */
-		err = mbs2ws(&ws, &wrefstr_len, refs_str);
-		if (err)
-			goto done;
-		free(ws);
-
-		wrefstr_len += 2; /* account for '[' and ']' */
-
-		if (asprintf(&newlogmsg, "[%s] %s", refs_str, logmsg) == -1) {
+		if (asprintf(&rs, "[%s]", refs_str) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
-
-		free(logmsg0);
-		logmsg0 = newlogmsg;
-		logmsg = logmsg0;
-	}
-
-	limit = avail - col;
-	if (view->child && !view_is_hsplit_top(view) && limit > 0)
-		limit--;	/* for the border */
-	err = format_line(&wlogmsg, &logmsg_width, &scrollx, logmsg, view->x,
-	    limit, col, 1);
-	if (err)
-		goto done;
-	if (wrefstr_len > 0 && scrollx < wrefstr_len) {
+		err = format_line(&wrefstr, &refstr_width,
+		    &scrollx, rs, view->x, limit, col, 1);
+		free(rs);
+		if (err)
+			goto done;
 		tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		waddnwstr(view->window, &wlogmsg[scrollx],
-		    MIN(logmsg_width, wrefstr_len - scrollx));
+		waddwstr(view->window, &wrefstr[scrollx]);
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (col + MIN(logmsg_width, wrefstr_len - scrollx) < avail)
-			waddwstr(view->window, &wlogmsg[wrefstr_len]);
+		col += MAX(refstr_width, 0);
+		if (col > avail)
+			goto done;
+
+		if (col < avail) {
+			waddch(view->window, ' ');
+			col++;
+		}
+
+		if (refstr_width > 0)
+			logmsg_x = 0;
+		else {
+			int unscrolled_refstr_width;
+			size_t len = wcslen(wrefstr);
+
+			/*
+			 * No need to check for -1 return value here since
+			 * unprintables have been replaced by span_wline().
+			 */
+			unscrolled_refstr_width = wcswidth(wrefstr, len);
+			unscrolled_refstr_width += 1; /* trailing space */
+			logmsg_x = view->x - unscrolled_refstr_width;
+		}
+
+		limit = avail - col;
+		if (view->child && !view_is_hsplit_top(view) && limit > 0)
+			limit--;	/* for the border */
 	} else
-		waddwstr(view->window, &wlogmsg[scrollx]);
+		logmsg_x = view->x;
+
+	err = format_line(&wlogmsg, &logmsg_width, &scrollx, logmsg, logmsg_x,
+	    limit, col, 1);
+	if (err)
+		goto done;
+	waddwstr(view->window, &wlogmsg[scrollx]);
 	col += MAX(logmsg_width, 0);
 	while (col < avail) {
 		waddch(view->window, ' ');
@@ -2559,6 +2571,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 done:
 	free(logmsg0);
 	free(wlogmsg);
+	free(wrefstr);
 	free(refs_str);
 	free(author);
 	free(wauthor);
@@ -2765,19 +2778,19 @@ draw_commits(struct tog_view *view)
 	struct commit_queue_entry *entry = s->selected_entry;
 	int limit = view->nlines;
 	int width;
-	int ncommits, author_cols = 4;
+	int ncommits, author_cols = 4, refstr_cols;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
 	struct tog_color *tc;
 	static const size_t date_display_cols = 12;
+	struct got_reflist_head *refs;
 
 	if (view_is_hsplit_top(view))
 		--limit;  /* account for border */
 
 	if (s->selected_entry &&
 	    !(view->searching && view->search_next_done == 0)) {
-		struct got_reflist_head *refs;
 		err = got_object_id_str(&id_str, s->selected_entry->id);
 		if (err)
 			return err;
@@ -2891,6 +2904,21 @@ draw_commits(struct tog_view *view)
 		free(author);
 		if (err)
 			goto done;
+		refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
+		    entry->id);
+		err = build_refs_str(&refs_str, refs, entry->id, s->repo);
+		if (err)
+			goto done;
+		if (refs_str) {
+			wchar_t *ws;
+			err = format_line(&ws, &width, NULL, refs_str,
+			    0, INT_MAX, date_display_cols + author_cols, 0);
+			free(ws);
+			if (err)
+				goto done;
+			refstr_cols = width + 3; /* account for [ ] + space */
+		} else
+			refstr_cols = 0;
 		err = got_object_commit_get_logmsg(&msg0, c);
 		if (err)
 			goto done;
@@ -2900,10 +2928,10 @@ draw_commits(struct tog_view *view)
 		if ((eol = strchr(msg, '\n')))
 			*eol = '\0';
 		err = format_line(&wmsg, &width, NULL, msg, 0, INT_MAX,
-		    date_display_cols + author_cols, 0);
+		    date_display_cols + author_cols + refstr_cols, 0);
 		if (err)
 			goto done;
-		view->maxx = MAX(view->maxx, width);
+		view->maxx = MAX(view->maxx, width + refstr_cols);
 		free(msg0);
 		free(wmsg);
 		ncommits++;
