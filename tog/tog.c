@@ -2223,7 +2223,7 @@ expand_tab(char **ptr, const char *src)
 /*
  * Advance at most n columns from wline starting at offset off.
  * Return the index to the first character after the span operation.
- * Return the combined column width of all spanned wide character in
+ * Return the combined column width of all spanned wide characters in
  * *rcol.
  */
 static int
