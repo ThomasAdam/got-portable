@@ -267,7 +267,6 @@ struct address {
 	TAILQ_ENTRY(address)	 entry;
 	struct sockaddr_storage	 ss;
 	int			 ipproto;
-	int			 prefixlen;
 	in_port_t		 port;
 	char			 ifname[IFNAMSIZ];
 };

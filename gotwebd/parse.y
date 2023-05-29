@@ -1016,10 +1016,6 @@ host_v4(const char *s)
 		fatal(__func__);
 	sain = (struct sockaddr_in *)&h->ss;
 	got_sockaddr_inet_init(sain, &ina);
-	if (sain->sin_addr.s_addr == INADDR_ANY)
-		h->prefixlen = 0; /* 0.0.0.0 address */
-	else
-		h->prefixlen = -1; /* host address */
 	return (h);
 }
 
@@ -1041,11 +1037,6 @@ host_v6(const char *s)
 		ra = (struct sockaddr_in6 *)res->ai_addr;
 		got_sockaddr_inet6_init(sa_in6, &ra->sin6_addr,
 		    ra->sin6_scope_id);
-		if (memcmp(&sa_in6->sin6_addr, &in6addr_any,
-		    sizeof(sa_in6->sin6_addr)) == 0)
-			h->prefixlen = 0; /* any address */
-		else
-			h->prefixlen = -1; /* host address */
 		freeaddrinfo(res);
 	}
 
@@ -1100,7 +1091,6 @@ host_dns(const char *s, struct server *new_srv, int max,
 		if (ipproto != -1)
 			h->ipproto = ipproto;
 		h->ss.ss_family = res->ai_family;
-		h->prefixlen = -1; /* host address */
 
 		if (res->ai_family == AF_INET) {
 			struct sockaddr_in *ra;
@@ -1167,7 +1157,6 @@ host_if(const char *s, struct server *new_srv, int max,
 		if (ipproto != -1)
 			h->ipproto = ipproto;
 		h->ss.ss_family = af;
-		h->prefixlen = -1; /* host address */
 
 		if (af == AF_INET) {
 			struct sockaddr_in *ra;
