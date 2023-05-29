@@ -1267,7 +1267,7 @@ got_init_repo_commit(struct repo_commit **rc)
 {
 	*rc = calloc(1, sizeof(**rc));
 	if (*rc == NULL)
-		return got_error_from_errno2("%s: calloc", __func__);
+		return got_error_from_errno2(__func__, "calloc");
 
 	(*rc)->path = NULL;
 	(*rc)->refs_str = NULL;
@@ -1286,7 +1286,7 @@ got_init_repo_tag(struct repo_tag **rt)
 {
 	*rt = calloc(1, sizeof(**rt));
 	if (*rt == NULL)
-		return got_error_from_errno2("%s: calloc", __func__);
+		return got_error_from_errno2(__func__, "calloc");
 
 	(*rt)->commit_id = NULL;
 	(*rt)->tag_name = NULL;
