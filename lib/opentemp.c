@@ -29,7 +29,7 @@ got_opentempfd(void)
 	char name[PATH_MAX];
 	int fd;
 
-	if (strlcpy(name, GOT_TMPDIR_STR "/got.XXXXXXXX", sizeof(name))
+	if (strlcpy(name, GOT_TMPDIR_STR "/got.XXXXXXXXXX", sizeof(name))
 	    >= sizeof(name))
 		return -1;
 
@@ -71,7 +71,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath,
 
 	*outfile = NULL;
 
-	if (asprintf(path, "%s-XXXXXX%s", basepath, suffix) == -1) {
+	if (asprintf(path, "%s-XXXXXXXXXX%s", basepath, suffix) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}
@@ -103,7 +103,7 @@ got_opentemp_named_fd(char **path, int *outfd, const char *basepath,
 
 	*outfd = -1;
 
-	if (asprintf(path, "%s-XXXXXX%s", basepath, suffix) == -1) {
+	if (asprintf(path, "%s-XXXXXXXXXX%s", basepath, suffix) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}

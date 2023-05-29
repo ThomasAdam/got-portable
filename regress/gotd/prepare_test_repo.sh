@@ -27,7 +27,7 @@ make_repo()
 		return
 	fi
 
-	test_tree=`mktemp -d "${GOTD_TEST_ROOT}/gotd-test-tree-XXXXXXXXX"`
+	test_tree=`mktemp -d "${GOTD_TEST_ROOT}/gotd-test-tree-XXXXXXXXXX"`
 	make_test_tree "$test_tree"
 	got import -m "import the test tree" -r "${GOTD_TEST_REPO}" "$test_tree" \
 		> /dev/null

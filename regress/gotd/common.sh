@@ -22,7 +22,8 @@ test_init()
 		echo "No test name provided" >&2
 		return 1
 	fi
-	local testroot=`mktemp -d "$GOTD_TEST_ROOT/gotd-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOTD_TEST_ROOT/gotd-test-$testname-XXXXXXXXXX"`
 	mkdir $testroot/repo
 	git_init $testroot/repo
 	if [ -z "$no_tree" ]; then

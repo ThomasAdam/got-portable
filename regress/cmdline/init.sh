@@ -18,7 +18,8 @@
 
 test_init_basic() {
 	local testname=init_basic
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=main
 
 	gotadmin init $testroot/repo
@@ -37,7 +38,8 @@ test_init_basic() {
 
 test_init_specified_head() {
 	local testname=init_specified_head
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=trunk
 
 	gotadmin init -b $headref $testroot/repo

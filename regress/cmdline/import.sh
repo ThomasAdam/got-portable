@@ -18,7 +18,8 @@
 
 test_import_basic() {
 	local testname=import_basic
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
 	gotadmin init $testroot/repo
 
@@ -142,7 +143,8 @@ test_import_basic() {
 
 test_import_specified_head() {
 	local testname=import_specified_head
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=trunk
 
 	gotadmin init -b $headref $testroot/repo
@@ -367,7 +369,8 @@ test_import_requires_new_branch() {
 
 test_import_ignores() {
 	local testname=import_ignores
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
 	gotadmin init $testroot/repo
 
@@ -400,7 +403,8 @@ test_import_ignores() {
 
 test_import_empty_dir() {
 	local testname=import_empty_dir
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
 	gotadmin init $testroot/repo
 
@@ -443,7 +447,8 @@ test_import_empty_dir() {
 
 test_import_symlink() {
 	local testname=import_symlink
-	local testroot=`mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX"`
+	local testroot=`mktemp -d \
+	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
 	gotadmin init $testroot/repo
 
