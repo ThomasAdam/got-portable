@@ -4312,6 +4312,8 @@ struct schedule_deletion_args {
 	int delete_local_mods;
 	int keep_on_disk;
 	int ignore_missing_paths;
+	const char *status_path;
+	size_t status_path_len;
 	const char *status_codes;
 };
 
@@ -4410,11 +4412,17 @@ schedule_for_deletion(void *arg, unsigned char status,
 		root_len = strlen(a->worktree->root_path);
 		do {
 			char *parent;
+
 			err = got_path_dirname(&parent, ondisk_path);
 			if (err)
 				goto done;
 			free(ondisk_path);
 			ondisk_path = parent;
+			if (got_path_cmp(ondisk_path, a->status_path,
+			    strlen(ondisk_path), a->status_path_len) != 0 &&
+			    !got_path_is_child(ondisk_path, a->status_path,
+			    a->status_path_len))
+				break;
 			if (rmdir(ondisk_path) == -1) {
 				if (errno != ENOTEMPTY)
 					err = got_error_from_errno2("rmdir",
@@ -4468,8 +4476,19 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	sda.status_codes = status_codes;
 
 	TAILQ_FOREACH(pe, paths, entry) {
+		char *ondisk_status_path;
+
+		if (asprintf(&ondisk_status_path, "%s%s%s",
+		    got_worktree_get_root_path(worktree),
+		    pe->path[0] == '\0' ? "" : "/", pe->path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		sda.status_path = ondisk_status_path;
+		sda.status_path_len = strlen(ondisk_status_path);
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 			schedule_for_deletion, &sda, NULL, NULL, 1, 1);
+		free(ondisk_status_path);
 		if (err)
 			break;
 	}
@@ -9838,7 +9857,9 @@ got_worktree_patch_schedule_rm(const char *path, struct got_repository *repo,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     got_worktree_delete_cb progress_cb, void *progress_arg)
 {
+	const struct got_error *err;
 	struct schedule_deletion_args sda;
+	char *ondisk_status_path;
 
 	memset(&sda, 0, sizeof(sda));
 	sda.worktree = worktree;
@@ -9850,9 +9871,16 @@ got_worktree_patch_schedule_rm(const char *path, struct got_repository *repo,
 	sda.keep_on_disk = 0;
 	sda.ignore_missing_paths = 0;
 	sda.status_codes = NULL;
+	if (asprintf(&ondisk_status_path, "%s/%s",
+	    got_worktree_get_root_path(worktree), path) == -1)
+		return got_error_from_errno("asprintf");
+	sda.status_path = ondisk_status_path;
+	sda.status_path_len = strlen(ondisk_status_path);
 
-	return worktree_status(worktree, path, fileindex, repo,
+	err = worktree_status(worktree, path, fileindex, repo,
 	    schedule_for_deletion, &sda, NULL, NULL, 1, 1);
+	free(ondisk_status_path);
+	return err;
 }
 
 const struct got_error *
