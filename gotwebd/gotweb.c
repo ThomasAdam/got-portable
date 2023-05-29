@@ -418,7 +418,7 @@ gotweb_init_transport(struct transport **t)
 
 	*t = calloc(1, sizeof(**t));
 	if (*t == NULL)
-		return got_error_from_errno2("%s: calloc", __func__);
+		return got_error_from_errno2(__func__, "calloc");
 
 	TAILQ_INIT(&(*t)->repo_commits);
 	TAILQ_INIT(&(*t)->repo_tags);
@@ -436,13 +436,13 @@ gotweb_init_querystring(struct querystring **qs)
 
 	*qs = calloc(1, sizeof(**qs));
 	if (*qs == NULL)
-		return got_error_from_errno2("%s: calloc", __func__);
+		return got_error_from_errno2(__func__, "calloc");
 
 	(*qs)->headref = strdup("HEAD");
 	if ((*qs)->headref == NULL) {
 		free(*qs);
 		*qs = NULL;
-		return got_error_from_errno2("%s: strdup", __func__);
+		return got_error_from_errno2(__func__, "strdup");
 	}
 
 	(*qs)->action = INDEX;
@@ -467,7 +467,7 @@ gotweb_parse_querystring(struct querystring **qs, char *qst)
 
 	tok1 = strdup(qst);
 	if (tok1 == NULL)
-		return got_error_from_errno2("%s: strdup", __func__);
+		return got_error_from_errno2(__func__, "strdup");
 
 	tok1_pair = tok1;
 	tok1_end = tok1;
@@ -478,7 +478,7 @@ gotweb_parse_querystring(struct querystring **qs, char *qst)
 		tok2 = strdup(tok1_pair);
 		if (tok2 == NULL) {
 			free(tok1);
-			return got_error_from_errno2("%s: strdup", __func__);
+			return got_error_from_errno2(__func__, "strdup");
 		}
 
 		tok2_pair = tok2;
@@ -583,24 +583,24 @@ qa_found:
 		case COMMIT:
 			(*qs)->commit = strdup(value);
 			if ((*qs)->commit == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
+				error = got_error_from_errno2(__func__,
+				    "strdup");
 				goto done;
 			}
 			break;
 		case RFILE:
 			(*qs)->file = strdup(value);
 			if ((*qs)->file == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
+				error = got_error_from_errno2(__func__,
+				    "strdup");
 				goto done;
 			}
 			break;
 		case FOLDER:
 			(*qs)->folder = strdup(value);
 			if ((*qs)->folder == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
+				error = got_error_from_errno2(__func__,
+				    "strdup");
 				goto done;
 			}
 			break;
@@ -608,8 +608,8 @@ qa_found:
 			free((*qs)->headref);
 			(*qs)->headref = strdup(value);
 			if ((*qs)->headref == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
+				error = got_error_from_errno2(__func__,
+				    "strdup");
 				goto done;
 			}
 			break;
@@ -619,8 +619,8 @@ qa_found:
 			(*qs)->index_page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
 			if (errstr) {
-				error = got_error_from_errno3("%s: strtonum %s",
-				    __func__, errstr);
+				error = got_error_from_errno3(__func__,
+				    "strtonum", errstr);
 				goto done;
 			}
 			if ((*qs)->index_page < 0)
@@ -629,8 +629,8 @@ qa_found:
 		case PATH:
 			(*qs)->path = strdup(value);
 			if ((*qs)->path == NULL) {
-				error = got_error_from_errno2("%s: strdup",
-				    __func__);
+				error = got_error_from_errno2(__func__,
+				    "strdup");
 				goto done;
 			}
 			break;
@@ -640,8 +640,8 @@ qa_found:
 			(*qs)->page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
 			if (errstr) {
-				error = got_error_from_errno3("%s: strtonum %s",
-				    __func__, errstr);
+				error = got_error_from_errno3(__func__,
+				    "strtonum", errstr);
 				goto done;
 			}
 			if ((*qs)->page < 0)
