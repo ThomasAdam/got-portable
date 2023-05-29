@@ -689,8 +689,8 @@ test_rm_nonexistent_directory() {
 	test_done "$testroot" "$ret"
 }
 
-test_rm_asterisk() {
-	local testroot=`test_init rm_asterisk`
+test_rm_empty_pwd() {
+	local testroot=`test_init rm_empty_pwd`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -721,4 +721,4 @@ run_test test_rm_subtree
 run_test test_rm_symlink
 run_test test_rm_status_code
 run_test test_rm_nonexistent_directory
-run_test test_rm_asterisk
+run_test test_rm_empty_pwd
