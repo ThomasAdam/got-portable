@@ -13241,11 +13241,17 @@ cmd_merge(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (merge_in_progress && !(abort_merge || continue_merge)) {
+		error = got_error(GOT_ERR_MERGE_BUSY);
+		goto done;
+	}
+
+	if (!merge_in_progress && (abort_merge || continue_merge)) {
+		error = got_error(GOT_ERR_NOT_MERGING);
+		goto done;
+	}
+
 	if (abort_merge) {
-		if (!merge_in_progress) {
-			error = got_error(GOT_ERR_NOT_MERGING);
-			goto done;
-		}
 		error = got_worktree_merge_continue(&branch_name,
 		    &branch_tip, &fileindex, worktree, repo);
 		if (error)
@@ -13263,10 +13269,6 @@ cmd_merge(int argc, char *argv[])
 		goto done;
 
 	if (continue_merge) {
-		if (!merge_in_progress) {
-			error = got_error(GOT_ERR_NOT_MERGING);
-			goto done;
-		}
 		error = got_worktree_merge_continue(&branch_name,
 		    &branch_tip, &fileindex, worktree, repo);
 		if (error)
