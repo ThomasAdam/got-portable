@@ -870,9 +870,15 @@ test_merge_in_progress() {
 	fi
 
 	for cmd in update commit histedit "rebase newbranch" \
-		"integrate newbranch" "stage alpha"; do
+		"integrate newbranch" "merge newbranch" "stage alpha"; do
 		(cd $testroot/wt && got $cmd > $testroot/stdout \
 			2> $testroot/stderr)
+		ret=$?
+		if [ $ret -eq 0 ]; then
+			echo "got $cmd succeeded unexpectedly" >&2
+			test_done "$testroot" "1"
+			return 1
+		fi
 
 		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout.expected $testroot/stdout
