@@ -1,3 +1,23 @@
+* got 0.89; 2023-06-05
+  see git repository history for per-change authorship information
+- gotd: return early after disconnect on auth event error instead of crashing
+- make 'got patch' display statistics about files with conflicts and rejects
+- make 'got diff' not treat \r\n line endings as special
+- fix test failures in test_blame_lines_shifted_skip on certain times of day
+- show reference labels next to commit messages in tog log view
+- some gotwebd refactoring related to handling of file descriptors
+- gotwebd: lower log priority of unexpected disconnections
+- gotwebd: avoid needless double fseek()
+- fix the size of gotwebd's tempfiles array; exposed by errors from ftruncate()
+- simplify ancestry checks in checkout, update, rebase, and merge commands
+- make gitwrapper not fail if programs it wants to run do not exist on disk
+- stop showing backup references in the tog log and diff views
+- consistently use ten Xs in mkstemp(3) templates
+- only delete empty directories which appear in arguments to 'got rm'
+- simplify parsing of host names and IP addresses in gotwebd's parse.y
+- make 'got merge' refuse to run if a merge is in progress
+- make 'got merge -c' fail even if new changes only affect unrelated paths
+
 * got 0.88; 2023-04-29
   see git repository history for per-change authorship information
 - tog: always use alternate charset for vertical/horizontal line
