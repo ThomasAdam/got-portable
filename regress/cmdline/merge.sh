@@ -590,6 +590,67 @@ test_merge_continue() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_continue_new_commit() {
+	# "got merge -c" should refuse to run if the current branch tip has
+	# changed since the merge was started, to avoid clobbering the changes.
+	local testroot=`test_init merge_continue_new_commit`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge -n newbranch >/dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha again on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master again"
+
+	(cd $testroot/wt && got merge -c > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got merge succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: merging cannot proceed because the work tree is no " \
+		> $testroot/stderr.expected
+	echo "longer up-to-date; merge must be aborted and retried" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_merge_abort() {
 	local testroot=`test_init merge_abort`
 	local commit0=`git_show_head $testroot/repo`
@@ -1506,6 +1567,7 @@ test_merge_gitconfig_author() {
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
+run_test test_merge_continue_new_commit
 run_test test_merge_abort
 run_test test_merge_in_progress
 run_test test_merge_path_prefix

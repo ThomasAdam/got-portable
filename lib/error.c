@@ -211,9 +211,6 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_MERGE_STAGED_PATHS, "work tree contains files with staged "
 	    "changes; these changes must be unstaged before merging can "
 	    "proceed" },
-	{ GOT_ERR_MERGE_COMMIT_OUT_OF_DATE, "merging cannot proceed because "
-	    "the work tree is no longer up-to-date; merge must be aborted "
-	    "and retried" },
 	{ GOT_ERR_MERGE_BUSY,"a merge operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_MERGE_PATH,	"cannot merge branch which contains "
@@ -243,6 +240,9 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_UID, "bad user ID" },
 	{ GOT_ERR_GID, "bad group ID" },
 	{ GOT_ERR_NO_PROG, "command not found or not accessible" },
+	{ GOT_ERR_MERGE_COMMIT_OUT_OF_DATE, "merging cannot proceed because "
+	    "the work tree is no longer up-to-date; merge must be aborted "
+	    "and retried" },
 };
 
 static struct got_custom_error {

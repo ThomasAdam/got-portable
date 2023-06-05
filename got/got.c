@@ -13267,7 +13267,21 @@ cmd_merge(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_ref_open(&wt_branch, repo,
+	    got_worktree_get_head_ref_name(worktree), 0);
+	if (error)
+		goto done;
+	error = got_ref_resolve(&wt_branch_tip, repo, wt_branch);
+	if (error)
+		goto done;
+
 	if (continue_merge) {
+		struct got_object_id *base_commit_id;
+		base_commit_id = got_worktree_get_base_commit_id(worktree);
+		if (got_object_id_cmp(wt_branch_tip, base_commit_id) != 0) {
+			error = got_error(GOT_ERR_MERGE_COMMIT_OUT_OF_DATE);
+			goto done;
+		}
 		error = got_worktree_merge_continue(&branch_name,
 		    &branch_tip, &fileindex, worktree, repo);
 		if (error)
@@ -13286,13 +13300,6 @@ cmd_merge(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_ref_open(&wt_branch, repo,
-	    got_worktree_get_head_ref_name(worktree), 0);
-	if (error)
-		goto done;
-	error = got_ref_resolve(&wt_branch_tip, repo, wt_branch);
-	if (error)
-		goto done;
 	error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
 	    wt_branch_tip, branch_tip, 0, repo,
 	    check_cancelled, NULL);

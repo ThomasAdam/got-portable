@@ -8406,20 +8406,6 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
-		struct got_commitable *ct = pe->data;
-		const char *ct_path = ct->in_repo_path;
-
-		while (ct_path[0] == '/')
-			ct_path++;
-		err = check_out_of_date(ct_path, ct->status,
-		    ct->staged_status, ct->base_blob_id, ct->base_commit_id,
-		    head_commit_id, repo, GOT_ERR_MERGE_COMMIT_OUT_OF_DATE);
-		if (err)
-			goto done;
-
-	}
-
 	mcm_arg.worktree = worktree;
 	mcm_arg.branch_name = branch_name;
 	err = commit_worktree(new_commit_id, &commitable_paths,
