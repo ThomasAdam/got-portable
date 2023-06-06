@@ -1962,6 +1962,66 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_path_in_root_commit() {
+	local testroot=`test_init diff_path_in_root_commit`
+	local commit_id=`git_show_head $testroot/repo`
+	local alpha_blobid=`get_blob_id $testroot/repo "" alpha`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -c $commit_id alpha > $testroot/stdout)
+
+	cat <<EOF >$testroot/stdout.expected
+diff /dev/null $commit_id
+commit - /dev/null
+commit + $commit_id
+blob - /dev/null
+blob + $alpha_blobid (mode 644)
+--- /dev/null
++++ alpha
+@@ -0,0 +1 @@
++alpha
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff non-existent path
+	(cd $testroot/wt && got diff -c $commit_id nonexistent \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: nonexistent: no such entry found in tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -1980,3 +2040,4 @@ run_test test_diff_commit_diffstat
 run_test test_diff_worktree_diffstat
 run_test test_diff_file_to_dir
 run_test test_diff_dir_to_file
+run_test test_diff_path_in_root_commit

@@ -1098,15 +1098,18 @@ diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			got_object_blob_close(blob2);
 			blob2 = NULL;
 		}
-
-		err = got_object_tree_find_path(&id1, &mode1, repo, tree1,
-		    pe->path);
-		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
-			goto done;
-		err = got_object_tree_find_path(&id2, &mode2, repo, tree2,
-		    pe->path);
-		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
-			goto done;
+		if (tree1) {
+			err = got_object_tree_find_path(&id1, &mode1, repo,
+			    tree1, pe->path);
+			if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+				goto done;
+		}
+		if (tree2) {
+			err = got_object_tree_find_path(&id2, &mode2, repo,
+			    tree2, pe->path);
+			if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+				goto done;
+		}
 		if (id1 == NULL && id2 == NULL) {
 			err = got_error_path(pe->path, GOT_ERR_NO_TREE_ENTRY);
 			goto done;
