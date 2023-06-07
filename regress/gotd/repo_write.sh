@@ -112,6 +112,16 @@ EOF
 		return 1
 	fi
 
+	# Verify that git push reports no changes to send and no error.
+	(cd $testroot/repo-clone3 && git push -q > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git push failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	# sending to a repository should result in a new pack file
 	ls -R ${GOTD_TEST_REPO}/objects/pack > $testroot/repo-list.after
 	diff -u $testroot/repo-list.before $testroot/repo-list.after \

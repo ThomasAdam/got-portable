@@ -1046,6 +1046,17 @@ session_dispatch_client(int fd, short events, void *arg)
 		if (err) {
 			if (err->code == GOT_ERR_PRIVSEP_READ)
 				err = NULL;
+			else if (err->code == GOT_ERR_EOF &&
+			    client->state == GOTD_STATE_EXPECT_CAPABILITIES) {
+				/*
+				 * The client has closed its socket before
+				 * sending its capability announcement.
+				 * This can happen when Git clients have
+				 * no ref-updates to send.
+				 */
+				disconnect_on_error(client, err);
+				return;
+			}
 			break;
 		}
 

@@ -1270,7 +1270,10 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 		if (err)
 			goto done;
 		if (n == 0) {
-			if (curstate != STATE_EXPECT_MORE_REF_UPDATES) {
+			if (curstate == STATE_EXPECT_REF_UPDATE) {
+				/* The client will not send us anything. */
+				goto done;
+			} else if (curstate != STATE_EXPECT_MORE_REF_UPDATES) {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
 				    "unexpected flush packet received");
 				goto done;
