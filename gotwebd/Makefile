@@ -10,15 +10,15 @@ PROG =		gotwebd
 SRCS =		config.c sockets.c log.c gotwebd.c parse.y proc.c \
 		fcgi.c gotweb.c got_operations.c tmpl.c pages.c
 SRCS +=		blame.c commit_graph.c delta.c diff.c \
-		diffreg.c error.c fileindex.c object.c object_cache.c \
+		diffreg.c error.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
-		privsep.c reference.c repository.c hash.c worktree.c \
+		privsep.c reference.c repository.c hash.c \
 		utf8.c inflate.c buf.c rcsutil.c diff3.c \
 		lockfile.c deflate.c object_create.c delta_cache.c \
 		gotconfig.c diff_main.c diff_atomize_text.c diff_myers.c \
 		diff_output.c diff_output_plain.c diff_output_unidiff.c \
 		diff_output_edscript.c diff_patience.c bloom.c murmurhash2.c \
-		worktree_open.c patch.c sigs.c date.c sockaddr.c \
+		sigs.c date.c sockaddr.c \
 		object_open_privsep.c read_gitconfig_privsep.c \
 		read_gotconfig_privsep.c pollfd.c reference_parse.c \
 		object_qid.c
