@@ -1079,6 +1079,25 @@ test_status_empty_file() {
 	test_done "$testroot" "$ret"
 }
 
+test_status_in_repo() {
+	local testroot=`test_init status_in_repo`
+
+	(cd $testroot/repo && got status > $testroot/stdout \
+		2> $testroot/stderr)
+
+	cat > $testroot/stderr.expected <<EOF
+got: 'got status' needs a work tree in addition to a git repository
+Work trees can be checked out from this Git repository with 'got checkout'.
+The got(1) manual page contains more information.
+EOF
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_status_basic
 run_test test_status_subdir_no_mods
@@ -1098,3 +1117,4 @@ run_test test_status_gitignore_trailing_slashes
 run_test test_status_status_code
 run_test test_status_suppress
 run_test test_status_empty_file
+run_test test_status_in_repo

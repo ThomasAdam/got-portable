@@ -3452,7 +3452,7 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 	err = got_error_msg(GOT_ERR_NOT_WORKTREE, msg);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
-		if (close_err == NULL)
+		if (err == NULL)
 			err = close_err;
 	}
 	if (pack_fds) {
