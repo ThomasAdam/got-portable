@@ -916,7 +916,7 @@ conf_new_access_rule(struct gotd_repo *repo, enum gotd_access access,
 static int
 refname_is_valid(char *refname)
 {
-	if (strlen(refname) < 5 || strncmp(refname, "refs/", 5) != 0) {
+	if (strncmp(refname, "refs/", 5) != 0) {
 		yyerror("reference name must begin with \"refs/\": %s",
 		    refname);
 		return 0;
