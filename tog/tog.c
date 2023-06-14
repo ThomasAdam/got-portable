@@ -2346,7 +2346,7 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 		if (strncmp(name, "remotes/", 8) == 0) {
 			name += 8;
 			s = strstr(name, "/" GOT_REF_HEAD);
-			if (s != NULL && s[strlen(s)] == '\0')
+			if (s != NULL && strcmp(s, "/" GOT_REF_HEAD) == 0)
 				continue;
 		}
 		err = got_ref_resolve(&ref_id, repo, re->ref);
