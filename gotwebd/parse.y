@@ -386,8 +386,12 @@ serveropts1	: REPOS_PATH STRING {
 				new_srv->max_repos_display = $2;
 		}
 		| MAX_COMMITS_DISPLAY NUMBER {
-			if ($2 > 0)
-				new_srv->max_commits_display = $2;
+			if ($2 <= 1) {
+				yyerror("max_commits_display is too small:"
+				    " %lld", $2);
+				YYERROR;
+			}
+			new_srv->max_commits_display = $2;
 		}
 		;
 
