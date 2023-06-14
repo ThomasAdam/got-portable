@@ -311,7 +311,7 @@ got_get_repo_commit(struct request *c, struct repo_commit *repo_commit,
 }
 
 const struct got_error *
-got_get_repo_commits(struct request *c, int limit)
+got_get_repo_commits(struct request *c, size_t limit)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -328,7 +328,10 @@ got_get_repo_commits(struct request *c, int limit)
 	char *in_repo_path = NULL, *repo_path = NULL, *file_path = NULL;
 	int chk_next = 0;
 
-	if (limit != 1 || srv->max_commits_display == 1) {
+	if (limit == 0)
+		return got_error(GOT_ERR_RANGE);
+
+	if (limit > 1) {
 		/*
 		 * Traverse one commit more than requested to provide
 		 * the next button.
