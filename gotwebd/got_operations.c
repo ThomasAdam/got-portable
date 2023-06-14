@@ -326,7 +326,16 @@ got_get_repo_commits(struct request *c, int limit)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	char *in_repo_path = NULL, *repo_path = NULL, *file_path = NULL;
-	int chk_next = 0, chk_multi = 0;
+	int chk_next = 0;
+
+	if (limit != 1 || srv->max_commits_display == 1) {
+		/*
+		 * Traverse one commit more than requested to provide
+		 * the next button.
+		 */
+		limit++;
+		chk_next = 1;
+	}
 
 	TAILQ_INIT(&refs);
 
@@ -404,38 +413,18 @@ got_get_repo_commits(struct request *c, int limit)
 			goto done;
 		}
 
+		if (--limit == 0 && chk_next) {
+			t->more_id = strdup(repo_commit->commit_id);
+			if (t->more_id == NULL)
+				error = got_error_from_errno("strdup");
+			goto done;
+		}
+
 		TAILQ_INSERT_TAIL(&t->repo_commits, repo_commit, entry);
 
-		if (!chk_multi || limit != 1 ||
-		    srv->max_commits_display == 1) {
-			chk_multi = 1;
+		if (limit == 0)
+			goto done;
 
-			/*
-			 * check for one more commit before breaking,
-			 * so we know whether to navigate through briefs
-			 * commits and summary
-			 */
-			if (chk_next && (qs->action == BRIEFS ||
-			    qs->action == COMMITS || qs->action == SUMMARY)) {
-				t->more_id = strdup(repo_commit->commit_id);
-				if (t->more_id == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-				got_object_commit_close(commit);
-				commit = NULL;
-				TAILQ_REMOVE(&t->repo_commits, repo_commit,
-				    entry);
-				gotweb_free_repo_commit(repo_commit);
-				goto done;
-			}
-		}
-		if (error || (limit && --limit == 0)) {
-			if (qs->file != NULL && *qs->file != '\0')
-				if (chk_multi == 0)
-					break;
-			chk_next = 1;
-		}
 		if (commit) {
 			got_object_commit_close(commit);
 			commit = NULL;
