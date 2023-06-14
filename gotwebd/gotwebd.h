@@ -509,7 +509,7 @@ const struct got_error *got_gotweb_closefile(FILE *);
 const struct got_error *got_get_repo_owner(char **, struct request *);
 const struct got_error *got_get_repo_age(time_t *, struct request *,
     const char *);
-const struct got_error *got_get_repo_commits(struct request *, int);
+const struct got_error *got_get_repo_commits(struct request *, size_t);
 const struct got_error *got_get_repo_tags(struct request *, int);
 const struct got_error *got_get_repo_heads(struct request *);
 const struct got_error *got_open_diff_for_output(FILE **, struct request *);
