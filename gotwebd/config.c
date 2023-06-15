@@ -48,6 +48,8 @@ config_init(struct gotwebd *env)
 	struct privsep *ps = env->gotwebd_ps;
 	unsigned int what;
 
+	strlcpy(env->httpd_chroot, D_HTTPD_CHROOT, sizeof(env->httpd_chroot));
+
 	/* Global configuration. */
 	if (privsep_process == PROC_GOTWEBD)
 		env->prefork_gotwebd = GOTWEBD_NUMPROC;
