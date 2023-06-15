@@ -157,12 +157,10 @@ varset		: STRING '=' STRING	{
 
 boolean		: STRING {
 			if (strcasecmp($1, "1") == 0 ||
-			    strcasecmp($1, "yes") == 0 ||
 			    strcasecmp($1, "on") == 0)
 				$$ = 1;
 			else if (strcasecmp($1, "0") == 0 ||
-			    strcasecmp($1, "off") == 0 ||
-			    strcasecmp($1, "no") == 0)
+			    strcasecmp($1, "off") == 0)
 				$$ = 0;
 			else {
 				yyerror("invalid boolean value '%s'", $1);
@@ -338,8 +336,7 @@ serveropts1	: REPOS_PATH STRING {
 			new_srv->fcgi_socket = 1;
 		}
 		| LISTEN ON SOCKET STRING {
-			if (!strcasecmp($4, "off") ||
-			    !strcasecmp($4, "no")) {
+			if (strcasecmp($4, "off") == 0) {
 				new_srv->unix_socket = 0;
 				free($4);
 				YYACCEPT;
