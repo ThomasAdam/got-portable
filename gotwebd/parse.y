@@ -232,8 +232,7 @@ main		: PREFORK NUMBER {
 		| UNIX_SOCKET_NAME STRING {
 			n = snprintf(gotwebd->unix_socket_name,
 			    sizeof(gotwebd->unix_socket_name), "%s%s",
-			    strlen(gotwebd->httpd_chroot) ?
-			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $2);
+			    gotwebd->httpd_chroot, $2);
 			if (n < 0 ||
 			    (size_t)n >= sizeof(gotwebd->unix_socket_name)) {
 				yyerror("%s: unix_socket_name truncated",
@@ -365,8 +364,7 @@ serveropts1	: REPOS_PATH STRING {
 
 			n = snprintf(new_srv->unix_socket_name,
 			    sizeof(new_srv->unix_socket_name), "%s%s",
-			    strlen(gotwebd->httpd_chroot) ?
-			    gotwebd->httpd_chroot : D_HTTPD_CHROOT, $4);
+			    gotwebd->httpd_chroot, $4);
 			if (n < 0 ||
 			    (size_t)n >= sizeof(new_srv->unix_socket_name)) {
 				yyerror("%s: unix_socket_name truncated",

@@ -212,8 +212,7 @@ main(int argc, char **argv)
 		ps->ps_title[proc_id] = title;
 
 	for (proc = 0; proc < nitems(procs); proc++)
-		procs[proc].p_chroot = strlen(env->httpd_chroot) ?
-		    env->httpd_chroot : D_HTTPD_CHROOT;
+		procs[proc].p_chroot = env->httpd_chroot;
 
 	/* only the gotwebd returns */
 	proc_init(ps, procs, nitems(procs), argc0, argv, proc_id);
@@ -250,8 +249,7 @@ main(int argc, char **argv)
 		err(1, "gmon.out");
 #endif
 
-	if (unveil(strlen(env->httpd_chroot) > 0 ? env->httpd_chroot :
-	    D_HTTPD_CHROOT, "rwc") == -1)
+	if (unveil(env->httpd_chroot, "rwc") == -1)
 		err(1, "unveil");
 
 	if (unveil(GOT_TMPDIR_STR, "rw") == -1)
