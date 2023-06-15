@@ -170,7 +170,13 @@ boolean		: STRING {
 			free($1);
 		}
 		| ON { $$ = 1; }
-		| NUMBER { $$ = $1; }
+		| NUMBER {
+			if ($1 != 0 && $1 != 1) {
+				yyerror("invalid boolean value '%lld'", $1);
+				YYERROR;
+			}
+			$$ = $1;
+		}
 		;
 
 fcgiport	: PORT NUMBER {
@@ -195,6 +201,11 @@ fcgiport	: PORT NUMBER {
 		;
 
 main		: PREFORK NUMBER {
+			if ($2 <= 0 || $2 > PROC_MAX_INSTANCES) {
+				yyerror("prefork is %s: %lld",
+				    $2 <= 0 ? "too small" : "too large", $2);
+				YYERROR;
+			}
 			gotwebd->prefork_gotwebd = $2;
 		}
 		| CHROOT STRING {
@@ -358,8 +369,11 @@ serveropts1	: REPOS_PATH STRING {
 			free($4);
 		}
 		| MAX_REPOS NUMBER {
-			if ($2 > 0)
-				new_srv->max_repos = $2;
+			if ($2 <= 0) {
+				yyerror("max_repos is too small: %lld", $2);
+				YYERROR;
+			}
+			new_srv->max_repos = $2;
 		}
 		| SHOW_SITE_OWNER boolean {
 			new_srv->show_site_owner = $2;
@@ -380,7 +394,12 @@ serveropts1	: REPOS_PATH STRING {
 			new_srv->respect_exportok = $2;
 		}
 		| MAX_REPOS_DISPLAY NUMBER {
-				new_srv->max_repos_display = $2;
+			if ($2 <= 0) {
+				yyerror("max_repos_display is too small: %lld",
+				    $2);
+				YYERROR;
+			}
+			new_srv->max_repos_display = $2;
 		}
 		| MAX_COMMITS_DISPLAY NUMBER {
 			if ($2 <= 1) {
