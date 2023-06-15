@@ -210,6 +210,13 @@ main		: PREFORK NUMBER {
 			gotwebd->prefork_gotwebd = $2;
 		}
 		| CHROOT STRING {
+			if (*$2 == '\0') {
+				yyerror("chroot path can't be an empty"
+				    " string");
+				free($2);
+				YYERROR;
+			}
+
 			n = strlcpy(gotwebd->httpd_chroot, $2,
 			    sizeof(gotwebd->httpd_chroot));
 			if (n >= sizeof(gotwebd->httpd_chroot)) {
