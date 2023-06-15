@@ -449,7 +449,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 }
 
 const struct got_error *
-got_get_repo_tags(struct request *c, int limit)
+got_get_repo_tags(struct request *c, size_t limit)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -470,6 +470,9 @@ got_get_repo_tags(struct request *c, int limit)
 	int chk_next = 0, chk_multi = 1, commit_found = 0, c_cnt = 0;
 
 	TAILQ_INIT(&refs);
+
+	if (limit == 0)
+		return got_error(GOT_ERR_RANGE);
 
 	if (asprintf(&repo_path, "%s/%s", srv->repos_path,
 	    repo_dir->name) == -1)
