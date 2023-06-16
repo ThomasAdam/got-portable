@@ -920,6 +920,8 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		case DT_REG:
 			err = open_ref(&ref, path_refs, subdir, dent->d_name,
 			    0, got_repo_get_object_format(repo));
+			if (err && err->code == GOT_ERR_BAD_REF_NAME)
+				break;
 			if (err)
 				goto done;
 			if (ref) {
