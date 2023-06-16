@@ -868,6 +868,8 @@ got_repo_close(struct got_repository *repo)
 		imsg_clear(repo->privsep_children[i].ibuf);
 		free(repo->privsep_children[i].ibuf);
 		err = got_privsep_send_stop(repo->privsep_children[i].imsg_fd);
+		if (err && err->code == GOT_ERR_EOF)
+			err = NULL;
 		child_err = got_privsep_wait_for_child(
 		    repo->privsep_children[i].pid);
 		if (child_err && err == NULL)
