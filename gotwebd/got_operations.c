@@ -342,7 +342,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 
 	TAILQ_INIT(&refs);
 
-	if (qs->file != NULL && strlen(qs->file) > 0)
+	if (qs->file != NULL && *qs->file != '\0')
 		if (asprintf(&file_path, "%s/%s", qs->folder ? qs->folder : "",
 		    qs->file) == -1)
 			return got_error_from_errno("asprintf");
@@ -376,7 +376,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 	if (error)
 		goto done;
 
-	if (qs->file != NULL && strlen(qs->file) > 0) {
+	if (qs->file != NULL && *qs->file != '\0') {
 		error = got_commit_graph_open(&graph, file_path, 0);
 		if (error)
 			goto done;

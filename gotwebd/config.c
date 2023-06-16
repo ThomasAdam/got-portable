@@ -228,7 +228,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	    sock->conf.af_type == AF_UNIX ? "unix" :
 	    (sock->conf.af_type == AF_INET ? "inet" :
 	    (sock->conf.af_type == AF_INET6 ? "inet6" : "unknown")),
-	    strlen(sock->conf.unix_socket_name) ?
+	    *sock->conf.unix_socket_name != '\0' ?
 	    sock->conf.unix_socket_name : "none");
 
 	return 0;
