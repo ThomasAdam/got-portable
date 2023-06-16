@@ -499,13 +499,15 @@ update_ref(int *shut, struct gotd_session_client *client,
 			goto done;
 		}
 
-		err = got_ref_change_ref(ref, &new_id);
-		if (err)
-			goto done;
+		if (got_object_id_cmp(&new_id, &old_id) != 0) {
+			err = got_ref_change_ref(ref, &new_id);
+			if (err)
+				goto done;
 
-		err = got_ref_write(ref, repo);
-		if (err)
-			goto done;
+			err = got_ref_write(ref, repo);
+			if (err)
+				goto done;
+		}
 
 		free(id);
 		id = NULL;
