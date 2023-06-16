@@ -7304,7 +7304,7 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 				free(id_str);
 				return err;
 			}
-			for (i = 0; i < strlen(link_target); i++) {
+			for (i = 0; i < link_target[i] != '\0'; i++) {
 				if (!isprint((unsigned char)link_target[i]))
 					link_target[i] = '?';
 			}

@@ -5969,7 +5969,7 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 		err = got_tree_entry_get_symlink_target(&link_target, te, repo);
 		if (err)
 			return err;
-		for (i = 0; i < strlen(link_target); i++) {
+		for (i = 0; link_target[i] != '\0'; i++) {
 			if (!isprint((unsigned char)link_target[i]))
 				link_target[i] = '?';
 		}
@@ -6326,7 +6326,7 @@ cmd_status(int argc, char *argv[])
 			st.suppress = 1;
 			/* fallthrough */
 		case 's':
-			for (i = 0; i < strlen(optarg); i++) {
+			for (i = 0; optarg[i] != '\0'; i++) {
 				switch (optarg[i]) {
 				case GOT_STATUS_MODIFY:
 				case GOT_STATUS_ADD:
@@ -7989,7 +7989,7 @@ cmd_remove(int argc, char *argv[])
 			can_recurse = 1;
 			break;
 		case 's':
-			for (i = 0; i < strlen(optarg); i++) {
+			for (i = 0; optarg[i] != '\0'; i++) {
 				switch (optarg[i]) {
 				case GOT_STATUS_MODIFY:
 					delete_local_mods = 1;
