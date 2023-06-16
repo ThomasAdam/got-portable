@@ -407,6 +407,8 @@ update_ref(int *shut, struct gotd_session_client *client,
 	char *refname = NULL;
 	size_t datalen;
 	int locked = 0;
+	char hex1[SHA1_DIGEST_STRING_LENGTH];
+	char hex2[SHA1_DIGEST_STRING_LENGTH];
 
 	log_debug("update-ref from uid %d", client->euid);
 
@@ -448,10 +450,17 @@ update_ref(int *shut, struct gotd_session_client *client,
 			if (err)
 				goto done;
 		} else {
+			err = got_ref_resolve(&id, repo, ref);
+			if (err)
+				goto done;
+			got_object_id_hex(&new_id, hex1, sizeof(hex1));
+			got_object_id_hex(id, hex2, sizeof(hex2));
 			err = got_error_fmt(GOT_ERR_REF_BUSY,
-			    "%s has been created by someone else "
-			    "while transaction was in progress",
-			    got_ref_get_name(ref));
+			    "Addition %s: %s failed; %s: %s has been "
+			    "created by someone else while transaction "
+			    "was in progress",
+			    got_ref_get_name(ref), hex1,
+			    got_ref_get_name(ref), hex2);
 			goto done;
 		}
 	} else if (iref.delete_ref) {
@@ -465,10 +474,14 @@ update_ref(int *shut, struct gotd_session_client *client,
 			goto done;
 
 		if (got_object_id_cmp(id, &old_id) != 0) {
+			got_object_id_hex(&old_id, hex1, sizeof(hex1));
+			got_object_id_hex(id, hex2, sizeof(hex2));
 			err = got_error_fmt(GOT_ERR_REF_BUSY,
-			    "%s has been modified by someone else "
-			    "while transaction was in progress",
-			    got_ref_get_name(ref));
+			    "Deletion %s: %s failed; %s: %s has been "
+			    "created by someone else while transaction "
+			    "was in progress",
+			    got_ref_get_name(ref), hex1,
+			    got_ref_get_name(ref), hex2);
 			goto done;
 		}
 
@@ -489,10 +502,14 @@ update_ref(int *shut, struct gotd_session_client *client,
 			goto done;
 
 		if (got_object_id_cmp(id, &old_id) != 0) {
+			got_object_id_hex(&old_id, hex1, sizeof(hex1));
+			got_object_id_hex(id, hex2, sizeof(hex2));
 			err = got_error_fmt(GOT_ERR_REF_BUSY,
-			    "%s has been modified by someone else "
-			    "while transaction was in progress",
-			    got_ref_get_name(ref));
+			    "Update %s: %s failed; %s: %s has been "
+			    "created by someone else while transaction "
+			    "was in progress",
+			    got_ref_get_name(ref), hex1,
+			    got_ref_get_name(ref), hex2);
 			goto done;
 		}
 
