@@ -391,13 +391,13 @@ gotweb_get_server(uint8_t *server_name, uint8_t *subdomain)
 	struct server *srv = NULL;
 
 	/* check against the server name first */
-	if (strlen(server_name) > 0)
+	if (*server_name != '\0')
 		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, server_name) == 0)
 				goto done;
 
 	/* check against subdomain second */
-	if (strlen(subdomain) > 0)
+	if (*subdomain != '\0')
 		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, subdomain) == 0)
 				goto done;
@@ -613,7 +613,7 @@ qa_found:
 			}
 			break;
 		case INDEX_PAGE:
-			if (strlen(value) == 0)
+			if (*value == '\0')
 				break;
 			(*qs)->index_page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
@@ -634,7 +634,7 @@ qa_found:
 			}
 			break;
 		case PAGE:
-			if (strlen(value) == 0)
+			if (*value == '\0')
 				break;
 			(*qs)->page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);

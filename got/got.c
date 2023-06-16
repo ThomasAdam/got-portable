@@ -877,7 +877,7 @@ cmd_import(int argc, char *argv[])
 	 * unveil(2) traverses exec(2); if an editor is used we have
 	 * to apply unveil after the log message has been written.
 	 */
-	if (logmsg == NULL || strlen(logmsg) == 0) {
+	if (logmsg == NULL || *logmsg == '\0') {
 		error = get_editor(&editor);
 		if (error)
 			goto done;
@@ -8914,7 +8914,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 	size_t len;
 
 	/* if a message was specified on the command line, just use it */
-	if (a->cmdline_log != NULL && strlen(a->cmdline_log) != 0) {
+	if (a->cmdline_log != NULL && *a->cmdline_log != '\0') {
 		len = strlen(a->cmdline_log) + 1;
 		*logmsg = malloc(len + 1);
 		if (*logmsg == NULL)
