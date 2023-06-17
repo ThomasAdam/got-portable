@@ -1426,7 +1426,7 @@ test_histedit_duplicate_commit_in_script() {
 	if [ $ret -eq 0 ]; then
 		echo "histedit succeeded unexpectedly:" >&2
 		cat $testroot/stdout >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" 1
 		return 1
 	fi
 

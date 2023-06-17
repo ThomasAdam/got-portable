@@ -2150,7 +2150,7 @@ test_stage_patch_removed_twice() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got stage command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

@@ -188,7 +188,7 @@ test_integrate_requires_rebase_first() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got integrate succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 
@@ -529,7 +529,7 @@ test_integrate_into_nonbranch() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got integrate succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

@@ -88,7 +88,7 @@ test_merge_basic() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: work tree must be updated before it can be used " \
@@ -123,7 +123,7 @@ test_merge_basic() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: work tree contains files from multiple base commits; " \
@@ -160,7 +160,7 @@ test_merge_basic() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo "got: alpha: file is staged" > $testroot/stderr.expected
@@ -185,7 +185,7 @@ test_merge_basic() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got merge succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: work tree contains local changes; " \
