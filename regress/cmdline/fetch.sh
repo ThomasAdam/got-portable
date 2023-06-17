@@ -1380,7 +1380,7 @@ test_fetch_delete_remote_refs() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 

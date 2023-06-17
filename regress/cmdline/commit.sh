@@ -321,7 +321,7 @@ test_commit_rejects_conflicted_file() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly"
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 
@@ -1339,7 +1339,7 @@ test_commit_symlink() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: $testroot/wt/passwd.link: " > $testroot/stderr.expected
@@ -1417,7 +1417,7 @@ test_commit_symlink() {
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got commit succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 	echo -n "got: $testroot/wt/dotgotbar.link: " > $testroot/stderr.expected
