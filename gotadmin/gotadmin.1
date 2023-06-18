@@ -241,13 +241,11 @@ reached via any reference in the entire
 .Pa refs/
 namespace.
 Objects will usually become unreferenced as a result of deleting
-branches or tags with
-.Cm got branch -d
+branches, tags, or other references with
+.Cm got branch -d ,
+.Cm got ref -d ,
 or
-.Cm got tag -d .
-Deleting arbitrary references with
-.Cm got ref -d
-may also leave unreferenced objects behind.
+.Cm got fetch -X .
 .Pp
 Loose objects are stored as individual files beneath the repository's
 .Pa objects/
