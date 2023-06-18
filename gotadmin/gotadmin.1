@@ -265,13 +265,6 @@ repository with
 .Nm
 .Cm pack Fl a .
 .Pp
-In order to determine the set of objects which are referenced, search
-all references for commit objects and tag objects, and traverse the
-corresponding tree object hierarchies.
-Any loose object IDs not encountered during this search are unreferenced
-and thus subject to removal.
-Display the number of commits which have been searched to indicate progress.
-.Pp
 References in the
 .Pa refs/got
 namespace may prevent objects from being purged.
