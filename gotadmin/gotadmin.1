@@ -240,6 +240,14 @@ Unreferenced objects are present in the repository but cannot be
 reached via any reference in the entire
 .Pa refs/
 namespace.
+Objects will usually become unreferenced as a result of deleting
+branches or tags with
+.Cm got branch -d
+or
+.Cm got tag -d .
+Deleting arbitrary references with
+.Cm got ref -d
+may also leave unreferenced objects behind.
 .Pp
 Loose objects are stored as individual files beneath the repository's
 .Pa objects/
@@ -254,22 +262,6 @@ If redundant copies of packed objects exist in loose form, such
 redundant copies will be purged.
 If all the objects of a pack file are present in other pack files,
 the redundant pack file will be purged.
-.Pp
-For compatibility with Git, if a file with the extension
-.Pa .keep
-exists and corresponds to a pack file with the extension
-.Pa .pack
-then this pack file will not be removed.
-.Pp
-Objects will usually become unreferenced as a result of deleting
-branches or tags with
-.Cm got branch -d
-or
-.Cm got tag -d .
-Deleting arbitrary references with
-.Cm got ref -d
-may also leave unreferenced objects behind.
-.Pp
 Pack files will usually become redundant as a result of repacking the
 repository with
 .Nm
@@ -305,6 +297,18 @@ deleted with
 or
 .Cm got ref -d .
 .Pp
+The
+.Dq preciousObjects
+Git extension is intended to prevent the removal of objects from a repository.
+.Cm gotadmin cleanup
+will refuse to operate on repositories where this extension is active.
+.Pp
+For compatibility with Git, if a file with the extension
+.Pa .keep
+exists and corresponds to a pack file with the extension
+.Pa .pack
+then this pack file will not be removed.
+.Pp
 Some Git repositories contain pack index files which lack a corresponding
 pack file, which is an inconsistent repository state.
 In such cases,
@@ -314,12 +318,6 @@ Whenever possible, the missing pack files should be restored.
 If restoring missing pack files is not possible, then affected pack index
 files can be removed with
 .Cm gotadmin cleanup -p .
-.Pp
-The
-.Dq preciousObjects
-Git extension is intended to prevent the removal of objects from a repository.
-.Cm gotadmin cleanup
-will refuse to operate on repositories where this extension is active.
 .Pp
 The options for
 .Cm gotadmin cleanup
