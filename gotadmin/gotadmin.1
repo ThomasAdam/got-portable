@@ -298,6 +298,9 @@ and
 .Cm gotadmin cleanup
 will only purge corresponding objects once such references have been
 deleted with
+.Cm got rebase -X ,
+.Cm got histedit -X ,
+or
 .Cm got ref -d .
 .Pp
 Some Git repositories contain pack index files which lack a corresponding
