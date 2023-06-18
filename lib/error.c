@@ -179,7 +179,6 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_REBASE_OUT_OF_DATE, "work tree must be updated before it "
 	    "can be used to rebase a branch" },
 	{ GOT_ERR_CACHE_DUP_ENTRY, "duplicate cache entry" },
-	{ GOT_ERR_QUERYSTRING, "bad querystring" },
 	{ GOT_ERR_FETCH_FAILED, "fetch failed" },
 	{ GOT_ERR_PARSE_URI, "failed to parse uri" },
 	{ GOT_ERR_BAD_PROTO, "unknown protocol" },
