@@ -51,7 +51,6 @@ tog:
 - make it possible to toggle the parent to diff against in merge commits
 
 gotwebd:
-- reply with a non-200 reply code when an error occurs
 - fix COMMITS page for paths that were deleted and/or re-added to the
   repository. One way would be not to let the commit graph filter paths.
   As an additional optimization we could keep a tailq or the object-id
@@ -96,7 +95,6 @@ gotd:
   into an empty repository regardless; this should return EPERM instead
 
 gotadmin:
-- teach 'gotadmin cleanup' to remove redundant pack files
 - add support for generating git-fast-export streams from a repository
 - add support for importing git-fast-export streams into a repository
 - speed up 'gotadmin pack -a' is too slow on repositories with many pack files
