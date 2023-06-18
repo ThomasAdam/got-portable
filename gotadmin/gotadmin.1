@@ -255,9 +255,11 @@ redundant copies will be purged.
 If all the objects of a pack file are present in other pack files,
 the redundant pack file will be purged.
 .Pp
-For compatibility with Git, if a matching file
+For compatibility with Git, if a file with the extension
 .Pa .keep
-exists for a given pack file, this pack file won't be removed.
+exists and corresponds to a pack file with the extension
+.Pa .pack
+then this pack file will not be removed.
 .Pp
 Objects will usually become unreferenced as a result of deleting
 branches or tags with
