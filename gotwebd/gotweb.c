@@ -190,7 +190,7 @@ gotweb_process_request(struct request *c)
 	if (qs->action == BLAME || qs->action == BLOB ||
 	    qs->action == BLOBRAW || qs->action == DIFF) {
 		if (qs->commit == NULL) {
-			error = got_error(GOT_ERR_QUERYSTRING);
+			error = got_error(GOT_ERR_BAD_QUERYSTRING);
 			goto err;
 		}
 	}
