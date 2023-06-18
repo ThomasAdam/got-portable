@@ -237,6 +237,122 @@ test_cleanup_redundant_loose_objects() {
 	test_done "$testroot" "$ret"
 }
 
+test_cleanup_redundant_pack_files() {
+	local testroot=`test_init cleanup_redundant_pack_files`
+
+	# no pack files should exist yet
+
+	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
+	if [ "$n" -ne 0 ]; then
+		echo "expected no pack file to exists, $n found" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# create a redundant pack with an associated .keep file
+	hash=$(gotadmin pack -a -r "$testroot/repo" \
+		| awk '/^Indexed/{print $2}')
+	kpack="$testroot/repo/.git/objects/pack/pack-$hash"
+	touch "${kpack%.pack}.keep"
+
+	# create a few pack files with different objects
+	for i in `jot 5`; do
+		echo "alpha $i" > $testroot/repo/alpha
+		git_commit "$testroot/repo" -m "edit #$i"
+		gotadmin pack -r "$testroot/repo" >/dev/null
+	done
+
+	# create two packs with all the objects
+	gotadmin pack -a -r "$testroot/repo" >/dev/null
+	gotadmin pack -a -r "$testroot/repo" >/dev/null
+
+	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
+		| tail -1 > $testroot/stdout
+
+	echo "5 pack files purged" > $testroot/stdout.expected
+	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
+	if [ "$n" -ne 2 ]; then
+		echo "expected 2 pack files left, $n found instead" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	if [ ! -f "$kpack" ]; then
+		echo "$kpack disappeared unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	if [ ! -f "${kpack%.pack}.keep" ]; then
+		echo "${kpack%.pack}.keep disappeared unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# create one more non-redundant pack
+	for i in `jot 5`; do
+		echo "alpha again $i" > $testroot/repo/alpha
+		git_commit "$testroot/repo" -m "edit $i"
+	done
+	gotadmin pack -r "$testroot/repo" >/dev/null
+
+	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
+	    | tail -1 > $testroot/stdout
+
+	echo "0 pack files purged" > $testroot/stdout.expected
+	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
+	if [ "$n" -ne 3 ]; then
+		echo "expected 3 pack files left, $n found instead" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# remove the .keep file
+	rm "${kpack%.pack}.keep"
+
+	# create some commits on a separate branch
+	(cd "$testroot/repo" && git checkout -q -b newbranch)
+
+	for i in `jot 5`; do
+		echo "alpha $i" > $testroot/repo/alpha
+		git_commit "$testroot/repo" -m "edit #$i"
+		gotadmin pack -r "$testroot/repo" >/dev/null
+	done
+
+	gotadmin pack -a -x master -r "$testroot/repo" >/dev/null
+
+	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
+		| tail -1 > $testroot/stdout
+
+	echo "6 pack files purged" > $testroot/stdout.expected
+	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
+	if [ "$n" -ne 3 ]; then
+		echo "expected 3 pack files left, $n found instead" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_cleanup_precious_objects() {
 	local testroot=`test_init cleanup_precious_objects`
 
@@ -365,5 +481,6 @@ test_cleanup_missing_pack_file() {
 test_parseargs "$@"
 run_test test_cleanup_unreferenced_loose_objects
 run_test test_cleanup_redundant_loose_objects
+run_test test_cleanup_redundant_pack_files
 run_test test_cleanup_precious_objects
 run_test test_cleanup_missing_pack_file

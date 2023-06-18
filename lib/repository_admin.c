@@ -625,7 +625,7 @@ report_cleanup_progress(got_cleanup_progress_cb progress_cb,
 	if (err || !elapsed)
 		return err;
 
-	return progress_cb(progress_arg, nloose, ncommits, npurged);
+	return progress_cb(progress_arg, nloose, ncommits, npurged, -1);
 }
 
 static const struct got_error *
@@ -1150,7 +1150,7 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	if (nloose == 0) {
 		got_object_idset_free(loose_ids);
 		if (progress_cb) {
-			err = progress_cb(progress_arg, 0, 0, 0);
+			err = progress_cb(progress_arg, 0, 0, 0, -1);
 			if (err)
 				return err;
 		}
@@ -1214,13 +1214,205 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 
 	/* Produce a final progress report. */
 	if (progress_cb) {
-		err = progress_cb(progress_arg, nloose, ncommits, arg.npurged);
+		err = progress_cb(progress_arg, nloose, ncommits, arg.npurged,
+		    -1);
 		if (err)
 			goto done;
 	}
 done:
 	got_object_idset_free(loose_ids);
 	got_object_idset_free(traversed_ids);
+	return err;
+}
+
+static const struct got_error *
+purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
+    int dry_run, int *remove, off_t *size_before, off_t *size_after)
+{
+	static const char *ext[] = {".idx", ".pack", ".rev", ".bitmap",
+	    ".promisor", ".mtimes"};
+	struct stat sb;
+	char *dot, path[PATH_MAX];
+	size_t i;
+
+	if (strlcpy(path, packidx_path, sizeof(path)) >=
+	    sizeof(path))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	/*
+	 * For compatibility with Git, if a matching .keep file exist
+	 * don't delete the packfile.
+	 */
+	dot = strrchr(path, '.');
+	*dot = '\0';
+	if (strlcat(path, ".keep", sizeof(path)) >= sizeof(path))
+		return got_error(GOT_ERR_NO_SPACE);
+	if (faccessat(got_repo_get_fd(repo), path, F_OK, 0) == 0)
+		*remove = 0;
+
+	for (i = 0; i < nitems(ext); ++i) {
+		*dot = '\0';
+
+		if (strlcat(path, ext[i], sizeof(path)) >=
+		    sizeof(path))
+			return got_error(GOT_ERR_NO_SPACE);
+
+		if (fstatat(got_repo_get_fd(repo), path, &sb, 0) ==
+		    -1) {
+			if (errno == ENOENT &&
+			    strcmp(ext[i], ".pack") != 0 &&
+			    strcmp(ext[i], ".idx") != 0)
+				continue;
+			return got_error_from_errno2("fstatat", path);
+		}
+
+		*size_before += sb.st_size;
+		if (!*remove) {
+			*size_after += sb.st_size;
+			continue;
+		}
+
+		if (dry_run)
+			continue;
+
+		if (unlinkat(got_repo_get_fd(repo), path, 0) == -1) {
+			if (errno == ENOENT)
+				continue;
+			return got_error_from_errno2("unlinkat",
+			    path);
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+pack_is_redundant(int *redundant, struct got_repository *repo,
+    const char *packidx_path, struct got_object_idset *idset)
+{
+	const struct got_error *err;
+	struct got_packidx *packidx;
+	struct got_packidx_object_id *pid;
+	struct got_object_id id;
+	size_t i, nobjects;
+
+	*redundant = 1;
+
+	err = got_repo_get_packidx(&packidx, packidx_path, repo);
+	if (err)
+		return err;
+
+	nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
+	for (i = 0; i < nobjects; ++i) {
+		pid = &packidx->hdr.sorted_ids[i];
+
+		memset(&id, 0, sizeof(id));
+		memcpy(&id.sha1, pid->sha1, sizeof(id.sha1));
+
+		if (got_object_idset_contains(idset, &id))
+			continue;
+
+		*redundant = 0;
+		err = got_object_idset_add(idset, &id, NULL);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+struct pack_info {
+	const char	*path;
+	size_t		 nobjects;
+};
+
+static int
+pack_info_cmp(const void *a, const void *b)
+{
+	const struct pack_info	*pa, *pb;
+
+	pa = a;
+	pb = b;
+	if (pa->nobjects == pb->nobjects)
+		return strcmp(pa->path, pb->path);
+	if (pa->nobjects > pb->nobjects)
+		return -1;
+	return 1;
+}
+
+const struct got_error *
+got_repo_purge_redundant_packfiles(struct got_repository *repo,
+    off_t *size_before, off_t *size_after, int dry_run,
+    got_cleanup_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	struct pack_info *pinfo, *sorted = NULL;
+	struct got_packidx *packidx;
+	struct got_object_idset *idset = NULL;
+	struct got_pathlist_entry *pe;
+	size_t i, npacks;
+	int remove, redundant_packs = 0;
+
+	*size_before = 0;
+	*size_after = 0;
+
+	npacks = 0;
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry)
+		npacks++;
+
+	if (npacks == 0)
+		return NULL;
+
+	sorted = calloc(npacks, sizeof(*sorted));
+	if (sorted == NULL)
+		return got_error_from_errno("calloc");
+
+	i = 0;
+	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+		err = got_repo_get_packidx(&packidx, pe->path, repo);
+		if (err)
+			goto done;
+
+		pinfo = &sorted[i++];
+		pinfo->path = pe->path;
+		pinfo->nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
+	}
+	qsort(sorted, npacks, sizeof(*sorted), pack_info_cmp);
+
+	idset = got_object_idset_alloc();
+	if (idset == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		goto done;
+	}
+
+	for (i = 0; i < npacks; ++i) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
+		err = pack_is_redundant(&remove, repo, sorted[i].path, idset);
+		if (err)
+			goto done;
+		err = purge_redundant_pack(repo, sorted[i].path, dry_run,
+		    &remove, size_before, size_after);
+		if (err)
+			goto done;
+		if (!remove)
+			continue;
+		err = progress_cb(progress_arg, -1, -1, -1,
+		    ++redundant_packs);
+		if (err)
+			goto done;
+	}
+
+	err = progress_cb(progress_arg, -1, -1, -1, redundant_packs);
+ done:
+	free(sorted);
+	if (idset)
+		got_object_idset_free(idset);
 	return err;
 }
 

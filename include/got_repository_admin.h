@@ -70,7 +70,7 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 
 /* A callback function which gets invoked with cleanup information to print. */
 typedef const struct got_error *(*got_cleanup_progress_cb)(void *arg,
-    int nloose, int ncommits, int npurged);
+    int nloose, int ncommits, int npurged, int nredundant);
 
 /*
  * Walk objects reachable via references to determine whether any loose
@@ -86,6 +86,12 @@ const struct got_error *
 got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
     off_t *size_before, off_t *size_after, int *npacked, int dry_run,
     int ignore_mtime, got_cleanup_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg);
+
+const struct got_error *
+got_repo_purge_redundant_packfiles(struct got_repository *repo,
+    off_t *before, off_t *size_after, int dry_run,
+    got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
 
 /* A callback function which gets invoked with cleanup information to print. */

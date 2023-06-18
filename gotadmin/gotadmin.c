@@ -1135,16 +1135,19 @@ struct got_cleanup_progress_arg {
 	int last_nloose;
 	int last_ncommits;
 	int last_npurged;
+	int last_nredundant;
 	int verbosity;
 	int printed_something;
 	int dry_run;
 };
 
 static const struct got_error *
-cleanup_progress(void *arg, int nloose, int ncommits, int npurged)
+cleanup_progress(void *arg, int nloose, int ncommits, int npurged,
+    int nredundant)
 {
 	struct got_cleanup_progress_arg *a = arg;
 	int print_loose = 0, print_commits = 0, print_purged = 0;
+	int print_redundant = 0;
 
 	if (a->last_nloose != nloose) {
 		print_loose = 1;
@@ -1161,11 +1164,15 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged)
 		print_purged = 1;
 		a->last_npurged = npurged;
 	}
+	if (a->last_nredundant != nredundant) {
+		print_redundant = 1;
+		a->last_nredundant = nredundant;
+	}
 
 	if (a->verbosity < 0)
 		return NULL;
 
-	if (print_loose || print_commits || print_purged)
+	if (print_loose || print_commits || print_purged || print_redundant)
 		printf("\r");
 	if (print_loose)
 		printf("%d loose object%s", nloose, nloose == 1 ? "" : "s");
@@ -1181,7 +1188,16 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged)
 			    npurged == 1 ? "" : "s");
 		}
 	}
-	if (print_loose || print_commits || print_purged) {
+	if (print_redundant) {
+		if (a->dry_run) {
+			printf("%d pack file%s could be purged", nredundant,
+			    nredundant == 1 ? "" : "s");
+		} else {
+			printf("%d pack file%s purged", nredundant,
+			    nredundant == 1 ? "" : "s");
+		}
+	}
+	if (print_loose || print_commits || print_purged || print_redundant) {
 		a->printed_something = 1;
 		fflush(stdout);
 	}
@@ -1221,10 +1237,14 @@ cmd_cleanup(int argc, char *argv[])
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
 	struct got_cleanup_progress_arg cpa;
 	struct got_lonely_packidx_progress_arg lpa;
-	off_t size_before, size_after;
-	char scaled_before[FMT_SCALED_STRSIZE];
-	char scaled_after[FMT_SCALED_STRSIZE];
-	char scaled_diff[FMT_SCALED_STRSIZE];
+	off_t loose_before, loose_after;
+	off_t pack_before, pack_after;
+	off_t total_size;
+	char loose_before_scaled[FMT_SCALED_STRSIZE];
+	char loose_after_scaled[FMT_SCALED_STRSIZE];
+	char pack_before_scaled[FMT_SCALED_STRSIZE];
+	char pack_after_scaled[FMT_SCALED_STRSIZE];
+	char total_size_scaled[FMT_SCALED_STRSIZE];
 	int *pack_fds = NULL;
 
 #ifndef PROFILE
@@ -1298,37 +1318,67 @@ cmd_cleanup(int argc, char *argv[])
 	memset(&cpa, 0, sizeof(cpa));
 	cpa.last_ncommits = -1;
 	cpa.last_npurged = -1;
+	cpa.last_nredundant = -1;
 	cpa.dry_run = dry_run;
 	cpa.verbosity = verbosity;
+
 	error = got_repo_purge_unreferenced_loose_objects(repo,
-	    &size_before, &size_after, &npacked, dry_run, ignore_mtime,
+	    &loose_before, &loose_after, &npacked, dry_run, ignore_mtime,
 	    cleanup_progress, &cpa, check_cancelled, NULL);
 	if (cpa.printed_something)
 		printf("\n");
 	if (error)
 		goto done;
+
+	cpa.printed_something = 0;
+	cpa.last_ncommits = -1;
+	cpa.last_npurged = -1;
+	cpa.last_nloose = -1;
+	cpa.last_nredundant = -1;
+	error = got_repo_purge_redundant_packfiles(repo, &pack_before,
+	    &pack_after, dry_run, cleanup_progress, &cpa,
+	    check_cancelled, NULL);
+	if (error)
+		goto done;
+	if (cpa.printed_something)
+		printf("\n");
+
+	total_size = (loose_before - loose_after) + (pack_before - pack_after);
+
 	if (cpa.printed_something) {
-		if (fmt_scaled(size_before, scaled_before) == -1) {
+		if (fmt_scaled(loose_before, loose_before_scaled) == -1) {
 			error = got_error_from_errno("fmt_scaled");
 			goto done;
 		}
-		if (fmt_scaled(size_after, scaled_after) == -1) {
+		if (fmt_scaled(loose_after, loose_after_scaled) == -1) {
 			error = got_error_from_errno("fmt_scaled");
 			goto done;
 		}
-		if (fmt_scaled(size_before - size_after, scaled_diff) == -1) {
+		if (fmt_scaled(pack_before, pack_before_scaled) == -1) {
 			error = got_error_from_errno("fmt_scaled");
 			goto done;
 		}
-		printf("loose total size before: %s\n", scaled_before);
-		printf("loose total size after: %s\n", scaled_after);
+		if (fmt_scaled(pack_after, pack_after_scaled) == -1) {
+			error = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		if (fmt_scaled(total_size, total_size_scaled) == -1) {
+			error = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		printf("loose total size before: %s\n", loose_before_scaled);
+		printf("loose total size after: %s\n", loose_after_scaled);
+		printf("pack files total size before: %s\n",
+		    pack_before_scaled);
+		printf("pack files total size after: %s\n", pack_after_scaled);
 		if (dry_run) {
 			printf("disk space which would be freed: %s\n",
-			    scaled_diff);
+			    total_size_scaled);
 		} else
-			printf("disk space freed: %s\n", scaled_diff);
+			printf("disk space freed: %s\n", total_size_scaled);
 		printf("loose objects also found in pack files: %d\n", npacked);
 	}
+
 done:
 	if (repo)
 		got_repo_close(repo);
