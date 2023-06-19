@@ -1235,6 +1235,7 @@ cmd_cleanup(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	int ch, dry_run = 0, npacked = 0, verbosity = 0;
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
+	struct got_lockfile *lock = NULL;
 	struct got_cleanup_progress_arg cpa;
 	struct got_lonely_packidx_progress_arg lpa;
 	off_t loose_before, loose_after;
@@ -1305,6 +1306,10 @@ cmd_cleanup(int argc, char *argv[])
 		    "this implies that objects must not be deleted");
 		goto done;
 	}
+
+	error = got_repo_cleanup_prepare(repo, &lock);
+	if (error)
+		goto done;
 
 	if (remove_lonely_packidx) {
 		memset(&lpa, 0, sizeof(lpa));
@@ -1380,6 +1385,7 @@ cmd_cleanup(int argc, char *argv[])
 	}
 
 done:
+	got_repo_cleanup_complete(repo, lock);
 	if (repo)
 		got_repo_close(repo);
 	if (pack_fds) {
