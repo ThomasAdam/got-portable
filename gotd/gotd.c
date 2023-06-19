@@ -831,7 +831,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			return 0;
 		}
 	}
-	if (proc->type == PROC_SESSION) {
+	if (proc->type == PROC_SESSION_READ ||
+	    proc->type == PROC_SESSION_WRITE) {
 		if (client->session == NULL) {
 			log_warnx("no session found for uid %d", client->euid);
 			return 0;
@@ -868,7 +869,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			ret = 1;
 		break;
 	case GOTD_IMSG_CLIENT_SESSION_READY:
-		if (proc->type != PROC_SESSION) {
+		if (proc->type != PROC_SESSION_READ &&
+		    proc->type != PROC_SESSION_WRITE) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "unexpected \"ready\" signal from PID %d",
 			    proc->pid);
@@ -1443,7 +1445,10 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 	case PROC_AUTH:
 		argv[argc++] = (char *)"-A";
 		break;
-	case PROC_SESSION:
+	case PROC_SESSION_READ:
+		argv[argc++] = (char *)"-s";
+		break;
+	case PROC_SESSION_WRITE:
 		argv[argc++] = (char *)"-S";
 		break;
 	case PROC_REPO_READ:
@@ -1505,7 +1510,10 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 	if (proc == NULL)
 		return got_error_from_errno("calloc");
 
-	proc->type = PROC_SESSION;
+	if (client_is_reading(client))
+		proc->type = PROC_SESSION_READ;
+	else
+		proc->type = PROC_SESSION_WRITE;
 	if (strlcpy(proc->repo_name, repo->name,
 	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 		fatalx("repository name too long: %s", repo->name);
@@ -1642,8 +1650,13 @@ start_auth_child(struct gotd_client *client, int required_auth,
 }
 
 static void
-apply_unveil_repo_readonly(const char *repo_path)
+apply_unveil_repo_readonly(const char *repo_path, int need_tmpdir)
 {
+	if (need_tmpdir) {
+		if (unveil(GOT_TMPDIR_STR, "rwc") == -1)
+			fatal("unveil %s", GOT_TMPDIR_STR);
+	}
+
 	if (unveil(repo_path, "r") == -1)
 		fatal("unveil %s", repo_path);
 
@@ -1701,7 +1714,7 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "Adf:LnP:RSvW")) != -1) {
+	while ((ch = getopt(argc, argv, "Adf:LnP:RsSvW")) != -1) {
 		switch (ch) {
 		case 'A':
 			proc_id = PROC_AUTH;
@@ -1726,8 +1739,11 @@ main(int argc, char **argv)
 		case 'R':
 			proc_id = PROC_REPO_READ;
 			break;
+		case 's':
+			proc_id = PROC_SESSION_READ;
+			break;
 		case 'S':
-			proc_id = PROC_SESSION;
+			proc_id = PROC_SESSION_WRITE;
 			break;
 		case 'v':
 			if (verbosity < 3)
@@ -1801,7 +1817,7 @@ main(int argc, char **argv)
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
 	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE ||
-	    proc_id == PROC_SESSION) {
+	    proc_id == PROC_SESSION_READ || proc_id == PROC_SESSION_WRITE) {
 		error = got_repo_pack_fds_open(&pack_fds);
 		if (error != NULL)
 			fatalx("cannot open pack tempfiles: %s", error->msg);
@@ -1865,7 +1881,8 @@ main(int argc, char **argv)
 		auth_main(title, &gotd.repos, repo_path);
 		/* NOTREACHED */
 		break;
-	case PROC_SESSION:
+	case PROC_SESSION_READ:
+	case PROC_SESSION_WRITE:
 #ifndef PROFILE
 		/*
 		 * The "recvfd" promise is only needed during setup and
@@ -1875,9 +1892,12 @@ main(int argc, char **argv)
 		    "unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		apply_unveil_repo_readwrite(repo_path);
+		if (proc_id == PROC_SESSION_READ)
+			apply_unveil_repo_readonly(repo_path, 1);
+		else
+			apply_unveil_repo_readwrite(repo_path);
 		session_main(title, repo_path, pack_fds, temp_fds,
-		    &gotd.request_timeout);
+		    &gotd.request_timeout, proc_id);
 		/* NOTREACHED */
 		break;
 	case PROC_REPO_READ:
@@ -1885,7 +1905,7 @@ main(int argc, char **argv)
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		apply_unveil_repo_readonly(repo_path);
+		apply_unveil_repo_readonly(repo_path, 0);
 		repo_read_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		exit(0);
@@ -1894,7 +1914,7 @@ main(int argc, char **argv)
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		apply_unveil_repo_readonly(repo_path);
+		apply_unveil_repo_readonly(repo_path, 0);
 		repo = gotd_find_repo_by_path(repo_path, &gotd);
 		if (repo == NULL)
 			fatalx("no repository for path %s", repo_path);

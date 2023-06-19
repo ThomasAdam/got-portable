@@ -59,6 +59,7 @@ static struct gotd_session {
 	int *temp_fds;
 	struct gotd_imsgev parent_iev;
 	struct timeval request_timeout;
+	enum gotd_procid proc_id;
 } gotd_session;
 
 static struct gotd_session_client {
@@ -90,7 +91,7 @@ disconnect(struct gotd_session_client *client)
 	log_debug("uid %d: disconnecting", client->euid);
 
 	if (gotd_imsg_compose_event(&gotd_session.parent_iev,
-	    GOTD_IMSG_DISCONNECT, PROC_SESSION, -1, NULL, 0) == -1)
+	    GOTD_IMSG_DISCONNECT, gotd_session.proc_id, -1, NULL, 0) == -1)
 		log_warn("imsg compose DISCONNECT");
 
 	imsg_clear(&client->repo_child_iev.ibuf);
@@ -123,7 +124,7 @@ disconnect_on_error(struct gotd_session_client *client,
 	log_warnx("uid %d: %s", client->euid, err->msg);
 	if (err->code != GOT_ERR_EOF) {
 		imsg_init(&ibuf, client->fd);
-		gotd_imsg_send_error(&ibuf, 0, PROC_SESSION, err);
+		gotd_imsg_send_error(&ibuf, 0, gotd_session.proc_id, err);
 		imsg_clear(&ibuf);
 	}
 
@@ -249,7 +250,7 @@ send_ref_update_ok(struct gotd_session_client *client,
 
 	len = sizeof(iok) + iok.name_len;
 	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_REF_UPDATE_OK,
-	    PROC_SESSION, gotd_session.pid, len);
+	    gotd_session.proc_id, gotd_session.pid, len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create REF_UPDATE_OK");
 
@@ -268,7 +269,7 @@ static void
 send_refs_updated(struct gotd_session_client *client)
 {
 	if (gotd_imsg_compose_event(&client->iev, GOTD_IMSG_REFS_UPDATED,
-	    PROC_SESSION, -1, NULL, 0) == -1)
+	    gotd_session.proc_id, -1, NULL, 0) == -1)
 		log_warn("imsg compose REFS_UPDATED");
 }
 
@@ -294,7 +295,7 @@ send_ref_update_ng(struct gotd_session_client *client,
 
 	len = sizeof(ing) + ing.name_len + ing.reason_len;
 	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_REF_UPDATE_NG,
-	    PROC_SESSION, gotd_session.pid, len);
+	    gotd_session.proc_id, gotd_session.pid, len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create REF_UPDATE_NG");
 
@@ -777,7 +778,7 @@ forward_want(struct gotd_session_client *client, struct imsg *imsg)
 	iwant.client_id = client->id;
 
 	if (gotd_imsg_compose_event(&client->repo_child_iev, GOTD_IMSG_WANT,
-	    PROC_SESSION, -1, &iwant, sizeof(iwant)) == -1)
+	    gotd_session.proc_id, -1, &iwant, sizeof(iwant)) == -1)
 		return got_error_from_errno("imsg compose WANT");
 
 	return NULL;
@@ -805,7 +806,8 @@ forward_ref_update(struct gotd_session_client *client, struct imsg *imsg)
 
 	iref->client_id = client->id;
 	if (gotd_imsg_compose_event(&client->repo_child_iev,
-	    GOTD_IMSG_REF_UPDATE, PROC_SESSION, -1, iref, datalen) == -1)
+	    GOTD_IMSG_REF_UPDATE, gotd_session.proc_id, -1,
+	    iref, datalen) == -1)
 		err = got_error_from_errno("imsg compose REF_UPDATE");
 	free(iref);
 	return err;
@@ -829,7 +831,7 @@ forward_have(struct gotd_session_client *client, struct imsg *imsg)
 	ihave.client_id = client->id;
 
 	if (gotd_imsg_compose_event(&client->repo_child_iev, GOTD_IMSG_HAVE,
-	    PROC_SESSION, -1, &ihave, sizeof(ihave)) == -1)
+	    gotd_session.proc_id, -1, &ihave, sizeof(ihave)) == -1)
 		return got_error_from_errno("imsg compose HAVE");
 
 	return NULL;
@@ -877,7 +879,7 @@ recv_packfile(struct gotd_session_client *client)
 
 	/* Send pack pipe end 0 to repo child process. */
 	if (gotd_imsg_compose_event(&client->repo_child_iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_SESSION, pipe[0],
+	    GOTD_IMSG_PACKFILE_PIPE, gotd_session.proc_id, pipe[0],
 	        &ipipe, sizeof(ipipe)) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		pipe[0] = -1;
@@ -887,7 +889,8 @@ recv_packfile(struct gotd_session_client *client)
 
 	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
 	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_SESSION, pipe[1], NULL, 0) == -1)
+	    GOTD_IMSG_PACKFILE_PIPE, gotd_session.proc_id, pipe[1],
+	    NULL, 0) == -1)
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 	pipe[1] = -1;
 
@@ -925,7 +928,7 @@ recv_packfile(struct gotd_session_client *client)
 	memset(&ifile, 0, sizeof(ifile));
 	ifile.client_id = client->id;
 	if (gotd_imsg_compose_event(&client->repo_child_iev,
-	    GOTD_IMSG_PACKIDX_FILE, PROC_SESSION,
+	    GOTD_IMSG_PACKIDX_FILE, gotd_session.proc_id,
 	    idxfd, &ifile, sizeof(ifile)) == -1) {
 		err = got_error_from_errno("imsg compose PACKIDX_FILE");
 		idxfd = -1;
@@ -939,7 +942,7 @@ recv_packfile(struct gotd_session_client *client)
 		ipack.report_status = 1;
 
 	if (gotd_imsg_compose_event(&client->repo_child_iev,
-	    GOTD_IMSG_RECV_PACKFILE, PROC_SESSION, packfd,
+	    GOTD_IMSG_RECV_PACKFILE, gotd_session.proc_id, packfd,
 	    &ipack, sizeof(ipack)) == -1) {
 		err = got_error_from_errno("imsg compose RECV_PACKFILE");
 		packfd = -1;
@@ -1268,7 +1271,7 @@ list_refs_request(void)
 		return got_error_from_errno("dup");
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LIST_REFS_INTERNAL,
-	    PROC_SESSION, fd, &ilref, sizeof(ilref)) == -1) {
+	    gotd_session.proc_id, fd, &ilref, sizeof(ilref)) == -1) {
 		err = got_error_from_errno("imsg compose LIST_REFS_INTERNAL");
 		close(fd);
 		return err;
@@ -1447,7 +1450,8 @@ done:
 
 void
 session_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds, struct timeval *request_timeout)
+    int *pack_fds, int *temp_fds, struct timeval *request_timeout,
+    enum gotd_procid proc_id)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -1458,6 +1462,7 @@ session_main(const char *title, const char *repo_path,
 	gotd_session.temp_fds = temp_fds;
 	memcpy(&gotd_session.request_timeout, request_timeout,
 	    sizeof(gotd_session.request_timeout));
+	gotd_session.proc_id = proc_id;
 
 	err = got_repo_open(&gotd_session.repo, repo_path, NULL, pack_fds);
 	if (err)
@@ -1494,7 +1499,8 @@ session_main(const char *title, const char *repo_path,
 	event_set(&gotd_session.parent_iev.ev, gotd_session.parent_iev.ibuf.fd,
 	    EV_READ, session_dispatch, &gotd_session.parent_iev);
 	if (gotd_imsg_compose_event(&gotd_session.parent_iev,
-	    GOTD_IMSG_CLIENT_SESSION_READY, PROC_SESSION, -1, NULL, 0) == -1) {
+	    GOTD_IMSG_CLIENT_SESSION_READY, gotd_session.proc_id,
+	    -1, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose CLIENT_SESSION_READY");
 		goto done;
 	}
