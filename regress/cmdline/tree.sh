@@ -32,15 +32,18 @@ test_tree_basic() {
 	echo 'foo' >> $testroot/stdout.expected
 	echo 'gamma/' >> $testroot/stdout.expected
 
-	(cd $testroot/wt && got tree > $testroot/stdout)
+	for p in "" "." "/"; do
+		(cd $testroot/wt && got tree $p > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-	fi
-
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 test_tree_branch() {
