@@ -6150,7 +6150,7 @@ cmd_tree(int argc, char *argv[])
 		const char *prefix = got_worktree_get_path_prefix(worktree);
 		char *p;
 
-		if (path == NULL)
+		if (path == NULL || got_path_is_root_dir(path))
 			path = "";
 		error = got_worktree_resolve_path(&p, worktree, path);
 		if (error)
