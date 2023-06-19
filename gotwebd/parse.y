@@ -400,7 +400,7 @@ serveropts1	: REPOS_PATH STRING {
 			new_srv->respect_exportok = $2;
 		}
 		| MAX_REPOS_DISPLAY NUMBER {
-			if ($2 <= 0) {
+			if ($2 < 0) {
 				yyerror("max_repos_display is too small: %lld",
 				    $2);
 				YYERROR;
