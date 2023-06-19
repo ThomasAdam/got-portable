@@ -613,6 +613,42 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_repo_cleanup_prepare(struct got_repository *repo,
+    struct got_lockfile **lk)
+{
+	const struct got_error *err;
+	char myname[HOST_NAME_MAX + 1];
+
+	if (gethostname(myname, sizeof(myname)) == -1)
+		return got_error_from_errno("gethostname");
+
+	err = got_lockfile_lock(lk, "gc.pid", got_repo_get_fd(repo));
+	if (err)
+		return err;
+
+	/*
+	 * Git uses these info to provide some verbiage when finds a
+	 * lock during `git gc --force' so don't try too hard to avoid
+	 * short writes and don't care if a race happens between the
+	 * lockfile creation and the write itself.
+	 */
+	if (dprintf((*lk)->fd, "%d %s", getpid(), myname) < 0)
+		return got_error_from_errno("dprintf");
+
+	return NULL;
+}
+
+const struct got_error *
+got_repo_cleanup_complete(struct got_repository *repo,
+    struct got_lockfile *lk)
+{
+	if (lk == NULL)
+		return NULL;
+
+	return got_lockfile_unlock(lk, got_repo_get_fd(repo));
+}
+
 static const struct got_error *
 report_cleanup_progress(got_cleanup_progress_cb progress_cb,
     void *progress_arg, struct got_ratelimit *rl,
@@ -1419,21 +1455,6 @@ got_repo_purge_redundant_packfiles(struct got_repository *repo,
 	return err;
 }
 
-static const struct got_error *
-remove_packidx(int dir_fd, const char *relpath)
-{
-	const struct got_error *err, *unlock_err;
-	struct got_lockfile *lf;
-
-	err = got_lockfile_lock(&lf, relpath, dir_fd);
-	if (err)
-		return err;
-	if (unlinkat(dir_fd, relpath, 0) == -1)
-		err = got_error_from_errno("unlinkat");
-	unlock_err = got_lockfile_unlock(lf, dir_fd);
-	return err ? err : unlock_err;
-}
-
 const struct got_error *
 got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
     got_lonely_packidx_progress_cb progress_cb, void *progress_arg,
@@ -1491,9 +1512,10 @@ got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
 		}
 
 		if (!dry_run) {
-			err = remove_packidx(packdir_fd, dent->d_name);
-			if (err)
+			if (unlinkat(packdir_fd, dent->d_name, 0) == -1) {
+				err = got_error_from_errno("unlinkat");
 				goto done;
+			}
 		}
 		if (progress_cb) {
 			char *path;

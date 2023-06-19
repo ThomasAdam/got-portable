@@ -55,11 +55,11 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path, int dir_fd)
 	do {
 		if (dir_fd != -1) {
 			(*lf)->fd = openat(dir_fd, (*lf)->path,
-			    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK | O_CLOEXEC,
+			    O_RDWR | O_CREAT | O_EXCL | O_EXLOCK | O_CLOEXEC,
 			    GOT_DEFAULT_FILE_MODE);
 		} else {
 			(*lf)->fd = open((*lf)->path,
-			    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK | O_CLOEXEC,
+			    O_RDWR | O_CREAT | O_EXCL | O_EXLOCK | O_CLOEXEC,
 			    GOT_DEFAULT_FILE_MODE);
 		}
 		if ((*lf)->fd != -1)

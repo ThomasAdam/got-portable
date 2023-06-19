@@ -134,6 +134,9 @@ struct got_repository {
 
 	/* Settings read from got.conf. */
 	struct got_gotconfig *gotconfig;
+
+	/* cleanup lockfile */
+	struct got_lockfile *cleanup_lock;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,

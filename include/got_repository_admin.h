@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_lockfile;
+
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_pack_progress_cb)(void *arg,
     int ncolored, int nfound, int ntrees, off_t packfile_size, int ncommits,
@@ -67,6 +69,18 @@ const struct got_error *
 got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
     struct got_repository *repo, got_pack_list_cb list_cb, void *list_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
+
+/*
+ * Prepare for removing loose objects or redundant packfiles.
+ *
+ * These functions do the necessary locking in order to avoid
+ * concurrent operation to irremediably damage the repository.
+ */
+const struct got_error *
+got_repo_cleanup_prepare(struct got_repository *, struct got_lockfile **);
+
+const struct got_error *
+got_repo_cleanup_complete(struct got_repository *, struct got_lockfile *);
 
 /* A callback function which gets invoked with cleanup information to print. */
 typedef const struct got_error *(*got_cleanup_progress_cb)(void *arg,
