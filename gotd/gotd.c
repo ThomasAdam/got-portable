@@ -723,7 +723,8 @@ static const char *gotd_proc_names[PROC_MAX] = {
 	"parent",
 	"listen",
 	"auth",
-	"session",
+	"session_read",
+	"session_write",
 	"repo_read",
 	"repo_write"
 };
