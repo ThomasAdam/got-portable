@@ -485,16 +485,22 @@ const struct got_error *got_worktree_merge_in_progress(int *,
     struct got_worktree *, struct got_repository *);
 
 /*
- * Prepare for merging a branch into the work tree's current branch.
+ * Prepare for merging a branch into the work tree's current branch: lock the
+ * worktree and check that preconditions are satisfied. The function also
+ * returns a pointer to a fileindex which must be passed back to other
+ * merge-related functions.
+ */
+const struct got_error *got_worktree_merge_prepare(struct got_fileindex **,
+    struct got_worktree *, struct got_repository *);
+
+/*
  * This function creates a reference to the branch being merged, and to
  * this branch's current tip commit, in the "got/worktree/merge/" namespace.
  * These references are used to keep track of merge operation state and are
  * used as input and/or output arguments with other merge-related functions.
- * The function also returns a pointer to a fileindex which must be
- * passed back to other merge-related functions.
  */
-const struct got_error *got_worktree_merge_prepare(struct got_fileindex **,
-    struct got_worktree *, struct got_reference *, struct got_repository *);
+const struct got_error *got_worktree_merge_write_refs(struct got_worktree *,
+    struct got_reference *, struct got_repository *);
 
 /*
  * Continue an interrupted merge operation.

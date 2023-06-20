@@ -8486,14 +8486,12 @@ got_worktree_merge_in_progress(int *in_progress, struct got_worktree *worktree,
 
 const struct got_error *got_worktree_merge_prepare(
     struct got_fileindex **fileindex, struct got_worktree *worktree,
-    struct got_reference *branch, struct got_repository *repo)
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *fileindex_path = NULL;
-	char *branch_refname = NULL, *commit_refname = NULL;
-	struct got_reference *wt_branch = NULL, *branch_ref = NULL;
-	struct got_reference *commit_ref = NULL;
-	struct got_object_id *branch_tip = NULL, *wt_branch_tip = NULL;
+	struct got_reference *wt_branch = NULL;
+	struct got_object_id *wt_branch_tip = NULL;
 	struct check_rebase_ok_arg ok_arg;
 
 	*fileindex = NULL;
@@ -8514,14 +8512,6 @@ const struct got_error *got_worktree_merge_prepare(
 	if (err)
 		goto done;
 
-	err = get_merge_branch_ref_name(&branch_refname, worktree);
-	if (err)
-		return err;
-
-	err = get_merge_commit_ref_name(&commit_refname, worktree);
-	if (err)
-		return err;
-
 	err = got_ref_open(&wt_branch, repo, worktree->head_ref_name,
 	    0);
 	if (err)
@@ -8535,6 +8525,38 @@ const struct got_error *got_worktree_merge_prepare(
 		err = got_error(GOT_ERR_MERGE_OUT_OF_DATE);
 		goto done;
 	}
+
+done:
+	free(fileindex_path);
+	if (wt_branch)
+		got_ref_close(wt_branch);
+	free(wt_branch_tip);
+	if (err) {
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *got_worktree_merge_write_refs(
+    struct got_worktree *worktree, struct got_reference *branch,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *branch_refname = NULL, *commit_refname = NULL;
+	struct got_reference *branch_ref = NULL, *commit_ref = NULL;
+	struct got_object_id *branch_tip = NULL;
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		return err;
+
+	err = get_merge_commit_ref_name(&commit_refname, worktree);
+	if (err)
+		return err;
 
 	err = got_ref_resolve(&branch_tip, repo, branch);
 	if (err)
@@ -8557,21 +8579,11 @@ const struct got_error *got_worktree_merge_prepare(
 done:
 	free(branch_refname);
 	free(commit_refname);
-	free(fileindex_path);
 	if (branch_ref)
 		got_ref_close(branch_ref);
 	if (commit_ref)
 		got_ref_close(commit_ref);
-	if (wt_branch)
-		got_ref_close(wt_branch);
-	free(wt_branch_tip);
-	if (err) {
-		if (*fileindex) {
-			got_fileindex_free(*fileindex);
-			*fileindex = NULL;
-		}
-		lock_worktree(worktree, LOCK_SH);
-	}
+	free(branch_tip);
 	return err;
 }
 

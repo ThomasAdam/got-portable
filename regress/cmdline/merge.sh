@@ -52,31 +52,7 @@ test_merge_basic() {
 		return 1
 	fi
 
-	# need a divergant commit on the main branch for 'got merge'
-	(cd $testroot/wt && got merge newbranch \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "got merge succeeded unexpectedly" >&2
-		test_done "$testroot" "1"
-		return 1
-	fi
-	echo -n "got: cannot create a merge commit because " \
-		> $testroot/stderr.expected
-	echo -n "refs/heads/newbranch is based on refs/heads/master; " \
-		>> $testroot/stderr.expected
-	echo -n "refs/heads/newbranch can be integrated with " \
-		>> $testroot/stderr.expected
-	echo "'got integrate' instead" >> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	# create the required dirvergant commit
+	# create a divergent commit
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
@@ -367,6 +343,158 @@ EOF
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_merge_forward() {
+	local testroot=`test_init merge_forward`
+	local commit0=`git_show_head $testroot/repo`
+
+	# Create a commit before branching, which will be used to help test
+	# preconditions for "got merge".
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "common commit"
+	local commit1=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified beta on branch" > $testroot/repo/beta
+	git_commit $testroot/repo -m "committing to beta on newbranch"
+	local commit2=`git_show_head $testroot/repo`
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# must not use a mixed-commit work tree with 'got merge'
+	(cd $testroot/wt && got update -c $commit0 alpha > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	(cd $testroot/wt && got merge newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got merge succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n "got: work tree contains files from multiple base commits; " \
+		> $testroot/stderr.expected
+	echo "the entire work tree must be updated first" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# 'got merge -n' refuses to fast-forward
+	(cd $testroot/wt && got merge -n newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got merge succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n "got: merge is a fast-forward; " > $testroot/stderr.expected 
+	echo "this is incompatible with got merge -n" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Forwarding refs/heads/master to refs/heads/newbranch" \
+		> $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo "Updated to commit $commit2" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log | grep ^commit > $testroot/stdout)
+	echo -n "commit $commit2 " > $testroot/stdout.expected
+	echo "(master, newbranch)" >> $testroot/stdout.expected
+	echo "commit $commit1" >> $testroot/stdout.expected
+	echo "commit $commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_merge_backward() {
+	local testroot=`test_init merge_backward`
+	local commit0=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "Already up-to-date" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -1566,6 +1694,8 @@ test_merge_gitconfig_author() {
 
 test_parseargs "$@"
 run_test test_merge_basic
+run_test test_merge_forward
+run_test test_merge_backward
 run_test test_merge_continue
 run_test test_merge_continue_new_commit
 run_test test_merge_abort
