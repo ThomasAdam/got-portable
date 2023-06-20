@@ -2796,9 +2796,18 @@ or reverted with
 .Op Ar branch
 .Xc
 .Dl Pq alias: Cm mg
-Create a merge commit based on the current branch of the work tree and
-the specified
-.Ar branch .
+Merge the specified
+.Ar branch
+into the current branch of the work tree.
+If the branches have diverged, creates a merge commit.
+Otherwise, if
+.Ar branch
+already includes all commits from the work tree's branch, updates the work
+tree's branch to be the same as
+.Ar branch
+without creating a commit, and updates the work tree to the most recent commit
+on the branch.
+.Pp
 If a linear project history is desired, then use of
 .Cm got rebase
 should be preferred over
@@ -2854,14 +2863,6 @@ the work tree's current branch unmodified.
 .Pp
 .Cm got merge
 will refuse to run if certain preconditions are not met.
-If history of the
-.Ar branch
-is based on the work tree's current branch, then no merge commit can
-be created and
-.Cm got integrate
-may be used to integrate the
-.Ar branch
-instead.
 If the work tree is not yet fully updated to the tip commit of its
 branch, then the work tree must first be updated with
 .Cm got update .
