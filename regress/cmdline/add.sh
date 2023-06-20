@@ -65,6 +65,24 @@ test_double_add() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/wt/epsilon/zeta2
+	(cd $testroot/wt && got add epsilon/zeta* > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got add failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo 'A  epsilon/zeta2' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
