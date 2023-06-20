@@ -98,7 +98,27 @@ test_add_multiple() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	echo "new file" > $testroot/wt/bax
+	(cd $testroot/wt && got add -R * > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got add failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "A  bax" > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
