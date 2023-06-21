@@ -13263,6 +13263,16 @@ cmd_merge(int argc, char *argv[])
 		goto done; /* nothing else to do */
 	}
 
+	if (strncmp(got_worktree_get_head_ref_name(worktree),
+	    "refs/heads/", 11) != 0) {
+		error = got_error_fmt(GOT_ERR_COMMIT_BRANCH,
+		    "work tree's current branch %s is outside the "
+		    "\"refs/heads/\" reference namespace; "
+		    "update -b required",
+		    got_worktree_get_head_ref_name(worktree));
+		goto done;
+	}
+
 	error = get_author(&author, repo, worktree);
 	if (error)
 		goto done;
