@@ -2837,7 +2837,10 @@ created with
 .Cm got import .
 .Pp
 Merge commits are commits based on multiple parent commits.
-The tip commit of the work tree's current branch, which must be set with
+The tip commit of the work tree's current branch, which must be
+must be in the
+.Dq refs/heads/
+reference namespace and must be set with
 .Cm got update -b
 before starting the
 .Cm merge
@@ -2882,6 +2885,13 @@ the work tree's current branch unmodified.
 .Pp
 .Cm got merge
 will refuse to run if certain preconditions are not met.
+If the work tree's current branch is not in the
+.Dq refs/heads/
+reference namespace then the work tree must first be switched to a
+branch in the
+.Dq refs/heads/
+namespace with
+.Cm got update -b .
 If the work tree is not yet fully updated to the tip commit of its
 branch, then the work tree must first be updated with
 .Cm got update .

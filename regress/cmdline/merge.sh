@@ -1692,6 +1692,171 @@ test_merge_gitconfig_author() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_fetched_branch() {
+	local testroot=`test_init merge_fetched_branch`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id2" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout $testroot/repo-clone $testroot/wt > /dev/null
+
+	echo "modified beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "modified beta" > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo-clone`
+
+	(cd $testroot/wt && got update > /dev/null)
+	(cd $testroot/wt && got merge origin/master > $testroot/stdout)
+	local merge_commit_id=`git_show_head $testroot/repo-clone`
+
+	cat > $testroot/stdout.expected <<EOF
+G  alpha
+Merged refs/remotes/origin/master into refs/heads/master: $merge_commit_id
+EOF
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_merge_fetched_branch_remote() {
+	local testroot=`test_init merge_fetched_branch_remote`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got fetch -q -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id2" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout $testroot/repo-clone $testroot/wt > /dev/null
+
+	echo "modified beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "modified beta" > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo-clone`
+
+	(cd $testroot/wt && got update -b origin/master > /dev/null)
+	(cd $testroot/wt && got merge master > \
+		$testroot/stdout 2> $testroot/stderr)
+	local merge_commit_id=`git_show_head $testroot/repo-clone`
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: work tree's current branch refs/remotes/origin/master " \
+		> $testroot/stderr.expected
+	echo -n 'is outside the "refs/heads/" reference namespace; ' \
+		>> $testroot/stderr.expected
+	echo -n "update -b required: will not commit to a branch " \
+		>> $testroot/stderr.expected
+	echo 'outside the "refs/heads/" reference namespace' \
+		>> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_forward
@@ -1707,3 +1872,5 @@ run_test test_merge_imported_branch
 run_test test_merge_interrupt
 run_test test_merge_umask
 run_test test_merge_gitconfig_author
+run_test test_merge_fetched_branch
+run_test test_merge_fetched_branch_remote
