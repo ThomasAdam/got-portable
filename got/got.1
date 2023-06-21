@@ -1412,6 +1412,25 @@ By default, files which match a
 .Cm got status
 ignore pattern will not be added.
 .Pp
+If a
+.Ar path
+mentioned in the command line is not an unversioned file then
+.Cm got add
+may raise an error.
+To avoid unnecessary errors from paths picked up by file globbing patterns
+in the shell, paths in the argument list will be silently ignored if they
+are not reported by
+.Cm got status
+at all, or if they are reported with one of the following status codes
+and do not have changes staged via
+.Cm got stage :
+.Bl -column YXZ description
+.It M Ta modified file
+.It A Ta file scheduled for addition in next commit
+.It C Ta modified or added file which contains merge conflicts
+.It m Ta modified file modes (executable bit only)
+.El
+.Pp
 The options for
 .Cm got add
 are as follows:
