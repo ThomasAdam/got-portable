@@ -10,6 +10,14 @@ for any functionality which has not yet been implemented in Got.
 It will always remain possible to work with both Got and Git on
 the same repository.
 
+A Got release tarball will install files under /usr/local by default.
+This default can be changed by passing PREFIX=/some/path to make.
+
+A build started in Got's Git repository will install files under ~/bin,
+which may have to be added to $PATH and be created first:
+
+ $ mkdir ~/bin
+
 To compile the Got client tool suite on OpenBSD, run:
 
  $ make obj
@@ -22,9 +30,6 @@ This will install the following commands:
  tog, an ncurses-based interactive Git repository browser
  several helper programs from the libexec directory
  man pages (only installed if building sources from a Got release tarball)
-
-A Got release tarball will install files under /usr/local by default.
-A build started in Got's Git repository will install files under ~/bin.
 
 Tests will pass only after 'make install' because they rely on installed
 binaries in $PATH. Any tests written as shell scripts also depend on git(1).
