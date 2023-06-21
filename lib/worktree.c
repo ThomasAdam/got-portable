@@ -4197,6 +4197,16 @@ struct schedule_addition_args {
 	struct got_repository *repo;
 };
 
+static int
+add_noop_status(unsigned char status)
+{
+	return (status == GOT_STATUS_ADD ||
+	    status == GOT_STATUS_MODIFY ||
+	    status == GOT_STATUS_CONFLICT ||
+	    status == GOT_STATUS_MODE_CHANGE ||
+	    status == GOT_STATUS_NO_CHANGE);
+}
+
 static const struct got_error *
 schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
     const char *relpath, struct got_object_id *blob_id,
@@ -4220,7 +4230,8 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 		if (err)
 			goto done;
 		/* Re-adding an existing entry is a no-op. */
-		if (status == GOT_STATUS_ADD)
+		if (staged_status == GOT_STATUS_NO_CHANGE &&
+		    add_noop_status(status))
 			goto done;
 		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
 		if (err)
@@ -4253,7 +4264,7 @@ done:
 	free(ondisk_path);
 	if (err)
 		return err;
-	if (status == GOT_STATUS_ADD)
+	if (staged_status == GOT_STATUS_NO_CHANGE && add_noop_status(status))
 		return NULL;
 	return (*a->progress_cb)(a->progress_arg, GOT_STATUS_ADD, relpath);
 }

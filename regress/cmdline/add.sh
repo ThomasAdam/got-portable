@@ -120,6 +120,7 @@ test_add_multiple() {
 		return 1
 	fi
 
+	echo "changed file" > $testroot/wt/alpha
 	echo "new file" > $testroot/wt/bax
 	(cd $testroot/wt && got add -R * > $testroot/stdout)
 	ret=$?
