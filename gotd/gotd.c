@@ -77,7 +77,11 @@ struct gotd_child_proc {
 	char				 repo_path[PATH_MAX];
 	int				 pipe[2];
 	struct gotd_imsgev		 iev;
+	struct event			 tmo;
+
+	TAILQ_ENTRY(gotd_child_proc)	 entry;
 };
+TAILQ_HEAD(gotd_procs, gotd_child_proc) procs;
 
 struct gotd_client {
 	STAILQ_ENTRY(gotd_client)	 entry;
@@ -110,6 +114,7 @@ static const struct got_error *start_repo_child(struct gotd_client *,
 static const struct got_error *start_auth_child(struct gotd_client *, int,
     struct gotd_repo *, char *, const char *, int, int);
 static void kill_proc(struct gotd_child_proc *, int);
+static void disconnect(struct gotd_client *);
 
 __dead static void
 usage(void)
@@ -273,77 +278,62 @@ ensure_client_is_not_reading(struct gotd_client *client)
 }
 
 static void
-wait_for_child(pid_t child_pid)
-{
-	pid_t pid;
-	int status;
-
-	log_debug("waiting for child PID %ld to terminate",
-	    (long)child_pid);
-
-	do {
-		pid = waitpid(child_pid, &status, WNOHANG);
-		if (pid == -1) {
-			if (errno != EINTR && errno != ECHILD)
-				fatal("wait");
-		} else if (WIFSIGNALED(status)) {
-			log_warnx("child PID %ld terminated; signal %d",
-			    (long)pid, WTERMSIG(status));
-		}
-	} while (pid != -1 || (pid == -1 && errno == EINTR));
-}
-
-static void
 proc_done(struct gotd_child_proc *proc)
 {
-	event_del(&proc->iev.ev);
-	msgbuf_clear(&proc->iev.ibuf.w);
-	close(proc->iev.ibuf.fd);
-	kill_proc(proc, 0);
-	wait_for_child(proc->pid);
+	struct gotd_client *client;
+
+	TAILQ_REMOVE(&procs, proc, entry);
+
+	client = find_client_by_proc_fd(proc->iev.ibuf.fd);
+	if (client != NULL) {
+		if (proc == client->repo)
+			client->repo = NULL;
+		if (proc == client->auth)
+			client->auth = NULL;
+		if (proc == client->session)
+			client->session = NULL;
+		disconnect(client);
+	}
+
+	evtimer_del(&proc->tmo);
+
+	if (proc->iev.ibuf.fd != -1) {
+		event_del(&proc->iev.ev);
+		msgbuf_clear(&proc->iev.ibuf.w);
+		close(proc->iev.ibuf.fd);
+	}
+
 	free(proc);
 }
 
 static void
 kill_repo_proc(struct gotd_client *client)
 {
-	struct gotd_child_proc *proc;
-
 	if (client->repo == NULL)
 		return;
 
-	proc = client->repo;
+	kill_proc(client->repo, 0);
 	client->repo = NULL;
-
-	proc_done(proc);
 }
 
 static void
 kill_auth_proc(struct gotd_client *client)
 {
-	struct gotd_child_proc *proc;
-
 	if (client->auth == NULL)
 		return;
 
-	proc = client->auth;
+	kill_proc(client->auth, 0);
 	client->auth = NULL;
-
-	proc_done(proc);
 }
 
 static void
 kill_session_proc(struct gotd_client *client)
 {
-	struct gotd_child_proc *proc;
-
 	if (client->session == NULL)
 		return;
 
-	proc = client->session;
+	kill_proc(client->session, 0);
 	client->session = NULL;
-
-	proc_done(proc);
 }
 
 static void
@@ -742,6 +732,20 @@ static const char *gotd_proc_names[PROC_MAX] = {
 static void
 kill_proc(struct gotd_child_proc *proc, int fatal)
 {
+	struct timeval tv = { 5, 0 };
+
+	log_debug("kill -%d %d", fatal ? SIGKILL : SIGTERM, proc->pid);
+
+	if (proc->iev.ibuf.fd != -1) {
+		event_del(&proc->iev.ev);
+		msgbuf_clear(&proc->iev.ibuf.w);
+		close(proc->iev.ibuf.fd);
+		proc->iev.ibuf.fd = -1;
+	}
+
+	if (!evtimer_pending(&proc->tmo, NULL) && !fatal)
+		evtimer_add(&proc->tmo, &tv);
+
 	if (fatal) {
 		log_warnx("sending SIGKILL to PID %d", proc->pid);
 		kill(proc->pid, SIGKILL);
@@ -750,9 +754,18 @@ kill_proc(struct gotd_child_proc *proc, int fatal)
 }
 
 static void
+kill_proc_timeout(int fd, short ev, void *d)
+{
+	struct gotd_child_proc *proc = d;
+
+	log_warnx("timeout waiting for PID %d to terminate;"
+	    " retrying with force", proc->pid);
+	kill_proc(proc, 1);
+}
+
+static void
 gotd_shutdown(void)
 {
-	struct gotd_child_proc *proc;
 	uint64_t slot;
 
 	log_debug("shutting down");
@@ -763,20 +776,31 @@ gotd_shutdown(void)
 			disconnect(c);
 	}
 
-	proc = gotd.listen_proc;
-	msgbuf_clear(&proc->iev.ibuf.w);
-	close(proc->iev.ibuf.fd);
-	kill_proc(proc, 0);
-	wait_for_child(proc->pid);
-	free(proc);
+	kill_proc(gotd.listen_proc, 0);
 
 	log_info("terminating");
 	exit(0);
 }
 
+static struct gotd_child_proc *
+find_proc_by_pid(pid_t pid)
+{
+	struct gotd_child_proc *proc = NULL;
+
+	TAILQ_FOREACH(proc, &procs, entry)
+		if (proc->pid == pid)
+			break;
+
+	return proc;
+}
+
 void
 gotd_sighdlr(int sig, short event, void *arg)
 {
+	struct gotd_child_proc *proc;
+	pid_t pid;
+	int status;
+
 	/*
 	 * Normal signal handler rules don't apply because libevent
 	 * decouples for us.
@@ -792,6 +816,35 @@ gotd_sighdlr(int sig, short event, void *arg)
 	case SIGTERM:
 	case SIGINT:
 		gotd_shutdown();
+		break;
+	case SIGCHLD:
+		for (;;) {
+			pid = waitpid(WAIT_ANY, &status, WNOHANG);
+			if (pid == -1) {
+				if (errno == EINTR)
+					continue;
+				if (errno == ECHILD)
+					break;
+				fatal("waitpid");
+			}
+			if (pid == 0)
+				break;
+
+			log_debug("reaped pid %d", pid);
+			proc = find_proc_by_pid(pid);
+			if (proc == NULL) {
+				log_info("caught exit of unknown child %d",
+				    pid);
+				continue;
+			}
+
+			if (WIFSIGNALED(status)) {
+				log_warnx("child PID %d terminated with"
+				    " signal %d", pid, WTERMSIG(status));
+			}
+
+			proc_done(proc);
+		}
 		break;
 	default:
 		fatalx("unexpected signal");
@@ -1505,6 +1558,10 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	if (proc == NULL)
 		fatal("calloc");
 
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+
+	/* proc->tmo is initialized in main() after event_init() */
+
 	proc->type = PROC_LISTEN;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
@@ -1530,6 +1587,9 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
 		return got_error_from_errno("calloc");
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	if (client_is_reading(client))
 		proc->type = PROC_SESSION_READ;
@@ -1576,6 +1636,9 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
 		return got_error_from_errno("calloc");
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	proc->type = proc_type;
 	if (strlcpy(proc->repo_name, repo->name,
@@ -1628,6 +1691,9 @@ start_auth_child(struct gotd_client *client, int required_auth,
 		close(fd);
 		return err;
 	}
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	proc->type = PROC_AUTH;
 	if (strlcpy(proc->repo_name, repo->name,
@@ -1729,9 +1795,11 @@ main(int argc, char **argv)
 	struct passwd *pw = NULL;
 	char *repo_path = NULL;
 	enum gotd_procid proc_id = PROC_GOTD;
-	struct event evsigint, evsigterm, evsighup, evsigusr1;
+	struct event evsigint, evsigterm, evsighup, evsigusr1, evsigchld;
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
+
+	TAILQ_INIT(&procs);
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
@@ -1952,18 +2020,23 @@ main(int argc, char **argv)
 	if (proc_id != PROC_GOTD)
 		fatal("invalid process id %d", proc_id);
 
+	evtimer_set(&gotd.listen_proc->tmo, kill_proc_timeout,
+	    gotd.listen_proc);
+
 	apply_unveil_selfexec();
 
 	signal_set(&evsigint, SIGINT, gotd_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, gotd_sighdlr, NULL);
 	signal_set(&evsighup, SIGHUP, gotd_sighdlr, NULL);
 	signal_set(&evsigusr1, SIGUSR1, gotd_sighdlr, NULL);
+	signal_set(&evsigchld, SIGCHLD, gotd_sighdlr, NULL);
 	signal(SIGPIPE, SIG_IGN);
 
 	signal_add(&evsigint, NULL);
 	signal_add(&evsigterm, NULL);
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
+	signal_add(&evsigchld, NULL);
 
 	gotd_imsg_event_add(&gotd.listen_proc->iev);
 
