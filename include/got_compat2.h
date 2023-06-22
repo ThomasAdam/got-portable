@@ -297,6 +297,10 @@ typedef struct _SHA2_CTX {
 #define SOCK_NONBLOCK 00004000
 #endif
 
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX _SC_HOST_NAME_MAX
+#endif
+
 #ifndef HAVE_ASPRINTF
 /* asprintf.c */
 int		 asprintf(char **, const char *, ...);
