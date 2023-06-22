@@ -51,16 +51,6 @@ struct gotd_imsgev {
 	short		 events;
 };
 
-struct gotd_child_proc {
-	pid_t pid;
-	enum gotd_procid type;
-	char repo_name[NAME_MAX];
-	char repo_path[PATH_MAX];
-	int pipe[2];
-	struct gotd_imsgev iev;
-	size_t nhelpers;
-};
-
 enum gotd_access {
 	GOTD_ACCESS_PERMITTED = 1,
 	GOTD_ACCESS_DENIED
@@ -120,13 +110,15 @@ struct gotd_uid_connection_limit {
 	int max_connections;
 };
 
+struct gotd_child_proc;
+
 struct gotd {
 	pid_t pid;
 	char unix_socket_path[PATH_MAX];
 	char user_name[32];
 	struct gotd_repolist repos;
 	int nrepos;
-	struct gotd_child_proc listen_proc;
+	struct gotd_child_proc *listen_proc;
 	struct timeval request_timeout;
 	struct timeval auth_timeout;
 	struct gotd_uid_connection_limit *connection_limits;
