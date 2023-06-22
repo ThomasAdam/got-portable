@@ -764,7 +764,7 @@ gotd_shutdown(void)
 	close(proc->iev.ibuf.fd);
 	kill_proc(proc, 0);
 	wait_for_child(proc->pid);
-	free(proc)
+	free(proc);
 
 	log_info("terminating");
 	exit(0);
