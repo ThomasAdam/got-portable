@@ -415,9 +415,16 @@ test_merge_forward() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo -n "got: merge is a fast-forward; " > $testroot/stderr.expected 
-	echo "this is incompatible with got merge -n" \
+
+	echo -n "got: there are no changes to merge since " \
+		> $testroot/stderr.expected
+	echo -n "refs/heads/newbranch is already based on " \
 		>> $testroot/stderr.expected
+	echo -n "refs/heads/master; merge cannot be interrupted " \
+		>> $testroot/stderr.expected
+	echo "for amending; -n: option cannot be used" \
+		>> $testroot/stderr.expected
+
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
