@@ -13329,9 +13329,11 @@ cmd_merge(int argc, char *argv[])
 		if (yca_id && got_object_id_cmp(wt_branch_tip, yca_id) == 0) {
 			struct got_pathlist_head paths;
 			if (interrupt_merge) {
-				error = got_error_msg(GOT_ERR_SAME_BRANCH,
-				    "merge is a fast-forward; this is "
-				    "incompatible with got merge -n");
+				error = got_error_fmt(GOT_ERR_BAD_OPTION,
+				    "there are no changes to merge since %s "
+				    "is already based on %s; merge cannot be "
+				    "interrupted for amending; -n",
+				    branch_name, got_ref_get_name(wt_branch));
 				goto done;
 			}
 			printf("Forwarding %s to %s\n",
