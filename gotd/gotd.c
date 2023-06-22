@@ -308,6 +308,20 @@ proc_done(struct gotd_child_proc *proc)
 }
 
 static void
+kill_repo_proc(struct gotd_client *client)
+{
+	struct gotd_child_proc *proc;
+
+	if (client->repo == NULL)
+		return;
+
+	proc = client->repo;
+	client->repo = NULL;
+
+	proc_done(proc);
+}
+
+static void
 kill_auth_proc(struct gotd_client *client)
 {
 	struct gotd_child_proc *proc;
@@ -339,7 +353,6 @@ static void
 disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
-	struct gotd_child_proc *proc = client->repo;
 	struct gotd_child_proc *listen_proc = gotd.listen_proc;
 	uint64_t slot;
 
@@ -347,16 +360,7 @@ disconnect(struct gotd_client *client)
 
 	kill_auth_proc(client);
 	kill_session_proc(client);
-
-	if (proc) {
-		event_del(&proc->iev.ev);
-		msgbuf_clear(&proc->iev.ibuf.w);
-		close(proc->iev.ibuf.fd);
-		kill_proc(proc, 0);
-		wait_for_child(proc->pid);
-		free(proc);
-		proc = NULL;
-	}
+	kill_repo_proc(client);
 
 	idisconnect.client_id = client->id;
 	if (gotd_imsg_compose_event(&listen_proc->iev,
