@@ -142,7 +142,44 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_tree_symlink()
+{
+	test_init tree_symlink 48 8
+
+	(cd $testroot/repo && ln -s alpha symlink)
+	(cd $testroot/repo && git add symlink)
+	git_commit $testroot/repo -m "symlink to alpha"
+	local head_id=`git_show_head $testroot/repo`
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+commit $head_id
+[1/5] /
+
+  alpha
+  beta
+  epsilon/
+  gamma/
+  symlink@ -> alpha
+EOF
+
+	cd $testroot/repo && tog tree
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_vsplit_blame
 run_test test_tree_hsplit_blame
+run_test test_tree_symlink
