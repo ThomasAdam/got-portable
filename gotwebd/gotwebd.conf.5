@@ -80,13 +80,8 @@ followed by server-specific configuration directives inside curly braces:
 .Pp
 .Ic server Ar name Brq ...
 .Pp
-.Xr gotwebd 8
-is compatible with TLS Server Name Indication (SNI), provided the
-.Ar name
-of a server defined in
-.Nm
-corresponds to the name of a server defined in
-.Xr httpd.conf 5 .
+The first server defined is used if the requested hostname is not
+matched by any server block.
 .Pp
 The available server configuration directives are as follows:
 .Bl -tag -width Ds

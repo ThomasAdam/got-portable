@@ -243,7 +243,6 @@ struct request {
 	size_t				 outbuf_len;
 
 	char				 querystring[MAX_QUERYSTRING];
-	char				 http_host[GOTWEBD_MAXTEXT];
 	char				 document_uri[MAX_DOCUMENT_URI];
 	char				 server_name[MAX_SERVER_NAME];
 	int				 https;

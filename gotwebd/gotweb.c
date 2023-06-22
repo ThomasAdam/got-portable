@@ -98,7 +98,7 @@ static const struct got_error *gotweb_get_clone_url(char **, struct server *,
 static void gotweb_free_querystring(struct querystring *);
 static void gotweb_free_repo_dir(struct repo_dir *);
 
-struct server *gotweb_get_server(uint8_t *, uint8_t *);
+struct server *gotweb_get_server(const char *);
 
 static int
 gotweb_reply(struct request *c, int status, const char *ctype,
@@ -162,7 +162,7 @@ gotweb_process_request(struct request *c)
 	if (c->sock->client_status == CLIENT_DISCONNECT)
 		return;
 	/* get the gotwebd server */
-	srv = gotweb_get_server(c->server_name, c->http_host);
+	srv = gotweb_get_server(c->server_name);
 	if (srv == NULL) {
 		log_warnx("%s: error server is NULL", __func__);
 		goto err;
@@ -387,28 +387,18 @@ err:
 }
 
 struct server *
-gotweb_get_server(uint8_t *server_name, uint8_t *subdomain)
+gotweb_get_server(const char *server_name)
 {
-	struct server *srv = NULL;
+	struct server *srv;
 
 	/* check against the server name first */
 	if (*server_name != '\0')
 		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
 			if (strcmp(srv->name, server_name) == 0)
-				goto done;
+				return srv;
 
-	/* check against subdomain second */
-	if (*subdomain != '\0')
-		TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
-			if (strcmp(srv->name, subdomain) == 0)
-				goto done;
-
-	/* if those fail, send first server */
-	TAILQ_FOREACH(srv, &gotwebd_env->servers, entry)
-		if (srv != NULL)
-			break;
-done:
-	return srv;
+	/* otherwise, use the first server */
+	return TAILQ_FIRST(&gotwebd_env->servers);
 };
 
 const struct got_error *

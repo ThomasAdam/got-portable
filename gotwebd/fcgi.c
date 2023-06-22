@@ -182,7 +182,7 @@ void
 fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 {
 	uint32_t name_len, val_len;
-	uint8_t *sd, *val;
+	uint8_t *val;
 
 	if (!c->request_started) {
 		log_warn("FCGI_PARAMS without FCGI_BEGIN_REQUEST, ignoring");
@@ -243,23 +243,6 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 		    strncmp(buf, "QUERY_STRING", 12) == 0) {
 			memcpy(c->querystring, val, val_len);
 			c->querystring[val_len] = '\0';
-		}
-
-		if (c->http_host[0] == '\0' &&
-		    val_len < GOTWEBD_MAXTEXT &&
-		    name_len == 9 &&
-		    strncmp(buf, "HTTP_HOST", 9) == 0) {
-			memcpy(c->http_host, val, val_len);
-			c->http_host[val_len] = '\0';
-
-			/*
-			 * lazily get subdomain
-			 * will only get domain if no subdomain exists
-			 * this can still work if gotweb server name is the same
-			 */
-			sd = strchr(c->http_host, '.');
-			if (sd)
-				*sd = '\0';
 		}
 
 		if (c->document_uri[0] == '\0' &&
