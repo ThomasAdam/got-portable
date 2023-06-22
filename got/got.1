@@ -3688,6 +3688,18 @@ from upstream:
 .Dl $ got update -b upstream/master
 .Dl $ got rebase master
 .Pp
+As an alternative to
+.Cm got rebase ,
+branches can be merged with
+.Cm got merge :
+.Pp
+.Dl $ got update -b master
+.Dl $ got merge upstream/master
+.Pp
+The question of whether to rebase or merge branches is philosophical.
+When in doubt, refer to the software project's policies set by project
+maintainers.
+.Pp
 As a final step, the forked repository's copy of the master branch needs
 to be kept in sync by sending the new changes there:
 .Pp
