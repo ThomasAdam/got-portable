@@ -70,6 +70,15 @@ enum gotd_client_state {
 	GOTD_CLIENT_STATE_ACCESS_GRANTED,
 };
 
+struct gotd_child_proc {
+	pid_t				 pid;
+	enum gotd_procid		 type;
+	char				 repo_name[NAME_MAX];
+	char				 repo_path[PATH_MAX];
+	int				 pipe[2];
+	struct gotd_imsgev		 iev;
+};
+
 struct gotd_client {
 	STAILQ_ENTRY(gotd_client)	 entry;
 	enum gotd_client_state		 state;
@@ -328,7 +337,7 @@ disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
 	struct gotd_child_proc *proc = client->repo;
-	struct gotd_child_proc *listen_proc = &gotd.listen_proc;
+	struct gotd_child_proc *listen_proc = gotd.listen_proc;
 	uint64_t slot;
 
 	log_debug("uid %d: disconnecting", client->euid);
@@ -700,7 +709,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	    client->euid, client->fd);
 done:
 	if (err) {
-		struct gotd_child_proc *listen_proc = &gotd.listen_proc;
+		struct gotd_child_proc *listen_proc = gotd.listen_proc;
 		struct gotd_imsg_disconnect idisconnect;
 
 		idisconnect.client_id = client->id;
@@ -750,11 +759,12 @@ gotd_shutdown(void)
 			disconnect(c);
 	}
 
-	proc = &gotd.listen_proc;
+	proc = gotd.listen_proc;
 	msgbuf_clear(&proc->iev.ibuf.w);
 	close(proc->iev.ibuf.fd);
 	kill_proc(proc, 0);
 	wait_for_child(proc->pid);
+	free(proc)
 
 	log_info("terminating");
 	exit(0);
@@ -957,7 +967,7 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 {
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
-	struct gotd_child_proc *proc = &gotd.listen_proc;
+	struct gotd_child_proc *proc = gotd.listen_proc;
 	ssize_t n;
 	int shut = 0;
 	struct imsg imsg;
@@ -1485,7 +1495,11 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 static void
 start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 {
-	struct gotd_child_proc *proc = &gotd.listen_proc;
+	struct gotd_child_proc *proc;
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL)
+		fatal("calloc");
 
 	proc->type = PROC_LISTEN;
 
@@ -1499,6 +1513,8 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	proc->iev.handler = gotd_dispatch_listener;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
+
+	gotd.listen_proc = proc;
 }
 
 static const struct got_error *
@@ -1945,7 +1961,7 @@ main(int argc, char **argv)
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	gotd_imsg_event_add(&gotd.listen_proc.iev);
+	gotd_imsg_event_add(&gotd.listen_proc->iev);
 
 	event_dispatch();
 
