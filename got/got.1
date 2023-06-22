@@ -3288,10 +3288,15 @@ command names in
 .Dl $ set -A complete_got_1 -- $(got -h 2>&1 | sed -n s/commands://p)
 .Pp
 Clone an existing Git repository for use with
-.Nm .
+.Nm :
 .Pp
 .Dl $ cd /var/git/
 .Dl $ got clone ssh://git@github.com/openbsd/src.git
+.Pp
+Unfortunately, many of the popular Git hosting sites do not offer anonymous
+access via SSH.
+Such sites will require an account to be created, and a public SSH key to be
+uploaded to this account, before repository access via ssh:// URLs will work.
 .Pp
 Use of HTTP URLs currently requires
 .Xr git 1 :
