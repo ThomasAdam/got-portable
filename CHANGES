@@ -1,3 +1,26 @@
+* got 0.90; 2023-06-23
+  see git repository history for per-change authorship information
+- fix segfault in 'got diff' when a root commit is passed to -c
+- make 'got status' error out as intended when invoked in a repository
+- make 'got tree /' succeed in a work tree
+- make 'got add *' more forgiving about versioned paths on the command line
+- make 'got merge' forward branches if there are no changes to merge
+- prevent 'got merge' from creating commits on branches outside "refs/heads/"
+- got, tog: show reference names that begin with the prefix "HEAD" as intended
+- gotd: unveil repositories read-only in session process while serving fetches
+- gotd: avoid a "failed to push some refs" error from no-op 'git push'
+- gotd: avoid re-writing existing ref files when a ref-update is a no-op
+- gotd: show relevant commit hashes in error message if incoming pushes collide
+- gotd: wait asynchronously for child process termination
+- gotwebd: avoid the slowness of needlessly traversing full commit history
+- gotwebd.conf: disallow 1 for max_commits_display and report range errors
+- gotwebd.conf: disallow yes/no for booleans to avoid accidental "on" vs. "no"
+- gotwebd: avoid "gotweb_render_index: repo.git: unexpected end of file" error
+- gotwebd: simplify the matching of requests against servers in gotwebd.conf
+- ignore files with invalid reference names while reading references from disk
+- teach 'gotadmin cleanup' to remove redundant pack files
+- grab gc.pid.lock file during cleanup operation to block 'git gc' from running
+
 * got 0.89; 2023-06-05
   see git repository history for per-change authorship information
 - gotd: return early after disconnect on auth event error instead of crashing
