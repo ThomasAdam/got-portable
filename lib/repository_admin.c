@@ -1159,15 +1159,16 @@ done:
 
 const struct got_error *
 got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
-    off_t *size_before, off_t *size_after, int *npacked, int dry_run,
-    int ignore_mtime, got_cleanup_progress_cb progress_cb, void *progress_arg,
+    off_t *size_before, off_t *size_after, int *ncommits, int *nloose,
+    int *npacked, int dry_run, int ignore_mtime,
+    got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_object_idset *loose_ids;
 	struct got_object_idset *traversed_ids;
 	struct got_object_id **referenced_ids;
-	int i, nreferenced, nloose, ncommits = 0;
+	int i, nreferenced;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct purge_loose_object_arg arg;
@@ -1185,8 +1186,8 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	    progress_cb, progress_arg, &rl, repo);
 	if (err)
 		return err;
-	nloose = got_object_idset_num_elements(loose_ids);
-	if (nloose == 0) {
+	*nloose = got_object_idset_num_elements(loose_ids);
+	if (*nloose == 0) {
 		got_object_idset_free(loose_ids);
 		if (progress_cb) {
 			err = progress_cb(progress_arg, 0, 0, 0, -1);
@@ -1227,9 +1228,9 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 
 	for (i = 0; i < nreferenced; i++) {
 		struct got_object_id *id = referenced_ids[i];
-		err = load_commit_or_tag(loose_ids, &ncommits, npacked,
+		err = load_commit_or_tag(loose_ids, ncommits, npacked,
 		    traversed_ids, id, repo, progress_cb, progress_arg, &rl,
-		    nloose, cancel_cb, cancel_arg);
+		    *nloose, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -1239,10 +1240,10 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	arg.progress_arg = progress_arg;
 	arg.progress_cb = progress_cb;
 	arg.rl = &rl;
-	arg.nloose = nloose;
+	arg.nloose = *nloose;
 	arg.npurged = 0;
 	arg.size_purged = 0;
-	arg.ncommits = ncommits;
+	arg.ncommits = *ncommits;
 	arg.dry_run = dry_run;
 	arg.max_mtime = max_mtime;
 	arg.ignore_mtime = ignore_mtime;
@@ -1253,7 +1254,7 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 
 	/* Produce a final progress report. */
 	if (progress_cb) {
-		err = progress_cb(progress_arg, nloose, ncommits, arg.npurged,
+		err = progress_cb(progress_arg, *nloose, *ncommits, arg.npurged,
 		    -1);
 		if (err)
 			goto done;
@@ -1382,6 +1383,7 @@ pack_info_cmp(const void *a, const void *b)
 const struct got_error *
 got_repo_purge_redundant_packfiles(struct got_repository *repo,
     off_t *size_before, off_t *size_after, int dry_run,
+    int nloose, int ncommits, int npurged,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -1441,13 +1443,21 @@ got_repo_purge_redundant_packfiles(struct got_repository *repo,
 			goto done;
 		if (!remove)
 			continue;
-		err = progress_cb(progress_arg, -1, -1, -1,
-		    ++redundant_packs);
+		if (progress_cb) {
+			err = progress_cb(progress_arg, nloose, ncommits,
+			    npurged, ++redundant_packs);
+			if (err)
+				goto done;
+		}
+	}
+
+	/* Produce a final progress report. */
+	if (progress_cb) {
+		err = progress_cb(progress_arg, nloose, ncommits, npurged,
+		    redundant_packs);
 		if (err)
 			goto done;
 	}
-
-	err = progress_cb(progress_arg, -1, -1, -1, redundant_packs);
  done:
 	free(sorted);
 	if (idset)

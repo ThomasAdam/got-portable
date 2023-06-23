@@ -1166,6 +1166,9 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged,
 		a->last_npurged = npurged;
 	}
 	if (a->last_nredundant != nredundant) {
+		print_loose = 1;
+		print_commits = 1;
+		print_purged = 1;
 		print_redundant = 1;
 		a->last_nredundant = nredundant;
 	}
@@ -1180,21 +1183,21 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged,
 	if (print_commits)
 		printf("; %d commit%s scanned", ncommits,
 		    ncommits == 1 ? "" : "s");
-	if (print_purged) {
+	if (print_purged || print_redundant) {
 		if (a->dry_run) {
-			printf("; %d object%s could be purged", npurged,
+			printf("; could purge %d object%s", npurged,
 			    npurged == 1 ? "" : "s");
 		} else {
-			printf("; %d object%s purged", npurged,
+			printf("; purged %d object%s", npurged,
 			    npurged == 1 ? "" : "s");
 		}
 	}
 	if (print_redundant) {
 		if (a->dry_run) {
-			printf("%d pack file%s could be purged", nredundant,
+			printf(", %d pack file%s", nredundant,
 			    nredundant == 1 ? "" : "s");
 		} else {
-			printf("%d pack file%s purged", nredundant,
+			printf(", %d pack file%s", nredundant,
 			    nredundant == 1 ? "" : "s");
 		}
 	}
@@ -1234,7 +1237,8 @@ cmd_cleanup(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	char *repo_path = NULL;
 	struct got_repository *repo = NULL;
-	int ch, dry_run = 0, npacked = 0, verbosity = 0;
+	int ch, dry_run = 0, verbosity = 0;
+	int ncommits = 0, nloose = 0, npacked = 0;
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
 	struct got_lockfile *lock = NULL;
 	struct got_cleanup_progress_arg cpa;
@@ -1329,25 +1333,22 @@ cmd_cleanup(int argc, char *argv[])
 	cpa.verbosity = verbosity;
 
 	error = got_repo_purge_unreferenced_loose_objects(repo,
-	    &loose_before, &loose_after, &npacked, dry_run, ignore_mtime,
+	    &loose_before, &loose_after, &ncommits, &nloose, &npacked,
+	    dry_run, ignore_mtime, cleanup_progress, &cpa,
+	    check_cancelled, NULL);
+	if (error) {
+		if (cpa.printed_something)
+			printf("\n");
+		goto done;
+	}
+
+	error = got_repo_purge_redundant_packfiles(repo, &pack_before,
+	    &pack_after, dry_run, ncommits, nloose, npacked,
 	    cleanup_progress, &cpa, check_cancelled, NULL);
 	if (cpa.printed_something)
 		printf("\n");
 	if (error)
 		goto done;
-
-	cpa.printed_something = 0;
-	cpa.last_ncommits = -1;
-	cpa.last_npurged = -1;
-	cpa.last_nloose = -1;
-	cpa.last_nredundant = -1;
-	error = got_repo_purge_redundant_packfiles(repo, &pack_before,
-	    &pack_after, dry_run, cleanup_progress, &cpa,
-	    check_cancelled, NULL);
-	if (error)
-		goto done;
-	if (cpa.printed_something)
-		printf("\n");
 
 	total_size = (loose_before - loose_after) + (pack_before - pack_after);
 
