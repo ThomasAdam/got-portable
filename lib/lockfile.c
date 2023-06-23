@@ -71,8 +71,10 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path, int dir_fd)
 		sleep(1);
 	} while (--attempts > 0);
 
-	if ((*lf)->fd == -1)
-		err = got_error(GOT_ERR_LOCKFILE_TIMEOUT);
+	if ((*lf)->fd == -1) {
+		err = got_error_fmt(GOT_ERR_LOCKFILE_TIMEOUT,
+		    "%s", (*lf)->path);
+	}
 done:
 	if (err) {
 		got_lockfile_unlock(*lf, dir_fd);
