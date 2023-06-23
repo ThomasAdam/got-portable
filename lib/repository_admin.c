@@ -652,7 +652,7 @@ got_repo_cleanup_complete(struct got_repository *repo,
 static const struct got_error *
 report_cleanup_progress(got_cleanup_progress_cb progress_cb,
     void *progress_arg, struct got_ratelimit *rl,
-    int nloose, int ncommits, int npurged)
+    int nloose, int ncommits, int npurged, int nredundant)
 {
 	const struct got_error *err;
 	int elapsed;
@@ -664,7 +664,7 @@ report_cleanup_progress(got_cleanup_progress_cb progress_cb,
 	if (err || !elapsed)
 		return err;
 
-	return progress_cb(progress_arg, nloose, ncommits, npurged, -1);
+	return progress_cb(progress_arg, nloose, ncommits, npurged, nredundant);
 }
 
 static const struct got_error *
@@ -759,7 +759,8 @@ get_loose_object_ids(struct got_object_idset **loose_ids, off_t *ondisk_size,
 				goto done;
 			err = report_cleanup_progress(progress_cb,
 			    progress_arg, rl,
-			    got_object_idset_num_elements(*loose_ids), -1, -1);
+			    got_object_idset_num_elements(*loose_ids),
+			    -1, -1, -1);
 			if (err)
 				goto done;
 		}
@@ -1055,7 +1056,7 @@ load_commit_or_tag(struct got_object_idset *loose_ids, int *ncommits,
 			(*ncommits)++; /* scanned tags are counted as commits */
 
 		err = report_cleanup_progress(progress_cb, progress_arg, rl,
-		    nloose, *ncommits, -1);
+		    nloose, *ncommits, -1, -1);
 		if (err)
 			break;
 
@@ -1144,7 +1145,7 @@ purge_loose_object(struct got_object_id *id, void *data, void *arg)
 		a->npurged++;
 		a->size_purged += sb.st_size;
 		err = report_cleanup_progress(a->progress_cb, a->progress_arg,
-		    a->rl, a->nloose, a->ncommits, a->npurged);
+		    a->rl, a->nloose, a->ncommits, a->npurged, -1);
 		if (err)
 			goto done;
 	}
@@ -1394,6 +1395,9 @@ got_repo_purge_redundant_packfiles(struct got_repository *repo,
 	struct got_pathlist_entry *pe;
 	size_t i, npacks;
 	int remove, redundant_packs = 0;
+	struct got_ratelimit rl;
+
+	got_ratelimit_init(&rl, 0, 500);
 
 	*size_before = 0;
 	*size_after = 0;
@@ -1443,12 +1447,10 @@ got_repo_purge_redundant_packfiles(struct got_repository *repo,
 			goto done;
 		if (!remove)
 			continue;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, nloose, ncommits,
-			    npurged, ++redundant_packs);
-			if (err)
-				goto done;
-		}
+		err = report_cleanup_progress(progress_cb, progress_arg,
+		    &rl, nloose, ncommits, npurged, ++redundant_packs);
+		if (err)
+			goto done;
 	}
 
 	/* Produce a final progress report. */
