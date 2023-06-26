@@ -242,9 +242,7 @@ static inline int rss_author(struct template *, char *);
 
 {{ define gotweb_render_briefs(struct template *tp) }}
 {!
-	const struct got_error	*error;
 	struct request		*c = tp->tp_arg;
-	struct server		*srv = c->srv;
 	struct transport	*t = c->t;
 	struct querystring	*qs = c->t->qs;
 	struct repo_commit	*rc;
@@ -266,13 +264,6 @@ static inline int rss_author(struct template *, char *);
 		.path = repo_dir->name,
 		.headref = qs->headref,
 	};
-
-	if (qs->action == SUMMARY) {
-		error = got_get_repo_commits(c, D_MAXSLCOMMDISP);
-	} else
-		error = got_get_repo_commits(c, srv->max_commits_display);
-	if (error)
-		return -1;
 !}
 <div id="briefs_title_wrapper">
   <div id="briefs_title">Commit Briefs</div>

@@ -267,6 +267,9 @@ gotweb_process_request(struct request *c)
 		}
 		return;
 	case BRIEFS:
+		error = got_get_repo_commits(c, srv->max_commits_display);
+		if (error)
+			goto err;
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
 			return;
 		gotweb_render_page(c->tp, gotweb_render_briefs);
@@ -326,6 +329,9 @@ gotweb_process_request(struct request *c)
 			    error->msg);
 			goto err;
 		}
+		error = got_get_repo_commits(c, D_MAXSLCOMMDISP);
+		if (error)
+			goto err;
 		qs->action = TAGS;
 		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
 		if (error) {
