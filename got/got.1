@@ -2397,7 +2397,8 @@ This option should generally be avoided, and can only be used with the
 option.
 .It Fl c
 Continue an interrupted rebase operation.
-If this option is used, no other command-line arguments are allowed.
+If this option is used, no other command-line arguments are allowed except
+.Fl C .
 .It Fl l
 Show a list of past rebase operations, represented by references in the
 .Dq refs/got/backup/rebase
@@ -2661,7 +2662,8 @@ This option should generally be avoided, and can only be used with the
 option.
 .It Fl c
 Continue an interrupted histedit operation.
-If this option is used, no other command-line arguments are allowed.
+If this option is used, no other command-line arguments are allowed except
+.Fl C .
 .It Fl d
 Drop all commits.
 This option is a quick equivalent to a histedit script which drops all
