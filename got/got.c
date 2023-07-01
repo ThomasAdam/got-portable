@@ -13165,6 +13165,7 @@ cmd_merge(int argc, char *argv[])
 			break;
 		case 'C':
 			allow_conflict = 1;
+			break;
 		case 'c':
 			continue_merge = 1;
 			break;
@@ -13183,18 +13184,23 @@ cmd_merge(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (abort_merge) {
+		if (continue_merge)
+			option_conflict('a', 'c');
+		if (!prefer_fast_forward)
+			option_conflict('a', 'M');
+		if (interrupt_merge)
+			option_conflict('a', 'n');
+	} else if (continue_merge) {
+		if (!prefer_fast_forward)
+			option_conflict('c', 'M');
+		if (interrupt_merge)
+			option_conflict('c', 'n');
+	}
 	if (allow_conflict) {
-		if (abort_merge)
-			option_conflict('a', 'C');
 		if (!continue_merge)
 			errx(1, "-C option requires -c");
 	}
-	if (abort_merge && continue_merge)
-		option_conflict('a', 'c');
-	if (abort_merge && !prefer_fast_forward)
-		option_conflict('a', 'M');
-	if (continue_merge && !prefer_fast_forward)
-		option_conflict('c', 'M');
 	if (abort_merge || continue_merge) {
 		if (argc != 0)
 			usage_merge();
