@@ -13144,7 +13144,7 @@ cmd_merge(int argc, char *argv[])
 	struct got_object_id *branch_tip = NULL, *yca_id = NULL;
 	struct got_object_id *wt_branch_tip = NULL;
 	int ch, merge_in_progress = 0, abort_merge = 0, continue_merge = 0;
-	int allow_conflict = 0, interrupt_merge = 0;
+	int allow_conflict = 0, prefer_fast_forward = 1, interrupt_merge = 0;
 	struct got_update_progress_arg upa;
 	struct got_object_id *merge_commit_id = NULL;
 	char *branch_name = NULL;
@@ -13158,7 +13158,7 @@ cmd_merge(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aCcn")) != -1) {
+	while ((ch = getopt(argc, argv, "aCcMn")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_merge = 1;
@@ -13167,6 +13167,9 @@ cmd_merge(int argc, char *argv[])
 			allow_conflict = 1;
 		case 'c':
 			continue_merge = 1;
+			break;
+		case 'M':
+			prefer_fast_forward = 0;
 			break;
 		case 'n':
 			interrupt_merge = 1;
@@ -13188,6 +13191,10 @@ cmd_merge(int argc, char *argv[])
 	}
 	if (abort_merge && continue_merge)
 		option_conflict('a', 'c');
+	if (abort_merge && !prefer_fast_forward)
+		option_conflict('a', 'M');
+	if (continue_merge && !prefer_fast_forward)
+		option_conflict('c', 'M');
 	if (abort_merge || continue_merge) {
 		if (argc != 0)
 			usage_merge();
@@ -13326,7 +13333,8 @@ cmd_merge(int argc, char *argv[])
 		error = got_worktree_merge_prepare(&fileindex, worktree, repo);
 		if (error)
 			goto done;
-		if (yca_id && got_object_id_cmp(wt_branch_tip, yca_id) == 0) {
+		if (prefer_fast_forward && yca_id &&
+		    got_object_id_cmp(wt_branch_tip, yca_id) == 0) {
 			struct got_pathlist_head paths;
 			if (interrupt_merge) {
 				error = got_error_fmt(GOT_ERR_BAD_OPTION,

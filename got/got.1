@@ -2811,7 +2811,7 @@ or reverted with
 .Tg mg
 .It Xo
 .Cm merge
-.Op Fl aCcn
+.Op Fl aCcMn
 .Op Ar branch
 .Xc
 .Dl Pq alias: Cm mg
@@ -2940,6 +2940,8 @@ option.
 .It Fl c
 Continue an interrupted merge operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl M
+Create a merge commit even if the branches have not diverged.
 .It Fl n
 Merge changes into the work tree as usual but do not create a merge
 commit immediately.

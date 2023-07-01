@@ -470,6 +470,134 @@ test_merge_forward() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_forward_commit() {
+	local testroot=`test_init merge_forward_commit`
+	local commit0=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local commit1=`git_show_head $testroot/repo`
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge -M newbranch > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local merge_commit=`git_show_branch_head $testroot/repo master`
+
+	echo "G  alpha" >> $testroot/stdout.expected
+	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
+		>> $testroot/stdout.expected
+	echo $merge_commit >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# We should have created a merge commit with two parents.
+	(cd $testroot/wt && got log -l1 | grep ^parent > $testroot/stdout)
+	echo "parent 1: $commit0" > $testroot/stdout.expected
+	echo "parent 2: $commit1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+test_merge_forward_interrupt() {
+	# Test -M and -n options together.
+	local testroot=`test_init merge_forward_commit`
+	local commit0=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local commit1=`git_show_head $testroot/repo`
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge -M -n newbranch > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "Merge of refs/heads/newbranch interrupted on request" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Continue the merge.
+	(cd $testroot/wt && got merge -c > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local merge_commit=`git_show_branch_head $testroot/repo master`
+
+	echo "M  alpha" > $testroot/stdout.expected
+	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
+		>> $testroot/stdout.expected
+	echo $merge_commit >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# We should have created a merge commit with two parents.
+	(cd $testroot/wt && got log -l1 | grep ^parent > $testroot/stdout)
+	echo "parent 1: $commit0" > $testroot/stdout.expected
+	echo "parent 2: $commit1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_merge_backward() {
 	local testroot=`test_init merge_backward`
 	local commit0=`git_show_head $testroot/repo`
@@ -1867,6 +1995,8 @@ test_merge_fetched_branch_remote() {
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_forward
+run_test test_merge_forward_commit
+run_test test_merge_forward_interrupt
 run_test test_merge_backward
 run_test test_merge_continue
 run_test test_merge_continue_new_commit
