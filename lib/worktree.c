@@ -2347,8 +2347,8 @@ got_worktree_get_logmsg_ref_name(char **refname, struct got_worktree *worktree,
 	return get_ref_name(refname, worktree, prefix);
 }
 
-const struct got_error *
-got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
+static const struct got_error *
+get_base_ref_name(char **refname, struct got_worktree *worktree)
 {
 	return get_ref_name(refname, worktree, GOT_WORKTREE_BASE_REF_PREFIX);
 }
@@ -2445,7 +2445,7 @@ ref_base_commit(struct got_worktree *worktree, struct got_repository *repo)
 	struct got_reference *ref = NULL;
 	char *refname;
 
-	err = got_worktree_get_base_ref_name(&refname, worktree);
+	err = get_base_ref_name(&refname, worktree);
 	if (err)
 		return err;
 
