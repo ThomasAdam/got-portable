@@ -271,6 +271,8 @@ reference namespace, rather than to branches in the
 namespace.
 This avoids the usual requirement of having to run
 .Cm got rebase
+or
+.Cm got merge
 after
 .Cm got fetch
 in order to make incoming changes appear on branches in the
@@ -377,6 +379,8 @@ By default, branch references in the
 reference namespace will be updated to point at the newly fetched commits.
 The
 .Cm got rebase
+or
+.Cm got merge
 command can then be used to make new changes visible on branches in the
 .Dq refs/heads/
 namespace, merging incoming changes with the changes on those branches
@@ -1922,8 +1926,10 @@ based on its configuration.
 Attempt to force the server to overwrite existing branches or tags
 in the remote repository, even when
 .Cm got fetch
-and
+followed by
 .Cm got rebase
+or
+.Cm got merge
 would usually be required before changes can be sent.
 The server may reject forced requests regardless, depending on its
 configuration.
@@ -1952,7 +1958,9 @@ option, new changes should
 be fetched with
 .Cm got fetch
 and local branches should be rebased with
-.Cm got rebase ,
+.Cm got rebase
+or merged with
+.Cm got merge ,
 followed by another attempt to send the changes.
 .Pp
 The
@@ -3066,6 +3074,7 @@ becoming out-of-date at some point after having been staged).
 The
 .Cm got update ,
 .Cm got rebase ,
+.Cm got merge ,
 and
 .Cm got histedit
 commands will refuse to run while staged changes exist.
@@ -3205,6 +3214,7 @@ Used by the
 .Cm got commit ,
 .Cm got import ,
 .Cm got rebase ,
+.Cm got merge ,
 and
 .Cm got histedit
 commands.
