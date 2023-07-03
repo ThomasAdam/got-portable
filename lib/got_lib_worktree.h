@@ -73,9 +73,6 @@ struct got_commitable {
 
 #define GOT_WORKTREE_BASE_REF_PREFIX "refs/got/worktree/base"
 
-const struct got_error *got_worktree_get_base_ref_name(char **,
-    struct got_worktree *worktree);
-
 /* Temporary branch which accumulates commits during a rebase operation. */
 #define GOT_WORKTREE_REBASE_TMP_REF_PREFIX "refs/got/worktree/rebase/tmp"
 
