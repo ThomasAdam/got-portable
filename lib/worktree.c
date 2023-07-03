@@ -65,7 +65,15 @@
 #define GOT_MERGE_LABEL_MERGED	"merged change"
 #define GOT_MERGE_LABEL_BASE	"3-way merge base"
 
-static mode_t		 apply_umask(mode_t);
+static mode_t
+apply_umask(mode_t mode)
+{
+	mode_t um;
+
+	um = umask(000);
+	umask(um);
+	return mode & ~um;
+}
 
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)
@@ -1129,16 +1137,6 @@ get_ondisk_perms(int executable, mode_t st_mode)
 	}
 
 	return st_mode;
-}
-
-static mode_t
-apply_umask(mode_t mode)
-{
-	mode_t um;
-
-	um = umask(000);
-	umask(um);
-	return mode & ~um;
 }
 
 /* forward declaration */
