@@ -8,9 +8,6 @@ got:
   instead of the root directory checked out at /usr/src.
   The next LLVM release 12.1 would later be committed onto the llvm-12
   branch and then merged into main at /usr/src/gnu/llvm in the same way.
-- Provide an option (-M) to 'got merge' which forces creation of a merge commit
-  even when forwarding is possible, for cases where users deem forwarding
-  undesirable.
 - When a clone fails the HEAD symref will always point to "refs/heads/main"
   (ie. the internal default HEAD symref of Got). Resuming a failed clone with
   'got fetch' is supposed to work. To make this easier, if the HEAD symref
