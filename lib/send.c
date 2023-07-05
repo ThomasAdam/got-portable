@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018, 2019 Ori Bernstein <ori@openbsd.org>
  * Copyright (c) 2021 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2023 Josh Rickmar <jrick@zettaport.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -139,21 +140,47 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 }
 
 static const struct got_error *
-insert_ref(struct got_reflist_head *refs, const char *refname,
+insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
     struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reference *ref;
-	struct got_reflist_entry *new;
+	struct got_object_id *id = NULL;
+	int obj_type;
 
 	err = got_ref_open(&ref, repo, refname, 0);
 	if (err)
 		return err;
 
-	err = got_reflist_insert(&new, refs, ref, got_ref_cmp_by_name, NULL);
-	if (err || new == NULL /* duplicate */)
-		got_ref_close(ref);
+	if (got_ref_is_symbolic(ref)) {
+		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
+		    "cannot send symbolic reference %s", refname);
+		goto done;
+	}
 
+	err = got_ref_resolve(&id, repo, ref);
+	if (err)
+		goto done;
+	err = got_object_get_type(&obj_type, repo, id);
+	if (err)
+		goto done;
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TAG:
+		break;
+	default:
+		err = got_error_fmt(GOT_ERR_OBJ_TYPE," cannot send %s",
+		    refname);
+		goto done;
+	}
+
+	err = got_pathlist_insert(NULL, refs, refname, id);
+done:
+	if (err != NULL) {
+		if (ref)
+			got_ref_close(ref);
+		free(id);
+	}
 	return err;
 }
 
@@ -206,31 +233,14 @@ realloc_ids(struct got_object_id ***ids, size_t *nalloc, size_t n)
 	return NULL;
 }
 
-static struct got_reference *
-find_ref(struct got_reflist_head *refs, const char *refname)
-{
-	struct got_reflist_entry *re;
-
-	TAILQ_FOREACH(re, refs, entry) {
-		if (got_path_cmp(got_ref_get_name(re->ref), refname,
-		    strlen(got_ref_get_name(re->ref)),
-		    strlen(refname)) == 0) {
-			return re->ref;
-		}
-	}
-
-	return NULL;
-}
-
 static struct got_pathlist_entry *
-find_their_ref(struct got_pathlist_head *their_refs, const char *refname)
+find_ref(struct got_pathlist_head *refs, const char *refname)
 {
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, their_refs, entry) {
-		const char *their_refname = pe->path;
-		if (got_path_cmp(their_refname, refname,
-		    strlen(their_refname), strlen(refname)) == 0) {
+	TAILQ_FOREACH(pe, refs, entry) {
+		if (got_path_cmp(pe->path, refname, strlen(pe->path),
+		    strlen(refname)) == 0) {
 			return pe;
 		}
 	}
@@ -255,21 +265,17 @@ get_remote_refname(char **remote_refname, const char *remote_name,
 }
 
 static const struct got_error *
-update_remote_ref(struct got_reference *my_ref, const char *remote_name,
+update_remote_ref(struct got_pathlist_entry *my_ref, const char *remote_name,
     struct got_repository *repo)
 {
 	const struct got_error *err, *unlock_err;
-	struct got_object_id *my_id;
+	const char *refname = my_ref->path;
+	struct got_object_id *my_id = my_ref->data;
 	struct got_reference *ref = NULL;
 	char *remote_refname = NULL;
 	int ref_locked = 0;
 
-	err = got_ref_resolve(&my_id, repo, my_ref);
-	if (err)
-		return err;
-
-	err = get_remote_refname(&remote_refname, remote_name,
-	    got_ref_get_name(my_ref));
+	err = get_remote_refname(&remote_refname, remote_name, refname);
 	if (err)
 		goto done;
 
@@ -297,7 +303,6 @@ done:
 		}
 		got_ref_close(ref);
 	}
-	free(my_id);
 	free(remote_refname);
 	return err;
 }
@@ -316,14 +321,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	const struct got_error *err;
 	struct imsgbuf sendibuf;
 	pid_t sendpid = -1;
-	struct got_reflist_head refs;
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_head their_refs;
 	struct got_pathlist_entry *pe;
-	struct got_reflist_entry *re;
 	struct got_object_id **our_ids = NULL;
 	struct got_object_id **their_ids = NULL;
-	int i, nours = 0, ntheirs = 0;
+	int nours = 0, ntheirs = 0;
 	size_t nalloc_ours = 0, nalloc_theirs = 0;
 	int refs_to_send = 0, refs_to_delete = 0;
 	off_t bytes_sent = 0, bytes_sent_cur = 0;
@@ -331,37 +334,39 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
 	int packfd = -1;
 	FILE *delta_cache = NULL;
+	char *s = NULL;
 
-	TAILQ_INIT(&refs);
 	TAILQ_INIT(&have_refs);
 	TAILQ_INIT(&their_refs);
 
 	TAILQ_FOREACH(pe, branch_names, entry) {
 		const char *branchname = pe->path;
 		if (strncmp(branchname, "refs/heads/", 11) != 0) {
-			char *s;
 			if (asprintf(&s, "refs/heads/%s", branchname) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
-			err = insert_ref(&refs, s, repo);
-			free(s);
 		} else {
-			err = insert_ref(&refs, branchname, repo);
+			if ((s = strdup(branchname)) == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
+		err = insert_sendable_ref(&have_refs, s, repo);
 		if (err)
 			goto done;
+		s = NULL;
 	}
 
 	TAILQ_FOREACH(pe, delete_branches, entry) {
 		const char *branchname = pe->path;
-		struct got_reference *ref;
+		struct got_pathlist_entry *ref;
 		if (strncmp(branchname, "refs/heads/", 11) != 0) {
 			err = got_error_fmt(GOT_ERR_SEND_DELETE_REF, "%s",
 			    branchname);
 			goto done;
 		}
-		ref = find_ref(&refs, branchname);
+		ref = find_ref(&have_refs, branchname);
 		if (ref) {
 			err = got_error_fmt(GOT_ERR_SEND_DELETE_REF,
 			    "changes on %s will be sent to server",
@@ -373,52 +378,25 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	TAILQ_FOREACH(pe, tag_names, entry) {
 		const char *tagname = pe->path;
 		if (strncmp(tagname, "refs/tags/", 10) != 0) {
-			char *s;
 			if (asprintf(&s, "refs/tags/%s", tagname) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
-			err = insert_ref(&refs, s, repo);
-			free(s);
 		} else {
-			err = insert_ref(&refs, tagname, repo);
+			if ((s = strdup(pe->path)) == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
+		err = insert_sendable_ref(&have_refs, s, repo);
 		if (err)
 			goto done;
+		s = NULL;
 	}
 
-	if (TAILQ_EMPTY(&refs) && TAILQ_EMPTY(delete_branches)) {
+	if (TAILQ_EMPTY(&have_refs) && TAILQ_EMPTY(delete_branches)) {
 		err = got_error(GOT_ERR_SEND_EMPTY);
 		goto done;
-	}
-
-	TAILQ_FOREACH(re, &refs, entry) {
-		struct got_object_id *id;
-		int obj_type;
-
-		if (got_ref_is_symbolic(re->ref)) {
-			err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
-			    "cannot send symbolic reference %s",
-			    got_ref_get_name(re->ref));
-			goto done;
-		}
-
-		err = got_ref_resolve(&id, repo, re->ref);
-		if (err)
-			goto done;
-		err = got_object_get_type(&obj_type, repo, id);
-		free(id);
-		if (err)
-			goto done;
-		switch (obj_type) {
-		case GOT_OBJ_TYPE_COMMIT:
-		case GOT_OBJ_TYPE_TAG:
-			break;
-		default:
-			err = got_error_fmt(GOT_ERR_OBJ_TYPE,
-			    "cannot send %s", got_ref_get_name(re->ref));
-			goto done;
-		}
 	}
 
 	packfd = got_opentempfd();
@@ -459,22 +437,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	}
 
 	/*
-	 * Convert reflist to pathlist since the privsep layer
-	 * is linked into helper programs which lack reference.c.
+	 * Also prepare the array of our object IDs which
+	 * will be needed for generating a pack file.
 	 */
-	TAILQ_FOREACH(re, &refs, entry) {
-		struct got_object_id *id;
-		err = got_ref_resolve(&id, repo, re->ref);
-		if (err)
-			goto done;
-		err = got_pathlist_append(&have_refs,
-		    got_ref_get_name(re->ref), id);
-		if (err)
-			goto done;
-		/*
-		 * Also prepare the array of our object IDs which
-		 * will be needed for generating a pack file.
-		 */
+	TAILQ_FOREACH(pe, &have_refs, entry) {
+		struct got_object_id *id = pe->data;
+
 		err = realloc_ids(&our_ids, &nalloc_ours, nours + 1);
 		if (err)
 			goto done;
@@ -503,7 +471,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		struct got_object_id *their_id = pe->data;
 		int have_their_id;
 		struct got_object *obj;
-		struct got_reference *my_ref = NULL;
+		struct got_pathlist_entry *my_ref = NULL;
 		int is_tag = 0;
 
 		/* Don't blindly trust the server to send us valid names. */
@@ -517,23 +485,18 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		 * Otherwise we can still use this reference as a hint to
 		 * avoid uploading any objects the server already has.
 		 */
-		my_ref = find_ref(&refs, refname);
+		my_ref = find_ref(&have_refs, refname);
 		if (my_ref) {
-			struct got_object_id *my_id;
-			err = got_ref_resolve(&my_id, repo, my_ref);
-			if (err)
-				goto done;
+			struct got_object_id *my_id = my_ref->data;
 			if (got_object_id_cmp(my_id, their_id) != 0) {
 				if (!overwrite_refs && is_tag) {
 					err = got_error_fmt(
 					    GOT_ERR_SEND_TAG_EXISTS,
 					    "%s", refname);
-					free(my_id);
 					goto done;
 				}
 				refs_to_send++;
 			}
-			free(my_id);
 		}
 
 		/* Check if their object exists locally. */
@@ -559,23 +522,14 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		if (have_their_id) {
 			/* Enforce linear ancestry if required. */
 			if (!overwrite_refs && my_ref && !is_tag) {
-				struct got_object_id *my_id;
-				err = got_ref_resolve(&my_id, repo, my_ref);
-				if (err)
-					goto done;
+				struct got_object_id *my_id = my_ref->data;
 				err = check_common_ancestry(refname, my_id,
 				    their_id, repo, cancel_cb, cancel_arg);
-				free(my_id);
-				my_id = NULL;
 				if (err)
 					goto done;
 			}
 			/* Exclude any objects reachable via their ID. */
-			their_ids[ntheirs] = got_object_id_dup(their_id);
-			if (their_ids[ntheirs] == NULL) {
-				err = got_error_from_errno("got_object_id_dup");
-				goto done;
-			}
+			their_ids[ntheirs] = their_id;
 			ntheirs++;
 		} else if (!is_tag) {
 			char *remote_refname;
@@ -605,16 +559,16 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	}
 
 	/* Account for any new references we are going to upload. */
-	TAILQ_FOREACH(re, &refs, entry) {
-		if (find_their_ref(&their_refs,
-		    got_ref_get_name(re->ref)) == NULL)
+	TAILQ_FOREACH(pe, &have_refs, entry) {
+		const char *refname = pe->path;
+		if (find_ref(&their_refs, refname) == NULL)
 			refs_to_send++;
 	}
 
 	/* Account for any existing references we are going to delete. */
 	TAILQ_FOREACH(pe, delete_branches, entry) {
 		const char *branchname = pe->path;
-		if (find_their_ref(&their_refs, branchname))
+		if (find_ref(&their_refs, branchname))
 			refs_to_delete++;
 	}
 
@@ -666,12 +620,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			goto done;
 		if (refname && got_ref_name_is_valid(refname) && success &&
 		    strncmp(refname, "refs/tags/", 10) != 0) {
-			struct got_reference *my_ref;
+			struct got_pathlist_entry *my_ref;
 			/*
 			 * The server has accepted our changes.
 			 * Update our reference in refs/remotes/ accordingly.
 			 */
-			my_ref = find_ref(&refs, refname);
+			my_ref = find_ref(&have_refs, refname);
 			if (my_ref) {
 				err = update_remote_ref(my_ref, remote_name,
 				    repo);
@@ -712,14 +666,14 @@ done:
 	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 
-	got_ref_list_free(&refs);
-	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_NONE);
-	got_pathlist_free(&their_refs, GOT_PATHLIST_FREE_NONE);
-	for (i = 0; i < nours; i++)
-		free(our_ids[i]);
+	got_pathlist_free(&have_refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&their_refs, GOT_PATHLIST_FREE_ALL);
+	/*
+	 * Object ids are owned by have_refs/their_refs and are already freed;
+	 * Only the arrays must be freed.
+	 */
 	free(our_ids);
-	for (i = 0; i < ntheirs; i++)
-		free(their_ids[i]);
 	free(their_ids);
+	free(s);
 	return err;
 }
