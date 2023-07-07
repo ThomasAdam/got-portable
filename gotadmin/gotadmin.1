@@ -337,6 +337,54 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
+.It Xo
+.Cm dump
+.Op Fl q
+.Op Fl r Ar repository-path
+.Op Fl x Ar reference
+.Op Ar reference ...
+.Xc
+Dump the contents of the repository to standard output.
+.Pp
+If one or more
+.Ar reference
+arguments is specified, only add objects which are reachable via the specified
+references.
+Each
+.Ar reference
+argument may either specify a specific reference or a reference namespace,
+in which case all references within this namespace will be used.
+.Pp
+The options for
+.Nm
+.Cm dump
+are as follows:
+.Bl -tag -width Ds
+.It Fl q
+Suppress progress reporting output.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
+.It Fl x Ar reference
+Exclude objects reachable via the specified
+.Ar reference
+from the dump file.
+The
+.Ar reference
+argument may either specify a specific reference or a reference namespace,
+in which case all references within this namespace will be excluded.
+The
+.Fl x
+option may be specified multiple times to build a list of references to exclude.
+.Pp
+Exclusion takes precedence over inclusion.
+If a reference appears in both the included and excluded lists, it will
+be excluded.
+.El
 .El
 .Sh EXIT STATUS
 .Ex -std gotadmin
