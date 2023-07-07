@@ -176,11 +176,10 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 
 	err = got_pathlist_insert(NULL, refs, refname, id);
 done:
-	if (err != NULL) {
-		if (ref)
-			got_ref_close(ref);
+	if (ref)
+		got_ref_close(ref);
+	if (err)
 		free(id);
-	}
 	return err;
 }
 
@@ -437,7 +436,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	}
 
 	/*
-	 * Also prepare the array of our object IDs which
+	 * Prepare the array of our object IDs which
 	 * will be needed for generating a pack file.
 	 */
 	TAILQ_FOREACH(pe, &have_refs, entry) {
