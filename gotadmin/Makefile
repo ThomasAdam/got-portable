@@ -11,7 +11,8 @@ SRCS=		gotadmin.c \
 		worktree_open.c hash.c bloom.c murmurhash2.c ratelimit.c \
 		sigs.c buf.c date.c object_open_privsep.c \
 		read_gitconfig_privsep.c read_gotconfig_privsep.c \
-		pack_create_privsep.c pollfd.c reference_parse.c object_qid.c
+		pack_create_privsep.c pollfd.c reference_parse.c object_qid.c \
+		dump.c
 MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
