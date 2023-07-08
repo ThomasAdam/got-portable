@@ -40,6 +40,7 @@ enum gotd_procid {
 	PROC_SESSION_WRITE,
 	PROC_REPO_READ,
 	PROC_REPO_WRITE,
+	PROC_GITWRAPPER,
 	PROC_MAX,
 };
 
@@ -442,7 +443,7 @@ struct gotd_imsg_auth {
 	uint32_t client_id;
 };
 
-int parse_config(const char *, enum gotd_procid, struct gotd *, int);
+int parse_config(const char *, enum gotd_procid, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(

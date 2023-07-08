@@ -729,7 +729,8 @@ static const char *gotd_proc_names[PROC_MAX] = {
 	"session_read",
 	"session_write",
 	"repo_read",
-	"repo_write"
+	"repo_write",
+	"gitwrapper"
 };
 
 static void
@@ -1858,7 +1859,7 @@ main(int argc, char **argv)
 	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
 		fatalx("need root privileges");
 
-	if (parse_config(confpath, proc_id, &gotd, 1) != 0)
+	if (parse_config(confpath, proc_id, &gotd) != 0)
 		return 1;
 
 	pw = getpwnam(gotd.user_name);
