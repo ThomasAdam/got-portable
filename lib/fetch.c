@@ -401,13 +401,17 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		}
 		nobj = be32toh(pack_hdr.nobjects);
 		if (nobj == 0 &&
-		    packfile_size > ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
-			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    packfile_size > ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE,
 			    "bad pack file with zero objects");
+			goto done;
+		}
 		if (nobj != 0 &&
-		    packfile_size <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
-			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    packfile_size <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE,
 			    "empty pack file with non-zero object count");
+			goto done;
+		}
 	}
 
 	/*
