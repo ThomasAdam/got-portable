@@ -1,4 +1,4 @@
-SUBDIR = libexec got tog gotadmin cvg
+SUBDIR = libexec got tog gotadmin
 
 .PHONY: release dist
 
@@ -15,6 +15,10 @@ SUBDIR += lib
 .endif
 
 .include "got-version.mk"
+
+.if "${GOT_RELEASE}" != "Yes"
+SUBDIR += cvg
+.endif
 
 release: clean
 	sed -i -e "s/_RELEASE=No/_RELEASE=Yes/" got-version.mk
