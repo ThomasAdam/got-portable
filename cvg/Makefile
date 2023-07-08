@@ -3,7 +3,7 @@
 .include "../got-version.mk"
 
 PROG=		cvg
-SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
+SRCS=		cvg.c blame.c commit_graph.c delta.c diff.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
 		privsep.c reference.c repository.c hash.c worktree.c worktree_cvg.c \
