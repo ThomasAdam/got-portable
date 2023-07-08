@@ -15,11 +15,11 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate$
-.Dt GOT 1
+.Dt CVG 1
 .Os
 .Sh NAME
-.Nm got
-.Nd Game of Trees
+.Nm cvg
+.Nd CVS-like Git client
 .Sh SYNOPSIS
 .Nm
 .Op Fl hV
@@ -27,17 +27,14 @@
 .Op Ar arg ...
 .Sh DESCRIPTION
 .Nm
-is a version control system which stores the history of tracked files
-in a Git repository, as used by the Git version control system.
-This repository format is described in
-.Xr git-repository 5 .
+is a Git-compatible version control system with a user interface
+similar to
+.Xr cvs 1 .
 .Pp
 .Nm
-is a
-.Dq distributed
-version control system because every copy of a repository is writeable.
-Modifications made to files can be synchronized between repositories
-at any time.
+supports local and remote Git repositories.
+The Git repository format is described in
+.Xr git-repository 5 .
 .Pp
 Files managed by
 .Nm
@@ -46,7 +43,7 @@ Checked out files are stored in a
 .Em work tree
 which can be placed at an arbitrary directory in the filesystem hierarchy.
 The on-disk format of this work tree is described in
-.Xr got-worktree 5 .
+.Xr cvg-worktree 5 .
 .Pp
 .Nm
 provides global and command-specific options.
