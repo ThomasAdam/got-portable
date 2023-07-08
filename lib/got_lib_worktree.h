@@ -105,3 +105,6 @@ struct got_commitable {
 
 /* Reference pointing at the ID of the merge source branches's tip commit. */
 #define GOT_WORKTREE_MERGE_COMMIT_REF_PREFIX "refs/got/worktree/merge/commit"
+
+/* Reference pointing to temporary commits that may need trivial rebasing. */
+#define GOT_WORKTREE_COMMIT_REF_PREFIX "refs/got/worktree/commit"

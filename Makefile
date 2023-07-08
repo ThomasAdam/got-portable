@@ -1,4 +1,4 @@
-SUBDIR = libexec got tog gotadmin
+SUBDIR = libexec got tog gotadmin cvg
 
 .PHONY: release dist
 

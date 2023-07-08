@@ -69,6 +69,7 @@
 #include "got_lib_ratelimit.h"
 #include "got_lib_pack_create.h"
 #include "got_lib_dial.h"
+#include "got_lib_worktree_cvg.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -145,7 +146,7 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 
 static const struct got_error *
 insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
-    struct got_repository *repo)
+    const char *target_refname, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reference *ref;
@@ -178,7 +179,7 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 		goto done;
 	}
 
-	err = got_pathlist_insert(NULL, refs, refname, id);
+	err = got_pathlist_insert(NULL, refs, target_refname, id);
 done:
 	if (ref)
 		got_ref_close(ref);
@@ -344,18 +345,23 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 
 	TAILQ_FOREACH(pe, branch_names, entry) {
 		const char *branchname = pe->path;
-		if (strncmp(branchname, "refs/heads/", 11) != 0) {
-			if (asprintf(&s, "refs/heads/%s", branchname) == -1) {
+		const char *targetname = pe->data;
+
+		if (targetname == NULL)
+			targetname = branchname;
+
+		if (strncmp(targetname, "refs/heads/", 11) != 0) {
+			if (asprintf(&s, "refs/heads/%s", targetname) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 		} else {
-			if ((s = strdup(branchname)) == NULL) {
+			if ((s = strdup(targetname)) == NULL) {
 				err = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
-		err = insert_sendable_ref(&have_refs, s, repo);
+		err = insert_sendable_ref(&have_refs, branchname, s, repo);
 		if (err)
 			goto done;
 		s = NULL;
@@ -391,7 +397,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 				goto done;
 			}
 		}
-		err = insert_sendable_ref(&have_refs, s, repo);
+		err = insert_sendable_ref(&have_refs, s, s, repo);
 		if (err)
 			goto done;
 		s = NULL;
@@ -462,7 +468,6 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	err = got_privsep_recv_send_remote_refs(&their_refs, &sendibuf);
 	if (err)
 		goto done;
-
 	/*
 	 * Process references reported by the server.
 	 * Push appropriate object IDs onto the "their IDs" array.

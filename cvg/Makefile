@@ -2,11 +2,11 @@
 
 .include "../got-version.mk"
 
-PROG=		got
+PROG=		cvg
 SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
-		privsep.c reference.c repository.c hash.c worktree.c \
+		privsep.c reference.c repository.c hash.c worktree.c worktree_cvg.c \
 		worktree_open.c inflate.c buf.c rcsutil.c diff3.c lockfile.c \
 		deflate.c object_create.c delta_cache.c fetch.c \
 		gotconfig.c diff_main.c diff_atomize_text.c \
@@ -18,7 +18,7 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		read_gotconfig_privsep.c pack_create_privsep.c pollfd.c \
 		reference_parse.c object_qid.c
 
-MAN =		${PROG}.1 got-worktree.5 git-repository.5 got.conf.5
+MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 

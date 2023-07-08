@@ -2,6 +2,7 @@
  * Copyright (c) 2017 Martin Pieuchot <mpi@openbsd.org>
  * Copyright (c) 2018, 2019, 2020 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2020 Ori Bernstein <ori@openbsd.org>
+ * Copyright (C) 2023 Josh Rickmar <jrick@zettaport.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,6 +51,7 @@
 #include "got_path.h"
 #include "got_cancel.h"
 #include "got_worktree.h"
+#include "got_worktree_cvg.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"
 #include "got_fetch.h"
@@ -154,7 +156,7 @@ static const struct got_error*		cmd_info(int, char *[]);
 static const struct got_cmd got_commands[] = {
 	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "clone",	cmd_clone,	usage_clone,	"cl" },
-	{ "fetch",	cmd_fetch,	usage_fetch,	"fe" },
+	/*{ "fetch",	cmd_fetch,	usage_fetch,	"fe" },*/ /* rolled into update */
 	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
 	{ "update",	cmd_update,	usage_update,	"up" },
 	{ "log",	cmd_log,	usage_log,	"" },
@@ -163,22 +165,22 @@ static const struct got_cmd got_commands[] = {
 	{ "tree",	cmd_tree,	usage_tree,	"tr" },
 	{ "status",	cmd_status,	usage_status,	"st" },
 	{ "ref",	cmd_ref,	usage_ref,	"" },
-	{ "branch",	cmd_branch,	usage_branch,	"br" },
+	/*{ "branch",	cmd_branch,	usage_branch,	"br" },*/
 	{ "tag",	cmd_tag,	usage_tag,	"" },
 	{ "add",	cmd_add,	usage_add,	"" },
 	{ "remove",	cmd_remove,	usage_remove,	"rm" },
 	{ "patch",	cmd_patch,	usage_patch,	"pa" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
 	{ "commit",	cmd_commit,	usage_commit,	"ci" },
-	{ "send",	cmd_send,	usage_send,	"se" },
+	/*{ "send",	cmd_send,	usage_send,	"se" },*/ /* part of commit */
 	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "cy" },
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
-	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
-	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
-	{ "integrate",  cmd_integrate,  usage_integrate,"ig" },
-	{ "merge",	cmd_merge,	usage_merge,	"mg" },
-	{ "stage",	cmd_stage,	usage_stage,	"sg" },
-	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
+	/*{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },*/
+	/*{ "histedit",	cmd_histedit,	usage_histedit,	"he" },*/
+	/*{ "integrate",  cmd_integrate,  usage_integrate,"ig" },*/
+	/*{ "merge",	cmd_merge,	usage_merge,	"mg" },*/
+	/*{ "stage",	cmd_stage,	usage_stage,	"sg" },*/
+	/*{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },*/
 	{ "cat",	cmd_cat,	usage_cat,	"" },
 	{ "info",	cmd_info,	usage_info,	"" },
 };
@@ -2279,524 +2281,6 @@ done:
 	return err;
 }
 
-static const struct got_error *
-cmd_fetch(int argc, char *argv[])
-{
-	const struct got_error *error = NULL, *unlock_err;
-	char *cwd = NULL, *repo_path = NULL;
-	const char *remote_name;
-	char *proto = NULL, *host = NULL, *port = NULL;
-	char *repo_name = NULL, *server_path = NULL;
-	const struct got_remote_repo *remotes, *remote = NULL;
-	int nremotes;
-	char *id_str = NULL;
-	struct got_repository *repo = NULL;
-	struct got_worktree *worktree = NULL;
-	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
-	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
-	struct got_pathlist_entry *pe;
-	struct got_reflist_head remote_refs;
-	struct got_reflist_entry *re;
-	struct got_object_id *pack_hash = NULL;
-	int i, ch, fetchfd = -1, fetchstatus;
-	pid_t fetchpid = -1;
-	struct got_fetch_progress_arg fpa;
-	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
-	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
-	int *pack_fds = NULL, have_bflag = 0;
-	const char *remote_head = NULL, *worktree_branch = NULL;
-
-	TAILQ_INIT(&refs);
-	TAILQ_INIT(&symrefs);
-	TAILQ_INIT(&remote_refs);
-	TAILQ_INIT(&wanted_branches);
-	TAILQ_INIT(&wanted_refs);
-
-	while ((ch = getopt(argc, argv, "ab:dlqR:r:tvX")) != -1) {
-		switch (ch) {
-		case 'a':
-			fetch_all_branches = 1;
-			break;
-		case 'b':
-			error = got_pathlist_append(&wanted_branches,
-			    optarg, NULL);
-			if (error)
-				return error;
-			have_bflag = 1;
-			break;
-		case 'd':
-			delete_refs = 1;
-			break;
-		case 'l':
-			list_refs_only = 1;
-			break;
-		case 'q':
-			verbosity = -1;
-			break;
-		case 'R':
-			error = got_pathlist_append(&wanted_refs,
-			    optarg, NULL);
-			if (error)
-				return error;
-			break;
-		case 'r':
-			repo_path = realpath(optarg, NULL);
-			if (repo_path == NULL)
-				return got_error_from_errno2("realpath",
-				    optarg);
-			got_path_strip_trailing_slashes(repo_path);
-			break;
-		case 't':
-			replace_tags = 1;
-			break;
-		case 'v':
-			if (verbosity < 0)
-				verbosity = 0;
-			else if (verbosity < 3)
-				verbosity++;
-			break;
-		case 'X':
-			delete_remote = 1;
-			break;
-		default:
-			usage_fetch();
-			break;
-		}
-	}
-	argc -= optind;
-	argv += optind;
-
-	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
-		option_conflict('a', 'b');
-	if (list_refs_only) {
-		if (!TAILQ_EMPTY(&wanted_branches))
-			option_conflict('l', 'b');
-		if (fetch_all_branches)
-			option_conflict('l', 'a');
-		if (delete_refs)
-			option_conflict('l', 'd');
-		if (delete_remote)
-			option_conflict('l', 'X');
-	}
-	if (delete_remote) {
-		if (fetch_all_branches)
-			option_conflict('X', 'a');
-		if (!TAILQ_EMPTY(&wanted_branches))
-			option_conflict('X', 'b');
-		if (delete_refs)
-			option_conflict('X', 'd');
-		if (replace_tags)
-			option_conflict('X', 't');
-		if (!TAILQ_EMPTY(&wanted_refs))
-			option_conflict('X', 'R');
-	}
-
-	if (argc == 0) {
-		if (delete_remote)
-			errx(1, "-X option requires a remote name");
-		remote_name = GOT_FETCH_DEFAULT_REMOTE_NAME;
-	} else if (argc == 1)
-		remote_name = argv[0];
-	else
-		usage_fetch();
-
-	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
-	}
-
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-
-	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
-		if (error && error->code != GOT_ERR_NOT_WORKTREE)
-			goto done;
-		else
-			error = NULL;
-		if (worktree) {
-			repo_path =
-			    strdup(got_worktree_get_repo_path(worktree));
-			if (repo_path == NULL)
-				error = got_error_from_errno("strdup");
-			if (error)
-				goto done;
-		} else {
-			repo_path = strdup(cwd);
-			if (repo_path == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
-	}
-
-	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
-	if (error)
-		goto done;
-
-	if (delete_remote) {
-		error = delete_refs_for_remote(repo, remote_name);
-		goto done; /* nothing else to do */
-	}
-
-	if (worktree) {
-		worktree_conf = got_worktree_get_gotconfig(worktree);
-		if (worktree_conf) {
-			got_gotconfig_get_remotes(&nremotes, &remotes,
-			    worktree_conf);
-			for (i = 0; i < nremotes; i++) {
-				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
-					break;
-				}
-			}
-		}
-	}
-	if (remote == NULL) {
-		repo_conf = got_repo_get_gotconfig(repo);
-		if (repo_conf) {
-			got_gotconfig_get_remotes(&nremotes, &remotes,
-			    repo_conf);
-			for (i = 0; i < nremotes; i++) {
-				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
-					break;
-				}
-			}
-		}
-	}
-	if (remote == NULL) {
-		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
-		for (i = 0; i < nremotes; i++) {
-			if (strcmp(remotes[i].name, remote_name) == 0) {
-				remote = &remotes[i];
-				break;
-			}
-		}
-	}
-	if (remote == NULL) {
-		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
-		goto done;
-	}
-
-	if (TAILQ_EMPTY(&wanted_branches)) {
-		if (!fetch_all_branches)
-			fetch_all_branches = remote->fetch_all_branches;
-		for (i = 0; i < remote->nfetch_branches; i++) {
-			error = got_pathlist_append(&wanted_branches,
-			    remote->fetch_branches[i], NULL);
-			if (error)
-				goto done;
-		}
-	}
-	if (TAILQ_EMPTY(&wanted_refs)) {
-		for (i = 0; i < remote->nfetch_refs; i++) {
-			error = got_pathlist_append(&wanted_refs,
-			    remote->fetch_refs[i], NULL);
-			if (error)
-				goto done;
-		}
-	}
-
-	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
-	    &repo_name, remote->fetch_url);
-	if (error)
-		goto done;
-
-	if (strcmp(proto, "git") == 0) {
-#ifndef PROFILE
-		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-		    "sendfd dns inet unveil", NULL) == -1)
-			err(1, "pledge");
-#endif
-	} else if (strcmp(proto, "git+ssh") == 0 ||
-	    strcmp(proto, "ssh") == 0) {
-#ifndef PROFILE
-		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
-		    "sendfd unveil", NULL) == -1)
-			err(1, "pledge");
-#endif
-	} else if (strcmp(proto, "http") == 0 ||
-	    strcmp(proto, "git+http") == 0) {
-		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
-		goto done;
-	} else {
-		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
-		goto done;
-	}
-
-	error = got_dial_apply_unveil(proto);
-	if (error)
-		goto done;
-
-	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
-	if (error)
-		goto done;
-
-	if (verbosity >= 0) {
-		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
-		    remote->name, proto, host,
-		    port ? ":" : "", port ? port : "",
-		    *server_path == '/' ? "" : "/", server_path);
-	}
-
-	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, verbosity);
-	if (error)
-		goto done;
-
-	if (!have_bflag) {
-		/*
-		 * If set, get this remote's HEAD ref target so
-		 * if it has changed on the server we can fetch it.
-		 */
-		error = got_ref_list(&remote_refs, repo, "refs/remotes",
-		    got_ref_cmp_by_name, repo);
-		if (error)
-			goto done;
-
-		TAILQ_FOREACH(re, &remote_refs, entry) {
-			const char	*remote_refname, *remote_target;
-			size_t		 remote_name_len;
-
-			if (!got_ref_is_symbolic(re->ref))
-				continue;
-
-			remote_name_len = strlen(remote->name);
-			remote_refname = got_ref_get_name(re->ref);
-
-			/* we only want refs/remotes/$remote->name/HEAD */
-			if (strncmp(remote_refname + 13, remote->name,
-			    remote_name_len) != 0)
-				continue;
-
-			if (strcmp(remote_refname + remote_name_len + 14,
-			    GOT_REF_HEAD) != 0)
-				continue;
-
-			/*
-			 * Take the name itself because we already
-			 * only match with refs/heads/ in fetch_pack().
-			 */
-			remote_target = got_ref_get_symref_target(re->ref);
-			remote_head = remote_target + remote_name_len + 14;
-			break;
-		}
-
-		if (worktree) {
-			const char *refname;
-
-			refname = got_worktree_get_head_ref_name(worktree);
-			if (strncmp(refname, "refs/heads/", 11) == 0)
-				worktree_branch = refname;
-		}
-	}
-
-	fpa.last_scaled_size[0] = '\0';
-	fpa.last_p_indexed = -1;
-	fpa.last_p_resolved = -1;
-	fpa.verbosity = verbosity;
-	fpa.repo = repo;
-	fpa.create_configs = 0;
-	fpa.configs_created = 0;
-	memset(&fpa.config_info, 0, sizeof(fpa.config_info));
-
-	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
-	    remote->mirror_references, fetch_all_branches, &wanted_branches,
-	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
-	    worktree_branch, remote_head, have_bflag, fetch_progress, &fpa);
-	if (error)
-		goto done;
-
-	if (list_refs_only) {
-		error = list_remote_refs(&symrefs, &refs);
-		goto done;
-	}
-
-	if (pack_hash == NULL) {
-		if (verbosity >= 0)
-			printf("Already up-to-date\n");
-	} else if (verbosity >= 0) {
-		error = got_object_id_str(&id_str, pack_hash);
-		if (error)
-			goto done;
-		printf("\nFetched %s.pack\n", id_str);
-		free(id_str);
-		id_str = NULL;
-	}
-
-	/* Update references provided with the pack file. */
-	TAILQ_FOREACH(pe, &refs, entry) {
-		const char *refname = pe->path;
-		struct got_object_id *id = pe->data;
-		struct got_reference *ref;
-		char *remote_refname;
-
-		if (is_wanted_ref(&wanted_refs, refname) &&
-		    !remote->mirror_references) {
-			error = update_wanted_ref(refname, id,
-			    remote->name, verbosity, repo);
-			if (error)
-				goto done;
-			continue;
-		}
-
-		if (remote->mirror_references ||
-		    strncmp("refs/tags/", refname, 10) == 0) {
-			error = got_ref_open(&ref, repo, refname, 1);
-			if (error) {
-				if (error->code != GOT_ERR_NOT_REF)
-					goto done;
-				error = create_ref(refname, id, verbosity,
-				    repo);
-				if (error)
-					goto done;
-			} else {
-				error = update_ref(ref, id, replace_tags,
-				    verbosity, repo);
-				unlock_err = got_ref_unlock(ref);
-				if (unlock_err && error == NULL)
-					error = unlock_err;
-				got_ref_close(ref);
-				if (error)
-					goto done;
-			}
-		} else if (strncmp("refs/heads/", refname, 11) == 0) {
-			if (asprintf(&remote_refname, "refs/remotes/%s/%s",
-			    remote_name, refname + 11) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			error = got_ref_open(&ref, repo, remote_refname, 1);
-			if (error) {
-				if (error->code != GOT_ERR_NOT_REF)
-					goto done;
-				error = create_ref(remote_refname, id,
-				    verbosity, repo);
-				if (error)
-					goto done;
-			} else {
-				error = update_ref(ref, id, replace_tags,
-				    verbosity, repo);
-				unlock_err = got_ref_unlock(ref);
-				if (unlock_err && error == NULL)
-					error = unlock_err;
-				got_ref_close(ref);
-				if (error)
-					goto done;
-			}
-
-			/* Also create a local branch if none exists yet. */
-			error = got_ref_open(&ref, repo, refname, 1);
-			if (error) {
-				if (error->code != GOT_ERR_NOT_REF)
-					goto done;
-				error = create_ref(refname, id, verbosity,
-				    repo);
-				if (error)
-					goto done;
-			} else {
-				unlock_err = got_ref_unlock(ref);
-				if (unlock_err && error == NULL)
-					error = unlock_err;
-				got_ref_close(ref);
-			}
-		}
-	}
-	if (delete_refs) {
-		error = delete_missing_refs(&refs, &symrefs, remote,
-		    verbosity, repo);
-		if (error)
-			goto done;
-	}
-
-	if (!remote->mirror_references) {
-		/* Update remote HEAD reference if the server provided one. */
-		TAILQ_FOREACH(pe, &symrefs, entry) {
-			struct got_reference *target_ref;
-			const char *refname = pe->path;
-			const char *target = pe->data;
-			char *remote_refname = NULL, *remote_target = NULL;
-
-			if (strcmp(refname, GOT_REF_HEAD) != 0)
-				continue;
-
-			if (strncmp("refs/heads/", target, 11) != 0)
-				continue;
-
-			if (asprintf(&remote_refname, "refs/remotes/%s/%s",
-			    remote->name, refname) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			if (asprintf(&remote_target, "refs/remotes/%s/%s",
-			    remote->name, target + 11) == -1) {
-				error = got_error_from_errno("asprintf");
-				free(remote_refname);
-				goto done;
-			}
-
-			error = got_ref_open(&target_ref, repo, remote_target,
-			    0);
-			if (error) {
-				free(remote_refname);
-				free(remote_target);
-				if (error->code == GOT_ERR_NOT_REF) {
-					error = NULL;
-					continue;
-				}
-				goto done;
-			}
-			error = update_symref(remote_refname, target_ref,
-			    verbosity, repo);
-			free(remote_refname);
-			free(remote_target);
-			got_ref_close(target_ref);
-			if (error)
-				goto done;
-		}
-	}
-done:
-	if (fetchpid > 0) {
-		if (kill(fetchpid, SIGTERM) == -1)
-			error = got_error_from_errno("kill");
-		if (waitpid(fetchpid, &fetchstatus, 0) == -1 && error == NULL)
-			error = got_error_from_errno("waitpid");
-	}
-	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
-		if (error == NULL)
-			error = close_err;
-	}
-	if (worktree)
-		got_worktree_close(worktree);
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
-	got_pathlist_free(&refs, GOT_PATHLIST_FREE_ALL);
-	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
-	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
-	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
-	got_ref_list_free(&remote_refs);
-	free(id_str);
-	free(cwd);
-	free(repo_path);
-	free(pack_hash);
-	free(proto);
-	free(host);
-	free(port);
-	free(server_path);
-	free(repo_name);
-	return error;
-}
 
 
 __dead static void
@@ -3279,7 +2763,7 @@ print_merge_progress_stats(struct got_update_progress_arg *upa)
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-q] [-b branch] [-c commit] "
+	fprintf(stderr, "usage: %s update [-qtvX] [-c commit] [-r remote] "
 	    "[path ...]\n", getprogname());
 	exit(1);
 }
@@ -3468,60 +2952,92 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *unlock_err;
+	char *worktree_path = NULL;
+	const char *repo_path = NULL;
+	const char *remote_name = NULL;
+	char *proto = NULL, *host = NULL, *port = NULL;
+	char *repo_name = NULL, *server_path = NULL;
+	const struct got_remote_repo *remotes, *remote = NULL;
+	int nremotes;
+	char *id_str = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *worktree_path = NULL;
+	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
+	struct got_pathlist_head paths, refs, symrefs;
+	struct got_pathlist_head wanted_branches, wanted_refs;
+	struct got_pathlist_entry *pe;
+	struct got_reflist_head remote_refs;
+	struct got_reflist_entry *re;
+	struct got_object_id *pack_hash = NULL;
+	int i, ch, fetchfd = -1, fetchstatus;
+	pid_t fetchpid = -1;
+	struct got_fetch_progress_arg fpa;
+	struct got_update_progress_arg upa;
+	int verbosity = 0;
+	int delete_remote = 0;
+	int replace_tags = 0;
+	int *pack_fds = NULL;
+	const char *remote_head = NULL, *worktree_branch = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
-	const char *branch_name = NULL;
+	const char *refname;
 	struct got_reference *head_ref = NULL;
-	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
-	int ch, verbosity = 0;
-	struct got_update_progress_arg upa;
-	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
+	TAILQ_INIT(&refs);
+	TAILQ_INIT(&symrefs);
+	TAILQ_INIT(&remote_refs);
+	TAILQ_INIT(&wanted_branches);
+	TAILQ_INIT(&wanted_refs);
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
-#endif
-
-	while ((ch = getopt(argc, argv, "b:c:q")) != -1) {
+	while ((ch = getopt(argc, argv, "c:qr:vX")) != -1) {
 		switch (ch) {
-		case 'b':
-			branch_name = optarg;
-			break;
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
 				return got_error_from_errno("strdup");
 			break;
+		case 't':
+			replace_tags = 1;
+			break;
 		case 'q':
 			verbosity = -1;
 			break;
+		case 'r':
+			remote_name = optarg;
+			break;
+		case 'v':
+			if (verbosity < 0)
+				verbosity = 0;
+			else if (verbosity < 3)
+				verbosity++;
+			break;
+		case 'X':
+			delete_remote = 1;
+			break;
 		default:
 			usage_update();
-			/* NOTREACHED */
+			break;
 		}
 	}
-
 	argc -= optind;
 	argv += optind;
+
+	if (delete_remote) {
+		if (replace_tags)
+			option_conflict('X', 't');
+		if (remote_name == NULL)
+			errx(1, "-X option requires a remote name");
+	}
+	if (remote_name == NULL)
+		remote_name = GOT_FETCH_DEFAULT_REMOTE_NAME;
 
 	worktree_path = getcwd(NULL, 0);
 	if (worktree_path == NULL) {
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
-
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-
 	error = got_worktree_open(&worktree, worktree_path);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
@@ -3529,21 +3045,19 @@ cmd_update(int argc, char *argv[])
 			    worktree_path);
 		goto done;
 	}
+	repo_path = got_worktree_get_repo_path(worktree);
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
+	if (error)
+		goto done;
 
 	error = check_rebase_or_histedit_in_progress(worktree);
 	if (error)
 		goto done;
-
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL, pack_fds);
-	if (error != NULL)
-		goto done;
-
-	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
-	if (error)
-		goto done;
-
 	error = check_merge_in_progress(worktree, repo);
 	if (error)
 		goto done;
@@ -3552,7 +3066,195 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_open(&head_ref, repo, branch_name ? branch_name :
+	worktree_conf = got_worktree_get_gotconfig(worktree);
+	if (worktree_conf) {
+		got_gotconfig_get_remotes(&nremotes, &remotes,
+		    worktree_conf);
+		for (i = 0; i < nremotes; i++) {
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
+				break;
+			}
+		}
+	}
+
+	if (remote == NULL) {
+		repo_conf = got_repo_get_gotconfig(repo);
+		if (repo_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    repo_conf);
+			for (i = 0; i < nremotes; i++) {
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
+					break;
+				}
+			}
+		}
+	}
+	if (remote == NULL) {
+		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
+		for (i = 0; i < nremotes; i++) {
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
+				break;
+			}
+		}
+	}
+	if (remote == NULL) {
+		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
+		goto done;
+	}
+
+	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
+	    &repo_name, remote->fetch_url);
+	if (error)
+		goto done;
+
+	if (strcmp(proto, "git") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd dns inet unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "git+ssh") == 0 ||
+	    strcmp(proto, "ssh") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+http") == 0) {
+		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
+		goto done;
+	} else {
+		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
+		goto done;
+	}
+
+	error = got_dial_apply_unveil(proto);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	if (verbosity >= 0) {
+		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
+		    remote->name, proto, host,
+		    port ? ":" : "", port ? port : "",
+		    *server_path == '/' ? "" : "/", server_path);
+	}
+
+	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
+	    server_path, verbosity);
+	if (error)
+		goto done;
+
+	/*
+	 * If set, get this remote's HEAD ref target so
+	 * if it has changed on the server we can fetch it.
+	 */
+	error = got_ref_list(&remote_refs, repo, "refs/remotes",
+	    got_ref_cmp_by_name, repo);
+	if (error)
+		goto done;
+
+	TAILQ_FOREACH(re, &remote_refs, entry) {
+		const char	*remote_refname, *remote_target;
+		size_t		 remote_name_len;
+
+		if (!got_ref_is_symbolic(re->ref))
+			continue;
+
+		remote_name_len = strlen(remote->name);
+		remote_refname = got_ref_get_name(re->ref);
+
+		/* we only want refs/remotes/$remote->name/HEAD */
+		if (strncmp(remote_refname + 13, remote->name,
+		    remote_name_len) != 0)
+			continue;
+
+		if (strcmp(remote_refname + remote_name_len + 14,
+		    GOT_REF_HEAD) != 0)
+			continue;
+
+		/*
+		 * Take the name itself because we already
+		 * only match with refs/heads/ in fetch_pack().
+		 */
+		remote_target = got_ref_get_symref_target(re->ref);
+		remote_head = remote_target + remote_name_len + 14;
+		break;
+	}
+
+	refname = got_worktree_get_head_ref_name(worktree);
+	if (strncmp(refname, "refs/heads/", 11) == 0)
+		worktree_branch = refname;
+
+	fpa.last_scaled_size[0] = '\0';
+	fpa.last_p_indexed = -1;
+	fpa.last_p_resolved = -1;
+	fpa.verbosity = verbosity;
+	fpa.repo = repo;
+	fpa.create_configs = 0;
+	fpa.configs_created = 0;
+	memset(&fpa.config_info, 0, sizeof(fpa.config_info));
+
+	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
+	    remote->mirror_references, 0, &wanted_branches, &wanted_refs,
+	    0, verbosity, fetchfd, repo, worktree_branch, remote_head,
+	    0, fetch_progress, &fpa);
+	if (error)
+		goto done;
+
+	if (pack_hash != NULL && verbosity >= 0) {
+		error = got_object_id_str(&id_str, pack_hash);
+		if (error)
+			goto done;
+		printf("\nFetched %s.pack\n", id_str);
+		free(id_str);
+		id_str = NULL;
+	}
+
+	/* Update references provided with the pack file. */
+	TAILQ_FOREACH(pe, &refs, entry) {
+		const char *refname = pe->path;
+		struct got_object_id *id = pe->data;
+		struct got_reference *ref;
+
+		if (is_wanted_ref(&wanted_refs, refname)) {
+			error = update_wanted_ref(refname, id,
+			    remote->name, verbosity, repo);
+			if (error)
+				goto done;
+			continue;
+		}
+
+		error = got_ref_open(&ref, repo, refname, 1);
+		if (error) {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = create_ref(refname, id, verbosity,
+			    repo);
+			if (error)
+				goto done;
+		} else {
+			error = update_ref(ref, id, replace_tags,
+			    verbosity-1, repo);
+			unlock_err = got_ref_unlock(ref);
+			if (unlock_err && error == NULL)
+				error = unlock_err;
+			got_ref_close(ref);
+			if (error)
+				goto done;
+		}
+	}
+
+	/* Update worktree */
+	error = got_ref_open(&head_ref, repo,
 	    got_worktree_get_head_ref_name(worktree), 0);
 	if (error != NULL)
 		goto done;
@@ -3582,42 +3284,17 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	if (branch_name) {
-		struct got_object_id *head_commit_id;
-		TAILQ_FOREACH(pe, &paths, entry) {
-			if (pe->path_len == 0)
-				continue;
-			error = got_error_msg(GOT_ERR_BAD_PATH,
-			    "switching between branches requires that "
-			    "the entire work tree gets updated");
-			goto done;
-		}
-		error = got_ref_resolve(&head_commit_id, repo, head_ref);
-		if (error)
-			goto done;
-		error = check_linear_ancestry(commit_id, head_commit_id, 0,
-		    repo);
-		free(head_commit_id);
-		if (error != NULL)
-			goto done;
-		error = check_same_branch(commit_id, head_ref, repo);
-		if (error)
-			goto done;
-		error = switch_head_ref(head_ref, commit_id, worktree, repo);
-		if (error)
-			goto done;
-	} else {
-		error = check_linear_ancestry(commit_id,
-		    got_worktree_get_base_commit_id(worktree), 0, repo);
-		if (error != NULL) {
-			if (error->code == GOT_ERR_ANCESTRY)
-				error = got_error(GOT_ERR_BRANCH_MOVED);
-			goto done;
-		}
-		error = check_same_branch(commit_id, head_ref, repo);
-		if (error)
-			goto done;
+
+	error = check_linear_ancestry(commit_id,
+	    got_worktree_get_base_commit_id(worktree), 0, repo);
+	if (error != NULL) {
+		if (error->code == GOT_ERR_ANCESTRY)
+			error = got_error(GOT_ERR_BRANCH_MOVED);
+		goto done;
 	}
+	error = check_same_branch(commit_id, head_ref, repo);
+	if (error)
+		goto done;
 
 	if (got_object_id_cmp(got_worktree_get_base_commit_id(worktree),
 	    commit_id) != 0) {
@@ -3642,19 +3319,41 @@ cmd_update(int argc, char *argv[])
 
 	print_update_progress_stats(&upa);
 done:
+	if (fetchpid > 0) {
+		if (kill(fetchpid, SIGTERM) == -1)
+			error = got_error_from_errno("kill");
+		if (waitpid(fetchpid, &fetchstatus, 0) == -1 && error == NULL)
+			error = got_error_from_errno("waitpid");
+	}
+	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (worktree)
+		got_worktree_close(worktree);
 	if (pack_fds) {
 		const struct got_error *pack_err =
 		    got_repo_pack_fds_close(pack_fds);
 		if (error == NULL)
 			error = pack_err;
 	}
-	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
-		if (error == NULL)
-			error = close_err;
-	}
-	free(worktree_path);
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
+	got_pathlist_free(&refs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&symrefs, GOT_PATHLIST_FREE_ALL);
+	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
+	got_ref_list_free(&remote_refs);
+	free(id_str);
+	free(worktree_path);
+	free(pack_hash);
+	free(proto);
+	free(host);
+	free(port);
+	free(server_path);
+	free(repo_name);
 	free(commit_id);
 	free(commit_id_str);
 	return error;
@@ -8845,10 +8544,9 @@ struct collect_commit_logmsg_arg {
 	int non_interactive;
 	const char *editor;
 	const char *worktree_path;
-	const char *branch_name;
 	const char *repo_path;
+	const char *dial_proto;
 	char *logmsg_path;
-
 };
 
 static const struct got_error *
@@ -8943,9 +8641,9 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 	}
 
 	initial_content_len = asprintf(&initial_content,
-	    "%s%s\n# changes to be committed on branch %s:\n",
+	    "%s%s\n# changes to be committed:\n",
 	    prepared_msg ? prepared_msg : "",
-	    merged_msg ? merged_msg : "", a->branch_name);
+	    merged_msg ? merged_msg : "");
 	if (initial_content_len == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -8986,6 +8684,8 @@ done:
 		err = got_error_from_errno2("close", a->logmsg_path);
 
 	/* Editor is done; we can now apply unveil(2) */
+	if (err == NULL)
+		err = got_dial_apply_unveil(a->dial_proto);
 	if (err == NULL)
 		err = apply_unveil(a->repo_path, 0, a->worktree_path);
 	if (err) {
@@ -9151,6 +8851,14 @@ cmd_commit(int argc, char *argv[])
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	int *pack_fds = NULL;
+	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
+	const struct got_remote_repo *remotes, *remote = NULL;
+	int nremotes;
+	char *proto = NULL, *host = NULL, *port = NULL;
+	char *repo_name = NULL, *server_path = NULL;
+	const char *remote_name;
+	int verbosity = 0;
+	int i;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&paths);
@@ -9257,19 +8965,94 @@ cmd_commit(int argc, char *argv[])
 	if (author == NULL)
 		author = committer;
 
-	/*
-	 * unveil(2) traverses exec(2); if an editor is used we have
-	 * to apply unveil after the log message has been written.
-	 */
-	if (logmsg == NULL || strlen(logmsg) == 0)
-		error = get_editor(&editor);
-	else
-		error = apply_unveil(got_repo_get_path(repo), 0,
-		    got_worktree_get_root_path(worktree));
+	remote_name = GOT_SEND_DEFAULT_REMOTE_NAME;
+	worktree_conf = got_worktree_get_gotconfig(worktree);
+	if (worktree_conf) {
+		got_gotconfig_get_remotes(&nremotes, &remotes,
+		    worktree_conf);
+		for (i = 0; i < nremotes; i++) {
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
+				break;
+			}
+		}
+	}
+	if (remote == NULL) {
+		repo_conf = got_repo_get_gotconfig(repo);
+		if (repo_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    repo_conf);
+			for (i = 0; i < nremotes; i++) {
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
+					break;
+				}
+			}
+		}
+	}
+	if (remote == NULL) {
+		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
+		for (i = 0; i < nremotes; i++) {
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
+				break;
+			}
+		}
+	}
+	if (remote == NULL) {
+		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
+		goto done;
+	}
+
+	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
+	    &repo_name, remote->fetch_url);
 	if (error)
 		goto done;
 
-	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (strcmp(proto, "git") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd dns inet unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "git+ssh") == 0 ||
+	    strcmp(proto, "ssh") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+http") == 0) {
+		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
+		goto done;
+	} else {
+		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
+		goto done;
+	}
+
+
+	/*if (verbosity >= 0) {
+		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
+		    remote->name, proto, host,
+		    port ? ":" : "", port ? port : "",
+		    *server_path == '/' ? "" : "/", server_path);
+	}*/
+
+	/*
+	 * unveil(2) traverses exec(2); if an editor is used we have
+	 * to apply unveil after the log message has been written during
+	 * the callback.
+	 */
+	if (logmsg == NULL || strlen(logmsg) == 0)
+		error = get_editor(&editor);
+	else {
+		error = got_dial_apply_unveil(proto);
+		if (error)
+			goto done;
+		error = apply_unveil(got_repo_get_path(repo), 0,
+		    got_worktree_get_root_path(worktree));
+	}
 	if (error)
 		goto done;
 
@@ -9280,24 +9063,22 @@ cmd_commit(int argc, char *argv[])
 			goto done;
 	}
 
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
+
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.prepared_log = prepared_logmsg;
 	cl_arg.merged_log = merged_logmsg;
 	cl_arg.non_interactive = non_interactive;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
-	cl_arg.branch_name = got_worktree_get_head_ref_name(worktree);
-	if (!histedit_in_progress) {
-		if (strncmp(cl_arg.branch_name, "refs/heads/", 11) != 0) {
-			error = got_error(GOT_ERR_COMMIT_BRANCH);
-			goto done;
-		}
-		cl_arg.branch_name += 11;
-	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	error = got_worktree_commit(&id, worktree, &paths, author, committer,
-	    allow_bad_symlinks, show_diff, commit_conflicts,
-	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
+	cl_arg.dial_proto = proto;
+	error = got_worktree_cvg_commit(&id, worktree, &paths, author,
+	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
+	    collect_commit_logmsg, &cl_arg, print_status, NULL, proto, host,
+	    port, server_path, verbosity, remote, check_cancelled, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 		    cl_arg.logmsg_path != NULL)
