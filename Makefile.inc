@@ -14,7 +14,6 @@ MANDIR ?= ${PREFIX}/man/man
 .else
 CFLAGS += -Werror -Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS += -Wwrite-strings -Wunused-variable
-CFLAGS += -Wno-unused-function
 PREFIX ?= ${HOME}
 BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${BINDIR}
