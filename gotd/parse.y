@@ -293,7 +293,8 @@ repository	: REPOSITORY STRING {
 
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_AUTH ||
-			    gotd_proc_id == PROC_REPO_WRITE) {
+			    gotd_proc_id == PROC_REPO_WRITE ||
+			    gotd_proc_id == PROC_GITWRAPPER) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -304,7 +305,8 @@ repository	: REPOSITORY STRING {
 repoopts1	: PATH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_AUTH ||
-			    gotd_proc_id == PROC_REPO_WRITE) {
+			    gotd_proc_id == PROC_REPO_WRITE ||
+			    gotd_proc_id == PROC_GITWRAPPER) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -312,16 +314,28 @@ repoopts1	: PATH STRING {
 					YYERROR;
 				}
 				if (realpath($2, new_repo->path) == NULL) {
-					yyerror("realpath %s: %s", $2,
-					    strerror(errno));
 					/*
-					 * Give admin a chance to create
-					 * missing repositories at run-time.
+					 * To give admins a chance to create
+					 * missing repositories at run-time
+					 * we only warn about ENOENT here.
+					 *
+					 * And ignore 'permission denied' when
+					 * running in gitwrapper. Users may be
+					 * able to access this repository via
+					 * gotd regardless.
 					 */
-					if (errno != ENOENT) {
+					if (errno == ENOENT) {
+						yyerror("realpath %s: %s", $2,
+						    strerror(errno));
+					} else if (errno != EACCES ||
+					    gotd_proc_id != PROC_GITWRAPPER) {
+						yyerror("realpath %s: %s", $2,
+						    strerror(errno));
 						free($2);
 						YYERROR;
-					} else if (strlcpy(new_repo->path, $2,
+					}
+
+					if (strlcpy(new_repo->path, $2,
 					    sizeof(new_repo->path)) >=
 					    sizeof(new_repo->path))
 						yyerror("path too long");
@@ -740,10 +754,11 @@ closefile(struct file *xfile)
 
 int
 parse_config(const char *filename, enum gotd_procid proc_id,
-    struct gotd *env, int require_config_file)
+    struct gotd *env)
 {
 	struct sym *sym, *next;
 	struct gotd_repo *repo;
+	int require_config_file = (proc_id != PROC_GITWRAPPER);
 
 	memset(env, 0, sizeof(*env));
 
