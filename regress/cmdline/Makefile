@@ -1,7 +1,7 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	ref commit revert cherrypick backout rebase init import histedit \
 	integrate merge stage unstage cat clone fetch send tree patch pack \
-	cleanup dump
+	cleanup dump load
 NOOBJ=Yes
 
 GOT_TEST_ROOT=/tmp
@@ -101,5 +101,8 @@ cleanup:
 
 dump:
 	./dump.sh -q -r "$(GOT_TEST_ROOT)"
+
+load:
+	./load.sh -q -r "$(GOT_TEST_ROOT)"
 
 .include <bsd.regress.mk>

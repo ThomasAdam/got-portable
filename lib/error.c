@@ -235,6 +235,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_MERGE_COMMIT_OUT_OF_DATE, "merging cannot proceed because "
 	    "the work tree is no longer up-to-date; merge must be aborted "
 	    "and retried" },
+	{ GOT_ERR_BUNDLE_FORMAT, "unknown git bundle version" },
 };
 
 static struct got_custom_error {

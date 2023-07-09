@@ -40,6 +40,7 @@
 #include "got_repository.h"
 #include "got_repository_admin.h"
 #include "got_repository_dump.h"
+#include "got_repository_load.h"
 #include "got_gotconfig.h"
 #include "got_path.h"
 #include "got_privsep.h"
@@ -88,6 +89,7 @@ __dead static void	usage_indexpack(void);
 __dead static void	usage_listpack(void);
 __dead static void	usage_cleanup(void);
 __dead static void	usage_dump(void);
+__dead static void	usage_load(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_info(int, char *[]);
@@ -96,6 +98,7 @@ static const struct got_error*		cmd_indexpack(int, char *[]);
 static const struct got_error*		cmd_listpack(int, char *[]);
 static const struct got_error*		cmd_cleanup(int, char *[]);
 static const struct got_error*		cmd_dump(int, char *[]);
+static const struct got_error*		cmd_load(int, char *[]);
 
 static const struct gotadmin_cmd gotadmin_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
@@ -105,6 +108,7 @@ static const struct gotadmin_cmd gotadmin_commands[] = {
 	{ "listpack",	cmd_listpack,	usage_listpack,	"ls" },
 	{ "cleanup",	cmd_cleanup,	usage_cleanup,	"cl" },
 	{ "dump",	cmd_dump,	usage_dump,	"" },
+	{ "load",	cmd_load,	usage_load,	"" },
 };
 
 static void
@@ -1539,6 +1543,296 @@ cmd_dump(int argc, char *argv[])
 	got_pathlist_free(&exclude_args, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&exclude_refs);
 	got_ref_list_free(&include_refs);
+	free(repo_path);
+
+	return error;
+}
+
+__dead static void
+usage_load(void)
+{
+	fprintf(stderr, "usage: %s load [-lnq] [-b reference] "
+	    "[-r repository-path] [file]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+load_progress(void *arg, off_t packfile_size, int nobj_total,
+    int nobj_indexed, int nobj_loose, int nobj_resolved)
+{
+	return pack_index_progress(arg, packfile_size, nobj_total,
+	    nobj_indexed, nobj_loose, nobj_resolved);
+}
+
+static int
+is_wanted_ref(struct got_pathlist_head *wanted, const char *ref)
+{
+	struct got_pathlist_entry *pe;
+
+	if (TAILQ_EMPTY(wanted))
+		return 1;
+
+	TAILQ_FOREACH(pe, wanted, entry) {
+		if (strcmp(pe->path, ref) == 0)
+			return 1;
+	}
+
+	return 0;
+}
+
+static const struct got_error *
+create_ref(const char *refname, struct got_object_id *id,
+    int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_ref_alloc(&ref, refname, id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+	got_ref_close(ref);
+
+	if (err == NULL && verbosity >= 0)
+		printf("Created reference %s: %s\n", refname, id_str);
+done:
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
+update_ref(struct got_reference *ref, struct got_object_id *new_id,
+    int replace_tags, int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *new_id_str = NULL;
+	struct got_object_id *old_id = NULL;
+
+	err = got_object_id_str(&new_id_str, new_id);
+	if (err)
+		goto done;
+
+	if (!replace_tags &&
+	    strncmp(got_ref_get_name(ref), "refs/tags/", 10) == 0) {
+		err = got_ref_resolve(&old_id, repo, ref);
+		if (err)
+			goto done;
+		if (got_object_id_cmp(old_id, new_id) == 0)
+			goto done;
+		if (verbosity >= 0) {
+			printf("Rejecting update of existing tag %s: %s\n",
+			    got_ref_get_name(ref), new_id_str);
+		}
+		goto done;
+	}
+
+	if (got_ref_is_symbolic(ref)) {
+		if (verbosity >= 0) {
+			printf("Replacing reference %s: %s\n",
+			    got_ref_get_name(ref),
+			    got_ref_get_symref_target(ref));
+		}
+		err = got_ref_change_symref_to_ref(ref, new_id);
+		if (err)
+			goto done;
+		err = got_ref_write(ref, repo);
+		if (err)
+			goto done;
+	} else {
+		err = got_ref_resolve(&old_id, repo, ref);
+		if (err)
+			goto done;
+		if (got_object_id_cmp(old_id, new_id) == 0)
+			goto done;
+
+		err = got_ref_change_ref(ref, new_id);
+		if (err)
+			goto done;
+		err = got_ref_write(ref, repo);
+		if (err)
+			goto done;
+	}
+
+	if (verbosity >= 0)
+		printf("Updated %s: %s\n", got_ref_get_name(ref),
+		    new_id_str);
+done:
+	free(old_id);
+	free(new_id_str);
+	return err;
+}
+
+static const struct got_error *
+cmd_load(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_pathlist_head include_args;
+	struct got_pathlist_head available_refs;
+	struct got_pathlist_entry *pe;
+	struct got_pack_progress_arg ppa;
+	FILE *in = stdin;
+	int *pack_fds = NULL;
+	char *repo_path = NULL;
+	int list_refs_only = 0;
+	int noop = 0;
+	int verbosity = 0;
+	int ch;
+
+	TAILQ_INIT(&include_args);
+	TAILQ_INIT(&available_refs);
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+	    "sendfd unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "b:lnqr:")) != -1) {
+		switch (ch) {
+		case 'b':
+			error = got_pathlist_append(&include_args,
+			    optarg, NULL);
+			if (error)
+				return error;
+			break;
+		case 'l':
+			list_refs_only = 1;
+			break;
+		case 'n':
+			noop = 1;
+			break;
+		case 'q':
+			verbosity = -1;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		default:
+			usage_load();
+			/* NOTREACHED */
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (list_refs_only && !TAILQ_EMPTY(&include_args))
+		errx(1, "-b and -l are mutually exclusive");
+
+	if (list_refs_only && noop)
+		errx(1, "-n and -l are mutually exclusive");
+
+	if (argc > 1)
+		usage_load();
+	if (argc == 1) {
+		in = fopen(argv[0], "re");
+		if (in == NULL)
+			return got_error_from_errno2("open", argv[0]);
+	}
+
+	if (repo_path == NULL) {
+		error = get_repo_path(&repo_path);
+		if (error)
+			goto done;
+	}
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 0);
+	if (error)
+		goto done;
+
+	memset(&ppa, 0, sizeof(ppa));
+	ppa.out = stdout;
+	ppa.verbosity = verbosity;
+
+	error = got_repo_load(in, &available_refs, repo, list_refs_only, noop,
+	    load_progress, &ppa, check_cancelled, NULL);
+	if (verbosity >= 0)    /* XXX printed_something is always zero */
+		printf("\n");
+	if (error)
+		goto done;
+
+	if (list_refs_only) {
+		TAILQ_FOREACH(pe, &available_refs, entry) {
+			const char *refname = pe->path;
+			struct got_object_id *id = pe->data;
+			char *idstr;
+
+			error = got_object_id_str(&idstr, id);
+			if (error)
+				goto done;
+
+			printf("%s: %s\n", refname, idstr);
+			free(idstr);
+		}
+		goto done;
+	}
+
+	if (noop)
+		goto done;
+
+	/* Update references */
+	TAILQ_FOREACH(pe, &available_refs, entry) {
+		const struct got_error *unlock_err;
+		struct got_reference *ref;
+		const char *refname = pe->path;
+		struct got_object_id *id = pe->data;
+
+		if (!is_wanted_ref(&include_args, pe->path))
+			continue;
+
+		error = got_ref_open(&ref, repo, refname, 1);
+		if (error) {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = create_ref(refname, id, verbosity, repo);
+			if (error)
+				goto done;
+		} else {
+			/* XXX: check advances only and add -f to force? */
+			error = update_ref(ref, id, 1, verbosity, repo);
+			unlock_err = got_ref_unlock(ref);
+			if (unlock_err && error == NULL)
+				error = unlock_err;
+			got_ref_close(ref);
+			if (error)
+				goto done;
+		}
+	}
+
+ done:
+	if (in != stdin && fclose(in) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
+
+	if (repo)
+		got_repo_close(repo);
+
+	if (pack_fds) {
+		const struct got_error *pack_err;
+
+		pack_err = got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
+
+	got_pathlist_free(&include_args, GOT_PATHLIST_FREE_NONE);
+	got_pathlist_free(&available_refs, GOT_PATHLIST_FREE_ALL);
 	free(repo_path);
 
 	return error;

@@ -385,6 +385,48 @@ Exclusion takes precedence over inclusion.
 If a reference appears in both the included and excluded lists, it will
 be excluded.
 .El
+.It Xo
+.Cm load
+.Op Fl lnq
+.Op Fl b Ar reference
+.Op Fl r Ar repository-path
+.Op Ar file
+.Xc
+Read a repository dump stream from standard input or
+.Ar file .
+.Pp
+The options for
+.Cm gotadmin dump
+are as follows:
+.Bl -tag -width Ds
+.It Fl b Ar reference
+Load only the specified
+.Ar reference
+from the dump.
+This option may be specified multiple times to build a list of
+reference to load.
+If not provided, all the reference will be loaded.
+.It Fl l
+List references available for loading from the dump and exit
+immediately.
+Cannot be used together with
+.Fl b
+and
+.Fl n .
+.It Fl n
+Attempt to load the dump but don't install new packfile or update any
+reference.
+Can be used to verify the integrity of the dump.
+.It Fl q
+Suppress progress reporting output.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the
+current working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
+.El
 .El
 .Sh EXIT STATUS
 .Ex -std gotadmin

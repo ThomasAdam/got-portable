@@ -185,6 +185,7 @@
 #define GOT_ERR_GID		168
 #define GOT_ERR_NO_PROG		169
 #define GOT_ERR_MERGE_COMMIT_OUT_OF_DATE 170
+#define GOT_ERR_BUNDLE_FORMAT 171
 
 struct got_error {
         int code;
