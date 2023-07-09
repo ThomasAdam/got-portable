@@ -1763,7 +1763,7 @@ cmd_load(int argc, char *argv[])
 
 	error = got_repo_load(in, &available_refs, repo, list_refs_only, noop,
 	    load_progress, &ppa, check_cancelled, NULL);
-	if (verbosity >= 0)    /* XXX printed_something is always zero */
+	if (verbosity >= 0 && !list_refs_only)
 		printf("\n");
 	if (error)
 		goto done;
