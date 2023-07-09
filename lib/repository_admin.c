@@ -1276,8 +1276,7 @@ purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
 	char *dot, path[PATH_MAX];
 	size_t i;
 
-	if (strlcpy(path, packidx_path, sizeof(path)) >=
-	    sizeof(path))
+	if (strlcpy(path, packidx_path, sizeof(path)) >= sizeof(path))
 		return got_error(GOT_ERR_NO_SPACE);
 
 	/*
