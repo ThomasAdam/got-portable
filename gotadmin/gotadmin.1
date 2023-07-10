@@ -387,32 +387,38 @@ be excluded.
 .El
 .It Xo
 .Cm load
-.Op Fl lnq
-.Op Fl b Ar reference
+.Op Fl nq
+.Op Fl l Ar bundle-path
 .Op Fl r Ar repository-path
-.Op Ar file
+.Op Ar reference ...
 .Xc
-Read a Git bundle stream from standard input or
-.Ar file .
+Read a Git bundle stream from standard input and load its data into
+a repository.
+.Pp
+If one or more
+.Ar reference
+arguments are provided then only load the specified references
+from the bundle.
+Otherwise, all references will be loaded.
 .Pp
 The options for
 .Cm gotadmin load
 are as follows:
 .Bl -tag -width Ds
-.It Fl b Ar reference
-Load only the specified
+.It Fl l Ar bundle-path
+List references available for loading from the bundle at the specified
+.Ar bundle-path
+and exit immediately.
+If the
+.Fl l
+option is specified then no
 .Ar reference
-from the bundle.
-This option may be specified multiple times to build a list of
-reference to load.
-If not provided, all the reference will be loaded.
-.It Fl l
-List references available for loading from the bundle and exit
-immediately.
-Cannot be used together with
-.Fl b
-and
-.Fl n .
+arguments are allowed.
+The
+.Fl l
+option is incompatible with the
+.Fl n
+option.
 .It Fl n
 Attempt to load the bundle but don't install new packfile or update any
 reference.
