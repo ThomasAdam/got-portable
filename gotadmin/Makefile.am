@@ -10,10 +10,12 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/delta.c \
        $(top_srcdir)/lib/delta_cache.c \
        $(top_srcdir)/lib/deltify.c \
+       $(top_srcdir)/lib/dump.c \
        $(top_srcdir)/lib/error.c \
        $(top_srcdir)/lib/gotconfig.c \
        $(top_srcdir)/lib/hash.c \
        $(top_srcdir)/lib/inflate.c \
+       $(top_srcdir)/lib/load.c \
        $(top_srcdir)/lib/lockfile.c \
        $(top_srcdir)/lib/murmurhash2.c \
        $(top_srcdir)/lib/object.c \
