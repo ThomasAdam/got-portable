@@ -344,7 +344,7 @@ work tree, use the repository path associated with this work tree.
 .Op Fl x Ar reference
 .Op Ar reference ...
 .Xc
-Dump the contents of the repository to standard output.
+Dump the contents of the repository to standard output in Git bundle format.
 .Pp
 If one or more
 .Ar reference
@@ -372,7 +372,7 @@ work tree, use the repository path associated with this work tree.
 .It Fl x Ar reference
 Exclude objects reachable via the specified
 .Ar reference
-from the dump file.
+from the bundle.
 The
 .Ar reference
 argument may either specify a specific reference or a reference namespace,
@@ -392,7 +392,7 @@ be excluded.
 .Op Fl r Ar repository-path
 .Op Ar file
 .Xc
-Read a repository dump stream from standard input or
+Read a Git bundle stream from standard input or
 .Ar file .
 .Pp
 The options for
@@ -402,21 +402,21 @@ are as follows:
 .It Fl b Ar reference
 Load only the specified
 .Ar reference
-from the dump.
+from the bundle.
 This option may be specified multiple times to build a list of
 reference to load.
 If not provided, all the reference will be loaded.
 .It Fl l
-List references available for loading from the dump and exit
+List references available for loading from the bundle and exit
 immediately.
 Cannot be used together with
 .Fl b
 and
 .Fl n .
 .It Fl n
-Attempt to load the dump but don't install new packfile or update any
+Attempt to load the bundle but don't install new packfile or update any
 reference.
-Can be used to verify the integrity of the dump.
+Can be used to verify the integrity of the bundle.
 .It Fl q
 Suppress progress reporting output.
 .It Fl r Ar repository-path
