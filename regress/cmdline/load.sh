@@ -24,7 +24,7 @@ test_load_bundle() {
 
 	# then load it in an empty repository
 	(cd "$testroot/" && gotadmin init -b master repo2) >/dev/null
-	(cd "$testroot/repo2" && gotadmin load "$testroot/bundle") \
+	(cd "$testroot/repo2" && gotadmin load < "$testroot/bundle") \
 		>/dev/null
 	if [ $? -ne 0 ]; then
 		echo "failed to load the bundle" >&2
@@ -48,7 +48,7 @@ test_load_bundle() {
 	(cd "$testroot/repo" && git bundle create -q \
 		"$testroot/bundle" "$base..master")
 
-	(cd "$testroot/repo2" && gotadmin load "$testroot/bundle") >/dev/null
+	(cd "$testroot/repo2" && gotadmin load < "$testroot/bundle") >/dev/null
 	if [ $? -ne 0 ]; then
 		echo "failed to load incremental bundle" >&2
 		test_done "$testroot" 1
@@ -102,7 +102,7 @@ EOF
 		return 1
 	fi
 
-	(cd "$testroot/repo2" && gotadmin load -q -b refs/heads/newbranch \
+	(cd "$testroot/repo2" && gotadmin load -q refs/heads/newbranch \
 		<$testroot/bundle)
 	if [ $? -ne 0 ]; then
 		echo "gotadmin load failed unexpectedly" >&2

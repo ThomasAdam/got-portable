@@ -1551,8 +1551,8 @@ cmd_dump(int argc, char *argv[])
 __dead static void
 usage_load(void)
 {
-	fprintf(stderr, "usage: %s load [-lnq] [-b reference] "
-	    "[-r repository-path] [file]\n",
+	fprintf(stderr, "usage: %s load [-nq] [-l bundle-file] "
+	    "[-r repository-path] [reference ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -1684,7 +1684,7 @@ cmd_load(int argc, char *argv[])
 	int list_refs_only = 0;
 	int noop = 0;
 	int verbosity = 0;
-	int ch;
+	int ch, i;
 
 	TAILQ_INIT(&include_args);
 	TAILQ_INIT(&available_refs);
@@ -1695,16 +1695,13 @@ cmd_load(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "b:lnqr:")) != -1) {
+	while ((ch = getopt(argc, argv, "l:nqr:")) != -1) {
 		switch (ch) {
-		case 'b':
-			error = got_pathlist_append(&include_args,
-			    optarg, NULL);
-			if (error)
-				return error;
-			break;
 		case 'l':
 			list_refs_only = 1;
+			in = fopen(optarg, "re");
+			if (in == NULL)
+				return got_error_from_errno2("open", optarg);
 			break;
 		case 'n':
 			noop = 1;
@@ -1727,18 +1724,19 @@ cmd_load(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (list_refs_only && !TAILQ_EMPTY(&include_args))
-		errx(1, "-b and -l are mutually exclusive");
-
+	if (list_refs_only && argc > 1)
+		errx(1, "-l and references on the command line are exclusive");
 	if (list_refs_only && noop)
 		errx(1, "-n and -l are mutually exclusive");
 
-	if (argc > 1)
-		usage_load();
-	if (argc == 1) {
-		in = fopen(argv[0], "re");
-		if (in == NULL)
-			return got_error_from_errno2("open", argv[0]);
+	for (i = 0; i < argc; i++) {
+		char *refname = argv[i];
+		got_path_strip_trailing_slashes(refname);
+		if (!got_ref_name_is_valid(refname))
+			errx(1, "invalid reference name %s", refname);
+		error = got_pathlist_append(&include_args, refname, NULL);
+		if (error)
+			goto done;
 	}
 
 	if (repo_path == NULL) {
