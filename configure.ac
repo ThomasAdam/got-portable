@@ -875,6 +875,7 @@ AH_BOTTOM([#include "got_compat2.h"])
 
 AC_CONFIG_FILES([Makefile
 		 compat/Makefile
+		 cvg/Makefile
 		 libexec/Makefile
 		 libexec/got-read-tree/Makefile
 		 libexec/got-fetch-pack/Makefile

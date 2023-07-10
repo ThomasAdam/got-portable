@@ -14,9 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/stat.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 
 #include <dirent.h>
 #include <limits.h>
@@ -28,13 +29,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>
-#include <uuid.h>
-#include <util.h>
 
 #include "got_error.h"
 #include "got_repository.h"

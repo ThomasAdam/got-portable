@@ -26,6 +26,7 @@ aclocal.m4
 config.log
 config.status
 configure
+cvg/cvg
 etc/*
 got/got
 gotadmin/gotadmin

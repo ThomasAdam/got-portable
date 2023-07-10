@@ -1,4 +1,4 @@
-SUBDIRS = compat libexec got tog gotadmin template gotwebd
+SUBDIRS = compat libexec got tog gotadmin template gotwebd cvg
 # TODO: gotd gotsh template
 
 include $(top_builddir)/Makefile.common

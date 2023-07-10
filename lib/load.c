@@ -20,15 +20,11 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/tree.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 
-#include <endian.h>
 #include <limits.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

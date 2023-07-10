@@ -14,13 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 #include <sys/types.h>
 
 #include <ctype.h>
 #include <limits.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
