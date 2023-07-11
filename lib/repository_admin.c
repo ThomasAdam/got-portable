@@ -1188,7 +1188,8 @@ done:
 
 static const struct got_error *
 purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
-    int dry_run, int *remove, off_t *size_before, off_t *size_after)
+    int dry_run, int ignore_mtime, time_t max_mtime,
+    int *remove, off_t *size_before, off_t *size_after)
 {
 	static const char *ext[] = {".idx", ".pack", ".rev", ".bitmap",
 	    ".promisor", ".mtimes"};
@@ -1198,6 +1199,20 @@ purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
 
 	if (strlcpy(path, packidx_path, sizeof(path)) >= sizeof(path))
 		return got_error(GOT_ERR_NO_SPACE);
+
+	/*
+	 * Do not delete pack files which are younger than our maximum
+	 * modification time threshold.  This prevents a race where a
+	 * new pack file which is being added to the repository
+	 * concurrently would be deleted.
+	 */
+	if (fstatat(got_repo_get_fd(repo), path, &sb, 0) == -1) {
+		if (errno == ENOENT)
+			return NULL;
+		return got_error_from_errno2("fstatat", path);
+	}
+	if (!ignore_mtime && sb.st_mtime > max_mtime)
+		*remove = 0;
 
 	/*
 	 * For compatibility with Git, if a matching .keep file exist
@@ -1305,8 +1320,9 @@ pack_info_cmp(const void *a, const void *b)
 static const struct got_error *
 repo_purge_redundant_packfiles(struct got_repository *repo,
     struct got_object_idset *traversed_ids,
-    off_t *size_before, off_t *size_after, int dry_run,
-    int nloose, int ncommits, int npurged, struct got_ratelimit *rl,
+    off_t *size_before, off_t *size_after, int dry_run, int ignore_mtime,
+    time_t max_mtime, int nloose, int ncommits, int npurged,
+    struct got_ratelimit *rl,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -1359,7 +1375,7 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 		if (err)
 			goto done;
 		err = purge_redundant_pack(repo, sorted[i].path, dry_run,
-		    &remove, size_before, size_after);
+		    ignore_mtime, max_mtime, &remove, size_before, size_after);
 		if (err)
 			goto done;
 		if (!remove)
@@ -1464,8 +1480,9 @@ got_repo_cleanup(struct got_repository *repo,
 		goto done;
 
 	err = repo_purge_redundant_packfiles(repo, traversed_ids,
-	    pack_before, pack_after, dry_run, *nloose, *ncommits, npurged,
-	    &rl, progress_cb, progress_arg, cancel_cb, cancel_arg);
+	    pack_before, pack_after, dry_run, ignore_mtime, max_mtime,
+	    *nloose, *ncommits, npurged, &rl, progress_cb, progress_arg,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
