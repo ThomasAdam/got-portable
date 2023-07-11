@@ -1222,9 +1222,7 @@ purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
 
 		if (fstatat(got_repo_get_fd(repo), path, &sb, 0) ==
 		    -1) {
-			if (errno == ENOENT &&
-			    strcmp(ext[i], ".pack") != 0 &&
-			    strcmp(ext[i], ".idx") != 0)
+			if (errno == ENOENT)
 				continue;
 			return got_error_from_errno2("fstatat", path);
 		}
