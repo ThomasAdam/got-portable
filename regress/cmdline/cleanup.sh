@@ -266,16 +266,15 @@ test_cleanup_redundant_pack_files() {
 	gotadmin pack -a -r "$testroot/repo" >/dev/null
 	gotadmin pack -a -r "$testroot/repo" >/dev/null
 
-	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
-		| tail -1 > $testroot/stdout
+	# create another one with unreachable objects
+	(cd "$testroot/repo" && git checkout -q -b tempbranch)
+	echo "modified alpha on tempbranch" >$testroot/repo/alpha
+	git_commit "$testroot/repo" -m "edit alpha on tempbranch"
+	gotadmin pack -a -r "$testroot/repo" >/dev/null
+	(cd "$testroot/repo" && git checkout -q master)
+	(cd "$testroot/repo" && got branch -d tempbranch) >/dev/null
 
-	echo "5 pack files purged" > $testroot/stdout.expected
-	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
-		diff -u "$testroot/stdout.expected" "$testroot/stdout"
-		test_done "$testroot" 1
-		return 1
-	fi
-
+	gotadmin cleanup -q -r "$testroot/repo"
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 2 ]; then
 		echo "expected 2 pack files left, $n found instead" >&2
@@ -302,15 +301,7 @@ test_cleanup_redundant_pack_files() {
 	done
 	gotadmin pack -r "$testroot/repo" >/dev/null
 
-	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
-	    | tail -1 > $testroot/stdout
-
-	echo "0 pack files purged" > $testroot/stdout.expected
-	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
-		diff -u "$testroot/stdout.expected" "$testroot/stdout"
-		test_done "$testroot" 1
-		return 1
-	fi
+	gotadmin cleanup -q -r "$testroot/repo"
 
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 3 ]; then
@@ -333,16 +324,7 @@ test_cleanup_redundant_pack_files() {
 
 	gotadmin pack -a -x master -r "$testroot/repo" >/dev/null
 
-	gotadmin cleanup -r "$testroot/repo" | grep 'pack files? purged' \
-		| tail -1 > $testroot/stdout
-
-	echo "6 pack files purged" > $testroot/stdout.expected
-	if cmp -s "$testroot/stdout.expected" "$testroot/stdout"; then
-		diff -u "$testroot/stdout.expected" "$testroot/stdout"
-		test_done "$testroot" 1
-		return 1
-	fi
-
+	gotadmin cleanup -q -r "$testroot/repo"
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 3 ]; then
 		echo "expected 3 pack files left, $n found instead" >&2

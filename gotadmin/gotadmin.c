@@ -1153,31 +1153,31 @@ struct got_cleanup_progress_arg {
 };
 
 static const struct got_error *
-cleanup_progress(void *arg, int nloose, int ncommits, int npurged,
+cleanup_progress(void *arg, int ncommits, int nloose, int npurged,
     int nredundant)
 {
 	struct got_cleanup_progress_arg *a = arg;
 	int print_loose = 0, print_commits = 0, print_purged = 0;
 	int print_redundant = 0;
 
-	if (a->last_nloose != nloose) {
-		print_loose = 1;
-		a->last_nloose = nloose;
-	}
 	if (a->last_ncommits != ncommits) {
-		print_loose = 1;
 		print_commits = 1;
 		a->last_ncommits = ncommits;
 	}
-	if (a->last_npurged != npurged) {
-		print_loose = 1;
+	if (a->last_nloose != nloose) {
 		print_commits = 1;
+		print_loose = 1;
+		a->last_nloose = nloose;
+	}
+	if (a->last_npurged != npurged) {
+		print_commits = 1;
+		print_loose = 1;
 		print_purged = 1;
 		a->last_npurged = npurged;
 	}
 	if (a->last_nredundant != nredundant) {
-		print_loose = 1;
 		print_commits = 1;
+		print_loose = 1;
 		print_purged = 1;
 		print_redundant = 1;
 		a->last_nredundant = nredundant;
@@ -1188,11 +1188,11 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged,
 
 	if (print_loose || print_commits || print_purged || print_redundant)
 		printf("\r");
-	if (print_loose)
-		printf("%d loose object%s", nloose, nloose == 1 ? "" : "s");
 	if (print_commits)
-		printf("; %d commit%s scanned", ncommits,
+		printf("%d commit%s scanned", ncommits,
 		    ncommits == 1 ? "" : "s");
+	if (print_loose)
+		printf("; %d loose object%s", nloose, nloose == 1 ? "" : "s");
 	if (print_purged || print_redundant) {
 		if (a->dry_run) {
 			printf("; could purge %d object%s", npurged,
@@ -1250,7 +1250,6 @@ cmd_cleanup(int argc, char *argv[])
 	int ch, dry_run = 0, verbosity = 0;
 	int ncommits = 0, nloose = 0, npacked = 0;
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
-	struct got_lockfile *lock = NULL;
 	struct got_cleanup_progress_arg cpa;
 	struct got_lonely_packidx_progress_arg lpa;
 	off_t loose_before, loose_after;
@@ -1322,10 +1321,6 @@ cmd_cleanup(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_cleanup_prepare(repo, &lock);
-	if (error)
-		goto done;
-
 	if (remove_lonely_packidx) {
 		memset(&lpa, 0, sizeof(lpa));
 		lpa.dry_run = dry_run;
@@ -1336,25 +1331,16 @@ cmd_cleanup(int argc, char *argv[])
 	}
 
 	memset(&cpa, 0, sizeof(cpa));
-	cpa.last_ncommits = -1;
+	cpa.last_nloose = -1;
 	cpa.last_npurged = -1;
 	cpa.last_nredundant = -1;
 	cpa.dry_run = dry_run;
 	cpa.verbosity = verbosity;
 
-	error = got_repo_purge_unreferenced_loose_objects(repo,
-	    &loose_before, &loose_after, &ncommits, &nloose, &npacked,
+	error = got_repo_cleanup(repo, &loose_before, &loose_after,
+	    &pack_before, &pack_after, &ncommits, &nloose, &npacked,
 	    dry_run, ignore_mtime, cleanup_progress, &cpa,
 	    check_cancelled, NULL);
-	if (error) {
-		if (cpa.printed_something)
-			printf("\n");
-		goto done;
-	}
-
-	error = got_repo_purge_redundant_packfiles(repo, &pack_before,
-	    &pack_after, dry_run, ncommits, nloose, npacked,
-	    cleanup_progress, &cpa, check_cancelled, NULL);
 	if (cpa.printed_something)
 		printf("\n");
 	if (error)
@@ -1397,7 +1383,6 @@ cmd_cleanup(int argc, char *argv[])
 	}
 
 done:
-	got_repo_cleanup_complete(repo, lock);
 	if (repo)
 		got_repo_close(repo);
 	if (pack_fds) {
