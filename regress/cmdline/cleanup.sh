@@ -274,7 +274,7 @@ test_cleanup_redundant_pack_files() {
 	(cd "$testroot/repo" && git checkout -q master)
 	(cd "$testroot/repo" && got branch -d tempbranch) >/dev/null
 
-	gotadmin cleanup -q -r "$testroot/repo"
+	gotadmin cleanup -a -q -r "$testroot/repo"
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 2 ]; then
 		echo "expected 2 pack files left, $n found instead" >&2
@@ -301,7 +301,7 @@ test_cleanup_redundant_pack_files() {
 	done
 	gotadmin pack -r "$testroot/repo" >/dev/null
 
-	gotadmin cleanup -q -r "$testroot/repo"
+	gotadmin cleanup -a -q -r "$testroot/repo"
 
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 3 ]; then
@@ -324,7 +324,7 @@ test_cleanup_redundant_pack_files() {
 
 	gotadmin pack -a -x master -r "$testroot/repo" >/dev/null
 
-	gotadmin cleanup -q -r "$testroot/repo"
+	gotadmin cleanup -a -q -r "$testroot/repo"
 	n=$(gotadmin info -r "$testroot/repo" | awk '/^pack files/{print $3}')
 	if [ "$n" -ne 3 ]; then
 		echo "expected 3 pack files left, $n found instead" >&2
