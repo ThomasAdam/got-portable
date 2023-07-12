@@ -2,7 +2,7 @@ sbin_PROGRAMS = cvg
 
 include $(top_builddir)/Makefile.common
 
-cvg_SOURCES = cvg.c \ 
+cvg_SOURCES = cvg.c \
 	$(top_srcdir)/lib/blame.c \
 	$(top_srcdir)/lib/bloom.c \
 	$(top_srcdir)/lib/buf.c \
