@@ -4160,6 +4160,8 @@ done:
 	free(path);
 	free(repo_path);
 	free(cwd);
+	free(start_id);
+	free(end_id);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
