@@ -548,7 +548,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 
 	evtimer_add(&client->tmo, &auth_timeout);
 
-	/* Flow continues upon authentication successs/failure or timeout. */
+	/* Flow continues upon authentication success/failure or timeout. */
 	return NULL;
 }
 
