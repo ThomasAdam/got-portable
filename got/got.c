@@ -462,7 +462,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	}
 
 	if (stat(logmsg_path, &st2) == -1)
-		return got_error_from_errno("stat");
+		return got_error_from_errno2("stat", logmsg_path);
 
 	if (require_modification && st.st_size == st2.st_size &&
 	    timespeccmp(&st.st_mtim, &st2.st_mtim, ==))
