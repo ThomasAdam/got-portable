@@ -397,6 +397,13 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 	const struct got_error *err = NULL;
 	char *abspath;
 
+	/* We only accept worktree-relative paths here. */
+	if (got_path_is_absolute(path)) {
+		return got_error_fmt(GOT_ERR_BAD_PATH,
+		    "%s does not accept absolute paths: %s",
+		    __func__, path);
+	}
+
 	if (asprintf(&abspath, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno("asprintf");
 
@@ -1350,7 +1357,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			err = got_path_dirname(&parent, ondisk_path);
 			if (err)
 				return err;
-			err = add_dir_on_disk(worktree, parent);
+			err = got_path_mkdir(parent);
 			free(parent);
 			if (err)
 				return err;
@@ -1360,6 +1367,12 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			 */
 			if (symlink(target_path, ondisk_path) != -1) {
 				err = NULL; /* success */
+				if (progress_cb) {
+					err = (*progress_cb)(progress_arg,
+					    reverting_versioned_file ?
+					    GOT_STATUS_REVERT : GOT_STATUS_ADD,
+					    path);
+				}
 				return err;
 			}
 		}
@@ -2294,16 +2307,16 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	if (got_object_tree_entry_is_submodule(te))
 		return NULL;
 
+	if (!S_ISREG(te->mode) && !S_ISLNK(te->mode))
+		return NULL;
+
 	if (asprintf(&path, "%s%s%s", parent_path,
 	    parent_path[0] ? "/" : "", te->name)
 	    == -1)
 		return got_error_from_errno("asprintf");
 
-	if (S_ISDIR(te->mode))
-		err = add_dir_on_disk(a->worktree, path);
-	else
-		err = update_blob(a->worktree, a->fileindex, NULL, te, path,
-		    a->repo, a->progress_cb, a->progress_arg);
+	err = update_blob(a->worktree, a->fileindex, NULL, te, path,
+	    a->repo, a->progress_cb, a->progress_arg);
 
 	free(path);
 	return err;
