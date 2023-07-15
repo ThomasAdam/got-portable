@@ -11969,6 +11969,8 @@ histedit_run_editor(struct got_histedit_list *histedit_cmds,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct stat st, st2;
+	struct timespec timeout;
 	char *editor;
 	FILE *f = NULL;
 
@@ -11976,8 +11978,29 @@ histedit_run_editor(struct got_histedit_list *histedit_cmds,
 	if (err)
 		return err;
 
+	if (stat(path, &st) == -1) {
+		err = got_error_from_errno2("stat", path);
+		goto done;
+	}
+
 	if (spawn_editor(editor, path) == -1) {
 		err = got_error_from_errno("failed spawning editor");
+		goto done;
+	}
+
+	timeout.tv_sec = 0;
+	timeout.tv_nsec = 1;
+	nanosleep(&timeout,  NULL);
+
+	if (stat(path, &st2) == -1) {
+		err = got_error_from_errno2("stat", path);
+		goto done;
+	}
+
+	if (st.st_size == st2.st_size &&
+	    timespeccmp(&st.st_mtim, &st2.st_mtim, ==)) {
+		err = got_error_msg(GOT_ERR_EMPTY_HISTEDIT,
+                    "no changes made to histedit script, aborting");
 		goto done;
 	}
 

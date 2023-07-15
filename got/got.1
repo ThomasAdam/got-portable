@@ -127,6 +127,7 @@ Without the
 option,
 .Cm got import
 opens a temporary file in an editor where a log message can be written.
+Quitting the editor without saving the file will abort the import operation.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -1347,6 +1348,7 @@ Without the
 option,
 .Cm got tag
 opens a temporary file in an editor where a tag message can be written.
+Quitting the editor without saving the file will abort the tag operation.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -1708,6 +1710,7 @@ or the
 and
 .Fl N
 options are used together.
+Quitting the editor without saving the file will abort the commit operation.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -2522,6 +2525,7 @@ command line, or generated with the
 or
 .Fl m
 options.
+Quitting the editor without saving the file will abort the histedit operation.
 .Pp
 The format of the histedit script is line-based.
 Each line in the script begins with a command name, followed by
