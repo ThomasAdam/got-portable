@@ -6956,10 +6956,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = open_diff_view(diff_view, pid ? &pid->id : NULL,
 		    id, NULL, NULL, 3, 0, 0, view, s->repo);
 		got_object_commit_close(commit);
-		if (err) {
-			view_close(diff_view);
+		if (err)
 			break;
-		}
 		s->last_diffed_line = s->first_displayed_line - 1 +
 		    s->selected_line;
 		if (*new_view)
