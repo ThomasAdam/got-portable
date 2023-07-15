@@ -897,6 +897,165 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
+.It Xo
+.Cm tag
+.Op Fl lVv
+.Op Fl c Ar commit
+.Op Fl m Ar message
+.Op Fl r Ar repository-path
+.Op Fl s Ar signer-id
+.Ar name
+.Xc
+Manage tags in a repository.
+.Pp
+Tags are managed via references which live in the
+.Dq refs/tags/
+reference namespace.
+The
+.Cm got tag
+command operates on references in this namespace only.
+References in this namespace point at tag objects which contain a pointer
+to another object, a tag message, as well as author and timestamp information.
+.Pp
+Attempt to create a tag with the given
+.Ar name ,
+and make this tag point at the given
+.Ar commit .
+If no commit is specified, default to the latest commit on the work tree's
+current branch if invoked in a work tree, and to a commit resolved via
+the repository's HEAD reference otherwise.
+.Pp
+The options for
+.Cm got tag
+are as follows:
+.Bl -tag -width Ds
+.It Fl c Ar commit
+Make the newly created tag reference point at the specified
+.Ar commit .
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference or tag name which
+will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
+.It Fl l
+List all existing tags in the repository instead of creating a new tag.
+If a
+.Ar name
+argument is passed, show only the tag with the given
+.Ar name .
+.It Fl m Ar message
+Use the specified tag message when creating the new tag.
+Without the
+.Fl m
+option,
+.Cm got tag
+opens a temporary file in an editor where a tag message can be written.
+Quitting the editor without saving the file will abort the tag operation.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl s Ar signer-id
+While creating a new tag, sign this tag with the identity given in
+.Ar signer-id .
+.Pp
+For SSH-based signatures,
+.Ar signer-id
+is the path to a file which may refer to either a private SSH key,
+or a public SSH key with the private half available via
+.Xr ssh-agent 1 .
+.Cm got tag
+will sign the tag object by invoking
+.Xr ssh-keygen 1
+with the
+.Fl Y Cm sign
+command, using the signature namespace
+.Dq git
+for compatibility with
+.Xr git 1 .
+.It Fl V
+Verify tag object signatures.
+If a
+.Ar name
+is specified, show and verify the tag object with the provided name.
+Otherwise, list all tag objects and verify signatures where present.
+.Pp
+.Cm got tag
+verifies SSH-based signatures by invoking
+.Xr ssh-keygen 1
+with the options
+.Fl Y Cm verify Fl f Ar allowed_signers .
+A path to the
+.Ar allowed_signers
+file must be set in
+.Xr got.conf 5 ,
+otherwise verification is impossible.
+.It Fl v
+Verbose mode.
+During SSH signature creation and verification this option will be passed to
+.Xr ssh-keygen 1 .
+Multiple -v options increase the verbosity.
+The maximum is 3.
+.El
+.Pp
+By design, the
+.Cm got tag
+command will not delete tags or change existing tags.
+If a tag must be deleted, the
+.Cm got ref
+command may be used to delete a tag's reference.
+This should only be done if the tag has not already been copied to
+another repository.
+.It Xo
+.Cm add
+.Op Fl IR
+.Ar path ...
+.Xc
+Schedule unversioned files in a work tree for addition to the
+repository in the next commit.
+By default, files which match a
+.Cm got status
+ignore pattern will not be added.
+.Pp
+If a
+.Ar path
+mentioned in the command line is not an unversioned file then
+.Cm got add
+may raise an error.
+To avoid unnecessary errors from paths picked up by file globbing patterns
+in the shell, paths in the argument list will be silently ignored if they
+are not reported by
+.Cm got status
+at all, or if they are reported with one of the following status codes
+and do not have changes staged via
+.Cm got stage :
+.Bl -column YXZ description
+.It M Ta modified file
+.It A Ta file scheduled for addition in next commit
+.It C Ta modified or added file which contains merge conflicts
+.It m Ta modified file modes (executable bit only)
+.El
+.Pp
+The options for
+.Cm got add
+are as follows:
+.Bl -tag -width Ds
+.It Fl I
+Add files even if they match a
+.Cm got status
+ignore pattern.
+.It Fl R
+Permit recursion into directories.
+If this option is not specified,
+.Cm got add
+will refuse to run if a specified
+.Ar path
+is a directory.
+.El
 .Tg rm
 .It Xo
 .Cm remove
