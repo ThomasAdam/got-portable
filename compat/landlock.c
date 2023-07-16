@@ -58,6 +58,19 @@ landlock_restrict_self(int ruleset_fd, __u32 flags)
 #endif
 
 /*
+ * Maybe we should ship with a full copy of the linux headers because
+ * you never know...
+ */
+
+#ifndef LANDLOCK_ACCESS_FS_REFER
+#define LANDLOCK_ACCESS_FS_REFER	(1ULL << 13)
+#endif
+
+#ifndef LANDLOCK_ACCESS_FS_TRUNCATE
+#define LANDLOCK_ACCESS_FS_TRUNCATE	(1ULL << 14)
+#endif
+
+/*
  * Revoke any fs access.
  */
 int
@@ -81,20 +94,30 @@ landlock_no_fs(void)
 				     LANDLOCK_ACCESS_FS_MAKE_SOCK |
 				     LANDLOCK_ACCESS_FS_MAKE_FIFO |
 				     LANDLOCK_ACCESS_FS_MAKE_BLOCK |
-				     LANDLOCK_ACCESS_FS_MAKE_SYM,
+				     LANDLOCK_ACCESS_FS_MAKE_SYM |
+				     LANDLOCK_ACCESS_FS_REFER |
+				     LANDLOCK_ACCESS_FS_TRUNCATE,
 	};
-	int fd, saved_errno;
+	int fd, abi, saved_errno;
 
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1)
 		return -1;
 
-	fd = landlock_create_ruleset(&rattr, sizeof(rattr), 0);
-	if (fd == -1) {
+	abi = landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+	if (abi == -1) {
 		/* this kernel doesn't have landlock built in */
 		if (errno == ENOSYS || errno == EOPNOTSUPP)
 			return 0;
 		return -1;
 	}
+	if (abi < 2)
+		rattr.handled_access_fs &= ~LANDLOCK_ACCESS_FS_REFER;
+	if (abi < 3)
+		rattr.handled_access_fs &= ~LANDLOCK_ACCESS_FS_TRUNCATE;
+
+	fd = landlock_create_ruleset(&rattr, sizeof(rattr), 0);
+	if (fd == -1)
+		return -1;
 
 	if (landlock_restrict_self(fd, 0)) {
 		saved_errno = errno;
