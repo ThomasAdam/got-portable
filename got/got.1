@@ -707,7 +707,7 @@ keywords
 and
 .Qq :head
 can also be used to represent the work tree's base commit
-and HEAD reference, respectively.
+and branch head, respectively.
 Keywords and reference names may be appended with
 .Qq :+
 or
@@ -716,7 +716,7 @@ modifiers and an optional integer N to denote the
 Nth descendant or antecedent, respectively, by first parent traversal;
 for example,
 .Sy :head:-2
-denotes the HEAD reference's 2nd generation ancestor, and
+denotes the work tree branch head's 2nd generation ancestor, and
 .Sy :base:+4
 denotes the 4th generation descendant of the work tree's base commit.
 Similarly,
@@ -903,7 +903,7 @@ keywords
 and
 .Qq :head
 can also be used to represent the work tree's base commit
-and HEAD reference, respectively.
+and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
@@ -1067,7 +1067,7 @@ keywords
 and
 .Qq :head
 can also be used to represent the work tree's base commit
-and HEAD reference, respectively.
+and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
