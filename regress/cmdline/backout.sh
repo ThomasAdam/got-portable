@@ -543,9 +543,105 @@ test_backout_logmsg_ref() {
 	test_done "$testroot" "$ret"
 }
 
+test_backout_commit_keywords() {
+	local testroot=$(test_init backout_commit_keywords)
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/wt/new
+	(cd $testroot/wt && got add new > /dev/null)
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm epsilon/zeta > /dev/null)
+	(cd $testroot/wt && got commit -m "bad changes" > /dev/null)
+
+	local bad_commit=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got update > /dev/null)
+
+	echo "modified beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "changing beta" > /dev/null)
+	echo "modified beta again" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "changing beta again" > /dev/null)
+
+	(cd $testroot/wt && got update > /dev/null)
+
+	(cd $testroot/wt && got bo :head:-2 > $testroot/stdout)
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "A  epsilon/zeta" >> $testroot/stdout.expected
+	echo "D  new" >> $testroot/stdout.expected
+	echo "Backed out commit $bad_commit" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e "$testroot/wt/new" ]; then
+		echo "file '$testroot/wt/new' still exists on disk" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -e "$testroot/wt/epsilon/zeta" ]; then
+		echo "file '$testroot/wt/epsilon/zeta' is missing on disk" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'A  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'D  new' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local next_backout=`git_show_head $testroot/repo`
+
+	(cd "$testroot/wt" && got ci -m "backed-out bad commit" > /dev/null)
+	(cd "$testroot/wt" && got up > /dev/null)
+
+	echo "G  beta" > $testroot/stdout.expected
+	echo "Backed out commit $next_backout" >> $testroot/stdout.expected
+	(cd "$testroot/wt" && got bo :base:- > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_backout_basic
 run_test test_backout_edits_for_file_since_deleted
 run_test test_backout_next_commit
 run_test test_backout_umask
 run_test test_backout_logmsg_ref
+run_test test_backout_commit_keywords

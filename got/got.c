@@ -2981,7 +2981,7 @@ cmd_checkout(int argc, char *argv[])
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
 	const char *branch_name = GOT_REF_HEAD, *refname = NULL;
-	char *commit_id_str = NULL;
+	char *commit_id_str = NULL, *keyword_idstr = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *cwd = NULL;
 	int ch, same_path_prefix, allow_nonempty = 0, verbosity = 0;
@@ -3131,6 +3131,16 @@ cmd_checkout(int argc, char *argv[])
 		    NULL);
 		if (error)
 			goto done;
+
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL) {
+			free(commit_id_str);
+			commit_id_str = keyword_idstr;
+		}
+
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		got_ref_list_free(&refs);
@@ -6974,7 +6984,7 @@ cmd_branch(int argc, char *argv[])
 	struct got_reference *ref = NULL;
 	struct got_pathlist_head paths;
 	struct got_object_id *commit_id = NULL;
-	char *commit_id_str = NULL;
+	char *commit_id_str = NULL, *keyword_idstr = NULL;;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
@@ -7102,6 +7112,14 @@ cmd_branch(int argc, char *argv[])
 			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
+		else {
+			error = got_keyword_to_idstr(&keyword_idstr,
+			    commit_id_arg, repo, worktree);
+			if (error != NULL)
+				goto done;
+			if (keyword_idstr != NULL)
+				commit_id_arg = keyword_idstr;
+		}
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		got_ref_list_free(&refs);
@@ -7153,6 +7171,7 @@ cmd_branch(int argc, char *argv[])
 		}
 	}
 done:
+	free(keyword_idstr);
 	if (ref)
 		got_ref_close(ref);
 	if (repo) {
@@ -8262,7 +8281,7 @@ cmd_patch(int argc, char *argv[])
 	const char *commit_id_str = NULL;
 	struct stat sb;
 	const char *errstr;
-	char *cwd = NULL;
+	char *cwd = NULL, *keyword_idstr = NULL;
 	int ch, nop = 0, strip = -1, reverse = 0;
 	int patchfd;
 	int *pack_fds = NULL;
@@ -8351,8 +8370,14 @@ cmd_patch(int argc, char *argv[])
 		goto done;
 
 	if (commit_id_str != NULL) {
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		    keyword_idstr != NULL ? keyword_idstr : commit_id_str,
+		    GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		if (error)
 			goto done;
 	}
@@ -8363,6 +8388,7 @@ cmd_patch(int argc, char *argv[])
 	print_patch_progress_stats(&ppa);
 done:
 	got_ref_list_free(&refs);
+	free(keyword_idstr);
 	free(commit_id);
 	if (repo) {
 		close_error = got_repo_close(repo);
@@ -10194,7 +10220,7 @@ cmd_cherrypick(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL, *commit_id_str = NULL;
+	char *cwd = NULL, *commit_id_str = NULL, *keyword_idstr = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
@@ -10274,7 +10300,12 @@ cmd_cherrypick(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
+	error = got_keyword_to_idstr(&keyword_idstr, argv[0], repo, worktree);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_match_object_id(&commit_id, NULL,
+	    keyword_idstr != NULL ? keyword_idstr : argv[0],
 	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
 	if (error)
 		goto done;
@@ -10303,6 +10334,7 @@ cmd_cherrypick(int argc, char *argv[])
 	print_merge_progress_stats(&upa);
 done:
 	free(cwd);
+	free(keyword_idstr);
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);
@@ -10336,7 +10368,7 @@ cmd_backout(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL, *commit_id_str = NULL;
+	char *cwd = NULL, *commit_id_str = NULL, *keyword_idstr = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
@@ -10416,7 +10448,12 @@ cmd_backout(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_match_object_id(&commit_id, NULL, argv[0],
+	error = got_keyword_to_idstr(&keyword_idstr, argv[0], repo, worktree);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_match_object_id(&commit_id, NULL,
+	    keyword_idstr != NULL ? keyword_idstr : argv[0],
 	    GOT_OBJ_TYPE_COMMIT, NULL, repo);
 	if (error)
 		goto done;
@@ -10449,6 +10486,7 @@ cmd_backout(int argc, char *argv[])
 	print_merge_progress_stats(&upa);
 done:
 	free(cwd);
+	free(keyword_idstr);
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);

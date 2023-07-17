@@ -932,6 +932,81 @@ test_checkout_ulimit_n() {
 	test_done "$testroot" "$ret"
 }
 
+test_checkout_commit_keywords() {
+	local testroot=$(test_init checkout_commit_keywords)
+
+	set -A ids "$(git_show_head $testroot/repo)"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in $(seq 4); do
+		echo "zeta change $i" > "$testroot/wt/epsilon/zeta"
+
+		(cd "$testroot/wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+		set -- "$ids" "$(git_show_head $testroot/repo)"
+		ids=$*
+	done
+
+	echo "A  $testroot/wt2/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt2/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt2/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt2/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $(pop_id 4 $ids)" \
+		>> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got co -c :head:- $testroot/repo $testroot/wt2 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  $testroot/wt3/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt3/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt3/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt3/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $(pop_id 4 $ids)" \
+		>> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got co -bmaster -c:base:- $testroot/repo $testroot/wt3 > \
+	    $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
@@ -948,3 +1023,4 @@ run_test test_checkout_repo_with_unknown_extension
 run_test test_checkout_quiet
 run_test test_checkout_umask
 run_test test_checkout_ulimit_n
+run_test test_checkout_commit_keywords

@@ -570,6 +570,43 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.Pp
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used, with both resolving to the
+repository's HEAD reference, or, if the
+.Fl b
+option is used, the head of the checked-out
+.Ar branch .
+Keywords and reference names may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy foo:-3
+will denote the 3rd generation ancestor of the commit resolved by the
+.Qq foo
+reference.
+If an integer does not follow the
+.Qq :+
+or
+.Qq :-
+modifier, a
+.Qq 1
+is implicitly appended
+.Po e.g.,
+.Sy :head:-
+is equivalent to
+.Sy :head:-1
+.Pc .
 If this option is not specified, the most recent commit on the selected
 branch will be used.
 .Pp
@@ -1364,6 +1401,46 @@ The expected
 .Ar commit
 argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
+.Pp
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and branch head, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foobar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq foobar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .It Fl d Ar name
 Delete the branch with the specified
 .Ar name
@@ -1687,6 +1764,49 @@ are as follows:
 Attempt to locate files within the specified
 .Ar commit
 for use as a merge-base for 3-way merges.
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
+or tag name which will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
+.Pp
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and branch head, respectively.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy flan:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq flan
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 Ideally, the specified
 .Ar commit
 should contain versions of files which the changes contained in the
@@ -2166,6 +2286,43 @@ The expected argument is a reference or a commit ID SHA1 hash.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 .Pp
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and branch head, respectively.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy barbaz:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq barbaz
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
+.Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
 .It G Ta file was merged
@@ -2273,6 +2430,43 @@ should be on the same branch as the work tree's base commit.
 The expected argument is a reference or a commit ID SHA1 hash.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.Pp
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and branch head, respectively.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy wip:+5
+will denote the 5th generation descendant of the commit resolved by the
+.Qq wip
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
