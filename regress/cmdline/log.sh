@@ -900,6 +900,154 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_log_commit_keywords() {
+	local testroot=$(test_init log_commit_keywords)
+	local commit_time=`git_show_author_time $testroot/repo`
+	local d=`date -u -r $commit_time +"%G-%m-%d"`
+
+	set -A ids "$(git_show_head $testroot/repo)"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in $(seq 16); do
+		echo "alpha change $i" > "$testroot/wt/alpha"
+
+		(cd "$testroot/wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+		set -- "$ids" "$(git_show_head $testroot/repo)"
+		ids=$*
+	done
+
+	for i in $(seq 16 2); do
+		printf '%s %.7s commit number %s\n' \
+		    "$d" $(pop_id $i $ids) "$(( i-1 ))" \
+		    >> $testroot/stdout.expected
+	done
+
+	got log -r "$testroot/repo" -scmaster:- -l15 > $testroot/stdout
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update -c:head:-8 > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > "$testroot/stdout.expected"
+
+	for i in $(seq 9 2); do
+		printf '%s %.7s commit number %s\n' \
+		    "$d" $(pop_id $i $ids) "$(( i-1 ))" \
+		    >> $testroot/stdout.expected
+	done
+	printf '%s %.7s adding the test tree\n' "$d" $(pop_id 1 $ids) >> \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -sc:base > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# if + modifier is too great, use HEAD commit
+	printf '%s %-7s commit number %s\n' "$d" master 16 > \
+	    $testroot/stdout.expected
+	printf '%s %.7s commit number %s\n' "$d" $(pop_id 16 $ids) 15 >> \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -sc:base:+20 -l2 > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# if - modifier is too great, use root commit
+	printf '%s %.7s adding the test tree\n' "$d" $(pop_id 1 $ids) > \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -sc:base:-10 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got br -r "$testroot/repo" -c $(pop_id 1 $ids) base+
+
+	printf '%s %.7s commit number 1\n' "$d" $(pop_id 2 $ids) > \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -scbase+:+ -l1 > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got br -r "$testroot/repo" -c $(pop_id 3 $ids) head-1
+
+	printf '%s %.7s commit number 1\n' "$d" $(pop_id 2 $ids) > \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -schead-1:- -l1 > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got br -r "$testroot/repo" -c $(pop_id 16 $ids) base-1+2
+
+	printf '%s %.7s commit number 12\n' "$d" $(pop_id 13 $ids) > \
+	    $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -scbase-1+2:-3 -l1 > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
@@ -916,3 +1064,4 @@ run_test test_log_in_worktree_different_repo
 run_test test_log_changed_paths
 run_test test_log_submodule
 run_test test_log_diffstat
+run_test test_log_commit_keywords

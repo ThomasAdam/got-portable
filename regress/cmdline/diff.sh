@@ -2022,6 +2022,254 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_commit_keywords() {
+	local testroot=`test_init diff_commit_keywords`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	set -A ids "$(git_show_head $testroot/repo)"
+	set -A alpha_ids "$(get_blob_id $testroot/repo "" alpha)"
+	set -A beta_ids "$(get_blob_id $testroot/repo "" beta)"
+
+	for i in `seq 8`; do
+		if [ $(( i % 2 )) -eq 0 ]; then
+			echo "alpha change $i" > "$testroot/wt/alpha"
+		else
+			echo "beta change $i" > "$testroot/wt/beta"
+		fi
+
+		(cd "$testroot/wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		if [ $(( i % 2 )) -eq 0 ]; then
+			set -- "$alpha_ids" \
+			    "$(get_blob_id $testroot/repo "" alpha)"
+			alpha_ids=$*
+		else
+			set -- "$beta_ids" \
+			    "$(get_blob_id $testroot/repo "" beta)"
+			beta_ids=$*
+		fi
+
+		set -- "$ids" "$(git_show_head $testroot/repo)"
+		ids=$*
+	done
+
+	echo "diff $(pop_id 7 $ids) $(pop_id 8 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 7 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 8 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 4 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-beta change 5' >> $testroot/stdout.expected
+	echo '+beta change 7' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -cmaster:- > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update -c:head:-6 > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "diff $(pop_id 1 $ids) $(pop_id 2 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 1 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 2 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 1 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo '+beta change 1' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -c:base:- > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $(pop_id 3 $ids) $(pop_id 4 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 3 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 4 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 3 $beta_ids)" >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-beta change 1' >> $testroot/stdout.expected
+	echo '+beta change 3' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -c:base:+ > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# if modifier extends beyond HEAD, we should use HEAD ref
+	echo "diff $(pop_id 8 $ids) $(pop_id 9 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 8 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 9 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 4 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 5 $alpha_ids)" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha change 6' >> $testroot/stdout.expected
+	echo '+alpha change 8' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -c:base:+20 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $(pop_id 3 $ids) $(pop_id 9 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 3 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 9 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 2 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 5 $alpha_ids)" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha change 2' >> $testroot/stdout.expected
+	echo '+alpha change 8' >> $testroot/stdout.expected
+	echo "blob - $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-beta change 1' >> $testroot/stdout.expected
+	echo '+beta change 7' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -c:base -c:head > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $(pop_id 6 $ids) $(pop_id 8 $ids)" > \
+	    $testroot/stdout.expected
+	echo "commit - $(pop_id 6 $ids)" >> $testroot/stdout.expected
+	echo "commit + $(pop_id 8 $ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_id 3 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 4 $alpha_ids)" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha change 4' >> $testroot/stdout.expected
+	echo '+alpha change 6' >> $testroot/stdout.expected
+	echo "blob - $(pop_id 4 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-beta change 5' >> $testroot/stdout.expected
+	echo '+beta change 7' >> $testroot/stdout.expected
+
+	got diff -r "$testroot/repo" -cmaster:-3 -c:head:-1 > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "'-c BASE' requires work tree" > "$testroot/stderr.expected"
+
+	got diff -r "$testroot/repo" -c:base -c:head 2> $testroot/stderr
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -2041,3 +2289,4 @@ run_test test_diff_worktree_diffstat
 run_test test_diff_file_to_dir
 run_test test_diff_dir_to_file
 run_test test_diff_path_in_root_commit
+run_test test_diff_commit_keywords

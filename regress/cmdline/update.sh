@@ -3230,6 +3230,345 @@ test_update_umask() {
 	test_done "$testroot" 0
 }
 
+test_update_commit_keywords() {
+	local testroot=`test_init update_commit_keywords`
+
+	set -A ids "$(git_show_head $testroot/repo)"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in `seq 8`; do
+		if [ $(( i % 2 )) -eq 0 ]; then
+			echo "alpha change $i" > "$testroot/wt/alpha"
+		else
+			echo "beta change $i" > "$testroot/wt/beta"
+		fi
+
+		(cd "$testroot/wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+		set -- "$ids" "$(git_show_head $testroot/repo)"
+		ids=$*
+	done
+
+	echo "got: reference base not found" > $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -cbase:-2 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: 'basefoo': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -c:basefoo:-2 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: ':base::': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -c:base:: 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: ':head:++': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -c:head:++ 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: ':head:+x': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -c:head:+x 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: 'master::': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -cmaster:: 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: 'master:++': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -cmaster:++ 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: 'master:+x': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got update -cmaster:+x 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 1 ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 7 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:base:-2 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  beta" > $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 8 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -cmaster:- > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha change 6" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 2 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:base:-6 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "beta change 1" > $testroot/content.expected
+	cat $testroot/wt/beta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 3 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:base:+ > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha change 2" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 7 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:head:-2 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha change 6" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# if - modifier is too great, use root commit
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 1 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:base:-20 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# if + modifier is too great, use HEAD commit
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	echo $(pop_id 9 $ids) >> "$testroot/stdout.expected"
+
+	(cd $testroot/wt && got update -c:head:+10 > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha change 8" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_update_basic
 run_test test_update_adds_file
@@ -3278,3 +3617,4 @@ run_test test_update_file_skipped_due_to_obstruction
 run_test test_update_quiet
 run_test test_update_binary_file
 run_test test_update_umask
+run_test test_update_commit_keywords

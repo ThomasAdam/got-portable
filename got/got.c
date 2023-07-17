@@ -62,6 +62,7 @@
 #include "got_patch.h"
 #include "got_sigs.h"
 #include "got_date.h"
+#include "got_keyword.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -3565,11 +3566,24 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
+		char *keyword_idstr = NULL;
+
 		TAILQ_INIT(&refs);
+
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
 			goto done;
+
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL) {
+			free(commit_id_str);
+			commit_id_str = keyword_idstr;
+		}
+
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		got_ref_list_free(&refs);
@@ -4730,8 +4744,18 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		got_object_commit_close(commit);
 	} else {
+		char *keyword_idstr = NULL;
+
+		error = got_keyword_to_idstr(&keyword_idstr, start_commit,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			start_commit = keyword_idstr;
+
 		error = got_repo_match_object_id(&start_id, NULL,
 		    start_commit, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		free(keyword_idstr);
 		if (error != NULL)
 			goto done;
 	}
@@ -5232,13 +5256,24 @@ cmd_diff(int argc, char *argv[])
 		if (error)
 			goto done;
 		for (i = 0; i < (ncommit_args > 0 ? ncommit_args : argc); i++) {
-			const char *arg;
+			const char	*arg;
+			char		*keyword_idstr = NULL;
+
 			if (ncommit_args > 0)
 				arg = commit_args[i];
 			else
 				arg = argv[i];
+
+			error = got_keyword_to_idstr(&keyword_idstr, arg,
+			    repo, worktree);
+			if (error != NULL)
+				goto done;
+			if (keyword_idstr != NULL)
+				arg = keyword_idstr;
+
 			error = got_repo_match_object_id(&ids[i], &labels[i],
 			    arg, obj_type, &refs, repo);
+			free(keyword_idstr);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF &&
 				    error->code != GOT_ERR_NO_OBJ)

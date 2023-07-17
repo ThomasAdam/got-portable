@@ -140,6 +140,12 @@ trim_obj_id()
 	echo ${id%$pat}
 }
 
+pop_id()
+{
+	shift "$1"
+	printf '%s' "${1:-index-out-of-bounds}"
+}
+
 git_commit_tree()
 {
 	local repo="$1"
