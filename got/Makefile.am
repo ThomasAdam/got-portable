@@ -30,6 +30,7 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/gotconfig.c \
 	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \
+	$(top_srcdir)/lib/keyword.c \
 	$(top_srcdir)/lib/lockfile.c \
 	$(top_srcdir)/lib/murmurhash2.c \
 	$(top_srcdir)/lib/object.c \

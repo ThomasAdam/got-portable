@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
 
 #include <ctype.h>
@@ -22,8 +24,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
-#include <sha2.h>
 
 #include "got_reference.h"
 #include "got_error.h"
