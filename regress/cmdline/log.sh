@@ -1043,6 +1043,109 @@ test_log_commit_keywords() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: '::base:+': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -c::base:+ 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: ':head:-:': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -c:head:-: 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: 'master::+': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -cmaster::+ 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: 'master:1+': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -cmaster:1+ 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: ':base:-1:base:-1': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -c:base:-1:base:-1 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: 'main:-main:-': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -cmain:-main:- 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: ':base:*1': invalid commit keyword" > \
+	    $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -c:base:*1 2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: reference null not found" > $testroot/stderr.expected
+
+	(cd $testroot/wt && got log -cnull:+ 2> $testroot/stderr)
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 
 	test_done "$testroot" "$ret"

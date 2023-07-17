@@ -537,6 +537,63 @@ test_branch_packed_ref_collision() {
 	test_done "$testroot" "$ret"
 }
 
+test_branch_commit_keywords() {
+	local testroot=$(test_init branch_commit_keywords)
+
+	set -A ids "$(git_show_head $testroot/repo)"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in $(seq 4); do
+		echo "beta change $i" > "$testroot/wt/beta"
+
+		(cd "$testroot/wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+		set -- "$ids" "$(git_show_head $testroot/repo)"
+		ids=$*
+	done
+
+	(cd "$testroot/wt" && got up > /dev/null)
+
+	echo "  kwbranch: $(pop_id 3 $ids)" > $testroot/stdout.expected
+	echo "  master: $(pop_id 5 $ids)" >> $testroot/stdout.expected
+
+	(cd "$testroot/wt" && got br -nc :head:-2 kwbranch > /dev/null)
+	got br -r "$testroot/repo" -l > "$testroot/stdout"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "  kwbranch2: $(pop_id 4 $ids)" > $testroot/stdout.expected
+
+	got br -r "$testroot/repo" -c master:- kwbranch2 > /dev/null
+	got br -r "$testroot/repo" -l | grep kwbranch2 > "$testroot/stdout"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_branch_create
 run_test test_branch_list
@@ -545,3 +602,4 @@ run_test test_branch_delete_current_branch
 run_test test_branch_delete_packed
 run_test test_branch_show
 run_test test_branch_packed_ref_collision
+run_test test_branch_commit_keywords

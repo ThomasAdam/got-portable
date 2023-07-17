@@ -1956,6 +1956,90 @@ test_patch_remove_binary_file() {
 	test_done $testroot 0
 }
 
+test_patch_commit_keywords() {
+	local testroot=`test_init patch_commit_keywords`
+
+	got checkout $testroot/repo $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
+		>/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed s/4/four/ > $testroot/wt/numbers
+
+	# get rid of the metadata
+	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > patch) \
+		>/dev/null
+
+	jot 10 | sed s/6/six/ > $testroot/wt/numbers
+	(cd $testroot/wt && got commit -m 'edit numbers') >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got patch -c :head:- patch) >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'G  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+
+	(cd "$testroot/wt" && got rv numbers > /dev/null)
+
+	(cd $testroot/wt && got patch -c :base:- patch) >$testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'G  numbers' > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout $testroot/stdout.expected
+		test_done $testroot $ret
+		return 1
+	fi
+
+	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/wt/numbers $testroot/wt/numbers.expected
+	fi
+
+	test_done $testroot $ret
+}
+
 test_parseargs "$@"
 run_test test_patch_basic
 run_test test_patch_dont_apply
@@ -1986,3 +2070,4 @@ run_test test_patch_newfile_xbit_got_diff
 run_test test_patch_newfile_xbit_git_diff
 run_test test_patch_umask
 run_test test_patch_remove_binary_file
+run_test test_patch_commit_keywords
