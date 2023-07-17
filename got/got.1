@@ -699,6 +699,42 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and HEAD reference, respectively.
+Keywords and reference names may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent, respectively, by first parent traversal;
+for example,
+.Sy :head:-2
+denotes the HEAD reference's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foo:-3
+will denote the 3rd generation ancestor of the commit resolved by the
+.Qq foo
+reference.
+If an integer does not follow the
+.Qq :+
+or
+.Qq :-
+modifier, a
+.Qq 1
+is implicitly appended
+.Po e.g.,
+.Sy :head:-
+is equivalent to
+.Sy :head:-1
+.Pc .
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
 .It Fl q
@@ -858,6 +894,45 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and HEAD reference, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent, respectively, by first parent traversal;
+for example,
+.Sy :head:-2
+denotes the HEAD reference's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy bar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq bar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl d
@@ -982,6 +1057,45 @@ The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The special
+.Ar commit
+keywords
+.Qq :base
+and
+.Qq :head
+can also be used to represent the work tree's base commit
+and HEAD reference, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent, respectively, by first parent traversal;
+for example,
+.Sy :head:-2
+denotes the HEAD reference's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy baz:+8
+will denote the 8th generation descendant of the commit resolved by the
+.Qq baz
+reference.
+If an integer does not follow the
+.Qq :+
+or
+.Qq :-
+modifier, a
+.Qq 1
+is implicitly appended
+.Po e.g.,
+.Sy :head:-
+is equivalent to
+.Sy :head:-1
+.Pc .
 .Pp
 If the
 .Fl c
