@@ -991,6 +991,135 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_blame_commit_keywords() {
+	local testroot=$(test_init blame_commit_keywords)
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+
+	set -A ids "$(trim_obj_id 32 $id)"
+
+	# :base requires work tree
+	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
+	got blame -r "$repo" -c:base alpha 2> "$testroot/stderr"
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s "$testroot/stderr.expected" "$testroot/stderr"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > "$wt/alpha"
+
+	for i in $(seq 8); do
+		echo "change $i" >> "$wt/alpha"
+
+		(cd "$wt" && got ci -m "commit $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$ids" "$(trim_obj_id 32 $id)"
+		ids=$*
+	done
+
+	local author_time=$(git_show_author_time "$repo")
+	local d=$(date -u -r $author_time +"%G-%m-%d")
+
+	got blame -r "$repo" -c:head:-8 alpha > "$testroot/stdout"
+	echo "1) $(pop_id 1 $ids) $d $GOT_AUTHOR_8 alpha" > \
+	    "$testroot/stdout.expected"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got blame -cmaster:-5 alpha > "$testroot/stdout")
+
+	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	    "$testroot/stdout.expected"
+	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	    "$testroot/stdout.expected"
+	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	    "$testroot/stdout.expected"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got blame -c:head:-4 alpha > "$testroot/stdout")
+
+	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	    "$testroot/stdout.expected"
+	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	    "$testroot/stdout.expected"
+	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	    "$testroot/stdout.expected"
+	echo "4) $(pop_id 5 $ids) $d $GOT_AUTHOR_8 change 4" >> \
+	    "$testroot/stdout.expected"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got up -c:head:-8 > /dev/null)
+	(cd "$wt" && got blame -c:base:+5 alpha > "$testroot/stdout")
+
+	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	    "$testroot/stdout.expected"
+	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	    "$testroot/stdout.expected"
+	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	    "$testroot/stdout.expected"
+	echo "4) $(pop_id 5 $ids) $d $GOT_AUTHOR_8 change 4" >> \
+	    "$testroot/stdout.expected"
+	echo "5) $(pop_id 6 $ids) $d $GOT_AUTHOR_8 change 5" >> \
+	    "$testroot/stdout.expected"
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blame_cmp "$testroot" "alpha"
+	ret=$?
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_blame_basic
 run_test test_blame_tag
@@ -1005,3 +1134,4 @@ run_test test_blame_added_on_branch
 run_test test_blame_submodule
 run_test test_blame_symlink
 run_test test_blame_lines_shifted_skip
+run_test test_blame_commit_keywords

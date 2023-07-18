@@ -438,7 +438,86 @@ test_ref_list() {
 	test_done "$testroot" "$ret"
 }
 
+test_ref_commit_keywords() {
+	local testroot=$(test_init ref_commit_keywords)
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in $(seq 8); do
+		echo "alpha change $i" > "$wt/alpha"
+
+		(cd "$wt" && got ci -m "commit number $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		set -- "$ids" "$(git_show_head $repo)"
+		ids=$*
+	done
+
+	(cd "$wt" && got ref -c:head:-4 refs/heads/head-4)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got up -c head-4 > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got ref -c:base:+2 refs/heads/base+2)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got ref -cmaster:- refs/heads/master-)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
+	cat "$wt/.got/uuid" | tr -d '\n' >> $testroot/stdout.expected
+	echo ": $(pop_id 4 $ids)" >> $testroot/stdout.expected
+	echo "refs/heads/base+2: $(pop_id 6 $ids)" >> $testroot/stdout.expected
+	echo "refs/heads/head-4: $(pop_id 4 $ids)" >> $testroot/stdout.expected
+	echo "refs/heads/master: $(pop_id 8 $ids)" >> $testroot/stdout.expected
+	echo "refs/heads/master-: $(pop_id 7 $ids)" >> $testroot/stdout.expected
+
+	got ref -r "$repo" -l > $testroot/stdout
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_ref_create
 run_test test_ref_delete
 run_test test_ref_list
+run_test test_ref_commit_keywords
