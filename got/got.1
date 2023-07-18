@@ -566,7 +566,12 @@ reference will be used.
 Check out files from the specified
 .Ar commit
 on the selected branch.
-The expected argument is a commit ID SHA1 hash or an existing reference
+If this option is not specified, the most recent commit on the selected
+branch will be used.
+.Pp
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
@@ -607,8 +612,6 @@ is implicitly appended
 is equivalent to
 .Sy :head:-1
 .Pc .
-If this option is not specified, the most recent commit on the selected
-branch will be used.
 .Pp
 If the specified
 .Ar commit
@@ -732,7 +735,12 @@ or could be discarded with
 .It Fl c Ar commit
 Update the work tree to the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+If this option is not specified, the most recent commit on the work tree's
+branch will be used.
+.Pp
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
@@ -773,8 +781,6 @@ is implicitly appended
 is equivalent to
 .Sy :head:-1
 .Pc .
-If this option is not specified, the most recent commit on the work tree's
-branch will be used.
 .It Fl q
 Silence progress output.
 .El
@@ -928,7 +934,12 @@ By default, 3 lines of context are shown.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+If this option is not specified, default to the work tree's current branch
+if invoked in a work tree, or to the repository's HEAD reference.
+.Pp
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
@@ -972,8 +983,6 @@ appended
 is equivalent to
 .Sy :base:+1
 .Pc .
-If this option is not specified, default to the work tree's current branch
-if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl d
 Display diffstat of changes introduced in each commit.
 Cannot be used with the
@@ -1092,7 +1101,16 @@ When used only once, show differences between the specified
 and its first parent commit.
 When used twice, show differences between the two specified commits.
 .Pp
-The expected argument is a commit ID SHA1 hash or an existing reference
+If the
+.Fl c
+option is used, all non-option arguments will be interpreted as paths.
+If one or more such
+.Ar path
+arguments are provided, only show differences for the specified paths.
+.Pp
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
@@ -1136,13 +1154,6 @@ is implicitly appended
 is equivalent to
 .Sy :head:-1
 .Pc .
-.Pp
-If the
-.Fl c
-option is used, all non-option arguments will be interpreted as paths.
-If one or more such
-.Ar path
-arguments are provided, only show differences for the specified paths.
 .Pp
 Cannot be used together with the
 .Fl P
@@ -1397,9 +1408,7 @@ are as follows:
 .It Fl c Ar commit
 Make a newly created branch reference point at the specified
 .Ar commit .
-The expected
-.Ar commit
-argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID SHA1 hash or an existing reference
 or tag name which will be resolved to a commit ID.
 .Pp
 The special
@@ -1764,6 +1773,37 @@ are as follows:
 Attempt to locate files within the specified
 .Ar commit
 for use as a merge-base for 3-way merges.
+.Pp
+If the
+.Fl c
+option is not used then
+.Cm got patch
+will attempt to locate merge-bases via object IDs found in
+.Ar patchfile
+meta-data, such as produced by
+.Cm got diff
+or
+.Xr git-diff 1 .
+Use of the
+.Fl c
+option is only recommended in the absence of such meta-data.
+.Pp
+Ideally, the specified
+.Ar commit
+should contain versions of files which the changes contained in the
+.Ar patchfile
+were based on.
+Files will be located by path, relative to the repository root.
+If the
+.Fl p
+option is used then leading path components will be stripped
+before paths are looked up in the repository.
+.Pp
+In case no merge-base is available for a file, changes will be applied
+without doing a 3-way merge.
+Changes which do not apply cleanly may then be rejected entirely, rather
+than producing merge conflicts in the patched target file.
+.Pp
 The expected
 .Ar commit
 argument is a commit ID SHA1 hash or an existing reference
@@ -1807,35 +1847,6 @@ appended
 is equivalent to
 .Sy :base:+1
 .Pc .
-Ideally, the specified
-.Ar commit
-should contain versions of files which the changes contained in the
-.Ar patchfile
-were based on.
-Files will be located by path, relative to the repository root.
-If the
-.Fl p
-option is used then leading path components will be stripped
-before paths are looked up in the repository.
-.Pp
-If the
-.Fl c
-option is not used then
-.Cm got patch
-will attempt to locate merge-bases via object IDs found in
-.Ar patchfile
-meta-data, such as produced by
-.Cm got diff
-or
-.Xr git-diff 1 .
-Use of the
-.Fl c
-option is only recommended in the absence of such meta-data.
-.Pp
-In case no merge-base is available for a file, changes will be applied
-without doing a 3-way merge.
-Changes which do not apply cleanly may then be rejected entirely, rather
-than producing merge conflicts in the patched target file.
 .It Fl n
 Do not make any modifications to the work tree.
 This can be used to check whether a patch would apply without issues.
