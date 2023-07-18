@@ -1187,19 +1187,16 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
-or tag name which will be resolved to a commit ID.
+The expected argument is a commit ID SHA1 hash, or a reference name
+or a keyword which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 .Pp
-The special
-.Ar commit
-keywords
+The keywords
 .Qq :base
 and
 .Qq :head
-can also be used to represent the work tree's base commit
-and branch head, respectively.
+resolve to the work tree's base commit and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
@@ -1274,19 +1271,16 @@ are as follows:
 .It Fl c Ar commit
 List files and directories as they appear in the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
-or tag name which will be resolved to a commit ID.
+.Pp
+The expected argument is a commit ID SHA1 hash, or a reference name
+or a keyword which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
-.Pp
-The special
-.Ar commit
-keywords
+The keywords
 .Qq :base
 and
 .Qq :head
-can also be used to represent the work tree's base commit
-and branch head, respectively.
+resolve to the work tree's base commit and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
@@ -1634,19 +1628,15 @@ Make the newly created tag reference point at the specified
 .Ar commit .
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash or an existing reference or tag name which
-will be resolved to a commit ID.
+argument is a commit ID SHA1 hash, or a reference or keyword
+which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
-.Pp
-The special
-.Ar commit
-keywords
+The keywords
 .Qq :base
 and
 .Qq :head
-can also be used to represent the work tree's base commit
-and branch head, respectively.
+resolve to the work tree's base commit and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
@@ -3629,19 +3619,17 @@ Look up paths in the specified
 .Ar commit .
 If this option is not used, paths are looked up in the commit resolved
 via the repository's HEAD reference.
-The expected argument is a commit ID SHA1 hash or an existing reference
-or tag name which will be resolved to a commit ID.
+.Pp
+The expected argument is a commit ID SHA1 hash, or a reference name
+or keyword which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 .Pp
-The special
-.Ar commit
-keywords
+The keywords
 .Qq :base
 and
 .Qq :head
-can also be used to represent the work tree's base commit
-and branch head, respectively.
+resolve to the work tree's base commit and branch head, respectively.
 The former is only valid if invoked in a work tree, while the latter will
 resolve to the tip of the work tree's current branch if invoked in a
 work tree, otherwise it will resolve to the repository's HEAD reference.
