@@ -466,9 +466,113 @@ test_tag_create_ssh_signed_missing_key() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_commit_keywords() {
+	local testroot=$(test_init tag_commit_keywords)
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local commit_id=$(git_show_head "$repo")
+	local tag=1.0.0
+	local tag2=2.0.0
+
+	echo "alphas" > "$repo/alpha"
+	git_commit "$repo" -m "alphas"
+
+	# create tag based on first gen ancestor of the repository's HEAD
+	got tag -m 'v1.0.0' -r "$repo" -c:head:- "$tag" > "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_id=$(got ref -r "$repo" -l \
+	    | grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2)
+	echo "Created tag $tag_id" > "$testroot/stdout.expected"
+	cmp -s "$testroot/stdout" "$testroot/stdout.expected"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_commit=$(got cat -r "$repo" "$tag" | grep ^object | cut -d' ' -f2)
+	if [ "$tag_commit" != "$commit_id" ]; then
+		echo "wrong commit was tagged" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got checkout -c "$tag" "$repo" "$wt" >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create new tag based on the base commit's 2nd gen descendant
+	(cd "$wt" && got up > /dev/null)
+	echo 'foo' > "$wt/alpha"
+	echo 'boo' > "$wt/beta"
+	echo 'hoo' > "$wt/gamma/delta"
+	(cd "$wt" && got commit -m foo alpha > /dev/null)
+	(cd "$wt" && got commit -m boo beta > /dev/null)
+	(cd "$wt" && got commit -m hoo gamma/delta > /dev/null)
+	local head_id=$(git_show_branch_head "$repo")
+	(cd "$wt" && got up -c:base:-2 > /dev/null)
+	local base_id=$(cd "$wt" && got info | grep base | cut -d' ' -f5)
+
+	(cd "$wt" && got tag -m 'v2.0.0' -c:base:+2 $tag2 > "$testroot/stdout")
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_id2=$(got ref -r "$repo" -l \
+	    | grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2)
+	echo "Created tag $tag_id2" > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag2_commit=$(got cat -r "$repo" "$tag2" | grep ^object | cut -d' ' -f2)
+	if [ "$tag2_commit" != "$head_id" ]; then
+		echo "wrong commit was tagged" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
+	cat "$wt/.got/uuid" | tr -d '\n' >> $testroot/stdout.expected
+	echo ": $base_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $head_id" >> $testroot/stdout.expected
+	echo "refs/tags/$tag: $tag_id" >> $testroot/stdout.expected
+	echo "refs/tags/$tag2: $tag_id2" >> $testroot/stdout.expected
+
+	got ref -r "$repo" -l > $testroot/stdout
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight
 run_test test_tag_create_ssh_signed
 run_test test_tag_create_ssh_signed_missing_key
+run_test test_tag_commit_keywords

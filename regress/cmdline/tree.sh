@@ -146,8 +146,131 @@ test_tree_submodule_of_same_repo() {
 	test_done "$testroot" "$ret"
 }
 
+test_tree_commit_keywords() {
+	local testroot=$(test_init tree_commit_keywords)
+	local wt="$testroot/wt"
+
+	# :base requires work tree
+	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
+	got tree -r "$testroot/repo" -c:base 2> "$testroot/stderr"
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "tree command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s "$testroot/stderr.expected" "$testroot/stderr"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'alpha' > $testroot/stdout.expected
+	echo 'beta' >> $testroot/stdout.expected
+	echo 'epsilon/' >> $testroot/stdout.expected
+	echo 'gamma/' >> $testroot/stdout.expected
+
+	got tree -r "$testroot/repo" -c:head > "$testroot/stdout"
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout "$testroot/repo" "$wt" > /dev/null
+
+	(
+		cd "$wt"
+		mkdir bing
+		echo "foo" > foo
+		echo "bar" > bar
+		echo "baz" > baz
+		echo "bob" > bing/bob
+		got add foo bar baz bing/bob > /dev/null
+		got commit -m "add foo" foo > /dev/null
+		got commit -m "add bar" bar > /dev/null
+		got commit -m "add baz" baz > /dev/null
+		got commit -m "add bing/bob" > /dev/null
+	)
+
+	echo 'alpha' > $testroot/stdout.expected
+	echo 'beta' >> $testroot/stdout.expected
+	echo 'epsilon/' >> $testroot/stdout.expected
+	echo 'foo' >> $testroot/stdout.expected
+	echo 'gamma/' >> $testroot/stdout.expected
+
+	(cd "$wt" && got tree -c:base:-3 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'alpha' > $testroot/stdout.expected
+	echo 'bar' >> $testroot/stdout.expected
+	echo 'beta' >> $testroot/stdout.expected
+	echo 'epsilon/' >> $testroot/stdout.expected
+	echo 'foo' >> $testroot/stdout.expected
+	echo 'gamma/' >> $testroot/stdout.expected
+
+	(cd "$wt" && got tree -cmaster:-2 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'alpha' > $testroot/stdout.expected
+	echo 'bar' >> $testroot/stdout.expected
+	echo 'baz' >> $testroot/stdout.expected
+	echo 'beta' >> $testroot/stdout.expected
+	echo 'epsilon/' >> $testroot/stdout.expected
+	echo 'foo' >> $testroot/stdout.expected
+	echo 'gamma/' >> $testroot/stdout.expected
+
+	(cd "$wt" && got tree -c:head:- > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'alpha' > $testroot/stdout.expected
+	echo 'bar' >> $testroot/stdout.expected
+	echo 'baz' >> $testroot/stdout.expected
+	echo 'beta' >> $testroot/stdout.expected
+	echo 'bing/' >> $testroot/stdout.expected
+	echo 'epsilon/' >> $testroot/stdout.expected
+	echo 'foo' >> $testroot/stdout.expected
+	echo 'gamma/' >> $testroot/stdout.expected
+
+	(cd "$wt" && got up -c:base:-4 > $testroot/stdout)
+	(cd "$wt" && got tree -c:base:+4 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_branch
 run_test test_tree_submodule
 run_test test_tree_submodule_of_same_repo
+run_test test_tree_commit_keywords

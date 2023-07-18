@@ -338,9 +338,107 @@ test_cat_symlink() {
 	test_done "$testroot" "$ret"
 }
 
+test_cat_commit_keywords() {
+	local testroot=$(test_init cat_commit_keywords)
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+
+	# :base requires work tree
+	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
+	got cat -r "$repo" -c:base alpha 2> "$testroot/stderr"
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "cat command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s "$testroot/stderr.expected" "$testroot/stderr"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in $(seq 8); do
+		echo "change $i" > "$wt/alpha"
+		echo "delta $i" > "$wt/gamma/delta"
+
+		(cd "$wt" && got ci -m "commit $i" > /dev/null)
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		local delta_id=$(got tree -r "$repo" -i gamma | \
+		    grep 'delta$' | cut -d' ' -f 1)
+		set -- "$delta_ids" "$delta_id"
+		delta_ids=$*
+	done
+
+	# cat blob by path
+	echo "change 6" > "$testroot/stdout.expected"
+	(cd "$wt" && got cat -c:head:-2 alpha > "$testroot/stdout")
+	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat blob by path with -r repo
+	echo "delta 7" > "$testroot/stdout.expected"
+	got cat -r "$repo" -c:head:- gamma/delta > "$testroot/stdout"
+	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat tree by path
+	echo "$(pop_id 4 $delta_ids) 0100644 delta" > \
+	    "$testroot/stdout.expected"
+	(cd "$wt" && got cat -c:base:-4 gamma > "$testroot/stdout")
+	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat blob by path with -P
+	echo "delta 4" > "$testroot/stdout.expected"
+	(cd "$wt" && got up -c:base:-8 > /dev/null)
+	(cd "$wt" && got cat -c:base:+4 -P gamma/delta > "$testroot/stdout")
+	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cat_basic
 run_test test_cat_path
 run_test test_cat_submodule
 run_test test_cat_submodule_of_same_repo
 run_test test_cat_symlink
+run_test test_cat_commit_keywords

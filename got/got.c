@@ -5720,7 +5720,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
-	char *commit_id_str = NULL;
+	char *commit_id_str = NULL, *keyword_idstr = NULL;
 	struct blame_cb_args bca;
 	int ch, obj_type, i, fd1 = -1, fd2 = -1, fd3 = -1;
 	off_t filesize;
@@ -5839,11 +5839,20 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
+
 		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
 			goto done;
+
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			commit_id_str = keyword_idstr;
+
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		got_ref_list_free(&refs);
@@ -5936,6 +5945,7 @@ cmd_blame(int argc, char *argv[])
 	    repo, GOT_DIFF_ALGORITHM_PATIENCE, blame_cb, &bca,
 	    check_cancelled, NULL, fd2, fd3, f1, f2);
 done:
+	free(keyword_idstr);
 	free(in_repo_path);
 	free(link_target);
 	free(repo_path);
@@ -6111,7 +6121,7 @@ cmd_tree(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
-	char *commit_id_str = NULL;
+	char *commit_id_str = NULL, *keyword_idstr = NULL;
 	int show_ids = 0, recurse = 0;
 	int ch;
 	int *pack_fds = NULL;
@@ -6238,11 +6248,20 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
+
 		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
 			goto done;
+
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			commit_id_str = keyword_idstr;
+
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		got_ref_list_free(&refs);
@@ -6263,6 +6282,7 @@ cmd_tree(int argc, char *argv[])
 	error = print_tree(in_repo_path, commit, show_ids, recurse,
 	    in_repo_path, repo);
 done:
+	free(keyword_idstr);
 	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
@@ -6584,7 +6604,7 @@ cmd_ref(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	int ch, do_list = 0, do_delete = 0, sort_by_time = 0;
 	const char *obj_arg = NULL, *symref_target= NULL;
-	char *refname = NULL;
+	char *refname = NULL, *keyword_idstr = NULL;
 	int *pack_fds = NULL;
 
 #ifndef PROFILE
@@ -6723,6 +6743,14 @@ cmd_ref(int argc, char *argv[])
 	else {
 		if (obj_arg == NULL)
 			usage_ref();
+
+		error = got_keyword_to_idstr(&keyword_idstr, obj_arg,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			obj_arg = keyword_idstr;
+
 		error = add_ref(repo, refname, obj_arg);
 	}
 done:
@@ -6742,6 +6770,7 @@ done:
 	}
 	free(cwd);
 	free(repo_path);
+	free(keyword_idstr);
 	return error;
 }
 
@@ -7628,7 +7657,7 @@ cmd_tag(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
-	char *gitconfig_path = NULL, *tagger = NULL;
+	char *gitconfig_path = NULL, *tagger = NULL, *keyword_idstr = NULL;
 	char *allowed_signers = NULL, *revoked_signers = NULL;
 	const char *signer_id = NULL;
 	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
@@ -7814,6 +7843,12 @@ cmd_tag(int argc, char *argv[])
 			free(commit_id);
 			if (error)
 				goto done;
+		} else {
+			error = got_keyword_to_idstr(&keyword_idstr,
+			    commit_id_arg, repo, worktree);
+			if (error != NULL)
+				goto done;
+			commit_id_str = keyword_idstr;
 		}
 
 		if (worktree) {
@@ -14042,6 +14077,7 @@ cmd_cat(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *label = NULL;
+	char *keyword_idstr = NULL;
 	const char *commit_id_str = NULL;
 	struct got_object_id *id = NULL, *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
@@ -14103,9 +14139,11 @@ cmd_cat(int argc, char *argv[])
 				goto done;
 			}
 
-			/* Release work tree lock. */
-			got_worktree_close(worktree);
-			worktree = NULL;
+			if (commit_id_str == NULL) {
+				/* Release work tree lock. */
+				got_worktree_close(worktree);
+				worktree = NULL;
+			}
 		}
 	}
 
@@ -14128,7 +14166,18 @@ cmd_cat(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (commit_id_str == NULL)
+	if (commit_id_str != NULL) {
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			commit_id_str = keyword_idstr;
+		if (worktree != NULL) {
+			got_worktree_close(worktree);
+			worktree = NULL;
+		}
+	} else
 		commit_id_str = GOT_REF_HEAD;
 	error = got_repo_match_object_id(&commit_id, NULL,
 	    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
@@ -14192,6 +14241,7 @@ done:
 	free(label);
 	free(id);
 	free(commit_id);
+	free(keyword_idstr);
 	if (commit)
 		got_object_commit_close(commit);
 	if (worktree)
