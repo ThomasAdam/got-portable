@@ -76,5 +76,234 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_blame_commit_keywords()
+{
+	test_init blame_commit_keywords 80 10
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+
+	set -A ids "$id"
+	set -A short_ids "$(trim_obj_id 32 $id)"
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for blame to finish
+	SCREENDUMP
+	EOF
+
+	# :base requires work tree
+	echo "tog: '-c :base' requires work tree" > "$testroot/stderr.expected"
+	tog blame -r "$repo" -c:base alpha 2> "$testroot/stderr"
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s "$testroot/stderr.expected" "$testroot/stderr"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stderr.expected" "$testroot/stderr"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# :head keyword in repo
+	cat <<-EOF >$testroot/view.expected
+	commit $id
+	[1/1] /alpha
+	$(pop_id 1 $short_ids) alpha
+
+
+
+
+
+
+
+	EOF
+
+	tog blame -r "$repo" -c:head alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# move into the work tree (test is run in a subshell)
+	cd "$wt"
+	echo -n > alpha
+
+	for i in $(seq 8); do
+		echo "alpha $i" >> alpha
+
+		got ci -m "commit $i" > /dev/null
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$ids" "$id"
+		ids=$*
+		set -- "$short_ids" "$(trim_obj_id 32 $id)"
+		short_ids=$*
+	done
+
+	author_time=$(git_show_author_time "$repo")
+	ymd=$(date -u -r $author_time +"%G-%m-%d")
+
+	# :base:- keyword in work tree
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 8 $ids)
+	[1/7] /alpha
+	$(pop_id 2 $short_ids) alpha 1
+	$(pop_id 3 $short_ids) alpha 2
+	$(pop_id 4 $short_ids) alpha 3
+	$(pop_id 5 $short_ids) alpha 4
+	$(pop_id 6 $short_ids) alpha 5
+	$(pop_id 7 $short_ids) alpha 6
+	$(pop_id 8 $short_ids) alpha 7
+
+	EOF
+
+	tog blame -c:base:- alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# :head:-4 keyword in work tree
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 5 $ids)
+	[1/4] /alpha
+	$(pop_id 2 $short_ids) alpha 1
+	$(pop_id 3 $short_ids) alpha 2
+	$(pop_id 4 $short_ids) alpha 3
+	$(pop_id 5 $short_ids) alpha 4
+
+
+
+
+	EOF
+
+	tog blame -c:head:-4 alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# :base:+2 keyword in work tree
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 5 $ids)
+	[1/4] /alpha
+	$(pop_id 2 $short_ids) alpha 1
+	$(pop_id 3 $short_ids) alpha 2
+	$(pop_id 4 $short_ids) alpha 3
+	$(pop_id 5 $short_ids) alpha 4
+
+
+
+
+	EOF
+
+	got up -c:head:-6 > /dev/null
+	if [ $ret -ne 0 ]; then
+		echo "update command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	tog blame -c:base:+2 alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# master:-99 keyword in work tree
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 1 $ids)
+	[1/1] /alpha
+	$(pop_id 1 $short_ids) alpha
+
+
+
+
+
+
+
+	EOF
+
+	tog blame -cmaster:-99 alpha
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_blame_basic
+run_test test_blame_commit_keywords

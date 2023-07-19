@@ -178,8 +178,173 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_tree_commit_keywords()
+{
+	test_init tree_commit_keywords 48 11
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+
+	set -A ids "$id"
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# move into the work tree (test is run in a subshell)
+	cd "$wt"
+
+	for i in $(seq 8); do
+		if [ $(( i % 2 )) -eq 0 ]; then
+			echo "file${i}" > "file${i}"
+			got add "file${i}" > /dev/null
+		else
+			echo "alpha $i" > alpha
+		fi
+
+		got ci -m "commit $i" > /dev/null
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$ids" "$id"
+		ids=$*
+	done
+
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 8 $ids)
+	[1/7] /
+
+	  alpha
+	  beta
+	  epsilon/
+	  file2
+	  file4
+	  file6
+	  gamma/
+
+	EOF
+
+	tog tree -c:base:-
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 6 $ids)
+	[1/6] /
+
+	  alpha
+	  beta
+	  epsilon/
+	  file2
+	  file4
+	  gamma/
+
+
+	EOF
+
+	tog tree -cmaster:-3
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 9 $ids)
+	[1/8] /
+
+	  alpha
+	  beta
+	  epsilon/
+	  file2
+	  file4
+	  file6
+	  file8
+	  gamma/
+	EOF
+
+	got up -c:head:-99 > /dev/null
+	tog tree -c:base:+99
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 4 $ids)
+	[1/5] /
+
+	  alpha
+	  beta
+	  epsilon/
+	  file2
+	  gamma/
+
+
+
+	EOF
+
+	tog tree -c:head:-5
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 1 $ids)
+	[1/4] /
+
+	  alpha
+	  beta
+	  epsilon/
+	  gamma/
+
+
+
+
+	EOF
+
+	tog tree -r "$repo" -cmaster:-99
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_vsplit_blame
 run_test test_tree_hsplit_blame
 run_test test_tree_symlink
+run_test test_tree_commit_keywords

@@ -205,7 +205,178 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_commit_keywords()
+{
+	test_init diff_commit_keywords 120 24
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+	local author_time=$(git_show_author_time "$repo")
+	local date=$(date -u -r $author_time +"%a %b %e %X %Y UTC")
+
+	set -A ids "$id"
+	set -A alpha_ids $(get_blob_id "$repo" "" alpha)
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# move into the work tree (test is run in a subshell)
+	cd "$wt"
+
+	for i in $(seq 8); do
+		echo "alpha $i" > alpha
+
+		got ci -m "commit $i" > /dev/null
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$ids" "$id"
+		ids=$*
+		set -- "$alpha_ids" "$(get_blob_id "$repo" "" alpha)"
+		alpha_ids=$*
+	done
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	SCREENDUMP
+	EOF
+
+	# diff consecutive commits with keywords
+	local lhs_id=$(pop_id 1 $ids)
+	local rhs_id=$(pop_id 2 $ids)
+
+	cat <<-EOF >$testroot/view.expected
+	[1/20] diff $lhs_id $rhs_id
+	commit $rhs_id
+	from: Flan Hacker <flan_hacker@openbsd.org>
+	date: $date
+
+	commit 1
+
+	M  alpha  |  1+  1-
+
+	1 file changed, 1 insertion(+), 1 deletion(-)
+
+	commit - $lhs_id
+	commit + $rhs_id
+	blob - $(pop_id 1 $alpha_ids)
+	blob + $(pop_id 2 $alpha_ids)
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-alpha
+	+alpha 1
+
+
+
+	(END)
+	EOF
+
+	tog diff :base:-99 :head:-7
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff arbitrary commits with keywords
+	lhs_id=$(pop_id 5 $ids)
+	rhs_id=$(pop_id 8 $ids)
+
+	cat <<-EOF >$testroot/view.expected
+	[1/10] diff $lhs_id $rhs_id
+	commit - $lhs_id
+	commit + $rhs_id
+	blob - $(pop_id 5 $alpha_ids)
+	blob + $(pop_id 8 $alpha_ids)
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-alpha 4
+	+alpha 7
+
+
+
+
+
+
+
+
+
+
+
+
+
+	(END)
+	EOF
+
+	tog diff master:-4 :head:-
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff consecutive commits using keywords with -r repository
+	lhs_id=$(pop_id 8 $ids)
+	rhs_id=$(pop_id 9 $ids)
+	author_time=$(git_show_author_time "$repo")
+	date=$(date -u -r $author_time +"%a %b %e %X %Y UTC")
+
+	cat <<-EOF >$testroot/view.expected
+	[1/20] diff $lhs_id refs/heads/master
+	commit $rhs_id (master)
+	from: Flan Hacker <flan_hacker@openbsd.org>
+	date: $date
+
+	commit 8
+
+	M  alpha  |  1+  1-
+
+	1 file changed, 1 insertion(+), 1 deletion(-)
+
+	commit - $lhs_id
+	commit + $rhs_id
+	blob - $(pop_id 8 $alpha_ids)
+	blob + $(pop_id 9 $alpha_ids)
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-alpha 7
+	+alpha 8
+
+
+
+	(END)
+	EOF
+
+	tog diff -r "$repo" :head:- master
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_contiguous_commits
 run_test test_diff_arbitrary_commits
 run_test test_diff_J_keymap_on_last_loaded_commit
+run_test test_diff_commit_keywords
