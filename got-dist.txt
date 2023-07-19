@@ -5,6 +5,10 @@
 /Makefile.inc
 /README
 /TODO
+/cvg
+/cvg/Makefile
+/cvg/cvg.1
+/cvg/cvg.c
 /gitwrapper
 /gitwrapper/Makefile
 /gitwrapper/gitwrapper.1
@@ -113,6 +117,7 @@
 /include/got_error.h
 /include/got_fetch.h
 /include/got_gotconfig.h
+/include/got_keyword.h
 /include/got_object.h
 /include/got_opentemp.h
 /include/got_patch.h
@@ -121,6 +126,8 @@
 /include/got_reference.h
 /include/got_repository.h
 /include/got_repository_admin.h
+/include/got_repository_dump.h
+/include/got_repository_load.h
 /include/got_send.h
 /include/got_serve.h
 /include/got_sigs.h
@@ -128,6 +135,7 @@
 /include/got_utf8.h
 /include/got_version.h
 /include/got_worktree.h
+/include/got_worktree_cvg.h
 /lib
 /lib/Makefile
 /lib/arraylist.h
@@ -158,6 +166,7 @@
 /lib/diff_output_unidiff.c
 /lib/diff_patience.c
 /lib/diffreg.c
+/lib/dump.c
 /lib/error.c
 /lib/fetch.c
 /lib/fileindex.c
@@ -192,9 +201,12 @@
 /lib/got_lib_ratelimit.h
 /lib/got_lib_repository.h
 /lib/got_lib_worktree.h
+/lib/got_lib_worktree_cvg.h
 /lib/gotconfig.c
 /lib/hash.c
 /lib/inflate.c
+/lib/keyword.c
+/lib/load.c
 /lib/lockfile.c
 /lib/murmurhash2.c
 /lib/murmurhash2.h
@@ -234,6 +246,7 @@
 /lib/sockaddr.c
 /lib/utf8.c
 /lib/worktree.c
+/lib/worktree_cvg.c
 /lib/worktree_open.c
 /libexec
 /libexec/Makefile
@@ -293,11 +306,13 @@
 /regress/cmdline/commit.sh
 /regress/cmdline/common.sh
 /regress/cmdline/diff.sh
+/regress/cmdline/dump.sh
 /regress/cmdline/fetch.sh
 /regress/cmdline/histedit.sh
 /regress/cmdline/import.sh
 /regress/cmdline/init.sh
 /regress/cmdline/integrate.sh
+/regress/cmdline/load.sh
 /regress/cmdline/log.sh
 /regress/cmdline/merge.sh
 /regress/cmdline/pack.sh
