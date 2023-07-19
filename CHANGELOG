@@ -6,6 +6,12 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.91 (2023-07-19)
+
+* Changes from got-0.91
+
+  No specific -portable changes worth mentioning.
+
 # got-portable 0.90 (2023-06-26)
 
 * Changes from got-0.90.
