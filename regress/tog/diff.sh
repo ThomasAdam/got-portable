@@ -212,10 +212,10 @@ test_diff_commit_keywords()
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 	local author_time=$(git_show_author_time "$repo")
-	local date=$(date -u -r $author_time +"%a %b %e %X %Y UTC")
 
 	set -A ids "$id"
 	set -A alpha_ids $(get_blob_id "$repo" "" alpha)
+	set -A dates "$author_time"
 
 	got checkout "$repo" "$wt" > /dev/null
 	ret=$?
@@ -244,6 +244,8 @@ test_diff_commit_keywords()
 		ids=$*
 		set -- "$alpha_ids" "$(get_blob_id "$repo" "" alpha)"
 		alpha_ids=$*
+		set -- "$dates" $(git_show_author_time "$repo")
+		dates=$*
 	done
 
 	cat <<-EOF >$TOG_TEST_SCRIPT
@@ -253,6 +255,7 @@ test_diff_commit_keywords()
 	# diff consecutive commits with keywords
 	local lhs_id=$(pop_id 1 $ids)
 	local rhs_id=$(pop_id 2 $ids)
+	local date=$(date -u -r $(pop_id 2 $dates) +"%a %b %e %X %Y UTC")
 
 	cat <<-EOF >$testroot/view.expected
 	[1/20] diff $lhs_id $rhs_id
@@ -333,8 +336,7 @@ test_diff_commit_keywords()
 	# diff consecutive commits using keywords with -r repository
 	lhs_id=$(pop_id 8 $ids)
 	rhs_id=$(pop_id 9 $ids)
-	author_time=$(git_show_author_time "$repo")
-	date=$(date -u -r $author_time +"%a %b %e %X %Y UTC")
+	date=$(date -u -r $(pop_id 9 $dates) +"%a %b %e %X %Y UTC")
 
 	cat <<-EOF >$testroot/view.expected
 	[1/20] diff $lhs_id refs/heads/master
