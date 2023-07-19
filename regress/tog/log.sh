@@ -354,6 +354,151 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_log_commit_keywords()
+{
+	test_init log_commit_keywords 120 10
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+
+	set -A ids "$id"
+	set -A short_ids "$(trim_obj_id 32 $id)"
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# move into the work tree (test is run in a subshell)
+	cd "$wt"
+	echo -n > alpha
+
+	for i in $(seq 8); do
+		echo "alpha $i" >> alpha
+
+		got ci -m "commit $i" > /dev/null
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$ids" "$id"
+		ids=$*
+		set -- "$short_ids" "$(trim_obj_id 32 $id)"
+		short_ids=$*
+	done
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 5 $ids) [1/5]
+	$ymd $(pop_id 5 $short_ids) flan_hacker  commit 4
+	$ymd $(pop_id 4 $short_ids) flan_hacker  commit 3
+	$ymd $(pop_id 3 $short_ids) flan_hacker  commit 2
+	$ymd $(pop_id 2 $short_ids) flan_hacker  commit 1
+	$ymd $(pop_id 1 $short_ids) flan_hacker  adding the test tree
+
+
+
+
+	EOF
+
+	tog log -c:base:-4
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 7 $ids) [1/7]
+	$ymd $(pop_id 7 $short_ids) flan_hacker  commit 6
+	$ymd $(pop_id 6 $short_ids) flan_hacker  commit 5
+	$ymd $(pop_id 5 $short_ids) flan_hacker  commit 4
+	$ymd $(pop_id 4 $short_ids) flan_hacker  commit 3
+	$ymd $(pop_id 3 $short_ids) flan_hacker  commit 2
+	$ymd $(pop_id 2 $short_ids) flan_hacker  commit 1
+	$ymd $(pop_id 1 $short_ids) flan_hacker  adding the test tree
+
+
+	EOF
+
+	tog log -r "$repo" -c:head:-2
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 5 $ids) [1/5]
+	$ymd $(pop_id 5 $short_ids) flan_hacker  commit 4
+	$ymd $(pop_id 4 $short_ids) flan_hacker  commit 3
+	$ymd $(pop_id 3 $short_ids) flan_hacker  commit 2
+	$ymd $(pop_id 2 $short_ids) flan_hacker  commit 1
+	$ymd $(pop_id 1 $short_ids) flan_hacker  adding the test tree
+
+
+
+
+	EOF
+
+	got up -c:base:-6 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tog log -c:base:+2
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_id 1 $ids) [1/1]
+	$ymd $(pop_id 1 $short_ids) flan_hacker  adding the test tree
+
+
+
+
+
+
+
+
+	EOF
+
+	tog log -c:base:-99
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -362,3 +507,4 @@ run_test test_log_scroll_right
 run_test test_log_hsplit_ref
 run_test test_log_hsplit_tree
 run_test test_log_logmsg_widechar
+run_test test_log_commit_keywords

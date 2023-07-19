@@ -58,6 +58,7 @@
 #include "got_privsep.h"
 #include "got_path.h"
 #include "got_worktree.h"
+#include "got_keyword.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -4310,7 +4311,7 @@ init_mock_term(const char *test_script_path)
 	screen_dump_path = getenv("TOG_SCR_DUMP");
 	if (screen_dump_path == NULL || *screen_dump_path == '\0')
 		return got_error_msg(GOT_ERR_IO, "TOG_SCR_DUMP not defined");
-	tog_io.sdump = fopen(screen_dump_path, "wex");
+	tog_io.sdump = fopen(screen_dump_path, "we");
 	if (tog_io.sdump == NULL) {
 		err = got_error_from_errno2("fopen", screen_dump_path);
 		goto done;
@@ -4408,7 +4409,7 @@ cmd_log(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *start_id = NULL;
 	char *in_repo_path = NULL, *repo_path = NULL, *cwd = NULL;
-	char *start_commit = NULL, *label = NULL;
+	char *keyword_idstr = NULL, *start_commit = NULL, *label = NULL;
 	struct got_reference *ref = NULL;
 	const char *head_ref_name = NULL;
 	int ch, log_branches = 0;
@@ -4494,6 +4495,13 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		head_ref_name = label;
 	} else {
+		error = got_keyword_to_idstr(&keyword_idstr, start_commit,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			start_commit = keyword_idstr;
+
 		error = got_ref_open(&ref, repo, start_commit, 0);
 		if (error == NULL)
 			head_ref_name = got_ref_get_name(ref);
@@ -4521,6 +4529,7 @@ cmd_log(int argc, char *argv[])
 	}
 	error = view_loop(view);
 done:
+	free(keyword_idstr);
 	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
@@ -5922,6 +5931,7 @@ cmd_diff(int argc, char *argv[])
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *repo_path = NULL, *cwd = NULL;
 	char *id_str1 = NULL, *id_str2 = NULL;
+	char *keyword_idstr1 = NULL, *keyword_idstr2 = NULL;
 	char *label1 = NULL, *label2 = NULL;
 	int diff_context = 3, ignore_whitespace = 0;
 	int ch, force_text_diff = 0;
@@ -6004,6 +6014,23 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (id_str1 != NULL) {
+		error = got_keyword_to_idstr(&keyword_idstr1, id_str1,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr1 != NULL)
+			id_str1 = keyword_idstr1;
+	}
+	if (id_str2 != NULL) {
+		error = got_keyword_to_idstr(&keyword_idstr2, id_str2,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr2 != NULL)
+			id_str2 = keyword_idstr2;
+	}
+
 	error = got_repo_match_object_id(&id1, &label1, id_str1,
 	    GOT_OBJ_TYPE_ANY, &tog_refs, repo);
 	if (error)
@@ -6025,6 +6052,8 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	error = view_loop(view);
 done:
+	free(keyword_idstr1);
+	free(keyword_idstr2);
 	free(label1);
 	free(label2);
 	free(repo_path);
@@ -7056,7 +7085,7 @@ cmd_blame(int argc, char *argv[])
 	char *link_target = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
-	char *commit_id_str = NULL;
+	char *keyword_idstr = NULL, *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view = NULL;
 	int *pack_fds = NULL;
@@ -7134,6 +7163,13 @@ cmd_blame(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 	} else {
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_str,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			commit_id_str = keyword_idstr;
+
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 	}
@@ -7174,6 +7210,7 @@ done:
 	free(link_target);
 	free(cwd);
 	free(commit_id);
+	free(keyword_idstr);
 	if (commit)
 		got_object_commit_close(commit);
 	if (worktree)
@@ -8033,7 +8070,7 @@ cmd_tree(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	const char *commit_id_arg = NULL;
-	char *label = NULL;
+	char *keyword_idstr = NULL, *label = NULL;
 	struct got_reference *ref = NULL;
 	const char *head_ref_name = NULL;
 	int ch;
@@ -8112,6 +8149,13 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 		head_ref_name = label;
 	} else {
+		error = got_keyword_to_idstr(&keyword_idstr, commit_id_arg,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			commit_id_arg = keyword_idstr;
+
 		error = got_ref_open(&ref, repo, commit_id_arg, 0);
 		if (error == NULL)
 			head_ref_name = got_ref_get_name(ref);
@@ -8149,6 +8193,7 @@ cmd_tree(int argc, char *argv[])
 	}
 	error = view_loop(view);
 done:
+	free(keyword_idstr);
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
@@ -9990,7 +10035,9 @@ main(int argc, char *argv[])
 	    error->code != GOT_ERR_EOF &&
 	    error->code != GOT_ERR_PRIVSEP_EXIT &&
 	    error->code != GOT_ERR_PRIVSEP_PIPE &&
-	    !(error->code == GOT_ERR_ERRNO && errno == EINTR))
+	    !(error->code == GOT_ERR_ERRNO && errno == EINTR)) {
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+		return 1;
+	}
 	return 0;
 }

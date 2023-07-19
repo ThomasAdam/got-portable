@@ -274,11 +274,46 @@ key binding can be used to toggle display of merged commits at run-time.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a commit ID SHA1 hash.
+The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
-If this option is not specified, default to the work tree's current branch
-if invoked in a work tree, or to the repository's HEAD reference.
+The keywords
+.Qq :base
+and
+.Qq :head
+resolve to the work tree's base commit and branch head, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foobar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq foobar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -296,11 +331,48 @@ work tree, use the repository path associated with this work tree.
 .Ar object2
 .Xc
 Display the differences between two objects in the repository.
-Treat each of the two arguments as a reference, a tag name, or an object
-ID SHA1 hash, and display differences between the corresponding objects.
+Treat each of the two arguments as a reference, a tag name, an object
+ID SHA1 hash, or a keyword and display differences between the corresponding
+objects.
 Both objects must be of the same type (blobs, trees, or commits).
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The keywords
+.Qq :base
+and
+.Qq :head
+resolve to the work tree's base commit and branch head, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foobar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq foobar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .Pp
 The key bindings for
 .Cm tog diff
@@ -484,9 +556,46 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a commit ID SHA1 hash.
+The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The keywords
+.Qq :base
+and
+.Qq :head
+resolve to the work tree's base commit and branch head, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foobar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq foobar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -584,9 +693,46 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a commit ID SHA1 hash.
+The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+which will be resolved to a commit ID.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+The keywords
+.Qq :base
+and
+.Qq :head
+resolve to the work tree's base commit and branch head, respectively.
+The former is only valid if invoked in a work tree, while the latter will
+resolve to the tip of the work tree's current branch if invoked in a
+work tree, otherwise it will resolve to the repository's HEAD reference.
+Keywords and references may be appended with
+.Qq :+
+or
+.Qq :-
+modifiers and an optional integer N to denote the
+Nth descendant or antecedent by first parent traversal, respectively;
+for example,
+.Sy :head:-2
+denotes the work tree branch head's 2nd generation ancestor, and
+.Sy :base:+4
+denotes the 4th generation descendant of the work tree's base commit.
+Similarly,
+.Sy foobar:+3
+will denote the 3rd generation descendant of the commit resolved by the
+.Qq foobar
+reference.
+A
+.Qq :+
+or
+.Qq :-
+modifier without a trailing integer has an implicit
+.Qq 1
+appended
+.Po e.g.,
+.Sy :base:+
+is equivalent to
+.Sy :base:+1
+.Pc .
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
