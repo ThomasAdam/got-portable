@@ -18,6 +18,8 @@ SUBDIR += lib
 
 .if "${GOT_RELEASE}" != "Yes"
 SUBDIR += cvg
+.elif make(clean) || make(obj)
+SUBDIR += cvg
 .endif
 
 release: clean
