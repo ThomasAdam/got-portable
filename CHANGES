@@ -1,3 +1,18 @@
+* got 0.91; 2023-07-19
+  see git repository history for per-change authorship information
+- use _POSIX_HOST_NAME_MAX from <limits.h> for portability
+- add merge -M option which tells 'got merge' not to fast-forward a reference
+- make gitwrapper ignore "permission denied" errors for repository paths
+- add cvg(1), a CVS-like Git client; still WIP and not installed by default yet
+- add initial implementation of 'gotadmin dump' which creates Git bundle files
+- add initial implementation of 'gotadmin load' which loads Git bundle files
+- gotadmin cleanup: consider object reachability while cleaning packfiles
+- gotadmin cleanup: don't delete pack files that are too young
+- prevent useless EEXIST errors filling up the global custom error array
+- abort histedit if the user quits the editor without saving the script
+- fix double-free in tog blame view error path
+- add support for keywords as <commit> arguments to got and tog
+
 * got 0.90; 2023-06-23
   see git repository history for per-change authorship information
 - fix segfault in 'got diff' when a root commit is passed to -c
