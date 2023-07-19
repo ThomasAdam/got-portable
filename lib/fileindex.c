@@ -961,7 +961,9 @@ read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 		if (strcmp(de->d_name, ".") == 0 ||
 		    strcmp(de->d_name, "..") == 0 ||
 		    (path[0] == '\0' &&
-		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
+		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0) ||
+		    (path[0] == '\0' &&
+		    strcmp(de->d_name, GOT_WORKTREE_CVG_DIR) == 0)) {
 			free(de);
 			continue;
 		}

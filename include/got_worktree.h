@@ -39,6 +39,10 @@ struct got_fileindex;
 #define GOT_STATUS_BASE_REF_ERR	'B'
 #define GOT_STATUS_CANNOT_UPDATE '#'
 
+/* Also defined in got_lib_worktree.h in case got_worktree.h is not included. */
+#define GOT_WORKTREE_GOT_DIR		".got"
+#define GOT_WORKTREE_CVG_DIR		".cvg"
+
 /*
  * Attempt to initialize a new work tree on disk.
  * The first argument is the path to a directory where the work tree
@@ -46,15 +50,21 @@ struct got_fileindex;
  * of the path must already exist.
  * The reference provided will be used to determine the new worktree's
  * base commit. The third argument speficies the work tree's path prefix.
+ * The fourth argument specifies the meta data directory to use, which
+ * should be either GOT_WORKTREE_GOT_DIR or GOT_WORKTREE_CVG_DIR.
  */
 const struct got_error *got_worktree_init(const char *, struct got_reference *,
-    const char *, struct got_repository *);
+    const char *, const char *, struct got_repository *);
 
 /*
- * Attempt to open a worktree at or above the specified path.
+ * Attempt to open a worktree at or above the specified path, using
+ * the specified meta data directory which should be either be NULL
+ * in which case a meta directory is auto-discovered, or be one of
+ * GOT_WORKTREE_GOT_DIR and GOT_WORKTREE_CVG_DIR.
  * The caller must dispose of it with got_worktree_close().
  */
-const struct got_error *got_worktree_open(struct got_worktree **, const char *);
+const struct got_error *got_worktree_open(struct got_worktree **,
+    const char *path, const char *meta_dir);
 
 /* Dispose of an open work tree. */
 const struct got_error *got_worktree_close(struct got_worktree *);
