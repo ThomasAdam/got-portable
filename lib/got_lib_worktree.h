@@ -16,6 +16,7 @@
 
 struct got_worktree {
 	char *root_path;
+	const char *meta_dir;
 	char *repo_path;
 	int root_fd;
 	char *path_prefix;
@@ -57,7 +58,14 @@ struct got_commitable {
 #define GOT_COMMITABLE_ADDED 0x01
 };
 
+/* Also defined in got_worktree.h */
+#ifndef GOT_WORKTREE_GOT_DIR
 #define GOT_WORKTREE_GOT_DIR		".got"
+#endif
+#ifndef GOT_WORKTREE_CVG_DIR
+#define GOT_WORKTREE_CVG_DIR		".cvg"
+#endif
+
 #define GOT_WORKTREE_FILE_INDEX		"file-index"
 #define GOT_WORKTREE_REPOSITORY		"repository"
 #define GOT_WORKTREE_PATH_PREFIX	"path-prefix"

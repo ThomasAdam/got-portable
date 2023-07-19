@@ -257,7 +257,7 @@ get_repo_path(char **repo_path)
 	if (cwd == NULL)
 		return got_error_from_errno("getcwd");
 
-	err = got_worktree_open(&worktree, cwd);
+	err = got_worktree_open(&worktree, cwd, NULL);
 	if (err) {
 		if (err->code != GOT_ERR_NOT_WORKTREE)
 			goto done;

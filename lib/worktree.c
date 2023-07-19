@@ -150,7 +150,7 @@ write_head_ref(const char *path_got, struct got_reference *head_ref)
 
 const struct got_error *
 got_worktree_init(const char *path, struct got_reference *head_ref,
-    const char *prefix, struct got_repository *repo)
+    const char *prefix, const char *meta_dir, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL;
@@ -188,8 +188,8 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 
-	/* Create .got directory (may already exist). */
-	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
+	/* Create .got/.cvg directory (may already exist). */
+	if (asprintf(&path_got, "%s/%s", path, meta_dir) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -297,7 +297,7 @@ got_worktree_set_head_ref(struct got_worktree *worktree,
 	char *path_got = NULL, *head_ref_name = NULL;
 
 	if (asprintf(&path_got, "%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR) == -1) {
+	    worktree->meta_dir) == -1) {
 		err = got_error_from_errno("asprintf");
 		path_got = NULL;
 		goto done;
@@ -338,7 +338,7 @@ got_worktree_set_base_commit_id(struct got_worktree *worktree,
 	char *path_got = NULL;
 
 	if (asprintf(&path_got, "%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR) == -1) {
+	    worktree->meta_dir) == -1) {
 		err = got_error_from_errno("asprintf");
 		path_got = NULL;
 		goto done;
@@ -1202,7 +1202,8 @@ replace_existing_symlink(int *did_something, const char *ondisk_path,
 
 static const struct got_error *
 is_bad_symlink_target(int *is_bad_symlink, const char *target_path,
-    size_t target_len, const char *ondisk_path, const char *wtroot_path)
+    size_t target_len, const char *ondisk_path, const char *wtroot_path,
+    const char *meta_dir)
 {
 	const struct got_error *err = NULL;
 	char canonpath[PATH_MAX];
@@ -1253,9 +1254,8 @@ is_bad_symlink_target(int *is_bad_symlink, const char *target_path,
 		return NULL;
 	}
 
-	/* Do not allow symlinks pointing into the .got directory. */
-	if (asprintf(&path_got, "%s/%s", wtroot_path,
-	    GOT_WORKTREE_GOT_DIR) == -1)
+	/* Do not allow symlinks pointing into the meta directory. */
+	if (asprintf(&path_got, "%s/%s", wtroot_path, meta_dir) == -1)
 		return got_error_from_errno("asprintf");
 	if (got_path_is_child(canonpath, path_got, strlen(path_got)))
 		*is_bad_symlink = 1;
@@ -1312,7 +1312,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	target_path[target_len] = '\0';
 
 	err = is_bad_symlink_target(is_bad_symlink, target_path, target_len,
-	    ondisk_path, worktree->root_path);
+	    ondisk_path, worktree->root_path, worktree->meta_dir);
 	if (err)
 		return err;
 
@@ -2429,7 +2429,7 @@ got_worktree_get_histedit_script_path(char **path,
     struct got_worktree *worktree)
 {
 	if (asprintf(path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_HISTEDIT_SCRIPT) == -1) {
+	    worktree->meta_dir, GOT_WORKTREE_HISTEDIT_SCRIPT) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}
@@ -2483,7 +2483,7 @@ get_fileindex_path(char **fileindex_path, struct got_worktree *worktree)
 	const struct got_error *err = NULL;
 
 	if (asprintf(fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+	    worktree->meta_dir, GOT_WORKTREE_FILE_INDEX) == -1) {
 		err = got_error_from_errno("asprintf");
 		*fileindex_path = NULL;
 	}
@@ -5586,7 +5586,8 @@ collect_commitables(void *arg, unsigned char status,
 			goto done;
 		}
 		err = is_bad_symlink_target(&is_bad_symlink, target_path,
-		    target_len, ct->ondisk_path, a->worktree->root_path);
+		    target_len, ct->ondisk_path, a->worktree->root_path,
+		    a->worktree->meta_dir);
 		if (err)
 			goto done;
 		if (is_bad_symlink) {
@@ -8946,7 +8947,8 @@ stage_path(void *arg, unsigned char status,
 				}
 				err = is_bad_symlink_target(&is_bad_symlink,
 				    target_path, target_len, ondisk_path,
-				    a->worktree->root_path);
+				    a->worktree->root_path,
+				    a->worktree->meta_dir);
 				if (err)
 					break;
 				if (is_bad_symlink) {

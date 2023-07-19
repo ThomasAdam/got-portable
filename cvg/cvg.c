@@ -2304,11 +2304,12 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_init(worktree_path, head_ref, path_prefix, repo);
+	error = got_worktree_init(worktree_path, head_ref, path_prefix,
+	    GOT_WORKTREE_CVG_DIR, repo);
 	if (error != NULL && !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
 		goto done;
 
-	error = got_worktree_open(&worktree, worktree_path);
+	error = got_worktree_open(&worktree, worktree_path, GOT_WORKTREE_CVG_DIR);
 	if (error != NULL)
 		goto done;
 
@@ -2712,7 +2713,7 @@ cmd_update(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
-	error = got_worktree_open(&worktree, worktree_path);
+	error = got_worktree_open(&worktree, worktree_path, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "update",
@@ -4037,7 +4038,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		error = NULL;
@@ -4544,7 +4545,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		else
@@ -5105,7 +5106,7 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		else
@@ -5496,7 +5497,7 @@ cmd_tree(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		else
@@ -5741,7 +5742,7 @@ cmd_status(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "status", cwd);
@@ -6304,7 +6305,7 @@ cmd_tag(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		else
@@ -6503,7 +6504,7 @@ cmd_add(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "add", cwd);
@@ -6668,7 +6669,7 @@ cmd_remove(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "remove", cwd);
@@ -6937,7 +6938,7 @@ cmd_patch(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error != NULL)
 		goto done;
 
@@ -7381,7 +7382,7 @@ cmd_revert(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "revert", cwd);
@@ -7865,7 +7866,7 @@ cmd_commit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "commit", cwd);
@@ -8361,7 +8362,7 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (list_refs || remove_refs) {
 			if (error->code != GOT_ERR_NOT_WORKTREE)
@@ -8503,7 +8504,7 @@ cmd_backout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (list_refs || remove_refs) {
 			if (error->code != GOT_ERR_NOT_WORKTREE)
@@ -8819,7 +8820,7 @@ cmd_cat(int argc, char *argv[])
 		goto done;
 
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
+		error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		if (worktree) {
@@ -9050,7 +9051,7 @@ cmd_info(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_worktree_open(&worktree, cwd);
+	error = got_worktree_open(&worktree, cwd, GOT_WORKTREE_CVG_DIR);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
 			error = wrap_not_worktree_error(error, "info", cwd);

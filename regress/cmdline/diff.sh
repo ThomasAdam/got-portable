@@ -71,7 +71,7 @@ test_diff_basic() {
 
 	# 'got diff' in a repository without any arguments is an error
 	(cd $testroot/repo && got diff 2> $testroot/stderr)
-	echo "got: no got work tree found" > $testroot/stderr.expected
+	echo "got: no work tree found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1239,7 +1239,7 @@ test_diff_commits() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "got: specified paths cannot be resolved: no got work tree found" \
+	echo "got: specified paths cannot be resolved: no work tree found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?

@@ -41,6 +41,10 @@
 #include "got_lib_worktree.h"
 #include "got_lib_gotconfig.h"
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 static const struct got_error *
 read_meta_file(char **content, const char *path_got, const char *name)
 {
@@ -106,10 +110,11 @@ done:
 }
 
 static const struct got_error *
-open_worktree(struct got_worktree **worktree, const char *path)
+open_worktree(struct got_worktree **worktree, const char *path,
+    const char *meta_dir)
 {
 	const struct got_error *err = NULL;
-	char *path_got;
+	char *path_meta;
 	char *formatstr = NULL;
 	char *uuidstr = NULL;
 	char *path_lock = NULL;
@@ -122,13 +127,13 @@ open_worktree(struct got_worktree **worktree, const char *path)
 
 	*worktree = NULL;
 
-	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
+	if (asprintf(&path_meta, "%s/%s", path, meta_dir) == -1) {
 		err = got_error_from_errno("asprintf");
-		path_got = NULL;
+		path_meta = NULL;
 		goto done;
 	}
 
-	if (asprintf(&path_lock, "%s/%s", path_got, GOT_WORKTREE_LOCK) == -1) {
+	if (asprintf(&path_lock, "%s/%s", path_meta, GOT_WORKTREE_LOCK) == -1) {
 		err = got_error_from_errno("asprintf");
 		path_lock = NULL;
 		goto done;
@@ -141,7 +146,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	err = read_meta_file(&formatstr, path_got, GOT_WORKTREE_FORMAT);
+	err = read_meta_file(&formatstr, path_meta, GOT_WORKTREE_FORMAT);
 	if (err)
 		goto done;
 
@@ -168,22 +173,23 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		err = got_error_from_errno2("realpath", path);
 		goto done;
 	}
-	err = read_meta_file(&(*worktree)->repo_path, path_got,
+	(*worktree)->meta_dir = meta_dir;
+	err = read_meta_file(&(*worktree)->repo_path, path_meta,
 	    GOT_WORKTREE_REPOSITORY);
 	if (err)
 		goto done;
 
-	err = read_meta_file(&(*worktree)->path_prefix, path_got,
+	err = read_meta_file(&(*worktree)->path_prefix, path_meta,
 	    GOT_WORKTREE_PATH_PREFIX);
 	if (err)
 		goto done;
 
-	err = read_meta_file(&base_commit_id_str, path_got,
+	err = read_meta_file(&base_commit_id_str, path_meta,
 	    GOT_WORKTREE_BASE_COMMIT);
 	if (err)
 		goto done;
 
-	err = read_meta_file(&uuidstr, path_got, GOT_WORKTREE_UUID);
+	err = read_meta_file(&uuidstr, path_meta, GOT_WORKTREE_UUID);
 	if (err)
 		goto done;
 	uuid_from_string(uuidstr, &(*worktree)->uuid, &uuid_status);
@@ -205,14 +211,14 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
-	err = read_meta_file(&(*worktree)->head_ref_name, path_got,
+	err = read_meta_file(&(*worktree)->head_ref_name, path_meta,
 	    GOT_WORKTREE_HEAD_REF);
 	if (err)
 		goto done;
 
 	if (asprintf(&(*worktree)->gotconfig_path, "%s/%s/%s",
-	    (*worktree)->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_GOTCONFIG_FILENAME) == -1) {
+	    (*worktree)->root_path, (*worktree)->meta_dir,
+	    GOT_GOTCONFIG_FILENAME) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -240,7 +246,7 @@ done:
 		if (err == NULL)
 			err = pack_err;
 	}
-	free(path_got);
+	free(path_meta);
 	free(path_lock);
 	free(base_commit_id_str);
 	free(uuidstr);
@@ -258,10 +264,16 @@ done:
 }
 
 const struct got_error *
-got_worktree_open(struct got_worktree **worktree, const char *path)
+got_worktree_open(struct got_worktree **worktree, const char *path,
+    const char *meta_dir)
 {
 	const struct got_error *err = NULL;
 	char *worktree_path;
+	const char *meta_dirs[] = {
+		GOT_WORKTREE_GOT_DIR,
+		GOT_WORKTREE_CVG_DIR
+	};
+	int i;
 
 	worktree_path = strdup(path);
 	if (worktree_path == NULL)
@@ -270,7 +282,15 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	for (;;) {
 		char *parent_path;
 
-		err = open_worktree(worktree, worktree_path);
+		if (meta_dir == NULL) {
+			for (i = 0; i < nitems(meta_dirs); i++) {
+				err = open_worktree(worktree, worktree_path,
+				    meta_dirs[i]);
+				if (err == NULL)
+					break;
+			}
+		} else
+			err = open_worktree(worktree, worktree_path, meta_dir);
 		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT)) {
 			free(worktree_path);
 			return err;
