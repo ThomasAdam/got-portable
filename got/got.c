@@ -3679,6 +3679,8 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	if (head_ref != NULL)
+		got_ref_close(head_ref);
 	free(worktree_path);
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(commit_id);
