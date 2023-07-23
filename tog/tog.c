@@ -2488,9 +2488,16 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	while (col < avail && author_width < author_display_cols + 2) {
 		if (tog_base_commit.id != NULL &&
 		    author_width == marker_column &&
-		    entry->idx == tog_base_commit.idx)
+		    entry->idx == tog_base_commit.idx) {
+			tc = get_color(&s->colors, TOG_COLOR_COMMIT);
+			if (tc)
+				wattr_on(view->window,
+				    COLOR_PAIR(tc->colorpair), NULL);
 			waddch(view->window, tog_base_commit.marker);
-		else
+			if (tc)
+				wattr_off(view->window,
+				    COLOR_PAIR(tc->colorpair), NULL);
+		} else
 			waddch(view->window, ' ');
 		col++;
 		author_width++;
