@@ -4476,8 +4476,10 @@ cmd_log(int argc, char *argv[])
 
 	if (repo_path == NULL) {
 		cwd = getcwd(NULL, 0);
-		if (cwd == NULL)
-			return got_error_from_errno("getcwd");
+		if (cwd == NULL) {
+			error = got_error_from_errno("getcwd");
+			goto done;
+		}
 		error = got_worktree_open(&worktree, cwd, NULL);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
