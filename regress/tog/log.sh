@@ -448,7 +448,7 @@ test_log_commit_keywords()
 	commit $(pop_id 5 $ids) [1/5]
 	$ymd $(pop_id 5 $short_ids) flan_hacker  commit 4
 	$ymd $(pop_id 4 $short_ids) flan_hacker  commit 3
-	$ymd $(pop_id 3 $short_ids) flan_hacker  commit 2
+	$ymd $(pop_id 3 $short_ids) flan_hacker ~commit 2
 	$ymd $(pop_id 2 $short_ids) flan_hacker  commit 1
 	$ymd $(pop_id 1 $short_ids) flan_hacker  adding the test tree
 
@@ -499,6 +499,94 @@ test_log_commit_keywords()
 	test_done "$testroot" "$ret"
 }
 
+test_log_show_base_commit()
+{
+	# make view wide enough to show full headline
+	test_init log_show_base_commit 80 3
+	local repo="$testroot/repo"
+	local id=$(git_show_head "$repo")
+
+	echo "alpha" >> "$repo/alpha"
+	git_commit "$repo" -m "base commit"
+
+	got checkout "$repo" "$testroot/wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# move into the work tree (test is run in a subshell)
+	cd "$testroot/wt"
+
+	local head_id=$(git_show_head "$repo")
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r "$author_time" +"%G-%m-%d")
+
+	# check up-to-date base commit marker prefixes base commit log message
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $head_id [1/2] master
+	$ymd flan_hacker *[master] base commit
+	$ymd flan_hacker  adding the test tree
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check marker is not drawn when not in a work tree
+	cat <<-EOF >$testroot/view.expected
+	commit $head_id [1/2] master
+	$ymd flan_hacker  [master] base commit
+	$ymd flan_hacker  adding the test tree
+	EOF
+
+	tog log -r "$repo"
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check out-of-date marker is shown with a mixed-commit tree
+	echo "mixed" > alpha
+	got commit -m "new base mixed-commit" > /dev/null
+	head_id=$(git_show_head "$repo")
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $head_id [1/3] master
+	$ymd flan_hacker ~[master] new base mixed-commit
+	$ymd flan_hacker  base commit
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -508,3 +596,4 @@ run_test test_log_hsplit_ref
 run_test test_log_hsplit_tree
 run_test test_log_logmsg_widechar
 run_test test_log_commit_keywords
+run_test test_log_show_base_commit

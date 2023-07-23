@@ -147,6 +147,14 @@ is interpreted relative to the current working directory,
 and the work tree's path prefix is implicitly prepended.
 Otherwise, the path is interpreted relative to the repository root.
 .Pp
+If invoked in a work tree, the log entry of the work tree's base commit will
+be prefixed with one of the following annotations:
+.Bl -column YXZ description
+.It * Ta work tree's base commit and the base commit of all tracked files
+matches the branch tip
+.It \(a~ Ta work tree comprises mixed commits or its base commit is out-of-date
+.El
+.Pp
 This command is also executed if no explicit command is specified.
 .Pp
 The key bindings for
