@@ -1566,8 +1566,9 @@ reference namespace.
 If invoked in a work tree, the work tree's current branch is shown
 with one of the following annotations:
 .Bl -column YXZ description
-.It * Ta work tree's base commit matches the branch tip
-.It \(a~ Ta work tree's base commit is out-of-date
+.It * Ta work tree's base commit and the base commit of all tracked files
+matches the branch tip
+.It \(a~ Ta work tree comprises mixed commits or its base commit is out-of-date
 .El
 .It Fl n
 Do not switch and update the work tree after creating a new branch.
