@@ -16,9 +16,7 @@ SUBDIR += lib
 
 .include "got-version.mk"
 
-.if "${GOT_RELEASE}" != "Yes"
-SUBDIR += cvg
-.elif make(clean) || make(obj)
+.if "${GOT_RELEASE}" != "Yes" || make(clean) || make(obj)
 SUBDIR += cvg
 .endif
 
