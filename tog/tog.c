@@ -151,6 +151,11 @@ STAILQ_HEAD(tog_colors, tog_color);
 
 static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
+static struct {
+	struct got_object_id	*id;
+	int			 idx;
+	char			 marker;
+} tog_base_commit;
 static enum got_diff_algorithm tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 
 static const struct got_error *
@@ -2397,12 +2402,13 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 }
 
 static const struct got_error *
-draw_commit(struct tog_view *view, struct got_commit_object *commit,
-    struct got_object_id *id, const size_t date_display_cols,
-    int author_display_cols)
+draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
+    const size_t date_display_cols, int author_display_cols)
 {
 	struct tog_log_view_state *s = &view->state.log;
 	const struct got_error *err = NULL;
+	struct got_commit_object *commit = entry->commit;
+	struct got_object_id *id = entry->id;
 	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
 	char *refs_str = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
@@ -2411,7 +2417,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	int author_width, refstr_width, logmsg_width;
 	char *newline, *line = NULL;
 	int col, limit, scrollx, logmsg_x;
-	const int avail = view->ncols;
+	const int avail = view->ncols, marker_column = author_display_cols + 1;
 	struct tm tm;
 	time_t committer_time;
 	struct tog_color *tc;
@@ -2476,7 +2482,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	waddwstr(view->window, wauthor);
 	col += author_width;
 	while (col < avail && author_width < author_display_cols + 2) {
-		waddch(view->window, ' ');
+		if (tog_base_commit.id != NULL &&
+		    author_width == marker_column &&
+		    entry->idx == tog_base_commit.idx)
+			waddch(view->window, tog_base_commit.marker);
+		else
+			waddch(view->window, ' ');
 		col++;
 		author_width++;
 	}
@@ -2690,6 +2701,10 @@ queue_commits(struct tog_log_thread_args *a)
 		entry->idx = a->real_commits->ncommits;
 		TAILQ_INSERT_TAIL(&a->real_commits->head, entry, entry);
 		a->real_commits->ncommits++;
+
+		if (tog_base_commit.id != NULL && tog_base_commit.idx == -1 &&
+		    got_object_id_cmp(&id, tog_base_commit.id) == 0)
+			tog_base_commit.idx = entry->idx;
 
 		if (*a->limiting) {
 			err = match_commit(&limit_match, &id, commit,
@@ -2948,8 +2963,7 @@ draw_commits(struct tog_view *view)
 			break;
 		if (ncommits == s->selected)
 			wstandout(view->window);
-		err = draw_commit(view, entry->commit, entry->id,
-		    date_display_cols, author_cols);
+		err = draw_commit(view, entry, date_display_cols, author_cols);
 		if (ncommits == s->selected)
 			wstandend(view->window);
 		if (err)
@@ -4365,6 +4379,20 @@ init_curses(void)
 }
 
 static const struct got_error *
+set_tog_base_commit(struct got_repository *repo, struct got_worktree *worktree)
+{
+	tog_base_commit.id = got_object_id_dup(
+	    got_worktree_get_base_commit_id(worktree));
+	if (tog_base_commit.id == NULL)
+		return got_error_from_errno( "got_object_id_dup");
+
+	tog_base_commit.idx = -1;
+
+	return got_worktree_get_state(&tog_base_commit.marker, repo,
+	    worktree);
+}
+
+static const struct got_error *
 get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
     struct got_repository *repo, struct got_worktree *worktree)
 {
@@ -4518,13 +4546,21 @@ cmd_log(int argc, char *argv[])
 	    in_repo_path, log_branches);
 	if (error)
 		goto done;
+
 	if (worktree) {
+		error = set_tog_base_commit(repo, worktree);
+		if (error != NULL)
+			goto done;
+
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
+
 	error = view_loop(view);
+
 done:
+	free(tog_base_commit.id);
 	free(keyword_idstr);
 	free(in_repo_path);
 	free(repo_path);
@@ -6046,8 +6082,17 @@ cmd_diff(int argc, char *argv[])
 	    ignore_whitespace, force_text_diff, NULL,  repo);
 	if (error)
 		goto done;
+
+	if (worktree) {
+		error = set_tog_base_commit(repo, worktree);
+		if (error != NULL)
+			goto done;
+	}
+
 	error = view_loop(view);
+
 done:
+	free(tog_base_commit.id);
 	free(keyword_idstr1);
 	free(keyword_idstr2);
 	free(label1);
@@ -7194,13 +7239,21 @@ cmd_blame(int argc, char *argv[])
 		view_close(view);
 		goto done;
 	}
+
 	if (worktree) {
+		error = set_tog_base_commit(repo, worktree);
+		if (error != NULL)
+			goto done;
+
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
+
 	error = view_loop(view);
+
 done:
+	free(tog_base_commit.id);
 	free(repo_path);
 	free(in_repo_path);
 	free(link_target);
@@ -8183,12 +8236,19 @@ cmd_tree(int argc, char *argv[])
 	}
 
 	if (worktree) {
+		error = set_tog_base_commit(repo, worktree);
+		if (error != NULL)
+			goto done;
+
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
+
 	error = view_loop(view);
+
 done:
+	free(tog_base_commit.id);
 	free(keyword_idstr);
 	free(repo_path);
 	free(cwd);
@@ -8196,6 +8256,8 @@ done:
 	free(label);
 	if (ref)
 		got_ref_close(ref);
+	if (worktree != NULL)
+		got_worktree_close(worktree);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
@@ -9032,14 +9094,23 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	if (worktree) {
+		error = set_tog_base_commit(repo, worktree);
+		if (error != NULL)
+			goto done;
+
 		/* Release work tree lock. */
 		got_worktree_close(worktree);
 		worktree = NULL;
 	}
+
 	error = view_loop(view);
+
 done:
+	free(tog_base_commit.id);
 	free(repo_path);
 	free(cwd);
+	if (worktree != NULL)
+		got_worktree_close(worktree);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (close_err)

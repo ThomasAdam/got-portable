@@ -134,6 +134,18 @@ const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
     struct got_repository *, struct got_object_id *);
 
 /*
+ * Get the state of the work tree. If the work tree's global base commit is
+ * the tip of the work tree's current branch, and each file in the index is
+ * based on this same commit, the char out parameter will be
+ * GOT_WORKTREE_UPTODATE, else it will be GOT_WORKTREE_OUTOFDATE.
+ */
+const struct got_error *got_worktree_get_state(char *,
+    struct got_repository *, struct got_worktree *);
+
+#define GOT_WORKTREE_UPTODATE	'*'
+#define GOT_WORKTREE_OUTOFDATE	'~'
+
+/*
  * Obtain a parsed representation of this worktree's got.conf file.
  * Return NULL if this configuration file could not be read.
  */

@@ -3251,6 +3251,53 @@ check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 	return NULL;
 }
 
+const struct got_error *
+got_worktree_get_state(char *state, struct got_repository *repo,
+    struct got_worktree *worktree)
+{
+	const struct got_error	*err;
+	struct got_object_id	*base_id, *head_id = NULL;
+	struct got_reference	*head_ref;
+	struct got_fileindex	*fileindex = NULL;
+	char			*fileindex_path = NULL;
+
+	if (worktree == NULL)
+		return got_error(GOT_ERR_NOT_WORKTREE);
+
+	err = got_ref_open(&head_ref, repo,
+	    got_worktree_get_head_ref_name(worktree), 0);
+	if (err)
+		return err;
+
+	err = got_ref_resolve(&head_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	*state = GOT_WORKTREE_OUTOFDATE;
+	base_id = got_worktree_get_base_commit_id(worktree);
+
+	if (got_object_id_cmp(base_id, head_id) == 0) {
+		err = open_fileindex(&fileindex, &fileindex_path, worktree);
+		if (err)
+			goto done;
+
+		err = got_fileindex_for_each_entry_safe(fileindex,
+		    check_mixed_commits, worktree);
+		if (err == NULL)
+			*state = GOT_WORKTREE_UPTODATE;
+		else if (err->code == GOT_ERR_MIXED_COMMITS)
+			err = NULL;
+	}
+
+done:
+	free(head_id);
+	free(fileindex_path);
+	got_ref_close(head_ref);
+	if (fileindex != NULL)
+		got_fileindex_free(fileindex);
+	return err;
+}
+
 struct check_merge_conflicts_arg {
 	struct got_worktree *worktree;
 	struct got_fileindex *fileindex;
