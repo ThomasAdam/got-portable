@@ -6797,23 +6797,16 @@ list_branch(struct got_repository *repo, struct got_worktree *worktree,
     struct got_reference *ref)
 {
 	const struct got_error *err = NULL;
-	const char *refname, *marker = "  ";
+	const char *refname;
 	char *refstr;
+	char marker = ' ';
 
 	refname = got_ref_get_name(ref);
 	if (worktree && strcmp(refname,
 	    got_worktree_get_head_ref_name(worktree)) == 0) {
-		struct got_object_id *id = NULL;
-
-		err = got_ref_resolve(&id, repo, ref);
-		if (err)
+		err = got_worktree_get_state(&marker, repo, worktree);
+		if (err != NULL)
 			return err;
-		if (got_object_id_cmp(id,
-		    got_worktree_get_base_commit_id(worktree)) == 0)
-			marker = "* ";
-		else
-			marker = "~ ";
-		free(id);
 	}
 
 	if (strncmp(refname, "refs/heads/", 11) == 0)
@@ -6827,7 +6820,7 @@ list_branch(struct got_repository *repo, struct got_worktree *worktree,
 	if (refstr == NULL)
 		return got_error_from_errno("got_ref_to_str");
 
-	printf("%s%s: %s\n", marker, refname, refstr);
+	printf("%c %s: %s\n", marker, refname, refstr);
 	free(refstr);
 	return NULL;
 }

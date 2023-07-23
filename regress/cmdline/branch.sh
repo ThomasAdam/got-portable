@@ -524,7 +524,7 @@ test_branch_packed_ref_collision() {
 	# variants of ref/heads/zoo:
 	(cd $testroot/wt && got br -lt > $testroot/stdout)
 
-	echo "* zoo: $commit_id2" > $testroot/stdout.expected
+	echo "~ zoo: $commit_id2" > $testroot/stdout.expected
 	echo "  master: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -594,6 +594,85 @@ test_branch_commit_keywords() {
 	test_done "$testroot" "$ret"
 }
 
+test_branch_list_worktree_state() {
+	local testroot=$(test_init branch_list_worktree_state)
+	local wt="$testroot/wt"
+
+	set -- "$(git_show_head "$testroot/repo")"
+
+	got checkout "$testroot/repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd "$wt" && got br -n newbranch > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "branch failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check up-to-date marker is shown with fresh checkout
+	(cd "$wt" && got br -l > "$testroot/stdout")
+	echo "* master: $(pop_id 1 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check out-of-date marker is shown with mixed-commit state
+	echo "mixed-commit" > "$wt/alpha"
+	(cd "$wt" && got commit -m "mixed-commit" > "$testroot/stdout")
+	set -- "$@" "$(git_show_head "$testroot/repo")"
+
+	(cd "$wt" && got br -l > "$testroot/stdout")
+	echo "~ master: $(pop_id 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check up-to-date marker is shown after 'got update'
+	(cd "$wt" && got up > /dev/null)
+	(cd "$wt" && got br -l > "$testroot/stdout")
+	echo "* master: $(pop_id 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check out-of-date marker is shown with out-of-date base commit
+	(cd "$wt" && got up -c:head:- > /dev/null)
+	(cd "$wt" && got br -l > "$testroot/stdout")
+	echo "~ master: $(pop_id 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_branch_create
 run_test test_branch_list
@@ -603,3 +682,4 @@ run_test test_branch_delete_packed
 run_test test_branch_show
 run_test test_branch_packed_ref_collision
 run_test test_branch_commit_keywords
+run_test test_branch_list_worktree_state
