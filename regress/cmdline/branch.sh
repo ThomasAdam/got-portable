@@ -617,8 +617,8 @@ test_branch_list_worktree_state() {
 
 	# check up-to-date marker is shown with fresh checkout
 	(cd "$wt" && got br -l > "$testroot/stdout")
-	echo "* master: $(pop_id 1 $@)" > $testroot/stdout.expected
-	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	echo "* master: $(pop_idx 1 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_idx 1 $@)" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -633,8 +633,8 @@ test_branch_list_worktree_state() {
 	set -- "$@" "$(git_show_head "$testroot/repo")"
 
 	(cd "$wt" && got br -l > "$testroot/stdout")
-	echo "~ master: $(pop_id 2 $@)" > $testroot/stdout.expected
-	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	echo "~ master: $(pop_idx 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_idx 1 $@)" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -646,8 +646,8 @@ test_branch_list_worktree_state() {
 	# check up-to-date marker is shown after 'got update'
 	(cd "$wt" && got up > /dev/null)
 	(cd "$wt" && got br -l > "$testroot/stdout")
-	echo "* master: $(pop_id 2 $@)" > $testroot/stdout.expected
-	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	echo "* master: $(pop_idx 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_idx 1 $@)" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -659,8 +659,8 @@ test_branch_list_worktree_state() {
 	# check out-of-date marker is shown with out-of-date base commit
 	(cd "$wt" && got up -c:head:- > /dev/null)
 	(cd "$wt" && got br -l > "$testroot/stdout")
-	echo "~ master: $(pop_id 2 $@)" > $testroot/stdout.expected
-	echo "  newbranch: $(pop_id 1 $@)" >> $testroot/stdout.expected
+	echo "~ master: $(pop_idx 2 $@)" > $testroot/stdout.expected
+	echo "  newbranch: $(pop_idx 1 $@)" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
