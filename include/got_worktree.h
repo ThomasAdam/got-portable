@@ -140,7 +140,8 @@ const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
  * GOT_WORKTREE_STATE_UPTODATE, else it will be GOT_WORKTREE_STATE_OUTOFDATE.
  */
 const struct got_error *got_worktree_get_state(char *,
-    struct got_repository *, struct got_worktree *);
+    struct got_repository *, struct got_worktree *,
+    got_cancel_cb, void *);
 
 #define GOT_WORKTREE_STATE_UNKNOWN	' '
 #define GOT_WORKTREE_STATE_UPTODATE	'*'

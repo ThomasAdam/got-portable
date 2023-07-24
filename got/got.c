@@ -6806,7 +6806,8 @@ list_branch(struct got_repository *repo, struct got_worktree *worktree,
 	refname = got_ref_get_name(ref);
 	if (worktree && strcmp(refname,
 	    got_worktree_get_head_ref_name(worktree)) == 0) {
-		err = got_worktree_get_state(&marker, repo, worktree);
+		err = got_worktree_get_state(&marker, repo, worktree,
+		    check_cancelled, NULL);
 		if (err != NULL)
 			return err;
 	}
