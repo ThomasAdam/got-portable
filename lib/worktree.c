@@ -2270,10 +2270,14 @@ static const struct got_error *
 diff_old_new(void *arg, struct got_fileindex_entry *ie,
     struct got_tree_entry *te, const char *parent_path)
 {
+	const struct got_error *err = NULL;
 	struct diff_cb_arg *a = arg;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	return update_blob(a->worktree, a->fileindex, ie, te,
 	    ie->path, a->repo, a->progress_cb, a->progress_arg);
@@ -2282,10 +2286,14 @@ diff_old_new(void *arg, struct got_fileindex_entry *ie,
 static const struct got_error *
 diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
+	const struct got_error *err = NULL;
 	struct diff_cb_arg *a = arg;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	return delete_blob(a->worktree, a->fileindex, ie,
 	    a->repo, a->progress_cb, a->progress_arg);
@@ -2294,12 +2302,15 @@ diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 static const struct got_error *
 diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 {
+	const struct got_error *err = NULL;
 	struct diff_cb_arg *a = arg;
-	const struct got_error *err;
 	char *path;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (got_object_tree_entry_is_submodule(te))
 		return NULL;
@@ -3243,7 +3254,7 @@ struct check_mixed_commits_args {
 static const struct got_error *
 check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	struct check_mixed_commits_args *a = arg;
 
 	if (a->cancel_cb) {
@@ -3589,8 +3600,11 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (got_path_cmp(parent_path, a->status_path,
 	    strlen(parent_path), a->status_path_len) != 0 &&
@@ -3616,12 +3630,16 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 static const struct got_error *
 status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
+	const struct got_error *err;
 	struct diff_dir_cb_arg *a = arg;
 	struct got_object_id blob_id, commit_id;
 	unsigned char status;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (!got_path_is_child(ie->path, a->status_path, a->status_path_len))
 		return NULL;
@@ -3843,8 +3861,11 @@ status_new(int *ignore, void *arg, struct dirent *de, const char *parent_path,
 	if (ignore != NULL)
 		*ignore = 0;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
@@ -9724,6 +9745,7 @@ struct report_file_info_arg {
 static const struct got_error *
 report_file_info(void *arg, struct got_fileindex_entry *ie)
 {
+	const struct got_error *err;
 	struct report_file_info_arg *a = arg;
 	struct got_pathlist_entry *pe;
 	struct got_object_id blob_id, staged_blob_id, commit_id;
@@ -9731,8 +9753,11 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 	struct got_object_id *commit_idp = NULL;
 	int stage;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	TAILQ_FOREACH(pe, a->paths, entry) {
 		if (pe->path_len == 0 || strcmp(pe->path, ie->path) == 0 ||
