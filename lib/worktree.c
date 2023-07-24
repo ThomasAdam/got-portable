@@ -8460,7 +8460,7 @@ got_worktree_merge_branch(struct got_worktree *worktree,
 	cma.cancel_arg = cancel_arg;
 
 	err = got_fileindex_for_each_entry_safe(fileindex, check_mixed_commits,
-	    worktree);
+	    &cma);
 	if (err)
 		goto done;
 
