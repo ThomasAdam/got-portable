@@ -3273,7 +3273,7 @@ got_worktree_get_state(char *state, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	*state = GOT_WORKTREE_OUTOFDATE;
+	*state = GOT_WORKTREE_STATE_UNKNOWN;
 	base_id = got_worktree_get_base_commit_id(worktree);
 
 	if (got_object_id_cmp(base_id, head_id) == 0) {
@@ -3284,10 +3284,13 @@ got_worktree_get_state(char *state, struct got_repository *repo,
 		err = got_fileindex_for_each_entry_safe(fileindex,
 		    check_mixed_commits, worktree);
 		if (err == NULL)
-			*state = GOT_WORKTREE_UPTODATE;
-		else if (err->code == GOT_ERR_MIXED_COMMITS)
+			*state = GOT_WORKTREE_STATE_UPTODATE;
+		else if (err->code == GOT_ERR_MIXED_COMMITS) {
+			*state = GOT_WORKTREE_STATE_OUTOFDATE;
 			err = NULL;
-	}
+		}
+	} else
+		*state = GOT_WORKTREE_STATE_OUTOFDATE;
 
 done:
 	free(head_id);
