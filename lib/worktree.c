@@ -3234,14 +3234,27 @@ done:
 	return err;
 }
 
+struct check_mixed_commits_args {
+	struct got_worktree *worktree;
+	got_cancel_cb cancel_cb;
+	void *cancel_arg;
+};
+
 static const struct got_error *
 check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 {
-	struct got_worktree *worktree = arg;
+	const struct got_error *err;
+	struct check_mixed_commits_args *a = arg;
+
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	/* Reject merges into a work tree with mixed base commits. */
 	if (got_fileindex_entry_has_commit(ie) &&
-	    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
+	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
 	    SHA1_DIGEST_LENGTH) != 0)
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
@@ -3250,13 +3263,15 @@ check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_worktree_get_state(char *state, struct got_repository *repo,
-    struct got_worktree *worktree)
+    struct got_worktree *worktree,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error	*err;
 	struct got_object_id	*base_id, *head_id = NULL;
 	struct got_reference	*head_ref;
 	struct got_fileindex	*fileindex = NULL;
 	char			*fileindex_path = NULL;
+	struct check_mixed_commits_args cma;
 
 	if (worktree == NULL)
 		return got_error(GOT_ERR_NOT_WORKTREE);
@@ -3273,13 +3288,17 @@ got_worktree_get_state(char *state, struct got_repository *repo,
 	*state = GOT_WORKTREE_STATE_UNKNOWN;
 	base_id = got_worktree_get_base_commit_id(worktree);
 
+	cma.worktree = worktree;
+	cma.cancel_cb = cancel_cb;
+	cma.cancel_arg = cancel_arg;
+
 	if (got_object_id_cmp(base_id, head_id) == 0) {
 		err = open_fileindex(&fileindex, &fileindex_path, worktree);
 		if (err)
 			goto done;
 
 		err = got_fileindex_for_each_entry_safe(fileindex,
-		    check_mixed_commits, worktree);
+		    check_mixed_commits, &cma);
 		if (err == NULL)
 			*state = GOT_WORKTREE_STATE_UPTODATE;
 		else if (err->code == GOT_ERR_MIXED_COMMITS) {
@@ -3477,6 +3496,7 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr;
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
+	struct check_mixed_commits_args cma;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -3486,8 +3506,12 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	cma.worktree = worktree;
+	cma.cancel_cb = cancel_cb;
+	cma.cancel_arg = cancel_arg;
+
 	err = got_fileindex_for_each_entry_safe(fileindex, check_mixed_commits,
-	    worktree);
+	    &cma);
 	if (err)
 		goto done;
 
@@ -8404,10 +8428,15 @@ got_worktree_merge_branch(struct got_worktree *worktree,
 {
 	const struct got_error *err;
 	char *fileindex_path = NULL;
+	struct check_mixed_commits_args cma;
 
 	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
 		goto done;
+
+	cma.worktree = worktree;
+	cma.cancel_cb = cancel_cb;
+	cma.cancel_arg = cancel_arg;
 
 	err = got_fileindex_for_each_entry_safe(fileindex, check_mixed_commits,
 	    worktree);

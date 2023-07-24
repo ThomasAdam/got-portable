@@ -3377,7 +3377,7 @@ log_thread(void *arg)
 				goto done;
 			}
 			err = got_worktree_get_state(&tog_base_commit.marker,
-			    a->repo, a->worktree);
+			    a->repo, a->worktree, NULL, NULL);
 			if (err)
 				goto done;
 			errcode = pthread_mutex_lock(&tog_mutex);
