@@ -185,7 +185,7 @@ test_tree_commit_keywords()
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 
-	set -A ids "$id"
+	set -- "$id"
 
 	got checkout "$repo" "$wt" > /dev/null
 	ret=$?
@@ -215,8 +215,7 @@ test_tree_commit_keywords()
 		fi
 
 		id=$(git_show_head "$repo")
-		set -- "$ids" "$id"
-		ids=$*
+		set -- "$@" "$id"
 	done
 
 
@@ -225,7 +224,7 @@ test_tree_commit_keywords()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 8 $ids)
+	commit $(pop_idx 8 $@)
 	[1/7] /
 
 	  alpha
@@ -248,7 +247,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 6 $ids)
+	commit $(pop_idx 6 $@)
 	[1/6] /
 
 	  alpha
@@ -271,7 +270,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 9 $ids)
+	commit $(pop_idx 9 $@)
 	[1/8] /
 
 	  alpha
@@ -295,7 +294,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 4 $ids)
+	commit $(pop_idx 4 $@)
 	[1/5] /
 
 	  alpha
@@ -318,7 +317,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 1 $ids)
+	commit $(pop_idx 1 $@)
 	[1/4] /
 
 	  alpha

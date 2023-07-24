@@ -935,7 +935,7 @@ test_checkout_ulimit_n() {
 test_checkout_commit_keywords() {
 	local testroot=$(test_init checkout_commit_keywords)
 
-	set -A ids "$(git_show_head $testroot/repo)"
+	set -- "$(git_show_head $testroot/repo)"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -955,15 +955,14 @@ test_checkout_commit_keywords() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
 	echo "A  $testroot/wt2/alpha" > $testroot/stdout.expected
 	echo "A  $testroot/wt2/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt2/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt2/gamma/delta" >> $testroot/stdout.expected
-	echo "Checked out refs/heads/master: $(pop_id 4 $ids)" \
+	echo "Checked out refs/heads/master: $(pop_idx 4 $@)" \
 		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
@@ -986,7 +985,7 @@ test_checkout_commit_keywords() {
 	echo "A  $testroot/wt3/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt3/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt3/gamma/delta" >> $testroot/stdout.expected
-	echo "Checked out refs/heads/master: $(pop_id 4 $ids)" \
+	echo "Checked out refs/heads/master: $(pop_idx 4 $@)" \
 		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 

@@ -2031,7 +2031,7 @@ test_cherrypick_logmsg_ref() {
 test_cherrypick_commit_keywords() {
 	local testroot=`test_init cherrypick_commit_keywords`
 
-	set -A ids "$(git_show_head $testroot/repo)"
+	set -- "$(git_show_head $testroot/repo)"
 
 	(cd $testroot/repo && git checkout -q -b branch-1)
 
@@ -2045,19 +2045,17 @@ test_cherrypick_commit_keywords() {
 
 	echo "changed on branch-1" >> "$testroot/repo/alpha"
 	git_commit $testroot/repo -m "alpha changed on branch-1"
-	set -- "$ids" "$(git_show_head $testroot/repo)"
-	ids=$*
+	set -- "$@" "$(git_show_head $testroot/repo)"
 
 	for i in $(seq 4); do
 		echo "branch-1 change $i" >> "$testroot/repo/gamma/delta"
 
 		git_commit $testroot/repo -m "commit number $i"
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
 	echo "G  alpha" > $testroot/stdout.expected
-	echo "Merged commit $(pop_id 2 $ids)" >> $testroot/stdout.expected
+	echo "Merged commit $(pop_idx 2 $@)" >> $testroot/stdout.expected
 
 	(cd "$testroot/wt" && got cy master:+ > $testroot/stdout)
 	ret=$?
@@ -2077,7 +2075,7 @@ test_cherrypick_commit_keywords() {
 	(cd "$testroot/wt" && got rv alpha > /dev/null)
 
 	echo "C  gamma/delta" > $testroot/stdout.expected
-	echo "Merged commit $(pop_id 5 $ids)" >> $testroot/stdout.expected
+	echo "Merged commit $(pop_idx 5 $@)" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	(cd "$testroot/wt" && got cy branch-1:- > $testroot/stdout)
 

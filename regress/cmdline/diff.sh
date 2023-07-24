@@ -2024,6 +2024,8 @@ EOF
 
 test_diff_commit_keywords() {
 	local testroot=`test_init diff_commit_keywords`
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -2033,9 +2035,9 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	set -A ids "$(git_show_head $testroot/repo)"
-	set -A alpha_ids "$(get_blob_id $testroot/repo "" alpha)"
-	set -A beta_ids "$(get_blob_id $testroot/repo "" beta)"
+	set -- "$(git_show_head $repo)"
+	local alpha_ids="$(get_blob_id "$repo" "" alpha)"
+	local beta_ids="$(get_blob_id "$repo" "" beta)"
 
 	for i in `seq 8`; do
 		if [ $(( i % 2 )) -eq 0 ]; then
@@ -2053,25 +2055,20 @@ test_diff_commit_keywords() {
 		fi
 
 		if [ $(( i % 2 )) -eq 0 ]; then
-			set -- "$alpha_ids" \
-			    "$(get_blob_id $testroot/repo "" alpha)"
-			alpha_ids=$*
+			alpha_ids="$alpha_ids $(get_blob_id "$repo" "" alpha)"
 		else
-			set -- "$beta_ids" \
-			    "$(get_blob_id $testroot/repo "" beta)"
-			beta_ids=$*
+			beta_ids="$beta_ids $(get_blob_id "$repo" "" beta)"
 		fi
 
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $repo)"
 	done
 
-	echo "diff $(pop_id 7 $ids) $(pop_id 8 $ids)" > \
+	echo "diff $(pop_idx 7 $@) $(pop_idx 8 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 7 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 8 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 4 $beta_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 7 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 8 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 4 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 5 $beta_ids)" >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ beta' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
@@ -2102,12 +2099,12 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	echo "diff $(pop_id 1 $ids) $(pop_id 2 $ids)" > \
+	echo "diff $(pop_idx 1 $@) $(pop_idx 2 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 1 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 2 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 1 $beta_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 1 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 2 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 1 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 2 $beta_ids)" >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ beta' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
@@ -2130,12 +2127,12 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	echo "diff $(pop_id 3 $ids) $(pop_id 4 $ids)" > \
+	echo "diff $(pop_idx 3 $@) $(pop_idx 4 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 3 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 4 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 3 $beta_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 3 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 4 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 2 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 3 $beta_ids)" >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ beta' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
@@ -2159,12 +2156,12 @@ test_diff_commit_keywords() {
 	fi
 
 	# if modifier extends beyond HEAD, we should use HEAD ref
-	echo "diff $(pop_id 8 $ids) $(pop_id 9 $ids)" > \
+	echo "diff $(pop_idx 8 $@) $(pop_idx 9 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 8 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 9 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 4 $alpha_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 5 $alpha_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 8 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 9 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 4 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 5 $alpha_ids)" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
 	echo '+++ alpha' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
@@ -2187,19 +2184,19 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	echo "diff $(pop_id 3 $ids) $(pop_id 9 $ids)" > \
+	echo "diff $(pop_idx 3 $@) $(pop_idx 9 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 3 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 9 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 2 $alpha_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 5 $alpha_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 3 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 9 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 2 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 5 $alpha_ids)" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
 	echo '+++ alpha' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha change 2' >> $testroot/stdout.expected
 	echo '+alpha change 8' >> $testroot/stdout.expected
-	echo "blob - $(pop_id 2 $beta_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 2 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 5 $beta_ids)" >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ beta' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
@@ -2222,19 +2219,19 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	echo "diff $(pop_id 6 $ids) $(pop_id 8 $ids)" > \
+	echo "diff $(pop_idx 6 $@) $(pop_idx 8 $@)" > \
 	    $testroot/stdout.expected
-	echo "commit - $(pop_id 6 $ids)" >> $testroot/stdout.expected
-	echo "commit + $(pop_id 8 $ids)" >> $testroot/stdout.expected
-	echo "blob - $(pop_id 3 $alpha_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 4 $alpha_ids)" >> $testroot/stdout.expected
+	echo "commit - $(pop_idx 6 $@)" >> $testroot/stdout.expected
+	echo "commit + $(pop_idx 8 $@)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 3 $alpha_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 4 $alpha_ids)" >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
 	echo '+++ alpha' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha change 4' >> $testroot/stdout.expected
 	echo '+alpha change 6' >> $testroot/stdout.expected
-	echo "blob - $(pop_id 4 $beta_ids)" >> $testroot/stdout.expected
-	echo "blob + $(pop_id 5 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob - $(pop_idx 4 $beta_ids)" >> $testroot/stdout.expected
+	echo "blob + $(pop_idx 5 $beta_ids)" >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ beta' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
