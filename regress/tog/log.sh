@@ -397,6 +397,7 @@ test_log_commit_keywords()
 	done
 
 	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to finish
 	SCREENDUMP
 	EOF
 
@@ -526,6 +527,7 @@ test_log_show_base_commit()
 
 	# check up-to-date base commit marker prefixes base commit log message
 	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to finish
 	SCREENDUMP
 	EOF
 
@@ -566,6 +568,7 @@ test_log_show_base_commit()
 	head_id=$(git_show_head "$repo")
 
 	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to finish
 	SCREENDUMP
 	EOF
 

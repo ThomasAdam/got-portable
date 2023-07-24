@@ -374,6 +374,7 @@ struct tog_log_thread_args {
 	struct got_repository *repo;
 	int *pack_fds;
 	int log_complete;
+	pthread_cond_t log_loaded;
 	sig_atomic_t *quit;
 	struct commit_queue_entry **first_displayed_entry;
 	struct commit_queue_entry **selected_entry;
@@ -384,6 +385,8 @@ struct tog_log_thread_args {
 	int limit_match;
 	regex_t *limit_regex;
 	struct commit_queue *limit_commits;
+	struct got_worktree *worktree;
+	int need_commit_marker;
 };
 
 struct tog_log_view_state {
@@ -734,7 +737,7 @@ static const struct got_error *search_next_view_match(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *,
-    const char *, const char *, int);
+    const char *, const char *, int, struct got_worktree *);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view *, int);
@@ -2427,6 +2430,10 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	struct tog_color *tc;
 	struct got_reflist_head *refs;
 
+	if (tog_base_commit.id != NULL && tog_base_commit.idx == -1 &&
+	    got_object_id_cmp(id, tog_base_commit.id) == 0)
+		tog_base_commit.idx = entry->idx;
+
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("gmtime_r");
@@ -2486,7 +2493,7 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	waddwstr(view->window, wauthor);
 	col += author_width;
 	while (col < avail && author_width < author_display_cols + 2) {
-		if (tog_base_commit.id != NULL &&
+		if (tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN &&
 		    author_width == marker_column &&
 		    entry->idx == tog_base_commit.idx) {
 			tc = get_color(&s->colors, TOG_COLOR_COMMIT);
@@ -2712,10 +2719,6 @@ queue_commits(struct tog_log_thread_args *a)
 		entry->idx = a->real_commits->ncommits;
 		TAILQ_INSERT_TAIL(&a->real_commits->head, entry, entry);
 		a->real_commits->ncommits++;
-
-		if (tog_base_commit.id != NULL && tog_base_commit.idx == -1 &&
-		    got_object_id_cmp(&id, tog_base_commit.id) == 0)
-			tog_base_commit.idx = entry->idx;
 
 		if (*a->limiting) {
 			err = match_commit(&limit_match, &id, commit,
@@ -3331,6 +3334,7 @@ log_thread(void *arg)
 				goto done;
 			err = NULL;
 			done = 1;
+			a->commits_needed = 0;
 		} else if (a->commits_needed > 0 && !a->load_all) {
 			if (*a->limiting) {
 				if (a->limit_match)
@@ -3364,10 +3368,49 @@ log_thread(void *arg)
 			goto done;
 		}
 
+		if (a->commits_needed == 0 &&
+		    a->need_commit_marker && a->worktree) {
+			errcode = pthread_mutex_unlock(&tog_mutex);
+			if (errcode) {
+				err = got_error_set_errno(errcode,
+				    "pthread_mutex_unlock");
+				goto done;
+			}
+			err = got_worktree_get_state(&tog_base_commit.marker,
+			    a->repo, a->worktree);
+			if (err)
+				goto done;
+			errcode = pthread_mutex_lock(&tog_mutex);
+			if (errcode) {
+				err = got_error_set_errno(errcode,
+				    "pthread_mutex_lock");
+				goto done;
+			}
+			a->need_commit_marker = 0;
+			/*
+			 * The main thread did not close this
+			 * work tree yet. Close it now.
+			 */
+			got_worktree_close(a->worktree);
+			a->worktree = NULL;
+
+			if (*a->quit)
+				done = 1;
+		}
+
 		if (done)
 			a->commits_needed = 0;
 		else {
 			if (a->commits_needed == 0 && !a->load_all) {
+				if (tog_io.wait_for_ui) {
+					errcode = pthread_cond_signal(
+					    &a->log_loaded);
+					if (errcode && err == NULL)
+						err = got_error_set_errno(
+						    errcode,
+						    "pthread_cond_signal");
+				}
+
 				errcode = pthread_cond_wait(&a->need_commits,
 				    &tog_mutex);
 				if (errcode) {
@@ -3382,6 +3425,13 @@ log_thread(void *arg)
 		}
 	}
 	a->log_complete = 1;
+	if (tog_io.wait_for_ui) {
+		errcode = pthread_cond_signal(&a->log_loaded);
+		if (errcode && err == NULL)
+			err = got_error_set_errno(errcode,
+			    "pthread_cond_signal");
+	}
+
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
 		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
@@ -3389,6 +3439,10 @@ done:
 	if (err) {
 		tog_thread_error = 1;
 		pthread_cond_signal(&a->commit_loaded);
+		if (a->worktree) {
+			got_worktree_close(a->worktree);
+			a->worktree = NULL;
+		}
 	}
 	return (void *)err;
 }
@@ -3709,7 +3763,8 @@ search_next_log_view(struct tog_view *view)
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_repository *repo, const char *head_ref_name,
-    const char *in_repo_path, int log_branches)
+    const char *in_repo_path, int log_branches,
+    struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -3807,6 +3862,14 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		goto done;
 	}
 
+	if (using_mock_io) {
+		int rc;
+
+		rc = pthread_cond_init(&s->thread_args.log_loaded, NULL);
+		if (rc)
+			return got_error_set_errno(rc, "pthread_cond_init");
+	}
+
 	s->thread_args.commits_needed = view->nlines;
 	s->thread_args.graph = thread_graph;
 	s->thread_args.real_commits = &s->real_commits;
@@ -3824,6 +3887,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.limiting = &s->limit_view;
 	s->thread_args.limit_regex = &s->limit_regex;
 	s->thread_args.limit_commits = &s->limit_commits;
+	s->thread_args.worktree = worktree;
+	if (worktree)
+		s->thread_args.need_commit_marker = 1;
 done:
 	if (err) {
 		if (view->close == NULL)
@@ -3848,6 +3914,16 @@ show_log_view(struct tog_view *view)
 			err = trigger_log_thread(view, 1);
 			if (err)
 				return err;
+			if (tog_io.wait_for_ui) {
+				int rc;
+
+				rc = pthread_cond_wait(&s->thread_args.log_loaded,
+				    &tog_mutex);
+				if (rc)
+					return got_error_set_errno(rc,
+					    "pthread_cond_wait");
+				tog_io.wait_for_ui = 0;
+			}
 		}
 	}
 
@@ -4397,10 +4473,7 @@ set_tog_base_commit(struct got_repository *repo, struct got_worktree *worktree)
 	if (tog_base_commit.id == NULL)
 		return got_error_from_errno( "got_object_id_dup");
 
-	tog_base_commit.idx = -1;
-
-	return got_worktree_get_state(&tog_base_commit.marker, repo,
-	    worktree);
+	return NULL;
 }
 
 static const struct got_error *
@@ -4555,18 +4628,20 @@ cmd_log(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_log_view(view, start_id, repo, head_ref_name,
-	    in_repo_path, log_branches);
-	if (error)
-		goto done;
 
 	if (worktree) {
 		error = set_tog_base_commit(repo, worktree);
 		if (error != NULL)
 			goto done;
+	}
 
-		/* Release work tree lock. */
-		got_worktree_close(worktree);
+	error = open_log_view(view, start_id, repo, head_ref_name,
+	    in_repo_path, log_branches, worktree);
+	if (error)
+		goto done;
+
+	if (worktree) {
+		/* The work tree will be closed by the log thread. */
 		worktree = NULL;
 	}
 
@@ -6818,7 +6893,7 @@ log_annotated_line(struct tog_view **new_view, int begin_y, int begin_x,
 	if (log_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = open_log_view(log_view, id, repo, GOT_REF_HEAD, "", 0);
+	err = open_log_view(log_view, id, repo, GOT_REF_HEAD, "", 0, NULL);
 	if (err)
 		view_close(log_view);
 	else
@@ -7620,7 +7695,7 @@ log_selected_tree_entry(struct tog_view **new_view, int begin_y, int begin_x,
 		return err;
 
 	err = open_log_view(log_view, s->commit_id, s->repo, s->head_ref_name,
-	    path, 0);
+	    path, 0, NULL);
 	if (err)
 		view_close(log_view);
 	else
@@ -8478,7 +8553,7 @@ log_ref_entry(struct tog_view **new_view, int begin_y, int begin_x,
 	}
 
 	err = open_log_view(log_view, commit_id, repo,
-	    got_ref_get_name(re->ref), "", 0);
+	    got_ref_get_name(re->ref), "", 0, NULL);
 done:
 	if (err)
 		view_close(log_view);
@@ -10085,6 +10160,9 @@ main(int argc, char *argv[])
 		if (strcasecmp(diff_algo_str, "myers") == 0)
 			tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
 	}
+
+	tog_base_commit.idx = -1;
+	tog_base_commit.marker = GOT_WORKTREE_STATE_UNKNOWN;
 
 	if (cmd == NULL) {
 		if (argc != 1)
