@@ -168,7 +168,7 @@ trim_obj_id()
 	echo ${id%$pat}
 }
 
-pop_id()
+pop_idx()
 {
 	shift "$1"
 	printf '%s' "${1:-index-out-of-bounds}"

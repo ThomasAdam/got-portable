@@ -905,7 +905,7 @@ test_log_commit_keywords() {
 	local commit_time=`git_show_author_time $testroot/repo`
 	local d=`date -u -r $commit_time +"%G-%m-%d"`
 
-	set -A ids "$(git_show_head $testroot/repo)"
+	set -- "$(git_show_head $testroot/repo)"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -925,13 +925,12 @@ test_log_commit_keywords() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
 	for i in $(seq 16 2); do
 		printf '%s %.7s commit number %s\n' \
-		    "$d" $(pop_id $i $ids) "$(( i-1 ))" \
+		    "$d" $(pop_idx $i $@) "$(( i-1 ))" \
 		    >> $testroot/stdout.expected
 	done
 
@@ -957,10 +956,10 @@ test_log_commit_keywords() {
 
 	for i in $(seq 9 2); do
 		printf '%s %.7s commit number %s\n' \
-		    "$d" $(pop_id $i $ids) "$(( i-1 ))" \
+		    "$d" $(pop_idx $i $@) "$(( i-1 ))" \
 		    >> $testroot/stdout.expected
 	done
-	printf '%s %.7s adding the test tree\n' "$d" $(pop_id 1 $ids) >> \
+	printf '%s %.7s adding the test tree\n' "$d" $(pop_idx 1 $@) >> \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -sc:base > $testroot/stdout)
@@ -976,7 +975,7 @@ test_log_commit_keywords() {
 	# if + modifier is too great, use HEAD commit
 	printf '%s %-7s commit number %s\n' "$d" master 16 > \
 	    $testroot/stdout.expected
-	printf '%s %.7s commit number %s\n' "$d" $(pop_id 16 $ids) 15 >> \
+	printf '%s %.7s commit number %s\n' "$d" $(pop_idx 16 $@) 15 >> \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -sc:base:+20 -l2 > $testroot/stdout)
@@ -990,7 +989,7 @@ test_log_commit_keywords() {
 	fi
 
 	# if - modifier is too great, use root commit
-	printf '%s %.7s adding the test tree\n' "$d" $(pop_id 1 $ids) > \
+	printf '%s %.7s adding the test tree\n' "$d" $(pop_idx 1 $@) > \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -sc:base:-10 > $testroot/stdout)
@@ -1002,9 +1001,9 @@ test_log_commit_keywords() {
 		return 1
 	fi
 
-	got br -r "$testroot/repo" -c $(pop_id 1 $ids) base+
+	got br -r "$testroot/repo" -c $(pop_idx 1 $@) base+
 
-	printf '%s %.7s commit number 1\n' "$d" $(pop_id 2 $ids) > \
+	printf '%s %.7s commit number 1\n' "$d" $(pop_idx 2 $@) > \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -scbase+:+ -l1 > $testroot/stdout)
@@ -1017,9 +1016,9 @@ test_log_commit_keywords() {
 		return 1
 	fi
 
-	got br -r "$testroot/repo" -c $(pop_id 3 $ids) head-1
+	got br -r "$testroot/repo" -c $(pop_idx 3 $@) head-1
 
-	printf '%s %.7s commit number 1\n' "$d" $(pop_id 2 $ids) > \
+	printf '%s %.7s commit number 1\n' "$d" $(pop_idx 2 $@) > \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -schead-1:- -l1 > $testroot/stdout)
@@ -1032,9 +1031,9 @@ test_log_commit_keywords() {
 		return 1
 	fi
 
-	got br -r "$testroot/repo" -c $(pop_id 16 $ids) base-1+2
+	got br -r "$testroot/repo" -c $(pop_idx 16 $@) base-1+2
 
-	printf '%s %.7s commit number 12\n' "$d" $(pop_id 13 $ids) > \
+	printf '%s %.7s commit number 12\n' "$d" $(pop_idx 13 $@) > \
 	    $testroot/stdout.expected
 
 	(cd $testroot/wt && got log -scbase-1+2:-3 -l1 > $testroot/stdout)

@@ -540,7 +540,7 @@ test_branch_packed_ref_collision() {
 test_branch_commit_keywords() {
 	local testroot=$(test_init branch_commit_keywords)
 
-	set -A ids "$(git_show_head $testroot/repo)"
+	set -- "$(git_show_head $testroot/repo)"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -560,14 +560,13 @@ test_branch_commit_keywords() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
 	(cd "$testroot/wt" && got up > /dev/null)
 
-	echo "  kwbranch: $(pop_id 3 $ids)" > $testroot/stdout.expected
-	echo "  master: $(pop_id 5 $ids)" >> $testroot/stdout.expected
+	echo "  kwbranch: $(pop_idx 3 $@)" > $testroot/stdout.expected
+	echo "  master: $(pop_idx 5 $@)" >> $testroot/stdout.expected
 
 	(cd "$testroot/wt" && got br -nc :head:-2 kwbranch > /dev/null)
 	got br -r "$testroot/repo" -l > "$testroot/stdout"
@@ -580,7 +579,7 @@ test_branch_commit_keywords() {
 		return 1
 	fi
 
-	echo "  kwbranch2: $(pop_id 4 $ids)" > $testroot/stdout.expected
+	echo "  kwbranch2: $(pop_idx 4 $@)" > $testroot/stdout.expected
 
 	got br -r "$testroot/repo" -c master:- kwbranch2 > /dev/null
 	got br -r "$testroot/repo" -l | grep kwbranch2 > "$testroot/stdout"

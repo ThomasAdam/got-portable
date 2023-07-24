@@ -3233,7 +3233,7 @@ test_update_umask() {
 test_update_commit_keywords() {
 	local testroot=`test_init update_commit_keywords`
 
-	set -A ids "$(git_show_head $testroot/repo)"
+	set -- "$(git_show_head $testroot/repo)"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -3257,8 +3257,7 @@ test_update_commit_keywords() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
-		set -- "$ids" "$(git_show_head $testroot/repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
 	echo "got: reference base not found" > $testroot/stderr.expected
@@ -3359,7 +3358,7 @@ test_update_commit_keywords() {
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 7 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 7 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:base:-2 > $testroot/stdout)
 	ret=$?
@@ -3379,7 +3378,7 @@ test_update_commit_keywords() {
 
 	echo "U  beta" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 8 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 8 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -cmaster:- > $testroot/stdout)
 	ret=$?
@@ -3411,7 +3410,7 @@ test_update_commit_keywords() {
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 2 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 2 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:base:-6 > $testroot/stdout)
 	ret=$?
@@ -3442,7 +3441,7 @@ test_update_commit_keywords() {
 
 	echo "U  alpha" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 3 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 3 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:base:+ > $testroot/stdout)
 	ret=$?
@@ -3474,7 +3473,7 @@ test_update_commit_keywords() {
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 7 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 7 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:head:-2 > $testroot/stdout)
 	ret=$?
@@ -3507,7 +3506,7 @@ test_update_commit_keywords() {
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 1 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 1 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:base:-20 > $testroot/stdout)
 	ret=$?
@@ -3540,7 +3539,7 @@ test_update_commit_keywords() {
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
-	echo $(pop_id 9 $ids) >> "$testroot/stdout.expected"
+	echo $(pop_idx 9 $@) >> "$testroot/stdout.expected"
 
 	(cd $testroot/wt && got update -c:head:+10 > $testroot/stdout)
 	ret=$?

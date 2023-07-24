@@ -462,8 +462,7 @@ test_ref_commit_keywords() {
 			return 1
 		fi
 
-		set -- "$ids" "$(git_show_head $repo)"
-		ids=$*
+		set -- "$@" "$(git_show_head $repo)"
 	done
 
 	(cd "$wt" && got ref -c:head:-4 refs/heads/head-4)
@@ -501,11 +500,11 @@ test_ref_commit_keywords() {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
 	cat "$wt/.got/uuid" | tr -d '\n' >> $testroot/stdout.expected
-	echo ": $(pop_id 4 $ids)" >> $testroot/stdout.expected
-	echo "refs/heads/base+2: $(pop_id 6 $ids)" >> $testroot/stdout.expected
-	echo "refs/heads/head-4: $(pop_id 4 $ids)" >> $testroot/stdout.expected
-	echo "refs/heads/master: $(pop_id 8 $ids)" >> $testroot/stdout.expected
-	echo "refs/heads/master-: $(pop_id 7 $ids)" >> $testroot/stdout.expected
+	echo ": $(pop_idx 4 $@)" >> $testroot/stdout.expected
+	echo "refs/heads/base+2: $(pop_idx 6 $@)" >> $testroot/stdout.expected
+	echo "refs/heads/head-4: $(pop_idx 4 $@)" >> $testroot/stdout.expected
+	echo "refs/heads/master: $(pop_idx 8 $@)" >> $testroot/stdout.expected
+	echo "refs/heads/master-: $(pop_idx 7 $@)" >> $testroot/stdout.expected
 
 	got ref -r "$repo" -l > $testroot/stdout
 	cmp -s $testroot/stdout $testroot/stdout.expected

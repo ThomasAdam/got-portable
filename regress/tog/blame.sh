@@ -85,8 +85,7 @@ test_blame_commit_keywords()
 	local author_time=$(git_show_author_time "$repo")
 	local ymd=$(date -u -r $author_time +"%G-%m-%d")
 
-	set -A ids "$id"
-	set -A short_ids "$(trim_obj_id 32 $id)"
+	set -- "$id"
 
 	cat <<-EOF >$TOG_TEST_SCRIPT
 	WAIT_FOR_UI	wait for blame to finish
@@ -115,7 +114,7 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $id
 	[1/1] /alpha
-	$(pop_id 1 $short_ids) alpha
+	$(trim_obj_id 32 $(pop_idx 1 $@)) alpha
 
 
 
@@ -165,10 +164,7 @@ test_blame_commit_keywords()
 		fi
 
 		id=$(git_show_head "$repo")
-		set -- "$ids" "$id"
-		ids=$*
-		set -- "$short_ids" "$(trim_obj_id 32 $id)"
-		short_ids=$*
+		set -- "$@" "$id"
 	done
 
 	author_time=$(git_show_author_time "$repo")
@@ -176,15 +172,15 @@ test_blame_commit_keywords()
 
 	# :base:- keyword in work tree
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 8 $ids)
+	commit $(pop_idx 8 $@)
 	[1/7] /alpha
-	$(pop_id 2 $short_ids) alpha 1
-	$(pop_id 3 $short_ids) alpha 2
-	$(pop_id 4 $short_ids) alpha 3
-	$(pop_id 5 $short_ids) alpha 4
-	$(pop_id 6 $short_ids) alpha 5
-	$(pop_id 7 $short_ids) alpha 6
-	$(pop_id 8 $short_ids) alpha 7
+	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
+	$(trim_obj_id 32 $(pop_idx 6 $@)) alpha 5
+	$(trim_obj_id 32 $(pop_idx 7 $@)) alpha 6
+	$(trim_obj_id 32 $(pop_idx 8 $@)) alpha 7
 
 	EOF
 
@@ -206,12 +202,12 @@ test_blame_commit_keywords()
 
 	# :head:-4 keyword in work tree
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 5 $ids)
+	commit $(pop_idx 5 $@)
 	[1/4] /alpha
-	$(pop_id 2 $short_ids) alpha 1
-	$(pop_id 3 $short_ids) alpha 2
-	$(pop_id 4 $short_ids) alpha 3
-	$(pop_id 5 $short_ids) alpha 4
+	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
 
 
 
@@ -236,12 +232,12 @@ test_blame_commit_keywords()
 
 	# :base:+2 keyword in work tree
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 5 $ids)
+	commit $(pop_idx 5 $@)
 	[1/4] /alpha
-	$(pop_id 2 $short_ids) alpha 1
-	$(pop_id 3 $short_ids) alpha 2
-	$(pop_id 4 $short_ids) alpha 3
-	$(pop_id 5 $short_ids) alpha 4
+	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
 
 
 
@@ -273,9 +269,9 @@ test_blame_commit_keywords()
 
 	# master:-99 keyword in work tree
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_id 1 $ids)
+	commit $(pop_idx 1 $@)
 	[1/1] /alpha
-	$(pop_id 1 $short_ids) alpha
+	$(trim_obj_id 32 $(pop_idx 1 $@)) alpha
 
 
 

@@ -997,7 +997,7 @@ test_blame_commit_keywords() {
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 
-	set -A ids "$(trim_obj_id 32 $id)"
+	set -- "$(trim_obj_id 32 $id)"
 
 	# :base requires work tree
 	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
@@ -1038,15 +1038,14 @@ test_blame_commit_keywords() {
 		fi
 
 		id=$(git_show_head "$repo")
-		set -- "$ids" "$(trim_obj_id 32 $id)"
-		ids=$*
+		set -- "$@" "$(trim_obj_id 32 $id)"
 	done
 
 	local author_time=$(git_show_author_time "$repo")
 	local d=$(date -u -r $author_time +"%G-%m-%d")
 
 	got blame -r "$repo" -c:head:-8 alpha > "$testroot/stdout"
-	echo "1) $(pop_id 1 $ids) $d $GOT_AUTHOR_8 alpha" > \
+	echo "1) $(pop_idx 1 $@) $d $GOT_AUTHOR_8 alpha" > \
 	    "$testroot/stdout.expected"
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1059,11 +1058,11 @@ test_blame_commit_keywords() {
 
 	(cd "$wt" && got blame -cmaster:-5 alpha > "$testroot/stdout")
 
-	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	echo "1) $(pop_idx 2 $@) $d $GOT_AUTHOR_8 change 1" > \
 	    "$testroot/stdout.expected"
-	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	echo "2) $(pop_idx 3 $@) $d $GOT_AUTHOR_8 change 2" >> \
 	    "$testroot/stdout.expected"
-	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	echo "3) $(pop_idx 4 $@) $d $GOT_AUTHOR_8 change 3" >> \
 	    "$testroot/stdout.expected"
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1076,13 +1075,13 @@ test_blame_commit_keywords() {
 
 	(cd "$wt" && got blame -c:head:-4 alpha > "$testroot/stdout")
 
-	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	echo "1) $(pop_idx 2 $@) $d $GOT_AUTHOR_8 change 1" > \
 	    "$testroot/stdout.expected"
-	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	echo "2) $(pop_idx 3 $@) $d $GOT_AUTHOR_8 change 2" >> \
 	    "$testroot/stdout.expected"
-	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	echo "3) $(pop_idx 4 $@) $d $GOT_AUTHOR_8 change 3" >> \
 	    "$testroot/stdout.expected"
-	echo "4) $(pop_id 5 $ids) $d $GOT_AUTHOR_8 change 4" >> \
+	echo "4) $(pop_idx 5 $@) $d $GOT_AUTHOR_8 change 4" >> \
 	    "$testroot/stdout.expected"
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1096,15 +1095,15 @@ test_blame_commit_keywords() {
 	(cd "$wt" && got up -c:head:-8 > /dev/null)
 	(cd "$wt" && got blame -c:base:+5 alpha > "$testroot/stdout")
 
-	echo "1) $(pop_id 2 $ids) $d $GOT_AUTHOR_8 change 1" > \
+	echo "1) $(pop_idx 2 $@) $d $GOT_AUTHOR_8 change 1" > \
 	    "$testroot/stdout.expected"
-	echo "2) $(pop_id 3 $ids) $d $GOT_AUTHOR_8 change 2" >> \
+	echo "2) $(pop_idx 3 $@) $d $GOT_AUTHOR_8 change 2" >> \
 	    "$testroot/stdout.expected"
-	echo "3) $(pop_id 4 $ids) $d $GOT_AUTHOR_8 change 3" >> \
+	echo "3) $(pop_idx 4 $@) $d $GOT_AUTHOR_8 change 3" >> \
 	    "$testroot/stdout.expected"
-	echo "4) $(pop_id 5 $ids) $d $GOT_AUTHOR_8 change 4" >> \
+	echo "4) $(pop_idx 5 $@) $d $GOT_AUTHOR_8 change 4" >> \
 	    "$testroot/stdout.expected"
-	echo "5) $(pop_id 6 $ids) $d $GOT_AUTHOR_8 change 5" >> \
+	echo "5) $(pop_idx 6 $@) $d $GOT_AUTHOR_8 change 5" >> \
 	    "$testroot/stdout.expected"
 
 	cmp -s $testroot/stdout.expected $testroot/stdout

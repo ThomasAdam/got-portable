@@ -382,8 +382,7 @@ test_cat_commit_keywords() {
 
 		local delta_id=$(got tree -r "$repo" -i gamma | \
 		    grep 'delta$' | cut -d' ' -f 1)
-		set -- "$delta_ids" "$delta_id"
-		delta_ids=$*
+		set -- "$@" "$delta_id"
 	done
 
 	# cat blob by path
@@ -409,7 +408,7 @@ test_cat_commit_keywords() {
 	fi
 
 	# cat tree by path
-	echo "$(pop_id 4 $delta_ids) 0100644 delta" > \
+	echo "$(pop_idx 4 $@) 0100644 delta" > \
 	    "$testroot/stdout.expected"
 	(cd "$wt" && got cat -c:base:-4 gamma > "$testroot/stdout")
 	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
