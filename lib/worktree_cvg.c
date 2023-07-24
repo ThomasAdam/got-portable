@@ -695,8 +695,11 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (got_path_cmp(parent_path, a->status_path,
 	    strlen(parent_path), a->status_path_len) != 0 &&
@@ -722,12 +725,16 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 static const struct got_error *
 status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
+	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	struct got_object_id blob_id, commit_id;
 	unsigned char status;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (!got_path_is_child(ie->path, a->status_path, a->status_path_len))
 		return NULL;
@@ -949,8 +956,11 @@ status_new(int *ignore, void *arg, struct dirent *de, const char *parent_path,
 	if (ignore != NULL)
 		*ignore = 0;
 
-	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
-		return got_error(GOT_ERR_CANCELLED);
+	if (a->cancel_cb) {
+		err = a->cancel_cb(a->cancel_arg);
+		if (err)
+			return err;
+	}
 
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
