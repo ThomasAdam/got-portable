@@ -2429,6 +2429,13 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	if (tog_base_commit.id != NULL && tog_base_commit.idx == -1 &&
 	    got_object_id_cmp(id, tog_base_commit.id) == 0)
 		tog_base_commit.idx = entry->idx;
+	if (tog_io.wait_for_ui && s->thread_args.need_commit_marker) {
+		int rc;
+
+		rc = pthread_cond_wait(&s->thread_args.log_loaded, &tog_mutex);
+		if (rc)
+			return got_error_set_errno(rc, "pthread_cond_wait");
+	}
 
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
@@ -3910,16 +3917,6 @@ show_log_view(struct tog_view *view)
 			err = trigger_log_thread(view, 1);
 			if (err)
 				return err;
-			if (tog_io.wait_for_ui) {
-				int rc;
-
-				rc = pthread_cond_wait(&s->thread_args.log_loaded,
-				    &tog_mutex);
-				if (rc)
-					return got_error_set_errno(rc,
-					    "pthread_cond_wait");
-				tog_io.wait_for_ui = 0;
-			}
 		}
 	}
 
