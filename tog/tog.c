@@ -4434,17 +4434,6 @@ done:
 static void
 init_curses(void)
 {
-	/*
-	 * Override default signal handlers before starting ncurses.
-	 * This should prevent ncurses from installing its own
-	 * broken cleanup() signal handler.
-	 */
-	signal(SIGWINCH, tog_sigwinch);
-	signal(SIGPIPE, tog_sigpipe);
-	signal(SIGCONT, tog_sigcont);
-	signal(SIGINT, tog_sigint);
-	signal(SIGTERM, tog_sigterm);
-
 	if (using_mock_io) /* In test mode we use a fake terminal */
 		return;
 
@@ -10088,6 +10077,17 @@ main(int argc, char *argv[])
 	const char *test_script_path;
 
 	setlocale(LC_CTYPE, "");
+
+	/*
+	 * Override default signal handlers before starting ncurses.
+	 * This should prevent ncurses from installing its own
+	 * broken cleanup() signal handler.
+	 */
+	signal(SIGWINCH, tog_sigwinch);
+	signal(SIGPIPE, tog_sigpipe);
+	signal(SIGCONT, tog_sigcont);
+	signal(SIGINT, tog_sigint);
+	signal(SIGTERM, tog_sigterm);
 
 	/*
 	 * Test mode init must happen before pledge() because "tty" will
