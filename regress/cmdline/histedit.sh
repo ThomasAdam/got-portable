@@ -1542,6 +1542,88 @@ test_histedit_fold_add_delete() {
 	test_done "$testroot" "$ret"
 }
 
+# if a previous commit edits a file, and it is folded into a commit
+# that deletes the same file, the file will be deleted by histedit
+test_histedit_fold_edit_delete() {
+	local testroot=`test_init histedit_fold_edit_delete`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modify alpha" > $testroot/repo/alpha
+	(cd $testroot/repo && git add alpha)
+	git_commit $testroot/repo -m "modified alpha"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	git_rm $testroot/repo alpha
+	git_commit $testroot/repo -m "deleted alpha"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "fold $old_commit1" > $testroot/histedit-script
+	echo "pick $old_commit2" >> $testroot/histedit-script
+	echo "mesg folded changes" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "G  alpha" >> $testroot/stdout.expected
+	echo "$short_old_commit1 ->  fold commit: modified alpha" \
+		>> $testroot/stdout.expected
+	echo "D  alpha" >> $testroot/stdout.expected
+	echo "$short_old_commit2 -> $short_new_commit1: folded changes" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/alpha ]; then
+		echo "removed file alpha still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l2 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
+	echo "commit $orig_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_histedit_fold_delete_add() {
 	local testroot=`test_init histedit_fold_delete_add`
 
@@ -2531,6 +2613,7 @@ run_test test_histedit_fold_last_commit_swap
 run_test test_histedit_split_commit
 run_test test_histedit_duplicate_commit_in_script
 run_test test_histedit_fold_add_delete
+run_test test_histedit_fold_edit_delete
 run_test test_histedit_fold_delete_add
 run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
