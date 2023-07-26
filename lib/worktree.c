@@ -2996,6 +2996,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 	int local_changes_subsumed;
 	FILE *f_orig = NULL, *f_deriv = NULL, *f_deriv2 = NULL;
 	char *id_str = NULL, *label_deriv2 = NULL;
+	struct got_object_id *id = NULL;
 
 	if (blob1 && blob2) {
 		ie = got_fileindex_entry_get(a->fileindex, path2,
@@ -3121,18 +3122,63 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (ie)
 				got_fileindex_entry_mark_deleted_from_disk(ie);
 			break;
-		case GOT_STATUS_ADD: {
-			struct got_object_id *id;
+		case GOT_STATUS_MODIFY: {
 			FILE *blob1_f;
 			off_t blob1_size;
+			int obj_type;
 			/*
-			 * Delete the added file only if its content already
+			 * Delete the file only if its content already
 			 * exists in the repository.
 			 */
 			err = got_object_blob_file_create(&id, &blob1_f,
 			    &blob1_size, path1);
 			if (err)
 				goto done;
+			if (fclose(blob1_f) == EOF) {
+				err = got_error_from_errno("fclose");
+				goto done;
+			}
+
+			/* Implied existence check. */
+			err = got_object_get_type(&obj_type, repo, id);
+			if (err) {
+				if (err->code != GOT_ERR_NO_OBJ)
+					goto done;
+				err = (*a->progress_cb)(a->progress_arg,
+				    GOT_STATUS_CANNOT_DELETE, path1);
+				goto done;
+			} else if (obj_type != GOT_OBJ_TYPE_BLOB) {
+				err = (*a->progress_cb)(a->progress_arg,
+				    GOT_STATUS_CANNOT_DELETE, path1);
+				goto done;
+			}
+			err = (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_DELETE, path1);
+			if (err)
+				goto done;
+			err = remove_ondisk_file(a->worktree->root_path,
+			    path1);
+			if (err)
+				goto done;
+			if (ie)
+				got_fileindex_entry_mark_deleted_from_disk(ie);
+			break;
+		}
+		case GOT_STATUS_ADD: {
+			FILE *blob1_f;
+			off_t blob1_size;
+			/*
+			 * Delete the file only if its content already
+			 * exists in the repository.
+			 */
+			err = got_object_blob_file_create(&id, &blob1_f,
+			    &blob1_size, path1);
+			if (err)
+				goto done;
+			if (fclose(blob1_f) == EOF) {
+				err = got_error_from_errno("fclose");
+				goto done;
+			}
 			if (got_object_id_cmp(id, id1) == 0) {
 				err = (*a->progress_cb)(a->progress_arg,
 				    GOT_STATUS_DELETE, path1);
@@ -3149,14 +3195,10 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				err = (*a->progress_cb)(a->progress_arg,
 				    GOT_STATUS_CANNOT_DELETE, path1);
 			}
-			if (fclose(blob1_f) == EOF && err == NULL)
-				err = got_error_from_errno("fclose");
-			free(id);
 			if (err)
 				goto done;
 			break;
 		}
-		case GOT_STATUS_MODIFY:
 		case GOT_STATUS_CONFLICT:
 			err = (*a->progress_cb)(a->progress_arg,
 			    GOT_STATUS_CANNOT_DELETE, path1);
@@ -3240,6 +3282,7 @@ done:
 	if (f_deriv2 && fclose(f_deriv2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(id_str);
+	free(id);
 	free(label_deriv2);
 	free(ondisk_path);
 	return err;
