@@ -578,38 +578,26 @@ read_fileindex_val16(uint16_t *val, struct got_hash *ctx, FILE *infile)
 static const struct got_error *
 read_fileindex_path(char **path, struct got_hash *ctx, FILE *infile)
 {
-	const struct got_error *err = NULL;
 	const size_t chunk_size = 8;
-	size_t n, len = 0, totlen = chunk_size;
-
-	*path = malloc(totlen);
-	if (*path == NULL)
-		return got_error_from_errno("malloc");
+	char p[PATH_MAX];
+	size_t n, len = 0;
 
 	do {
-		if (len + chunk_size > totlen) {
-			char *p = reallocarray(*path, totlen + chunk_size, 1);
-			if (p == NULL) {
-				err = got_error_from_errno("reallocarray");
-				break;
-			}
-			totlen += chunk_size;
-			*path = p;
-		}
-		n = fread(*path + len, 1, chunk_size, infile);
-		if (n != chunk_size) {
-			err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-			break;
-		}
-		got_hash_update(ctx, *path + len, chunk_size);
-		len += chunk_size;
-	} while (memchr(*path + len - chunk_size, '\0', chunk_size) == NULL);
+		if (len + chunk_size > sizeof(p))
+			return got_error(GOT_ERR_FILEIDX_BAD);
 
-	if (err) {
-		free(*path);
-		*path = NULL;
-	}
-	return err;
+		n = fread(&p[len], 1, chunk_size, infile);
+		if (n != chunk_size)
+			return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+
+		got_hash_update(ctx, &p[len], chunk_size);
+		len += chunk_size;
+	} while (memchr(&p[len - chunk_size], '\0', chunk_size) == NULL);
+
+	*path = strdup(p);
+	if (*path == NULL)
+		return got_error_from_errno("strdup");
+	return NULL;
 }
 
 static const struct got_error *
