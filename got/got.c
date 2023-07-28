@@ -12199,7 +12199,6 @@ histedit_save_list(struct got_histedit_list *histedit_cmds,
 	char *path = NULL;
 	FILE *f = NULL;
 	struct got_histedit_list_entry *hle;
-	struct got_commit_object *commit = NULL;
 
 	err = got_worktree_get_histedit_script_path(&path, worktree);
 	if (err)
@@ -12229,8 +12228,6 @@ done:
 	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(path);
-	if (commit)
-		got_object_commit_close(commit);
 	return err;
 }
 
