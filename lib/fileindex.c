@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
@@ -50,7 +51,7 @@
 struct got_fileindex {
 	struct got_fileindex_tree entries;
 	int nentries; /* Does not include entries marked for removal. */
-#define GOT_FILEIDX_MAX_ENTRIES INT_MAX
+#define GOT_FILEIDX_MAX_ENTRIES INT32_MAX
 };
 
 mode_t
