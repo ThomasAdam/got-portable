@@ -140,18 +140,18 @@ addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
 	dt->blocks[i].offset = offset;
 	dt->blocks[i].hash = h;
 	dt->nblocks++;
-	if (dt->nalloc < dt->nblocks + 64) {
+	if (dt->nalloc < dt->nblocks + 256) {
 		struct got_delta_block *db;
 		size_t old_size = dt->nalloc;
 		db = dt->blocks;
-		dt->blocks = calloc(dt->nalloc + 64,
+		dt->blocks = calloc(dt->nalloc + 256,
 		    sizeof(struct got_delta_block));
 		if (dt->blocks == NULL) {
 			err = got_error_from_errno("calloc");
 			dt->blocks = db;
 			return err;
 		}
-		dt->nalloc += 64;
+		dt->nalloc += 256;
 		/*
 		 * Recompute all block positions. Hash-based indices of blocks
 		 * in the array depend on the allocated length of the array.
@@ -204,18 +204,18 @@ addblk_mem(struct got_delta_table *dt, uint8_t *data, off_t file_offset0,
 	dt->blocks[i].offset = offset;
 	dt->blocks[i].hash = h;
 	dt->nblocks++;
-	if (dt->nalloc < dt->nblocks + 64) {
+	if (dt->nalloc < dt->nblocks + 256) {
 		struct got_delta_block *db;
 		size_t old_size = dt->nalloc;
 		db = dt->blocks;
-		dt->blocks = calloc(dt->nalloc + 64,
+		dt->blocks = calloc(dt->nalloc + 256,
 		    sizeof(struct got_delta_block));
 		if (dt->blocks == NULL) {
 			err = got_error_from_errno("calloc");
 			dt->blocks = db;
 			return err;
 		}
-		dt->nalloc += 64;
+		dt->nalloc += 256;
 		/*
 		 * Recompute all block positions. Hash-based indices of blocks
 		 * in the array depend on the allocated length of the array.
