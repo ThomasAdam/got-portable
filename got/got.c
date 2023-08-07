@@ -4594,6 +4594,7 @@ cmd_log(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *start_id = NULL, *end_id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
+	char *keyword_idstr = NULL;
 	const char *start_commit = NULL, *end_commit = NULL;
 	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
@@ -4760,8 +4761,6 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		got_object_commit_close(commit);
 	} else {
-		char *keyword_idstr = NULL;
-
 		error = got_keyword_to_idstr(&keyword_idstr, start_commit,
 		    repo, worktree);
 		if (error != NULL)
@@ -4771,11 +4770,17 @@ cmd_log(int argc, char *argv[])
 
 		error = got_repo_match_object_id(&start_id, NULL,
 		    start_commit, GOT_OBJ_TYPE_COMMIT, &refs, repo);
-		free(keyword_idstr);
 		if (error != NULL)
 			goto done;
 	}
 	if (end_commit != NULL) {
+		error = got_keyword_to_idstr(&keyword_idstr, end_commit,
+		    repo, worktree);
+		if (error != NULL)
+			goto done;
+		if (keyword_idstr != NULL)
+			end_commit = keyword_idstr;
+
 		error = got_repo_match_object_id(&end_id, NULL,
 		    end_commit, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		if (error != NULL)
@@ -4831,6 +4836,7 @@ done:
 	free(cwd);
 	free(start_id);
 	free(end_id);
+	free(keyword_idstr);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
