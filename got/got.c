@@ -4459,7 +4459,8 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		if (err)
 			break;
 
-		if ((show_changed_paths || (show_diffstat && !show_patch))
+		if (((show_changed_paths && !show_diffstat) ||
+		    (show_diffstat && !show_patch))
 		    && !reverse_display_order) {
 			err = get_changed_paths(&changed_paths, commit, repo,
 			    show_diffstat ? &dsa : NULL);
@@ -4525,7 +4526,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			    &qid->id);
 			if (err)
 				break;
-			if (show_changed_paths ||
+			if ((show_changed_paths && !show_diffstat) ||
 			    (show_diffstat && !show_patch)) {
 				err = get_changed_paths(&changed_paths, commit,
 				    repo, show_diffstat ? &dsa : NULL);
