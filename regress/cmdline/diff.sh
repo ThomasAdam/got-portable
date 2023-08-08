@@ -2254,14 +2254,14 @@ test_diff_commit_keywords() {
 		return 1
 	fi
 
-	echo "'-c BASE' requires work tree" > "$testroot/stderr.expected"
+	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
 
 	got diff -r "$testroot/repo" -c:base -c:head 2> $testroot/stderr
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 
 	test_done "$testroot" "$ret"

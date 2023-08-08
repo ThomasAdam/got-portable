@@ -870,9 +870,6 @@ test_log_diffstat() {
 	(cd $testroot/wt && got add new >/dev/null)
 	(cd $testroot/wt && got commit -m 'log_diffstat add file' > /dev/null)
 
-	(cd $testroot/wt && got log -d | grep -A2 '^ [MDmA]' | sed '/^--/d' > \
-	    $testroot/stdout)
-
 	cat <<EOF >$testroot/stdout.expected
  A  new  |  1+  0-
 
@@ -892,12 +889,21 @@ test_log_diffstat() {
 4 files changed, 4 insertions(+), 0 deletions(-)
 EOF
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-	fi
-	test_done "$testroot" "$ret"
+	# try different -dPp combinations
+	for flags in -d -dP -dp -dPp; do
+		(cd $testroot/wt && got log $flags | grep -A2 '^ [MDmA]' | \
+		    sed '/^--/d' > $testroot/stdout)
+
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
 }
 
 test_log_commit_keywords() {
@@ -934,7 +940,19 @@ test_log_commit_keywords() {
 		    >> $testroot/stdout.expected
 	done
 
-	got log -r "$testroot/repo" -scmaster:- -l15 > $testroot/stdout
+	got log -r "$testroot/repo" -s -cmaster:- -l15 > $testroot/stdout
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# request same set of commits now with log -x
+	got log -r "$testroot/repo" -s -cmaster:- -xmaster:-15 > \
+	    $testroot/stdout
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -962,7 +980,26 @@ test_log_commit_keywords() {
 	printf '%s %.7s adding the test tree\n' "$d" $(pop_idx 1 $@) >> \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -sc:base > $testroot/stdout)
+	(cd $testroot/wt && got log -s -c:base > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# from head to the base commit using -x
+	printf '%s %-7s commit number 16\n' "$d" "master" > \
+	    $testroot/stdout.expected
+	for i in $(seq 16 9); do
+		printf '%s %.7s commit number %s\n' \
+		    "$d" $(pop_idx $i $@) $(( i-1 )) \
+		    >> $testroot/stdout.expected
+	done
+
+	(cd $testroot/wt && got log -s -c:head -x:base > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -978,7 +1015,7 @@ test_log_commit_keywords() {
 	printf '%s %.7s commit number %s\n' "$d" $(pop_idx 16 $@) 15 >> \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -sc:base:+20 -l2 > $testroot/stdout)
+	(cd $testroot/wt && got log -s -c:base:+20 -l2 > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -992,7 +1029,7 @@ test_log_commit_keywords() {
 	printf '%s %.7s adding the test tree\n' "$d" $(pop_idx 1 $@) > \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -sc:base:-10 > $testroot/stdout)
+	(cd $testroot/wt && got log -s -c:base:-10 > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1006,7 +1043,7 @@ test_log_commit_keywords() {
 	printf '%s %.7s commit number 1\n' "$d" $(pop_idx 2 $@) > \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -scbase+:+ -l1 > $testroot/stdout)
+	(cd $testroot/wt && got log -s -cbase+:+ -l1 > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -1021,7 +1058,7 @@ test_log_commit_keywords() {
 	printf '%s %.7s commit number 1\n' "$d" $(pop_idx 2 $@) > \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -schead-1:- -l1 > $testroot/stdout)
+	(cd $testroot/wt && got log -s -chead-1:- -l1 > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -1036,7 +1073,7 @@ test_log_commit_keywords() {
 	printf '%s %.7s commit number 12\n' "$d" $(pop_idx 13 $@) > \
 	    $testroot/stdout.expected
 
-	(cd $testroot/wt && got log -scbase-1+2:-3 -l1 > $testroot/stdout)
+	(cd $testroot/wt && got log -s -cbase-1+2:-3 -l1 > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -1051,10 +1088,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -c::base:+ 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1064,10 +1101,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -c:head:-: 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1077,10 +1114,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -cmaster::+ 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1090,10 +1127,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -cmaster:1+ 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1103,10 +1140,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -c:base:-1:base:-1 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1116,10 +1153,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -cmain:-main:- 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -1129,10 +1166,10 @@ test_log_commit_keywords() {
 
 	(cd $testroot/wt && got log -c:base:*1 2> $testroot/stderr)
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "$ret"
 		return 1
 	fi
