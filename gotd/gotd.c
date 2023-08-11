@@ -373,11 +373,13 @@ disconnect_on_error(struct gotd_client *client, const struct got_error *err)
 {
 	struct imsgbuf ibuf;
 
-	log_warnx("uid %d: %s", client->euid, err->msg);
-	if (err->code != GOT_ERR_EOF && client->fd != -1) {
-		imsg_init(&ibuf, client->fd);
-		gotd_imsg_send_error(&ibuf, 0, PROC_GOTD, err);
-		imsg_clear(&ibuf);
+	if (err->code != GOT_ERR_EOF) {
+		log_warnx("uid %d: %s", client->euid, err->msg);
+		if (client->fd != -1) {
+			imsg_init(&ibuf, client->fd);
+			gotd_imsg_send_error(&ibuf, 0, PROC_GOTD, err);
+			imsg_clear(&ibuf);
+		}
 	}
 	disconnect(client);
 }
