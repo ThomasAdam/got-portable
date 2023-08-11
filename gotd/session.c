@@ -124,8 +124,8 @@ disconnect_on_error(struct gotd_session_client *client,
 {
 	struct imsgbuf ibuf;
 
-	log_warnx("uid %d: %s", client->euid, err->msg);
 	if (err->code != GOT_ERR_EOF) {
+		log_warnx("uid %d: %s", client->euid, err->msg);
 		imsg_init(&ibuf, client->fd);
 		gotd_imsg_send_error(&ibuf, 0, gotd_session.proc_id, err);
 		imsg_clear(&ibuf);
