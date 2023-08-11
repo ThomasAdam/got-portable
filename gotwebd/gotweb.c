@@ -1221,9 +1221,11 @@ done:
 	error = got_get_repo_owner(&repo_dir->owner, c);
 	if (error)
 		goto err;
-	error = got_get_repo_age(&repo_dir->age, c, NULL);
-	if (error)
-		goto err;
+	if (srv->show_repo_age) {
+		error = got_get_repo_age(&repo_dir->age, c, NULL);
+		if (error)
+			goto err;
+	}
 	error = gotweb_get_clone_url(&repo_dir->url, srv, repo_dir->path,
 	    dirfd(dt));
 err:
