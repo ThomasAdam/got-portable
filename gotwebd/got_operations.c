@@ -128,7 +128,6 @@ const struct got_error *
 got_get_repo_age(time_t *repo_age, struct request *c, const char *refname)
 {
 	const struct got_error *error = NULL;
-	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct got_repository *repo = t->repo;
 	struct got_commit_object *commit = NULL;
@@ -138,8 +137,7 @@ got_get_repo_age(time_t *repo_age, struct request *c, const char *refname)
 
 	TAILQ_INIT(&refs);
 
-	if (srv->show_repo_age == 0)
-		return NULL;
+	*repo_age = 0;
 
 	error = got_ref_list(&refs, repo, "refs/heads",
 	    got_ref_cmp_by_name, NULL);
