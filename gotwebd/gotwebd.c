@@ -19,7 +19,6 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <sys/cdefs.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
