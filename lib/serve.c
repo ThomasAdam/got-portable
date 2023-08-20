@@ -1103,7 +1103,7 @@ recv_packfile(struct imsg *imsg, int infd)
 
 		if (r == 0) {
 			/* Detect gotd(8) closing the pack pipe when done. */
-			err = got_poll_fd(packfd, POLLOUT, 1);
+			err = got_poll_fd(packfd, 0, 1);
 			if (err) {
 				if (err->code != GOT_ERR_EOF)
 					break;
