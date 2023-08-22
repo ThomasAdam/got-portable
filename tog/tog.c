@@ -6590,6 +6590,8 @@ stop_blame(struct tog_blame *blame)
 			err = pack_err;
 		blame->pack_fds = NULL;
 	}
+	free(blame->line_offsets);
+	blame->line_offsets = NULL;
 	return err;
 }
 
