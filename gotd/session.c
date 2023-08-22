@@ -80,6 +80,7 @@ static struct gotd_session_client {
 	char				*packidx_path;
 	int				 nref_updates;
 	int				 accept_flush_pkt;
+	int				 flush_disconnect;
 } gotd_session_client;
 
 void gotd_session_sighdlr(int sig, short event, void *arg);
@@ -542,7 +543,7 @@ done:
 		client->nref_updates--;
 		if (client->nref_updates == 0) {
 			send_refs_updated(client);
-			*shut = 1;
+			client->flush_disconnect = 1;
 		}
 
 	}
@@ -1052,6 +1053,11 @@ session_dispatch_client(int fd, short events, void *arg)
 				disconnect_on_error(client, err);
 				return;
 			}
+		}
+
+		if (client->flush_disconnect) {
+			disconnect(client);
+			return;
 		}
 	}
 
