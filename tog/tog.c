@@ -2502,7 +2502,7 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	while (col < avail && author_width < author_display_cols + 2) {
 		if (tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN &&
 		    author_width == marker_column &&
-		    entry->idx == tog_base_commit.idx) {
+		    entry->idx == tog_base_commit.idx && !s->limit_view) {
 			tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 			if (tc)
 				wattr_on(view->window,
