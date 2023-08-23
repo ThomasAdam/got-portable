@@ -43,11 +43,7 @@
 #include "log.h"
 
 #ifndef GITWRAPPER_GIT_LIBEXEC_DIR
-#ifdef __linux__
-#define GITWRAPPER_GIT_LIBEXEC_DIR "/usr/lib/git-core/"
-#else
 #define GITWRAPPER_GIT_LIBEXEC_DIR "/usr/local/libexec/git"
-#endif
 #endif
 
 #ifndef GITWRAPPER_MY_SERVER_PROG

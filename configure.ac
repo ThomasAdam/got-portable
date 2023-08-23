@@ -24,6 +24,24 @@ AC_CONFIG_SUBDIRS([template])
 AC_ARG_ENABLE([gotd],
 	AS_HELP_STRING([--enable gotd], [build gotd and gotsh]))
 
+# Override gotd's empty_path location.
+AC_ARG_WITH([gotd-empty-path],
+	    [AS_HELP_STRING([--with-gotd-empty-path],
+			    [gotd empty path])
+	    ],
+	    [GOTD_EMPTY_PATHC=$withval]
+	    [])
+AC_SUBST(GOTD_EMPTY_PATHC)
+
+# Override where git's libexec helpers are located for gitwrapper.
+AC_ARG_WITH([gitwrapper-git-libexec-path],
+	    [AS_HELP_STRING([--with-gitwrapper-git-libexec-path],
+			    [git libexec path for gitwrapper])
+	    ],
+	    [GITWRAPPER_LIBEXEC_PATHC=$withval]
+	    [])
+AC_SUBST(GITWRAPPER_LIBEXEC_PATHC)
+
 # When CFLAGS isn't set at this stage and gcc is detected by the macro below,
 # autoconf will automatically use CFLAGS="-O2 -g". Prevent that by using an
 # empty default.

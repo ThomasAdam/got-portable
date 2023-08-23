@@ -2,6 +2,8 @@ sbin_PROGRAMS = gotd
 
 include $(top_builddir)/Makefile.common
 
+AM_CPPFLAGS += -DGOTD_EMPTY_PATH='"@GOTD_EMPTY_PATHC@"'
+
 gotd_SOURCES = gotd.c \
 	auth.c \
 	imsg.c \
