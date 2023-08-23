@@ -116,6 +116,7 @@ static const struct got_error *start_auth_child(struct gotd_client *, int,
     struct gotd_repo *, char *, const char *, int, int);
 static void kill_proc(struct gotd_child_proc *, int);
 static void disconnect(struct gotd_client *);
+static void drop_privs(struct passwd *);
 
 __dead static void
 usage(void)
@@ -1821,6 +1822,16 @@ apply_unveil_selfexec(void)
 		fatal("unveil");
 }
 
+static void
+drop_privs(struct passwd *pw)
+{
+	/* Drop root privileges. */
+	if (setgid(pw->pw_gid) == -1)
+		fatal("setgid %d failed", pw->pw_gid);
+	if (setuid(pw->pw_uid) == -1)
+		fatal("setuid %d failed", pw->pw_uid);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1960,11 +1971,14 @@ main(int argc, char **argv)
 	setproctitle("%s", title);
 	log_procinit(title);
 
-	/* Drop root privileges. */
-	if (setgid(pw->pw_gid) == -1)
-		fatal("setgid %d failed", pw->pw_gid);
-	if (setuid(pw->pw_uid) == -1)
-		fatal("setuid %d failed", pw->pw_uid);
+	if (proc_id != PROC_GOTD && proc_id != PROC_LISTEN &&
+	    proc_id != PROC_REPO_READ && proc_id != PROC_REPO_WRITE) {
+		/* Drop root privileges. */
+		if (setgid(pw->pw_gid) == -1)
+			fatal("setgid %d failed", pw->pw_gid);
+		if (setuid(pw->pw_uid) == -1)
+			fatal("setuid %d failed", pw->pw_uid);
+	}
 
 	event_init();
 
@@ -1986,6 +2000,9 @@ main(int argc, char **argv)
 		 * sockets by revoking all filesystem access via unveil(2).
 		 */
 		apply_unveil_none();
+
+		enter_chroot(GOTD_EMPTY_PATH);
+		drop_privs(pw);
 
 		listen_main(title, fd, gotd.connection_limits,
 		    gotd.nconnection_limits);
@@ -2022,6 +2039,7 @@ main(int argc, char **argv)
 			apply_unveil_repo_readonly(repo_path, 1);
 		else
 			apply_unveil_repo_readwrite(repo_path);
+
 		session_main(title, repo_path, pack_fds, temp_fds,
 		    &gotd.request_timeout, proc_id);
 		/* NOTREACHED */
@@ -2032,6 +2050,17 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		apply_unveil_repo_readonly(repo_path, 0);
+
+		if (enter_chroot(repo_path)) {
+			log_info("change repo path %s", repo_path);
+			free(repo_path);
+			repo_path = strdup("/");
+			if (repo_path == NULL)
+				fatal("strdup");
+			log_info("repo path is now %s", repo_path);
+		}
+		drop_privs(pw);
+
 		repo_read_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		exit(0);
@@ -2044,6 +2073,15 @@ main(int argc, char **argv)
 		repo = gotd_find_repo_by_path(repo_path, &gotd);
 		if (repo == NULL)
 			fatalx("no repository for path %s", repo_path);
+
+		if (enter_chroot(repo_path)) {
+			free(repo_path);
+			repo_path = strdup("/");
+			if (repo_path == NULL)
+				fatal("strdup");
+		}
+		drop_privs(pw);
+
 		repo_write_main(title, repo_path, pack_fds, temp_fds,
 		    &repo->protected_tag_namespaces,
 		    &repo->protected_branch_namespaces,
