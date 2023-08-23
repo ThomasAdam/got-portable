@@ -3,6 +3,7 @@ bin_PROGRAMS = gitwrapper
 include $(top_builddir)/Makefile.common
 
 AM_CPPFLAGS += -I$(top_builddir)/gotd
+AM_CPPFLAGS += -DGITWRAPPER_GIT_LIBEXEC_DIR='"@GITWRAPPER_LIBEXEC_PATHC@"'
 
 CLEANFILES = parse.h
 

@@ -20,11 +20,7 @@
 #define GOTD_UNIX_SOCKET_BACKLOG 10
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
-#ifdef __linux__
-/* FIXME: Will move to --configure */
-#define GOTD_EMPTY_PATH	"/var/run/gotd"
-#else
-/* Assumes *BSD, Apple, etc... */
+#ifndef GOTD_EMPTY_PATH
 #define GOTD_EMPTY_PATH	"/var/empty"
 #endif
 
