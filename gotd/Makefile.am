@@ -48,6 +48,12 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/reference_parse.c \
 	$(top_srcdir)/lib/repository.c \
 	$(top_srcdir)/lib/sigs.c
+
+if !HOST_OPENBSD
+nodist_gotd_SOURCES = chroot-notobsd.c
+else
+nodist_gotd_SOURCES = chroot-openbsd.c
+endif
        
 gotd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = gotd.8 gotd.conf.5 *.h
@@ -59,7 +65,8 @@ LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
 LDADD += $(libuuid_LIBS) \
 	 $(zlib_LIBS) \
 	 $(libbsd_LIBS) \
-	 $(libevent_LIBS)
+	 $(libevent_LIBS) \
+	 $(libutil_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif

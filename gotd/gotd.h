@@ -20,7 +20,13 @@
 #define GOTD_UNIX_SOCKET_BACKLOG 10
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
+#ifdef __linux__
+/* FIXME: Will move to --configure */
+#define GOTD_EMPTY_PATH	"/var/run/gotd"
+#else
+/* Assumes *BSD, Apple, etc... */
 #define GOTD_EMPTY_PATH	"/var/empty"
+#endif
 
 #define GOTD_MAXCLIENTS		1024
 #define GOTD_MAX_CONN_PER_UID	4
@@ -444,6 +450,7 @@ struct gotd_imsg_auth {
 	uint32_t client_id;
 };
 
+int enter_chroot(const char *);
 int parse_config(const char *, enum gotd_procid, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
