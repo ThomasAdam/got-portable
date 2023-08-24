@@ -911,7 +911,6 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-read-patch/Makefile
 		 libexec/got-read-tag/Makefile
 		 libexec/got-send-pack/Makefile
-		 gitwrapper/Makefile
 		 got/Makefile
 		 gotadmin/Makefile
 		 gotwebd/Makefile
@@ -919,6 +918,7 @@ AC_CONFIG_FILES([Makefile
 		 Makefile.common:Makefile.common.in])
 
 if test "x$enable_gotd" = "xyes"; then
+	AC_CONFIG_FILES([gitwrapper/Makefile])
 	AC_CONFIG_FILES([gotd/Makefile])
 	AC_CONFIG_FILES([gotsh/Makefile])
 	AC_CONFIG_FILES([gotctl/Makefile])
