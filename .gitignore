@@ -28,6 +28,7 @@ config.status
 configure
 cvg/cvg
 etc/*
+gitwrapper/gitwrapper
 got/got
 gotadmin/gotadmin
 gotctl/gotctl
