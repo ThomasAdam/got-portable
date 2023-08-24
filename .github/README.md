@@ -88,6 +88,66 @@ INSTALLATION
  $ sudo make install
 ```
 
+INSTALLING AND PACKAGING GITWRAPPER
+===================================
+
+The gotd server has an optional companion tool called gitwrapper.
+
+A gotd server can be used without gitwrapper in the following cases:
+
+1) The Git client's user account has gotsh configured as its login shell.
+
+2) The Git client's user account sees gotsh installed under the names
+   git-receive-pack and git-upload-pack, and these appear in $PATH before
+   the corresponding Git binaries if Git is also installed. Setting up the
+   user's $PATH in this way can require the use of SetEnv in sshd_config.
+
+The above cases can be too restrictive. For example, users who have regular
+shell access to the system may expect to be able to serve Git repositories
+from their home directories while also accessing repositories served by gotd.
+
+Once gitwrapper has been installed correctly it provides an out-of-the box
+experience where both gotd and Git "just work".
+However, this will require coordination with the system's Git installation
+and/or distribution package because the names of two specific Git programs
+will be overlapping: git-upload-pack and git-receive-pack
+
+If the gitwrapper tool will be used then it must replace git-receive-pack
+and git-upload-pack in /usr/bin. This is usually achieved by replacing the
+regular Git binaries in /usr/bin with symlinks to gitwrapper:
+
+```
+-rwxr-xr-x 1 root root 1019928 Aug 24 00:16 /usr/bin/gitwrapper
+lrwxrwxrwx 1 root root 10 Aug 20 12:40 /usr/bin/git-receive-pack -> gitwrapper
+lrwxrwxrwx 1 root root 10 Aug 20 12:40 /usr/bin/git-upload-pack -> gitwrapper
+```
+
+The Git binaries remain available in Git's libexec directory, which is set
+when Git gets compiled. On Debian it defaults to /usr/lib/git-core.
+This same path must be given to Got's configure script at build time to
+allow gitwrapper to find Git's binaries:
+
+```
+  ./configure --with-gitwrapper-git-libexec-path=/usr/lib/git-core
+```
+
+Once gitwrapper is found in /usr/bin under the names git-receive-pack and
+git-upload-pack, any Git repositories listed in /etc/gotd.conf will be
+automatically served by gotd, and any Git repositories not listed in
+/etc/gotd.conf will be automatically served by regular Git's git-upload-pack
+and git-receive-pack. The client's login shell or $PATH no longer matter,
+and a peaceful co-existence of gotd and Git is possible.
+
+We recommend that distribution packagers take appropriate steps to package
+gitwrapper as a required dependency of gotd. It is also possible to install
+gitwrapper without installing gotd. As long as /etc/gotd.conf does not exist
+or no repositories are listed in /etc/gotd.conf there will be no visible
+change in run-time behaviour for Git users since gitwrapper will simply run
+the standard Git tools.
+In the OpenBSD ports tree both the regular git package and the gotd package
+are depending on gitwrapper, and the git package no longer installs the
+git-receive-pack and git-upload-pack programs in /usr/local/bin.
+
 BRANCHES + SUBMITTING PATCHES
 =============================
 
