@@ -929,9 +929,21 @@ AC_OUTPUT
 executables="$(eval echo ${exec_prefix}/bin)"
 helpers="$(eval echo ${libexecdir})"
 manpages="$(eval echo ${mandir})"
+gotdep="$GOTD_EMPTY_PATHC"
+gotgwlep="$GITWRAPPER_LIBEXEC_PATHC"
 
 if test -z "$enable_gotd"; then
 	enable_gotd="no"
+	gotdep="N/A"
+	gotgwlep="N/A"
+fi
+
+if test -z "$gotdep"; then
+	gotdep="N/A"
+fi
+
+if test -z "$gotgwlep"; then
+	gotgwlep="N/A"
 fi
 
 echo "
@@ -939,11 +951,13 @@ Configured got-portable with:
 
  Version:      $VERSION
 
- Prefix:       ${prefix}
- Executables:  ${executables}
- Bison:        $YACC
- CFlags:       $CFLAGS
- Gotd:         ${enable_gotd}
- Helpers:      ${helpers}
- Man pages:    ${manpages}
+ Prefix:           ${prefix}
+ Executables:      ${executables}
+ Bison:            $YACC
+ CFlags:           $CFLAGS
+ Gotd:             ${enable_gotd}
+   Empty Path:     ${gotdep}
+   Gitwrapper:     ${gotgwlep}
+ Helpers:          ${helpers}
+ Man pages:        ${manpages}
 "
