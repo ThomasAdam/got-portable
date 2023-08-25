@@ -196,6 +196,78 @@ test_add_deleted() {
 	test_done "$testroot" "$ret"
 }
 
+test_add_force_delete_commit() {
+	local testroot=`test_init add_force_delete_commit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo new > $testroot/wt/new
+
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got add new > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got add command failed unexpectedly" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && mv new new2 > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "rename the file failed unexpectedly" >&2
+		ls beta2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+
+	(cd $testroot/wt && got add new2 > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got add  command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# File 'new' was once in A status (locally added) but is now
+	# in "!" (missing) status since it was never committed.
+	# Removing it effectively reverts the local addition.
+	(cd $testroot/wt && got remove -f new > $testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got remove -f command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo 'A  new2' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "add force remove commit" \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit command failed unexpectedly" >&2
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_add_directory() {
 	local testroot=`test_init add_directory`
 
@@ -419,6 +491,7 @@ run_test test_double_add
 run_test test_add_multiple
 run_test test_add_file_in_new_subdir
 run_test test_add_deleted
+run_test test_add_force_delete_commit
 run_test test_add_directory
 run_test test_add_clashes_with_submodule
 run_test test_add_symlink
