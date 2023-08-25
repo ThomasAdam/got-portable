@@ -5765,17 +5765,16 @@ collect_commitables(void *arg, unsigned char status,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
-	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
-	if (err)
-		goto done;
 
-	if (a->diff_outfile && ct && new != NULL) {
+	if (a->diff_outfile) {
 		err = append_ct_diff(ct, &a->diff_header_shown,
 		    a->diff_outfile, a->f1, a->f2, dirfd, de_name,
 		    a->have_staged_files, a->repo, a->worktree);
 		if (err)
 			goto done;
 	}
+
+	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
 done:
 	if (ct && (err || new == NULL))
 		free_commitable(ct);
