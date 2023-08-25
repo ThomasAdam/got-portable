@@ -4593,7 +4593,10 @@ schedule_for_deletion(void *arg, unsigned char status,
 		    strlen(ondisk_path), root_len) != 0);
 	}
 
-	got_fileindex_entry_mark_deleted_from_disk(ie);
+	if (got_fileindex_entry_has_blob(ie))
+		got_fileindex_entry_mark_deleted_from_disk(ie);
+	else
+		got_fileindex_entry_remove(a->fileindex, ie);
 done:
 	free(ondisk_path);
 	if (err)
