@@ -146,6 +146,74 @@ test_checkout_dir_not_empty() {
 
 }
 
+test_checkout_into_repo() {
+	local testroot=`test_init checkout_into_repo`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/repo/wt \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "checkout succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: work tree and repository paths may not overlap: " \
+		> $testroot/stderr.expected
+	echo "$testroot/repo/wt: bad path" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_checkout_overlap_repo() {
+	local testroot=`test_init checkout_into_repo`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "checkout succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: work tree and repository paths may not overlap: " \
+		> $testroot/stderr.expected
+	echo "$testroot: bad path" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_checkout_sets_xbit() {
 	local testroot=`test_init checkout_sets_xbit 1`
 
@@ -1010,6 +1078,8 @@ test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty
+run_test test_checkout_into_repo
+run_test test_checkout_overlap_repo
 run_test test_checkout_sets_xbit
 run_test test_checkout_commit_from_wrong_branch
 run_test test_checkout_tag

@@ -3077,6 +3077,15 @@ cmd_checkout(int argc, char *argv[])
 	got_path_strip_trailing_slashes(repo_path);
 	got_path_strip_trailing_slashes(worktree_path);
 
+	if (got_path_is_child(worktree_path, repo_path, strlen(repo_path)) ||
+	    got_path_is_child(repo_path, worktree_path,
+	    strlen(worktree_path))) {
+		error = got_error_fmt(GOT_ERR_BAD_PATH,
+		    "work tree and repository paths may not overlap: %s",
+		    worktree_path);
+		goto done;
+	}
+
 	error = got_repo_pack_fds_open(&pack_fds);
 	if (error != NULL)
 		goto done;
