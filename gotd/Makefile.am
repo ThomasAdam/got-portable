@@ -52,9 +52,9 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/sigs.c
 
 if !HOST_OPENBSD
-nodist_gotd_SOURCES = chroot-notobsd.c
+gotd_SOURCES += chroot-notobsd.c
 else
-nodist_gotd_SOURCES = chroot-openbsd.c
+gotd_SOURCES += chroot-openbsd.c
 endif
        
 gotd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
