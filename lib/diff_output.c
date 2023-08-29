@@ -263,19 +263,17 @@ is_function_prototype(unsigned char ch)
 int
 diff_output_match_function_prototype(char *prototype, size_t prototype_size,
     int *last_prototype_idx, const struct diff_result *result,
-    const struct diff_chunk_context *cc, unsigned int ncontext)
+    const struct diff_chunk_context *cc)
 {
 	struct diff_atom *start_atom, *atom;
 	const struct diff_data *data;
 	unsigned char buf[DIFF_FUNCTION_CONTEXT_SIZE];
 	const char *state = NULL;
-	int rc, i, ch, idx;
-
-	idx = MIN(cc->left.start + (ncontext ? ncontext : 0), cc->left.end - 1);
+	int rc, i, ch;
 
 	if (result->left->atoms.len > 0 && cc->left.start > 0) {
 		data = result->left;
-		start_atom = &data->atoms.head[idx];
+		start_atom = &data->atoms.head[cc->left.start - 1];
 	} else
 		return DIFF_RC_OK;
 
