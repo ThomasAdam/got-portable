@@ -6,6 +6,28 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.92 (2023-08-29)
+
+* Changes from got-0.92
+
+This release also introduces 'gotd', which is got's server implementation.  By
+extension, other tools are also introduced to work with gotd, and they are:
+
+* gitwrapper
+* gotctl
+* gotsh
+
+For more information about gotd, see gotd(8), as well as the above command man
+pages where necessary.  Note that gotd's portable implementation uses chroot()
+to ensure some separation; this still requires the main gotd binary to run as
+the root user.
+
+To enable gotd and the corresponding other tools which work with it, you must
+pass the '--enable-gotd' ./configure flag.
+
+Further installation instructions can be found in the README.portable file in
+the root directory of the project.
+
 # got-portable 0.91 (2023-07-19)
 
 * Changes from got-0.91
