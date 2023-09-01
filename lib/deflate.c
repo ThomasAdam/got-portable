@@ -37,6 +37,17 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+static const struct got_error *
+wrap_deflate_error(int zerr, const char *prefix)
+{
+	if  (zerr == Z_ERRNO)
+		return got_error_from_errno(prefix);
+	if  (zerr == Z_MEM_ERROR)
+		return got_error_set_errno(ENOMEM, prefix);
+
+	return got_error(GOT_ERR_COMPRESSION);
+}
+
 const struct got_error *
 got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 {
@@ -48,15 +59,8 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	zb->z.zalloc = Z_NULL;
 	zb->z.zfree = Z_NULL;
 	zerr = deflateInit(&zb->z, Z_DEFAULT_COMPRESSION);
-	if (zerr != Z_OK) {
-		if  (zerr == Z_ERRNO)
-			return got_error_from_errno("deflateInit");
-		if  (zerr == Z_MEM_ERROR) {
-			errno = ENOMEM;
-			return got_error_from_errno("deflateInit");
-		}
-		return got_error(GOT_ERR_COMPRESSION);
-	}
+	if (zerr != Z_OK)
+		return wrap_deflate_error(zerr, "deflateInit");
 
 	zb->inlen = zb->outlen = bufsize;
 
@@ -131,7 +135,7 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, off_t len,
 		zb->flags |= GOT_DEFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_COMPRESSION);
+			return wrap_deflate_error(ret, "deflate");
 		zb->flags &= ~GOT_DEFLATE_F_HAVE_MORE;
 	}
 
@@ -175,7 +179,7 @@ deflate_read_mmap(struct got_deflate_buf *zb, uint8_t *map, size_t offset,
 		zb->flags |= GOT_DEFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_COMPRESSION);
+			return wrap_deflate_error(ret, "deflate");
 		zb->flags &= ~GOT_DEFLATE_F_HAVE_MORE;
 	}
 
@@ -210,7 +214,7 @@ got_deflate_flush(struct got_deflate_buf *zb, FILE *outfile,
 
 		ret = deflate(z, Z_FINISH);
 		if (ret != Z_STREAM_END && ret != Z_OK)
-			return got_error(GOT_ERR_COMPRESSION);
+			return wrap_deflate_error(ret, "deflate");
 
 		avail = z->total_out - last_total_out;
 		if (avail > 0) {
