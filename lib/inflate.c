@@ -39,6 +39,17 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+static const struct got_error *
+wrap_inflate_error(int zerr, const char *prefix)
+{
+	if  (zerr == Z_ERRNO)
+		return got_error_from_errno(prefix);
+	if  (zerr == Z_MEM_ERROR)
+		return got_error_set_errno(ENOMEM, prefix);
+
+	return got_error(GOT_ERR_DECOMPRESSION);
+}
+
 const struct got_error *
 got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize,
     struct got_inflate_checksum *csum)
@@ -51,15 +62,8 @@ got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize,
 	zb->z.zalloc = Z_NULL;
 	zb->z.zfree = Z_NULL;
 	zerr = inflateInit(&zb->z);
-	if (zerr != Z_OK) {
-		if  (zerr == Z_ERRNO)
-			return got_error_from_errno("inflateInit");
-		if  (zerr == Z_MEM_ERROR) {
-			errno = ENOMEM;
-			return got_error_from_errno("inflateInit");
-		}
-		return got_error(GOT_ERR_DECOMPRESSION);
-	}
+	if (zerr != Z_OK)
+		return wrap_inflate_error(zerr, "inflateInit");
 
 	zb->inlen = zb->outlen = bufsize;
 
@@ -157,7 +161,7 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_DECOMPRESSION);
+			return wrap_inflate_error(ret, "inflate");
 		zb->flags &= ~GOT_INFLATE_F_HAVE_MORE;
 	}
 
@@ -227,7 +231,7 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_DECOMPRESSION);
+			return wrap_inflate_error(ret, "inflate");
 		zb->flags &= ~GOT_INFLATE_F_HAVE_MORE;
 	}
 
@@ -288,7 +292,7 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_DECOMPRESSION);
+			return wrap_inflate_error(ret, "inflate");
 		zb->flags &= ~GOT_INFLATE_F_HAVE_MORE;
 	}
 
