@@ -907,10 +907,114 @@ got_repo_close(struct got_repository *repo)
 	return err;
 }
 
+const struct got_error *
+got_repo_remote_repo_dup(struct got_remote_repo **newp,
+    const struct got_remote_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_remote_repo *new;
+	int i;
+
+	new = calloc(1, sizeof(*new));
+	if (new == NULL)
+		return got_error_from_errno("calloc");
+	
+	if (repo->name) {
+		new->name = strdup(repo->name);
+		if (new->name == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	if (repo->fetch_url) {
+		new->fetch_url = strdup(repo->fetch_url);
+		if (new->fetch_url == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	if (repo->send_url) {
+		new->send_url = strdup(repo->send_url);
+		if (new->send_url == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	new->mirror_references = repo->mirror_references;
+
+	new->nfetch_branches = repo->nfetch_branches;
+	if (repo->fetch_branches) {
+		new->fetch_branches = calloc(repo->nfetch_branches,
+		    sizeof(char *));
+		if (new->fetch_branches == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+		for (i = 0; i < repo->nfetch_branches; i++) {
+			new->fetch_branches[i] = strdup(
+			    repo->fetch_branches[i]);
+			if (new->fetch_branches[i] == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	new->nsend_branches = repo->nsend_branches;
+	if (repo->send_branches) {
+		new->send_branches = calloc(repo->nsend_branches,
+		    sizeof(char *));
+		if (new->send_branches == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+		for (i = 0; i < repo->nsend_branches; i++) {
+			new->send_branches[i] = strdup(
+			    repo->send_branches[i]);
+			if (new->send_branches[i] == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	new->nfetch_refs = repo->nfetch_refs;
+	if (repo->fetch_refs) {
+		new->fetch_refs = calloc(repo->nfetch_refs,
+		    sizeof(char *));
+		if (new->fetch_refs == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+		for (i = 0; i < repo->nfetch_refs; i++) {
+			new->fetch_refs[i] = strdup(
+			    repo->fetch_refs[i]);
+			if (new->fetch_refs[i] == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+done:
+	if (err) {
+		got_repo_free_remote_repo_data(new);
+		free(new);
+	} else
+		*newp = new;
+
+	return err;
+}
+
 void
 got_repo_free_remote_repo_data(struct got_remote_repo *repo)
 {
 	int i;
+
+	if (repo == NULL)
+		return;
 
 	free(repo->name);
 	repo->name = NULL;
@@ -928,6 +1032,11 @@ got_repo_free_remote_repo_data(struct got_remote_repo *repo)
 	free(repo->send_branches);
 	repo->send_branches = NULL;
 	repo->nsend_branches = 0;
+	for (i = 0; i < repo->nfetch_refs; i++)
+		free(repo->fetch_refs[i]);
+	free(repo->fetch_refs);
+	repo->fetch_refs = NULL;
+	repo->nfetch_refs = 0;
 }
 
 const struct got_error *

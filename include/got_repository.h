@@ -88,6 +88,14 @@ struct got_remote_repo {
 };
 
 /*
+ * Return a deep copy of a given remote_repo. The result should be
+ * freed with got_repo_free_remote_repo_data() and then free(3).
+ * Return NULL on failure.
+ */
+const struct got_error *got_repo_remote_repo_dup(struct got_remote_repo **,
+    const struct got_remote_repo *);
+
+/*
  * Free data allocated for the specified remote repository.
  * Do not free the remote_repo pointer itself.
  */
