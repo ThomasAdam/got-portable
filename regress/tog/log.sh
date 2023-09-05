@@ -586,6 +586,146 @@ test_log_show_base_commit()
 	test_done "$testroot" "$ret"
 }
 
+test_log_limit_view()
+{
+	test_init log_limit_view 80 4
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cd "$wt"
+
+	echo "alpha0" > alpha
+	got commit -m alpha0 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "beta0" > beta
+	got commit -m beta0 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha1" > alpha
+	got commit -m alpha1 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "beta1" > beta
+	got commit -m beta1 > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+	local id=$(git_show_head "$repo")
+
+	# check base commit marker is not drawn
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	&beta
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id [1/2] master
+	$ymd flan_hacker  [master] beta1
+	$ymd flan_hacker  beta0
+
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_log_search()
+{
+	test_init log_search 80 8
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id=$(git_show_head "$repo")
+
+	set -- "$id"
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cd "$wt"
+
+	for i in $(seq 16); do
+		echo "alpha $i" > alpha
+
+		got ci -m "alpha commit $i" > /dev/null
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			echo "got commit failed unexpectedly" >&2
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		id=$(git_show_head "$repo")
+		set -- "$@" "$id"
+	done
+
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	/alpha commit 8
+	n
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $(pop_idx 9 $@) [9/17] no more matches
+	$ymd flan_hacker  alpha commit 14
+	$ymd flan_hacker  alpha commit 13
+	$ymd flan_hacker  alpha commit 12
+	$ymd flan_hacker  alpha commit 11
+	$ymd flan_hacker  alpha commit 10
+	$ymd flan_hacker  alpha commit 9
+	$ymd flan_hacker  alpha commit 8
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -596,3 +736,5 @@ run_test test_log_hsplit_tree
 run_test test_log_logmsg_widechar
 run_test test_log_commit_keywords
 run_test test_log_show_base_commit
+run_test test_log_limit_view
+run_test test_log_search

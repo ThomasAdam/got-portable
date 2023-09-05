@@ -632,6 +632,7 @@ struct tog_io {
 	FILE	*cout;
 	FILE	*f;
 	FILE	*sdump;
+	char	*input_str;
 	int	 wait_for_ui;
 } tog_io;
 static int using_mock_io;
@@ -1337,21 +1338,26 @@ view_search_start(struct tog_view *view, int fast_refresh)
 	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
 		v = view->parent;
 
-	mvwaddstr(v->window, v->nlines - 1, 0, "/");
-	wclrtoeol(v->window);
-
-	nodelay(v->window, FALSE);  /* block for search term input */
-	nocbreak();
-	echo();
-	ret = wgetnstr(v->window, pattern, sizeof(pattern));
-	wrefresh(v->window);
-	cbreak();
-	noecho();
-	nodelay(v->window, TRUE);
-	if (!fast_refresh && !using_mock_io)
-		halfdelay(10);
-	if (ret == ERR)
-		return NULL;
+	if (tog_io.input_str != NULL) {
+		if (strlcpy(pattern, tog_io.input_str, sizeof(pattern)) >=
+		    sizeof(pattern))
+			return got_error(GOT_ERR_NO_SPACE);
+	} else {
+		mvwaddstr(v->window, v->nlines - 1, 0, "/");
+		wclrtoeol(v->window);
+		nodelay(v->window, FALSE);  /* block for search term input */
+		nocbreak();
+		echo();
+		ret = wgetnstr(v->window, pattern, sizeof(pattern));
+		wrefresh(v->window);
+		cbreak();
+		noecho();
+		nodelay(v->window, TRUE);
+		if (!fast_refresh && !using_mock_io)
+			halfdelay(10);
+		if (ret == ERR)
+			return NULL;
+	}
 
 	if (regcomp(&view->regex, pattern, REG_EXTENDED | REG_NEWLINE) == 0) {
 		err = view->search_start(view);
@@ -1633,6 +1639,8 @@ tog_read_script_key(FILE *script, struct tog_view *view, int *ch, int *done)
 	const struct got_error	*err = NULL;
 	char			*line = NULL;
 	size_t			 linesz = 0;
+	ssize_t			 n;
+
 
 	if (view->count && --view->count) {
 		*ch = view->ch;
@@ -1640,7 +1648,7 @@ tog_read_script_key(FILE *script, struct tog_view *view, int *ch, int *done)
 	} else
 		*ch = -1;
 
-	if (getline(&line, &linesz, script) == -1) {
+	if ((n = getline(&line, &linesz, script)) == -1) {
 		if (feof(script)) {
 			*done = 1;
 			goto done;
@@ -1675,8 +1683,17 @@ tog_read_script_key(FILE *script, struct tog_view *view, int *ch, int *done)
 		*t = '\0';
 		/* ignore error, view->count is 0 if instruction is invalid */
 		view->count = strtonum(line, 0, INT_MAX, NULL);
-	} else
+	} else {
 		*ch = *line;
+		if (n > 2 && (*ch == '/' || *ch == '&')) {
+			/* skip leading keymap and trim trailing newline */
+			tog_io.input_str = strndup(line + 1, n - 2);
+			if (tog_io.input_str == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+		}
+	}
 
 done:
 	free(line);
@@ -1967,6 +1984,8 @@ tog_io_close(void)
 		err = got_ferror(tog_io.f, GOT_ERR_IO);
 	if (tog_io.sdump && fclose(tog_io.sdump) == EOF && err == NULL)
 		err = got_ferror(tog_io.sdump, GOT_ERR_IO);
+	if (tog_io.input_str != NULL)
+		free(tog_io.input_str);
 
 	return err;
 }
@@ -3551,19 +3570,24 @@ limit_log_view(struct tog_view *view)
 	else if (view->mode == TOG_VIEW_SPLIT_VERT && view->parent)
 		v = view->parent;
 
-	/* Get the pattern */
-	wmove(v->window, v->nlines - 1, 0);
-	wclrtoeol(v->window);
-	mvwaddstr(v->window, v->nlines - 1, 0, "&/");
-	nodelay(v->window, FALSE);
-	nocbreak();
-	echo();
-	ret = wgetnstr(v->window, pattern, sizeof(pattern));
-	cbreak();
-	noecho();
-	nodelay(v->window, TRUE);
-	if (ret == ERR)
-		return NULL;
+	if (tog_io.input_str != NULL) {
+		if (strlcpy(pattern, tog_io.input_str, sizeof(pattern)) >=
+		    sizeof(pattern))
+			return got_error(GOT_ERR_NO_SPACE);
+	} else {
+		wmove(v->window, v->nlines - 1, 0);
+		wclrtoeol(v->window);
+		mvwaddstr(v->window, v->nlines - 1, 0, "&/");
+		nodelay(v->window, FALSE);
+		nocbreak();
+		echo();
+		ret = wgetnstr(v->window, pattern, sizeof(pattern));
+		cbreak();
+		noecho();
+		nodelay(v->window, TRUE);
+		if (ret == ERR)
+			return NULL;
+	}
 
 	if (*pattern == '\0') {
 		/*
@@ -3674,19 +3698,22 @@ search_next_log_view(struct tog_view *view)
 	doupdate();
 
 	if (s->search_entry) {
-		int errcode, ch;
-		errcode = pthread_mutex_unlock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_unlock");
-		ch = wgetch(view->window);
-		errcode = pthread_mutex_lock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_lock");
-		if (ch == CTRL('g') || ch == KEY_BACKSPACE) {
-			view->search_next_done = TOG_SEARCH_HAVE_MORE;
-			return NULL;
+		if (!using_mock_io) {
+			int errcode, ch;
+
+			errcode = pthread_mutex_unlock(&tog_mutex);
+			if (errcode)
+				return got_error_set_errno(errcode,
+				    "pthread_mutex_unlock");
+			ch = wgetch(view->window);
+			errcode = pthread_mutex_lock(&tog_mutex);
+			if (errcode)
+				return got_error_set_errno(errcode,
+				    "pthread_mutex_lock");
+			if (ch == CTRL('g') || ch == KEY_BACKSPACE) {
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
+				return NULL;
+			}
 		}
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(s->search_entry, entry);
