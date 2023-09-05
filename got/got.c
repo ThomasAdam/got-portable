@@ -2287,7 +2287,8 @@ cmd_fetch(int argc, char *argv[])
 	const char *remote_name;
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
-	const struct got_remote_repo *remotes, *remote = NULL;
+	const struct got_remote_repo *remotes;
+	struct got_remote_repo *remote = NULL;
 	int nremotes;
 	char *id_str = NULL;
 	struct got_repository *repo = NULL;
@@ -2449,7 +2450,10 @@ cmd_fetch(int argc, char *argv[])
 			    worktree_conf);
 			for (i = 0; i < nremotes; i++) {
 				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
+					error = got_repo_remote_repo_dup(&remote,
+					    &remotes[i]);
+					if (error)
+						goto done;
 					break;
 				}
 			}
@@ -2462,7 +2466,10 @@ cmd_fetch(int argc, char *argv[])
 			    repo_conf);
 			for (i = 0; i < nremotes; i++) {
 				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
+					error = got_repo_remote_repo_dup(&remote,
+					    &remotes[i]);
+					if (error)
+						goto done;
 					break;
 				}
 			}
@@ -2472,7 +2479,10 @@ cmd_fetch(int argc, char *argv[])
 		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
 		for (i = 0; i < nremotes; i++) {
 			if (strcmp(remotes[i].name, remote_name) == 0) {
-				remote = &remotes[i];
+				error = got_repo_remote_repo_dup(&remote,
+				    &remotes[i]);
+				if (error)
+					goto done;
 				break;
 			}
 		}
@@ -2795,6 +2805,8 @@ done:
 	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
 	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&remote_refs);
+	got_repo_free_remote_repo_data(remote);
+	free(remote);
 	free(head_refname);
 	free(id_str);
 	free(cwd);
@@ -9692,7 +9704,8 @@ cmd_send(int argc, char *argv[])
 	const char *remote_name;
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
-	const struct got_remote_repo *remotes, *remote = NULL;
+	const struct got_remote_repo *remotes;
+	struct got_remote_repo *remote = NULL;
 	int nremotes, nbranches = 0, ndelete_branches = 0;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
@@ -9827,7 +9840,10 @@ cmd_send(int argc, char *argv[])
 			    worktree_conf);
 			for (i = 0; i < nremotes; i++) {
 				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
+					error = got_repo_remote_repo_dup(&remote,
+					    &remotes[i]);
+					if (error)
+						goto done;
 					break;
 				}
 			}
@@ -9840,7 +9856,10 @@ cmd_send(int argc, char *argv[])
 			    repo_conf);
 			for (i = 0; i < nremotes; i++) {
 				if (strcmp(remotes[i].name, remote_name) == 0) {
-					remote = &remotes[i];
+					error = got_repo_remote_repo_dup(&remote,
+					    &remotes[i]);
+					if (error)
+						goto done;
 					break;
 				}
 			}
@@ -9850,7 +9869,10 @@ cmd_send(int argc, char *argv[])
 		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
 		for (i = 0; i < nremotes; i++) {
 			if (strcmp(remotes[i].name, remote_name) == 0) {
-				remote = &remotes[i];
+				error = got_repo_remote_repo_dup(&remote,
+				    &remotes[i]);
+				if (error)
+					goto done;
 				break;
 			}
 		}
@@ -10040,6 +10062,8 @@ done:
 	}
 	if (ref)
 		got_ref_close(ref);
+	got_repo_free_remote_repo_data(remote);
+	free(remote);
 	got_pathlist_free(&branches, GOT_PATHLIST_FREE_NONE);
 	got_pathlist_free(&tags, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&all_branches);
