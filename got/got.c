@@ -2295,6 +2295,7 @@ cmd_fetch(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
 	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
+	char *head_refname = NULL;
 	struct got_pathlist_entry *pe;
 	struct got_reflist_head remote_refs;
 	struct got_reflist_entry *re;
@@ -2536,6 +2537,18 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (worktree) {
+		head_refname = strdup(got_worktree_get_head_ref_name(worktree));
+		if (head_refname == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
+
 	if (verbosity >= 0) {
 		printf("Connecting to \"%s\" %s://%s%s%s%s%s\n",
 		    remote->name, proto, host,
@@ -2586,13 +2599,9 @@ cmd_fetch(int argc, char *argv[])
 			break;
 		}
 
-		if (worktree) {
-			const char *refname;
-
-			refname = got_worktree_get_head_ref_name(worktree);
-			if (strncmp(refname, "refs/heads/", 11) == 0)
-				worktree_branch = refname;
-		}
+		if (head_refname &&
+		    strncmp(head_refname, "refs/heads/", 11) == 0)
+			worktree_branch = head_refname;
 	}
 
 	fpa.last_scaled_size[0] = '\0';
@@ -2787,6 +2796,7 @@ done:
 	got_pathlist_free(&wanted_branches, GOT_PATHLIST_FREE_NONE);
 	got_pathlist_free(&wanted_refs, GOT_PATHLIST_FREE_NONE);
 	got_ref_list_free(&remote_refs);
+	free(head_refname);
 	free(id_str);
 	free(cwd);
 	free(repo_path);
@@ -9972,6 +9982,12 @@ cmd_send(int argc, char *argv[])
 		if (error)
 			goto done;
 		nbranches++;
+	}
+
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
 	}
 
 	if (verbosity >= 0) {
