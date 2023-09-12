@@ -62,6 +62,6 @@ main(int argc, char **argv)
 		return (1);
 	puts("");
 
-	free(tp);
+	template_free(tp);
 	return (0);
 }
