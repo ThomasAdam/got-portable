@@ -74,7 +74,7 @@ static inline int rss_author(struct template *, char *);
   <head>
     <meta charset="utf-8" />
     <title>{{ srv->site_name }}</title>
-    <meta name="viewport" content="initial-scale=.75" />
+    <meta name="viewport" content="initial-scale=1.0" />
     <meta name="msapplication-TileColor" content="#da532c" />
     <meta name="theme-color" content="#ffffff"/>
     <link rel="apple-touch-icon" sizes="180x180" href="{{ prfx }}apple-touch-icon.png" />
@@ -85,42 +85,40 @@ static inline int rss_author(struct template *, char *);
     <link rel="stylesheet" type="text/css" href="{{ prfx }}{{ css }}" />
   </head>
   <body>
-    <div id="gw_body">
-      <div id="header">
-        <div id="got_link">
-          <a href="{{ srv->logo_url }}" target="_blank">
-            <img src="{{ prfx }}{{ srv->logo }}" />
+    <header id="header">
+      <div id="got_link">
+        <a href="{{ srv->logo_url }}" target="_blank">
+          <img src="{{ prfx }}{{ srv->logo }}" />
+        </a>
+      </div>
+    </header>
+    <nav id="site_path">
+      <div id="site_link">
+        <a href="?index_page={{ printf "%d", qs->index_page }}">
+          {{ srv->site_link }}
+        </a>
+        {{ if qs->path }}
+          {! u_path.path = qs->path; !}
+          {{ " / " }}
+          <a href="{{ render gotweb_render_url(tp->tp_arg, &u_path)}}">
+            {{ qs->path }}
           </a>
-        </div>
+        {{ end }}
+        {{ if qs->action != INDEX }}
+          {{ " / " }}{{ gotweb_action_name(qs->action) }}
+        {{ end }}
       </div>
-      <div id="site_path">
-        <div id="site_link">
-          <a href="?index_page={{ printf "%d", qs->index_page }}">
-            {{ srv->site_link }}
-          </a>
-          {{ if qs->path }}
-            {! u_path.path = qs->path; !}
-            {{ " / " }}
-            <a href="{{ render gotweb_render_url(tp->tp_arg, &u_path)}}">
-              {{ qs->path }}
-            </a>
-          {{ end }}
-          {{ if qs->action != INDEX }}
-            {{ " / " }}{{ gotweb_action_name(qs->action) }}
-          {{ end }}
-        </div>
-      </div>
-      <div id="content">
-        {{ render body(tp) }}
-        <div id="site_owner_wrapper">
-          <div id="site_owner">
-            {{ if srv->show_site_owner }}
-              {{ srv->site_owner }}
-            {{ end }}
-          </div>
-        </div>
-      </div>
-    </div>
+    </nav>
+    <main>
+      {{ render body(tp) }}
+    </main>
+    <footer id="site_owner_wrapper">
+      <p id="site_owner">
+        {{ if srv->show_site_owner }}
+          {{ srv->site_owner }}
+        {{ end }}
+      </p>
+    </footer>
   </body>
 </html>
 {{ end }}
@@ -145,21 +143,21 @@ static inline int rss_author(struct template *, char *);
 	struct server *srv = c->srv;
 !}
 <div id="index_header">
-  <div id="index_header_project">
+  <div class="index_project">
     Project
   </div>
   {{ if srv->show_repo_description }}
-    <div id="index_header_description">
+    <div class="index_project_description">
       Description
     </div>
   {{ end }}
   {{ if srv->show_repo_owner }}
-    <div id="index_header_owner">
+    <div class="index_project_owner">
       Owner
     </div>
   {{ end }}
   {{ if srv->show_repo_age }}
-    <div id="index_header_age">
+    <div class="index_project_age">
       Last Change
     </div>
   {{ end }}
@@ -235,7 +233,7 @@ static inline int rss_author(struct template *, char *);
       {{ " | " }}
       <a href="{{ render gotweb_render_url(tp->tp_arg, &rss) }}">rss</a>
     </div>
-    <div class="dotted_line"></div>
+    <hr />
   </div>
 </div>
 {{ end }}
@@ -265,9 +263,9 @@ static inline int rss_author(struct template *, char *);
 		.headref = qs->headref,
 	};
 !}
-<div id="briefs_title_wrapper">
-  <div id="briefs_title">Commit Briefs</div>
-</div>
+<header class='subtitle'>
+  <h2>Commit Briefs</h2>
+</header>
 <div id="briefs_content">
   {{ tailq-foreach rc &t->repo_commits entry }}
     {!
@@ -282,20 +280,25 @@ static inline int rss_author(struct template *, char *);
 	if (tmp)
 		*tmp = '\0';
     !}
-    <div class="briefs_age">
-      {{ render gotweb_render_age(tp, rc->committer_time, TM_DIFF) }}
-    </div>
-    <div class="briefs_author">
-      {{ rc->committer }}
-    </div>
-    <div class="briefs_log">
-      <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
-        {{ rc->commit_msg }}
-      </a>
-      {{ if rc->refs_str }}
-        {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
-      {{ end }}
-      </a>
+    <div class='brief'>
+      <p class='brief_meta'>
+        <span class='briefs_age'>
+          {{ render gotweb_render_age(tp, rc->committer_time, TM_DIFF) }}
+        </span>
+        {{" "}}
+        <span class="briefs_author">
+          {{ rc->committer }}
+        </span>
+      </p>
+      <p class="briefs_log">
+        <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
+          {{ rc->commit_msg }}
+        </a>
+        {{ if rc->refs_str }}
+          {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
+        {{ end }}
+        </a>
+      </p>
     </div>
     <div class="navs_wrapper">
       <div class="navs">
@@ -304,7 +307,7 @@ static inline int rss_author(struct template *, char *);
 	<a href="{{ render gotweb_render_url(tp->tp_arg, &tree_url) }}">tree</a>
       </div>
     </div>
-    <div class="dotted_line"></div>
+    <hr />
   {{ end }}
   {{ render gotweb_render_more(tp, BRIEFS) }}
 </div>
@@ -389,9 +392,9 @@ static inline int rss_author(struct template *, char *);
 		.path = repo_dir->name,
 	};
 !}
-<div class="commits_title_wrapper">
-  <div class="commits_title">Commits</div>
-</div>
+<header class="subtitle">
+  <h2>Commits</h2>
+</header>
 <div class="commits_content">
   {{ tailq-foreach rc &t->repo_commits entry }}
     {!
@@ -399,22 +402,22 @@ static inline int rss_author(struct template *, char *);
 	tree.commit = rc->commit_id;
     !}
     <div class="commits_header_wrapper">
-      <div class="commits_header">
-        <div class="header_commit_title">Commit:</div>
-        <div class="header_commit">{{ rc->commit_id }}</div>
-        <div class="header_author_title">From:</div>
-        <div class="header_author">{{ rc->author }}</div>
+      <dl class="commits_header">
+        <dt>Commit:</dt>
+        <dd><code class="commit-id">{{ rc->commit_id }}</code></dd>
+        <dt>From:</dt>
+        <dd>{{ rc->author }}</dd>
 	{{ if strcmp(rc->committer, rc->author) != 0 }}
-          <div class="header_author_title">Via:</div>
-          <div class="header_author">{{ rc->committer }}</div>
+          <dt>Via:</dt>
+          <dd>{{ rc->committer }}</dd>
 	{{ end }}
-        <div class="header_age_title">Date:</div>
-        <div class="header_age">
+        <dt>Date:</dt>
+        <dd>
           {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-        </div>
-      </div>
+        </dd>
+      </dl>
     </div>
-    <div class="dotted_line"></div>
+    <hr />
     <div class="commit">
       {{ "\n" }}
       {{ rc->commit_msg }}
@@ -426,7 +429,7 @@ static inline int rss_author(struct template *, char *);
         <a href="{{ render gotweb_render_url(c, &tree) }}">tree</a>
       </div>
     </div>
-    <div class="dotted_line"></div>
+    <hr />
   {{ end }}
   {{ render gotweb_render_more(tp, COMMITS) }}
 </div>
@@ -439,21 +442,21 @@ static inline int rss_author(struct template *, char *);
 	struct got_blob_object	*blob = t->blob;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 !}
-<div id="blob_title_wrapper">
-  <div id="blob_title">Blob</div>
-</div>
+<header class="subtitle">
+  <h2>Blob</h2>
+</header>
 <div id="blob_content">
   <div id="blob_header_wrapper">
-    <div id="blob_header">
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
+    <dl id="blob_header">
+      <dt>Date:</dt>
+      <dd>
         {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-      </div>
-      <div id="header_commit_msg_title">Message:</div>
-      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
-    </div>
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+    </dl>
   </div>
-  <div class="dotted_line"></div>
+  <hr />
   <div id="blob">
     <pre>
       {{ render got_output_blob_by_lines(tp, blob, gotweb_render_blob_line) }}
@@ -473,10 +476,8 @@ static inline int rss_author(struct template *, char *);
 		return -1;
 !}
 <div class="blob_line" id="line{{ lineno }}">
-  <div class="blob_number">
-    <a href="#line{{ lineno }}">{{ lineno }}</a>
-  </div>
-  <div class="blob_code">{{ line }}</div>
+  <a href="#line{{ lineno }}">{{ lineno }}</a>
+  <span class="blob_code">{{ line }}</span>
 </div>
 {{ end }}
 
@@ -486,26 +487,26 @@ static inline int rss_author(struct template *, char *);
 	struct transport	*t = c->t;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 !}
-<div id="tree_title_wrapper">
-  <div id="tree_title">Tree</div>
-</div>
+<header class='subtitle'>
+  <h2>Tree</h2>
+</header>
 <div id="tree_content">
   <div id="tree_header_wrapper">
-    <div id="tree_header">
-      <div id="header_tree_title">Tree:</div>
-      <div id="header_tree">{{ rc->tree_id }}</div>
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
+    <dl id="tree_header">
+      <dt>Tree:</dt>
+      <dd><code class="commit-id">{{ rc->tree_id }}</code></dd>
+      <dt>Date:</dt>
+      <dd>
         {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-      </div>
-      <div id="header_commit_msg_title">Message:</div>
-      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
-    </div>
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rc->commit_msg }}</d>
+    </dl>
   </div>
-  <div class="dotted_line"></div>
-  <div id="tree">
+  <hr />
+  <table id="tree">
     {{ render got_output_repo_tree(c, gotweb_render_tree_item) }}
-  </div>
+  </table>
 </div>
 {{ end }}
 
@@ -553,21 +554,20 @@ static inline int rss_author(struct template *, char *);
 	else if (mode & S_IXUSR)
 		modestr = "*";
 !}
-<div class="tree_wrapper">
+<tr class="tree_wrapper">
   {{ if S_ISDIR(mode) }}
-    <div class="tree_line">
+    <td class="tree_line" colspan=2>
       <a href="{{ render gotweb_render_url(c, &url) }}">
         {{ name }}{{ modestr }}
       </a>
-    </div>
-    <div class="tree_line_blank">&nbsp;</div>
+    </td>
   {{ else }}
-    <div class="tree_line">
+    <td class="tree_line">
       <a href="{{ render gotweb_render_url(c, &url) }}">
         {{ name }}{{ modestr }}
       </a>
-    </div>
-    <div class="tree_line_blank">
+    </td>
+    <td class="tree_line_blank">
       {! url.action = COMMITS; !}
       <a href="{{ render gotweb_render_url(c, &url) }}">
         commits
@@ -577,9 +577,9 @@ static inline int rss_author(struct template *, char *);
       <a href="{{ render gotweb_render_url(c, &url) }}">
         blame
       </a>
-    </div>
+    </td>
   {{ end }}
-</div>
+</tr>
 {{ finally }}
 {!
 	free(dir);
@@ -596,9 +596,9 @@ static inline int rss_author(struct template *, char *);
 
 	commit_found = qs->commit == NULL;
 !}
-<div id="tags_title_wrapper">
-  <div id="tags_title">Tags</div>
-</div>
+<header class='subtitle'>
+  <h2>Tags</h2>
+</header>
 <div id="tags_content">
   {{ if t->tag_count == 0 }}
     <div id="err_content">
@@ -647,7 +647,7 @@ static inline int rss_author(struct template *, char *);
 <div class="tag_age">
   {{ render gotweb_render_age(tp, rt->tagger_time, TM_DIFF) }}
 </div>
-<div class="tag">{{ tag_name }}</div>
+<div class="tag_name">{{ tag_name }}</div>
 <div class="tag_log">
   <a href="{{ render gotweb_render_url(c, &url) }}">
     {{ msg }}
@@ -664,7 +664,7 @@ static inline int rss_author(struct template *, char *);
     <a href="{{ render gotweb_render_url(c, &url) }}">commits</a>
   </div>
 </div>
-<div class="dotted_line"></div>
+<hr />
 {{ end }}
 
 {{ define gotweb_render_tag(struct template *tp) }}
@@ -680,32 +680,31 @@ static inline int rss_author(struct template *, char *);
 	if (strncmp(tag_name, "refs/", 5) == 0)
 		tag_name += 5;
 !}
-<div id="tags_title_wrapper">
-  <div id="tags_title">Tag</div>
-</div>
+<header class="subtitle">
+  <h2>Tag</h2>
+</header>
 <div id="tags_content">
   <div id="tag_header_wrapper">
-    <div id="tag_header">
-      <div class="header_commit_title">Commit:</div>
-      <div class="header_commit">
-        {{ rt->commit_id }}
+    <dl id="tag_header">
+      <dt>Commit:</dt>
+      <dd>
+        <code class="commit-id">{{ rt->commit_id }}</code>
         {{ " " }}
         <span class="refs_str">({{ tag_name }})</span>
-      </div>
-      <div class="header_author_title">Tagger:</div>
-      <div class="header_author">{{ rt->tagger }}</div>
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
+      </dd>
+      <dt>Tagger:</dt>
+      <dd>{{ rt->tagger }}</dd>
+      <dt>Date:</dt>
+      <dd>
         {{ render gotweb_render_age(tp, rt->tagger_time, TM_LONG)}}
-      </div>
-      <div id="header_commit_msg_title">Message:</div>
-      <div id="header_commit_msg">{{ rt->commit_msg }}</div>
-    </div>
-    <div class="dotted_line"></div>
-    <div id="tag_commit">
-      {{ "\n" }}
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rt->commit_msg }}</dd>
+    </dl>
+    <hr />
+    <pre id="tag_commit">
       {{ rt->tag_commit }}
-    </div>
+    </pre>
   </div>
 </div>
 {{ end }}
@@ -720,35 +719,34 @@ static inline int rss_author(struct template *, char *);
 	size_t			 linesize = 0;
 	ssize_t			 linelen;
 !}
-<div id="diff_title_wrapper">
-  <div id="diff_title">Commit Diff</div>
-</div>
+<header class="subtitle">
+  <h2>Commit Diff</h2>
+</header>
 <div id="diff_content">
   <div id="diff_header_wrapper">
-    <div id="diff_header">
-      <div class="header_commit_title">Commit:</div>
-      <div class="header_commit">{{ rc->commit_id }}</div>
-      <div class="header_author_title">From:</div>
-      <div class="header_author">{{ rc->author }}</div>
+    <dl id="diff_header">
+      <dt>Commit:</dt>
+      <dd><code class="commit-id">{{ rc->commit_id }}</code></dd>
+      <dt>From:</dt>
+      <dd>{{ rc->author }}</dd>
       {{ if strcmp(rc->committer, rc->author) != 0 }}
-        <div class="header_author_title">Via:</div>
-        <div class="header_author">{{ rc->committer }}</div>
+        <dt>Via:</dt>
+        <dd>{{ rc->committer }}</dd>
       {{ end }}
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
+      <dt>Date:</dt>
+      <dd>
         {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-      </div>
-      <div id="header_commit_msg_title">Message:</div>
-      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
-    </div>
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+    </dl>
   </div>
-  <div class="dotted_line"></div>
-  <div id="diff">
-    {{ "\n" }}
+  <hr />
+  <pre id="diff">
     {{ while (linelen = getline(&line, &linesize, fp)) != -1 }}
       {{ render diff_line(tp, line) }}
     {{ end }}
-  </div>
+  </pre>
 </div>
 {{ finally }}
 {! free(line); !}
@@ -781,7 +779,7 @@ static inline int rss_author(struct template *, char *);
 	if (nl)
 		*nl = '\0';
 !}
-<div class="diff_line {{ color }}">{{ line }}</div>
+<span class="diff_line {{ color }}">{{ line }}</span>{{"\n"}}
 {{ end }}
 
 {{ define gotweb_render_branches(struct template *tp,
@@ -789,9 +787,9 @@ static inline int rss_author(struct template *, char *);
 {!
 	struct got_reflist_entry	*re;
 !}
-<div id="branches_title_wrapper">
-  <div id="branches_title">Branches</div>
-</div>
+<header class='subtitle'>
+  <h2>Branches</h2>
+</header>
 <div id="branches_content">
   {{ tailq-foreach re refs entry }}
     {{ if !got_ref_is_symbolic(re->ref) }}
@@ -828,11 +826,10 @@ static inline int rss_author(struct template *, char *);
 
 	url.headref = refname;
 !}
-<div class="branches_wrapper">
+<section class="branches_wrapper">
   <div class="branches_age">
     {{ render gotweb_render_age(tp, age, TM_DIFF) }}
   </div>
-  <div class="branches_space">&nbsp;</div>
   <div class="branch">
     <a href="{{ render gotweb_render_url(c, &url) }}">{{ refname }}</a>
   </div>
@@ -847,8 +844,8 @@ static inline int rss_author(struct template *, char *);
       <a href="{{ render gotweb_render_url(c, &url) }}">commits</a>
     </div>
   </div>
-  <div class="dotted_line"></div>
-</div>
+  <hr />
+</section>
 {{ end }}
 
 {{ define gotweb_render_summary(struct template *tp) }}
@@ -858,26 +855,26 @@ static inline int rss_author(struct template *, char *);
 	struct transport	*t = c->t;
 	struct got_reflist_head	*refs = &t->refs;
 !}
-<div id="summary_wrapper">
+<dl id="summary_wrapper">
   {{ if srv->show_repo_description }}
-    <div id="description_title">Description:</div>
-    <div id="description">{{ t->repo_dir->description }}</div>
+    <dt>Description:</dt>
+    <dd>{{ t->repo_dir->description }}</dd>
   {{ end }}
   {{ if srv->show_repo_owner }}
-    <div id="repo_owner_title">Owner:</div>
-    <div id="repo_owner">{{ t->repo_dir->owner }}</div>
+    <dt>Owner:</dt>
+    <dd>{{ t->repo_dir->owner }}</dd>
   {{ end }}
   {{ if srv->show_repo_age }}
-    <div id="last_change_title">Last Change:</div>
-    <div id="last_change">
+    <dt>Last Change:</dt>
+    <dd>
       {{ render gotweb_render_age(tp, t->repo_dir->age, TM_DIFF) }}
-    </div>
+    </dd>
   {{ end }}
   {{ if srv->show_repo_cloneurl }}
-    <div id="cloneurl_title">Clone URL:</div>
-    <div id="cloneurl">{{ t->repo_dir->url }}</div>
+    <dt>Clone URL:</dt>
+    <dd><pre class="clone-url">{{ t->repo_dir->url }}</pre></dd>
   {{ end }}
-</div>
+</dl>
 {{ render gotweb_render_briefs(tp) }}
 {{ render gotweb_render_tags(tp) }}
 {{ render gotweb_render_branches(tp, refs) }}
@@ -890,23 +887,22 @@ static inline int rss_author(struct template *, char *);
 	struct transport	*t = c->t;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 !}
-<div id="blame_title_wrapper">
-  <div id="blame_title">Blame</div>
-</div>
+<header class="subtitle">
+  <h2>Blame</h2>
+</header>
 <div id="blame_content">
   <div id="blame_header_wrapper">
-    <div id="blame_header">
-      <div class="header_age_title">Date:</div>
-      <div class="header_age">
+    <dl id="blame_header">
+      <dt>Date:</dt>
+      <dd>
         {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
-      </div>
-      <div id="header_commit_msg_title">Message:</div>
-      <div id="header_commit_msg">{{ rc->commit_msg }}</div>
-    </div>
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+    </dl>
   </div>
-  <div class="dotted_line"></div>
-  <div id="blame">
-    {{ "\n" }}
+  <hr />
+  <pre id="blame">
     {!
 	err = got_output_file_blame(c, &blame_line);
 	if (err && err->code != GOT_ERR_CANCELLED)
@@ -915,7 +911,7 @@ static inline int rss_author(struct template *, char *);
 	if (err)
 		return (-1);
     !}
-  </div>
+  </pre>
 </div>
 {{ end }}
 

@@ -15,7 +15,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* general sections */
+*, *::after, *::before {
+	box-sizing: border-box;
+}
 
 a {
 	color: #444444;
@@ -30,7 +32,13 @@ body {
 	color: #000000;
 	margin: 0;
 	padding: 0;
-	font-family: Arial, sans-serif;
+	font-family: sans-serif;
+	font-size: 16px;
+}
+
+pre {
+	font-family: monospace;
+	margin: 0;
 }
 
 .diff_minus, .diff_submodule {
@@ -50,45 +58,34 @@ body {
 	color: blue;
 }
 
-#logo {
-	height: 50px;
-}
 .refs_str {
 	background-color: #243647;
 	color: #ffffff;
 	font-style: italic;
+	white-space: pre;
 }
-.dotted_line {
-	clear: left;
-	float: left;
-	width: 100%;
+hr {
+	margin: 0;
+	height: 0;
 	border-top: 1px dotted #444444;
 }
 #header {
-	overflow: auto;
-	width: 100%;
 	background-image: linear-gradient(to right, White, LightSlateGray);
 }
 #header a {
 	color: #ffffff;
-	font-size: 1.2em;
 	text-decoration: none;
 }
 #header a:hover {
 	color: Gold;
-	font-size: 1.2em;
 	text-decoration: none;
 }
 #site_path {
-	clear: left;
-	float: left;
 	overflow: auto;
 	width: 100%;
 	background-color: #243647;
 }
 #site_link {
-	float: left;
-	width: 40%;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -100,18 +97,10 @@ body {
 	text-decoration: none;
 }
 #got_link {
-	float: left;
 	padding-bottom: 10px;
 	padding-top: 10px;
 }
-#content {
-	width: 100%;
-	float: left;
-	clear: both;
-}
 #np_wrapper {
-	clear: left;
-	float: left;
 	width: 100%;
 	border-bottom: 1px dotted #444444;
 	background-color: #f5fcfb;
@@ -122,7 +111,6 @@ body {
 	text-align: center;
 }
 #nav_prev {
-	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -136,8 +124,6 @@ body {
 	overflow: hidden;
 }
 .navs_wrapper {
-	clear: left;
-	float: left;
 	width: 100%;
 	background-color: #ced7e0;
 }
@@ -145,11 +131,13 @@ body {
 	padding-left: 10px;
 	padding-top: 2px;
 	padding-bottom: 2px;
-	font-size: .8em;
+}
+@media (min-width: 680px) {
+	.navs {
+		font-size: .8em;
+	}
 }
 #site_owner_wrapper {
-	clear: left;
-	float: left;
 	width: 100%;
 	background-color: LightSlateGray;
 	color: #ffffff;
@@ -158,215 +146,86 @@ body {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-}
-#description_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#description {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#repo_owner_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#repo_owner {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#last_change_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#last_change {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#cloneurl_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#cloneurl {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	overflow: auto;
-	white-space: pre-wrap;
-}
-
-.header_commit_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-.header_commit {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-.header_author_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-.header_author {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-.header_age_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-.header_age {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_commit_msg_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_commit_msg {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
-	white-space: pre-wrap;
-}
-#header_tree_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#header_tree {
-	float: left;
-	width: 72%;
-	padding-top: 2px;
-	padding-bottom: 2px;
+	margin: 0;
 }
 
 #err_content {
-	clear: left;
-	float: left;
 	padding-left: 20px;
 	padding-top: 20px;
 	padding-bottom: 20px;
 }
 
-#briefs_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
+header.subtitle {
 	background-color: LightSlateGray;
+}
+header.subtitle h2 {
+	margin: 0;
+	padding: 5px 10px;
+	font-size: 1rem;
+	font-weight: normal;
 	color: #ffffff;
 }
-#briefs_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
+
+.brief {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	flex-wrap: wrap;
 }
-#briefs_content {
-	clear: left;
-	float: left;
-	width: 100%;
+.brief p {
+	margin: 0;
 }
+.brief_meta {
+	flex-grow: 0;
+	flex-shrink: 0;
+}
+.briefs_age, .briefs_author { display: inline-block; }
 .briefs_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-	float: left;
-	width: 7.5em;
-	overflow: auto;
+	width: 140px;
 }
 .briefs_author {
-	float: left;
 	padding-top: 5px;
 	padding-bottom: 5px;
 	width: 8.5em;
 	font-style: italic;
-	overflow: auto;
 }
 .briefs_log {
-	float: left;
 	padding-left: 10px;
 	padding-right: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-	width: 65%;
+	width: 100%;
 }
 
-#tags_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-	background-color: LightSlateGray;
-	color: #ffffff;
+@media (min-width: 680px) {
+	.brief {
+		flex-wrap: nowrap;
+	}
+	.briefs_log {
+		width: auto;
+	}
 }
-#tags_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#tags_content {
-	clear: left;
-	float: left;
-	width: 100%;
+
+.tag_age, .tag_name, .tag_log {
+	display: inline-block;
+	vertical-align: middle;
 }
 .tag_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-	float: left;
-	width: 7.5em;
-	overflow: auto;
+	width: 140px;
+}
+.tag_name {
+	width: 8.5em;
+	font-style: italic;
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 .tag_log {
-	float: left;
 	padding-left: 10px;
 	padding-right: 10px;
 	padding-top: 5px;
@@ -375,88 +234,42 @@ body {
 }
 
 #tag_header_wrapper {
-	clear: left;
-	float: left;
 	background-color: #f5fcfb;
-	width: 100%;
 }
 #tag_header {
-	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
 	width: 80%;
 }
-.tag {
-	float: left;
-	width: 8.5em;
-	font-style: italic;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
 #tag_commit {
-	clear: left;
-	float: left;
+	padding-top: 20px;
 	padding-left: 20px;
 	padding-bottom: 20px;
-	white-space: pre-wrap;
+	overflow: auto;
 }
 
 #index_header {
-	clear: left;
-	float: left;
-	overflow: auto;
-	width: 100%;
 	background-color: Khaki;
 }
-#index_header_project {
-	clear: left;
-	float: left;
-	width: 20%;
-	padding: 10px;
-}
-#index_header_description {
-	float: left;
-	width: 30%;
-	padding: 10px;
-}
-#index_header_owner {
-	float: left;
-	width: 12%;
-	padding: 10px;
-}
-#index_header_age {
+.index_project, .index_project_description, .index_project_owner,
+.index_project_age {
+	display: inline-block;
 	padding: 10px;
 	overflow: hidden;
-}
-.index_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
+	vertical-align: middle;
 }
 .index_project {
-	float: left;
 	width: 20%;
-	padding: 10px;
-	overflow: hidden;
 }
 .index_project_description {
-	float: left;
 	width: 30%;
-	padding: 10px;
-	overflow: auto;
 }
 .index_project_owner {
-	float: left;
-	width: 12%;
-	padding: 10px;
-	overflow: hidden;
+	width: 25%;
 }
 .index_project_age {
-	float: left;
-	width: 14%;
-	padding: 10px;
-	overflow: visible;
+	width: 25%;
 }
 .index_project a {
 	color: #444444;
@@ -483,261 +296,163 @@ body {
 	text-decoration: none;
 }
 
-.commits_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-	background-color: LightSlateGray;
-	color: #ffffff;
-}
-.commits_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
 .commits_content {
-	clear: left;
-	float: left;
 	width: 100%;
 }
 .commits_header_wrapper {
-	float: left;
 	background-color: #f5fcfb;
-	width: 100%;
 }
 .commits_header {
-	float: left;
 	padding-top: 5px;
 	padding-bottom: 2px;
 	width: 80%;
 }
 .commit {
-	clear: left;
-	float: left;
 	padding-left: 20px;
 	padding-bottom: 20px;
 	white-space: pre-wrap;
 }
 
-#blame_title_wrapper, #blob_title_wrapper {
-	background-color: LightSlateGray;
-	color: #ffffff;
-}
-#blame_title, #blob_title_wrapper {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#blame_content, #blob_content {
-	clear: left;
-	float: left;
-	width: 100%;
-}
 #blame_header_wrapper, #blob_header_wrapper {
-	float: left;
 	background-color: #f5fcfb;
-	width: 100%;
 }
 #blame_header, #blob_header {
-	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 80%;
 }
 #blame, #blob {
-	clear: left;
-	float: left;
+	margin-top: 20px;
 	margin-left: 20px;
 	margin-bottom: 20px;
-	font-family: monospace;
-	white-space: pre;
 	overflow: auto;
 }
-.blame_wrapper, .blob_line {
-	clear: left;
-	float: left;
-	width: 100%;
+.blob_line > a {
+	display: inline-block;
+	text-align: right;
+	width: 60px;
+	padding-right: 20px;
+}
+.blob_code {
+	/* fixes the width of the first tab */
+	display: inline-block;
+}
+.blame_number, .blame_hash, .blame_date, .blame_author, .blame_code {
+	display: inline-block;
+	vertical-align: middle;
 }
 .blame_wrapper:target, .blob_line:target {
 	background-color: Khaki;
 }
 .blame_number, .blob_number {
-	float: left;
 	width: 6em;
 	overflow: hidden;
 }
 .blame_hash {
-	float: left;
 	width: 6em;
 	overflow: auto;
 }
 .blame_date {
-	float: left;
 	width: 7em;
 	overflow: auto;
 }
 .blame_author {
-	float: left;
 	width: 6em;
 	overflow: hidden;
 }
-.blame_code, .blob_code {
-	float:left;
-	width: 50%;
-	overflow: visible;
-}
 
-#tree_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-	background-color: LightSlateGray;
-	color: #ffffff;
-}
-#tree_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#tree_content {
-	clear: left;
-	float: left;
-	width: 100%;
-}
-#tree_header_wrapper {
-	clear: left;
-	float: left;
-	background-color: #f5fcfb;
-	width: 100%;
-}
 #tree_header {
-	float: left;
+	background-color: #f5fcfb;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 80%;
 }
 #tree {
-	clear: left;
-	float: left;
 	margin-left: 20px;
 	margin-top: 20px;
 	margin-bottom: 20px;
-	font-family: monospace;
+	border-collapse: collapse;
 }
 .tree_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
 	background-color: #d8f3ef;
 }
 .tree_wrapper:nth-child(even) {
 	background-color: #ffffff;
 }
 .tree_line {
-	clear: left;
-	float: left;
+	font-family: monospace;
 	width: 20em;
-	padding: 1px;
+	padding: 5px;
 }
 .tree_line_blank {
-	float: left;
 	padding: 1px;
 	width: 9.5em;
 }
 
-#diff_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-	background-color: LightSlateGray;
-	color: #ffffff;
-}
-#diff_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#diff_content {
-	clear: left;
-	float: left;
-	width: 100%;
-}
 #diff_header_wrapper {
-	float: left;
 	background-color: #f5fcfb;
-	width: 100%;
 }
 #diff_header {
-	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 80%;
 }
 #diff {
-	clear: left;
-	float: left;
+	margin-top: 20px;
 	margin-left: 20px;
 	margin-bottom: 20px;
-	font-family: monospace;
-	white-space: pre;
-}
-.diff_line {
-	clear: left;
-	float: left;
+	overflow: auto;
 }
 
 #summary_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
 	background-color: Khaki;
 }
 
-#branches_title_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-	background-color: LightSlateGray;
-	color: #ffffff;
+dl {
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-wrap: wrap;
 }
-#branches_title {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
+dt {
+	padding: 3px 7px;
+	width: 120px;
 }
-#branches_content {
-	clear: left;
-	float: left;
-	width: 100%;
+dd {
+	padding: 3px 7px;
+	margin-left: auto;
+	width: calc(100% - 130px);
+	flex-grow: 2;
 }
 
-.branches_wrapper {
-	clear: left;
-	float: left;
+.clone-url {
+	white-space: pre-wrap;
+}
+
+.commit-msg {
+	white-space: pre-wrap;
+}
+
+.commit-id {
 	width: 100%;
+	display: inline-block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.branches_age, .branches_space, .branch {
+	display: inline-block;
+	vertical-align: middle;
 }
 .branches_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-	float: left;
-	width: 7.5em;
-	overflow: auto;
-}
-.branches_space {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	float: left;
-	width: 8.5em;
-	overflow: auto;
+	width: calc(140px + 8.5em);
 }
 .branch {
-	float: left;
 	padding-right: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
+	padding-left: 10px;
 }
