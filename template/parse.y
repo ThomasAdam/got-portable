@@ -89,7 +89,7 @@ typedef struct {
 %token	DEFINE ELSE END ERROR FINALLY FOR IF INCLUDE PRINTF
 %token	RENDER TQFOREACH UNSAFE URLESCAPE WHILE
 %token	<v.string>	STRING
-%type	<v.string>	string
+%type	<v.string>	string nstring
 %type	<v.string>	stringy
 
 %%
@@ -137,7 +137,7 @@ verbatims	: /* empty */
 		| verbatims verbatim
 		;
 
-raw		: STRING {
+raw		: nstring {
 			dbg();
 			fprintf(fp, "if ((tp_ret = tp->tp_puts(tp, ");
 			printq($1);
@@ -288,6 +288,15 @@ finally		: '{' FINALLY '}' {
 			dbg();
 			fputs("err:\n", fp);
 		} verbatims
+		;
+
+nstring	:	STRING nstring {
+			if (asprintf(&$$, "%s%s", $1, $2) == -1)
+				err(1, "asprintf");
+			free($1);
+			free($2);
+		}
+		| STRING
 		;
 
 string		: STRING string {
