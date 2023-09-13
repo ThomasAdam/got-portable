@@ -21,26 +21,14 @@
 #include "tmpl.h"
 
 int	 base(struct template *, const char *title);
-int	 my_putc(struct template *, int);
-int	 my_puts(struct template *, const char *);
+int	 my_write(void *, const void *, size_t);
 
 int
-my_putc(struct template *tp, int c)
+my_write(void *arg, const void *s, size_t len)
 {
-	FILE	*fp = tp->tp_arg;
+	FILE	*fp = arg;
 
-	if (putc(c, fp) < 0)
-		return (-1);
-
-	return (0);
-}
-
-int
-my_puts(struct template *tp, const char *s)
-{
-	FILE	*fp = tp->tp_arg;
-
-	if (fputs(s, fp) < 0)
+	if (fwrite(s, 1, len, fp) < 0)
 		return (-1);
 
 	return (0);
@@ -49,16 +37,20 @@ my_puts(struct template *tp, const char *s)
 int
 main(int argc, char **argv)
 {
-	struct template *tp;
+	struct template	*tp;
+	char		 buf[3];
+	/* use a ridiculously small buffer in regress */
 
-	if ((tp = template(stdout, my_puts, my_putc)) == NULL)
+	if ((tp = template(stdout, my_write, buf, sizeof(buf))) == NULL)
 		err(1, "template");
 
-	if (base(tp, " *hello* ") == -1)
+	if (base(tp, " *hello* ") == -1 ||
+	    template_flush(tp) == -1)
 		return (1);
 	puts("");
 
-	if (base(tp, "<hello>") == -1)
+	if (base(tp, "<hello>") == -1 ||
+	    template_flush(tp) == -1)
 		return (1);
 	puts("");
 

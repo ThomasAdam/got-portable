@@ -105,25 +105,25 @@ gotweb_reply(struct request *c, int status, const char *ctype,
 {
 	const char	*csp;
 
-	if (status != 200 && fcgi_printf(c, "Status: %d\r\n", status) == -1)
+	if (status != 200 && tp_writef(c->tp, "Status: %d\r\n", status) == -1)
 		return -1;
 
 	if (location) {
-		if (fcgi_puts(c->tp, "Location: ") == -1 ||
+		if (tp_writes(c->tp, "Location: ") == -1 ||
 		    gotweb_render_url(c, location) == -1 ||
-		    fcgi_puts(c->tp, "\r\n") == -1)
+		    tp_writes(c->tp, "\r\n") == -1)
 			return -1;
 	}
 
 	csp = "Content-Security-Policy: default-src 'self'; "
 	    "script-src 'none'; object-src 'none';\r\n";
-	if (fcgi_puts(c->tp, csp) == -1)
+	if (tp_writes(c->tp, csp) == -1)
 		return -1;
 
-	if (ctype && fcgi_printf(c, "Content-Type: %s\r\n", ctype) == -1)
+	if (ctype && tp_writef(c->tp, "Content-Type: %s\r\n", ctype) == -1)
 		return -1;
 
-	return fcgi_puts(c->tp, "\r\n");
+	return tp_writes(c->tp, "\r\n");
 }
 
 static int
@@ -132,7 +132,7 @@ gotweb_reply_file(struct request *c, const char *ctype, const char *file,
 {
 	int r;
 
-	r = fcgi_printf(c, "Content-Disposition: attachment; "
+	r = tp_writef(c->tp, "Content-Disposition: attachment; "
 	    "filename=%s%s\r\n", file, suffix ? suffix : "");
 	if (r == -1)
 		return -1;
@@ -254,6 +254,8 @@ gotweb_process_request(struct request *c)
 			r = gotweb_reply(c, 200, "text/plain", NULL);
 		if (r == -1)
 			return;
+		if (template_flush(c->tp) == -1)
+			return;
 
 		for (;;) {
 			error = got_object_blob_read_block(&len, c->t->blob);
@@ -262,7 +264,7 @@ gotweb_process_request(struct request *c)
 			if (len == 0)
 				break;
 			buf = got_object_blob_get_read_buf(c->t->blob);
-			if (fcgi_gen_binary_response(c, buf, len) == -1)
+			if (fcgi_write(c, buf, len) == -1)
 				break;
 		}
 		return;
@@ -1003,25 +1005,25 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 
 	action = gotweb_action_name(url->action);
 	if (action != NULL) {
-		if (fcgi_printf(c, "?action=%s", action) == -1)
+		if (tp_writef(c->tp, "?action=%s", action) == -1)
 			return -1;
 		sep = "&";
 	}
 
 	if (url->commit) {
-		if (fcgi_printf(c, "%scommit=%s", sep, url->commit) == -1)
+		if (tp_writef(c->tp, "%scommit=%s", sep, url->commit) == -1)
 			return -1;
 		sep = "&";
 	}
 
 	if (url->previd) {
-		if (fcgi_printf(c, "%sprevid=%s", sep, url->previd) == -1)
+		if (tp_writef(c->tp, "%sprevid=%s", sep, url->previd) == -1)
 			return -1;
 		sep = "&";
 	}
 
 	if (url->prevset) {
-		if (fcgi_printf(c, "%sprevset=%s", sep, url->prevset) == -1)
+		if (tp_writef(c->tp, "%sprevset=%s", sep, url->prevset) == -1)
 			return -1;
 		sep = "&";
 	}
@@ -1030,7 +1032,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		tmp = gotweb_urlencode(url->file);
 		if (tmp == NULL)
 			return -1;
-		r = fcgi_printf(c, "%sfile=%s", sep, tmp);
+		r = tp_writef(c->tp, "%sfile=%s", sep, tmp);
 		free(tmp);
 		if (r == -1)
 			return -1;
@@ -1041,7 +1043,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		tmp = gotweb_urlencode(url->folder);
 		if (tmp == NULL)
 			return -1;
-		r = fcgi_printf(c, "%sfolder=%s", sep, tmp);
+		r = tp_writef(c->tp, "%sfolder=%s", sep, tmp);
 		free(tmp);
 		if (r == -1)
 			return -1;
@@ -1052,7 +1054,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		tmp = gotweb_urlencode(url->headref);
 		if (tmp == NULL)
 			return -1;
-		r = fcgi_printf(c, "%sheadref=%s", sep, url->headref);
+		r = tp_writef(c->tp, "%sheadref=%s", sep, url->headref);
 		free(tmp);
 		if (r == -1)
 			return -1;
@@ -1060,7 +1062,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 	}
 
 	if (url->index_page != -1) {
-		if (fcgi_printf(c, "%sindex_page=%d", sep,
+		if (tp_writef(c->tp, "%sindex_page=%d", sep,
 		    url->index_page) == -1)
 			return -1;
 		sep = "&";
@@ -1070,7 +1072,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		tmp = gotweb_urlencode(url->path);
 		if (tmp == NULL)
 			return -1;
-		r = fcgi_printf(c, "%spath=%s", sep, tmp);
+		r = tp_writef(c->tp, "%spath=%s", sep, tmp);
 		free(tmp);
 		if (r == -1)
 			return -1;
@@ -1078,7 +1080,7 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 	}
 
 	if (url->page != -1) {
-		if (fcgi_printf(c, "%spage=%d", sep, url->page) == -1)
+		if (tp_writef(c->tp, "%spage=%d", sep, url->page) == -1)
 			return -1;
 		sep = "&";
 	}
@@ -1092,8 +1094,8 @@ gotweb_render_absolute_url(struct request *c, struct gotweb_url *url)
 	struct template	*tp = c->tp;
 	const char	*proto = c->https ? "https" : "http";
 
-	if (fcgi_puts(tp, proto) == -1 ||
-	    fcgi_puts(tp, "://") == -1 ||
+	if (tp_writes(tp, proto) == -1 ||
+	    tp_writes(tp, "://") == -1 ||
 	    tp_htmlescape(tp, c->server_name) == -1 ||
 	    tp_htmlescape(tp, c->document_uri) == -1)
 		return -1;
@@ -1367,36 +1369,36 @@ gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
 	case TM_DIFF:
 		diff_time = time(NULL) - committer_time;
 		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if (fcgi_printf(c, "%lld %s",
+			if (tp_writef(c->tp, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 365), years) == -1)
 				return -1;
 		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if (fcgi_printf(c, "%lld %s",
+			if (tp_writef(c->tp, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / (365 / 12)),
 			    months) == -1)
 				return -1;
 		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if (fcgi_printf(c, "%lld %s",
+			if (tp_writef(c->tp, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
 				return -1;
 		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if (fcgi_printf(c, "%lld %s",
+			if (tp_writef(c->tp, "%lld %s",
 			    (diff_time / 60 / 60 / 24), days) == -1)
 				return -1;
 		} else if (diff_time > 60 * 60 * 2) {
-			if (fcgi_printf(c, "%lld %s",
+			if (tp_writef(c->tp, "%lld %s",
 			    (diff_time / 60 / 60), hours) == -1)
 				return -1;
 		} else if (diff_time > 60 * 2) {
-			if (fcgi_printf(c, "%lld %s", (diff_time / 60),
+			if (tp_writef(c->tp, "%lld %s", (diff_time / 60),
 			    minutes) == -1)
 				return -1;
 		} else if (diff_time > 2) {
-			if (fcgi_printf(c, "%lld %s", diff_time,
+			if (tp_writef(c->tp, "%lld %s", diff_time,
 			    seconds) == -1)
 				return -1;
 		} else {
-			if (fcgi_puts(tp, now) == -1)
+			if (tp_writes(tp, now) == -1)
 				return -1;
 		}
 		break;
@@ -1408,8 +1410,8 @@ gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
 		if (s == NULL)
 			return -1;
 
-		if (fcgi_puts(tp, datebuf) == -1 ||
-		    fcgi_puts(tp, " UTC") == -1)
+		if (tp_writes(tp, datebuf) == -1 ||
+		    tp_writes(tp, " UTC") == -1)
 			return -1;
 		break;
 	case TM_RFC822:
@@ -1421,7 +1423,7 @@ gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
 		if (r == 0)
 			return -1;
 
-		if (fcgi_puts(tp, datebuf) == -1)
+		if (tp_writes(tp, datebuf) == -1)
 			return -1;
 		break;
 	}

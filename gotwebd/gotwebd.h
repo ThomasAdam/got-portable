@@ -242,7 +242,6 @@ struct request {
 	size_t				 buf_len;
 
 	uint8_t				 outbuf[GOTWEBD_CACHESIZE];
-	size_t				 outbuf_len;
 
 	char				 querystring[MAX_QUERYSTRING];
 	char				 document_uri[MAX_DOCUMENT_URI];
@@ -497,13 +496,7 @@ void fcgi_timeout(int, short, void *);
 void fcgi_cleanup_request(struct request *);
 void fcgi_create_end_record(struct request *);
 void dump_fcgi_record(const char *, struct fcgi_record_header *);
-int fcgi_puts(struct template *, const char *);
-int fcgi_putc(struct template *, int);
-int fcgi_vprintf(struct request *, const char *, va_list);
-int fcgi_printf(struct request *, const char *, ...)
-	__attribute__((__format__(printf, 2, 3)))
-	__attribute__((__nonnull__(2)));
-int fcgi_gen_binary_response(struct request *, const uint8_t *, int);
+int fcgi_write(void *, const void *, size_t);
 
 /* got_operations.c */
 const struct got_error *got_gotweb_closefile(FILE *);
