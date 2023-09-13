@@ -1473,7 +1473,7 @@ EOF
 }
 
 test_send_config() {
-	local testroot=`test_init send_fetch_conf`
+	local testroot=`test_init send_config`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
