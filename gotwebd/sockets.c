@@ -620,7 +620,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 		return;
 	}
 
-	c->tp = template(c, fcgi_puts, fcgi_putc);
+	c->tp = template(c, &fcgi_write, c->outbuf, sizeof(c->outbuf));
 	if (c->tp == NULL) {
 		log_warn("%s", __func__);
 		close(s);

@@ -19,21 +19,26 @@
 
 struct template;
 
-typedef int (*tmpl_puts)(struct template *, const char *);
-typedef int (*tmpl_putc)(struct template *, int);
+typedef int (*tmpl_write)(void *, const void *, size_t);
 
 struct template {
 	void		*tp_arg;
 	char		*tp_tmp;
-	tmpl_puts	 tp_escape;
-	tmpl_puts	 tp_puts;
-	tmpl_putc	 tp_putc;
+	tmpl_write	 tp_write;
+	char		*tp_buf;
+	size_t		 tp_len;
+	size_t		 tp_cap;
 };
 
-int		 tp_urlescape(struct template *, const char *);
-int		 tp_htmlescape(struct template *, const char *);
+int	 tp_write(struct template *, const char *, size_t);
+int	 tp_writes(struct template *, const char *);
+int	 tp_writef(struct template *, const char *, ...)
+	    __attribute__((__format__ (printf, 2, 3)));
+int	 tp_urlescape(struct template *, const char *);
+int	 tp_htmlescape(struct template *, const char *);
 
-struct template	*template(void *, tmpl_puts, tmpl_putc);
+struct template	*template(void *, tmpl_write, char *, size_t);
+int		 template_flush(struct template *);
 void		 template_free(struct template *);
 
 #endif

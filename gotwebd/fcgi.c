@@ -140,12 +140,6 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 		break;
 	case FCGI_STDIN:
 	case FCGI_ABORT_REQUEST:
-		if (c->sock->client_status != CLIENT_DISCONNECT &&
-		    c->outbuf_len != 0) {
-			fcgi_send_response(c, FCGI_STDOUT, c->outbuf,
-			    c->outbuf_len);
-		}
-
 		fcgi_create_end_record(c);
 		fcgi_cleanup_request(c);
 		return 0;
@@ -196,6 +190,7 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 
 	if (n == 0) {
 		gotweb_process_request(c);
+		template_flush(c->tp);
 		return;
 	}
 
@@ -274,90 +269,6 @@ void
 fcgi_timeout(int fd, short events, void *arg)
 {
 	fcgi_cleanup_request((struct request*) arg);
-}
-
-int
-fcgi_puts(struct template *tp, const char *str)
-{
-	if (str == NULL)
-		return 0;
-	return fcgi_gen_binary_response(tp->tp_arg, str, strlen(str));
-}
-
-int
-fcgi_putc(struct template *tp, int ch)
-{
-	uint8_t c = ch;
-	return fcgi_gen_binary_response(tp->tp_arg, &c, 1);
-}
-
-int
-fcgi_vprintf(struct request *c, const char *fmt, va_list ap)
-{
-	char *str;
-	int r;
-
-	r = vasprintf(&str, fmt, ap);
-	if (r == -1) {
-		log_warn("%s: asprintf", __func__);
-		return -1;
-	}
-
-	r = fcgi_gen_binary_response(c, str, r);
-	free(str);
-	return r;
-}
-
-int
-fcgi_printf(struct request *c, const char *fmt, ...)
-{
-	va_list ap;
-	int r;
-
-	va_start(ap, fmt);
-	r = fcgi_vprintf(c, fmt, ap);
-	va_end(ap);
-
-	return r;
-}
-
-int
-fcgi_gen_binary_response(struct request *c, const uint8_t *data, int len)
-{
-	int r;
-
-	if (c->sock->client_status == CLIENT_DISCONNECT)
-		return -1;
-
-	if (data == NULL || len == 0)
-		return 0;
-
-	/*
-	 * special case: send big replies -like blobs- directly
-	 * without copying.
-	 */
-	if (len > sizeof(c->outbuf)) {
-		if (c->outbuf_len > 0) {
-			fcgi_send_response(c, FCGI_STDOUT,
-			    c->outbuf, c->outbuf_len);
-			c->outbuf_len = 0;
-		}
-		return fcgi_send_response(c, FCGI_STDOUT, data, len);
-	}
-
-	if (len < sizeof(c->outbuf) - c->outbuf_len) {
-		memcpy(c->outbuf + c->outbuf_len, data, len);
-		c->outbuf_len += len;
-		return 0;
-	}
-
-	r = fcgi_send_response(c, FCGI_STDOUT, c->outbuf, c->outbuf_len);
-	if (r == -1)
-		return -1;
-
-	memcpy(c->outbuf, data, len);
-	c->outbuf_len = len;
-	return 0;
 }
 
 static int
@@ -462,6 +373,14 @@ fcgi_send_response(struct request *c, int type, const void *data,
 		return 0;
 
 	return send_response(c, type, data, len);
+}
+
+int
+fcgi_write(void *arg, const void *buf, size_t len)
+{
+	struct request	*c = arg;
+
+	return fcgi_send_response(c, FCGI_STDOUT, buf, len);
 }
 
 void

@@ -139,9 +139,10 @@ verbatims	: /* empty */
 
 raw		: nstring {
 			dbg();
-			fprintf(fp, "if ((tp_ret = tp->tp_puts(tp, ");
+			fprintf(fp, "if ((tp_ret = tp_write(tp, ");
 			printq($1);
-			fputs(")) == -1) goto err;\n", fp);
+			fprintf(fp, ", %zu)) == -1) goto err;\n",
+			    strlen($1));
 
 			free($1);
 		}
@@ -189,7 +190,7 @@ special		: '{' RENDER string '}' {
 		| '{' string '|' UNSAFE '}' {
 			dbg();
 			fprintf(fp,
-			    "if ((tp_ret = tp->tp_puts(tp, %s)) == -1)\n",
+			    "if ((tp_ret = tp_writes(tp, %s)) == -1)\n",
 			    $2);
 			fputs("goto err;\n", fp);
 			free($2);
@@ -205,7 +206,7 @@ special		: '{' RENDER string '}' {
 		| '{' string '}' {
 			dbg();
 			fprintf(fp,
-			    "if ((tp_ret = tp->tp_escape(tp, %s)) == -1)\n",
+			    "if ((tp_ret = tp_htmlescape(tp, %s)) == -1)\n",
 			    $2);
 			fputs("goto err;\n", fp);
 			free($2);
@@ -218,7 +219,7 @@ printf		: '{' PRINTF {
 		} printfargs '}' {
 			fputs(") == -1)\n", fp);
 			fputs("goto err;\n", fp);
-			fputs("if ((tp_ret = tp->tp_escape(tp, tp->tp_tmp)) "
+			fputs("if ((tp_ret = tp_htmlescape(tp, tp->tp_tmp)) "
 			    "== -1)\n", fp);
 			fputs("goto err;\n", fp);
 			fputs("free(tp->tp_tmp);\n", fp);

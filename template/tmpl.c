@@ -15,10 +15,60 @@
  */
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "tmpl.h"
+
+int
+tp_write(struct template *tp, const char *str, size_t len)
+{
+	size_t	 avail;
+
+	while (len > 0) {
+		avail = tp->tp_cap - tp->tp_len;
+		if (avail == 0) {
+			if (template_flush(tp) == -1)
+				return (-1);
+			avail = tp->tp_cap;
+		}
+
+		if (len < avail)
+			avail = len;
+
+		memcpy(tp->tp_buf + tp->tp_len, str, avail);
+		tp->tp_len += avail;
+		str += avail;
+		len -= avail;
+	}
+
+	return (0);
+}
+
+int
+tp_writes(struct template *tp, const char *str)
+{
+	return (tp_write(tp, str, strlen(str)));
+}
+
+int
+tp_writef(struct template *tp, const char *fmt, ...)
+{
+	va_list	 ap;
+	char	*str;
+	int	 r;
+
+	va_start(ap, fmt);
+	r = vasprintf(&str, fmt, ap);
+	va_end(ap);
+	if (r == -1)
+		return (-1);
+	r = tp_write(tp, str, r);
+	free(str);
+	return (r);
+}
 
 int
 tp_urlescape(struct template *tp, const char *str)
@@ -36,10 +86,10 @@ tp_urlescape(struct template *tp, const char *str)
 			r = snprintf(tmp, sizeof(tmp), "%%%2X", *str);
 			if (r < 0  || (size_t)r >= sizeof(tmp))
 				return (0);
-			if (tp->tp_puts(tp, tmp) == -1)
+			if (tp_write(tp, tmp, r) == -1)
 				return (-1);
 		} else {
-			if (tp->tp_putc(tp, *str) == -1)
+			if (tp_write(tp, str, 1) == -1)
 				return (-1);
 		}
 	}
@@ -58,22 +108,22 @@ tp_htmlescape(struct template *tp, const char *str)
 	for (; *str; ++str) {
 		switch (*str) {
 		case '<':
-			r = tp->tp_puts(tp, "&lt;");
+			r = tp_write(tp, "&lt;", 4);
 			break;
 		case '>':
-			r = tp->tp_puts(tp, "&gt;");
+			r = tp_write(tp, "&gt;", 4);
 			break;
 		case '&':
-			r = tp->tp_puts(tp, "&amp;");
+			r = tp_write(tp, "&amp;", 5);
 			break;
 		case '"':
-			r = tp->tp_puts(tp, "&quot;");
+			r = tp_write(tp, "&quot;", 6);
 			break;
 		case '\'':
-			r = tp->tp_puts(tp, "&apos;");
+			r = tp_write(tp, "&apos;", 6);
 			break;
 		default:
-			r = tp->tp_putc(tp, *str);
+			r = tp_write(tp, str, 1);
 			break;
 		}
 
@@ -85,7 +135,7 @@ tp_htmlescape(struct template *tp, const char *str)
 }
 
 struct template *
-template(void *arg, tmpl_puts putsfn, tmpl_putc putcfn)
+template(void *arg, tmpl_write writefn, char *buf, size_t siz)
 {
 	struct template *tp;
 
@@ -93,11 +143,23 @@ template(void *arg, tmpl_puts putsfn, tmpl_putc putcfn)
 		return (NULL);
 
 	tp->tp_arg = arg;
-	tp->tp_escape = tp_htmlescape;
-	tp->tp_puts = putsfn;
-	tp->tp_putc = putcfn;
+	tp->tp_write = writefn;
+	tp->tp_buf = buf;
+	tp->tp_cap = siz;
 
 	return (tp);
+}
+
+int
+template_flush(struct template *tp)
+{
+	if (tp->tp_len == 0)
+		return (0);
+
+	if (tp->tp_write(tp->tp_arg, tp->tp_buf, tp->tp_len) == -1)
+		return (-1);
+	tp->tp_len = 0;
+	return (0);
 }
 
 void
