@@ -66,6 +66,7 @@
 #include "got_lib_pack_create.h"
 #include "got_lib_dial.h"
 #include "got_lib_worktree_cvg.h"
+#include "got_lib_poll.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -104,6 +105,7 @@ got_send_connect(pid_t *sendpid, int *sendfd, const char *proto,
 struct pack_progress_arg {
     got_send_progress_cb progress_cb;
     void *progress_arg;
+    int sendfd;
 
     int ncolored;
     int nfound;
@@ -129,6 +131,25 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 	if (err)
 		return err;
 
+	/*
+	 * Detect the server closing our connection while we are
+	 * busy creating a pack file.
+	 *
+	 * XXX This should be a temporary workaround. A better fix would
+	 * be to avoid use of an on-disk tempfile for pack file data.
+	 * Instead we could stream pack file data to got-send-pack while
+	 * the pack file is being generated. Write errors in got-send-pack
+	 * would then automatically abort the creation of pack file data.
+	 */
+	err = got_poll_fd(a->sendfd, 0, 0);
+	if (err && err->code != GOT_ERR_TIMEOUT) {
+		if (err->code == GOT_ERR_EOF) {
+			err = got_error_msg(GOT_ERR_EOF,
+			    "server unexpectedly closed the connection");
+		}
+		return err;
+	}
+	 
 	a->ncolored= ncolored;
 	a->nfound = nfound;
 	a->ntrees = ntrees;
@@ -587,6 +608,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		memset(&ppa, 0, sizeof(ppa));
 		ppa.progress_cb = progress_cb;
 		ppa.progress_arg = progress_arg;
+		ppa.sendfd = sendfd;
 		err = got_pack_create(packsha1, packfd, delta_cache,
 		    their_ids, ntheirs, our_ids, nours, repo, 0, 1, 0,
 		    pack_progress, &ppa, &rl, cancel_cb, cancel_arg);
