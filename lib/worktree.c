@@ -1104,7 +1104,8 @@ done:
 static const struct got_error *
 create_fileindex_entry(struct got_fileindex_entry **new_iep,
     struct got_fileindex *fileindex, struct got_object_id *base_commit_id,
-    int wt_fd, const char *path, struct got_object_id *blob_id)
+    int wt_fd, const char *path, struct got_object_id *blob_id,
+    int update_timestamps)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *new_ie;
@@ -1116,7 +1117,7 @@ create_fileindex_entry(struct got_fileindex_entry **new_iep,
 		return err;
 
 	err = got_fileindex_entry_update(new_ie, wt_fd, path,
-	    blob_id->sha1, base_commit_id->sha1, 1);
+	    blob_id->sha1, base_commit_id->sha1, update_timestamps);
 	if (err)
 		goto done;
 
@@ -1152,7 +1153,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
     int reverting_versioned_file, int installing_bad_symlink,
-    int path_is_unversioned, struct got_repository *repo,
+    int path_is_unversioned, int *update_timestamps,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg);
 
 /*
@@ -1298,7 +1300,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			return install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file,
-			    1, path_is_unversioned, repo, progress_cb,
+			    1, path_is_unversioned, NULL, repo, progress_cb,
 			    progress_arg);
 		}
 		if (len > 0) {
@@ -1322,7 +1324,8 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
-		    path_is_unversioned, repo, progress_cb, progress_arg);
+		    path_is_unversioned, NULL, repo,
+		    progress_cb, progress_arg);
 		return err;
 	}
 
@@ -1385,7 +1388,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			err = install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file, 1,
-			    path_is_unversioned, repo,
+			    path_is_unversioned, NULL, repo,
 			    progress_cb, progress_arg);
 		} else if (errno == ENOTDIR) {
 			err = got_error_path(ondisk_path,
@@ -1405,7 +1408,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
     int reverting_versioned_file, int installing_bad_symlink,
-    int path_is_unversioned, struct got_repository *repo,
+    int path_is_unversioned, int *update_timestamps,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -1414,6 +1418,9 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	int update = 0;
 	char *tmppath = NULL;
 	mode_t mode;
+
+	if (update_timestamps)
+		*update_timestamps = 1;
 
 	mode = get_ondisk_perms(te_mode & S_IXUSR, GOT_DEFAULT_FILE_MODE);
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW |
@@ -1438,8 +1445,10 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				    ondisk_path);
 		} else if (errno == EEXIST) {
 			if (path_is_unversioned) {
+				if (update_timestamps)
+					*update_timestamps = 0;
 				err = (*progress_cb)(progress_arg,
-				    GOT_STATUS_UNVERSIONED, path);
+				    GOT_STATUS_EXISTS, path);
 				goto done;
 			}
 			if (!(S_ISLNK(st_mode) && S_ISREG(te_mode)) &&
@@ -1911,6 +1920,7 @@ update_blob(struct got_worktree *worktree,
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 	struct stat sb;
 	int fd1 = -1, fd2 = -1;
+	int update_timestamps;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno("asprintf");
@@ -2119,8 +2129,9 @@ update_blob(struct got_worktree *worktree,
 			err = install_blob(worktree, ondisk_path, path,
 			    te->mode, sb.st_mode, blob,
 			    status == GOT_STATUS_MISSING, 0, 0,
-			    status == GOT_STATUS_UNVERSIONED, repo,
-			    progress_cb, progress_arg);
+			    status == GOT_STATUS_UNVERSIONED,
+			    &update_timestamps,
+			    repo, progress_cb, progress_arg);
 		}
 		if (err)
 			goto done;
@@ -2132,7 +2143,7 @@ update_blob(struct got_worktree *worktree,
 		} else {
 			err = create_fileindex_entry(&ie, fileindex,
 			    worktree->base_commit_id, worktree->root_fd, path,
-			    &blob->id);
+			    &blob->id, update_timestamps);
 		}
 		if (err)
 			goto done;
@@ -2934,7 +2945,8 @@ add_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		err = install_blob(worktree, ondisk_path, path2,
 		    mode2, GOT_DEFAULT_FILE_MODE, blob2,
 		    restoring_missing_file, reverting_versioned_file, 0,
-		    path_is_unversioned, repo, progress_cb, progress_arg);
+		    path_is_unversioned, NULL, repo,
+		    progress_cb, progress_arg);
 	}
 	if (err)
 		return err;
@@ -5289,7 +5301,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				    ie->path,
 				    te ? te->mode : GOT_DEFAULT_FILE_MODE,
 				    got_fileindex_perms_to_st(ie), blob,
-				    0, 1, 0, 0, a->repo,
+				    0, 1, 0, 0, NULL, a->repo,
 				    a->progress_cb, a->progress_arg);
 			}
 			if (err)

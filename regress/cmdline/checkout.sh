@@ -489,10 +489,10 @@ test_checkout_into_nonempty_dir() {
 		return 1
 	fi
 
-	echo "?  $testroot/wt/alpha" > $testroot/stdout.expected
-	echo "?  $testroot/wt/beta" >> $testroot/stdout.expected
-	echo "?  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
-	echo "?  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
 	echo "Checked out refs/heads/master: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
@@ -550,7 +550,10 @@ test_checkout_into_nonempty_dir() {
 		return 1
 	fi
 
-	echo "modified alpha" > $testroot/wt/alpha
+	# retry, but with alpha modified
+
+	rm -rf "$testroot/wt/.got"
+	echo modified alpha >$testroot/wt/alpha
 
 	echo "E  $testroot/wt/alpha" > $testroot/stdout.expected
 	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
