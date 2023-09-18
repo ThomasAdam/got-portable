@@ -1,3 +1,17 @@
+* got 0.93; 2023-09-18
+  see git repository history for per-change authorship information
+- show out-of-memory errors from zlib inflate() and deflate() calls
+- make 'got fetch' and 'got send' release the work tree lock earlier
+- tog: add basic regress for log limit and log search
+- fix "no git repository found" on locked work trees; regression from 0.91
+- gotwebd: CSS improvements, looks much better in text-based browsers
+- gotwebd: don't lose track of the current file during commit log pagination
+- gotwebd: move buffering from the fastcgi layer to the template layer
+- got diff: fix "No newline at end of file" showing up where not expected
+- make 'got send' detect connections unexpectedly closed by server
+- fix detection of modified files in fresh work trees created with checkout -E
+- gotd: fix bogus "gotsh: operation timed out" errors; regression from 0.92
+
 * got 0.92; 2023-08-29
   see git repository history for per-change authorship information
 - allow modified files to be deleted during merges if content exists in repo
