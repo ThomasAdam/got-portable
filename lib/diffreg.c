@@ -327,6 +327,9 @@ got_diffreg_result_free(struct got_diffreg_result *diffreg_result)
 {
 	const struct got_error *err;
 
+	if (diffreg_result == NULL)
+		return NULL;
+
 	diff_result_free(diffreg_result->result);
 	diff_data_free(&diffreg_result->left);
 	diff_data_free(&diffreg_result->right);
@@ -334,22 +337,4 @@ got_diffreg_result_free(struct got_diffreg_result *diffreg_result)
 	    diffreg_result->map2, diffreg_result->size2);
 	free(diffreg_result);
 	return err;
-}
-
-const struct got_error *
-got_diffreg_result_free_left(struct got_diffreg_result *diffreg_result)
-{
-	diff_data_free(&diffreg_result->left);
-	memset(&diffreg_result->left, 0, sizeof(diffreg_result->left));
-	return got_diffreg_close(diffreg_result->map1, diffreg_result->size1,
-	    NULL, 0);
-}
-
-const struct got_error *
-got_diffreg_result_free_right(struct got_diffreg_result *diffreg_result)
-{
-	diff_data_free(&diffreg_result->right);
-	memset(&diffreg_result->right, 0, sizeof(diffreg_result->right));
-	return got_diffreg_close(NULL, 0, diffreg_result->map2,
-	    diffreg_result->size2);
 }
