@@ -48,10 +48,6 @@ const struct got_error *got_diffreg_output(struct got_diff_line **, size_t *,
     struct got_diffreg_result *, int, int, const char *, const char *,
     enum got_diff_output_format, int, FILE *);
 const struct got_error *got_diffreg_result_free(struct got_diffreg_result *);
-const struct got_error *got_diffreg_result_free_left(
-    struct got_diffreg_result *);
-const struct got_error *got_diffreg_result_free_right(
-    struct got_diffreg_result *);
 const struct got_error *got_diffreg_close(char *, size_t, char *, size_t);
 
 const struct got_error *got_merge_diff3(int *, int, FILE *, FILE *, FILE *,
