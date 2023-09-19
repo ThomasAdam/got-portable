@@ -378,8 +378,15 @@ diff_blob_file(struct got_diffreg_result **resultp,
 
 	err = got_diffreg(&result, f1, f2, diff_algo, ignore_whitespace,
 	    force_text_diff);
-	if (err)
+	if (err) {
+		char msg[GOT_ERR_MAX_MSG_SIZE];
+		if (snprintf(msg, sizeof(msg), "%s vs %s: %s",
+		             label1 ? label1 : idstr1,
+		             f2_exists ? label2 : "/dev/null", err->msg) >= 0) {
+			err = got_error_msg(err->code, msg);
+		}
 		goto done;
+	}
 
 	if (outfile) {
 		err = got_diffreg_output(NULL, NULL, result,
