@@ -179,7 +179,10 @@ header.subtitle h2 {
 	flex-grow: 0;
 	flex-shrink: 0;
 }
-.briefs_age, .briefs_author { display: inline-block; }
+.briefs_age, .briefs_author {
+	display: inline-block;
+	vertical-align: middle;
+}
 .briefs_age {
 	padding-left: 10px;
 	padding-top: 5px;
