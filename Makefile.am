@@ -1,4 +1,6 @@
-SUBDIRS = compat libexec got tog gotadmin template gotwebd cvg
+SUBDIRS = compat libexec got tog gotadmin template gotwebd
+
+# -portable: re-enable once upstream is happy:  cvg
 # TODO: gotd gotsh template
 
 if GOTD_ENABLED
