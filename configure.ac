@@ -23,6 +23,9 @@ AC_CANONICAL_HOST
 AC_CONFIG_SUBDIRS([template])
 AC_ARG_ENABLE([gotd],
 	AS_HELP_STRING([--enable gotd], [build gotd and gotsh]))
+AC_ARG_ENABLE([cvg],
+	       AS_HELP_STRING([--enable cvg],
+			      [EXPERIMENTAL: cvg - cvs-like-git]))
 
 # Override gotd's empty_path location.
 AC_ARG_WITH([gotd-empty-path],
@@ -894,10 +897,10 @@ LIBS=""
 AH_BOTTOM([#include "got_compat2.h"])
 
 AM_CONDITIONAL([GOTD_ENABLED], [test "x$enable_gotd" = xyes])
+AM_CONDITIONAL([CVG_ENABLED], [test "x$enable_cvg" = xyes])
 
 AC_CONFIG_FILES([Makefile
 		 compat/Makefile
-		 cvg/Makefile
 		 libexec/Makefile
 		 libexec/got-read-tree/Makefile
 		 libexec/got-fetch-pack/Makefile
@@ -922,6 +925,10 @@ if test "x$enable_gotd" = "xyes"; then
 	AC_CONFIG_FILES([gotd/Makefile])
 	AC_CONFIG_FILES([gotsh/Makefile])
 	AC_CONFIG_FILES([gotctl/Makefile])
+fi
+
+if test "x$enable_cvg" = "xyes"; then
+	AC_CONFIG_FILES([cvg/Makefile])
 fi
 
 AC_OUTPUT

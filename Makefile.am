@@ -7,6 +7,10 @@ if GOTD_ENABLED
 SUBDIRS += gotd gotsh gotctl gitwrapper
 endif
 
+if CVG_ENABLED
+SUBDIRS += cvg
+endif
+
 include $(top_builddir)/Makefile.common
 
 EXTRA_DIST = CHANGES CHANGELOG LICENCE README.portable util/got-portable-ver.sh
