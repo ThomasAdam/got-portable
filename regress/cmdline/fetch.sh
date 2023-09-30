@@ -425,12 +425,6 @@ test_fetch_all() {
 		return 1
 	fi
 
-	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
-	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
-	local tag_id=`got ref -r $testroot/repo -l \
-		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
-
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
@@ -439,7 +433,6 @@ test_fetch_all() {
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
-	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret=$?
@@ -448,6 +441,12 @@ test_fetch_all() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
+	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 
 	got fetch -q -a -r $testroot/repo-clone
 	ret=$?
