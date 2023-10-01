@@ -474,6 +474,49 @@ test_fetch_all() {
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
+
+	(cd $testroot/repo && git checkout -q foo)
+	echo "modified beta on foo" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified beta"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	# set the default HEAD branch back to master
+	(cd $testroot/repo && git checkout -q master)
+
+	# remove default branch from got.conf, fetch all branches
+	ed -s $testroot/repo-clone/got.conf <<-EOF
+	/branch {/c
+	fetch_all_branches yes
+	.
+	w
+	EOF
+
+	got fetch -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
 	test_done "$testroot" "$ret"
 }
 
