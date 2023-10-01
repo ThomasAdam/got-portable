@@ -94,7 +94,7 @@ git_commit()
 {
 	local repo="$1"
 	shift
-	(cd $repo && git commit --author="$GOT_AUTHOR" -q -a "$@")
+	git -C $repo commit --author="$GOT_AUTHOR" -q -a "$@"
 	maybe_pack_repo $repo
 }
 
@@ -102,27 +102,27 @@ git_rm()
 {
 	local repo="$1"
 	shift
-	(cd $repo && git rm -q "$@")
+	git -C $repo rm -q "$@"
 }
 
 git_rmdir()
 {
 	local repo="$1"
 	shift
-	(cd $repo && git rm -q -r "$@")
+	git -C $repo rm -q -r "$@"
 }
 
 git_show_head()
 {
 	local repo="$1"
-	(cd $repo && git show --no-patch --pretty='format:%H')
+	git -C $repo show --no-patch --pretty='format:%H'
 }
 
 git_show_branch_head()
 {
 	local repo="$1"
 	local branch="$2"
-	(cd $repo && git show --no-patch --pretty='format:%H' $branch)
+	git -C $repo show --no-patch --pretty='format:%H' $branch
 }
 
 
@@ -130,28 +130,28 @@ git_show_author_time()
 {
 	local repo="$1"
 	local object="$2"
-	(cd $repo && git show --no-patch --pretty='format:%at' $object)
+	git -C $repo show --no-patch --pretty='format:%at' $object
 }
 
 git_show_tagger_time()
 {
 	local repo="$1"
 	local tag="$2"
-	(cd $repo && git cat-file tag $tag | grep ^tagger | \
-		sed -e "s/^tagger $GOT_AUTHOR//" | cut -d' ' -f2)
+	git -C $repo cat-file tag $tag | grep ^tagger | \
+		sed -e "s/^tagger $GOT_AUTHOR//" | cut -d' ' -f2
 }
 
 git_show_parent_commit()
 {
 	local repo="$1"
 	local commit="$2"
-	(cd $repo && git show --no-patch --pretty='format:%P' $commit)
+	git -C $repo show --no-patch --pretty='format:%P' $commit
 }
 
 git_show_tree()
 {
 	local repo="$1"
-	(cd $repo && git show --no-patch --pretty='format:%T')
+	git -C $repo show --no-patch --pretty='format:%T'
 }
 
 trim_obj_id()
@@ -179,7 +179,7 @@ git_commit_tree()
 	local repo="$1"
 	local msg="$2"
 	local tree="$3"
-	(cd $repo && git commit-tree -m "$msg" "$tree")
+	git -C $repo commit-tree -m "$msg" "$tree"
 }
 
 git_fsck()
@@ -187,8 +187,8 @@ git_fsck()
 	local testroot="$1"
 	local repo="$2"
 
-	(cd $repo && git fsck --strict \
-		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	git -C $repo fsck --strict \
+		> $testroot/fsck.stdout 2> $testroot/fsck.stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo -n "git fsck: "
@@ -220,7 +220,7 @@ make_single_file_repo()
 	mkdir $repo
 	git_init $repo
 	echo "this is file $file" > $repo/$file
-	(cd $repo && git add .)
+	git -C $repo add .
 	git_commit $repo -m "intialize $repo with file $file"
 }
 
@@ -257,7 +257,7 @@ test_init()
 	git_init $testroot/repo
 	if [ -z "$no_tree" ]; then
 		make_test_tree $testroot/repo
-		(cd $repo && git add .)
+		git -C $repo add .
 		git_commit $testroot/repo -m "adding the test tree"
 	fi
 	touch $testroot/repo/.git/git-daemon-export-ok

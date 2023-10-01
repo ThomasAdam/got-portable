@@ -21,21 +21,21 @@ test_rebase_basic() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 	local orig_author_time2=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -49,7 +49,7 @@ test_rebase_basic() {
 
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
@@ -240,7 +240,7 @@ test_rebase_ancestry_check() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local newbranch_id=`git_show_head $testroot/repo`
@@ -276,13 +276,13 @@ test_rebase_continue() {
 	local testroot=`test_init rebase_continue`
 	local init_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -377,7 +377,7 @@ test_rebase_continue() {
 	(cd $testroot/wt && got unstage alpha > /dev/null)
 	(cd $testroot/wt && got rebase -c > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_head $testroot/repo`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 
@@ -412,7 +412,7 @@ test_rebase_abort() {
 
 	local init_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified beta on branch" > $testroot/repo/beta
 	git_commit $testroot/repo -m "committing to beta on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
@@ -420,13 +420,13 @@ test_rebase_abort() {
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo \
 		-m "changing alpha and adding new on newbranch"
 	local orig_commit2=`git_show_head $testroot/repo`
 	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -515,7 +515,7 @@ test_rebase_abort() {
 
 	(cd $testroot/wt && got rebase -a > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 
 	echo "Switching work tree to refs/heads/master" \
 		> $testroot/stdout.expected
@@ -605,13 +605,13 @@ test_rebase_no_op_change() {
 	local testroot=`test_init rebase_no_op_change`
 	local init_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -683,7 +683,7 @@ test_rebase_no_op_change() {
 
 	(cd $testroot/wt && got rebase -c > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_head $testroot/repo`
 
 	echo -n "$short_orig_commit1 -> no-op change" \
@@ -717,13 +717,13 @@ test_rebase_in_progress() {
 	local testroot=`test_init rebase_in_progress`
 	local init_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -822,14 +822,14 @@ test_rebase_in_progress() {
 test_rebase_path_prefix() {
 	local testroot=`test_init rebase_path_prefix`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -875,7 +875,7 @@ test_rebase_path_prefix() {
 	(cd $testroot/wt2 && got rebase newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -920,7 +920,7 @@ test_rebase_path_prefix() {
 test_rebase_preserves_logmsg() {
 	local testroot=`test_init rebase_preserves_logmsg`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta on newbranch"
 
@@ -933,7 +933,7 @@ test_rebase_preserves_logmsg() {
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -948,7 +948,7 @@ test_rebase_preserves_logmsg() {
 	(cd $testroot/wt && got rebase newbranch > /dev/null \
 		2> $testroot/stderr)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -1242,25 +1242,25 @@ test_rebase_out_of_date() {
 	local testroot=`test_init rebase_out_of_date`
 	local initial_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit1=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified beta on master" > $testroot/repo/beta
 	git_commit $testroot/repo -m "committing to beta on master"
 	local master_commit2=`git_show_head $testroot/repo`
@@ -1311,17 +1311,17 @@ test_rebase_out_of_date() {
 test_rebase_trims_empty_dir() {
 	local testroot=`test_init rebase_trims_empty_dir`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
-	(cd $testroot/repo && git rm -q epsilon/zeta)
+	git -C $testroot/repo rm -q epsilon/zeta
 	git_commit $testroot/repo -m "removing zeta on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1335,7 +1335,7 @@ test_rebase_trims_empty_dir() {
 
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -1418,7 +1418,7 @@ test_rebase_delete_missing_file() {
 
 	mkdir -p $testroot/repo/d/f/g
 	echo "new file" > $testroot/repo/d/f/g/new
-	(cd $testroot/repo && git add d/f/g/new)
+	git -C $testroot/repo add d/f/g/new
 	git_commit $testroot/repo -m "adding a subdir"
 	local commit0=`git_show_head $testroot/repo`
 
@@ -1434,7 +1434,7 @@ test_rebase_delete_missing_file() {
 	(cd $testroot/wt && got commit \
 		-m "removing beta and d/f/g/new on newbranch" > /dev/null)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
@@ -1446,7 +1446,7 @@ test_rebase_delete_missing_file() {
 	(cd $testroot/wt && got commit \
 		-m "removing beta and d/f/g/new on master" > /dev/null)
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	local master_commit=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got update -b master > /dev/null)
@@ -1545,7 +1545,7 @@ test_rebase_delete_missing_file() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_head $testroot/repo`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 
@@ -1564,21 +1564,21 @@ test_rebase_delete_missing_file() {
 test_rebase_rm_add_rm_file() {
 	local testroot=`test_init rebase_rm_add_rm_file`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo checkout -q -b newbranch
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing beta from newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
 
 	echo 'restored beta' > $testroot/repo/beta
-	(cd $testroot/repo && git add beta)
+	git -C $testroot/repo add beta
 	git_commit $testroot/repo -m "restoring beta on newbranch"
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing beta from newbranch again"
 	local orig_commit3=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1601,12 +1601,12 @@ test_rebase_rm_add_rm_file() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit3=`git_show_head $testroot/repo`
 	local new_commit2=`git_show_parent_commit $testroot/repo`
 	local new_commit1=`git_show_parent_commit $testroot/repo $new_commit2`
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
@@ -1674,7 +1674,7 @@ test_rebase_resets_committer() {
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 	local committer="Flan Luck <flan_luck@openbsd.org>"
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
@@ -1685,7 +1685,7 @@ test_rebase_resets_committer() {
 	local orig_commit2=`git_show_head $testroot/repo`
 	local orig_author_time2=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1700,7 +1700,7 @@ test_rebase_resets_committer() {
 	(cd $testroot/wt && env GOT_AUTHOR="$committer" \
 		got rebase newbranch > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
@@ -1762,7 +1762,7 @@ test_rebase_no_author_info() {
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 	local committer="$GOT_AUTHOR"
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
@@ -1773,7 +1773,7 @@ test_rebase_no_author_info() {
 	local orig_commit2=`git_show_head $testroot/repo`
 	local orig_author_time2=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1789,7 +1789,7 @@ test_rebase_no_author_info() {
 	(unset GOT_AUTHOR && cd $testroot/wt && \
 		got rebase newbranch > $testroot/stdout)
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
@@ -1920,7 +1920,7 @@ test_rebase_out_of_date2() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
@@ -1928,7 +1928,7 @@ test_rebase_out_of_date2() {
 	local orig_commit2=`git_show_head $testroot/repo`
 	local orig_author_time2=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`

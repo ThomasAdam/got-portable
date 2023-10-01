@@ -515,7 +515,7 @@ test_rm_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

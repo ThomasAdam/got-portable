@@ -20,7 +20,7 @@ test_load_bundle() {
 	local testroot=`test_init test_load_bundle`
 
 	# generate a bundle with all the history of the repository
-	(cd "$testroot/repo" && git bundle create -q "$testroot/bundle" master)
+	git -C "$testroot/repo" bundle create -q "$testroot/bundle" master
 
 	# then load it in an empty repository
 	(cd "$testroot/" && gotadmin init -b master repo2) >/dev/null
@@ -45,8 +45,8 @@ test_load_bundle() {
 	echo "modified alpha in master" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "edit alpha in master"
 
-	(cd "$testroot/repo" && git bundle create -q \
-		"$testroot/bundle" "$base..master")
+	git -C "$testroot/repo" bundle create -q \
+		"$testroot/bundle" "$base..master"
 
 	(cd "$testroot/repo2" && gotadmin load < "$testroot/bundle") >/dev/null
 	if [ $? -ne 0 ]; then
@@ -74,7 +74,7 @@ test_load_branch_from_bundle() {
 
 	master_commit="$(git_show_head "$testroot/repo")"
 
-	(cd "$testroot/repo" && git checkout -q -b newbranch)
+	git -C "$testroot/repo" checkout -q -b newbranch
 
 	for i in `seq 1`; do
 		echo "alpha edit #$i" > $testroot/repo/alpha

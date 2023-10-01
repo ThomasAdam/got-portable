@@ -21,7 +21,7 @@ test_merge_basic() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -29,18 +29,19 @@ test_merge_basic() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit1=`git_show_branch_head $testroot/repo newbranch`
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing beta on newbranch"
 	local branch_commit2=`git_show_branch_head $testroot/repo newbranch`
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "adding new file on newbranch"
 	local branch_commit3=`git_show_branch_head $testroot/repo newbranch`
-	(cd $testroot/repo && ln -s alpha symlink && git add symlink)
+	(cd $testroot/repo && ln -s alpha symlink)
+	git -C $testroot/repo add symlink
 	git_commit $testroot/repo -m "adding symlink on newbranch"
 	local branch_commit4=`git_show_branch_head $testroot/repo newbranch`
 	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
-	(cd $testroot/repo && git add dotgotbar.link)
+	git -C $testroot/repo add dotgotbar.link
 	git_commit $testroot/repo -m "adding a bad symlink on newbranch"
 	local branch_commit5=`git_show_branch_head $testroot/repo newbranch`
 
@@ -53,7 +54,7 @@ test_merge_basic() {
 	fi
 
 	# create a divergent commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -357,7 +358,7 @@ test_merge_forward() {
 	git_commit $testroot/repo -m "common commit"
 	local commit1=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified beta on branch" > $testroot/repo/beta
 	git_commit $testroot/repo -m "committing to beta on newbranch"
 	local commit2=`git_show_head $testroot/repo`
@@ -474,7 +475,7 @@ test_merge_forward_commit() {
 	local testroot=`test_init merge_forward_commit`
 	local commit0=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local commit1=`git_show_head $testroot/repo`
@@ -530,7 +531,7 @@ test_merge_forward_interrupt() {
 	local testroot=`test_init merge_forward_commit`
 	local commit0=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local commit1=`git_show_head $testroot/repo`
@@ -602,8 +603,8 @@ test_merge_backward() {
 	local testroot=`test_init merge_backward`
 	local commit0=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q -b newbranch
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 
@@ -639,7 +640,7 @@ test_merge_continue() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -647,11 +648,11 @@ test_merge_continue() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit1=`git_show_branch_head $testroot/repo newbranch`
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing beta on newbranch"
 	local branch_commit2=`git_show_branch_head $testroot/repo newbranch`
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "adding new file on newbranch"
 	local branch_commit3=`git_show_branch_head $testroot/repo newbranch`
 
@@ -664,7 +665,7 @@ test_merge_continue() {
 	fi
 
 	# create a conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -858,11 +859,11 @@ test_merge_continue_new_commit() {
 	# changed since the merge was started, to avoid clobbering the changes.
 	local testroot=`test_init merge_continue_new_commit`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 
@@ -919,7 +920,7 @@ test_merge_abort() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -927,14 +928,15 @@ test_merge_abort() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit1=`git_show_branch_head $testroot/repo newbranch`
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing beta on newbranch"
 	local branch_commit2=`git_show_branch_head $testroot/repo newbranch`
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "adding new file on newbranch"
 	local branch_commit3=`git_show_branch_head $testroot/repo newbranch`
-	(cd $testroot/repo && ln -s alpha symlink && git add symlink)
+	(cd $testroot/repo && ln -s alpha symlink)
+	git -C $testroot/repo add symlink
 	git_commit $testroot/repo -m "adding symlink on newbranch"
 	local branch_commit4=`git_show_branch_head $testroot/repo newbranch`
 
@@ -950,7 +952,7 @@ test_merge_abort() {
 	touch $testroot/wt/unversioned-file
 
 	# create a conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1125,7 +1127,7 @@ test_merge_in_progress() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -1139,7 +1141,7 @@ test_merge_in_progress() {
 	fi
 
 	# create a conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1234,7 +1236,7 @@ test_merge_path_prefix() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -1249,7 +1251,7 @@ test_merge_path_prefix() {
 	fi
 
 	# create a conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1288,7 +1290,7 @@ test_merge_missing_file() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to alpha and delta"
@@ -1303,8 +1305,8 @@ test_merge_missing_file() {
 	fi
 
 	# create a conflicting commit which renames alpha
-	(cd $testroot/repo && git checkout -q master)
-	(cd $testroot/repo && git mv alpha epsilon/alpha-moved)
+	git -C $testroot/repo checkout -q master
+	git -C $testroot/repo mv alpha epsilon/alpha-moved
 	git_commit $testroot/repo -m "moving alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
 
@@ -1372,7 +1374,7 @@ test_merge_no_op() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit=`git_show_branch_head $testroot/repo newbranch`
@@ -1386,7 +1388,7 @@ test_merge_no_op() {
 	fi
 
 	# create a conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1569,10 +1571,10 @@ EOF
 	fi
 
 	# update the 'files' branch
-	(cd $testroot/repo && git reset -q --hard master)
-	(cd $testroot/repo && git checkout -q files)
+	git -C $testroot/repo reset -q --hard master
+	git -C $testroot/repo checkout -q files
 	echo "indeed" > $testroot/repo/indeed
-	(cd $testroot/repo && git add indeed)
+	git -C $testroot/repo add indeed
 	git_commit $testroot/repo -m "adding another file indeed"
 	echo "be lots and lots of" > $testroot/repo/be/lots/of
 	git_commit $testroot/repo -m "lots of changes"
@@ -1614,7 +1616,7 @@ test_merge_interrupt() {
 	local commit0=`git_show_head $testroot/repo`
 	local commit0_author_time=`git_show_author_time $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
@@ -1628,7 +1630,7 @@ test_merge_interrupt() {
 	fi
 
 	# create a non-conflicting commit
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified beta on master" > $testroot/repo/beta
 	git_commit $testroot/repo -m "committing to beta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1759,14 +1761,14 @@ test_merge_interrupt() {
 test_merge_umask() {
 	local testroot=`test_init merge_umask`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "committing alpha on newbranch"
 	echo "modified delta on branch" >$testroot/repo/gamma/delta
 	git_commit "$testroot/repo" -m "committing delta on newbranch"
 
 	# diverge from newbranch
-	(cd "$testroot/repo" && git checkout -q master)
+	git -C "$testroot/repo" checkout -q master
 	echo "modified beta on master" >$testroot/repo/beta
 	git_commit "$testroot/repo" -m "committing zeto no master"
 
@@ -1790,17 +1792,17 @@ test_merge_umask() {
 test_merge_gitconfig_author() {
 	local testroot=`test_init merge_gitconfig_author`
 
-	(cd $testroot/repo && git config user.name 'Flan Luck')
-	(cd $testroot/repo && git config user.email 'flan_luck@openbsd.org')
+	git -C $testroot/repo config user.name 'Flan Luck'
+	git -C $testroot/repo config user.email 'flan_luck@openbsd.org'
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on branch" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "committing alpha on newbranch"
 	echo "modified delta on branch" >$testroot/repo/gamma/delta
 	git_commit "$testroot/repo" -m "committing delta on newbranch"
 
 	# diverge from newbranch
-	(cd "$testroot/repo" && git checkout -q master)
+	git -C "$testroot/repo" checkout -q master
 	echo "modified beta on master" >$testroot/repo/beta
 	git_commit "$testroot/repo" -m "committing zeto no master"
 

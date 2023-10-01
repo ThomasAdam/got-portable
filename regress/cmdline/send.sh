@@ -40,10 +40,11 @@ EOF
 		| tr -d ' ' | cut -d: -f2`
 
 	echo "modified alpha" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
-	(cd $testroot/repo && ln -s epsilon/zeta symlink && git add symlink)
+	git -C $testroot/repo rm -q beta
+	(cd $testroot/repo && ln -s epsilon/zeta symlink)
+	git -C $testroot/repo add symlink
 	echo "new file alpha" > $testroot/repo/new
-	(cd $testroot/repo && git add new)
+	git -C $testroot/repo add new
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -349,7 +350,7 @@ test_send_merge_commit() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
+	git -C $testroot/repo config receive.denyCurrentBranch ignore
 
 	got send -q -r $testroot/repo-clone
 	ret=$?
@@ -549,7 +550,7 @@ test_send_clone_and_send() {
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
+	git -C $testroot/repo config receive.denyCurrentBranch ignore
 
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
@@ -1012,7 +1013,7 @@ test_send_new_branch() {
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
+	git -C $testroot/repo config receive.denyCurrentBranch ignore
 
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
@@ -1105,7 +1106,7 @@ test_send_all_branches() {
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git config receive.denyCurrentBranch ignore)
+	git -C $testroot/repo config receive.denyCurrentBranch ignore
 
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?

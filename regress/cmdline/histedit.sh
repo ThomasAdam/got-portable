@@ -23,9 +23,9 @@ test_histedit_no_op() {
 	local orig_author_time=`git_show_author_time $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 	local old_author_time1=`git_show_author_time $testroot/repo`
@@ -238,9 +238,9 @@ test_histedit_swap() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -360,9 +360,9 @@ test_histedit_drop() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -470,9 +470,9 @@ test_histedit_fold() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -585,9 +585,9 @@ test_histedit_edit() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -730,9 +730,9 @@ test_histedit_fold_last_commit() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -777,9 +777,9 @@ test_histedit_missing_commit() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -824,9 +824,9 @@ test_histedit_abort() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1227,9 +1227,9 @@ test_histedit_fold_last_commit_swap() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1292,9 +1292,9 @@ test_histedit_split_commit() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes 1"
 	local old_commit1=`git_show_head $testroot/repo`
 	local short_old_commit1=`trim_obj_id 28 $old_commit1`
@@ -1398,9 +1398,9 @@ test_histedit_duplicate_commit_in_script() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes 1"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1451,7 +1451,7 @@ test_histedit_fold_add_delete() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "added new file epsilon/psi" > $testroot/repo/epsilon/psi
-	(cd $testroot/repo && git add epsilon/psi)
+	git -C $testroot/repo add epsilon/psi
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1459,7 +1459,7 @@ test_histedit_fold_add_delete() {
 	git_commit $testroot/repo -m "editing psi"
 	local old_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git rm -q epsilon/psi)
+	git -C $testroot/repo rm -q epsilon/psi
 	git_commit $testroot/repo -m "removing psi"
 	local old_commit3=`git_show_head $testroot/repo`
 
@@ -1550,7 +1550,7 @@ test_histedit_fold_edit_delete() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modify alpha" > $testroot/repo/alpha
-	(cd $testroot/repo && git add alpha)
+	git -C $testroot/repo add alpha
 	git_commit $testroot/repo -m "modified alpha"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1629,12 +1629,12 @@ test_histedit_fold_delete_add() {
 
 	local orig_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git rm -q alpha)
+	git -C $testroot/repo rm -q alpha
 	git_commit $testroot/repo -m "removing alpha"
 	local old_commit1=`git_show_head $testroot/repo`
 
 	echo "modified alpha" >$testroot/repo/alpha
-	(cd $testroot/repo && git add alpha)
+	git -C $testroot/repo add alpha
 	git_commit $testroot/repo -m "add back modified alpha"
 	local old_commit2=`git_show_head $testroot/repo`
 
@@ -1699,9 +1699,9 @@ test_histedit_fold_only() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1818,9 +1818,9 @@ test_histedit_fold_only_empty_logmsg() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1939,9 +1939,9 @@ test_histedit_edit_only() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -2148,9 +2148,9 @@ test_histedit_mesg_invalid() {
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m 'committing changes'
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -2489,9 +2489,9 @@ test_histedit_drop_only() {
 	local dropmsg="commit changes to drop"
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 
 	git_commit $testroot/repo -m "$dropmsg 1"
 	local drop_commit1=`git_show_head $testroot/repo`

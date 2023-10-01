@@ -219,7 +219,7 @@ test_checkout_sets_xbit() {
 
 	touch $testroot/repo/xfile
 	chmod +x $testroot/repo/xfile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding executable file"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -255,7 +255,7 @@ test_checkout_sets_xbit() {
 test_checkout_commit_from_wrong_branch() {
 	local testroot=`test_init checkout_commit_from_wrong_branch`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on new branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha on new branch"
 
@@ -301,7 +301,7 @@ test_checkout_tag() {
 	local commit_id=`git_show_head $testroot/repo`
 	local tag="1.0.0"
 
-	(cd $testroot/repo && git tag -a -m "test" $tag)
+	git -C $testroot/repo tag -a -m "test" $tag
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
@@ -346,9 +346,9 @@ test_checkout_ignores_submodules() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/.gitmodules" > $testroot/stdout.expected
@@ -614,7 +614,7 @@ test_checkout_symlink() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -762,7 +762,7 @@ test_checkout_symlink_relative_wtpath() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 
 	(cd $testroot && got checkout $testroot/repo wt > /dev/null)
@@ -863,10 +863,8 @@ test_checkout_symlink_relative_wtpath() {
 test_checkout_repo_with_unknown_extension() {
 	local testroot=`test_init checkout_repo_with_unknown_extension`
 
-	(cd $testroot/repo &&
-	    git config --add extensions.badExtension foobar)
-	(cd $testroot/repo &&
-	    git config --add extensions.otherBadExtension 0)
+	git -C $testroot/repo config --add extensions.badExtension foobar
+	git -C $testroot/repo config --add extensions.otherBadExtension 0
 
 	echo "got: badExtension: unsupported repository format extension" \
 		> $testroot/stderr.expected

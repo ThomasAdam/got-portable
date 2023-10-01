@@ -66,7 +66,7 @@ test_update_adds_file() {
 	fi
 
 	echo "new" > $testroot/repo/gamma/new
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a new file"
 
 	echo "A  gamma/new" > $testroot/stdout.expected
@@ -180,7 +180,7 @@ test_update_deletes_dir_with_path_prefix() {
 
 	mkdir $testroot/repo/epsilon/psi
 	echo mu > $testroot/repo/epsilon/psi/mu
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	# check out the epsilon/ sub-tree
@@ -223,7 +223,7 @@ test_update_deletes_dir_recursively() {
 	echo mu > $testroot/repo/epsilon/psi/mu
 	mkdir $testroot/repo/epsilon/psi/chi
 	echo tau > $testroot/repo/epsilon/psi/chi/tau
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	# check out the epsilon/ sub-tree
@@ -271,7 +271,7 @@ test_update_sibling_dirs_with_common_prefix() {
 
 	mkdir $testroot/repo/epsilon2
 	echo mu > $testroot/repo/epsilon2/mu
-	(cd $testroot/repo && git add epsilon2/mu)
+	git -C $testroot/repo add epsilon2/mu
 	git_commit $testroot/repo -m "adding sibling of epsilon"
 	echo change > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "changing epsilon/zeta"
@@ -333,7 +333,7 @@ test_update_dir_with_dot_sibling() {
 	fi
 
 	echo text > $testroot/repo/epsilon.txt
-	(cd $testroot/repo && git add epsilon.txt)
+	git -C $testroot/repo add epsilon.txt
 	git_commit $testroot/repo -m "adding sibling of epsilon"
 	echo change > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "changing epsilon/zeta"
@@ -387,7 +387,7 @@ test_update_moves_files_upwards() {
 	echo mu > $testroot/repo/epsilon/psi/mu
 	mkdir $testroot/repo/epsilon/psi/chi
 	echo tau > $testroot/repo/epsilon/psi/chi/tau
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -397,8 +397,8 @@ test_update_moves_files_upwards() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git mv epsilon/psi/mu epsilon/mu)
-	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon/psi/tau)
+	git -C $testroot/repo mv epsilon/psi/mu epsilon/mu
+	git -C $testroot/repo mv epsilon/psi/chi/tau epsilon/psi/tau
 	git_commit $testroot/repo -m "moving files upwards"
 
 	echo "A  epsilon/mu" > $testroot/stdout.expected
@@ -441,7 +441,7 @@ test_update_moves_files_to_new_dir() {
 	echo mu > $testroot/repo/epsilon/psi/mu
 	mkdir $testroot/repo/epsilon/psi/chi
 	echo tau > $testroot/repo/epsilon/psi/chi/tau
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -452,8 +452,8 @@ test_update_moves_files_to_new_dir() {
 	fi
 
 	mkdir -p $testroot/repo/epsilon-new/psi
-	(cd $testroot/repo && git mv epsilon/psi/mu epsilon-new/mu)
-	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon-new/psi/tau)
+	git -C $testroot/repo mv epsilon/psi/mu epsilon-new/mu
+	git -C $testroot/repo mv epsilon/psi/chi/tau epsilon-new/psi/tau
 	git_commit $testroot/repo -m "moving files upwards"
 
 	echo "D  epsilon/psi/chi/tau" > $testroot/stdout.expected
@@ -495,7 +495,7 @@ test_update_creates_missing_parent() {
 	touch $testroot/repo/Makefile
 	touch $testroot/repo/snake.6
 	touch $testroot/repo/snake.c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding initial snake tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -506,14 +506,14 @@ test_update_creates_missing_parent() {
 	fi
 
 	mkdir -p $testroot/repo/snake
-	(cd $testroot/repo && git mv Makefile snake.6 snake.c snake)
+	git -C $testroot/repo mv Makefile snake.6 snake.c snake
 	touch $testroot/repo/snake/move.c
 	touch $testroot/repo/snake/pathnames.h
 	touch $testroot/repo/snake/snake.h
 	mkdir -p $testroot/repo/snscore
 	touch $testroot/repo/snscore/Makefile
 	touch $testroot/repo/snscore/snscore.c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "restructuring snake tree"
 
 	echo "D  Makefile" > $testroot/stdout.expected
@@ -547,7 +547,7 @@ test_update_creates_missing_parent_with_subdir() {
 	touch $testroot/repo/Makefile
 	touch $testroot/repo/snake.6
 	touch $testroot/repo/snake.c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding initial snake tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -558,14 +558,14 @@ test_update_creates_missing_parent_with_subdir() {
 	fi
 
 	mkdir -p $testroot/repo/sss/snake
-	(cd $testroot/repo && git mv Makefile snake.6 snake.c sss/snake)
+	git -C $testroot/repo mv Makefile snake.6 snake.c sss/snake
 	touch $testroot/repo/sss/snake/move.c
 	touch $testroot/repo/sss/snake/pathnames.h
 	touch $testroot/repo/sss/snake/snake.h
 	mkdir -p $testroot/repo/snscore
 	touch $testroot/repo/snscore/Makefile
 	touch $testroot/repo/snscore/snscore.c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "restructuring snake tree"
 
 	echo "D  Makefile" > $testroot/stdout.expected
@@ -604,7 +604,7 @@ test_update_file_in_subsubdir() {
 	touch $testroot/repo/altq/if_altq.h
 	mkdir -p $testroot/repo/arch/alpha
 	touch $testroot/repo/arch/alpha/Makefile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding initial tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -615,7 +615,7 @@ test_update_file_in_subsubdir() {
 	fi
 
 	echo change > $testroot/repo/arch/alpha/Makefile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "changed a file"
 
 	echo "U  arch/alpha/Makefile" > $testroot/stdout.expected
@@ -649,7 +649,7 @@ test_update_changes_file_to_dir() {
 	git_rm $testroot/repo alpha
 	mkdir $testroot/repo/alpha
 	echo eta > $testroot/repo/alpha/eta
-	(cd $testroot/repo && git add alpha/eta)
+	git -C $testroot/repo add alpha/eta
 	git_commit $testroot/repo -m "changed alpha into directory"
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
@@ -687,7 +687,7 @@ test_update_changes_dir_to_file() {
 	git_rmdir $testroot/repo epsilon
 	echo epsilon > $testroot/repo/epsilon
 	cp $testroot/repo/epsilon $testroot/content.expected
-	(cd $testroot/repo && git add epsilon)
+	git -C $testroot/repo add epsilon
 	git_commit $testroot/repo -m "changed epsilon into file"
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
@@ -759,7 +759,7 @@ test_update_changes_modified_file_to_dir() {
 	git_rm $testroot/repo alpha
 	mkdir $testroot/repo/alpha
 	echo eta > $testroot/repo/alpha/eta
-	(cd $testroot/repo && git add alpha/eta)
+	git -C $testroot/repo add alpha/eta
 	git_commit $testroot/repo -m "changed alpha into directory"
 
 	echo "modified alpha" >> $testroot/wt/alpha
@@ -801,7 +801,7 @@ test_update_merges_file_edits() {
 	echo "6" >> $testroot/repo/numbers
 	echo "7" >> $testroot/repo/numbers
 	echo "8" >> $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local base_commit=`git_show_head $testroot/repo`
 
@@ -882,7 +882,7 @@ test_update_keeps_xbit() {
 
 	touch $testroot/repo/xfile
 	chmod +x $testroot/repo/xfile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding executable file"
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
@@ -929,7 +929,7 @@ test_update_clears_xbit() {
 
 	touch $testroot/repo/xfile
 	chmod +x $testroot/repo/xfile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding executable file"
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
@@ -1031,7 +1031,7 @@ test_update_conflict_wt_add_vs_repo_add() {
 	fi
 
 	echo "new" > $testroot/repo/gamma/new
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding a new file"
 
 	echo "also new" > $testroot/wt/gamma/new
@@ -1093,7 +1093,7 @@ test_update_conflict_wt_edit_vs_repo_rm() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing a file"
 
 	echo "modified beta" > $testroot/wt/beta
@@ -1208,7 +1208,7 @@ test_update_conflict_wt_rm_vs_repo_rm() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	git_commit $testroot/repo -m "removing a file"
 
 	(cd $testroot/wt && got rm beta > /dev/null)
@@ -1340,7 +1340,7 @@ test_update_partial_add() {
 
 	echo "new" > $testroot/repo/new
 	echo "epsilon/new2" > $testroot/repo/epsilon/new2
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "added two files"
 
 	echo "A  epsilon/new2" > $testroot/stdout.expected
@@ -1382,7 +1382,7 @@ test_update_partial_rm() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git rm -q alpha epsilon/zeta)
+	git -C $testroot/repo rm -q alpha epsilon/zeta
 	git_commit $testroot/repo -m "removed two files"
 
 	echo "got: /alpha: no such entry found in tree" \
@@ -1469,7 +1469,7 @@ test_update_moved_branch_ref() {
 	(cd $testroot/wt && got commit -m "modified alpha with got" > /dev/null)
 
 	# + xxxxxxx...yyyyyyy master     -> master  (forced update)
-	(cd $testroot/repo2 && git fetch -q --all)
+	git -C $testroot/repo2 fetch -q --all
 
 	echo -n > $testroot/stdout.expected
 	echo -n "got: work tree's head reference now points to a different " \
@@ -1515,7 +1515,7 @@ test_update_to_another_branch() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on new branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha on new branch"
 
@@ -1581,7 +1581,7 @@ test_update_to_commit_on_wrong_branch() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified alpha on new branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha on new branch"
 
@@ -1616,7 +1616,7 @@ test_update_bumps_base_commit_id() {
 	local testroot=`test_init update_bumps_base_commit_id`
 
 	echo "psi" > $testroot/repo/epsilon/psi
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding another file"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1641,7 +1641,7 @@ test_update_bumps_base_commit_id() {
 	fi
 
 	echo "changed zeta with git" > $testroot/repo/epsilon/zeta
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "changing zeta with git"
 
 	echo "modified zeta" > $testroot/wt/epsilon/zeta
@@ -1707,7 +1707,7 @@ test_update_tag() {
 
 	echo "modified alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha"
-	(cd $testroot/repo && git tag -m "test" -a $tag)
+	git -C $testroot/repo tag -m "test" -a $tag
 
 	echo "U  alpha" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
@@ -1740,7 +1740,7 @@ test_update_toggles_xbit() {
 
 	touch $testroot/repo/xfile
 	chmod +x $testroot/repo/xfile
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding executable file"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -1885,18 +1885,18 @@ test_update_modified_submodules() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 
 	echo "modified foo" > $testroot/repo2/foo
-	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+	git -C $testroot/repo2 commit -q -a -m 'modified a submodule'
 
 	# Update the repo/repo2 submodule link
-	(cd $testroot/repo && git -C repo2 pull -q)
-	(cd $testroot/repo && git add repo2)
+	git -C $testroot/repo/repo2 pull -q
+	git -C $testroot/repo add repo2
 	git_commit $testroot/repo -m "modified submodule link"
 
 	echo "Already up-to-date" > $testroot/stdout.expected
@@ -1918,11 +1918,11 @@ test_update_adds_submodule() {
 	make_single_file_repo $testroot/repo2 foo
 
 	echo "modified foo" > $testroot/repo2/foo
-	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+	git -C $testroot/repo2 commit -q -a -m 'modified a submodule'
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	echo "A  .gitmodules" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
@@ -1957,9 +1957,9 @@ test_update_conflict_wt_file_vs_repo_submodule() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	# Modify the clashing file such that any modifications brought
 	# in by 'got update' would require a merge.
@@ -2009,7 +2009,7 @@ test_update_adds_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 
 	echo "A  alpha.link" > $testroot/stdout.expected
@@ -2116,7 +2116,7 @@ test_update_deletes_symlink() {
 	local testroot=`test_init update_deletes_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlink"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -2127,7 +2127,7 @@ test_update_deletes_symlink() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git rm -q alpha.link)
+	git -C $testroot/repo rm -q alpha.link
 	git_commit $testroot/repo -m "delete symlink"
 
 	echo "D  alpha.link" > $testroot/stdout.expected
@@ -2163,7 +2163,7 @@ test_update_symlink_conflicts() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -2180,10 +2180,10 @@ test_update_symlink_conflicts() {
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
 	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
-	(cd $testroot/repo && git rm -q nonexistent.link)
+	git -C $testroot/repo rm -q nonexistent.link
 	(cd $testroot/repo && ln -sf gamma/delta zeta.link)
 	(cd $testroot/repo && ln -sf alpha new.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "change symlinks"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -2439,18 +2439,18 @@ test_update_single_file() {
 	local testroot=`test_init update_single_file 1`
 
 	echo c1 > $testroot/repo/c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding file c"
 	local commit_id1=`git_show_head $testroot/repo`
 
 	echo a > $testroot/repo/a
 	echo b > $testroot/repo/b
 	echo c2 > $testroot/repo/c
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add files a and b, change c"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git rm -qf c)
+	git -C $testroot/repo rm -qf c
 	git_commit $testroot/repo -m "remove file c"
 	local commit_id3=`git_show_head $testroot/repo`
 
@@ -2751,7 +2751,7 @@ test_update_file_skipped_due_to_obstruction() {
 
 	echo "changed beta" > $testroot/repo/beta
 	echo "new file" > $testroot/repo/new
-	(cd $testroot/repo && git add new)
+	git -C $testroot/repo add new
 	git_commit $testroot/repo -m "changed beta"
 	local commit_id1=`git_show_head $testroot/repo`
 	blob_id1=`get_blob_id $testroot/repo "" beta`

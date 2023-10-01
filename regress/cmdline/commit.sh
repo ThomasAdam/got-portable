@@ -818,8 +818,8 @@ test_commit_tree_entry_sorting() {
 	(cd $testroot/wt && got commit -m 'test' > /dev/null)
 
 	# Let git-fsck verify the newly written tree to make sure Git is happy
-	(cd $testroot/repo && git fsck --strict  \
-		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	git -C $testroot/repo fsck --strict  \
+		> $testroot/fsck.stdout 2> $testroot/fsck.stderr
 	ret=$?
 	test_done "$testroot" "$ret"
 }
@@ -949,8 +949,8 @@ test_commit_gitconfig_author() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git config user.name 'Flan Luck')
-	(cd $testroot/repo && git config user.email 'flan_luck@openbsd.org')
+	git -C $testroot/repo config user.name 'Flan Luck'
+	git -C $testroot/repo config user.email 'flan_luck@openbsd.org'
 
 	echo "modified alpha" > $testroot/wt/alpha
 
@@ -1208,9 +1208,9 @@ test_commit_with_unrelated_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1826,7 +1826,7 @@ test_commit_logmsg_ref() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 
 	local bo_logmsg_prefix="log message of backed-out commit"
 	local cy_logmsg_prefix="log message of cherrypicked commit"
@@ -1835,9 +1835,9 @@ test_commit_logmsg_ref() {
 
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 
 	git_commit $testroot/repo -m "$branch_rev_logmsg"
 	local branch_rev=`git_show_head $testroot/repo`

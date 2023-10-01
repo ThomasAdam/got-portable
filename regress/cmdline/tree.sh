@@ -84,9 +84,9 @@ test_tree_submodule() {
 	local testroot=`test_init tree_submodule`
 
 	make_single_file_repo $testroot/repo2 foo
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	local submodule_id=$(got tree -r $testroot/repo -i | \
 		grep 'repo2\$$' | cut -d ' ' -f1)
@@ -115,10 +115,10 @@ test_tree_submodule() {
 test_tree_submodule_of_same_repo() {
 	local testroot=`test_init tree_submodule_of_same_repo`
 
-	(cd $testroot && git clone -q repo repo2 >/dev/null)
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot clone -q repo repo2 >/dev/null
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	# Currently fails with "bad object data"
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr

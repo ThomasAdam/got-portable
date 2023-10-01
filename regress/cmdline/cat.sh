@@ -207,9 +207,9 @@ test_cat_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	got cat -r $testroot/repo repo2 > $testroot/stdout \
 		> $testroot/stdout 2> $testroot/stderr
@@ -237,10 +237,10 @@ test_cat_submodule_of_same_repo() {
 	local author_time=`git_show_author_time $testroot/repo`
 	local gmtoff=`date +%z`
 
-	(cd $testroot && git clone -q repo repo2 >/dev/null)
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot clone -q repo repo2 >/dev/null
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	# 'got cat' shows the commit object which the submodule points to
 	# because a commit with the same ID exists in the outer repository
@@ -272,7 +272,7 @@ test_cat_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 
 	local alpha_link_id=`got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | cut -d' ' -f 1`

@@ -24,7 +24,7 @@ test_init_basic() {
 
 	gotadmin init $testroot/repo
 
-	local git_head=`(cd $testroot/repo && git symbolic-ref HEAD)`
+	local git_head=`git -C $testroot/repo symbolic-ref HEAD`
 	echo $git_head > $testroot/content
 	echo refs/heads/$headref > $testroot/content.expected
 	cmp -s $testroot/content.expected $testroot/content
@@ -44,7 +44,7 @@ test_init_specified_head() {
 
 	gotadmin init -b $headref $testroot/repo
 
-	local git_head=`(cd $testroot/repo && git symbolic-ref HEAD)`
+	local git_head=`git -C $testroot/repo symbolic-ref HEAD`
 	echo refs/heads/$headref > $testroot/content.expected
 	echo $git_head > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content

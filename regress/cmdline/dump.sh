@@ -32,7 +32,7 @@ test_dump_bundle() {
 		return 1
 	fi
 
-	if ! (cd "$testroot" && git clone -b master -q r.bundle); then
+	if ! git -C "$testroot" clone -b master -q r.bundle; then
 		echo "failed to git clone from the generated bundle" >&2
 		test_done "$testroot" 1
 		return 1
@@ -51,7 +51,7 @@ test_dump_bundle() {
 		return 1
 	fi
 
-	(cd "$testroot/repo" && git checkout -q -b newbranch)
+	git -C "$testroot/repo" checkout -q -b newbranch
 
 	# commit some changes in the repo
 	for i in `seq 5`; do
@@ -67,8 +67,8 @@ test_dump_bundle() {
 		return 1
 	fi
 
-	(cd "$testroot/r" && git checkout -q -b newbranch && \
-	    git pull -q "$testroot/r.bundle" newbranch)
+	git -C "$testroot/r" checkout -q -b newbranch && \
+	    git -C "$testroot/r" pull -q "$testroot/r.bundle" newbranch
 	if [ $? -ne 0 ]; then
 		echo "git pull failed unexpectedly" >&2
 		test_done "$testroot" 1

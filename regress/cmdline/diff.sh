@@ -432,7 +432,7 @@ test_diff_shows_conflict() {
 	echo "6" >> $testroot/repo/numbers
 	echo "7" >> $testroot/repo/numbers
 	echo "8" >> $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local base_commit=`git_show_head $testroot/repo`
 
@@ -529,14 +529,14 @@ test_diff_tag() {
 	git_commit $testroot/repo -m "changed alpha"
 	local commit_id1=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git tag -m "test" $tag1)
+	git -C $testroot/repo tag -m "test" $tag1
 
 	echo "new file" > $testroot/repo/new
-	(cd $testroot/repo && git add new)
+	git -C $testroot/repo add new
 	git_commit $testroot/repo -m "new file"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git tag -m "test" $tag2)
+	git -C $testroot/repo tag -m "test" $tag2
 
 	echo "diff $commit_id0 refs/tags/$tag1" > $testroot/stdout.expected
 	echo "commit - $commit_id0" >> $testroot/stdout.expected
@@ -594,14 +594,14 @@ test_diff_lightweight_tag() {
 	git_commit $testroot/repo -m "changed alpha"
 	local commit_id1=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git tag $tag1)
+	git -C $testroot/repo tag $tag1
 
 	echo "new file" > $testroot/repo/new
-	(cd $testroot/repo && git add new)
+	git -C $testroot/repo add new
 	git_commit $testroot/repo -m "new file"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git tag $tag2)
+	git -C $testroot/repo tag $tag2
 
 	echo "diff $commit_id0 refs/tags/$tag1" > $testroot/stdout.expected
 	echo "commit - $commit_id0" >> $testroot/stdout.expected
@@ -683,10 +683,10 @@ test_diff_ignore_whitespace() {
 test_diff_submodule_of_same_repo() {
 	local testroot=`test_init diff_submodule_of_same_repo`
 
-	(cd $testroot && git clone -q repo repo2 >/dev/null)
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot clone -q repo repo2 >/dev/null
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	epsilon_id=$(got tree -r $testroot/repo -i | grep 'epsilon/$' | \
 		cut -d ' ' -f 1)
@@ -723,7 +723,7 @@ test_diff_symlinks_in_work_tree() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -829,7 +829,7 @@ test_diff_symlinks_in_repo() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -837,9 +837,9 @@ test_diff_symlinks_in_repo() {
 	(cd $testroot/repo && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	(cd $testroot/repo && ln -sf .got/bar $testroot/repo/dotgotfoo.link)
-	(cd $testroot/repo && git rm -q nonexistent.link)
+	git -C $testroot/repo rm -q nonexistent.link
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "change symlinks"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -1810,7 +1810,7 @@ test_diff_file_to_dir() {
 	git_rm $testroot/repo alpha
 	mkdir $testroot/repo/alpha
 	echo eta > $testroot/repo/alpha/eta
-	(cd $testroot/repo && git add alpha/eta)
+	git -C $testroot/repo add alpha/eta
 	git_commit $testroot/repo -m "changed alpha into directory"
 	local commit_id1=`git_show_head $testroot/repo`
 	local alpha_eta_blobid=`get_blob_id $testroot/repo alpha eta`
@@ -1893,7 +1893,7 @@ test_diff_dir_to_file() {
 
 	git_rmdir $testroot/repo epsilon
 	echo epsilon > $testroot/repo/epsilon
-	(cd $testroot/repo && git add epsilon)
+	git -C $testroot/repo add epsilon
 	git_commit $testroot/repo -m "changed epsilon into file"
 	local commit_id1=`git_show_head $testroot/repo`
 	local epsilon_blobid=`get_blob_id $testroot/repo "" epsilon`

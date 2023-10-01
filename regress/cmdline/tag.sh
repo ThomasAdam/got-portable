@@ -43,7 +43,7 @@ test_tag_create() {
 	fi
 
 	# Ensure that Git recognizes the tag Got has created
-	(cd $testroot/repo && git checkout -q $tag)
+	git -C $testroot/repo checkout -q $tag
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -91,7 +91,7 @@ test_tag_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q $tag2)
+	git -C $testroot/repo checkout -q $tag2
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -144,7 +144,7 @@ test_tag_list() {
 	local tag2=2.0.0
 
 	# create tag with Git
-	(cd $testroot/repo && git tag -a -m 'test' $tag)
+	git -C $testroot/repo tag -a -m 'test' $tag
 	# create tag with Got
 	(cd $testroot/repo && got tag -m 'test' $tag2 > /dev/null)
 
@@ -230,8 +230,8 @@ test_tag_list_lightweight() {
 	local tag2=2.0.0
 
 	# create "lightweight" tag with Git
-	(cd $testroot/repo && git tag $tag)
-	(cd $testroot/repo && git tag $tag2)
+	git -C $testroot/repo tag $tag
+	git -C $testroot/repo tag $tag2
 
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -364,16 +364,16 @@ test_tag_create_ssh_signed() {
 	echo -n > $testroot/revoked_signers
 
 	# Ensure that Git recognizes and verifies the tag Got has created
-	(cd $testroot/repo && git checkout -q $tag)
+	git -C $testroot/repo checkout -q $tag
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	(cd $testroot/repo && git config --local gpg.ssh.allowedSignersFile \
-		$testroot/allowed_signers)
-	GIT_STDERR=$(cd $testroot/repo && git tag -v $tag 2>&1 1>/dev/null)
+	git -C $testroot/repo config --local gpg.ssh.allowedSignersFile \
+		$testroot/allowed_signers
+	GIT_STDERR=$(git -C $testroot/repo tag -v $tag 2>&1 1>/dev/null)
 	if ! echo "$GIT_STDERR" | grep -q "^$GOOD_SIG"; then
 		echo "git tag command failed to validate signature"
 		test_done "$testroot" "1"

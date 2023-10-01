@@ -183,7 +183,7 @@ test_fetch_branch() {
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q foo)
+	git -C $testroot/repo checkout -q foo
 	echo "modified alpha on foo" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id3=`git_show_head $testroot/repo`
@@ -315,7 +315,7 @@ test_fetch_branch() {
 	local commit_id4=`git_show_head $testroot/repo`
 
 	# set the default HEAD branch back to master
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 
 	got checkout -b foo $testroot/repo-clone $testroot/wt > /dev/null
 
@@ -366,11 +366,11 @@ test_fetch_branch() {
 	EOF
 
 	# make another change on 'foo' and fetch it without got.conf
-	(cd $testroot/repo && git checkout -q foo)
+	git -C $testroot/repo checkout -q foo
 	echo "modified beta on foo agan" > $testroot/repo/beta
 	git_commit $testroot/repo -m "modified beta"
 	local commit_id5=`git_show_head $testroot/repo`
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 
 	# fetch new commits on branch 'foo', implicitly obtaining the
 	# branch name from a work tree
@@ -475,13 +475,13 @@ test_fetch_all() {
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
-	(cd $testroot/repo && git checkout -q foo)
+	git -C $testroot/repo checkout -q foo
 	echo "modified beta on foo" > $testroot/repo/beta
 	git_commit $testroot/repo -m "modified beta"
 	local commit_id2=`git_show_head $testroot/repo`
 
 	# set the default HEAD branch back to master
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 
 	# remove default branch from got.conf, fetch all branches
 	ed -s $testroot/repo-clone/got.conf <<-EOF
@@ -980,11 +980,11 @@ test_fetch_reference() {
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q foo)
+	git -C $testroot/repo checkout -q foo
 	echo "modified alpha on foo" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id3=`git_show_head $testroot/repo`
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 
 	got fetch -q -r $testroot/repo-clone -R refs/remotes/origin/main \
 		> $testroot/stdout 2> $testroot/stderr
@@ -1486,18 +1486,18 @@ test_fetch_honor_wt_conf_bflag() {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id boo
-	(cd $testroot/repo && git checkout -q boo)
+	git -C $testroot/repo checkout -q boo
 	echo "modified beta on boo" > $testroot/repo/beta
 	git_commit $testroot/repo -m "modified beta"
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id2 hoo
-	(cd $testroot/repo && git checkout -q hoo)
+	git -C $testroot/repo checkout -q hoo
 	echo "modified delta on hoo" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta"
 	local commit_id3=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1547,7 +1547,7 @@ test_fetch_honor_wt_conf_bflag() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q boo)
+	git -C $testroot/repo checkout -q boo
 	# clone has remote/origin/HEAD symref with "master" as its target
 	# but the repo has changed HEAD to "boo", so we should fetch "boo"
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
@@ -1709,7 +1709,7 @@ test_fetch_honor_wt_conf_bflag() {
 	git_commit $testroot/repo -m "modified delta"
 	local commit_id4=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 
 	got checkout -b boo $testroot/repo-clone $testroot/wt > /dev/null
 	(cd $testroot/wt && got fetch -q > $testroot/stdout)
@@ -1764,12 +1764,12 @@ test_fetch_honor_wt_conf_bflag() {
 	git_commit $testroot/repo -m "modified delta on master"
 	local commit_id5=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q boo)
+	git -C $testroot/repo checkout -q boo
 	echo "modified alpha on boo" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha on boo"
 	local commit_id6=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q hoo)
+	git -C $testroot/repo checkout -q hoo
 	echo "modified beta on hoo" > $testroot/repo/beta
 	git_commit $testroot/repo -m "modified beta on hoo"
 	local commit_id7=`git_show_head $testroot/repo`
@@ -1815,7 +1815,7 @@ test_fetch_honor_wt_conf_bflag() {
 
 	# from wt: fetch -b hoo not got.conf "master" or wt "boo" or
 	# repo HEAD "boo"
-	(cd $testroot/repo && git checkout -q boo)
+	git -C $testroot/repo checkout -q boo
 	echo "modified alpha again on boo" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha again on boo"
 	local commit_id8=`git_show_head $testroot/repo`

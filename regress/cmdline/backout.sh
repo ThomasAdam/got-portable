@@ -252,13 +252,13 @@ test_backout_logmsg_ref() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 
 	git_commit $testroot/repo -m "commit changes on newbranch"
 	local commit_time=`git_show_author_time $testroot/repo`
@@ -368,12 +368,12 @@ test_backout_logmsg_ref() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch2)
+	git -C $testroot/repo checkout -q -b newbranch2
 
 	echo "modified delta on branch2" > $testroot/repo/gamma/delta
 	echo "modified alpha on branch2" > $testroot/repo/alpha
 	echo "new file on branch2" > $testroot/repo/epsilon/new2
-	(cd $testroot/repo && git add epsilon/new2)
+	git -C $testroot/repo add epsilon/new2
 
 	git_commit $testroot/repo -m "commit changes on newbranch2"
 	local b2_commit_time=`git_show_author_time $testroot/repo`

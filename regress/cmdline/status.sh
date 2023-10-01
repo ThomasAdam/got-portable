@@ -61,7 +61,7 @@ test_status_subdir_no_mods() {
 	touch $testroot/repo/Basic/Targets/AArch64.cpp
 	touch $testroot/repo/Basic/Targets.cpp
 	touch $testroot/repo/Basic/Targets.h
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add subdir with files"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -101,7 +101,7 @@ test_status_subdir_no_mods2() {
 	mkdir $testroot/repo/FrontendTool
 	touch $testroot/repo/FrontendTool/CMakeLists.txt
 	touch $testroot/repo/FrontendTool/ExecuteCompilerInvocation.cpp
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add subdir with files"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -177,7 +177,7 @@ test_status_shows_local_mods_after_update() {
 	echo "6" >> $testroot/repo/numbers
 	echo "7" >> $testroot/repo/numbers
 	echo "8" >> $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -241,7 +241,7 @@ test_status_unversioned_subdirs() {
 	mkdir $testroot/repo/ramdisk_cd/
 	touch $testroot/repo/ramdisk_cd/Makefile
 	touch $testroot/repo/ramdisk_cd/list.local
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "first commit"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -282,7 +282,7 @@ test_status_symlink() {
 	(cd $testroot/repo && ln -s alpha alpha.link)
 	(cd $testroot/repo && ln -s epsilon epsilon.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "first commit"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -338,7 +338,7 @@ test_status_shows_no_mods_after_complete_merge() {
 	# make this file larger than the usual blob buffer size of 8192
 	jot 16384 > $testroot/repo/numbers
 
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -398,7 +398,7 @@ test_status_shows_conflict() {
 	echo "6" >> $testroot/repo/numbers
 	echo "7" >> $testroot/repo/numbers
 	echo "8" >> $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

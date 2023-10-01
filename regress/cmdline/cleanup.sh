@@ -267,11 +267,11 @@ test_cleanup_redundant_pack_files() {
 	gotadmin pack -a -r "$testroot/repo" >/dev/null
 
 	# create another one with unreachable objects
-	(cd "$testroot/repo" && git checkout -q -b tempbranch)
+	git -C "$testroot/repo" checkout -q -b tempbranch
 	echo "modified alpha on tempbranch" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "edit alpha on tempbranch"
 	gotadmin pack -a -r "$testroot/repo" >/dev/null
-	(cd "$testroot/repo" && git checkout -q master)
+	git -C "$testroot/repo" checkout -q master
 	(cd "$testroot/repo" && got branch -d tempbranch) >/dev/null
 
 	gotadmin cleanup -a -q -r "$testroot/repo"
@@ -314,7 +314,7 @@ test_cleanup_redundant_pack_files() {
 	rm "${kpack%.pack}.keep"
 
 	# create some commits on a separate branch
-	(cd "$testroot/repo" && git checkout -q -b newbranch)
+	git -C "$testroot/repo" checkout -q -b newbranch
 
 	for i in `jot 5`; do
 		echo "alpha $i" > $testroot/repo/alpha
@@ -339,7 +339,7 @@ test_cleanup_precious_objects() {
 	local testroot=`test_init cleanup_precious_objects`
 
 	# enable Git's preciousObjects extension
-	(cd $testroot/repo && git config extensions.preciousObjects true)
+	git -C $testroot/repo config extensions.preciousObjects true
 
 	# cleanup should now refuse to purge objects
 	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \

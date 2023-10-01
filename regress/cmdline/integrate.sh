@@ -19,20 +19,20 @@
 test_integrate_basic() {
 	local testroot=`test_init integrate_basic`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -52,7 +52,7 @@ test_integrate_basic() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -154,25 +154,25 @@ test_integrate_requires_rebase_first() {
 	local testroot=`test_init integrate_requires_rebase_first`
 	local init_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -258,20 +258,20 @@ test_integrate_requires_rebase_first() {
 test_integrate_path_prefix() {
 	local testroot=`test_init integrate_path_prefix`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -291,7 +291,7 @@ test_integrate_path_prefix() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
@@ -321,20 +321,20 @@ test_integrate_path_prefix() {
 test_integrate_backwards_in_time() {
 	local testroot=`test_init integrate_backwards_in_time`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -354,7 +354,7 @@ test_integrate_backwards_in_time() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 

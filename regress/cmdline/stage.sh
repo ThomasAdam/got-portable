@@ -1022,9 +1022,9 @@ test_stage_histedit() {
 	(cd $testroot/wt && got stage alpha > /dev/null)
 
 	echo "modified alpha on master" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on master" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
 
@@ -1066,20 +1066,20 @@ test_stage_histedit() {
 test_stage_rebase() {
 	local testroot=`test_init stage_rebase`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q master)
+	git -C $testroot/repo checkout -q master
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local master_commit=`git_show_head $testroot/repo`
@@ -1441,7 +1441,7 @@ test_stage_patch() {
 	local testroot=`test_init stage_patch`
 
 	jot 16 > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -1731,7 +1731,7 @@ test_stage_patch_twice() {
 	local testroot=`test_init stage_patch_twice`
 
 	jot 16 > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2230,7 +2230,7 @@ test_stage_patch_quit() {
 
 	jot 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
-	(cd $testroot/repo && git add numbers zzz)
+	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2342,7 +2342,7 @@ test_stage_patch_incomplete_script() {
 
 	jot 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
-	(cd $testroot/repo && git add numbers zzz)
+	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2442,7 +2442,7 @@ test_stage_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local head_commit=`git_show_head $testroot/repo`
 
@@ -2755,7 +2755,7 @@ test_stage_patch_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local head_commit=`git_show_head $testroot/repo`
 

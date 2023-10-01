@@ -277,7 +277,7 @@ test_import_detached_head() {
 	local testroot=`test_init import_detached_head`
 
 	# mute verbose 'detached HEAD' warning
-	(cd $testroot/repo && git config --local advice.detachedHead false)
+	git -C $testroot/repo config --local advice.detachedHead false
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
@@ -286,8 +286,8 @@ test_import_detached_head() {
 
 	# enter detached HEAD state
 	local head_commit=`git_show_head $testroot/repo | cut -c1-7`
-	(cd $testroot/repo && \
-	    git checkout $head_commit > $testroot/stdout 2> $testroot/stderr)
+	git -C $testroot/repo checkout $head_commit \
+	    > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
@@ -317,8 +317,8 @@ test_import_detached_head() {
 		return 1
 	fi
 
-	local main_commit=`(cd $testroot/repo && \
-	    git show-ref main | cut -d ' ' -f 1)`
+	local main_commit=`git -C $testroot/repo show-ref main | \
+	    cut -d ' ' -f 1`
 	echo "A  $testroot/import/gamma/delta" > $testroot/stdout.expected
 	echo "A  $testroot/import/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/import/alpha" >> $testroot/stdout.expected
