@@ -23,9 +23,9 @@ blame_cmp() {
 
 	(cd $testroot/wt && got blame "$file" | cut -d ' ' -f 2 \
 		> $testroot/${file}.blame.got)
-	(cd $testroot/repo && git reset --hard master > /dev/null)
-	(cd $testroot/repo && git blame "$file" | cut -d ' ' -f 1 \
-		> $testroot/${file}.blame.git)
+	git -C $testroot/repo reset --hard master > /dev/null
+	git -C $testroot/repo blame "$file" | cut -d ' ' -f 1 \
+		> $testroot/${file}.blame.git
 
 	cmp -s $testroot/${file}.blame.git $testroot/${file}.blame.got
 	ret=$?
@@ -101,7 +101,7 @@ test_blame_tag() {
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git tag -a -m "test" $tag)
+	git -C $testroot/repo tag -a -m "test" $tag
 
 	echo 3 >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
@@ -744,9 +744,9 @@ test_blame_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	# Attempt a (nonsensical) blame of a submodule.
 	got blame -r $testroot/repo repo2 \
@@ -779,7 +779,7 @@ test_blame_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 
 	local commit_id1=`git_show_head $testroot/repo`

@@ -187,7 +187,7 @@ test_unstage_patch() {
 	local testroot=`test_init unstage_patch`
 
 	jot 16 > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
+	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -821,7 +821,7 @@ test_unstage_patch_quit() {
 
 	jot 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
-	(cd $testroot/repo && git add numbers zzz)
+	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -981,7 +981,7 @@ test_unstage_symlink() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local head_commit=`git_show_head $testroot/repo`
 
@@ -1165,7 +1165,7 @@ test_unstage_patch_symlink() {
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta2.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 

@@ -30,7 +30,7 @@ test_branch_create() {
 	fi
 
 	# Ensure that Git recognizes the branch Got has created
-	(cd $testroot/repo && git checkout -q newbranch)
+	git -C $testroot/repo checkout -q newbranch
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -66,7 +66,7 @@ test_branch_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q anotherbranch)
+	git -C $testroot/repo checkout -q anotherbranch
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -82,7 +82,7 @@ test_branch_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q yetanotherbranch)
+	git -C $testroot/repo checkout -q yetanotherbranch
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -100,7 +100,7 @@ test_branch_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q commitbranch)
+	git -C $testroot/repo checkout -q commitbranch
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -394,7 +394,7 @@ test_branch_delete_packed() {
 		fi
 	done
 
-	(cd $testroot/repo && git pack-refs --all)
+	git -C $testroot/repo pack-refs --all
 
 	got branch -d refs/heads/branch2 -r $testroot/repo > $testroot/stdout
 	ret=$?

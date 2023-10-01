@@ -26,14 +26,14 @@ test_cherrypick_basic() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local branch_rev=`git_show_head $testroot/repo`
@@ -134,14 +134,14 @@ test_cherrypick_root_commit() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git rm -q alpha)
-	(cd $testroot/repo && git rm -q beta)
-	(cd $testroot/repo && git rm -q epsilon/zeta)
-	(cd $testroot/repo && git rm -q gamma/delta)
+	git -C $testroot/repo checkout -q -b newbranch
+	git -C $testroot/repo rm -q alpha
+	git -C $testroot/repo rm -q beta
+	git -C $testroot/repo rm -q epsilon/zeta
+	git -C $testroot/repo rm -q gamma/delta
 	mkdir -p $testroot/repo/epsilon
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing on newbranch"
 
 	echo "modified new file on branch" >> $testroot/repo/epsilon/new
@@ -196,14 +196,14 @@ test_cherrypick_into_work_tree_with_conflicts() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local branch_rev=`git_show_head $testroot/repo`
@@ -280,13 +280,13 @@ test_cherrypick_into_work_tree_with_mixed_commits() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local branch_rev=`git_show_head $testroot/repo`
@@ -330,19 +330,19 @@ test_cherrypick_modified_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 
 	echo "modified foo" > $testroot/repo2/foo
-	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+	git -C $testroot/repo2 commit -q -a -m 'modified a submodule'
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	# Update the repo/repo2 submodule link on newbranch
-	(cd $testroot/repo && git -C repo2 pull -q)
-	(cd $testroot/repo && git add repo2)
+	git -C $testroot/repo/repo2 pull -q
+	git -C $testroot/repo add repo2
 	git_commit $testroot/repo -m "modified submodule link"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -367,10 +367,10 @@ test_cherrypick_added_submodule() {
 	make_single_file_repo $testroot/repo2 foo
 
 	# Add the repo/repo2 submodule on newbranch
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo checkout -q -b newbranch
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 	local commit_id=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got cherrypick $commit_id > $testroot/stdout)
@@ -404,10 +404,10 @@ test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 	make_single_file_repo $testroot/repo2 foo
 
 	# Add the repo/repo2 submodule on newbranch
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo checkout -q -b newbranch
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 	local commit_id=`git_show_head $testroot/repo`
 
 	# Modify the clashing file such that any modifications brought
@@ -447,7 +447,7 @@ test_cherrypick_modified_symlinks() {
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -482,9 +482,9 @@ EOF
 	(cd $testroot/repo && rm epsilon.link && ln -s gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	(cd $testroot/repo && ln -sf .got/foo $testroot/repo/dotgotfoo.link)
-	(cd $testroot/repo && git rm -q nonexistent.link)
+	git -C $testroot/repo rm -q nonexistent.link
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "change symlinks"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -651,7 +651,7 @@ test_cherrypick_symlink_conflicts() {
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
@@ -661,10 +661,10 @@ test_cherrypick_symlink_conflicts() {
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
 	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
-	(cd $testroot/repo && git rm -q nonexistent.link)
+	git -C $testroot/repo rm -q nonexistent.link
 	(cd $testroot/repo && ln -sf gamma/delta zeta.link)
 	(cd $testroot/repo && ln -sf alpha new.link)
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "change symlinks"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -927,14 +927,14 @@ test_cherrypick_symlink_conflicts() {
 test_cherrypick_with_path_prefix_and_empty_tree() {
 	local testroot=`test_init cherrypick_with_path_prefix_and_empty_tree 1`
 
-	(cd $testroot/repo && git commit --allow-empty \
-		-m "initial empty commit" >/dev/null)
+	git -C $testroot/repo commit --allow-empty \
+		-m "initial empty commit" >/dev/null
 
 	(cd $testroot/repo && got br bar >/dev/null)
 
 	mkdir -p $testroot/repo/epsilon
 	echo "file foo" > $testroot/repo/epsilon/foo
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "add file foo"
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -978,7 +978,7 @@ test_cherrypick_conflict_no_eol() {
 	local content_c="aaa\naaa\nccc\naaa\naaa\naaa\naaa"
 
 	printf "$content_a" > $testroot/repo/a
-	(cd $testroot/repo && git add a)
+	git -C $testroot/repo add a
 	git_commit $testroot/repo -m "initial commit"
 
 	(cd $testroot/repo && got branch newbranch)
@@ -1018,7 +1018,7 @@ test_cherrypick_conflict_no_eol2() {
 	local content_c="aaa\naaa\nbbb\naaa\naaa\naaa\n"
 
 	printf "$content_a" > $testroot/repo/a
-	(cd $testroot/repo && git add a)
+	git -C $testroot/repo add a
 	git_commit $testroot/repo -m "initial commit"
 
 	(cd $testroot/repo && got branch newbranch)
@@ -1314,7 +1314,7 @@ got_ref_list_free(struct got_reflist_head *refs)
         }
 }
 EOF
-	(cd $testroot/repo && git add reference.c)
+	git -C $testroot/repo add reference.c
 	git_commit $testroot/repo -m "added reference.c file"
 	local base_commit=`git_show_head $testroot/repo`
 
@@ -1325,7 +1325,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	ed -s $testroot/repo/reference.c <<EOF
 91a
         if (!is_valid_ref_name(name))
@@ -1395,14 +1395,14 @@ test_cherrypick_same_branch() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing more changes on newbranch"
 
 	local branch_rev=`git_show_head $testroot/repo`
@@ -1438,7 +1438,7 @@ test_cherrypick_dot_on_a_line_by_itself() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 	printf "modified\n:delta\n.\non\n:branch\n" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local branch_rev=`git_show_head $testroot/repo`
@@ -1736,13 +1736,13 @@ test_cherrypick_logmsg_ref() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
+	git -C $testroot/repo checkout -q -b newbranch
 
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
 	echo "modified alpha on branch" > $testroot/repo/alpha
-	(cd $testroot/repo && git rm -q beta)
+	git -C $testroot/repo rm -q beta
 	echo "new file on branch" > $testroot/repo/epsilon/new
-	(cd $testroot/repo && git add epsilon/new)
+	git -C $testroot/repo add epsilon/new
 
 	git_commit $testroot/repo -m "commit changes on newbranch"
 	local commit_time=`git_show_author_time $testroot/repo`
@@ -1852,12 +1852,12 @@ test_cherrypick_logmsg_ref() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q -b newbranch2)
+	git -C $testroot/repo checkout -q -b newbranch2
 
 	echo "modified delta on branch2" > $testroot/repo/gamma/delta
 	echo "modified alpha on branch2" > $testroot/repo/alpha
 	echo "new file on branch2" > $testroot/repo/epsilon/new2
-	(cd $testroot/repo && git add epsilon/new2)
+	git -C $testroot/repo add epsilon/new2
 
 	git_commit $testroot/repo -m "commit changes on newbranch2"
 	local b2_commit_time=`git_show_author_time $testroot/repo`
@@ -2033,7 +2033,7 @@ test_cherrypick_commit_keywords() {
 
 	set -- "$(git_show_head $testroot/repo)"
 
-	(cd $testroot/repo && git checkout -q -b branch-1)
+	git -C $testroot/repo checkout -q -b branch-1
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret=$?

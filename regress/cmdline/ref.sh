@@ -39,7 +39,7 @@ test_ref_create() {
 	fi
 
 	# Ensure that Git recognizes the ref Got has created
-	(cd $testroot/repo && git checkout -q newref)
+	git -C $testroot/repo checkout -q newref
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -64,7 +64,7 @@ test_ref_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q anotherref)
+	git -C $testroot/repo checkout -q anotherref
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -80,7 +80,7 @@ test_ref_create() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git checkout -q symbolicref)
+	git -C $testroot/repo checkout -q symbolicref
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -154,7 +154,7 @@ test_ref_create() {
 	fi
 
 	# Ensure that Git recognizes the ref Got has created
-	(cd $testroot/repo && git checkout -q HEAD)
+	git -C $testroot/repo checkout -q HEAD
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "git checkout command failed unexpectedly"
@@ -251,7 +251,7 @@ test_ref_delete() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git pack-refs --all)
+	git -C $testroot/repo pack-refs --all
 
 	echo "modified alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha"

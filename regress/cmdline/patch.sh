@@ -1365,8 +1365,8 @@ test_patch_merge_gitdiff() {
 	local testroot=`test_init patch_merge_gitdiff`
 
 	jot 10 > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers && \
-		git_commit $testroot/repo -m "nums")
+	git -C $testroot/repo add numbers && \
+		git_commit $testroot/repo -m "nums"
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
@@ -1374,7 +1374,7 @@ test_patch_merge_gitdiff() {
 	fi
 
 	jot 10 | sed 's/4/four/g' > $testroot/repo/numbers
-	(cd $testroot/repo && git diff > $testroot/old.diff)
+	git -C $testroot/repo diff > $testroot/old.diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
@@ -1385,8 +1385,8 @@ test_patch_merge_gitdiff() {
 	jot 10 > $testroot/repo/numbers
 
 	jot 10 | sed 's/6/six/g' > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers && \
-		git_commit $testroot/repo -m "edit")
+	git -C $testroot/repo add numbers && \
+		git_commit $testroot/repo -m "edit"
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
@@ -1921,7 +1921,7 @@ test_patch_remove_binary_file() {
 	# try again using a git produced diff
 	(cd $testroot/wt && got revert x) >/dev/null
 
-	(cd $testroot/repo && git show demo) >$testroot/wt/patch
+	git -C $testroot/repo show demo >$testroot/wt/patch
 
 	(cd $testroot/wt && got patch <patch) > $testroot/stdout
 	if [ $? -ne 0 ]; then

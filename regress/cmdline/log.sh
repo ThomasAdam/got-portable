@@ -76,7 +76,7 @@ test_log_in_worktree() {
 	make_test_tree $testroot/repo
 	mkdir -p $testroot/repo/epsilon/d
 	echo foo > $testroot/repo/epsilon/d/foo
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding the test tree"
 	local head_commit=`git_show_head $testroot/repo`
 
@@ -191,7 +191,7 @@ test_log_tag() {
 		return 1
 	fi
 
-	(cd $testroot/repo && git tag -a -m "test" $tag)
+	git -C $testroot/repo tag -a -m "test" $tag
 
 	echo "commit $commit_id (master, tags/$tag)" > $testroot/stdout.expected
 	(cd $testroot/wt && got log -l1 -c $tag | grep ^commit \
@@ -205,7 +205,7 @@ test_log_tag() {
 	fi
 
 	# test a "lightweight" tag
-	(cd $testroot/repo && git tag $tag2)
+	git -C $testroot/repo tag $tag2
 
 	echo "commit $commit_id (master, tags/$tag, tags/$tag2)" \
 		> $testroot/stdout.expected
@@ -666,7 +666,7 @@ test_log_in_worktree_different_repo() {
 	make_test_tree $testroot/repo
 	mkdir -p $testroot/repo/epsilon/d
 	echo foo > $testroot/repo/epsilon/d/foo
-	(cd $testroot/repo && git add .)
+	git -C $testroot/repo add .
 	git_commit $testroot/repo -m "adding the test tree"
 	local head_commit=`git_show_head $testroot/repo`
 
@@ -774,9 +774,9 @@ test_log_submodule() {
 
 	make_single_file_repo $testroot/repo2 foo
 
-	(cd $testroot/repo && git -c protocol.file.allow=always \
-		submodule -q add ../repo2)
-	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	git -C $testroot/repo -c protocol.file.allow=always \
+		submodule -q add ../repo2
+	git -C $testroot/repo commit -q -m 'adding submodule'
 	local head_commit=`git_show_head $testroot/repo`
 
 	echo "commit $head_commit (master)" > $testroot/stdout.expected
@@ -823,11 +823,11 @@ test_log_submodule() {
 	fi
 
 	echo "modified foo" > $testroot/repo2/foo
-	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+	git -C $testroot/repo2 commit -q -a -m 'modified a submodule'
 
 	# Update the repo/repo2 submodule link
-	(cd $testroot/repo && git -C repo2 pull -q)
-	(cd $testroot/repo && git add repo2)
+	git -C $testroot/repo/repo2 pull -q
+	git -C $testroot/repo add repo2
 	git_commit $testroot/repo -m "changed submodule link"
 
 	# log -P does not show the changed submodule path
