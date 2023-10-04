@@ -160,7 +160,7 @@ static struct {
 	int			 idx;
 	char			 marker;
 } tog_base_commit;
-static enum got_diff_algorithm tog_diff_algo = GOT_DIFF_ALGORITHM_MYERS;
+static enum got_diff_algorithm tog_diff_algo = GOT_DIFF_ALGORITHM_PATIENCE;
 
 static const struct got_error *
 tog_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
