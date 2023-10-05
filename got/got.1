@@ -3285,35 +3285,29 @@ or reverted with
 Merge the specified
 .Ar branch
 into the current branch of the work tree.
-If the branches have diverged, creates a merge commit.
-Otherwise, if
+If the branches have diverged, merge changes into the work tree
+and create a merge commit.
+Otherwise, if the specified
 .Ar branch
-already includes all commits from the work tree's branch, updates the work
-tree's branch to be the same as
+is already based on the work tree's current branch, make the work tree's
+current branch equivalent to the specified
 .Ar branch
-without creating a commit, and updates the work tree to the most recent commit
-on the branch.
-.Pp
-If a linear project history is desired, then use of
-.Cm got rebase
-should be preferred over
-.Cm got merge .
-However, even strictly linear projects may require merge commits in order
-to merge in new versions of third-party code stored on vendor branches
-created with
-.Cm got import .
+and update files in the work tree accordingly.
 .Pp
 Merge commits are commits based on multiple parent commits.
-The tip commit of the work tree's current branch, which must be in the
-.Dq refs/heads/
-reference namespace and must be set with
-.Cm got update -b
-before starting the
-.Cm merge
-operation, will be used as the first parent.
+The tip commit of the work tree's current branch will be used as the
+first parent.
 The tip commit of the specified
 .Ar branch
 will be used as the second parent.
+The work tree's current branch
+must be in the
+.Dq refs/heads/
+reference namespace and can be set with
+.Cm got update -b
+before starting the
+.Cm merge
+operation.
 .Pp
 No ancestral relationship between the two branches is required.
 If the two branches have already been merged previously, only new changes
@@ -3322,6 +3316,18 @@ will be merged.
 It is not possible to create merge commits with more than two parents.
 If more than one branch needs to be merged, then multiple merge commits
 with two parents each can be created in sequence.
+.Pp
+If a linear project history is desired, then use of
+.Cm got rebase
+should generally be preferred over
+.Cm got merge .
+However, even strictly linear projects may require occasional merge commits,
+for example in order to merge in new versions of third-party code stored
+on
+.Dq vendor
+branches created with
+.Cm got import .
+.Pp
 .Pp
 While merging changes found on the
 .Ar branch
