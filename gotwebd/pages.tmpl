@@ -39,6 +39,12 @@
 #include "gotwebd.h"
 #include "tmpl.h"
 
+enum gotweb_ref_tm {
+	TM_DIFF,
+	TM_LONG,
+};
+
+static int datetime(struct template *, time_t, int);
 static int gotweb_render_blob_line(struct template *, const char *, size_t);
 static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
 static int blame_line(struct template *, const char *, struct blame_line *,
@@ -53,6 +59,30 @@ static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
 
 !}
+
+{{ define datetime(struct template *tp, time_t t, int fmt) }}
+{!
+	struct tm	 tm;
+	char		 rfc3339[64];
+	char		 datebuf[64];
+
+	if (gmtime_r(&t, &tm) == NULL)
+		return -1;
+
+	if (strftime(rfc3339, sizeof(rfc3339), "%FT%TZ", &tm) == 0)
+		return -1;
+
+	if (fmt != TM_DIFF && asctime_r(&tm, datebuf) == NULL)
+		return -1;
+!}
+<time datetime="{{ rfc3339 }}">
+  {{ if fmt == TM_DIFF }}
+    {{ render gotweb_render_age(tp, t) }}
+  {{ else }}
+    {{ datebuf }} {{ " UTC" }}
+  {{ end }}
+</time>
+{{ end }}
 
 {{ define gotweb_render_page(struct template *tp,
     int (*body)(struct template *)) }}
@@ -216,7 +246,7 @@ static inline int rss_author(struct template *, char *);
   {{ end }}
   {{ if srv->show_repo_age }}
     <div class="index_project_age">
-      {{ render gotweb_render_age(tp, repo_dir->age, TM_DIFF) }}
+      {{ render datetime(tp, repo_dir->age, TM_DIFF) }}
     </div>
   {{ end }}
   <div class="navs_wrapper">
@@ -283,7 +313,7 @@ static inline int rss_author(struct template *, char *);
     <div class='brief'>
       <p class='brief_meta'>
         <span class='briefs_age'>
-          {{ render gotweb_render_age(tp, rc->committer_time, TM_DIFF) }}
+          {{ render datetime(tp, rc->committer_time, TM_DIFF) }}
         </span>
         {{" "}}
         <span class="briefs_author">
@@ -414,7 +444,7 @@ static inline int rss_author(struct template *, char *);
 	{{ end }}
         <dt>Date:</dt>
         <dd>
-          {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+          {{ render datetime(tp, rc->committer_time, TM_LONG) }}
         </dd>
       </dl>
     </div>
@@ -451,7 +481,7 @@ static inline int rss_author(struct template *, char *);
     <dl id="blob_header">
       <dt>Date:</dt>
       <dd>
-        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>
@@ -498,7 +528,7 @@ static inline int rss_author(struct template *, char *);
       <dd><code class="commit-id">{{ rc->tree_id }}</code></dd>
       <dt>Date:</dt>
       <dd>
-        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>
@@ -646,7 +676,7 @@ static inline int rss_author(struct template *, char *);
 	}
 !}
 <div class="tag_age">
-  {{ render gotweb_render_age(tp, rt->tagger_time, TM_DIFF) }}
+  {{ render datetime(tp, rt->tagger_time, TM_DIFF) }}
 </div>
 <div class="tag_name">{{ tag_name }}</div>
 <div class="tag_log">
@@ -697,7 +727,7 @@ static inline int rss_author(struct template *, char *);
       <dd>{{ rt->tagger }}</dd>
       <dt>Date:</dt>
       <dd>
-        {{ render gotweb_render_age(tp, rt->tagger_time, TM_LONG)}}
+        {{ render datetime(tp, rt->tagger_time, TM_LONG)}}
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rt->commit_msg }}</dd>
@@ -736,7 +766,7 @@ static inline int rss_author(struct template *, char *);
       {{ end }}
       <dt>Date:</dt>
       <dd>
-        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>
@@ -829,7 +859,7 @@ static inline int rss_author(struct template *, char *);
 !}
 <section class="branches_wrapper">
   <div class="branches_age">
-    {{ render gotweb_render_age(tp, age, TM_DIFF) }}
+    {{ render datetime(tp, age, TM_DIFF) }}
   </div>
   <div class="branch">
     <a href="{{ render gotweb_render_url(c, &url) }}">{{ refname }}</a>
@@ -868,7 +898,7 @@ static inline int rss_author(struct template *, char *);
   {{ if srv->show_repo_age }}
     <dt>Last Change:</dt>
     <dd>
-      {{ render gotweb_render_age(tp, t->repo_dir->age, TM_DIFF) }}
+      {{ render datetime(tp, t->repo_dir->age, TM_DIFF) }}
     </dd>
   {{ end }}
   {{ if srv->show_repo_cloneurl }}
@@ -896,7 +926,7 @@ static inline int rss_author(struct template *, char *);
     <dl id="blame_header">
       <dt>Date:</dt>
       <dd>
-        {{ render gotweb_render_age(tp, rc->committer_time, TM_LONG) }}
+        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>

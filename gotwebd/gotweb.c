@@ -1353,68 +1353,48 @@ done:
 }
 
 int
-gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
+gotweb_render_age(struct template *tp, time_t committer_time)
 {
 	struct request *c = tp->tp_arg;
-	struct tm tm;
 	long long diff_time;
 	const char *years = "years ago", *months = "months ago";
 	const char *weeks = "weeks ago", *days = "days ago";
 	const char *hours = "hours ago",  *minutes = "minutes ago";
 	const char *seconds = "seconds ago", *now = "right now";
-	char *s;
-	char datebuf[64];
-	size_t r;
 
-	switch (ref_tm) {
-	case TM_DIFF:
-		diff_time = time(NULL) - committer_time;
-		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if (tp_writef(c->tp, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 365), years) == -1)
-				return -1;
-		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if (tp_writef(c->tp, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / (365 / 12)),
-			    months) == -1)
-				return -1;
-		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if (tp_writef(c->tp, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
-				return -1;
-		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if (tp_writef(c->tp, "%lld %s",
-			    (diff_time / 60 / 60 / 24), days) == -1)
-				return -1;
-		} else if (diff_time > 60 * 60 * 2) {
-			if (tp_writef(c->tp, "%lld %s",
-			    (diff_time / 60 / 60), hours) == -1)
-				return -1;
-		} else if (diff_time > 60 * 2) {
-			if (tp_writef(c->tp, "%lld %s", (diff_time / 60),
-			    minutes) == -1)
-				return -1;
-		} else if (diff_time > 2) {
-			if (tp_writef(c->tp, "%lld %s", diff_time,
-			    seconds) == -1)
-				return -1;
-		} else {
-			if (tp_writes(tp, now) == -1)
-				return -1;
-		}
-		break;
-	case TM_LONG:
-		if (gmtime_r(&committer_time, &tm) == NULL)
+	diff_time = time(NULL) - committer_time;
+	if (diff_time > 60 * 60 * 24 * 365 * 2) {
+		if (tp_writef(c->tp, "%lld %s",
+		    (diff_time / 60 / 60 / 24 / 365), years) == -1)
 			return -1;
-
-		s = asctime_r(&tm, datebuf);
-		if (s == NULL)
+	} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
+		if (tp_writef(c->tp, "%lld %s",
+		    (diff_time / 60 / 60 / 24 / (365 / 12)),
+		    months) == -1)
 			return -1;
-
-		if (tp_writes(tp, datebuf) == -1 ||
-		    tp_writes(tp, " UTC") == -1)
+	} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
+		if (tp_writef(c->tp, "%lld %s",
+		    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
 			return -1;
-		break;
+	} else if (diff_time > 60 * 60 * 24 * 2) {
+		if (tp_writef(c->tp, "%lld %s",
+		    (diff_time / 60 / 60 / 24), days) == -1)
+			return -1;
+	} else if (diff_time > 60 * 60 * 2) {
+		if (tp_writef(c->tp, "%lld %s",
+		    (diff_time / 60 / 60), hours) == -1)
+			return -1;
+	} else if (diff_time > 60 * 2) {
+		if (tp_writef(c->tp, "%lld %s", (diff_time / 60),
+		    minutes) == -1)
+			return -1;
+	} else if (diff_time > 2) {
+		if (tp_writef(c->tp, "%lld %s", diff_time,
+		    seconds) == -1)
+			return -1;
+	} else {
+		if (tp_writes(tp, now) == -1)
+			return -1;
 	}
 	return 0;
 }

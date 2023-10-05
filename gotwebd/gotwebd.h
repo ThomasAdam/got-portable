@@ -435,11 +435,6 @@ enum query_actions {
 	ACTIONS__MAX,
 };
 
-enum gotweb_ref_tm {
-	TM_DIFF,
-	TM_LONG,
-};
-
 extern struct gotwebd	*gotwebd_env;
 
 typedef int (*got_render_blame_line_cb)(struct template *, const char *,
@@ -455,7 +450,7 @@ int sockets_privinit(struct gotwebd *, struct socket *);
 /* gotweb.c */
 void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
     struct gotweb_url *, int *);
-int gotweb_render_age(struct template *, time_t, int);
+int gotweb_render_age(struct template *, time_t);
 const struct got_error *gotweb_init_transport(struct transport **);
 const char *gotweb_action_name(int);
 int gotweb_render_url(struct request *, struct gotweb_url *);
