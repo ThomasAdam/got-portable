@@ -438,7 +438,6 @@ enum query_actions {
 enum gotweb_ref_tm {
 	TM_DIFF,
 	TM_LONG,
-	TM_RFC822,
 };
 
 extern struct gotwebd	*gotwebd_env;

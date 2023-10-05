@@ -989,6 +989,9 @@ static inline int rss_author(struct template *, char *);
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
 	struct repo_dir		*repo_dir = t->repo_dir;
+	struct tm		 tm;
+	char			 rfc822[128];
+	int			 r;
 	char			*tag_name = rt->tag_name;
 	struct gotweb_url	 tag = {
 		.action = TAG,
@@ -1000,6 +1003,12 @@ static inline int rss_author(struct template *, char *);
 
 	if (strncmp(tag_name, "refs/tags/", 10) == 0)
 		tag_name += 10;
+
+	if (gmtime_r(&rt->tagger_time, &tm) == NULL)
+		return -1;
+	r = strftime(rfc822, sizeof(rfc822), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+	if (r == 0)
+		return 0;
 !}
 <item>
   <title>{{ repo_dir->name }} {{" "}} {{ tag_name }}</title>
@@ -1014,7 +1023,7 @@ static inline int rss_author(struct template *, char *);
   {{ render rss_author(tp, rt->tagger) }}
   <guid isPermaLink="false">{{ rt->commit_id }}</guid>
   <pubDate>
-    {{ render gotweb_render_age(tp, rt->tagger_time, TM_RFC822) }}
+    {{ rfc822 }}
   </pubDate>
 </item>
 {{ end }}

@@ -1415,18 +1415,6 @@ gotweb_render_age(struct template *tp, time_t committer_time, int ref_tm)
 		    tp_writes(tp, " UTC") == -1)
 			return -1;
 		break;
-	case TM_RFC822:
-		if (gmtime_r(&committer_time, &tm) == NULL)
-			return -1;
-
-		r = strftime(datebuf, sizeof(datebuf),
-		    "%a, %d %b %Y %H:%M:%S GMT", &tm);
-		if (r == 0)
-			return -1;
-
-		if (tp_writes(tp, datebuf) == -1)
-			return -1;
-		break;
 	}
 	return 0;
 }
