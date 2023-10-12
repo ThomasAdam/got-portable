@@ -6185,6 +6185,10 @@ cmd_diff(int argc, char *argv[])
 		error = set_tog_base_commit(repo, worktree);
 		if (error != NULL)
 			goto done;
+
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
 	}
 
 	error = view_loop(view);
