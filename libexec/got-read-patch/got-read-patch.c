@@ -445,23 +445,29 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 }
 
 static const struct got_error *
-send_line(const char *line)
+send_line(const char *line, size_t len)
 {
 	static const struct got_error *err = NULL;
-	char *p = NULL;
+	struct iovec iov[2];
+	int iovcnt = 0;
+
+	memset(&iov, 0, sizeof(iov));
 
 	if (*line != '+' && *line != '-' && *line != ' ' && *line != '\\') {
-		if (asprintf(&p, " %s", line) == -1)
-			return got_error_from_errno("asprintf");
-		line = p;
+		iov[iovcnt].iov_base = (void *)" ";
+		iov[iovcnt].iov_len = 1;
+		iovcnt++;
 	}
 
-	if (imsg_compose(&ibuf, GOT_IMSG_PATCH_LINE, 0, 0, -1,
-	    line, strlen(line) + 1) == -1)
+	iov[iovcnt].iov_base = (void *)line;
+	iov[iovcnt].iov_len = len;
+	iovcnt++;
+
+	if (imsg_composev(&ibuf, GOT_IMSG_PATCH_LINE, 0, 0, -1,
+	    iov, iovcnt) == -1)
 		err = got_error_from_errno(
 		    "imsg_compose GOT_IMSG_PATCH_LINE");
 
-	free(p);
 	return err;
 }
 
@@ -478,7 +484,7 @@ peek_special_line(FILE *fp)
 	}
 
 	if (ch == '\\') {
-		err = send_line("\\");
+		err = send_line("\\", 2);
 		if (err)
 			return err;
 	}
@@ -568,7 +574,7 @@ parse_hunk(FILE *fp, int *done)
 			goto done;
 		}
 
-		err = send_line(line);
+		err = send_line(line, linelen);
 		if (err)
 			goto done;
 

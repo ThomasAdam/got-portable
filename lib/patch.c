@@ -59,6 +59,12 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+struct got_patch_line {
+	char	 mode;
+	char	*line;
+	size_t	 len;
+};
+
 struct got_patch_hunk {
 	STAILQ_ENTRY(got_patch_hunk) entries;
 	const struct got_error *err;
@@ -72,7 +78,7 @@ struct got_patch_hunk {
 	int	new_lines;
 	size_t	len;
 	size_t	cap;
-	char	**lines;
+	struct got_patch_line *lines;
 };
 
 STAILQ_HEAD(got_patch_hunk_head, got_patch_hunk);
@@ -128,7 +134,7 @@ patch_free(struct got_patch *p)
 		STAILQ_REMOVE_HEAD(&p->head, entries);
 
 		for (i = 0; i < h->len; ++i)
-			free(h->lines[i]);
+			free(h->lines[i].line);
 		free(h->lines);
 		free(h);
 	}
@@ -141,7 +147,7 @@ patch_free(struct got_patch *p)
 }
 
 static const struct got_error *
-pushline(struct got_patch_hunk *h, const char *line)
+pushline(struct got_patch_hunk *h, const char *line, size_t len)
 {
 	void 	*t;
 	size_t	 newcap;
@@ -157,10 +163,14 @@ pushline(struct got_patch_hunk *h, const char *line)
 		h->cap = newcap;
 	}
 
-	if ((t = strdup(line)) == NULL)
-		return got_error_from_errno("strdup");
+	if ((t = malloc(len - 1)) == NULL)
+		return got_error_from_errno("malloc");
+	memcpy(t, line + 1, len - 1);	/* skip the line type */
 
-	h->lines[h->len++] = t;
+	h->lines[h->len].mode = *line;
+	h->lines[h->len].line = t;
+	h->lines[h->len].len = len - 2;	/* line type and trailing NUL */
+	h->len++;
 	return NULL;
 }
 
@@ -301,7 +311,7 @@ recv_patch(struct imsgbuf *ibuf, int *done, struct got_patch *p, int strip)
 			}
 
 			if (*t != '\\')
-				err = pushline(h, t);
+				err = pushline(h, t, datalen);
 			else if (lastmode == '-')
 				h->old_nonl = 1;
 			else if (lastmode == '+')
@@ -351,10 +361,10 @@ reverse_patch(struct got_patch *p)
 		h->new_nonl = tmp;
 
 		for (i = 0; i < h->len; ++i) {
-			if (*h->lines[i] == '+')
-				*h->lines[i] = '-';
-			else if (*h->lines[i] == '-')
-				*h->lines[i] = '+';
+			if (h->lines[i].mode == '+')
+				h->lines[i].mode = '-';
+			else if (h->lines[i].mode == '-')
+				h->lines[i].mode = '+';
 		}
 	}
 }
@@ -392,14 +402,15 @@ copy(FILE *tmp, FILE *orig, off_t copypos, off_t pos)
 	return NULL;
 }
 
-static int linecmp(const char *, const char *, int *);
+static int lines_eq(struct got_patch_line *, const char *, size_t, int *);
 
 static const struct got_error *
 locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 {
 	const struct got_error *err = NULL;
+	struct got_patch_line *l = &h->lines[0];
 	char *line = NULL;
-	char mode = *h->lines[0];
+	char mode = l->mode;
 	size_t linesize = 0;
 	ssize_t linelen;
 	off_t match = -1;
@@ -414,12 +425,10 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 				err = got_error(GOT_ERR_HUNK_FAILED);
 			break;
 		}
-		if (line[linelen - 1] == '\n')
-			line[linelen - 1] = '\0';
 		(*lineno)++;
 
-		if ((mode == ' ' && !linecmp(h->lines[0] + 1, line, &mangled)) ||
-		    (mode == '-' && !linecmp(h->lines[0] + 1, line, &mangled)) ||
+		if ((mode == ' ' && lines_eq(l, line, linelen, &mangled)) ||
+		    (mode == '-' && lines_eq(l, line, linelen, &mangled)) ||
 		    (mode == '+' && *lineno == h->old_from)) {
 			match = ftello(orig);
 			if (match == -1) {
@@ -449,27 +458,34 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 }
 
 static int
-linecmp(const char *a, const char *b, int *mangled)
+lines_eq(struct got_patch_line *l, const char *b, size_t len, int *mangled)
 {
-	int c;
+	char *a = l->line;
+	size_t i, j;
+
+	if (len > 00 && b[len - 1] == '\n')
+		len--;
 
 	*mangled = 0;
-	c = strcmp(a, b);
-	if (c == 0)
-		return c;
+	if (l->len == len && !memcmp(a, b, len))
+		return 1;
 
 	*mangled = 1;
+
+	i = j = 0;
 	for (;;) {
-		while (*a == '\t' || *a == ' ' || *a == '\f')
-			a++;
-		while (*b == '\t' || *b == ' ' || *b == '\f')
-			b++;
-		if (*a == '\0' || *a != *b)
+		while (i < l->len &&
+		    (a[i] == '\t' || a[i] == ' ' || a[i] == '\f'))
+			i++;
+		while (j < len &&
+		    (b[j] == '\t' || b[j] == ' ' || b[j] == '\f'))
+			j++;
+		if (i == l->len || j == len || a[i] != b[j])
 			break;
-		a++, b++;
+		i++, j++;
 	}
 
-	return *a - *b;
+	return (i == l->len && j == len);
 }
 
 static const struct got_error *
@@ -482,7 +498,7 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 	int mangled;
 
 	for (i = 0; i < h->len; ++i) {
-		switch (*h->lines[i]) {
+		switch (h->lines[i].mode) {
 		case '+':
 			continue;
 		case ' ':
@@ -496,9 +512,7 @@ test_hunk(FILE *orig, struct got_patch_hunk *h)
 					    GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
-			if (line[linelen - 1] == '\n')
-				line[linelen - 1] = '\0';
-			if (linecmp(h->lines[i] + 1, line, &mangled)) {
+			if (!lines_eq(&h->lines[i], line, linelen, &mangled)) {
 				err = got_error(GOT_ERR_HUNK_FAILED);
 				goto done;
 			}
@@ -522,13 +536,14 @@ apply_hunk(FILE *orig, FILE *tmp, struct got_patch_hunk *h, int *lineno,
 	size_t linesize = 0, i, new = 0;
 	char *line = NULL;
 	char mode;
+	size_t l;
 	ssize_t linelen;
 
 	if (orig != NULL && fseeko(orig, from, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
 	for (i = 0; i < h->len; ++i) {
-		switch (mode = *h->lines[i]) {
+		switch (mode = h->lines[i].mode) {
 		case '-':
 		case ' ':
 			(*lineno)++;
@@ -541,18 +556,24 @@ apply_hunk(FILE *orig, FILE *tmp, struct got_patch_hunk *h, int *lineno,
 				if (line[linelen - 1] == '\n')
 					line[linelen - 1] = '\0';
 				t = line;
-			} else
-				t = h->lines[i] + 1;
+				l = linelen - 1;
+			} else {
+				t = h->lines[i].line;
+				l = h->lines[i].len;
+			}
 			if (mode == '-')
 				continue;
-			if (fprintf(tmp, "%s\n", t) < 0) {
+			if (fwrite(t, 1, l, tmp) != l ||
+			    fputc('\n', tmp) == EOF) {
 				err = got_error_from_errno("fprintf");
 				goto done;
 			}
 			break;
 		case '+':
 			new++;
-			if (fprintf(tmp, "%s", h->lines[i] + 1) < 0) {
+			t = h->lines[i].line;
+			l = h->lines[i].len;
+			if (fwrite(t, 1, l, tmp) != l) {
 				err = got_error_from_errno("fprintf");
 				goto done;
 			}
