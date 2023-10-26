@@ -214,7 +214,6 @@ got_privsep_flush_imsg(struct imsgbuf *ibuf)
 const struct got_error *
 got_privsep_send_stop(int fd)
 {
-	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 
 	imsg_init(&ibuf, fd);
@@ -222,8 +221,7 @@ got_privsep_send_stop(int fd)
 	if (imsg_compose(&ibuf, GOT_IMSG_STOP, 0, 0, -1, NULL, 0) == -1)
 		return got_error_from_errno("imsg_compose STOP");
 
-	err = flush_imsg(&ibuf);
-	return err;
+	return flush_imsg(&ibuf);
 }
 
 const struct got_error *
@@ -267,7 +265,6 @@ const struct got_error *
 got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
     uint8_t *data)
 {
-	const struct got_error *err = NULL;
 	struct got_imsg_raw_obj iobj;
 	size_t len = sizeof(iobj);
 	struct ibuf *wbuf;
@@ -280,10 +277,8 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 		len += (size_t)size + hdrlen;
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_RAW_OBJECT, 0, 0, len);
-	if (wbuf == NULL) {
-		err = got_error_from_errno("imsg_create RAW_OBJECT");
-		return err;
-	}
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create RAW_OBJECT");
 
 	if (imsg_add(wbuf, &iobj, sizeof(iobj)) == -1)
 		return got_error_from_errno("imsg_add RAW_OBJECT");
