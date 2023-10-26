@@ -11695,8 +11695,7 @@ static const struct got_histedit_cmd {
 	{ GOT_HISTEDIT_FOLD, "fold", "combine with next commit that will "
 	    "be used" },
 	{ GOT_HISTEDIT_DROP, "drop", "remove commit from history" },
-	{ GOT_HISTEDIT_MESG, "mesg",
-	    "single-line log message for commit above (open editor if empty)" },
+	{ GOT_HISTEDIT_MESG, "mesg", "open editor to edit the log message" },
 };
 
 struct got_histedit_list_entry {
@@ -11759,16 +11758,11 @@ histedit_write_commit_list(struct got_object_id_queue *commits,
 			histedit_cmd = "edit";
 		else if (fold_only && STAILQ_NEXT(qid, entry) != NULL)
 			histedit_cmd = "fold";
+		else if (edit_logmsg_only)
+			histedit_cmd = "mesg";
 		err = histedit_write_commit(&qid->id, histedit_cmd, f, repo);
 		if (err)
 			break;
-		if (edit_logmsg_only) {
-			int n = fprintf(f, "%c\n", GOT_HISTEDIT_MESG);
-			if (n < 0) {
-				err = got_ferror(f, GOT_ERR_IO);
-				break;
-			}
-		}
 	}
 
 	return err;
@@ -11985,7 +11979,7 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 	char *line = NULL, *p, *end;
 	size_t i, linesize = 0;
 	ssize_t linelen;
-	int lineno = 0, lastcmd = -1;
+	int lineno = 0;
 	const struct got_histedit_cmd *cmd;
 	struct got_object_id *commit_id = NULL;
 	struct got_histedit_list_entry *hle = NULL;
@@ -12025,37 +12019,15 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		}
 		while (isspace((unsigned char)p[0]))
 			p++;
-		if (cmd->code == GOT_HISTEDIT_MESG) {
-			if (lastcmd != GOT_HISTEDIT_PICK &&
-			    lastcmd != GOT_HISTEDIT_EDIT) {
-				err = got_error(GOT_ERR_HISTEDIT_CMD);
-				break;
-			}
-			if (p[0] == '\0') {
-				err = histedit_edit_logmsg(hle, repo);
-				if (err)
-					break;
-			} else {
-				hle->logmsg = strdup(p);
-				if (hle->logmsg == NULL) {
-					err = got_error_from_errno("strdup");
-					break;
-				}
-			}
-			lastcmd = cmd->code;
-			continue;
-		} else {
-			end = p;
-			while (end[0] && !isspace((unsigned char)end[0]))
-				end++;
-			*end = '\0';
-
-			err = got_object_resolve_id_str(&commit_id, repo, p);
-			if (err) {
-				/* override error code */
-				err = histedit_syntax_error(lineno);
-				break;
-			}
+		end = p;
+		while (end[0] && !isspace((unsigned char)end[0]))
+			end++;
+		*end = '\0';
+		err = got_object_resolve_id_str(&commit_id, repo, p);
+		if (err) {
+			/* override error code */
+			err = histedit_syntax_error(lineno);
+			break;
 		}
 		hle = malloc(sizeof(*hle));
 		if (hle == NULL) {
@@ -12067,7 +12039,6 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 		hle->logmsg = NULL;
 		commit_id = NULL;
 		TAILQ_INSERT_TAIL(histedit_cmds, hle, entry);
-		lastcmd = cmd->code;
 	}
 
 	free(line);
@@ -12269,15 +12240,6 @@ histedit_save_list(struct got_histedit_list *histedit_cmds,
 		    repo);
 		if (err)
 			break;
-
-		if (hle->logmsg) {
-			int n = fprintf(f, "%c %s\n",
-			    GOT_HISTEDIT_MESG, hle->logmsg);
-			if (n < 0) {
-				err = got_ferror(f, GOT_ERR_IO);
-				break;
-			}
-		}
 	}
 done:
 	if (f && fclose(f) == EOF && err == NULL)
@@ -12415,6 +12377,7 @@ show_histedit_progress(struct got_commit_object *commit,
 	switch (hle->cmd->code) {
 	case GOT_HISTEDIT_PICK:
 	case GOT_HISTEDIT_EDIT:
+	case GOT_HISTEDIT_MESG:
 		printf("%s -> %s: %s\n", old_id_str,
 		    new_id_str ? new_id_str : "no-op change", logmsg);
 		break;
@@ -13035,7 +12998,6 @@ cmd_histedit(int argc, char *argv[])
 				goto done;
 			continue;
 		}
-
 		error = got_object_open_as_commit(&commit, repo,
 		    hle->commit_id);
 		if (error)
@@ -13076,13 +13038,15 @@ cmd_histedit(int argc, char *argv[])
 			error = got_worktree_histedit_postpone(worktree,
 			    fileindex);
 			goto done;
-		}
-
-		if (hle->cmd->code == GOT_HISTEDIT_FOLD) {
+		} else if (hle->cmd->code == GOT_HISTEDIT_FOLD) {
 			error = histedit_skip_commit(hle, worktree, repo);
 			if (error)
 				goto done;
 			continue;
+		} else if (hle->cmd->code == GOT_HISTEDIT_MESG) {
+			error = histedit_edit_logmsg(hle, repo);
+			if (error)
+				goto done;
 		}
 
 		error = histedit_commit(&merged_paths, worktree, fileindex,

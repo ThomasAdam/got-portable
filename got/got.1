@@ -3016,18 +3016,8 @@ Regular editing of history must eventually be resumed by running
 .It Cm fold Ar commit Ta Combine the specified commit with the next commit
 listed further below that will be used.
 .It Cm drop Ar commit Ta Remove this commit from the edited history.
-.It Cm mesg Oo Ar log-message Oc Ta Create a new log message for the commit of
-a preceding
-.Cm pick
-or
-.Cm edit
-command on the previous line of the histedit script.
-The optional
-.Ar log-message
-argument provides a new single-line log message to use.
-If the
-.Ar log-message
-argument is omitted, open an editor where a new log message can be written.
+.It Cm mesg Ar commit Ta Open an editor to create a new log message for this
+commit.
 .El
 .Pp
 Every commit in the history being edited must be mentioned in the script.
