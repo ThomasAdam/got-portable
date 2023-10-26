@@ -491,13 +491,22 @@ test_histedit_fold() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/committing folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	echo "fold $old_commit1" > $testroot/histedit-script
 	echo "drop $old_commit2" >> $testroot/histedit-script
 	echo "pick $old_commit3" >> $testroot/histedit-script
-	echo "mesg committing folded changes" >> $testroot/histedit-script
 
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout)
 
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
@@ -603,7 +612,6 @@ test_histedit_edit() {
 	fi
 
 	echo "edit $old_commit1" > $testroot/histedit-script
-	echo "mesg committing changes" >> $testroot/histedit-script
 	echo "pick $old_commit2" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
@@ -650,7 +658,19 @@ test_histedit_edit() {
 	fi
 
 	(cd $testroot/wt && got unstage alpha > /dev/null)
-	(cd $testroot/wt && got histedit -c > $testroot/stdout)
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/committing changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -c > $testroot/stdout)
 
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
@@ -771,7 +791,7 @@ test_histedit_fold_last_commit() {
 	test_done "$testroot" "$ret"
 }
 
-test_histedit_missing_commit() {
+test_histedit_missing_commit_pick() {
 	local testroot=`test_init histedit_missing_commit`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -795,10 +815,66 @@ test_histedit_missing_commit() {
 	fi
 
 	echo "pick $old_commit1" > $testroot/histedit-script
-	echo "mesg committing changes" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
+
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: commit $old_commit2 missing from histedit script" \
+		> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_histedit_missing_commit_mesg() {
+	local testroot=`test_init histedit_missing_commit`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git -C $testroot/repo rm -q beta
+	echo "new file on master" > $testroot/repo/epsilon/new
+	git -C $testroot/repo add epsilon/new
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/committing folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
+	echo "mesg $old_commit1" > $testroot/histedit-script
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout \
+			2>$testroot/stderr)
 
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -845,7 +921,6 @@ test_histedit_abort() {
 	touch $testroot/wt/unversioned-file
 
 	echo "edit $old_commit1" > $testroot/histedit-script
-	echo "mesg committing changes" >> $testroot/histedit-script
 	echo "pick $old_commit2" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
@@ -1051,7 +1126,6 @@ test_histedit_path_prefix_edit() {
 	fi
 
 	echo "edit $old_commit1" > $testroot/histedit-script
-	echo "mesg modified zeta" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
@@ -1120,8 +1194,19 @@ test_histedit_path_prefix_edit() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+	
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/modified zeta/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
 
-	(cd $testroot/wt && got histedit -c > $testroot/stdout)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -c > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
@@ -1244,13 +1329,23 @@ test_histedit_fold_last_commit_swap() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/committing folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	# fold commit2 into commit1 (requires swapping commits)
 	echo "fold $old_commit2" > $testroot/histedit-script
-	echo "pick $old_commit1" >> $testroot/histedit-script
-	echo "mesg committing folded changes" >> $testroot/histedit-script
+	echo "mesg $old_commit1" >> $testroot/histedit-script
 
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout 2> $testroot/stderr)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout \
+		2> $testroot/stderr)
 
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1470,13 +1565,22 @@ test_histedit_fold_add_delete() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	echo "fold $old_commit1" > $testroot/histedit-script
 	echo "fold $old_commit2" >> $testroot/histedit-script
 	echo "pick $old_commit3" >> $testroot/histedit-script
-	echo "mesg folded changes" >> $testroot/histedit-script
 
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
 
@@ -1565,12 +1669,21 @@ test_histedit_fold_edit_delete() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	echo "fold $old_commit1" > $testroot/histedit-script
 	echo "pick $old_commit2" >> $testroot/histedit-script
-	echo "mesg folded changes" >> $testroot/histedit-script
 
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
 
@@ -1645,12 +1758,21 @@ test_histedit_fold_delete_add() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/folded changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	echo "fold $old_commit1" > $testroot/histedit-script
 	echo "pick $old_commit2" >> $testroot/histedit-script
-	echo "mesg folded changes" >> $testroot/histedit-script
 
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -F $testroot/histedit-script > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
 	
@@ -2142,126 +2264,6 @@ EOF
 	test_done "$testroot" $ret
 }
 
-test_histedit_mesg_invalid() {
-	local testroot=`test_init mesg_invalid`
-
-	local orig_commit=`git_show_head $testroot/repo`
-
-	echo "modified alpha on master" > $testroot/repo/alpha
-	git -C $testroot/repo rm -q beta
-	echo "new file on master" > $testroot/repo/epsilon/new
-	git -C $testroot/repo add epsilon/new
-	git_commit $testroot/repo -m 'committing changes'
-	local old_commit1=`git_show_head $testroot/repo`
-
-	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
-	git_commit $testroot/repo -m 'committing to zeto on master'
-	local old_commit2=`git_show_head $testroot/repo`
-
-	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done "$testroot" $ret
-		return 1
-	fi
-
-	# try with a leading mesg
-
-	echo "mesg something something" > $testroot/histedit-script
-	echo "pick $old_commit1" >> $testroot/histedit-script
-	echo "pick $old_commit2" >> $testroot/histedit-script
-
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "histedit succeeded unexpectedly" >&2
-		test_done "$testroot" 1
-		return 1
-	fi
-
-	echo "got: bad histedit command" > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" $ret
-		return 1
-	fi
-
-	# try again with mesg -> mesg
-
-	echo "pick $old_commit1" > $testroot/histedit-script
-	echo "mesg something something" >> $testroot/histedit-script
-	echo "mesg something something else" >> $testroot/histedit-script
-	echo "pick $old_commit2" >> $testroot/histedit-script
-
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "histedit succeeded unexpectedly" >&2
-		test_done "$testroot" 1
-		return 1
-	fi
-
-	echo "got: bad histedit command" > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" $ret
-		return 1
-	fi
-
-	# try again with drop -> mesg
-
-	echo "drop $old_commit1" > $testroot/histedit-script
-	echo "mesg something something" >> $testroot/histedit-script
-	echo "pick $old_commit2" >> $testroot/histedit-script
-
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "histedit succeeded unexpectedly" >&2
-		test_done "$testroot" 1
-		return 1
-	fi
-
-	echo "got: bad histedit command" > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" $ret
-		return 1
-	fi
-
-	# try again with fold -> mesg
-
-	echo "fold $old_commit1" > $testroot/histedit-script
-	echo "mesg something something" >> $testroot/histedit-script
-	echo "pick $old_commit2" >> $testroot/histedit-script
-
-	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	if [ $ret -eq 0 ]; then
-		echo "histedit succeeded unexpectedly" >&2
-		test_done "$testroot" 1
-		return 1
-	fi
-
-	echo "got: bad histedit command" > $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-	fi
-	test_done "$testroot" $ret
-}
-
 test_histedit_resets_committer() {
 	local testroot=`test_init histedit_resets_committer`
 	local orig_commit=`git_show_head $testroot/repo`
@@ -2354,13 +2356,22 @@ test_histedit_umask() {
 		return 1
 	fi
 
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/folding changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
 	echo fold $commit1 >$testroot/histedit-script
 	echo fold $commit2 >>$testroot/histedit-script
 	echo pick $commit3 >>$testroot/histedit-script
-	echo mesg folding changes >>$testroot/histedit-script
 
 	# using a subshell to avoid clobbering global umask
 	(umask 077 && cd "$testroot/wt" && \
+		env EDITOR="$testroot/editor.sh" VISUAL="$testroot/editor.sh" \
 		got histedit -F "$testroot/histedit-script") >/dev/null
 	ret=$?
 
@@ -2604,7 +2615,8 @@ run_test test_histedit_drop
 run_test test_histedit_fold
 run_test test_histedit_edit
 run_test test_histedit_fold_last_commit
-run_test test_histedit_missing_commit
+run_test test_histedit_missing_commit_pick
+run_test test_histedit_missing_commit_mesg
 run_test test_histedit_abort
 run_test test_histedit_path_prefix_drop
 run_test test_histedit_path_prefix_edit
@@ -2619,7 +2631,6 @@ run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
 run_test test_histedit_edit_only
 run_test test_histedit_prepend_line
-run_test test_histedit_mesg_invalid
 run_test test_histedit_resets_committer
 run_test test_histedit_umask
 run_test test_histedit_mesg_filemode_change
