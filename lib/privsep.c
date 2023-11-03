@@ -419,7 +419,7 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 		}
 	}
 
-	wbuf->fd = fd;
+	ibuf_fd_set(wbuf, fd);
 	imsg_close(ibuf, wbuf);
 
 	return flush_imsg(ibuf);
@@ -612,7 +612,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return err;
 		}
 	}
-	wbuf->fd = fd;
+	ibuf_fd_set(wbuf, fd);
 	fd = -1;
 	imsg_close(ibuf, wbuf);
 
