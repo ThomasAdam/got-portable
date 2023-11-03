@@ -293,9 +293,7 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 			return got_error_from_errno("imsg_add RAW_OBJECT");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
-
 	return flush_imsg(ibuf);
 }
 
@@ -640,7 +638,6 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		if (imsg_add(wbuf, name, name_len) == -1)
 			return got_error_from_errno("imsg_add FETCH_HAVE_REF");
 
-		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
 		err = flush_imsg(ibuf);
 		if (err)
@@ -666,7 +663,6 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_BRANCH");
 
-		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
 		err = flush_imsg(ibuf);
 		if (err)
@@ -692,7 +688,6 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return got_error_from_errno(
 			    "imsg_add FETCH_WANTED_REF");
 
-		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
 		err = flush_imsg(ibuf);
 		if (err)
@@ -878,7 +873,6 @@ send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
 	if (imsg_add(wbuf, name, name_len) == -1)
 		return got_error_from_errno("imsg_add SEND_REF");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return flush_imsg(ibuf);
 }
@@ -1471,7 +1465,6 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 			return got_error_from_errno("imsg_add TREE_ENTRY");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return NULL;
 }
@@ -2698,9 +2691,7 @@ got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
 		return got_error_from_errno("imsg_add "
 		    "COMMIT_TRAVERSAL_REQUEST");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
-
 	return flush_imsg(ibuf);
 }
 
@@ -2803,7 +2794,6 @@ got_privsep_send_enumerated_tree(size_t *totlen, struct imsgbuf *ibuf,
 	if (imsg_add(wbuf, path, path_len) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_TREE");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	if (entries) {
@@ -2865,7 +2855,6 @@ got_privsep_send_enumerated_commit(struct imsgbuf *ibuf,
 	if (imsg_add(wbuf, &mtime, sizeof(mtime)) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_COMMIT");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	/* Don't flush yet, tree entries or ENUMERATION_DONE will follow. */
 	return NULL;
@@ -3195,7 +3184,6 @@ send_idlist(struct imsgbuf *ibuf, struct got_object_id **ids, size_t nids)
 			return got_error_from_errno("imsg_add OBJ_ID_LIST");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	return flush_imsg(ibuf);
@@ -3332,7 +3320,6 @@ got_privsep_send_reused_deltas(struct imsgbuf *ibuf,
 			return got_error_from_errno("imsg_add REUSED_DELTAS");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	return flush_imsg(ibuf);
@@ -3469,9 +3456,7 @@ send_painted_commits(struct got_object_id_queue *ids, int *nids,
 		got_object_qid_free(qid);
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
-
 	return flush_imsg(ibuf);
 }
 
