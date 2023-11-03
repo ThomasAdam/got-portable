@@ -239,9 +239,14 @@ const struct got_error *
 got_privsep_send_raw_obj_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id)
 {
+	const struct got_error *err;
+
 	if (imsg_compose(ibuf, GOT_IMSG_RAW_OBJECT_REQUEST, 0, 0, fd,
-	    id, sizeof(*id)) == -1)
-		return got_error_from_errno("imsg_compose RAW_OBJECT_REQUEST");
+	    id, sizeof(*id)) == -1) {
+		err = got_error_from_errno("imsg_compose RAW_OBJECT_REQUEST");
+		close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -383,6 +388,7 @@ const struct got_error *
 got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
+	const struct got_error *err;
 	struct ibuf *wbuf;
 	size_t len;
 
@@ -392,15 +398,27 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 		len = sizeof(*id);
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create TREE_REQUEST");
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create TREE_REQUEST");
+		if (fd != -1)
+			close(fd);
+		return err;
+	}
 
-	if (imsg_add(wbuf, id, sizeof(*id)) == -1)
-		return got_error_from_errno("imsg_add TREE_REQUEST");
+	if (imsg_add(wbuf, id, sizeof(*id)) == -1) {
+		err = got_error_from_errno("imsg_add TREE_REQUEST");
+		if (fd != -1)
+			close(fd);
+		return err;
+	}
 
 	if (pack_idx != -1) { /* tree is packed */
-		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1)
-			return got_error_from_errno("imsg_add TREE_REQUEST");
+		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1) {
+			err = got_error_from_errno("imsg_add TREE_REQUEST");
+			if (fd != -1)
+				close(fd);
+			return err;
+		}
 	}
 
 	wbuf->fd = fd;
@@ -413,6 +431,7 @@ const struct got_error *
 got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
+	const struct got_error *err;
 	struct got_imsg_packed_object iobj;
 	void *data;
 	size_t len;
@@ -429,8 +448,12 @@ got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_TAG_REQUEST, 0, 0, fd, data, len)
-	    == -1)
-		return got_error_from_errno("imsg_compose TAG_REQUEST");
+	    == -1) {
+		err = got_error_from_errno("imsg_compose TAG_REQUEST");
+		if (fd != -1)
+			close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -553,8 +576,11 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	}
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create FETCH_HAVE_REF");
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create FETCH_HAVE_REF");
+		close(fd);
+		return err;
+	}
 
 	memset(&fetchreq, 0, sizeof(fetchreq));
 	fetchreq.no_head = no_head;
@@ -574,22 +600,27 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	if (imsg_add(wbuf, &fetchreq, sizeof(fetchreq)) == -1)
 		return got_error_from_errno("imsg_add FETCH_REQUEST");
 	if (worktree_branch) {
-		if (imsg_add(wbuf, worktree_branch, worktree_branch_len) == -1)
-			return got_error_from_errno("imsg_add FETCH_REQUEST");
+		if (imsg_add(wbuf, worktree_branch, worktree_branch_len)
+		    == -1) {
+			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			close(fd);
+			return err;
+		}
 	}
 	if (remote_head) {
-		if (imsg_add(wbuf, remote_head, remote_head_len) == -1)
-			return got_error_from_errno("imsg_add FETCH_REQUEST");
+		if (imsg_add(wbuf, remote_head, remote_head_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			close(fd);
+			return err;
+		}
 	}
 	wbuf->fd = fd;
+	fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	err = flush_imsg(ibuf);
-	if (err) {
-		close(fd);
+	if (err)
 		return err;
-	}
-	fd = -1;
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		const char *name = pe->path;
@@ -668,9 +699,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return err;
 	}
 
-
 	return NULL;
-
 }
 
 const struct got_error *
@@ -879,10 +908,10 @@ got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
 		goto done;
 	}
 
+	fd = -1;
 	err = flush_imsg(ibuf);
 	if (err)
 		goto done;
-	fd = -1;
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		const char *name = pe->path;
@@ -904,7 +933,6 @@ done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err;
-
 }
 
 const struct got_error *
