@@ -100,9 +100,9 @@ int		 addr_dup_check(struct addresslist *, struct address *,
 		    const char *, const char *);
 int		 add_addr(struct server *, struct address *);
 int		 host(const char *, struct server *,
-		    int, in_port_t, const char *, int);
+		    int, in_port_t, const char *);
 int		 host_if(const char *, struct server *,
-		    int, in_port_t, const char *, int);
+		    int, in_port_t, const char *);
 int		 is_if_in_group(const char *, const char *);
 
 typedef struct {
@@ -1024,7 +1024,7 @@ getservice(const char *n)
 
 int
 host(const char *s, struct server *new_srv, int max,
-    in_port_t port, const char *ifname, int ipproto)
+    in_port_t port, const char *ifname)
 {
 	struct addrinfo hints, *res0, *res;
 	int error, cnt = 0;
@@ -1032,7 +1032,7 @@ host(const char *s, struct server *new_srv, int max,
 	struct sockaddr_in6 *sin6;
 	struct address *h;
 
-	if ((cnt = host_if(s, new_srv, max, port, ifname, ipproto)) != 0)
+	if ((cnt = host_if(s, new_srv, max, port, ifname)) != 0)
 		return (cnt);
 
 	memset(&hints, 0, sizeof(hints));
@@ -1067,8 +1067,6 @@ host(const char *s, struct server *new_srv, int max,
 				return (-1);
 			}
 		}
-		if (ipproto != -1)
-			h->ipproto = ipproto;
 		h->ss.ss_family = res->ai_family;
 
 		if (res->ai_family == AF_INET) {
@@ -1097,7 +1095,7 @@ host(const char *s, struct server *new_srv, int max,
 
 int
 host_if(const char *s, struct server *new_srv, int max,
-    in_port_t port, const char *ifname, int ipproto)
+    in_port_t port, const char *ifname)
 {
 	struct ifaddrs *ifap, *p;
 	struct sockaddr_in *sain;
@@ -1133,8 +1131,6 @@ host_if(const char *s, struct server *new_srv, int max,
 				return (-1);
 			}
 		}
-		if (ipproto != -1)
-			h->ipproto = ipproto;
 		h->ss.ss_family = af;
 
 		if (af == AF_INET) {
@@ -1216,19 +1212,17 @@ int
 get_addrs(const char *addr, struct server *new_srv, in_port_t port)
 {
 	if (strcmp("", addr) == 0) {
-		if (host("127.0.0.1", new_srv, 1, port, "127.0.0.1",
-		    -1) <= 0) {
+		if (host("127.0.0.1", new_srv, 1, port, "127.0.0.1") <= 0) {
 			yyerror("invalid listen ip: %s",
 			    "127.0.0.1");
 			return (-1);
 		}
-		if (host("::1", new_srv, 1, port, "::1", -1) <= 0) {
+		if (host("::1", new_srv, 1, port, "::1") <= 0) {
 			yyerror("invalid listen ip: %s", "::1");
 			return (-1);
 		}
 	} else {
-		if (host(addr, new_srv, GOTWEBD_MAXIFACE, port, addr,
-		    -1) <= 0) {
+		if (host(addr, new_srv, GOTWEBD_MAXIFACE, port, addr) <= 0) {
 			yyerror("invalid listen ip: %s", addr);
 			return (-1);
 		}
