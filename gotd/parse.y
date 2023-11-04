@@ -127,8 +127,27 @@ typedef struct {
 
 grammar		:
 		| grammar '\n'
+		| grammar varset '\n'
 		| grammar main '\n'
 		| grammar repository '\n'
+		;
+
+varset		: STRING '=' STRING	{
+			char *s = $1;
+			while (*s++) {
+				if (isspace((unsigned char)*s)) {
+					yyerror("macro name cannot contain "
+					    "whitespace");
+					free($1);
+					free($3);
+					YYERROR;
+				}
+			}
+			if (symset($1, $3, 0) == -1)
+				fatal("cannot store variable");
+			free($1);
+			free($3);
+		}
 		;
 
 timeout		: NUMBER {
