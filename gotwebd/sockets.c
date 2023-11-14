@@ -113,8 +113,8 @@ sockets_run(struct privsep *ps, struct privsep_proc *p, void *arg)
 	signal_add(&ps->ps_evsigchld, NULL);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath inet recvfd proc exec sendfd "
-	    "unveil", NULL) == -1)
+	if (pledge("stdio rpath inet recvfd proc exec sendfd unveil",
+	    NULL) == -1)
 		fatal("pledge");
 #endif
 }

@@ -259,7 +259,7 @@ main(int argc, char **argv)
 		err(1, "unveil");
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath inet unix", NULL) == -1)
+	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 #endif
 
