@@ -53,6 +53,7 @@
 #include "got_opentemp.h"
 #include "got_reference.h"
 #include "got_repository.h"
+#include "got_privsep.h"
 
 #include "proc.h"
 #include "gotwebd.h"
@@ -112,8 +113,8 @@ sockets_run(struct privsep *ps, struct privsep_proc *p, void *arg)
 	signal_add(&ps->ps_evsigchld, NULL);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath inet recvfd proc exec sendfd",
-	    NULL) == -1)
+	if (pledge("stdio rpath wpath cpath inet recvfd proc exec sendfd "
+	    "unveil", NULL) == -1)
 		fatal("pledge");
 #endif
 }
@@ -246,6 +247,8 @@ static void
 sockets_launch(void)
 {
 	struct socket *sock;
+	struct server *srv;
+	const struct got_error *error;
 
 	TAILQ_FOREACH(sock, &gotwebd_env->sockets, entry) {
 		log_debug("%s: configuring socket %d (%d)", __func__,
@@ -262,6 +265,18 @@ sockets_launch(void)
 		log_debug("%s: running socket listener %d", __func__,
 		    sock->conf.id);
 	}
+
+	TAILQ_FOREACH(srv, &gotwebd_env->servers, entry) {
+		if (unveil(srv->repos_path, "r") == -1)
+			fatal("unveil %s", srv->repos_path);
+	}
+
+	error = got_privsep_unveil_exec_helpers();
+	if (error)
+		fatal("%s", error->msg);
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
 }
 
 static void

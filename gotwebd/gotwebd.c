@@ -249,10 +249,7 @@ main(int argc, char **argv)
 		err(1, "gmon.out");
 #endif
 
-	if (unveil(env->httpd_chroot, "rwc") == -1)
-		err(1, "unveil");
-
-	if (unveil(GOT_TMPDIR_STR, "rw") == -1)
+	if (unveil(env->httpd_chroot, "r") == -1)
 		err(1, "unveil");
 
 	if (unveil(GOTWEBD_CONF, "r") == -1)
