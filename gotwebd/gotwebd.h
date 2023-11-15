@@ -263,7 +263,7 @@ struct fcgi_end_request_body {
 struct address {
 	TAILQ_ENTRY(address)	 entry;
 	struct sockaddr_storage	 ss;
-	int			 ipproto;
+	socklen_t		 slen;
 	in_port_t		 port;
 	char			 ifname[IFNAMSIZ];
 };

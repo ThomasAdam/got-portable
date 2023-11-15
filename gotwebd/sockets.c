@@ -230,7 +230,7 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 	acp = &sock->conf.addr;
 
 	memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
-	acp->ipproto = a->ipproto;
+	acp->slen = a->slen;
 	acp->port = a->port;
 	if (*a->ifname != '\0') {
 		if (strlcpy(acp->ifname, a->ifname,
@@ -505,19 +505,7 @@ sockets_create_socket(struct address *a, in_port_t port)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags |= AI_PASSIVE;
 
-	switch (a->ss.ss_family) {
-	case AF_INET:
-		((struct sockaddr_in *)(&a->ss))->sin_port = htons(port);
-		break;
-	case AF_INET6:
-		((struct sockaddr_in6 *)(&a->ss))->sin6_port = htons(port);
-		break;
-	default:
-		log_warnx("%s: unknown address family", __func__);
-		return -1;
-	}
-
-	fd = socket(a->ss.ss_family, hints.ai_socktype, a->ipproto);
+	fd = socket(a->ss.ss_family, hints.ai_socktype, 0);
 	if (fd == -1)
 		return -1;
 
@@ -540,7 +528,7 @@ sockets_create_socket(struct address *a, in_port_t port)
 		return -1;
 	}
 
-	if (bind(fd, (struct sockaddr *)&a->ss, a->ss.ss_len) == -1) {
+	if (bind(fd, (struct sockaddr *)&a->ss, a->slen) == -1) {
 		close(fd);
 		log_info("%s: can't bind to port %d", __func__,
 		    ntohs(port));

@@ -18,7 +18,7 @@ SRCS +=		blame.c commit_graph.c delta.c diff.c \
 		gotconfig.c diff_main.c diff_atomize_text.c diff_myers.c \
 		diff_output.c diff_output_plain.c diff_output_unidiff.c \
 		diff_output_edscript.c diff_patience.c bloom.c murmurhash2.c \
-		sigs.c date.c sockaddr.c \
+		sigs.c date.c \
 		object_open_privsep.c read_gitconfig_privsep.c \
 		read_gotconfig_privsep.c pollfd.c reference_parse.c \
 		object_qid.c

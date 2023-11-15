@@ -47,7 +47,6 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "got_sockaddr.h"
 #include "got_reference.h"
 
 #include "proc.h"
@@ -1003,8 +1002,8 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 {
 	struct addrinfo hints, *res0, *res;
 	int error;
-	struct sockaddr_in *sain, *ra;
-	struct sockaddr_in6 *sin6, *ra6;
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	struct address *h;
 
 	memset(&hints, 0, sizeof(hints));
@@ -1036,18 +1035,17 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 		}
 		h->ss.ss_family = res->ai_family;
 
+		memcpy(&h->ss, res->ai_addr, res->ai_addrlen);
+		h->slen = res->ai_addrlen;
+
 		switch (res->ai_family) {
 		case AF_INET:
-			sain = (struct sockaddr_in *)&h->ss;
-			ra = (struct sockaddr_in *)res->ai_addr;
-			h->port = ntohs(ra->sin_port);
-			got_sockaddr_inet_init(sain, &ra->sin_addr);
+			sin = (struct sockaddr_in *)res->ai_addr;
+			h->port = ntohs(sin->sin_port);
 			break;
 		case AF_INET6:
-			sin6 = (struct sockaddr_in6 *)&h->ss;
-			ra6 = (struct sockaddr_in6 *)res->ai_addr;
-			h->port = ntohs(ra6->sin6_port);
-			got_sockaddr_inet6_init(sin6, &ra6->sin6_addr, 0);
+			sin6 = (struct sockaddr_in6 *)res->ai_addr;
+			h->port = ntohs(sin6->sin6_port);
 			break;
 		default:
 			fatalx("unknown address family %d", res->ai_family);
@@ -1070,8 +1068,8 @@ addr_dup_check(struct addresslist *al, struct address *h, const char *new_srv,
 	const char *addrstr;
 
 	TAILQ_FOREACH(a, al, entry) {
-		if (memcmp(&a->ss, &h->ss, sizeof(h->ss)) != 0 ||
-		    a->port != h->port)
+		if (a->slen != h->slen ||
+		    memcmp(&a->ss, &h->ss, a->slen) != 0)
 			continue;
 
 		switch (h->ss.ss_family) {
