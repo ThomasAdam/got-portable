@@ -92,8 +92,7 @@ If this option is not specified then a default style sheet will be used.
 Configure an address and port for incoming FCGI TCP connections.
 Valid
 .Ar address
-arguments are hostnames, IP4 addresses, IPv6 addresses, and network
-interface names.
+arguments are hostnames, IP4 addresses and IPv6 addresses.
 The
 .Ar port
 argument may be number or a service name defined in
@@ -102,14 +101,6 @@ argument may be number or a service name defined in
 May be specified multiple times to build up a list of listening sockets.
 However, a given combination of address and port may only be used by
 one server.
-.Pp
-If a network interface name is given as
-.Ar address
-argument then
-.Xr gotwebd 8
-will obtain the list of addresses on this interface only on startup.
-Any future changes to the address configuration of the interface will
-be ignored.
 .It Ic listen on socket off
 Disable use of unix socket.
 .It Ic listen on socket Ar path
