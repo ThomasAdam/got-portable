@@ -129,6 +129,9 @@ main(int argc, char **argv)
 	if (env == NULL)
 		fatal("%s: calloc", __func__);
 
+	/* log to stderr until daemonized */
+	log_init(1, LOG_DAEMON);
+
 	/* XXX: add s and S for both sockets */
 	while ((ch = getopt(argc, argv, "D:df:I:nP:v")) != -1) {
 		switch (ch) {
@@ -166,9 +169,6 @@ main(int argc, char **argv)
 			usage();
 		}
 	}
-
-	/* log to stderr until daemonized */
-	log_init(env->gotwebd_debug ? env->gotwebd_debug : 1, LOG_DAEMON);
 
 	argc -= optind;
 	if (argc > 0)
