@@ -102,9 +102,6 @@ int		 addr_dup_check(struct addresslist *, struct address *,
 int		 add_addr(struct server *, struct address *);
 int		 host(const char *, struct server *,
 		    int, in_port_t, const char *);
-int		 host_if(const char *, struct server *,
-		    int, in_port_t, const char *);
-int		 is_if_in_group(const char *, const char *);
 
 typedef struct {
 	union {
@@ -1033,9 +1030,6 @@ host(const char *s, struct server *new_srv, int max,
 	struct sockaddr_in6 *sin6;
 	struct address *h;
 
-	if ((cnt = host_if(s, new_srv, max, port, ifname)) != 0)
-		return (cnt);
-
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM; /* DUMMY */
@@ -1092,126 +1086,6 @@ host(const char *s, struct server *new_srv, int max,
 	}
 	freeaddrinfo(res0);
 	return (cnt);
-}
-
-int
-host_if(const char *s, struct server *new_srv, int max,
-    in_port_t port, const char *ifname)
-{
-	struct ifaddrs *ifap, *p;
-	struct sockaddr_in *sain;
-	struct sockaddr_in6 *sin6;
-	struct address *h;
-	int cnt = 0, af;
-
-	if (getifaddrs(&ifap) == -1)
-		fatal("getifaddrs");
-
-	/* First search for IPv4 addresses */
-	af = AF_INET;
-
- nextaf:
-	for (p = ifap; p != NULL && cnt < max; p = p->ifa_next) {
-		if (p->ifa_addr == NULL ||
-		    p->ifa_addr->sa_family != af ||
-		    (strcmp(s, p->ifa_name) != 0 &&
-		    !is_if_in_group(p->ifa_name, s)))
-			continue;
-		if ((h = calloc(1, sizeof(*h))) == NULL)
-			fatal("calloc");
-
-		if (port)
-			h->port = port;
-		if (ifname != NULL) {
-			if (strlcpy(h->ifname, ifname, sizeof(h->ifname)) >=
-			    sizeof(h->ifname)) {
-				log_warnx("%s: interface name truncated",
-				    __func__);
-				free(h);
-				freeifaddrs(ifap);
-				return (-1);
-			}
-		}
-		h->ss.ss_family = af;
-
-		if (af == AF_INET) {
-			struct sockaddr_in *ra;
-			sain = (struct sockaddr_in *)&h->ss;
-			ra = (struct sockaddr_in *)p->ifa_addr;
-			got_sockaddr_inet_init(sain, &ra->sin_addr);
-		} else {
-			struct sockaddr_in6 *ra;
-			sin6 = (struct sockaddr_in6 *)&h->ss;
-			ra = (struct sockaddr_in6 *)p->ifa_addr;
-			got_sockaddr_inet6_init(sin6, &ra->sin6_addr,
-			    ra->sin6_scope_id);
-		}
-
-		if (add_addr(new_srv, h))
-			return -1;
-		cnt++;
-	}
-	if (af == AF_INET) {
-		/* Next search for IPv6 addresses */
-		af = AF_INET6;
-		goto nextaf;
-	}
-
-	if (cnt > max) {
-		log_warnx("%s: %s resolves to more than %d hosts", __func__,
-		    s, max);
-	}
-	freeifaddrs(ifap);
-	return (cnt);
-}
-
-int
-is_if_in_group(const char *ifname, const char *groupname)
-{
-/* TA: Check this... */
-#ifdef HAVE_STRUCT_IFGROUPREQ
-	unsigned int len;
-	struct ifgroupreq ifgr;
-	struct ifg_req *ifg;
-	int s;
-	int ret = 0;
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		err(1, "socket");
-
-	memset(&ifgr, 0, sizeof(ifgr));
-	if (strlcpy(ifgr.ifgr_name, ifname, IFNAMSIZ) >= IFNAMSIZ)
-		err(1, "IFNAMSIZ");
-	if (ioctl(s, SIOCGIFGROUP, (caddr_t)&ifgr) == -1) {
-		if (errno == EINVAL || errno == ENOTTY)
-			goto end;
-		err(1, "SIOCGIFGROUP");
-	}
-
-	len = ifgr.ifgr_len;
-	ifgr.ifgr_groups = calloc(len / sizeof(struct ifg_req),
-	    sizeof(struct ifg_req));
-	if (ifgr.ifgr_groups == NULL)
-		err(1, "getifgroups");
-	if (ioctl(s, SIOCGIFGROUP, (caddr_t)&ifgr) == -1)
-		err(1, "SIOCGIFGROUP");
-
-	ifg = ifgr.ifgr_groups;
-	for (; ifg && len >= sizeof(struct ifg_req); ifg++) {
-		len -= sizeof(struct ifg_req);
-		if (strcmp(ifg->ifgrq_group, groupname) == 0) {
-			ret = 1;
-			break;
-		}
-	}
-	free(ifgr.ifgr_groups);
-
-end:
-	close(s);
-	return (ret);
-#else
-	return (0);
-#endif
 }
 
 int
