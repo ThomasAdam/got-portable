@@ -96,7 +96,7 @@ static struct server		*conf_new_server(const char *);
 int				 getservice(const char *);
 int				 n;
 
-int		 get_addrs(const char *, struct server *, in_port_t);
+int		 get_addrs(const char *, const char *, struct server *);
 int		 addr_dup_check(struct addresslist *, struct address *,
 		    const char *, const char *);
 int		 add_addr(struct server *, struct address *);
@@ -105,7 +105,6 @@ typedef struct {
 	union {
 		long long	 number;
 		char		*string;
-		in_port_t	 port;
 	} v;
 	int lineno;
 } YYSTYPE;
@@ -119,7 +118,6 @@ typedef struct {
 %token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
 
 %token	<v.string>	STRING
-%type	<v.port>	fcgiport
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean
 %type	<v.string>	listen_addr
@@ -178,27 +176,6 @@ boolean		: STRING {
 
 listen_addr	: '*' { $$ = NULL; }
 		| STRING
-		;
-
-fcgiport	: PORT NUMBER {
-			if ($2 <= 0 || $2 > (int)USHRT_MAX) {
-				yyerror("invalid port: %lld", $2);
-				YYERROR;
-			}
-			$$ = $2;
-		}
-		| PORT STRING {
-			int	 val;
-
-			if ((val = getservice($2)) == -1) {
-				yyerror("invalid port: %s", $2);
-				free($2);
-				YYERROR;
-			}
-			free($2);
-
-			$$ = val;
-		}
 		;
 
 main		: PREFORK NUMBER {
@@ -346,11 +323,30 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			free($2);
 		}
-		| LISTEN ON listen_addr fcgiport {
-			if (get_addrs($3, new_srv, $4) == -1) {
+		| LISTEN ON listen_addr PORT STRING {
+			if (get_addrs($3, $5, new_srv) == -1) {
 				yyerror("could not get addrs");
 				YYERROR;
 			}
+			free($3);
+			free($5);
+			new_srv->fcgi_socket = 1;
+		}
+		| LISTEN ON listen_addr PORT NUMBER {
+			char portno[32];
+			int n;
+
+			n = snprintf(portno, sizeof(portno), "%lld",
+			    (long long)$5);
+			if (n < 0 || (size_t)n >= sizeof(portno))
+				fatalx("port number too long: %lld",
+				    (long long)$5);
+
+			if (get_addrs($3, portno, new_srv) == -1) {
+				yyerror("could not get addrs");
+				YYERROR;
+			}
+			free($3);
 			new_srv->fcgi_socket = 1;
 		}
 		| LISTEN ON SOCKET STRING {
@@ -1004,47 +1000,22 @@ symget(const char *nam)
 }
 
 int
-getservice(const char *n)
-{
-	struct servent *s;
-	const char *errstr;
-	long long llval;
-
-	llval = strtonum(n, 0, UINT16_MAX, &errstr);
-	if (errstr) {
-		s = getservbyname(n, "tcp");
-		if (s == NULL)
-			s = getservbyname(n, "udp");
-		if (s == NULL)
-			return (-1);
-		return ntohs(s->s_port);
-	}
-
-	return (unsigned short)llval;
-}
-
-int
-get_addrs(const char *s, struct server *new_srv, in_port_t port)
+get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 {
 	struct addrinfo hints, *res0, *res;
-	int n, error;
-	struct sockaddr_in *sain;
-	struct sockaddr_in6 *sin6;
+	int error;
+	struct sockaddr_in *sain, *ra;
+	struct sockaddr_in6 *sin6, *ra6;
 	struct address *h;
-	char portstr[32];
-
-	n = snprintf(portstr, sizeof(portstr), "%d", port);
-	if (n < 0 || (size_t)n >= sizeof(portstr))
-		fatalx("snprintf: port number too long: %d", port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM; /* DUMMY */
+	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-	error = getaddrinfo(s, portstr, &hints, &res0);
+	error = getaddrinfo(hostname, servname, &hints, &res0);
 	if (error) {
-		log_warnx("%s: could not parse \"%s\": %s", __func__, s,
-		    gai_strerror(error));
+		log_warnx("%s: could not parse \"%s:%s\": %s", __func__,
+		    hostname, servname, gai_strerror(error));
 		return (-1);
 	}
 
@@ -1052,12 +1023,10 @@ get_addrs(const char *s, struct server *new_srv, in_port_t port)
 		if ((h = calloc(1, sizeof(*h))) == NULL)
 			fatal(__func__);
 
-		if (port)
-			h->port = port;
-		if (s == NULL) {
+		if (hostname == NULL) {
 			strlcpy(h->ifname, "*", sizeof(h->ifname));
 		} else {
-			if (strlcpy(h->ifname, s, sizeof(h->ifname)) >=
+			if (strlcpy(h->ifname, hostname, sizeof(h->ifname)) >=
 			    sizeof(h->ifname)) {
 				log_warnx("%s: address truncated", __func__);
 				freeaddrinfo(res0);
@@ -1067,16 +1036,21 @@ get_addrs(const char *s, struct server *new_srv, in_port_t port)
 		}
 		h->ss.ss_family = res->ai_family;
 
-		if (res->ai_family == AF_INET) {
-			struct sockaddr_in *ra;
+		switch (res->ai_family) {
+		case AF_INET:
 			sain = (struct sockaddr_in *)&h->ss;
 			ra = (struct sockaddr_in *)res->ai_addr;
+			h->port = ntohs(ra->sin_port);
 			got_sockaddr_inet_init(sain, &ra->sin_addr);
-		} else {
-			struct sockaddr_in6 *ra;
+			break;
+		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)&h->ss;
-			ra = (struct sockaddr_in6 *)res->ai_addr;
-			got_sockaddr_inet6_init(sin6, &ra->sin6_addr, 0);
+			ra6 = (struct sockaddr_in6 *)res->ai_addr;
+			h->port = ntohs(ra6->sin6_port);
+			got_sockaddr_inet6_init(sin6, &ra6->sin6_addr, 0);
+			break;
+		default:
+			fatalx("unknown address family %d", res->ai_family);
 		}
 
 		if (add_addr(new_srv, h))
