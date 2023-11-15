@@ -77,7 +77,7 @@ static void	 sockets_rlimit(int);
 static int	 sockets_dispatch_gotwebd(int, struct privsep_proc *,
 		    struct imsg *);
 static int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
-static int	 sockets_create_socket(struct address *, in_port_t);
+static int	 sockets_create_socket(struct address *);
 static int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *,
 		    int, volatile int *);
 
@@ -231,6 +231,9 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 
 	memcpy(&acp->ss, &a->ss, sizeof(acp->ss));
 	acp->slen = a->slen;
+	acp->ai_family = a->ai_family;
+	acp->ai_socktype = a->ai_socktype;
+	acp->ai_protocol = a->ai_protocol;
 	acp->port = a->port;
 	if (*a->ifname != '\0') {
 		if (strlcpy(acp->ifname, a->ifname,
@@ -408,8 +411,7 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 		log_debug("%s: initializing %s FCGI socket on port %d for %s",
 		    __func__, sock->conf.af_type == AF_INET ? "inet" : "inet6",
 		    sock->conf.fcgi_socket_port, sock->conf.name);
-		sock->fd = sockets_create_socket(&sock->conf.addr,
-		    sock->conf.fcgi_socket_port);
+		sock->fd = sockets_create_socket(&sock->conf.addr);
 		if (sock->fd == -1) {
 			log_warnx("%s: create FCGI socket failed", __func__);
 			return -1;
@@ -500,17 +502,11 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 }
 
 static int
-sockets_create_socket(struct address *a, in_port_t port)
+sockets_create_socket(struct address *a)
 {
-	struct addrinfo hints;
 	int fd = -1, o_val = 1, flags;
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags |= AI_PASSIVE;
-
-	fd = socket(a->ss.ss_family, hints.ai_socktype, 0);
+	fd = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
 	if (fd == -1)
 		return -1;
 
@@ -535,8 +531,7 @@ sockets_create_socket(struct address *a, in_port_t port)
 
 	if (bind(fd, (struct sockaddr *)&a->ss, a->slen) == -1) {
 		close(fd);
-		log_info("%s: can't bind to port %d", __func__,
-		    ntohs(port));
+		log_info("%s: can't bind to port %d", __func__, a->port);
 		return -1;
 	}
 
