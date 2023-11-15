@@ -99,8 +99,6 @@ int		 get_addrs(const char *, struct server *, in_port_t);
 int		 addr_dup_check(struct addresslist *, struct address *,
 		    const char *, const char *);
 int		 add_addr(struct server *, struct address *);
-int		 host(const char *, struct server *,
-		    int, in_port_t, const char *);
 
 typedef struct {
 	union {
@@ -123,6 +121,7 @@ typedef struct {
 %type	<v.port>	fcgiport
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean
+%type	<v.string>	listen_addr
 
 %%
 
@@ -174,6 +173,10 @@ boolean		: STRING {
 			}
 			$$ = $1;
 		}
+		;
+
+listen_addr	: '*' { $$ = NULL; }
+		| STRING
 		;
 
 fcgiport	: PORT NUMBER {
@@ -342,7 +345,7 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			free($2);
 		}
-		| LISTEN ON STRING fcgiport {
+		| LISTEN ON listen_addr fcgiport {
 			if (get_addrs($3, new_srv, $4) == -1) {
 				yyerror("could not get addrs");
 				YYERROR;
@@ -1020,42 +1023,42 @@ getservice(const char *n)
 }
 
 int
-host(const char *s, struct server *new_srv, int max,
-    in_port_t port, const char *ifname)
+get_addrs(const char *s, struct server *new_srv, in_port_t port)
 {
 	struct addrinfo hints, *res0, *res;
-	int error, cnt = 0;
+	int n, error;
 	struct sockaddr_in *sain;
 	struct sockaddr_in6 *sin6;
 	struct address *h;
+	char portstr[32];
+
+	n = snprintf(portstr, sizeof(portstr), "%d", port);
+	if (n < 0 || (size_t)n >= sizeof(portstr))
+		fatalx("snprintf: port numbr too long: %d", port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM; /* DUMMY */
-	hints.ai_flags = AI_ADDRCONFIG;
-	error = getaddrinfo(s, NULL, &hints, &res0);
-	if (error == EAI_AGAIN || error == EAI_NODATA || error == EAI_NONAME)
-		return (0);
+	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+	error = getaddrinfo(s, portstr, &hints, &res0);
 	if (error) {
 		log_warnx("%s: could not parse \"%s\": %s", __func__, s,
 		    gai_strerror(error));
 		return (-1);
 	}
 
-	for (res = res0; res && cnt < max; res = res->ai_next) {
-		if (res->ai_family != AF_INET &&
-		    res->ai_family != AF_INET6)
-			continue;
+	for (res = res0; res; res = res->ai_next) {
 		if ((h = calloc(1, sizeof(*h))) == NULL)
 			fatal(__func__);
 
 		if (port)
 			h->port = port;
-		if (ifname != NULL) {
-			if (strlcpy(h->ifname, ifname, sizeof(h->ifname)) >=
+		if (s == NULL) {
+			strlcpy(h->ifname, "*", sizeof(h->ifname));
+		} else {
+			if (strlcpy(h->ifname, s, sizeof(h->ifname)) >=
 			    sizeof(h->ifname)) {
-				log_warnx("%s: interface name truncated",
-				    __func__);
+				log_warnx("%s: address truncated", __func__);
 				freeaddrinfo(res0);
 				free(h);
 				return (-1);
@@ -1077,35 +1080,8 @@ host(const char *s, struct server *new_srv, int max,
 
 		if (add_addr(new_srv, h))
 			return -1;
-		cnt++;
-	}
-	if (cnt == max && res) {
-		log_warnx("%s: %s resolves to more than %d hosts", __func__,
-		    s, max);
 	}
 	freeaddrinfo(res0);
-	return (cnt);
-}
-
-int
-get_addrs(const char *addr, struct server *new_srv, in_port_t port)
-{
-	if (strcmp("", addr) == 0) {
-		if (host("127.0.0.1", new_srv, 1, port, "127.0.0.1") <= 0) {
-			yyerror("invalid listen ip: %s",
-			    "127.0.0.1");
-			return (-1);
-		}
-		if (host("::1", new_srv, 1, port, "::1") <= 0) {
-			yyerror("invalid listen ip: %s", "::1");
-			return (-1);
-		}
-	} else {
-		if (host(addr, new_srv, GOTWEBD_MAXIFACE, port, addr) <= 0) {
-			yyerror("invalid listen ip: %s", addr);
-			return (-1);
-		}
-	}
 	return (0);
 }
 
