@@ -1033,8 +1033,10 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 				return (-1);
 			}
 		}
-		h->ss.ss_family = res->ai_family;
 
+		h->ai_family = res->ai_family;
+		h->ai_socktype = res->ai_socktype;
+		h->ai_protocol = res->ai_protocol;
 		memcpy(&h->ss, res->ai_addr, res->ai_addrlen);
 		h->slen = res->ai_addrlen;
 
@@ -1068,7 +1070,10 @@ addr_dup_check(struct addresslist *al, struct address *h, const char *new_srv,
 	const char *addrstr;
 
 	TAILQ_FOREACH(a, al, entry) {
-		if (a->slen != h->slen ||
+		if (a->ai_family != h->ai_family ||
+		    a->ai_socktype != h->ai_socktype ||
+		    a->ai_protocol != h->ai_protocol ||
+		    a->slen != h->slen ||
 		    memcmp(&a->ss, &h->ss, a->slen) != 0)
 			continue;
 

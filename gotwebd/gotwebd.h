@@ -264,6 +264,9 @@ struct address {
 	TAILQ_ENTRY(address)	 entry;
 	struct sockaddr_storage	 ss;
 	socklen_t		 slen;
+	int			 ai_family;
+	int			 ai_socktype;
+	int			 ai_protocol;
 	in_port_t		 port;
 	char			 ifname[IFNAMSIZ];
 };
