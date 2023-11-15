@@ -1027,7 +1027,8 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 		} else {
 			if (strlcpy(h->ifname, hostname, sizeof(h->ifname)) >=
 			    sizeof(h->ifname)) {
-				log_warnx("%s: address truncated", __func__);
+				log_warnx("%s: address truncated: %s",
+				    __func__, hostname);
 				freeaddrinfo(res0);
 				free(h);
 				return (-1);
