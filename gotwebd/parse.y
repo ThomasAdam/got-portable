@@ -1035,7 +1035,7 @@ get_addrs(const char *s, struct server *new_srv, in_port_t port)
 
 	n = snprintf(portstr, sizeof(portstr), "%d", port);
 	if (n < 0 || (size_t)n >= sizeof(portstr))
-		fatalx("snprintf: port numbr too long: %d", port);
+		fatalx("snprintf: port number too long: %d", port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
