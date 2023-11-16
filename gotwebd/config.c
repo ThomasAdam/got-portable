@@ -165,18 +165,28 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 int
 config_setfd(struct gotwebd *env, struct socket *sock)
 {
-	int i, fd;
+	int i, j, ret, fd;
 
 	log_debug("%s: Allocating %d file descriptors",
 	    __func__, PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES);
 
 	for (i = 0; i < PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES; i++) {
-		fd = got_opentempfd();
-		if (fd == -1)
-			fatal("got_opentemp");
-		if (main_compose_sockets(env, IMSG_CFG_FD, fd,
-		    &sock->conf.id, sizeof(sock->conf.id)) == -1)
-			fatal("main_compose_sockets IMSG_CFG_FD");
+		for (j = 0; j < env->nserver; ++j) {
+			fd = got_opentempfd();
+			if (fd == -1)
+				fatal("got_opentemp");
+			if (imsg_compose_event(&env->iev_server[j],
+			    IMSG_CFG_FD, 0, -1, fd, &sock->conf.id,
+			    sizeof(sock->conf.id)) == -1)
+				fatal("imsg_compose_event IMSG_CFG_FD");
+
+			do {
+				ret = imsg_flush(&env->iev_server[j].ibuf);
+			} while (ret == -1 && errno == EAGAIN);
+			if (ret == -1)
+				fatal("imsg_flush");
+			imsg_event_add(&env->iev_server[j]);
+		}
 	}
 
 	return 0;
