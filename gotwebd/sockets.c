@@ -106,6 +106,8 @@ sockets(struct gotwebd *env, int fd)
 	    env->iev_parent);
 	event_add(&env->iev_parent->ev, NULL);
 
+	signal(SIGPIPE, SIG_IGN);
+
 	signal_set(&sighup, SIGCHLD, sockets_sighdlr, env);
 	signal_add(&sighup, NULL);
 	signal_set(&sigpipe, SIGCHLD, sockets_sighdlr, env);
