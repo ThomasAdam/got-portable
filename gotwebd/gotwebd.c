@@ -356,7 +356,7 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!env->gotwebd_debug && daemon(0, 0) == -1)
+	if (!env->gotwebd_debug && daemon(1, 0) == -1)
 		fatal("daemon");
 
 	event_init();
@@ -370,6 +370,9 @@ main(int argc, char **argv)
 		if (spawn_socket_process(env, argv0, i) == -1)
 			fatal("spawn_socket_process");
 	}
+
+	if (chdir("/") == -1)
+		fatal("chdir /");
 
 	log_procinit("gotwebd");
 
