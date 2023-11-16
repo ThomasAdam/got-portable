@@ -559,7 +559,7 @@ gotweb_assign_querystring(struct querystring **qs, char *key, char *value)
 	if (error)
 		return error;
 
-	for (el_cnt = 0; el_cnt < QSELEM__MAX; el_cnt++) {
+	for (el_cnt = 0; el_cnt < nitems(querystring_keys); el_cnt++) {
 		if (strcmp(key, querystring_keys[el_cnt].name) != 0)
 			continue;
 
@@ -645,9 +645,10 @@ qa_found:
 			if ((*qs)->page < 0)
 				(*qs)->page = 0;
 			break;
-		default:
-			break;
 		}
+
+		/* entry found */
+		break;
 	}
 done:
 	return error;

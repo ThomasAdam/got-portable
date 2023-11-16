@@ -416,7 +416,6 @@ enum querystring_elements {
 	INDEX_PAGE,
 	PATH,
 	PAGE,
-	QSELEM__MAX,
 };
 
 enum query_actions {
