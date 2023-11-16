@@ -418,7 +418,6 @@ enum querystring_elements {
 	INDEX_PAGE,
 	PATH,
 	PAGE,
-	PREVID,
 	QSELEM__MAX,
 };
 
