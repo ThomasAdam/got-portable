@@ -276,13 +276,13 @@ main(int argc, char **argv)
 	if ((argv0 = argv[0]) == NULL)
 		argv0 = "gotwebd";
 
+	/* log to stderr until daemonized */
+	log_init(1, LOG_DAEMON);
+
 	env = calloc(1, sizeof(*env));
 	if (env == NULL)
 		fatal("%s: calloc", __func__);
 	config_init(env);
-
-	/* log to stderr until daemonized */
-	log_init(1, LOG_DAEMON);
 
 	while ((ch = getopt(argc, argv, "D:df:nSv")) != -1) {
 		switch (ch) {
