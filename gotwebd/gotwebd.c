@@ -41,7 +41,6 @@
 #include "got_opentemp.h"
 #include "got_reference.h"
 
-#include "proc.h"
 #include "gotwebd.h"
 
 __dead void usage(void);
@@ -51,39 +50,137 @@ int	 gotwebd_configure(struct gotwebd *);
 void	 gotwebd_configure_done(struct gotwebd *);
 void	 gotwebd_sighdlr(int sig, short event, void *arg);
 void	 gotwebd_shutdown(void);
-int	 gotwebd_dispatch_sockets(int, struct privsep_proc *, struct imsg *);
+void	 gotwebd_dispatch_sockets(int, short, void *);
 
 struct gotwebd	*gotwebd_env;
 
-static struct privsep_proc procs[] = {
-	{ "sockets",	PROC_SOCKS,	gotwebd_dispatch_sockets, sockets,
-	    sockets_shutdown },
-};
-
-int
-gotwebd_dispatch_sockets(int fd, struct privsep_proc *p, struct imsg *imsg)
+void
+imsg_event_add(struct imsgev *iev)
 {
-	struct privsep		*ps = p->p_ps;
-	struct gotwebd		*env = ps->ps_env;
-
-	switch (imsg->hdr.type) {
-	case IMSG_CFG_DONE:
-		gotwebd_configure_done(env);
-		break;
-	default:
-		return (-1);
+	if (iev->handler == NULL) {
+		imsg_flush(&iev->ibuf);
+		return;
 	}
 
-	return (0);
+	iev->events = EV_READ;
+	if (iev->ibuf.w.queued)
+		iev->events |= EV_WRITE;
+
+	event_del(&iev->ev);
+	event_set(&iev->ev, iev->ibuf.fd, iev->events, iev->handler, iev->data);
+	event_add(&iev->ev, NULL);
+}
+
+int
+imsg_compose_event(struct imsgev *iev, uint16_t type, uint32_t peerid,
+    pid_t pid, int fd, const void *data, uint16_t datalen)
+{
+	int ret;
+
+	ret = imsg_compose(&iev->ibuf, type, peerid, pid, fd, data, datalen);
+	if (ret == -1)
+		return (ret);
+	imsg_event_add(iev);
+	return (ret);
+}
+
+int
+main_compose_sockets(struct gotwebd *env, uint32_t type, int fd,
+    const void *data, uint16_t len)
+{
+	size_t	 i;
+	int	 ret, d;
+
+	for (i = 0; i < env->nserver; ++i) {
+		d = -1;
+		if (fd != -1 && (d = dup(fd)) == -1)
+			return (-1);
+
+		ret = imsg_compose_event(&env->iev_server[i], type, 0, -1,
+		    d, data, len);
+		if (ret == -1)
+			return (-1);
+
+		/* prevent fd exhaustion */
+		if (d != -1) {
+			do {
+				ret = imsg_flush(&env->iev_server[i].ibuf);
+			} while (ret == -1 && errno == EAGAIN);
+			if (ret == -1)
+				return (-1);
+			imsg_event_add(&env->iev_server[i]);
+		}
+	}
+
+	if (fd != -1)
+		close(fd);
+
+	return 0;
+}
+
+int
+sockets_compose_main(struct gotwebd *env, uint32_t type, const void *d,
+    uint16_t len)
+{
+	return (imsg_compose_event(env->iev_parent, type, 0, -1, -1, d, len));
+}
+
+void
+gotwebd_dispatch_sockets(int fd, short event, void *arg)
+{
+	struct imsgev		*iev = arg;
+	struct imsgbuf		*ibuf;
+	struct imsg		 imsg;
+	struct gotwebd		*env = gotwebd_env;
+	ssize_t			 n;
+	int			 shut = 0;
+
+	ibuf = &iev->ibuf;
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+	if (event & EV_WRITE) {
+		if ((n = msgbuf_write(&ibuf->w)) == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("imsg_get");
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case IMSG_CFG_DONE:
+			gotwebd_configure_done(env);
+			break;
+		default:
+			fatalx("%s: unknown imsg type %d", __func__,
+			    imsg.hdr.type);
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut)
+		imsg_event_add(iev);
+	else {
+		/* This pipe is dead.  Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
 }
 
 void
 gotwebd_sighdlr(int sig, short event, void *arg)
 {
 	/* struct privsep	*ps = arg; */
-
-	if (privsep_process != PROC_GOTWEBD)
-		return;
 
 	switch (sig) {
 	case SIGHUP:
@@ -104,6 +201,54 @@ gotwebd_sighdlr(int sig, short event, void *arg)
 	}
 }
 
+static int
+spawn_socket_process(struct gotwebd *env, const char *argv0, int n)
+{
+	const char	*argv[5];
+	int		 argc = 0;
+	int		 p[2];
+	pid_t		 pid;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, p) == -1)
+		fatal("socketpair");
+
+	switch (pid = fork()) {
+	case -1:
+		fatal("fork");
+	case 0:		/* child */
+		break;
+	default:	/* parent */
+		close(p[0]);
+		imsg_init(&env->iev_server[n].ibuf, p[1]);
+		env->iev_server[n].handler = gotwebd_dispatch_sockets;
+		env->iev_server[n].data = &env->iev_server[n];
+		event_set(&env->iev_server[n].ev, p[1], EV_READ,
+		    gotwebd_dispatch_sockets, &env->iev_server[n]);
+		event_add(&env->iev_server[n].ev, NULL);
+		return 0;
+	}
+
+	close(p[1]);
+
+	argv[argc++] = argv0;
+	argv[argc++] = "-S";
+	if (env->gotwebd_debug)
+		argv[argc++] = "-d";
+	if (env->gotwebd_verbose)
+		argv[argc++] = "-v";
+	argv[argc] = NULL;
+
+	if (p[0] != 3) {
+		if (dup2(p[0], 3) == -1)
+			fatal("dup2");
+	} else if (fcntl(p[0], F_SETFD, 0) == -1)
+		fatal("fcntl");
+
+	/* obnoxious cast */
+	execvp(argv0, (char * const *)argv);
+	fatal("execvp %s", argv0);
+}
+
 __dead void
 usage(void)
 {
@@ -115,25 +260,27 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	struct gotwebd *env;
-	struct privsep *ps;
-	unsigned int proc;
-	int ch;
-	const char *conffile = GOTWEBD_CONF;
-	enum privsep_procid proc_id = PROC_GOTWEBD;
-	int proc_instance = 0;
-	const char *errp, *title = NULL;
-	int argc0 = argc;
+	struct event		 sigint, sigterm, sighup, sigpipe, sigusr1;
+	struct gotwebd		*env;
+	struct passwd		*pw;
+	int			 ch, i;
+	int			 no_action = 0;
+	int			 server_proc = 0;
+	const char		*conffile = GOTWEBD_CONF;
+	const char		*argv0;
+
+	if ((argv0 = argv[0]) == NULL)
+		argv0 = "gotwebd";
 
 	env = calloc(1, sizeof(*env));
 	if (env == NULL)
 		fatal("%s: calloc", __func__);
+	config_init(env);
 
 	/* log to stderr until daemonized */
 	log_init(1, LOG_DAEMON);
 
-	/* XXX: add s and S for both sockets */
-	while ((ch = getopt(argc, argv, "D:df:I:nP:v")) != -1) {
+	while ((ch = getopt(argc, argv, "D:df:nSv")) != -1) {
 		switch (ch) {
 		case 'D':
 			if (cmdline_symset(optarg) < 0)
@@ -141,26 +288,16 @@ main(int argc, char **argv)
 				    optarg);
 			break;
 		case 'd':
-			env->gotwebd_debug = 2;
+			env->gotwebd_debug = 1;
 			break;
 		case 'f':
 			conffile = optarg;
 			break;
-		case 'I':
-			proc_instance = strtonum(optarg, 0,
-			    PROC_MAX_INSTANCES, &errp);
-			if (errp)
-				fatalx("invalid process instance");
-			break;
 		case 'n':
-			env->gotwebd_debug = 2;
-			env->gotwebd_noaction = 1;
+			no_action = 1;
 			break;
-		case 'P':
-			title = optarg;
-			proc_id = proc_getid(procs, nitems(procs), title);
-			if (proc_id == PROC_MAX)
-				fatalx("invalid process name");
+		case 'S':
+			server_proc = 1;
 			break;
 		case 'v':
 			env->gotwebd_verbose++;
@@ -174,71 +311,76 @@ main(int argc, char **argv)
 	if (argc > 0)
 		usage();
 
-	ps = calloc(1, sizeof(*ps));
-	if (ps == NULL)
-		fatal("%s: calloc:", __func__);
-
 	gotwebd_env = env;
-	env->gotwebd_ps = ps;
-	ps->ps_env = env;
 	env->gotwebd_conffile = conffile;
 
 	if (parse_config(env->gotwebd_conffile, env) == -1)
 		exit(1);
 
-	if (env->gotwebd_noaction && !env->gotwebd_debug)
-		env->gotwebd_debug = 1;
-
-	/* check for root privileges */
-	if (env->gotwebd_noaction == 0) {
-		if (geteuid())
-			fatalx("need root privileges");
+	if (no_action) {
+		fprintf(stderr, "configuration OK\n");
+		exit(0);
 	}
 
-	ps->ps_pw = getpwnam(GOTWEBD_USER);
-	if (ps->ps_pw == NULL)
+	/* check for root privileges */
+	if (geteuid())
+		fatalx("need root privileges");
+
+	pw = getpwnam(GOTWEBD_USER);
+	if (pw == NULL)
 		fatalx("unknown user %s", GOTWEBD_USER);
+	env->pw = pw;
 
 	log_init(env->gotwebd_debug, LOG_DAEMON);
 	log_setverbose(env->gotwebd_verbose);
 
-	if (env->gotwebd_noaction)
-		ps->ps_noaction = 1;
+	if (server_proc) {
+		setproctitle("sockets");
+		log_procinit("sockets");
 
-	ps->ps_instances[PROC_SOCKS] = env->prefork_gotwebd;
-	ps->ps_instance = proc_instance;
-	if (title != NULL)
-		ps->ps_title[proc_id] = title;
+		if (chroot(pw->pw_dir) == -1)
+			fatal("chroot %s", pw->pw_dir);
+		if (chdir("/") == -1)
+			fatal("chdir /");
+		if (setgroups(1, &pw->pw_gid) == -1 ||
+		    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) == -1 ||
+		    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1)
+			fatal("failed to drop privileges");
 
-	for (proc = 0; proc < nitems(procs); proc++)
-		procs[proc].p_chroot = env->httpd_chroot;
+		sockets(env, 3);
+		return 1;
+	}
 
-	/* only the gotwebd returns */
-	proc_init(ps, procs, nitems(procs), argc0, argv, proc_id);
-
-	log_procinit("gotwebd");
 	if (!env->gotwebd_debug && daemon(0, 0) == -1)
-		fatal("can't daemonize");
-
-	if (ps->ps_noaction == 0)
-		log_info("%s startup", getprogname());
+		fatal("daemon");
 
 	event_init();
 
-	signal_set(&ps->ps_evsigint, SIGINT, gotwebd_sighdlr, ps);
-	signal_set(&ps->ps_evsigterm, SIGTERM, gotwebd_sighdlr, ps);
-	signal_set(&ps->ps_evsighup, SIGHUP, gotwebd_sighdlr, ps);
-	signal_set(&ps->ps_evsigpipe, SIGPIPE, gotwebd_sighdlr, ps);
-	signal_set(&ps->ps_evsigusr1, SIGUSR1, gotwebd_sighdlr, ps);
+	env->nserver = env->prefork_gotwebd;
+	env->iev_server = calloc(env->nserver, sizeof(*env->iev_server));
+	if (env->iev_server == NULL)
+		fatal("calloc");
 
-	signal_add(&ps->ps_evsigint, NULL);
-	signal_add(&ps->ps_evsigterm, NULL);
-	signal_add(&ps->ps_evsighup, NULL);
-	signal_add(&ps->ps_evsigpipe, NULL);
-	signal_add(&ps->ps_evsigusr1, NULL);
+	for (i = 0; i < env->nserver; ++i) {
+		if (spawn_socket_process(env, argv0, i) == -1)
+			fatal("spawn_socket_process");
+	}
 
-	if (!env->gotwebd_noaction)
-		proc_connect(ps);
+	log_procinit("gotwebd");
+
+	log_info("%s startup", getprogname());
+
+	signal_set(&sigint, SIGINT, gotwebd_sighdlr, env);
+	signal_set(&sigterm, SIGTERM, gotwebd_sighdlr, env);
+	signal_set(&sighup, SIGHUP, gotwebd_sighdlr, env);
+	signal_set(&sigpipe, SIGPIPE, gotwebd_sighdlr, env);
+	signal_set(&sigusr1, SIGUSR1, gotwebd_sighdlr, env);
+
+	signal_add(&sigint, NULL);
+	signal_add(&sigterm, NULL);
+	signal_add(&sighup, NULL);
+	signal_add(&sigpipe, NULL);
+	signal_add(&sigusr1, NULL);
 
 	if (gotwebd_configure(env) == -1)
 		fatalx("configuration failed");
@@ -274,13 +416,6 @@ gotwebd_configure(struct gotwebd *env)
 {
 	struct server *srv;
 	struct socket *sock;
-	int id;
-
-	if (env->gotwebd_noaction) {
-		fprintf(stderr, "configuration OK\n");
-		proc_kill(env->gotwebd_ps);
-		exit(0);
-	}
 
 	/* gotweb need to reload its config. */
 	env->gotwebd_reload = env->prefork_gotwebd;
@@ -299,11 +434,8 @@ gotwebd_configure(struct gotwebd *env)
 			fatalx("%s: send priv_fd error", __func__);
 	}
 
-	for (id = 0; id < PROC_MAX; id++) {
-		if (id == privsep_process)
-			continue;
-		proc_compose(env->gotwebd_ps, id, IMSG_CFG_DONE, NULL, 0);
-	}
+	if (main_compose_sockets(env, IMSG_CFG_DONE, -1, NULL, 0) == -1)
+		fatal("main_compose_sockets IMSG_CFG_DONE");
 
 	return (0);
 }
@@ -311,31 +443,44 @@ gotwebd_configure(struct gotwebd *env)
 void
 gotwebd_configure_done(struct gotwebd *env)
 {
-	int id;
-
 	if (env->gotwebd_reload == 0) {
 		log_warnx("%s: configuration already finished", __func__);
 		return;
 	}
 
 	env->gotwebd_reload--;
-	if (env->gotwebd_reload == 0) {
-		for (id = 0; id < PROC_MAX; id++) {
-			if (id == privsep_process)
-				continue;
-			proc_compose(env->gotwebd_ps, id, IMSG_CTL_START,
-			    NULL, 0);
-		}
-	}
+	if (env->gotwebd_reload == 0 &&
+	    main_compose_sockets(env, IMSG_CTL_START, -1, NULL, 0) == -1)
+		fatal("main_compose_sockets IMSG_CTL_START");
 }
 
 void
 gotwebd_shutdown(void)
 {
-	proc_kill(gotwebd_env->gotwebd_ps);
+	struct gotwebd	*env = gotwebd_env;
+	pid_t		 pid;
+	int		 i, status;
 
-	/* unlink(gotwebd_env->gotweb->gotweb_conf.gotweb_unix_socket_name); */
-	/* free(gotwebd_env->gotweb); */
+	for (i = 0; i < env->nserver; ++i) {
+		event_del(&env->iev_server[i].ev);
+		imsg_clear(&env->iev_server[i].ibuf);
+		close(env->iev_server[i].ibuf.fd);
+		env->iev_server[i].ibuf.fd = -1;
+	}
+
+	do {
+		pid = waitpid(WAIT_ANY, &status, 0);
+		if (pid <= 0)
+			continue;
+
+		if (WIFSIGNALED(status))
+			log_warnx("lost child: pid %u terminated; signal %d",
+			    pid, WTERMSIG(status));
+		else if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+			log_warnx("lost child: pid %u exited abnormally",
+			    pid);
+	} while (pid != -1 || (pid == -1 && errno == EINTR));
+
 	free(gotwebd_env);
 
 	log_warnx("gotwebd terminating");

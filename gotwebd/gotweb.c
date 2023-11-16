@@ -48,7 +48,6 @@
 #include "got_blame.h"
 #include "got_privsep.h"
 
-#include "proc.h"
 #include "gotwebd.h"
 #include "tmpl.h"
 

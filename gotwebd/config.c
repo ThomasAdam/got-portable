@@ -37,33 +37,18 @@
 #include "got_opentemp.h"
 #include "got_reference.h"
 
-#include "got_compat.h"
-
-#include "proc.h"
 #include "gotwebd.h"
 
 int
 config_init(struct gotwebd *env)
 {
-	struct privsep *ps = env->gotwebd_ps;
-	unsigned int what;
-
 	strlcpy(env->httpd_chroot, D_HTTPD_CHROOT, sizeof(env->httpd_chroot));
 
-	/* Global configuration. */
-	if (privsep_process == PROC_GOTWEBD)
-		env->prefork_gotwebd = GOTWEBD_NUMPROC;
+	env->prefork_gotwebd = GOTWEBD_NUMPROC;
+	env->server_cnt = 0;
+	TAILQ_INIT(&env->servers);
+	TAILQ_INIT(&env->sockets);
 
-	ps->ps_what[PROC_GOTWEBD] = CONFIG_ALL;
-	ps->ps_what[PROC_SOCKS] = CONFIG_SOCKS;
-
-	/* Other configuration. */
-	what = ps->ps_what[privsep_process];
-	if (what & CONFIG_SOCKS) {
-		env->server_cnt = 0;
-		TAILQ_INIT(&env->servers);
-		TAILQ_INIT(&env->sockets);
-	}
 	return 0;
 }
 
@@ -71,23 +56,17 @@ int
 config_getcfg(struct gotwebd *env, struct imsg *imsg)
 {
 	/* nothing to do but tell gotwebd configuration is done */
-	if (privsep_process != PROC_GOTWEBD)
-		proc_compose(env->gotwebd_ps, PROC_GOTWEBD,
-		    IMSG_CFG_DONE, NULL, 0);
-
+	if (sockets_compose_main(env, IMSG_CFG_DONE, NULL, 0) == -1)
+		fatal("sockets_compose_main IMSG_CFG_DONE");
 	return 0;
 }
 
 int
 config_setserver(struct gotwebd *env, struct server *srv)
 {
-	struct server ssrv;
-	struct privsep *ps = env->gotwebd_ps;
-
-	memcpy(&ssrv, srv, sizeof(ssrv));
-	if (proc_compose(ps, PROC_SOCKS, IMSG_CFG_SRV, &ssrv, sizeof(ssrv))
+	if (main_compose_sockets(env, IMSG_CFG_SRV, -1, srv, sizeof(*srv))
 	    == -1)
-		fatal("proc_compose");
+		fatal("main_compose_sockets IMSG_CFG_SRV");
 	return 0;
 }
 
@@ -97,17 +76,11 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	struct server *srv;
 	uint8_t *p = imsg->data;
 
-	IMSG_SIZE_CHECK(imsg, &srv);
-
 	srv = calloc(1, sizeof(*srv));
 	if (srv == NULL)
 		fatalx("%s: calloc", __func__);
 
-	if (IMSG_DATA_SIZE(imsg) != sizeof(*srv)) {
-		log_debug("%s: imsg size error", __func__);
-		free(srv);
-		return 1;
-	}
+	IMSG_SIZE_CHECK(imsg, srv);
 
 	memcpy(srv, p, sizeof(*srv));
 	srv->cached_repos = calloc(GOTWEBD_REPO_CACHESIZE,
@@ -129,62 +102,15 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 int
 config_setsock(struct gotwebd *env, struct socket *sock)
 {
-	struct privsep *ps = env->gotwebd_ps;
-	struct socket_conf s;
-	int id;
-	int fd = -1, n, m;
-	struct iovec iov[6];
-	size_t c;
-	unsigned int what;
-
 	/* open listening sockets */
 	if (sockets_privinit(env, sock) == -1)
 		return -1;
 
-	for (id = 0; id < PROC_MAX; id++) {
-		what = ps->ps_what[id];
+	if (main_compose_sockets(env, IMSG_CFG_SOCK, sock->fd,
+	    &sock->conf, sizeof(sock->conf)) == -1)
+		fatal("main_compose_sockets IMSG_CFG_SOCK");
 
-		if ((what & CONFIG_SOCKS) == 0 || id == privsep_process)
-			continue;
-
-		memcpy(&s, &sock->conf, sizeof(s));
-
-		c = 0;
-		iov[c].iov_base = &s;
-		iov[c++].iov_len = sizeof(s);
-
-		if (id == PROC_SOCKS) {
-			/* XXX imsg code will close the fd after 1st call */
-			n = -1;
-			proc_range(ps, id, &n, &m);
-			for (n = 0; n < m; n++) {
-				if (sock->fd == -1)
-					fd = -1;
-				else if ((fd = dup(sock->fd)) == -1)
-					return 1;
-				if (proc_composev_imsg(ps, id, n, IMSG_CFG_SOCK,
-				    -1, fd, iov, c) != 0) {
-					log_warn("%s: failed to compose "
-					    "IMSG_CFG_SOCK imsg",
-					    __func__);
-					return 1;
-				}
-				if (proc_flush_imsg(ps, id, n) == -1) {
-					log_warn("%s: failed to flush "
-					    "IMSG_CFG_SOCK imsg",
-					    __func__);
-					return 1;
-				}
-			}
-		}
-	}
-
-	/* Close socket early to prevent fd exhaustion in gotwebd. */
-	if (sock->fd != -1) {
-		close(sock->fd);
-		sock->fd = -1;
-	}
-
+	sock->fd = -1;
 	return 0;
 }
 
@@ -237,60 +163,20 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 int
 config_setfd(struct gotwebd *env, struct socket *sock)
 {
-	struct privsep *ps = env->gotwebd_ps;
-	int id, s;
-	int fd = -1, n, m, j;
-	struct iovec iov[6];
-	size_t c;
-	unsigned int what;
+	int i, fd;
 
 	log_debug("%s: Allocating %d file descriptors",
 	    __func__, PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES);
 
-	for (j = 0; j < PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES; j++) {
-		for (id = 0; id < PROC_MAX; id++) {
-			what = ps->ps_what[id];
-
-			if ((what & CONFIG_SOCKS) == 0 || id == privsep_process)
-				continue;
-
-			s = sock->conf.id;
-			c = 0;
-			iov[c].iov_base = &s;
-			iov[c++].iov_len = sizeof(s);
-
-			if (id == PROC_SOCKS) {
-				/*
-				 * XXX imsg code will close the fd
-				 * after 1st call
-				 */
-				n = -1;
-				proc_range(ps, id, &n, &m);
-				for (n = 0; n < m; n++) {
-					fd = got_opentempfd();
-					if (fd == -1)
-						return 1;
-					if (proc_composev_imsg(ps, id, n,
-					    IMSG_CFG_FD, -1, fd, iov, c) != 0) {
-						log_warn("%s: failed to compose "
-						    "IMSG_CFG_FD imsg",
-						    __func__);
-						return 1;
-					}
-					if (proc_flush_imsg(ps, id, n) == -1) {
-						log_warn("%s: failed to flush "
-						    "IMSG_CFG_FD imsg",
-						    __func__);
-						return 1;
-					}
-				}
-			}
-		}
-
-		/* Close fd early to prevent fd exhaustion in gotwebd. */
-		if (fd != -1)
-			close(fd);
+	for (i = 0; i < PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES; i++) {
+		fd = got_opentempfd();
+		if (fd == -1)
+			fatal("got_opentemp");
+		if (main_compose_sockets(env, IMSG_CFG_FD, fd,
+		    &sock->conf.id, sizeof(sock->conf.id)) == -1)
+			fatal("main_compose_sockets IMSG_CFG_FD");
 	}
+
 	return 0;
 }
 
