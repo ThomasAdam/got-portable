@@ -94,12 +94,12 @@ main_compose_sockets(struct gotwebd *env, uint32_t type, int fd,
 	for (i = 0; i < env->nserver; ++i) {
 		d = -1;
 		if (fd != -1 && (d = dup(fd)) == -1)
-			return (-1);
+			goto err;
 
 		ret = imsg_compose_event(&env->iev_server[i], type, 0, -1,
 		    d, data, len);
 		if (ret == -1)
-			return (-1);
+			goto err;
 
 		/* prevent fd exhaustion */
 		if (d != -1) {
@@ -107,15 +107,19 @@ main_compose_sockets(struct gotwebd *env, uint32_t type, int fd,
 				ret = imsg_flush(&env->iev_server[i].ibuf);
 			} while (ret == -1 && errno == EAGAIN);
 			if (ret == -1)
-				return (-1);
+				goto err;
 			imsg_event_add(&env->iev_server[i]);
 		}
 	}
 
 	if (fd != -1)
 		close(fd);
-
 	return 0;
+
+err:
+	if (fd != -1)
+		close(fd);
+	return -1;
 }
 
 int
