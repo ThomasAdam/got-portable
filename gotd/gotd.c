@@ -126,6 +126,16 @@ usage(void)
 	exit(1);
 }
 
+static void
+drop_privs(struct passwd *pw)
+{
+	/* Drop root privileges. */
+	if (setgid(pw->pw_gid) == -1)
+		fatal("setgid %d failed", pw->pw_gid);
+	if (setuid(pw->pw_uid) == -1)
+		fatal("setuid %d failed", pw->pw_uid);
+}
+
 static int
 unix_socket_listen(const char *unix_socket_path, uid_t uid, gid_t gid)
 {
