@@ -55,28 +55,25 @@
 #include "got_repository.h"
 #include "got_privsep.h"
 
-#include "proc.h"
 #include "gotwebd.h"
 #include "tmpl.h"
 
 #define SOCKS_BACKLOG 5
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
 
-
 volatile int client_cnt;
 
 static struct timeval	timeout = { TIMEOUT_DEFAULT, 0 };
 
 static void	 sockets_sighdlr(int, short, void *);
-static void	 sockets_run(struct privsep *, struct privsep_proc *, void *);
+static void	 sockets_shutdown(void);
 static void	 sockets_launch(void);
 static void	 sockets_purge(struct gotwebd *);
 static void	 sockets_accept_paused(int, short, void *);
 static void	 sockets_rlimit(int);
 
-static int	 sockets_dispatch_gotwebd(int, struct privsep_proc *,
-		    struct imsg *);
-static int	 sockets_unix_socket_listen(struct privsep *, struct socket *);
+static void	 sockets_dispatch_main(int, short, void *);
+static int	 sockets_unix_socket_listen(struct gotwebd *, struct socket *);
 static int	 sockets_create_socket(struct address *);
 static int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *,
 		    int, volatile int *);
@@ -88,35 +85,44 @@ static struct socket *sockets_conf_new_socket_fcgi(struct gotwebd *,
 
 int cgi_inflight = 0;
 
-static struct privsep_proc procs[] = {
-	{ "gotwebd",	PROC_GOTWEBD,	sockets_dispatch_gotwebd  },
-};
-
 void
-sockets(struct privsep *ps, struct privsep_proc *p)
+sockets(struct gotwebd *env, int fd)
 {
-	proc_run(ps, p, procs, nitems(procs), sockets_run, NULL);
-}
+	struct event	 sighup, sigpipe, sigusr1, sigchld;
 
-static void
-sockets_run(struct privsep *ps, struct privsep_proc *p, void *arg)
-{
-	if (config_init(ps->ps_env) == -1)
-		fatal("failed to initialize configuration");
-
-	p->p_shutdown = sockets_shutdown;
+	event_init();
 
 	sockets_rlimit(-1);
 
-	signal_del(&ps->ps_evsigchld);
-	signal_set(&ps->ps_evsigchld, SIGCHLD, sockets_sighdlr, ps);
-	signal_add(&ps->ps_evsigchld, NULL);
+	if (config_init(env) == -1)
+		fatal("failed to initialize configuration");
+
+	if ((env->iev_parent = malloc(sizeof(*env->iev_parent))) == NULL)
+		fatal("malloc");
+	imsg_init(&env->iev_parent->ibuf, fd);
+	env->iev_parent->handler = sockets_dispatch_main;
+	env->iev_parent->data = env->iev_parent;
+	event_set(&env->iev_parent->ev, fd, EV_READ, sockets_dispatch_main,
+	    env->iev_parent);
+	event_add(&env->iev_parent->ev, NULL);
+
+	signal_set(&sighup, SIGCHLD, sockets_sighdlr, env);
+	signal_add(&sighup, NULL);
+	signal_set(&sigpipe, SIGCHLD, sockets_sighdlr, env);
+	signal_add(&sigpipe, NULL);
+	signal_set(&sigusr1, SIGCHLD, sockets_sighdlr, env);
+	signal_add(&sigusr1, NULL);
+	signal_set(&sigchld, SIGCHLD, sockets_sighdlr, env);
+	signal_add(&sigchld, NULL);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath inet recvfd proc exec sendfd unveil",
 	    NULL) == -1)
 		fatal("pledge");
 #endif
+
+	event_dispatch();
+	sockets_shutdown();
 }
 
 void
@@ -301,48 +307,68 @@ sockets_purge(struct gotwebd *env)
 	}
 }
 
-static int
-sockets_dispatch_gotwebd(int fd, struct privsep_proc *p, struct imsg *imsg)
+static void
+sockets_dispatch_main(int fd, short event, void *arg)
 {
-	struct privsep *ps = p->p_ps;
-	int res = 0, cmd = 0, verbose;
+	struct imsgev		*iev = arg;
+	struct imsgbuf		*ibuf;
+	struct imsg		 imsg;
+	struct gotwebd		*env = gotwebd_env;
+	ssize_t			 n;
+	int			 shut = 0;
 
-	switch (imsg->hdr.type) {
-	case IMSG_CFG_SRV:
-		config_getserver(gotwebd_env, imsg);
-		break;
-	case IMSG_CFG_SOCK:
-		config_getsock(gotwebd_env, imsg);
-		break;
-	case IMSG_CFG_FD:
-		config_getfd(gotwebd_env, imsg);
-		break;
-	case IMSG_CFG_DONE:
-		config_getcfg(gotwebd_env, imsg);
-		break;
-	case IMSG_CTL_START:
-		sockets_launch();
-		break;
-	case IMSG_CTL_VERBOSE:
-		IMSG_SIZE_CHECK(imsg, &verbose);
-		memcpy(&verbose, imsg->data, sizeof(verbose));
-		log_setverbose(verbose);
-		break;
-	default:
-		return -1;
+	ibuf = &iev->ibuf;
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+	if (event & EV_WRITE) {
+		if ((n = msgbuf_write(&ibuf->w)) == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
 	}
 
-	switch (cmd) {
-	case 0:
-		break;
-	default:
-		if (proc_compose_imsg(ps, PROC_GOTWEBD, -1, cmd,
-		    imsg->hdr.peerid, -1, &res, sizeof(res)) == -1)
-			return -1;
-		break;
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("imsg_get");
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case IMSG_CFG_SRV:
+			config_getserver(env, &imsg);
+			break;
+		case IMSG_CFG_SOCK:
+			config_getsock(env, &imsg);
+			break;
+		case IMSG_CFG_FD:
+			config_getfd(env, &imsg);
+			break;
+		case IMSG_CFG_DONE:
+			config_getcfg(env, &imsg);
+			break;
+		case IMSG_CTL_START:
+			sockets_launch();
+			break;
+		default:
+			fatalx("%s: unknown imsg type %d", __func__,
+			    imsg.hdr.type);
+		}
+
+		imsg_free(&imsg);
 	}
 
-	return 0;
+	if (!shut)
+		imsg_event_add(iev);
+	else {
+		/* This pipe is dead.  Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
 }
 
 static void
@@ -366,7 +392,7 @@ sockets_sighdlr(int sig, short event, void *arg)
 	}
 }
 
-void
+static void
 sockets_shutdown(void)
 {
 	struct server *srv, *tsrv;
@@ -395,12 +421,10 @@ sockets_shutdown(void)
 int
 sockets_privinit(struct gotwebd *env, struct socket *sock)
 {
-	struct privsep *ps = env->gotwebd_ps;
-
 	if (sock->conf.af_type == AF_UNIX) {
 		log_debug("%s: initializing unix socket %s", __func__,
 		    sock->conf.unix_socket_name);
-		sock->fd = sockets_unix_socket_listen(ps, sock);
+		sock->fd = sockets_unix_socket_listen(env, sock);
 		if (sock->fd == -1) {
 			log_warnx("%s: create unix socket failed", __func__);
 			return -1;
@@ -422,9 +446,8 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 }
 
 static int
-sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
+sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
 {
-	struct gotwebd *env = ps->ps_env;
 	struct sockaddr_un sun;
 	struct socket *tsock;
 	int u_fd = -1;
@@ -480,8 +503,8 @@ sockets_unix_socket_listen(struct privsep *ps, struct socket *sock)
 		return -1;
 	}
 
-	if (chown(sock->conf.unix_socket_name, ps->ps_pw->pw_uid,
-	    ps->ps_pw->pw_gid) == -1) {
+	if (chown(sock->conf.unix_socket_name, env->pw->pw_uid,
+	    env->pw->pw_gid) == -1) {
 		log_warn("%s: chown", __func__);
 		close(u_fd);
 		(void)unlink(sock->conf.unix_socket_name);

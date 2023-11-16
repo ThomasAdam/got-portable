@@ -49,7 +49,6 @@
 
 #include "got_reference.h"
 
-#include "proc.h"
 #include "gotwebd.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);

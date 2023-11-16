@@ -49,6 +49,8 @@
 #define GOTWEBD_NUMPROC		 3
 #define GOTWEBD_REPO_CACHESIZE	 4
 
+#define PROC_MAX_INSTANCES	 32
+
 /* GOTWEB DEFAULTS */
 #define MAX_QUERYSTRING		 2048
 #define MAX_DOCUMENT_URI	 255
@@ -120,12 +122,27 @@ struct got_tree_entry;
 struct got_reflist_head;
 
 enum imsg_type {
-	IMSG_CFG_SRV = IMSG_PROC_MAX,
+	IMSG_CFG_SRV,
 	IMSG_CFG_SOCK,
 	IMSG_CFG_FD,
 	IMSG_CFG_DONE,
 	IMSG_CTL_START,
 };
+
+struct imsgev {
+	struct imsgbuf		 ibuf;
+	void			(*handler)(int, short, void *);
+	struct event		 ev;
+	void			*data;
+	short			 events;
+};
+
+#define IMSG_SIZE_CHECK(imsg, p) do {					\
+	if (IMSG_DATA_SIZE(imsg) < sizeof(*p))				\
+		fatalx("bad length imsg received (%s)",	#p);		\
+} while (0)
+
+#define IMSG_DATA_SIZE(imsg)	((imsg)->hdr.len - IMSG_HEADER_SIZE)
 
 struct env_val {
 	SLIST_ENTRY(env_val)	 entry;
@@ -345,16 +362,21 @@ struct socket {
 };
 TAILQ_HEAD(socketlist, socket);
 
+struct passwd;
 struct gotwebd {
 	struct serverlist	servers;
 	struct socketlist	sockets;
 
-	struct privsep	*gotwebd_ps;
 	const char	*gotwebd_conffile;
 
 	int		 gotwebd_debug;
 	int		 gotwebd_verbose;
-	int		 gotwebd_noaction;
+
+	struct imsgev	*iev_parent;
+	struct imsgev	*iev_server;
+	size_t		 nserver;
+
+	struct passwd	*pw;
 
 	uint16_t	 prefork_gotwebd;
 	int		 gotwebd_reload;
@@ -440,9 +462,17 @@ extern struct gotwebd	*gotwebd_env;
 typedef int (*got_render_blame_line_cb)(struct template *, const char *,
     struct blame_line *, int, int);
 
+/* gotwebd.c */
+void	 imsg_event_add(struct imsgev *);
+int	 imsg_compose_event(struct imsgev *, uint16_t, uint32_t,
+	    pid_t, int, const void *, uint16_t);
+int	 main_compose_sockets(struct gotwebd *, uint32_t, int,
+	    const void *, uint16_t);
+int	 sockets_compose_main(struct gotwebd *, uint32_t,
+	    const void *, uint16_t);
+
 /* sockets.c */
-void sockets(struct privsep *, struct privsep_proc *);
-void sockets_shutdown(void);
+void sockets(struct gotwebd *, int);
 void sockets_parse_sockets(struct gotwebd *);
 void sockets_socket_accept(int, short, void *);
 int sockets_privinit(struct gotwebd *, struct socket *);
@@ -517,3 +547,25 @@ int config_setfd(struct gotwebd *, struct socket *);
 int config_getfd(struct gotwebd *, struct imsg *);
 int config_getcfg(struct gotwebd *, struct imsg *);
 int config_init(struct gotwebd *);
+
+/* log.c */
+void	log_init(int, int);
+void	log_procinit(const char *);
+void	log_setverbose(int);
+int	log_getverbose(void);
+void	log_warn(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
+void	log_warnx(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
+void	log_info(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
+void	log_debug(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
+void	logit(int, const char *, ...)
+	    __attribute__((__format__ (printf, 2, 3)));
+void	vlog(int, const char *, va_list)
+	    __attribute__((__format__ (printf, 2, 0)));
+__dead void fatal(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
+__dead void fatalx(const char *, ...)
+	    __attribute__((__format__ (printf, 1, 2)));
