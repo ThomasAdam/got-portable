@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 
 #include <fcntl.h>
 #include <err.h>
@@ -1790,6 +1791,18 @@ apply_unveil_selfexec(void)
 		fatal("unveil");
 }
 
+static void
+set_max_datasize(void)
+{
+	struct rlimit rl;
+
+	if (getrlimit(RLIMIT_DATA, &rl) != 0)
+		return;
+
+	rl.rlim_cur = rl.rlim_max;
+	setrlimit(RLIMIT_DATA, &rl);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1996,6 +2009,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 		break;
 	case PROC_REPO_READ:
+		set_max_datasize();
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2005,6 +2019,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 		exit(0);
 	case PROC_REPO_WRITE:
+		set_max_datasize();
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
