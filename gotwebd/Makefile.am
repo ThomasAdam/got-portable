@@ -71,11 +71,6 @@ gotwebd_SOURCES = config.c \
 		  parse.y \
 		  proc.c \
 		  sockets.c
-if HOST_LINUX
-nodist_gotwebd_SOURCES = $(top_srcdir)/compat/sockaddr-@PLATFORM@.c
-else
-nodist_gotwebd_SOURCES = $(top_srcdir)/lib/sockaddr.c
-endif
 
 gotwebd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = $(top_srcdir)/gotwebd/*.h \
