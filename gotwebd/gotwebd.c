@@ -242,8 +242,8 @@ spawn_socket_process(struct gotwebd *env, const char *argv0, int n)
 		argv[argc++] = "-v";
 	argv[argc] = NULL;
 
-	if (p[0] != 3) {
-		if (dup2(p[0], 3) == -1)
+	if (p[0] != GOTWEBD_SOCK_FILENO) {
+		if (dup2(p[0], GOTWEBD_SOCK_FILENO) == -1)
 			fatal("dup2");
 	} else if (fcntl(p[0], F_SETFD, 0) == -1)
 		fatal("fcntl");
@@ -351,7 +351,7 @@ main(int argc, char **argv)
 		    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1)
 			fatal("failed to drop privileges");
 
-		sockets(env, 3);
+		sockets(env, GOTWEBD_SOCK_FILENO);
 		return 1;
 	}
 
