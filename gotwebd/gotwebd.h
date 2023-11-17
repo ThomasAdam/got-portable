@@ -137,11 +137,6 @@ struct imsgev {
 	short			 events;
 };
 
-#define IMSG_SIZE_CHECK(imsg, p) do {					\
-	if (IMSG_DATA_SIZE(imsg) < sizeof(*p))				\
-		fatalx("bad length imsg received (%s)",	#p);		\
-} while (0)
-
 #define IMSG_DATA_SIZE(imsg)	((imsg)->hdr.len - IMSG_HEADER_SIZE)
 
 struct env_val {
