@@ -80,7 +80,8 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	if (srv == NULL)
 		fatalx("%s: calloc", __func__);
 
-	IMSG_SIZE_CHECK(imsg, srv);
+	if (IMSG_DATA_SIZE(imsg) != sizeof(*srv))
+		fatalx("%s: wrong size", __func__);
 
 	memcpy(srv, p, sizeof(*srv));
 
@@ -117,7 +118,9 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	uint8_t *p = imsg->data;
 	int i;
 
-	IMSG_SIZE_CHECK(imsg, &sock_conf);
+	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_conf))
+		fatalx("%s: wrong size", __func__);
+
 	memcpy(&sock_conf, p, sizeof(sock_conf));
 
 	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_conf)) {
@@ -192,7 +195,9 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 	uint8_t *p = imsg->data;
 	int sock_id, match = 0, i;
 
-	IMSG_SIZE_CHECK(imsg, &sock_id);
+	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_id))
+		fatalx("%s: wrong size", __func__);
+
 	memcpy(&sock_id, p, sizeof(sock_id));
 
 	TAILQ_FOREACH(sock, &env->sockets, entry) {
