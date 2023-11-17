@@ -49,7 +49,6 @@
 #define GOTWEBD_MAXNAME		 64
 #define GOTWEBD_MAXPORT		 6
 #define GOTWEBD_NUMPROC		 3
-#define GOTWEBD_REPO_CACHESIZE	 4
 #define GOTWEBD_SOCK_FILENO	 3
 
 #define PROC_MAX_INSTANCES	 32
@@ -292,17 +291,9 @@ struct address {
 };
 TAILQ_HEAD(addresslist, address);
 
-struct cached_repo {
-	char path[PATH_MAX];
-	struct got_repository *repo;
-};
-
 struct server {
 	TAILQ_ENTRY(server)	 entry;
 	struct addresslist	al;
-
-	struct cached_repo	*cached_repos;
-	int		 ncached_repos;
 
 	char		 name[GOTWEBD_MAXTEXT];
 
