@@ -745,6 +745,8 @@ gotweb_free_transport(struct transport *t)
 			free(t->repos[i]);
 		free(t->repos);
 	}
+	if (t->repo)
+		got_repo_close(t->repo);
 	free(t);
 }
 
@@ -869,6 +871,9 @@ gotweb_render_index(struct template *tp)
 
 		r = gotweb_render_repo_fragment(c->tp, repo_dir);
 		gotweb_free_repo_dir(repo_dir);
+		repo_dir = NULL;
+		got_repo_close(t->repo);
+		t->repo = NULL;
 		if (r == -1)
 			return -1;
 
@@ -1104,67 +1109,6 @@ gotweb_render_absolute_url(struct request *c, struct gotweb_url *url)
 	return gotweb_render_url(c, url);
 }
 
-static struct got_repository *
-find_cached_repo(struct server *srv, const char *path)
-{
-	int i;
-
-	for (i = 0; i < srv->ncached_repos; i++) {
-		if (strcmp(srv->cached_repos[i].path, path) == 0)
-			return srv->cached_repos[i].repo;
-	}
-
-	return NULL;
-}
-
-static const struct got_error *
-cache_repo(struct got_repository **new, struct server *srv,
-    struct repo_dir *repo_dir, struct socket *sock)
-{
-	const struct got_error *error = NULL;
-	struct got_repository *repo;
-	struct cached_repo *cr;
-	int evicted = 0;
-
-	if (srv->ncached_repos >= GOTWEBD_REPO_CACHESIZE) {
-		cr = &srv->cached_repos[srv->ncached_repos - 1];
-		error = got_repo_close(cr->repo);
-		memset(cr, 0, sizeof(*cr));
-		srv->ncached_repos--;
-		if (error)
-			return error;
-		memmove(&srv->cached_repos[1], &srv->cached_repos[0],
-		    srv->ncached_repos * sizeof(srv->cached_repos[0]));
-		cr = &srv->cached_repos[0];
-		evicted = 1;
-	} else {
-		cr = &srv->cached_repos[srv->ncached_repos];
-	}
-
-	error = got_repo_open(&repo, repo_dir->path, NULL, sock->pack_fds);
-	if (error) {
-		if (evicted) {
-			memmove(&srv->cached_repos[0], &srv->cached_repos[1],
-			    srv->ncached_repos * sizeof(srv->cached_repos[0]));
-		}
-		return error;
-	}
-
-	if (strlcpy(cr->path, repo_dir->path, sizeof(cr->path))
-	    >= sizeof(cr->path)) {
-		if (evicted) {
-			memmove(&srv->cached_repos[0], &srv->cached_repos[1],
-			    srv->ncached_repos * sizeof(srv->cached_repos[0]));
-		}
-		return got_error(GOT_ERR_NO_SPACE);
-	}
-
-	cr->repo = repo;
-	srv->ncached_repos++;
-	*new = repo;
-	return NULL;
-}
-
 static const struct got_error *
 gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 {
@@ -1172,7 +1116,6 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	struct socket *sock = c->sock;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
-	struct got_repository *repo = NULL;
 	DIR *dt;
 	char *dir_test;
 
@@ -1186,12 +1129,14 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	} else {
 		repo_dir->path = dir_test;
 		dir_test = NULL;
-		goto done;
+		goto open_repo;
 	}
 
 	if (asprintf(&dir_test, "%s/%s", srv->repos_path,
-	    repo_dir->name) == -1)
-		return got_error_from_errno("asprintf");
+	    repo_dir->name) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto err;
+	}
 
 	dt = opendir(dir_test);
 	if (dt == NULL) {
@@ -1202,20 +1147,16 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 		dir_test = NULL;
 	}
 
-done:
+open_repo:
 	if (srv->respect_exportok &&
 	    faccessat(dirfd(dt), "git-daemon-export-ok", F_OK, 0) == -1) {
 		error = got_error_path(repo_dir->name, GOT_ERR_NOT_GIT_REPO);
 		goto err;
 	}
 
-	repo = find_cached_repo(srv, repo_dir->path);
-	if (repo == NULL) {
-		error = cache_repo(&repo, srv, repo_dir, sock);
-		if (error)
-			goto err;
-	}
-	t->repo = repo;
+	error = got_repo_open(&t->repo, repo_dir->path, NULL, sock->pack_fds);
+	if (error)
+		goto err;
 	error = gotweb_get_repo_description(&repo_dir->description, srv,
 	    repo_dir->path, dirfd(dt));
 	if (error)
@@ -1234,6 +1175,10 @@ err:
 	free(dir_test);
 	if (dt != NULL && closedir(dt) == EOF && error == NULL)
 		error = got_error_from_errno("closedir");
+	if (error && t->repo) {
+		got_repo_close(t->repo);
+		t->repo = NULL;
+	}
 	return error;
 }
 

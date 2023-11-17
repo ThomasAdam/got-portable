@@ -85,11 +85,6 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	IMSG_SIZE_CHECK(imsg, srv);
 
 	memcpy(srv, p, sizeof(*srv));
-	srv->cached_repos = calloc(GOTWEBD_REPO_CACHESIZE,
-	    sizeof(*srv->cached_repos));
-	if (srv->cached_repos == NULL)
-		fatal("%s: calloc", __func__);
-	srv->ncached_repos = 0;
 
 	/* log server info */
 	log_debug("%s: server=%s fcgi_socket=%s unix_socket=%s", __func__,

@@ -399,7 +399,6 @@ sockets_shutdown(void)
 {
 	struct server *srv, *tsrv;
 	struct socket *sock, *tsock;
-	int i;
 
 	sockets_purge(gotwebd_env);
 
@@ -411,11 +410,8 @@ sockets_shutdown(void)
 	}
 
 	/* clean servers */
-	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv) {
-		for (i = 0; i < srv->ncached_repos; i++)
-			got_repo_close(srv->cached_repos[i].repo);
+	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv)
 		free(srv);
-	}
 
 	free(gotwebd_env);
 }
