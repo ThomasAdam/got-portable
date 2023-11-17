@@ -50,10 +50,6 @@ gotwebd:
   timestamp changes)
 - reply with 404 on some kind of errors ('reference not found' for sure,
   maybe also tree entry not found?)
-- run-time changes of addresses on interfaces are being ignored by gotwebd
-- perhaps "bind interface" should be removed in favour of using only IP
-  addresses? This makes the address family selection explicit and avoids
-  having to monitor interfaces for dynamic address changes.
 - add breadcrumbs to navigate in the directory tree
 - add more action links, like "raw", "blame" and "commits" in the blob
   page.
