@@ -214,7 +214,7 @@ gotweb_process_request(struct request *c)
 			goto err;
 	}
 
-	switch(qs->action) {
+	switch (qs->action) {
 	case BLAME:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
