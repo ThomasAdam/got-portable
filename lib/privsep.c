@@ -3510,22 +3510,32 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 
 	for (;;) {
 		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-		if (err)
+		if (err){
+			imsg_free(&imsg);
 			return err;
+		}
 
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-		if (imsg.hdr.type == GOT_IMSG_COMMIT_PAINTING_DONE)
+		if (imsg.hdr.type == GOT_IMSG_COMMIT_PAINTING_DONE) {
+			imsg_free(&imsg);
 			break;
-		if (imsg.hdr.type != GOT_IMSG_PAINTED_COMMITS)
+		}
+		if (imsg.hdr.type != GOT_IMSG_PAINTED_COMMITS){
+			imsg_free(&imsg);
 			return got_error(GOT_ERR_PRIVSEP_MSG);
+		}
 
-		if (datalen < sizeof(icommits))
+		if (datalen < sizeof(icommits)){
+			imsg_free(&imsg);
 			return got_error(GOT_ERR_PRIVSEP_LEN);
+		}
 		memcpy(&icommits, imsg.data, sizeof(icommits));
 		if (icommits.ncommits * sizeof(icommit) < icommits.ncommits ||
 		    datalen < sizeof(icommits) +
-		    icommits.ncommits * sizeof(icommit))
+		    icommits.ncommits * sizeof(icommit)){
+			imsg_free(&imsg);
 			return got_error(GOT_ERR_PRIVSEP_LEN);
+		}
 
 		for (i = 0; i < icommits.ncommits; i++) {
 			memcpy(&icommit,
