@@ -88,7 +88,7 @@ int cgi_inflight = 0;
 void
 sockets(struct gotwebd *env, int fd)
 {
-	struct event	 sighup, sigpipe, sigusr1, sigchld;
+	struct event	 sighup, sigusr1, sigchld;
 
 	event_init();
 
@@ -108,11 +108,9 @@ sockets(struct gotwebd *env, int fd)
 
 	signal(SIGPIPE, SIG_IGN);
 
-	signal_set(&sighup, SIGCHLD, sockets_sighdlr, env);
+	signal_set(&sighup, SIGHUP, sockets_sighdlr, env);
 	signal_add(&sighup, NULL);
-	signal_set(&sigpipe, SIGCHLD, sockets_sighdlr, env);
-	signal_add(&sigpipe, NULL);
-	signal_set(&sigusr1, SIGCHLD, sockets_sighdlr, env);
+	signal_set(&sigusr1, SIGUSR1, sockets_sighdlr, env);
 	signal_add(&sigusr1, NULL);
 	signal_set(&sigchld, SIGCHLD, sockets_sighdlr, env);
 	signal_add(&sigchld, NULL);
