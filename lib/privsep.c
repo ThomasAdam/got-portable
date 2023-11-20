@@ -3518,7 +3518,7 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 		if (imsg.hdr.type == GOT_IMSG_COMMIT_PAINTING_DONE) {
 			imsg_free(&imsg);
-			break;
+			return NULL;
 		}
 		if (imsg.hdr.type != GOT_IMSG_PAINTED_COMMITS){
 			imsg_free(&imsg);
@@ -3561,9 +3561,9 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 		}
 
 		imsg_free(&imsg);
+		if (err)
+			return err;
 	}
-
-	return err;
 }
 
 const struct got_error *
