@@ -69,7 +69,6 @@ gotwebd_SOURCES = config.c \
 		  log.c \
 		  pages.c \
 		  parse.y \
-		  proc.c \
 		  sockets.c
 
 gotwebd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a

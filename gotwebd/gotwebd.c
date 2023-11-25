@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
@@ -37,7 +39,6 @@
 #include <unistd.h>
 #include <ctype.h>
 
-#include "got_compat.h"
 #include "got_opentemp.h"
 #include "got_reference.h"
 
