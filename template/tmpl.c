@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "got_compat.h"
 #include "tmpl.h"
 
 int
