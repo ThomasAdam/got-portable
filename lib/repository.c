@@ -1766,6 +1766,9 @@ match_packed_object(struct got_object_id **unique_id,
 	const struct got_error *err = NULL;
 	struct got_object_id_queue matched_ids;
 	struct got_pathlist_entry *pe;
+	struct timespec tv;
+	int retries = 0;
+	const int max_retries = 10;
 
 	STAILQ_INIT(&matched_ids);
 
@@ -1773,10 +1776,41 @@ match_packed_object(struct got_object_id **unique_id,
 	if (err)
 		return err;
 
+	/*
+	 * Opening objects while iterating over the pack-index path
+	 * list is racy. If the set of pack files in the repository
+	 * changes during loop iteration, refresh_packidx_paths() will
+	 * be called again, via got_object_get_type(), invalidating
+	 * the packidx_paths list we are iterating over.
+	 * To work around this we keep track of the current modification
+	 * time and retry the entire loop if it changes.
+	 */
+retry:
+	tv.tv_sec = repo->pack_path_mtime.tv_sec;
+	tv.tv_nsec = repo->pack_path_mtime.tv_nsec;
+
 	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
-		const char *path_packidx = pe->path;
+		const char *path_packidx;
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
+
+		/*
+		 * If the modification time of the 'objects/pack' directory
+		 * has changed then 'pe' could now be an invalid pointer.
+		 */
+		if (tv.tv_sec != repo->pack_path_mtime.tv_sec ||
+		    tv.tv_nsec != repo->pack_path_mtime.tv_nsec) {
+			if (++retries > max_retries) {
+				err = got_error_msg(GOT_ERR_TIMEOUT,
+				    "too many concurrent pack file "
+				    "modifications");
+				goto done;
+			}
+			got_object_id_queue_free(&matched_ids);
+			goto retry;
+		}
+
+		path_packidx = pe->path;
 
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
 		    path_packidx, 0);
