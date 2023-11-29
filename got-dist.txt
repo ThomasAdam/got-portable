@@ -104,8 +104,6 @@
 /gotwebd/log.c
 /gotwebd/pages.tmpl
 /gotwebd/parse.y
-/gotwebd/proc.c
-/gotwebd/proc.h
 /gotwebd/sockets.c
 /include
 /include/got_blame.h
@@ -131,7 +129,6 @@
 /include/got_send.h
 /include/got_serve.h
 /include/got_sigs.h
-/include/got_sockaddr.h
 /include/got_utf8.h
 /include/got_version.h
 /include/got_worktree.h
@@ -243,7 +240,6 @@
 /lib/send.c
 /lib/serve.c
 /lib/sigs.c
-/lib/sockaddr.c
 /lib/utf8.c
 /lib/worktree.c
 /lib/worktree_cvg.c
