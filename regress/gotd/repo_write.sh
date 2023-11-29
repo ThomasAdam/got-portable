@@ -354,6 +354,7 @@ test_delete_branch() {
 	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
 	cat <<EOF >$testroot/refs.expected
 HEAD: refs/heads/main
+HEAD: $main_id
 refs/heads/foo: $foo_id
 refs/heads/main: $main_id
 refs/heads/newbranch: $nb_id
@@ -377,6 +378,7 @@ EOF
 	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
 	cat <<EOF >$testroot/refs.expected
 HEAD: refs/heads/main
+HEAD: $main_id
 refs/heads/main: $main_id
 refs/heads/newbranch: $nb_id
 refs/heads/newbranch2: $nb2_id
@@ -412,6 +414,7 @@ EOF
 	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
 	cat <<EOF >$testroot/refs.expected
 HEAD: refs/heads/main
+HEAD: $main_id
 refs/heads/main: $main_id
 refs/tags/1.0: $tag_id
 EOF
@@ -452,6 +455,7 @@ EOF
 	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
 	cat <<EOF >$testroot/refs.expected
 HEAD: refs/heads/main
+HEAD: $main_id
 refs/heads/main: $main_id
 refs/tags/1.0: $tag_id
 EOF
@@ -536,6 +540,7 @@ test_rewind_branch() {
 	got fetch -q -r $testroot/repo-clone -l >$testroot/refs
 	cat <<EOF >$testroot/refs.expected
 HEAD: refs/heads/main
+HEAD: $main_id
 refs/heads/foo: $main_id
 refs/heads/main: $main_id
 refs/tags/1.0: $tag_id
