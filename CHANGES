@@ -1,3 +1,31 @@
+* got 0.94; 2023-11-29
+  see git repository history for per-change authorship information
+- in diff error message, say what was being diffed
+- gotwebd.css: vertically align briefs age and author
+- honor fetch_all_branches configuration again
+- tog: switch back to patience diff algorithm by default for pretty diffs
+- gotwebd: render all the datetimes in a time tag
+- slightly reword 'got merge' documentation to hopefully be more clear
+- make 'tog diff' release the work-tree lock earlier
+- got patch: handle embedded NULs in lines of patch files with binary data
+- simplify usage of the 'mesg' histedit script command
+- fix some fd leaks in error paths and avoid some double-close()
+- use ibuf_fd_set() instead of reaching into the ibuf struct
+- gotwebd: remove dead ipproto handling in host() and host_if()
+- allow setting variables in gotd.conf syntax
+- fix gotwebd unveil permissions; gotwebd now runs entirely read-only
+- reduce gotwebd pledges to the minimum currently required
+- gotwebd.conf: drop support for inferring listen addresses via interface names
+- gotwebd.conf: use listen * instead of listen "" to listen on any address
+- gotwebd: get rid of got_sockaddr.[ch] usage to help -portable
+- allow gotd repo read/write processes to max out data-size resource limits
+- gotwebd: replace proc.c with much simpler code
+- gotwebd: don't chdir to / before spawning the child processes
+- remove the quite ineffective gotwebd repository cache to fix stability issues
+- fix memory leak on error in got_privsep_recv_painted_commits()
+- gotwebd: fix broken signal catching
+- detect concurrent changes to the set of pack files while matching object IDs
+
 * got 0.93; 2023-09-18
   see git repository history for per-change authorship information
 - show out-of-memory errors from zlib inflate() and deflate() calls
