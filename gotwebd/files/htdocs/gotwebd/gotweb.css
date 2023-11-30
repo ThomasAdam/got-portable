@@ -376,11 +376,8 @@ header.subtitle h2 {
 	margin-bottom: 20px;
 	border-collapse: collapse;
 }
-.tree_wrapper {
+.tree_wrapper:nth-child(odd) {
 	background-color: #d8f3ef;
-}
-.tree_wrapper:nth-child(even) {
-	background-color: #ffffff;
 }
 .tree_line {
 	font-family: monospace;
