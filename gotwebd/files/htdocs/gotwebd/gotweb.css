@@ -236,15 +236,6 @@ header.subtitle h2 {
 	width: 65%;
 }
 
-#tag_header_wrapper {
-	background-color: #f5fcfb;
-}
-#tag_header {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 2px;
-	width: 80%;
-}
 #tag_commit {
 	padding-top: 20px;
 	padding-left: 20px;
@@ -299,16 +290,15 @@ header.subtitle h2 {
 	text-decoration: none;
 }
 
-.commits_content {
-	width: 100%;
-}
-.commits_header_wrapper {
+.page_header_wrapper {
 	background-color: #f5fcfb;
-}
-.commits_header {
+	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 80%;
+}
+
+.commits_content {
+	width: 100%;
 }
 .commit {
 	padding-left: 20px;
@@ -316,14 +306,6 @@ header.subtitle h2 {
 	white-space: pre-wrap;
 }
 
-#blame_header_wrapper, #blob_header_wrapper {
-	background-color: #f5fcfb;
-}
-#blame_header, #blob_header {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 2px;
-}
 #blame, #blob {
 	margin-top: 20px;
 	margin-left: 20px;
@@ -364,12 +346,6 @@ header.subtitle h2 {
 	overflow: hidden;
 }
 
-#tree_header {
-	background-color: #f5fcfb;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 2px;
-}
 #tree {
 	margin-left: 20px;
 	margin-top: 20px;
@@ -389,14 +365,6 @@ header.subtitle h2 {
 	width: 9.5em;
 }
 
-#diff_header_wrapper {
-	background-color: #f5fcfb;
-}
-#diff_header {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 2px;
-}
 #diff {
 	margin-top: 20px;
 	margin-left: 20px;
