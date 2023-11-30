@@ -6,6 +6,14 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.94 (2023-11-30)
+
+* Changes from got-0.94
+
+  -portable ships with an experimental/work-in-progress cvg(1) utility, which
+  is disable by default, but can be enabled via the configure flag
+  --enable-cvg.  It's is not recommended for use at this time though.
+
 # got-portable 0.93 (2023-09-18)
 
 * Changes from got-0.93
