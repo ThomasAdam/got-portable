@@ -67,6 +67,7 @@ pre {
 hr {
 	margin: 0;
 	height: 0;
+	border: 0px;
 	border-top: 1px dotted #444444;
 }
 #header {
@@ -423,4 +424,94 @@ dd {
 	padding-top: 5px;
 	padding-bottom: 5px;
 	padding-left: 10px;
+}
+
+/* dark theme */
+@media (prefers-color-scheme: dark) {
+	body {
+		color: #eee;
+		background-color: #282A36;
+	}
+
+	#index_header, #summary_wrapper {
+		background-color: #BD93F9;
+		color: #222;
+	}
+
+	#got_link {
+		filter: brightness(0) saturate(100%)
+			invert(68%) sepia(73%) saturate(2771%)
+			hue-rotate(213deg) brightness(104%)
+			contrast(95%);
+	}
+
+	#header {
+		background-image: unset;
+	}
+
+	.index_project a {
+		color: #8BE9FD;
+		text-decoration: none;
+	}
+	.index_project a:hover {
+		color: #FFFFA5;
+		text-decoration: none;
+	}
+
+	.index_wrapper {
+		border-bottom-style: solid;
+		border-bottom-width: 1px;
+		border-image: linear-gradient(90deg, #FF79C6, #BD93F9 50%) 1;
+	}
+
+	a {
+		color: #FF79C6;
+	}
+
+	.diff_minus, .diff_submodule {
+		color: #FF5555;
+	}
+	.diff_plus, .diff_symlink, .diff_author {
+		color: #50FA7B;
+	}
+	.diff_chunk_header, .diff_date {
+		background-color: unset;
+		color: #FFB86C;
+	}
+	.diff_meta, .diff_executable, .diff_commit {
+		color: #6272A4;
+	}
+
+	.blame_code {
+		color: #eee;
+	}
+
+	.blame_wrapper {
+		color: #6272A4;
+	}
+
+	.blame_author {
+		color: #8BE9FD;
+		text-decoration: none;
+	}
+
+	#site_owner_wrapper, #np_wrapper {
+		background-color: unset;
+	}
+
+	.page_header_wrapper {
+		background-color: unset;
+	}
+
+	.navs_wrapper {
+		background-color: #282A36;
+	}
+
+	.tree_wrapper:nth-child(even) {
+		background-color: #282A36;
+	}
+
+	.tree_wrapper:nth-child(odd) {
+		background-color: #3e3e3e;
+	}
 }
