@@ -503,8 +503,8 @@ nextsep(char *s, char **t)
 	diff.commit = rc->commit_id;
 	tree.commit = rc->commit_id;
     !}
-    <div class="commits_header_wrapper">
-      <dl class="commits_header">
+    <div class="page_header_wrapper">
+      <dl>
         <dt>Commit:</dt>
         <dd><code class="commit-id">{{ rc->commit_id }}</code></dd>
         <dt>From:</dt>
@@ -548,8 +548,8 @@ nextsep(char *s, char **t)
   <h2>Blob</h2>
 </header>
 <div id="blob_content">
-  <div id="blob_header_wrapper">
-    <dl id="blob_header">
+  <div class="page_header_wrapper">
+    <dl>
       <dt>Date:</dt>
       <dd>
         {{ render datetime(tp, rc->committer_time, TM_LONG) }}
@@ -594,8 +594,8 @@ nextsep(char *s, char **t)
   <h2>Tree</h2>
 </header>
 <div id="tree_content">
-  <div id="tree_header_wrapper">
-    <dl id="tree_header">
+  <div class="page_header_wrapper">
+    <dl>
       <dt>Tree:</dt>
       <dd><code class="commit-id">{{ rc->tree_id }}</code></dd>
       <dt>Date:</dt>
@@ -787,8 +787,8 @@ nextsep(char *s, char **t)
   <h2>Tag</h2>
 </header>
 <div id="tags_content">
-  <div id="tag_header_wrapper">
-    <dl id="tag_header">
+  <div class="page_header_wrapper">
+    <dl>
       <dt>Commit:</dt>
       <dd>
         <code class="commit-id">{{ rt->commit_id }}</code>
@@ -826,8 +826,8 @@ nextsep(char *s, char **t)
   <h2>Commit Diff</h2>
 </header>
 <div id="diff_content">
-  <div id="diff_header_wrapper">
-    <dl id="diff_header">
+  <div class="page_header_wrapper">
+    <dl>
       <dt>Commit:</dt>
       <dd><code class="commit-id">{{ rc->commit_id }}</code></dd>
       <dt>From:</dt>
@@ -994,8 +994,8 @@ nextsep(char *s, char **t)
   <h2>Blame</h2>
 </header>
 <div id="blame_content">
-  <div id="blame_header_wrapper">
-    <dl id="blame_header">
+  <div class="page_header_wrapper">
+    <dl>
       <dt>Date:</dt>
       <dd>
         {{ render datetime(tp, rc->committer_time, TM_LONG) }}
