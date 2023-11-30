@@ -42,6 +42,7 @@ enum gotweb_ref_tm {
 	TM_LONG,
 };
 
+static int breadcumbs(struct template *);
 static int datetime(struct template *, time_t, int);
 static int gotweb_render_blob_line(struct template *, const char *, size_t);
 static int gotweb_render_tree_item(struct template *, struct got_tree_entry *);
@@ -55,6 +56,23 @@ static inline int tag_item(struct template *, struct repo_tag *);
 static inline int branch(struct template *, struct got_reflist_entry *);
 static inline int rss_tag_item(struct template *, struct repo_tag *);
 static inline int rss_author(struct template *, char *);
+
+static inline char *
+nextsep(char *s, char **t)
+{
+	char *q;
+
+	while (*s == '/')
+		s++;
+	*t = s;
+	if (*s == '\0')
+		return NULL;
+
+	q = strchr(s, '/');
+	if (q == NULL)
+		q = strchr(s, '\0');
+	return q;
+}
 
 !}
 
@@ -80,6 +98,59 @@ static inline int rss_author(struct template *, char *);
     {{ datebuf }} {{ " UTC" }}
   {{ end }}
 </time>
+{{ end }}
+
+{{ define breadcumbs(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct querystring	*qs = c->t->qs;
+	struct gotweb_url	 url;
+	const char		*folder = qs->folder;
+	char			*t, *s = NULL, *dir = NULL;
+	char			 ch;
+
+	memset(&url, 0, sizeof(url));
+	url.index_page = -1;
+	url.page = -1;
+	url.action = TREE;
+	url.path = qs->path;
+	url.commit = qs->commit;
+
+	if (folder && *folder != '\0') {
+		while (*folder == '/')
+			folder++;
+		dir = strdup(folder);
+		if (dir == NULL)
+			return (-1);
+		s = dir;
+	}
+!}
+  {{ " / " }}
+  <a href="{{ render gotweb_render_url(c, &url) }}">tree</a>
+  {{ " / " }}
+  {{ if dir }}
+    {{ while (s = nextsep(s, &t)) != NULL }}
+      {!
+	ch = *s;
+	*s = '\0';
+	url.folder = dir;
+      !}
+
+      <a href="{{ render gotweb_render_url(c, &url) }}">
+        {{ t }}
+      </a>
+      {{ " / " }}
+
+      {! *s = ch; !}
+    {{ end }}
+  {{ end }}
+
+  {{ if qs->file }}
+    {{ qs->file }}
+  {{ end}}
+
+  {{ finally }}
+  {! free(dir); !}
 {{ end }}
 
 {{ define gotweb_render_page(struct template *tp,
@@ -132,7 +203,9 @@ static inline int rss_author(struct template *, char *);
             {{ qs->path }}
           </a>
         {{ end }}
-        {{ if qs->action != INDEX }}
+        {{ if qs->action == TREE || qs->action == BLOB }}
+          {{ render breadcumbs(tp) }}
+        {{ else if qs->action != INDEX }}
           {{ " / " }}{{ gotweb_action_name(qs->action) }}
         {{ end }}
       </div>
