@@ -945,6 +945,10 @@ if test -z "$enable_gotd"; then
 	gotgwlep="N/A"
 fi
 
+if test -z "$enable_cvg"; then
+	enable_cvg="no"
+fi
+
 if test -z "$gotdep"; then
 	gotdep="N/A"
 fi
@@ -962,6 +966,7 @@ Configured got-portable with:
  Executables:      ${executables}
  Bison:            $YACC
  CFlags:           $CFLAGS
+ cvg:		   ${enable_cvg}
  Gotd:             ${enable_gotd}
    Empty Path:     ${gotdep}
    Gitwrapper:     ${gotgwlep}
