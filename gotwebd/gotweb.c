@@ -72,6 +72,7 @@ static const struct action_keys action_keys[] = {
 	{ "diff",	DIFF },
 	{ "error",	ERR },
 	{ "index",	INDEX },
+	{ "patch",	PATCH },
 	{ "summary",	SUMMARY },
 	{ "tag",	TAG },
 	{ "tags",	TAGS },
@@ -187,7 +188,8 @@ gotweb_process_request(struct request *c)
 	 */
 
 	if (qs->action == BLAME || qs->action == BLOB ||
-	    qs->action == BLOBRAW || qs->action == DIFF) {
+	    qs->action == BLOBRAW || qs->action == DIFF ||
+	    qs->action == PATCH) {
 		if (qs->commit == NULL) {
 			error = got_error(GOT_ERR_BAD_QUERYSTRING);
 			goto err;
@@ -313,6 +315,21 @@ gotweb_process_request(struct request *c)
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
 			return;
 		gotweb_render_page(c->tp, gotweb_render_index);
+		return;
+	case PATCH:
+		error = got_get_repo_commits(c, 1);
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+		error = got_open_diff_for_output(&c->t->fp, c);
+		if (error) {
+			log_warnx("%s: %s", __func__, error->msg);
+			goto err;
+		}
+		if (gotweb_reply(c, 200, "text/plain", NULL) == -1)
+			return;
+		gotweb_render_patch(c->tp);
 		return;
 	case RSS:
 		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
@@ -987,6 +1004,8 @@ gotweb_action_name(int action)
 		return "err";
 	case INDEX:
 		return "index";
+	case PATCH:
+		return "patch";
 	case SUMMARY:
 		return "summary";
 	case TAG:
