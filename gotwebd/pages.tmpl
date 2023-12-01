@@ -866,11 +866,22 @@ nextsep(char *s, char **t)
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
+	struct querystring	*qs = t->qs;
 	FILE			*fp = t->fp;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
 	char			*line = NULL;
 	size_t			 linesize = 0;
 	ssize_t			 linelen;
+	struct gotweb_url	 patch_url, tree_url = {
+		.action = TREE,
+		.index_page = -1,
+		.page = -1,
+		.path = qs->path,
+		.commit = rc->commit_id,
+	};
+
+	memcpy(&patch_url, &tree_url, sizeof(patch_url));
+	patch_url.action = PATCH;
 !}
 <header class="subtitle">
   <h2>Commit Diff</h2>
@@ -892,6 +903,16 @@ nextsep(char *s, char **t)
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+      <dt>Actions:</dt>
+      <dd>
+        <a href="{{ render gotweb_render_url(c, &patch_url) }}">
+          Patch
+        </a>
+        {{" | "}}
+        <a href="{{ render gotweb_render_url(c, &tree_url) }}">
+          Tree
+        </a>
+      </dd>
     </dl>
   </div>
   <hr />
