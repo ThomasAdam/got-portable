@@ -541,8 +541,25 @@ nextsep(char *s, char **t)
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
+	struct querystring	*qs = t->qs;
 	struct got_blob_object	*blob = t->blob;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+	struct gotweb_url	 briefs_url, blame_url, raw_url;
+
+	memset(&briefs_url, 0, sizeof(briefs_url));
+	briefs_url.index_page = -1,
+	briefs_url.page = -1,
+	briefs_url.action = BRIEFS,
+	briefs_url.path = qs->path,
+	briefs_url.commit = qs->commit,
+	briefs_url.folder = qs->folder,
+	briefs_url.file = qs->file,
+
+	memcpy(&blame_url, &briefs_url, sizeof(blame_url));
+	blame_url.action = BLAME;
+
+	memcpy(&raw_url, &briefs_url, sizeof(raw_url));
+	raw_url.action = BLOBRAW;
 !}
 <header class="subtitle">
   <h2>Blob</h2>
@@ -556,6 +573,20 @@ nextsep(char *s, char **t)
       </dd>
       <dt>Message:</dt>
       <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+      <dt>Actions:</dt>
+      <dd>
+        <a href="{{ render gotweb_render_url(c, &briefs_url) }}">
+          History
+        </a>
+        {{" | "}}
+        <a href="{{ render gotweb_render_url(c, &blame_url) }}">
+          Blame
+        </a>
+	{{" | "}}
+        <a href="{{ render gotweb_render_url(c, &raw_url) }}">
+          Raw File
+        </a>
+      </dd>
     </dl>
   </div>
   <hr />
