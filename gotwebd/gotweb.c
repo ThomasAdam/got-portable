@@ -1126,28 +1126,20 @@ gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
 	dt = opendir(dir_test);
 	if (dt == NULL) {
 		free(dir_test);
-	} else {
-		repo_dir->path = dir_test;
-		dir_test = NULL;
-		goto open_repo;
+		if (asprintf(&dir_test, "%s/%s", srv->repos_path,
+		    repo_dir->name) == -1)
+			return got_error_from_errno("asprintf");
+		dt = opendir(dir_test);
+		if (dt == NULL) {
+			free(dir_test);
+			return got_error_path(repo_dir->name,
+			    GOT_ERR_NOT_GIT_REPO);
+		}
 	}
 
-	if (asprintf(&dir_test, "%s/%s", srv->repos_path,
-	    repo_dir->name) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto err;
-	}
+	repo_dir->path = dir_test;
+	dir_test = NULL;
 
-	dt = opendir(dir_test);
-	if (dt == NULL) {
-		error = got_error_path(repo_dir->name, GOT_ERR_NOT_GIT_REPO);
-		goto err;
-	} else {
-		repo_dir->path = dir_test;
-		dir_test = NULL;
-	}
-
-open_repo:
 	if (srv->respect_exportok &&
 	    faccessat(dirfd(dt), "git-daemon-export-ok", F_OK, 0) == -1) {
 		error = got_error_path(repo_dir->name, GOT_ERR_NOT_GIT_REPO);
