@@ -50,11 +50,6 @@ gotwebd:
   timestamp changes)
 - reply with 404 on some kind of errors ('reference not found' for sure,
   maybe also tree entry not found?)
-- add breadcrumbs to navigate in the directory tree
-- add more action links, like "raw", "blame" and "commits" in the blob
-  page.
-- add a "rawdiff" page to serve a diff as text/plain (or text/x-patch),
-  or maybe "rawcommit" that includes the commentary too.
 - support category grouping a-la gitweb/cgit with the gitweb.category
   config option or via the "category" file in the root of the repo.
 - consider changing the URL scheme to avoid so many query parameters
