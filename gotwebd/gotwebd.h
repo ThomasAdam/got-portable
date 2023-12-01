@@ -438,6 +438,7 @@ enum query_actions {
 	DIFF,
 	ERR,
 	INDEX,
+	PATCH,
 	SUMMARY,
 	TAG,
 	TAGS,
@@ -495,6 +496,7 @@ int	gotweb_render_diff(struct template *);
 int	gotweb_render_branches(struct template *, struct got_reflist_head *);
 int	gotweb_render_summary(struct template *);
 int	gotweb_render_blame(struct template *);
+int	gotweb_render_patch(struct template *);
 int	gotweb_render_rss(struct template *);
 
 /* parse.y */

@@ -259,7 +259,7 @@ got_get_repo_commit(struct request *c, struct repo_commit *repo_commit,
 	if (error)
 		return error;
 
-	if (qs->action == DIFF) {
+	if (qs->action == DIFF || qs->action == PATCH) {
 		parent_id = STAILQ_FIRST(
 		    got_object_commit_get_parent_ids(commit));
 		if (parent_id != NULL) {

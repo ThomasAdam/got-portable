@@ -346,11 +346,18 @@ nextsep(char *s, char **t)
 	struct querystring	*qs = c->t->qs;
 	struct repo_commit	*rc;
 	struct repo_dir		*repo_dir = t->repo_dir;
-	struct gotweb_url	 diff_url, tree_url;
+	struct gotweb_url	 diff_url, patch_url, tree_url;
 	char			*tmp;
 
 	diff_url = (struct gotweb_url){
 		.action = DIFF,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+		.headref = qs->headref,
+	};
+	patch_url = (struct gotweb_url){
+		.action = PATCH,
 		.index_page = -1,
 		.page = -1,
 		.path = repo_dir->name,
@@ -371,6 +378,7 @@ nextsep(char *s, char **t)
   {{ tailq-foreach rc &t->repo_commits entry }}
     {!
 	diff_url.commit = rc->commit_id;
+	patch_url.commit = rc->commit_id;
 	tree_url.commit = rc->commit_id;
 
 	tmp = strchr(rc->committer, '<');
@@ -404,6 +412,8 @@ nextsep(char *s, char **t)
     <div class="navs_wrapper">
       <div class="navs">
         <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">diff</a>
+	{{ " | " }}
+        <a href="{{ render gotweb_render_url(tp->tp_arg, &patch_url) }}">patch</a>
 	{{ " | " }}
 	<a href="{{ render gotweb_render_url(tp->tp_arg, &tree_url) }}">tree</a>
       </div>
@@ -479,10 +489,16 @@ nextsep(char *s, char **t)
 	struct transport	*t = c->t;
 	struct repo_dir		*repo_dir = t->repo_dir;
 	struct repo_commit	*rc;
-	struct gotweb_url	 diff, tree;
+	struct gotweb_url	 diff, patch, tree;
 
 	diff = (struct gotweb_url){
 		.action = DIFF,
+		.index_page = -1,
+		.page = -1,
+		.path = repo_dir->name,
+	};
+	patch = (struct gotweb_url){
+		.action = PATCH,
 		.index_page = -1,
 		.page = -1,
 		.path = repo_dir->name,
@@ -501,6 +517,7 @@ nextsep(char *s, char **t)
   {{ tailq-foreach rc &t->repo_commits entry }}
     {!
 	diff.commit = rc->commit_id;
+	patch.commit = rc->commit_id;
 	tree.commit = rc->commit_id;
     !}
     <div class="page_header_wrapper">
@@ -527,6 +544,8 @@ nextsep(char *s, char **t)
     <div class="navs_wrapper">
       <div class="navs">
         <a href="{{ render gotweb_render_url(c, &diff) }}">diff</a>
+	{{ " | " }}
+        <a href="{{ render gotweb_render_url(c, &patch) }}">patch</a>
 	{{ " | " }}
         <a href="{{ render gotweb_render_url(c, &tree) }}">tree</a>
       </div>
@@ -989,7 +1008,7 @@ nextsep(char *s, char **t)
 	struct transport	*t = c->t;
 	struct got_reflist_head	*refs = &t->refs;
 !}
-<dl id="summary_wrapper">
+<dl id="summary_wrapper" class="page_header_wrapper">
   {{ if srv->show_repo_description }}
     <dt>Description:</dt>
     <dd>{{ t->repo_dir->description }}</dd>
@@ -1116,6 +1135,39 @@ nextsep(char *s, char **t)
   {{" "}}
   <span class="blame_code">{{ line }}</span>
 </div>
+{{ end }}
+
+{{ define gotweb_render_patch(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+	struct tm		 tm;
+	char			 buf[BUFSIZ], datebuf[64];
+	size_t			 r;
+
+	if (gmtime_r(&rc->committer_time, &tm) == NULL ||
+	    strftime(datebuf, sizeof(datebuf), "%a %b %d %T %Y UTC", &tm) == 0)
+		return (-1);
+!}
+commit {{ rc->commit_id }} {{ "\n" }}
+from: {{ rc->author | unsafe }} {{ "\n" }}
+{{ if strcmp(rc->committer, rc->author) != 0 }}
+via: {{ rc->committer | unsafe }} {{ "\n" }}
+{{ end }}
+date: {{ datebuf }} {{ "\n" }}
+{{ "\n" }}
+{{ rc->commit_msg | unsafe }} {{ "\n" }}
+{!
+	if (template_flush(tp) == -1)
+		return (-1);
+	for (;;) {
+		r = fread(buf, 1, sizeof(buf), t->fp);
+		if (fcgi_write(c, buf, r) == -1 ||
+		    r != sizeof(buf))
+			break;
+	}
+!}
 {{ end }}
 
 {{ define gotweb_render_rss(struct template *tp) }}
