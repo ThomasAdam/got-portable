@@ -1102,16 +1102,19 @@ nextsep(char *s, char **t)
 	if (s)
 		*s = '\0';
 !}
-<div class="blame_wrapper">
-  <div class="blame_number">{{ printf "%.*d", lprec, lcur }}</div>
-  <div class="blame_hash">
+<div class="blame_line">
+  <span class="blame_number">{{ printf "%*d ", lprec, lcur }}</span>
+  <span class="blame_hash">
     <a href="{{ render gotweb_render_url(c, &url) }}">
       {{ printf "%.8s", bline->id_str }}
     </a>
-  </div>
-  <div class="blame_date">{{ bline->datebuf }}</div>
-  <div class="blame_author">{{ printf "%.9s", committer }}</div>
-  <div class="blame_code">{{ line }}</div>
+  </span>
+  {{" "}}
+  <span class="blame_date">{{ bline->datebuf }}</span>
+  {{" "}}
+  <span class="blame_author">{{ printf "%.9s", committer }}</span>
+  {{" "}}
+  <span class="blame_code">{{ line }}</span>
 </div>
 {{ end }}
 
