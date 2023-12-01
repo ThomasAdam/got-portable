@@ -319,15 +319,11 @@ header.subtitle h2 {
 	width: 60px;
 	padding-right: 20px;
 }
-.blob_code {
+.blame_code, .blob_code {
 	/* fixes the width of the first tab */
 	display: inline-block;
 }
-.blame_number, .blame_hash, .blame_date, .blame_author, .blame_code {
-	display: inline-block;
-	vertical-align: middle;
-}
-.blame_wrapper:target, .blob_line:target {
+.blame_line:target, .blob_line:target {
 	background-color: Khaki;
 }
 .blame_number, .blob_number {
