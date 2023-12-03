@@ -2995,7 +2995,7 @@ checkout_ancestry_error(struct got_reference *ref, const char *commit_id_str)
 static const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *close_err, *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reference *head_ref = NULL, *ref = NULL;
 	struct got_worktree *worktree = NULL;
@@ -3251,7 +3251,12 @@ done:
 	if (ref)
 		got_ref_close(ref);
 	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
+		close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (worktree != NULL) {
+		close_err = got_worktree_close(worktree);
 		if (error == NULL)
 			error = close_err;
 	}
@@ -3512,7 +3517,7 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *close_err, *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *worktree_path = NULL;
@@ -3707,7 +3712,12 @@ done:
 			error = pack_err;
 	}
 	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
+		close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (worktree != NULL) {
+		close_err = got_worktree_close(worktree);
 		if (error == NULL)
 			error = close_err;
 	}
