@@ -6408,7 +6408,7 @@ print:
 static const struct got_error *
 cmd_status(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *close_err, *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_status_arg st;
@@ -6512,7 +6512,12 @@ done:
 			error = pack_err;
 	}
 	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
+		close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (worktree != NULL) {
+		close_err = got_worktree_close(worktree);
 		if (error == NULL)
 			error = close_err;
 	}
