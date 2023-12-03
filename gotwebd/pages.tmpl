@@ -106,6 +106,7 @@ nextsep(char *s, char **t)
 	struct querystring	*qs = c->t->qs;
 	struct gotweb_url	 url;
 	const char		*folder = qs->folder;
+	const char		*action = "tree";
 	char			*t, *s = NULL, *dir = NULL;
 	char			 ch;
 
@@ -115,6 +116,11 @@ nextsep(char *s, char **t)
 	url.action = TREE;
 	url.path = qs->path;
 	url.commit = qs->commit;
+
+	if (qs->action != TREE && qs->action != BLOB) {
+		action = gotweb_action_name(qs->action);
+		url.action = qs->action;
+	}
 
 	if (folder && *folder != '\0') {
 		while (*folder == '/')
@@ -126,7 +132,7 @@ nextsep(char *s, char **t)
 	}
 !}
   {{ " / " }}
-  <a href="{{ render gotweb_render_url(c, &url) }}">tree</a>
+  <a href="{{ render gotweb_render_url(c, &url) }}">{{ action }}</a>
   {{ " / " }}
   {{ if dir }}
     {{ while (s = nextsep(s, &t)) != NULL }}
@@ -203,10 +209,11 @@ nextsep(char *s, char **t)
             {{ qs->path }}
           </a>
         {{ end }}
-        {{ if qs->action == TREE || qs->action == BLOB }}
-          {{ render breadcumbs(tp) }}
-        {{ else if qs->action != INDEX }}
+        {{ if qs->action == SUMMARY || qs->action == DIFF ||
+              qs->action == TAG || qs->action == TAGS }}
           {{ " / " }}{{ gotweb_action_name(qs->action) }}
+        {{ else if qs->action != INDEX}}
+          {{ render breadcumbs(tp) }}
         {{ end }}
       </div>
     </nav>
