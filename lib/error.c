@@ -41,7 +41,7 @@
 #endif
 
 static const struct got_error got_errors[] = {
-	{ GOT_ERR_OK,		"no error occured?!?" },
+	{ GOT_ERR_OK,		"no error occurred?!?" },
 	{ GOT_ERR_ERRNO,	"see errno" },
 	{ GOT_ERR_NOT_GIT_REPO, "no git repository found" },
 	{ GOT_ERR_BAD_FILETYPE,	"bad file type" },
