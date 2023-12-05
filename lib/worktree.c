@@ -4208,6 +4208,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	}
 done:
 	free_ignores(&ignores);
+	got_pathlist_free(&missing_children, GOT_PATHLIST_FREE_NONE);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(ondisk_path);
