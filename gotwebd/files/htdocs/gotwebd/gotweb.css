@@ -465,10 +465,10 @@ dd {
 	}
 
 	.diff_minus, .diff_submodule {
-		color: #FF5555;
+		color: #FF79C6;
 	}
 	.diff_plus, .diff_symlink, .diff_author {
-		color: #50FA7B;
+		color: #8BE9FD;
 	}
 	.diff_chunk_header, .diff_date {
 		background-color: unset;
