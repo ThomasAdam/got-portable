@@ -361,6 +361,14 @@ header.subtitle h2 {
 	padding: 1px;
 	width: 9.5em;
 }
+#tree_content h2 {
+	margin-top: 40px;
+	padding: 0 20px 0;
+}
+#tree_content pre {
+	padding: 0 20px 20px;
+	white-space: pre-wrap;
+}
 
 #diff {
 	margin-top: 20px;

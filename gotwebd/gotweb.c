@@ -211,7 +211,7 @@ gotweb_process_request(struct request *c)
 			goto err;
 
 		error = got_open_blob_for_output(&c->t->blob, &c->t->fd,
-		    &binary, c);
+		    &binary, c, qs->folder, qs->file, qs->commit);
 		if (error)
 			goto err;
 	}

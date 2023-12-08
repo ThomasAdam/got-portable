@@ -643,9 +643,16 @@ nextsep(char *s, char **t)
 
 {{ define gotweb_render_tree(struct template *tp) }}
 {!
+	const struct got_error	*error;
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
+	struct querystring	*qs = t->qs;
 	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+	struct gotweb_url	 url;
+	char			*readme = NULL;
+	int			 binary;
+	const uint8_t		*buf;
+	size_t			 len;
 !}
 <header class='subtitle'>
   <h2>Tree</h2>
@@ -665,9 +672,55 @@ nextsep(char *s, char **t)
   </div>
   <hr />
   <table id="tree">
-    {{ render got_output_repo_tree(c, gotweb_render_tree_item) }}
+    {{ render got_output_repo_tree(c, &readme, gotweb_render_tree_item) }}
   </table>
+  {{ if readme }}
+    {!
+	error = got_open_blob_for_output(&t->blob, &t->fd, &binary, c,
+	    qs->folder, readme, qs->commit);
+	if (error) {
+		free(readme);
+		return (-1);
+	}
+
+	memset(&url, 0, sizeof(url));
+	url.index_page = -1;
+	url.page = -1;
+	url.action = BLOB;
+	url.path = t->qs->path;
+	url.file = readme;
+	url.folder = t->qs->folder;
+	url.commit = t->qs->commit;
+    !}
+    {{ if !binary }}
+      <h2>
+        <a href="{{ render gotweb_render_url(c, &url) }}">
+          {{ readme }}
+        </a>
+      </h2>
+      <pre>
+        {!
+		for (;;) {
+			error = got_object_blob_read_block(&len, t->blob);
+			if (error) {
+				free(readme);
+				return (-1);
+			}
+			if (len == 0)
+				break;
+			buf = got_object_blob_get_read_buf(t->blob);
+			if (tp_write_htmlescape(tp, buf, len) == -1) {
+				free(readme);
+				return (-1);
+			}
+		}
+        !}
+      </pre>
+    {{ end }}
+  {{ end }}
 </div>
+{{ finally }}
+{! free(readme); !}
 {{ end }}
 
 {{ define gotweb_render_tree_item(struct template *tp,

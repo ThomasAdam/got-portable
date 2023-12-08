@@ -704,7 +704,7 @@ got_get_repo_tags(struct request *c, size_t limit)
 }
 
 int
-got_output_repo_tree(struct request *c,
+got_output_repo_tree(struct request *c, char **readme,
     int (*cb)(struct template *, struct got_tree_entry *))
 {
 	const struct got_error *error = NULL;
@@ -718,10 +718,13 @@ got_output_repo_tree(struct request *c,
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te;
 	struct repo_dir *repo_dir = t->repo_dir;
+	const char *name;
+	mode_t mode;
 	char *escaped_name = NULL, *path = NULL;
 	int nentries, i;
 
 	TAILQ_INIT(&refs);
+	*readme = NULL;
 
 	rc = TAILQ_FIRST(&t->repo_commits);
 
@@ -758,6 +761,16 @@ got_output_repo_tree(struct request *c,
 
 	for (i = 0; i < nentries; i++) {
 		te = got_object_tree_get_entry(tree, i);
+
+		name = got_tree_entry_get_name(te);
+		mode = got_tree_entry_get_mode(te);
+		if (!S_ISDIR(mode) && (!strcasecmp(name, "README") ||
+		    !strcasecmp(name, "README.md") ||
+		    !strcasecmp(name, "README.txt"))) {
+			free(*readme);
+			*readme = strdup(name);
+		}
+
 		if (cb(c->tp, te) == -1) {
 			error = got_error(GOT_ERR_CANCELLED);
 			break;
@@ -774,6 +787,8 @@ got_output_repo_tree(struct request *c,
 	free(commit_id);
 	free(tree_id);
 	if (error) {
+		free(*readme);
+		*readme = NULL;
 		if (error->code != GOT_ERR_CANCELLED)
 			log_warnx("%s: %s", __func__, error->msg);
 		return -1;
@@ -783,12 +798,11 @@ got_output_repo_tree(struct request *c,
 
 const struct got_error *
 got_open_blob_for_output(struct got_blob_object **blob, int *fd,
-    int *binary, struct request *c)
+    int *binary, struct request *c, const char *directory, const char *file,
+    const char *commitstr)
 {
 	const struct got_error *error = NULL;
-	struct transport *t = c->t;
-	struct got_repository *repo = t->repo;
-	struct querystring *qs = c->t->qs;
+	struct got_repository *repo = c->t->repo;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_reflist_head refs;
@@ -801,8 +815,13 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	*fd = -1;
 	*binary = 0;
 
-	if (asprintf(&path, "%s%s%s", qs->folder ? qs->folder : "",
-	    qs->folder ? "/" : "", qs->file) == -1) {
+	error = got_ref_list(&refs, repo, "refs/heads",
+	    got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
+	if (asprintf(&path, "%s%s%s", directory ? directory : "",
+	    directory ? "/" : "", file) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -811,7 +830,10 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&commit_id, NULL, qs->commit,
+	if (commitstr == NULL)
+		commitstr = GOT_REF_HEAD;
+
+	error = got_repo_match_object_id(&commit_id, NULL, commitstr,
 	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (error)
 		goto done;
@@ -863,6 +885,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 		*blob = NULL;
 	}
 
+	got_ref_list_free(&refs);
 	free(in_repo_path);
 	free(commit_id);
 	free(path);
