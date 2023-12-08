@@ -744,8 +744,7 @@ gotweb_free_transport(struct transport *t)
 	gotweb_free_repo_dir(t->repo_dir);
 	gotweb_free_querystring(t->qs);
 	free(t->more_id);
-	free(t->next_id);
-	free(t->prev_id);
+	free(t->tags_more_id);
 	if (t->blob)
 		got_object_blob_close(t->blob);
 	if (t->fp) {
@@ -767,7 +766,7 @@ gotweb_free_transport(struct transport *t)
 }
 
 void
-gotweb_get_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
+gotweb_index_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
     struct gotweb_url *next, int *have_next)
 {
 	struct transport *t = c->t;
@@ -776,52 +775,23 @@ gotweb_get_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
 
 	*have_prev = *have_next = 0;
 
-	switch(qs->action) {
-	case INDEX:
-		if (qs->index_page > 0) {
-			*have_prev = 1;
-			*prev = (struct gotweb_url){
-				.action = -1,
-				.index_page = qs->index_page - 1,
-				.page = -1,
-			};
-		}
-		if (t->next_disp == srv->max_repos_display &&
-		    t->repos_total != (qs->index_page + 1) *
-		    srv->max_repos_display) {
-			*have_next = 1;
-			*next = (struct gotweb_url){
-				.action = -1,
-				.index_page = qs->index_page + 1,
-				.page = -1,
-			};
-		}
-		break;
-	case TAGS:
-		if (t->prev_id && qs->commit != NULL &&
-		    strcmp(qs->commit, t->prev_id) != 0) {
-			*have_prev = 1;
-			*prev = (struct gotweb_url){
-				.action = TAGS,
-				.index_page = -1,
-				.page = qs->page - 1,
-				.path = qs->path,
-				.commit = t->prev_id,
-				.headref = qs->headref,
-			};
-		}
-		if (t->next_id) {
-			*have_next = 1;
-			*next = (struct gotweb_url){
-				.action = TAGS,
-				.index_page = -1,
-				.page = qs->page + 1,
-				.path = qs->path,
-				.commit = t->next_id,
-				.headref = qs->headref,
-			};
-		}
-		break;
+	if (qs->index_page > 0) {
+		*have_prev = 1;
+		*prev = (struct gotweb_url){
+			.action = -1,
+			.index_page = qs->index_page - 1,
+			.page = -1,
+		};
+	}
+	if (t->next_disp == srv->max_repos_display &&
+	    t->repos_total != (qs->index_page + 1) *
+	    srv->max_repos_display) {
+		*have_next = 1;
+		*next = (struct gotweb_url){
+			.action = -1,
+			.index_page = qs->index_page + 1,
+			.page = -1,
+		};
 	}
 }
 

@@ -445,8 +445,11 @@ nextsep(char *s, char **t)
 		.headref = qs->headref,
 		.file = qs->file,
 	};
+
+	if (action == TAGS)
+		more.commit = t->tags_more_id;
 !}
-  {{ if t->more_id }}
+  {{ if more.commit }}
     <div id="np_wrapper">
       <div id="nav_more">
         <a href="{{ render gotweb_render_url(c, &more) }}">
@@ -460,11 +463,10 @@ nextsep(char *s, char **t)
 {{ define gotweb_render_navs(struct template *tp) }}
 {!
 	struct request		*c = tp->tp_arg;
-	struct transport	*t = c->t;
 	struct gotweb_url	 prev, next;
 	int			 have_prev, have_next;
 
-	gotweb_get_navs(c, &prev, &have_prev, &next, &have_next);
+	gotweb_index_navs(c, &prev, &have_prev, &next, &have_next);
 !}
 <div id="np_wrapper">
   <div id="nav_prev">
@@ -482,13 +484,6 @@ nextsep(char *s, char **t)
     {{ end }}
   </div>
 </div>
-{{ finally }}
-{!
-	free(t->next_id);
-	t->next_id = NULL;
-	free(t->prev_id);
-	t->prev_id = NULL;
-!}
 {{ end }}
 
 {{ define gotweb_render_commits(struct template *tp) }}
@@ -833,10 +828,7 @@ nextsep(char *s, char **t)
         {{ render tag_item(tp, rt) }}
       {{ end }}
     {{ end }}
-    {{ if t->next_id || t->prev_id }}
-      {! qs->action = TAGS; !}
-      {{ render gotweb_render_navs(tp) }}
-    {{ end }}
+    {{ render gotweb_render_more(tp, TAGS) }}
   {{ end }}
 </div>
 {{ end }}

@@ -460,11 +460,10 @@ got_get_repo_tags(struct request *c, size_t limit)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	struct got_tag_object *tag = NULL;
-	struct repo_tag *rt = NULL, *trt = NULL;
 	char *in_repo_path = NULL, *repo_path = NULL, *id_str = NULL;
 	char *tag_commit = NULL, *tag_commit0 = NULL;
 	char *commit_msg = NULL, *commit_msg0 = NULL;
-	int chk_next = 0, chk_multi = 1, commit_found = 0, c_cnt = 0;
+	int chk_next = 0, chk_multi = 1, commit_found = 0;
 
 	TAILQ_INIT(&refs);
 
@@ -478,28 +477,28 @@ got_get_repo_tags(struct request *c, size_t limit)
 	if (qs->commit == NULL && (qs->action == TAGS || qs->action == RSS)) {
 		error = got_ref_open(&ref, repo, qs->headref, 0);
 		if (error)
-			goto err;
+			goto done;
 		error = got_ref_resolve(&id, repo, ref);
 		got_ref_close(ref);
 		if (error)
-			goto err;
+			goto done;
 	} else if (qs->commit == NULL && qs->action == TAG) {
 		error = got_error_msg(GOT_ERR_EOF, "commit id missing");
-		goto err;
+		goto done;
 	} else {
 		error = got_repo_match_object_id_prefix(&id, qs->commit,
 		    GOT_OBJ_TYPE_COMMIT, repo);
 		if (error)
-			goto err;
+			goto done;
 	}
 
 	if (qs->action != SUMMARY && qs->action != TAGS) {
 		error = got_object_open_as_commit(&commit, repo, id);
 		if (error)
-			goto err;
+			goto done;
 		error = got_object_commit_get_logmsg(&commit_msg0, commit);
 		if (error)
-			goto err;
+			goto done;
 		if (commit) {
 			got_object_commit_close(commit);
 			commit = NULL;
@@ -508,12 +507,12 @@ got_get_repo_tags(struct request *c, size_t limit)
 
 	error = got_repo_map_path(&in_repo_path, repo, repo_path);
 	if (error)
-		goto err;
+		goto done;
 
 	error = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags,
 	   repo);
 	if (error)
-		goto err;
+		goto done;
 
 	if (limit == 1)
 		chk_multi = 0;
@@ -526,14 +525,14 @@ got_get_repo_tags(struct request *c, size_t limit)
 		struct repo_tag *new_repo_tag = NULL;
 		error = got_init_repo_tag(&new_repo_tag);
 		if (error)
-			goto err;
+			goto done;
 
 		TAILQ_INSERT_TAIL(&t->repo_tags, new_repo_tag, entry);
 
 		new_repo_tag->tag_name = strdup(got_ref_get_name(re->ref));
 		if (new_repo_tag->tag_name == NULL) {
 			error = got_error_from_errno("strdup");
-			goto err;
+			goto done;
 		}
 
 		free(id);
@@ -560,31 +559,31 @@ got_get_repo_tags(struct request *c, size_t limit)
 			    strdup(got_object_commit_get_committer(commit));
 			if (new_repo_tag->tagger == NULL) {
 				error = got_error_from_errno("strdup");
-				goto err;
+				goto done;
 			}
 			new_repo_tag->tagger_time =
 			    got_object_commit_get_committer_time(commit);
 			error = got_object_id_str(&id_str, id);
 			if (error)
-				goto err;
+				goto done;
 		} else {
 			new_repo_tag->tagger =
 			    strdup(got_object_tag_get_tagger(tag));
 			if (new_repo_tag->tagger == NULL) {
 				error = got_error_from_errno("strdup");
-				goto err;
+				goto done;
 			}
 			new_repo_tag->tagger_time =
 			    got_object_tag_get_tagger_time(tag);
 			error = got_object_id_str(&id_str,
 			    got_object_tag_get_object_id(tag));
 			if (error)
-				goto err;
+				goto done;
 		}
 
 		new_repo_tag->commit_id = strdup(id_str);
 		if (new_repo_tag->commit_id == NULL)
-			goto err;
+			goto done;
 
 		if (commit_found == 0 && qs->commit != NULL &&
 		    strncmp(id_str, qs->commit, strlen(id_str)) != 0)
@@ -600,10 +599,10 @@ got_get_repo_tags(struct request *c, size_t limit)
 		 * commits and summary
 		 */
 		if (chk_next) {
-			t->next_id = strdup(new_repo_tag->commit_id);
-			if (t->next_id == NULL) {
+			t->tags_more_id = strdup(new_repo_tag->commit_id);
+			if (t->tags_more_id == NULL) {
 				error = got_error_from_errno("strdup");
-				goto err;
+				goto done;
 			}
 			if (commit) {
 				got_object_commit_close(commit);
@@ -618,14 +617,14 @@ got_get_repo_tags(struct request *c, size_t limit)
 			error = got_object_commit_get_logmsg(&tag_commit0,
 			    commit);
 			if (error)
-				goto err;
+				goto done;
 			got_object_commit_close(commit);
 			commit = NULL;
 		} else {
 			tag_commit0 = strdup(got_object_tag_get_message(tag));
 			if (tag_commit0 == NULL) {
 				error = got_error_from_errno("strdup");
-				goto err;
+				goto done;
 			}
 		}
 
@@ -636,7 +635,7 @@ got_get_repo_tags(struct request *c, size_t limit)
 		if (new_repo_tag->tag_commit == NULL) {
 			error = got_error_from_errno("strdup");
 			free(tag_commit0);
-			goto err;
+			goto done;
 		}
 		free(tag_commit0);
 
@@ -648,7 +647,7 @@ got_get_repo_tags(struct request *c, size_t limit)
 			new_repo_tag->commit_msg = strdup(commit_msg);
 			if (new_repo_tag->commit_msg == NULL) {
 				error = got_error_from_errno("strdup");
-				goto err;
+				goto done;
 			}
 		}
 
@@ -660,36 +659,6 @@ got_get_repo_tags(struct request *c, size_t limit)
 	}
 
  done:
-	/*
-	 * we have tailq populated, so find previous commit id
-	 * for navigation through briefs and commits
-	 */
-	if (t->tag_count == 0) {
-		TAILQ_FOREACH_SAFE(rt, &t->repo_tags, entry, trt) {
-			TAILQ_REMOVE(&t->repo_tags, rt, entry);
-			gotweb_free_repo_tag(rt);
-		}
-	}
-	if (t->tag_count > 0 && t->prev_id == NULL && qs->commit != NULL) {
-		commit_found = 0;
-		TAILQ_FOREACH_REVERSE(rt, &t->repo_tags, repo_tags_head,
-		    entry) {
-			if (commit_found == 0 && rt->commit_id != NULL &&
-			    strcmp(qs->commit, rt->commit_id) != 0) {
-				continue;
-			} else
-				commit_found = 1;
-			if (c_cnt == srv->max_commits_display ||
-			    rt == TAILQ_FIRST(&t->repo_tags)) {
-				t->prev_id = strdup(rt->commit_id);
-				if (t->prev_id == NULL)
-					error = got_error_from_errno("strdup");
-				break;
-			}
-			c_cnt++;
-		}
-	}
- err:
 	if (commit)
 		got_object_commit_close(commit);
 	if (tag)
