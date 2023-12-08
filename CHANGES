@@ -1,3 +1,20 @@
+* got 0.95; 2023-12-08
+  see git repository history for per-change authorship information
+- plug memory leaks in checkout, update, and status commands
+- gotwebd: repair the "chroot" option in /etc/gotwebd.conf; regression from 0.94
+- gotwebd: add breadcumbs to navigate paths in tree/blob/commits/blame views
+- gotwebd: add a dark mode, enabled based on web-browser preferences
+- gotwebd: add History/Blob/Raw-File links to blob and blame views
+- gotwebd: adjust blob line numbers for text-mode browsers
+- gotwebd: make the blame view work in text-mode browsers
+- gotwebd: add a Patch action to serve diffs in plain text
+- gotwebd: add Patch and Tree links to the diff view
+- gotwebd: display README files in tree views
+- gotwebd: display a tree-listing and README files in the summary view
+- gotwebd: render less tags in the summary page to make space for other content
+- gotwebd: swap order of tags and branch listings on the summary page
+- gotwebd: display 'More' link instead of 'prev/next' links in the tag listing
+
 * got 0.94; 2023-11-29
   see git repository history for per-change authorship information
 - in diff error message, say what was being diffed
