@@ -1084,10 +1084,16 @@ nextsep(char *s, char **t)
 
 {{ define gotweb_render_summary(struct template *tp) }}
 {!
+	const struct got_error	*error;
 	struct request		*c = tp->tp_arg;
 	struct server		*srv = c->srv;
 	struct transport	*t = c->t;
 	struct got_reflist_head	*refs = &t->refs;
+	struct gotweb_url	 url;
+	char			*readme = NULL;
+	int			 binary;
+	const uint8_t		*buf;
+	size_t			 len;
 !}
 <dl id="summary_wrapper" class="page_header_wrapper">
   {{ if srv->show_repo_description }}
@@ -1112,6 +1118,58 @@ nextsep(char *s, char **t)
 {{ render gotweb_render_briefs(tp) }}
 {{ render gotweb_render_branches(tp, refs) }}
 {{ render gotweb_render_tags(tp) }}
+<header class='subtitle'>
+  <h2>Tree</h2>
+</header>
+<div id="tree_content">
+  <table id="tree">
+    {{ render got_output_repo_tree(c, &readme, gotweb_render_tree_item) }}
+  </table>
+  {{ if readme }}
+    {!
+	error = got_open_blob_for_output(&t->blob, &t->fd, &binary, c,
+	    "/", readme, NULL);
+	if (error) {
+		free(readme);
+		return (-1);
+	}
+
+	memset(&url, 0, sizeof(url));
+	url.index_page = -1;
+	url.page = -1;
+	url.action = BLOB;
+	url.path = t->qs->path;
+	url.file = readme;
+	url.folder = t->qs->folder;
+	url.commit = t->qs->commit;
+    !}
+    {{ if !binary }}
+      <h2>
+        <a href="{{ render gotweb_render_url(c, &url) }}">
+          {{ readme }}
+        </a>
+      </h2>
+      <pre>
+        {!
+		for (;;) {
+			error = got_object_blob_read_block(&len, t->blob);
+			if (error) {
+				free(readme);
+				return (-1);
+			}
+			if (len == 0)
+				break;
+			buf = got_object_blob_get_read_buf(t->blob);
+			if (tp_write_htmlescape(tp, buf, len) == -1) {
+				free(readme);
+				return (-1);
+			}
+		}
+        !}
+      </pre>
+    {{ end }}
+  {{ end }}
+</div>
 {{ end }}
 
 {{ define gotweb_render_blame(struct template *tp) }}
