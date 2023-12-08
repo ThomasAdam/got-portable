@@ -203,8 +203,7 @@ struct transport {
 	struct repo_dir		*repo_dir;
 	struct querystring	*qs;
 	char			*more_id;
-	char			*next_id;
-	char			*prev_id;
+	char			*tags_more_id;
 	unsigned int		 repos_total;
 	unsigned int		 next_disp;
 	unsigned int		 prev_disp;
@@ -467,7 +466,7 @@ void sockets_socket_accept(int, short, void *);
 int sockets_privinit(struct gotwebd *, struct socket *);
 
 /* gotweb.c */
-void gotweb_get_navs(struct request *, struct gotweb_url *, int *,
+void gotweb_index_navs(struct request *, struct gotweb_url *, int *,
     struct gotweb_url *, int *);
 int gotweb_render_age(struct template *, time_t);
 const struct got_error *gotweb_init_transport(struct transport **);
