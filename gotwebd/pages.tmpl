@@ -355,7 +355,7 @@ nextsep(char *s, char **t)
 	struct repo_commit	*rc;
 	struct repo_dir		*repo_dir = t->repo_dir;
 	struct gotweb_url	 diff_url, patch_url, tree_url;
-	char			*tmp;
+	char			*tmp, *body;
 
 	diff_url = (struct gotweb_url){
 		.action = DIFF,
@@ -393,9 +393,12 @@ nextsep(char *s, char **t)
 	if (tmp)
 		*tmp = '\0';
 
-	tmp = strchr(rc->commit_msg, '\n');
-	if (tmp)
-		*tmp = '\0';
+	body = strchr(rc->commit_msg, '\n');
+	if (body) {
+		*body++ = '\0';
+		while (*body == '\n')
+		      body++;
+	}
     !}
     <div class='brief'>
       <p class='brief_meta'>
@@ -407,15 +410,33 @@ nextsep(char *s, char **t)
           {{ rc->committer }}
         </span>
       </p>
-      <p class="briefs_log">
-        <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
-          {{ rc->commit_msg }}
-        </a>
-        {{ if rc->refs_str }}
-          {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
-        {{ end }}
-        </a>
-      </p>
+      {{ if body && *body != '\0' }}
+        <details class="briefs_log">
+          <summary>
+            <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
+              {{ rc->commit_msg }}
+            </a>
+            {{ if rc->refs_str }}
+              {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
+            {{ end }}
+            {{ " " }}
+            <span class="briefs_toggle" aria-hidden="true">
+              {{ " ⋅⋅⋅ " }}
+            </span>
+          </summary>
+          {{ "\n" }}
+          <p>{{ body }}</p>
+        </details>
+      {{ else }}
+        <p class="briefs_log">
+          <a href="{{ render gotweb_render_url(tp->tp_arg, &diff_url) }}">
+            {{ rc->commit_msg }}
+          </a>
+          {{ if rc->refs_str }}
+            {{ " " }} <span class="refs_str">({{ rc->refs_str }})</span>
+          {{ end }}
+        </p>
+      {{ end }}
     </div>
     <div class="navs_wrapper">
       <div class="navs">
