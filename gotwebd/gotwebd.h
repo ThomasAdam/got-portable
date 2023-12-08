@@ -79,6 +79,7 @@
 #define D_MAXREPODISP		 25
 #define D_MAXSLCOMMDISP		 10
 #define D_MAXCOMMITDISP		 25
+#define D_MAXSLTAGDISP		 3
 
 #define BUF			 8192
 

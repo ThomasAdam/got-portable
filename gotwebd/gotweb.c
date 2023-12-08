@@ -352,7 +352,7 @@ gotweb_process_request(struct request *c)
 		if (error)
 			goto err;
 		qs->action = TAGS;
-		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
+		error = got_get_repo_tags(c, D_MAXSLTAGDISP);
 		if (error) {
 			log_warnx("%s: got_get_repo_tags: %s", __func__,
 			    error->msg);
