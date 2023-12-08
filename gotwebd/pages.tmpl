@@ -1170,6 +1170,8 @@ nextsep(char *s, char **t)
     {{ end }}
   {{ end }}
 </div>
+{{ finally }}
+{! free(readme); !}
 {{ end }}
 
 {{ define gotweb_render_blame(struct template *tp) }}
