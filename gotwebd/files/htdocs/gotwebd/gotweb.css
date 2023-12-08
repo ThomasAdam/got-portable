@@ -507,6 +507,10 @@ dd {
 		background-color: unset;
 	}
 
+        #site_owner_wrapper {
+            border-top: 1px solid #444444;
+        }
+
 	.page_header_wrapper {
 		background-color: unset;
 	}
