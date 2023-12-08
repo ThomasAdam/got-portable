@@ -1110,8 +1110,8 @@ nextsep(char *s, char **t)
   {{ end }}
 </dl>
 {{ render gotweb_render_briefs(tp) }}
-{{ render gotweb_render_tags(tp) }}
 {{ render gotweb_render_branches(tp, refs) }}
+{{ render gotweb_render_tags(tp) }}
 {{ end }}
 
 {{ define gotweb_render_blame(struct template *tp) }}
