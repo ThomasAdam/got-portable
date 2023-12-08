@@ -518,10 +518,10 @@ const struct got_error *got_get_repo_commits(struct request *, size_t);
 const struct got_error *got_get_repo_tags(struct request *, size_t);
 const struct got_error *got_get_repo_heads(struct request *);
 const struct got_error *got_open_diff_for_output(FILE **, struct request *);
-int got_output_repo_tree(struct request *,
+int got_output_repo_tree(struct request *, char **,
     int (*)(struct template *, struct got_tree_entry *));
 const struct got_error *got_open_blob_for_output(struct got_blob_object **,
-    int *, int *, struct request *);
+    int *, int *, struct request *, const char *, const char *, const char *);
 int got_output_blob_by_lines(struct template *, struct got_blob_object *,
     int (*)(struct template *, const char *, size_t));
 const struct got_error *got_output_file_blame(struct request *,
