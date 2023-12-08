@@ -429,6 +429,10 @@ dd {
 		background-color: #282A36;
 	}
 
+	hr {
+		border-style: solid;
+	}
+
 	#index_header, #summary_wrapper {
 		background-color: #BD93F9;
 		color: #222;
