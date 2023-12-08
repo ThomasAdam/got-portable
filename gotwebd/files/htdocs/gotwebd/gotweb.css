@@ -213,6 +213,24 @@ header.subtitle h2 {
 	}
 }
 
+.briefs_log summary {
+	cursor: pointer;
+}
+
+.briefs_toggle {
+	display: inline-block;
+	padding: 3px 4px;
+	padding: 0px 4px;
+	border: 1px solid #222;
+	border-radius: 3px;
+	user-select: none;
+}
+
+/* work around .commits being unusable here */
+.briefs_log > p {
+	white-space: pre-wrap;
+}
+
 .tag_age, .tag_name, .tag_log {
 	display: inline-block;
 	vertical-align: middle;
