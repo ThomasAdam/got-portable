@@ -343,8 +343,8 @@ main(int argc, char **argv)
 		setproctitle("sockets");
 		log_procinit("sockets");
 
-		if (chroot(pw->pw_dir) == -1)
-			fatal("chroot %s", pw->pw_dir);
+		if (chroot(env->httpd_chroot) == -1)
+			fatal("chroot %s", env->httpd_chroot);
 		if (chdir("/") == -1)
 			fatal("chdir /");
 		if (setgroups(1, &pw->pw_gid) == -1 ||
