@@ -51,6 +51,7 @@ static int blame_line(struct template *, const char *, struct blame_line *,
 
 static inline int gotweb_render_more(struct template *, int);
 
+static inline int tree_listing(struct template *);
 static inline int diff_line(struct template *, char *);
 static inline int tag_item(struct template *, struct repo_tag *);
 static inline int branch(struct template *, struct got_reflist_entry *);
@@ -641,36 +642,18 @@ nextsep(char *s, char **t)
 </div>
 {{ end }}
 
-{{ define gotweb_render_tree(struct template *tp) }}
+{{ define tree_listing(struct template *tp) }}
 {!
 	const struct got_error	*error;
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
-	struct querystring	*qs = t->qs;
-	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+	struct querystring	*qs = c->t->qs;
 	struct gotweb_url	 url;
 	char			*readme = NULL;
 	int			 binary;
 	const uint8_t		*buf;
 	size_t			 len;
 !}
-<header class='subtitle'>
-  <h2>Tree</h2>
-</header>
-<div id="tree_content">
-  <div class="page_header_wrapper">
-    <dl>
-      <dt>Tree:</dt>
-      <dd><code class="commit-id">{{ rc->tree_id }}</code></dd>
-      <dt>Date:</dt>
-      <dd>
-        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
-      </dd>
-      <dt>Message:</dt>
-      <dd class="commit-msg">{{ rc->commit_msg }}</dd>
-    </dl>
-  </div>
-  <hr />
   <table id="tree">
     {{ render got_output_repo_tree(c, &readme, gotweb_render_tree_item) }}
   </table>
@@ -718,9 +701,35 @@ nextsep(char *s, char **t)
       </pre>
     {{ end }}
   {{ end }}
-</div>
 {{ finally }}
-{! free(readme); !}
+  {! free(readme); !}
+{{ end }}
+
+{{ define gotweb_render_tree(struct template *tp) }}
+{!
+	struct request		*c = tp->tp_arg;
+	struct transport	*t = c->t;
+	struct repo_commit	*rc = TAILQ_FIRST(&t->repo_commits);
+!}
+<header class='subtitle'>
+  <h2>Tree</h2>
+</header>
+<div id="tree_content">
+  <div class="page_header_wrapper">
+    <dl>
+      <dt>Tree:</dt>
+      <dd><code class="commit-id">{{ rc->tree_id }}</code></dd>
+      <dt>Date:</dt>
+      <dd>
+        {{ render datetime(tp, rc->committer_time, TM_LONG) }}
+      </dd>
+      <dt>Message:</dt>
+      <dd class="commit-msg">{{ rc->commit_msg }}</dd>
+    </dl>
+  </div>
+  <hr />
+  {{ render tree_listing(tp) }}
+</div>
 {{ end }}
 
 {{ define gotweb_render_tree_item(struct template *tp,
@@ -1084,16 +1093,10 @@ nextsep(char *s, char **t)
 
 {{ define gotweb_render_summary(struct template *tp) }}
 {!
-	const struct got_error	*error;
 	struct request		*c = tp->tp_arg;
 	struct server		*srv = c->srv;
 	struct transport	*t = c->t;
 	struct got_reflist_head	*refs = &t->refs;
-	struct gotweb_url	 url;
-	char			*readme = NULL;
-	int			 binary;
-	const uint8_t		*buf;
-	size_t			 len;
 !}
 <dl id="summary_wrapper" class="page_header_wrapper">
   {{ if srv->show_repo_description }}
@@ -1122,56 +1125,8 @@ nextsep(char *s, char **t)
   <h2>Tree</h2>
 </header>
 <div id="tree_content">
-  <table id="tree">
-    {{ render got_output_repo_tree(c, &readme, gotweb_render_tree_item) }}
-  </table>
-  {{ if readme }}
-    {!
-	error = got_open_blob_for_output(&t->blob, &t->fd, &binary, c,
-	    "/", readme, NULL);
-	if (error) {
-		free(readme);
-		return (-1);
-	}
-
-	memset(&url, 0, sizeof(url));
-	url.index_page = -1;
-	url.page = -1;
-	url.action = BLOB;
-	url.path = t->qs->path;
-	url.file = readme;
-	url.folder = t->qs->folder;
-	url.commit = t->qs->commit;
-    !}
-    {{ if !binary }}
-      <h2>
-        <a href="{{ render gotweb_render_url(c, &url) }}">
-          {{ readme }}
-        </a>
-      </h2>
-      <pre>
-        {!
-		for (;;) {
-			error = got_object_blob_read_block(&len, t->blob);
-			if (error) {
-				free(readme);
-				return (-1);
-			}
-			if (len == 0)
-				break;
-			buf = got_object_blob_get_read_buf(t->blob);
-			if (tp_write_htmlescape(tp, buf, len) == -1) {
-				free(readme);
-				return (-1);
-			}
-		}
-        !}
-      </pre>
-    {{ end }}
-  {{ end }}
+  {{ render tree_listing(tp) }}
 </div>
-{{ finally }}
-{! free(readme); !}
 {{ end }}
 
 {{ define gotweb_render_blame(struct template *tp) }}
