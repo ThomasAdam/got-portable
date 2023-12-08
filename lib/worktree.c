@@ -3722,7 +3722,7 @@ free_ignores(struct got_pathlist_head *ignores)
 
 		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
 	}
-	got_pathlist_free(ignores, GOT_PATHLIST_FREE_PATH);
+	got_pathlist_free(ignores, GOT_PATHLIST_FREE_ALL);
 }
 
 static const struct got_error *
@@ -3777,6 +3777,7 @@ done:
 	if (err || pe == NULL) {
 		free(dirpath);
 		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
+		free(ignorelist);
 	}
 	return err;
 }
