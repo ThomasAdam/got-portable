@@ -97,37 +97,46 @@ tp_urlescape(struct template *tp, const char *str)
 	return (0);
 }
 
+static inline int
+htmlescape(struct template *tp, char c)
+{
+	switch (c) {
+	case '<':
+		return tp_write(tp, "&lt;", 4);
+	case '>':
+		return tp_write(tp, "&gt;", 4);
+	case '&':
+		return tp_write(tp, "&amp;", 5);
+	case '"':
+		return tp_write(tp, "&quot;", 6);
+	case '\'':
+		return tp_write(tp, "&apos;", 6);
+	default:
+		return tp_write(tp, &c, 1);
+	}
+}
+
 int
 tp_htmlescape(struct template *tp, const char *str)
 {
-	int r;
-
 	if (str == NULL)
 		return (0);
 
 	for (; *str; ++str) {
-		switch (*str) {
-		case '<':
-			r = tp_write(tp, "&lt;", 4);
-			break;
-		case '>':
-			r = tp_write(tp, "&gt;", 4);
-			break;
-		case '&':
-			r = tp_write(tp, "&amp;", 5);
-			break;
-		case '"':
-			r = tp_write(tp, "&quot;", 6);
-			break;
-		case '\'':
-			r = tp_write(tp, "&apos;", 6);
-			break;
-		default:
-			r = tp_write(tp, str, 1);
-			break;
-		}
+		if (htmlescape(tp, *str) == -1)
+			return (-1);
+	}
 
-		if (r == -1)
+	return (0);
+}
+
+int
+tp_write_htmlescape(struct template *tp, const char *str, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; ++i) {
+		if (htmlescape(tp, str[i]) == -1)
 			return (-1);
 	}
 

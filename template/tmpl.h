@@ -36,6 +36,7 @@ int	 tp_writef(struct template *, const char *, ...)
 	    __attribute__((__format__ (printf, 2, 3)));
 int	 tp_urlescape(struct template *, const char *);
 int	 tp_htmlescape(struct template *, const char *);
+int	 tp_write_htmlescape(struct template *, const char *, size_t);
 
 struct template	*template(void *, tmpl_write, char *, size_t);
 int		 template_flush(struct template *);
