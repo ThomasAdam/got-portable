@@ -460,11 +460,6 @@ gotweb_init_querystring(struct querystring **qs)
 	}
 
 	(*qs)->action = INDEX;
-	(*qs)->commit = NULL;
-	(*qs)->file = NULL;
-	(*qs)->folder = NULL;
-	(*qs)->index_page = 0;
-	(*qs)->path = NULL;
 
 	return error;
 }
