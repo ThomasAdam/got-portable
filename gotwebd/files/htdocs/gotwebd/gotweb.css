@@ -106,23 +106,16 @@ hr {
 	border-bottom: 1px dotted #444444;
 	background-color: #f5fcfb;
 	overflow: hidden;
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+}
+#nav_more, #nav_prev, #nav_next {
+	padding: 5px 10px;
 }
 #nav_more {
-	padding: 5px 0;
 	text-align: center;
-}
-#nav_prev {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	overflow: visible;
-}
-#nav_next {
-	padding-right: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	text-align: right;
-	overflow: hidden;
+	flex-grow: 2;
 }
 .navs_wrapper {
 	width: 100%;
