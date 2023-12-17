@@ -52,7 +52,7 @@ const struct got_error *got_pack_parse_object_type_and_size(uint8_t *,
 
 #define GOT_PACK_PREFIX		"pack-"
 #define GOT_PACKFILE_SUFFIX	".pack"
-#define GOT_PACKIDX_SUFFIX		".idx"
+#define GOT_PACKIDX_SUFFIX	".idx"
 #define GOT_PACKFILE_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
 				SHA1_DIGEST_STRING_LENGTH - 1 + \
 				strlen(GOT_PACKFILE_SUFFIX))
