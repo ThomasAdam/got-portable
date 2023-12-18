@@ -442,7 +442,6 @@ enum query_actions {
 	TAGS,
 	TREE,
 	RSS,
-	ACTIONS__MAX,
 };
 
 extern struct gotwebd	*gotwebd_env;
