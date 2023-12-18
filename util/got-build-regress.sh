@@ -15,19 +15,22 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 prog=`basename $0`
-usage="$prog [-f] [-b branch] [-R testroot] [-r from-address] [-w worktree] email-address ..."
+usage="$prog [-fG] [-b branch] [-R testroot] [-r from-address] [-w worktree] email-address ..."
 branch=main
 worktree=$HOME/got
 fromaddr_arg=
 force=0
+gotd=0
 testroot="/tmp"
 
-while getopts b:fR:r:w: arg; do
+while getopts b:fGR:r:w: arg; do
 	case $arg in
 		b)
 			branch="$OPTARG" ;;
 		f)
 			force=1 ;;
+		G)
+			gotd=1 ;;
 		w)
 			worktree="$OPTARG" ;;
 		r)
@@ -147,6 +150,21 @@ if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
 	cat failures.log >> build.log
 	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
 	exit 0
+fi
+
+if [ $gotd -ne 0 ]; then
+	printf "\n\n\tRunning gotd tests\n\n" >> build.log
+	log_cmd regress.log doas env PATH=$HOME/bin:$PATH make server-regress
+	regress_status=$?
+	cat regress.log >> build.log
+	egrep "test.*failed" regress.log > failures.log
+	regress_failure_grep="$?"
+	if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
+		printf "\n\n\t Test failures:\n\n" >> build.log
+		cat failures.log >> build.log
+		mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
+		exit 0
+	fi
 fi
 
 printf "\n\n\tTesting a release build\n\n" >> build.log
