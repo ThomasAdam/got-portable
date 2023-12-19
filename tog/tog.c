@@ -5308,6 +5308,7 @@ create_diff(struct tog_diff_view_state *s)
 	int obj_type;
 	struct got_diff_line *lines = NULL;
 	struct got_pathlist_head changed_paths;
+	struct got_commit_object *commit2 = NULL;
 
 	TAILQ_INIT(&changed_paths);
 
@@ -5357,7 +5358,6 @@ create_diff(struct tog_diff_view_state *s)
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *pid;
-		struct got_commit_object *commit2;
 		struct got_reflist_head *refs;
 		size_t nlines = 0;
 		struct got_diffstat_cb_arg dsa = {
@@ -5382,9 +5382,6 @@ create_diff(struct tog_diff_view_state *s)
 		if (err)
 			break;
 
-		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
-		if (err)
-			goto done;
 		refs = got_reflist_object_id_map_lookup(tog_refs_idmap, s->id2);
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
@@ -5394,6 +5391,11 @@ create_diff(struct tog_diff_view_state *s)
 			if (err)
 				goto done;
 		} else {
+			err = got_object_open_as_commit(&commit2, s->repo,
+			    s->id2);
+			if (err)
+				goto done;
+
 			parent_ids = got_object_commit_get_parent_ids(commit2);
 			STAILQ_FOREACH(pid, parent_ids, entry) {
 				if (got_object_id_cmp(s->id1, &pid->id) == 0) {
@@ -5407,7 +5409,6 @@ create_diff(struct tog_diff_view_state *s)
 				}
 			}
 		}
-		got_object_commit_close(commit2);
 
 		err = cat_diff(s->f, tmp_diff_file, &s->lines, &s->nlines,
 		    lines, nlines);
@@ -5419,6 +5420,8 @@ create_diff(struct tog_diff_view_state *s)
 	}
 done:
 	free(lines);
+	if (commit2 != NULL)
+		got_object_commit_close(commit2);
 	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	if (s->f && fflush(s->f) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
