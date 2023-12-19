@@ -672,8 +672,6 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	struct got_packidx_object_id *oid;
 	uint32_t i = 0;
 
-	STAILQ_INIT(matched_ids);
-
 	if (prefix_len < 2)
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
@@ -703,16 +701,14 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 
 		err = got_object_qid_alloc_partial(&qid);
 		if (err)
-			break;
+			return err;
 		memcpy(qid->id.sha1, oid->sha1, SHA1_DIGEST_LENGTH);
 		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = &packidx->hdr.sorted_ids[++i];
 	}
 
-	if (err)
-		got_object_id_queue_free(matched_ids);
-	return err;
+	return NULL;
 }
 
 static void
