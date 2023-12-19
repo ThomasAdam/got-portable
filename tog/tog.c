@@ -3539,6 +3539,7 @@ close_log_view(struct tog_view *view)
 
 	free_commits(&s->limit_commits);
 	free_commits(&s->real_commits);
+	free_colors(&s->colors);
 	free(s->in_repo_path);
 	s->in_repo_path = NULL;
 	free(s->start_id);
@@ -3849,16 +3850,12 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 			goto done;
 		err = add_color(&s->colors, "^$", TOG_COLOR_AUTHOR,
 		    get_color_value("TOG_COLOR_AUTHOR"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 		err = add_color(&s->colors, "^$", TOG_COLOR_DATE,
 		    get_color_value("TOG_COLOR_DATE"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 	}
 
 	view->show = show_log_view;
