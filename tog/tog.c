@@ -8359,6 +8359,8 @@ done:
 	free(cwd);
 	free(commit_id);
 	free(label);
+	if (commit != NULL)
+		got_object_commit_close(commit);
 	if (ref)
 		got_ref_close(ref);
 	if (worktree != NULL)
