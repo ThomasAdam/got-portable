@@ -1809,7 +1809,6 @@ retry:
 				    "modifications");
 				goto done;
 			}
-			got_object_id_queue_free(&matched_ids);
 			goto retry;
 		}
 
@@ -1819,6 +1818,8 @@ retry:
 		    path_packidx, 0);
 		if (err)
 			break;
+
+		got_object_id_queue_free(&matched_ids);
 
 		err = got_packidx_match_id_str_prefix(&matched_ids,
 		    packidx, id_str_prefix);
