@@ -5606,8 +5606,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->last_displayed_line = view->nlines;
 	s->selected_line = 1;
 	s->repo = repo;
-	s->id1 = id1;
-	s->id2 = id2;
 	s->label1 = label1;
 	s->label2 = label2;
 
@@ -6196,6 +6194,8 @@ done:
 	free(keyword_idstr2);
 	free(label1);
 	free(label2);
+	free(id1);
+	free(id2);
 	free(repo_path);
 	free(cwd);
 	if (repo) {
