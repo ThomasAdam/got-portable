@@ -112,6 +112,7 @@ if [ "$build_status" -ne 0 ]; then
 	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	exit 0
 fi
+log_cmd build.log make server-install
 
 printf "\n\n\tRunning tests\n\n" >> build.log
 log_cmd regress.log env PATH=$HOME/bin:$PATH make regress GOT_TEST_ROOT="$testroot"
