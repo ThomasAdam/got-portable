@@ -695,7 +695,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		int cmp;
 
 		if (!got_sha1_digest_to_str(oid->sha1, id_str, sizeof(id_str)))
-		        return got_error(GOT_ERR_NO_SPACE);
+			return got_error(GOT_ERR_NO_SPACE);
 
 		cmp = strncmp(id_str, id_str_prefix, prefix_len);
 		if (cmp < 0) {
