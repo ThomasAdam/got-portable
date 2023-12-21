@@ -5304,7 +5304,7 @@ static const struct got_error *
 create_diff(struct tog_diff_view_state *s)
 {
 	const struct got_error *err = NULL;
-	FILE *f = NULL, *tmp_diff_file = NULL;
+	FILE *tmp_diff_file = NULL;
 	int obj_type;
 	struct got_diff_line *lines = NULL;
 	struct got_pathlist_head changed_paths;
@@ -5318,21 +5318,18 @@ create_diff(struct tog_diff_view_state *s)
 		return got_error_from_errno("malloc");
 	s->nlines = 0;
 
-	f = got_opentemp();
-	if (f == NULL) {
-		err = got_error_from_errno("got_opentemp");
-		goto done;
-	}
-	tmp_diff_file = got_opentemp();
-	if (tmp_diff_file == NULL) {
-		err = got_error_from_errno("got_opentemp");
-		goto done;
-	}
 	if (s->f && fclose(s->f) == EOF) {
-		err = got_error_from_errno("fclose");
-		goto done;
+		s->f = NULL;
+		return got_error_from_errno("fclose");
 	}
-	s->f = f;
+
+	s->f = got_opentemp();
+	if (s->f == NULL)
+		return got_error_from_errno("got_opentemp");
+
+	tmp_diff_file = got_opentemp();
+	if (tmp_diff_file == NULL)
+		return got_error_from_errno("got_opentemp");
 
 	if (s->id1)
 		err = got_object_get_type(&obj_type, s->repo, s->id1);
