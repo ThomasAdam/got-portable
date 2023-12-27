@@ -96,6 +96,7 @@ struct gotd_client {
 	struct event			 tmo;
 	uid_t				 euid;
 	gid_t				 egid;
+	char				*username;
 	struct gotd_child_proc		*repo;
 	struct gotd_child_proc		*auth;
 	struct gotd_child_proc		*session;
@@ -368,6 +369,7 @@ disconnect(struct gotd_client *client)
 		close(client->fd);
 	else if (client->iev.ibuf.fd != -1)
 		close(client->iev.ibuf.fd);
+	free(client->username);
 	free(client);
 	client_cnt--;
 }
@@ -1126,6 +1128,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	struct imsg imsg;
 	uint32_t client_id = 0;
 	int do_disconnect = 0;
+	size_t datalen;
 
 	client = find_client_by_proc_fd(fd);
 	if (client == NULL) {
@@ -1169,13 +1172,18 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 
 	evtimer_del(&client->tmo);
 
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
 	switch (imsg.hdr.type) {
 	case GOTD_IMSG_ERROR:
 		do_disconnect = 1;
 		err = gotd_imsg_recv_error(&client_id, &imsg);
 		break;
 	case GOTD_IMSG_ACCESS_GRANTED:
-		client->state = GOTD_CLIENT_STATE_ACCESS_GRANTED;
+		if (client->state != GOTD_CLIENT_STATE_NEW) {
+			do_disconnect = 1;
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+		}
 		break;
 	default:
 		do_disconnect = 1;
@@ -1188,14 +1196,24 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		log_debug("dropping imsg type %d from PID %d",
 		    imsg.hdr.type, client->auth->pid);
 	}
-	imsg_free(&imsg);
 
 	if (do_disconnect) {
 		if (err)
 			disconnect_on_error(client, err);
 		else
 			disconnect(client);
+		imsg_free(&imsg);
 		return;
+	}
+
+	client->state = GOTD_CLIENT_STATE_ACCESS_GRANTED;
+	if (datalen > 0)
+		client->username = strndup(imsg.data, datalen);
+	imsg_free(&imsg);
+	if (client->username == NULL &&
+	    asprintf(&client->username, "uid %d", client->euid) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
 	}
 
 	repo = gotd_find_repo_by_name(client->auth->repo_name, &gotd);
@@ -1205,8 +1223,8 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	}
 	kill_auth_proc(client);
 
-	log_info("authenticated uid %d for repository %s",
-	    client->euid, repo->name);
+	log_info("authenticated %s for repository %s",
+	    client->username, repo->name);
 
 	err = start_session_child(client, repo, gotd.argv0,
 	    gotd.confpath, gotd.daemonize, gotd.verbosity);
