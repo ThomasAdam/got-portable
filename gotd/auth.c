@@ -128,14 +128,16 @@ match_identifier(const char *identifier, gid_t *groups, int ngroups,
 }
 
 static const struct got_error *
-auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
-    uid_t euid, gid_t egid, int required_auth)
+auth_check(char **username, struct gotd_access_rule_list *rules,
+    const char *repo_name, uid_t euid, gid_t egid, int required_auth)
 {
 	struct gotd_access_rule *rule;
 	enum gotd_access access = GOTD_ACCESS_DENIED;
 	struct passwd *pw;
 	gid_t groups[NGROUPS_MAX];
 	int ngroups = NGROUPS_MAX;
+
+	*username = NULL;
 
 	pw = getpwuid(euid);
 	if (pw == NULL) {
@@ -144,6 +146,10 @@ auth_check(struct gotd_access_rule_list *rules, const char *repo_name,
 		else
 			return got_error_set_errno(EACCES, repo_name);
 	}
+
+	*username = strdup(pw->pw_name);
+	if (*username == NULL)
+		return got_error_from_errno("strdup");
 
 	if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) == -1)
 		log_warnx("group membership list truncated");
@@ -178,6 +184,9 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 	size_t datalen;
 	uid_t euid;
 	gid_t egid;
+	char *username = NULL;
+	size_t len;
+	const size_t maxlen = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
 
 	log_debug("authentication request received");
 
@@ -200,18 +209,23 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	log_debug("authenticating uid %d gid %d", euid, egid);
 
-	err = auth_check(&gotd_auth.repo->rules, gotd_auth.repo->name,
-	    iauth.euid, iauth.egid, iauth.required_auth);
+	err = auth_check(&username, &gotd_auth.repo->rules,
+	    gotd_auth.repo->name, iauth.euid, iauth.egid, iauth.required_auth);
 	if (err) {
 		gotd_imsg_send_error(ibuf, PROC_AUTH, iauth.client_id, err);
-		return err;
+		goto done;
 	}
 
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_ACCESS_GRANTED,
-	    PROC_AUTH, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg compose ACCESS_GRANTED");
+	len = strlen(username);
+	if (len > maxlen)
+		len = maxlen;
 
-	return NULL;
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_ACCESS_GRANTED,
+	    PROC_AUTH, -1, username, len) == -1)
+		err = got_error_from_errno("imsg compose ACCESS_GRANTED");
+done:
+	free(username);
+	return err;
 }
 
 static void
