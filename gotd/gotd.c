@@ -946,7 +946,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "new connection for uid %d from PID %d "
 			    "which is not the listen process",
-			    proc->pid, client->euid);
+			    client->euid, proc->pid);
 		} else
 			ret = 1;
 		break;
@@ -955,7 +955,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "authentication of uid %d from PID %d "
 			    "which is not the auth process",
-			    proc->pid, client->euid);
+			    client->euid, proc->pid);
 		} else
 			ret = 1;
 		break;
