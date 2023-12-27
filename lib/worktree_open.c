@@ -79,6 +79,10 @@ read_meta_file(char **content, const char *path_got, const char *name)
 		err = got_error_from_errno2("fstat", path);
 		goto done;
 	}
+	if (sb.st_size == 0) {
+		err = got_error_path(path, GOT_ERR_WORKTREE_META);
+		goto done;
+	}
 	*content = calloc(1, sb.st_size);
 	if (*content == NULL) {
 		err = got_error_from_errno("calloc");
