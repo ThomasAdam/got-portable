@@ -114,6 +114,7 @@ typedef struct {
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
 %token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
+%token	SUMMARY_COMMITS_DISPLAY SUMMARY_TAGS_DISPLAY
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -409,6 +410,22 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			new_srv->max_commits_display = $2;
 		}
+		| SUMMARY_COMMITS_DISPLAY NUMBER {
+			if ($2 < 1) {
+				yyerror("summary_commits_display is too small:"
+				    " %lld", $2);
+				YYERROR;
+			}
+			new_srv->summary_commits_display = $2;
+		}
+		| SUMMARY_TAGS_DISPLAY NUMBER {
+			if ($2 < 1) {
+				yyerror("summary_tags_display is too small:"
+				    " %lld", $2);
+				YYERROR;
+			}
+			new_srv->summary_tags_display = $2;
+		}
 		;
 
 serveropts2	: serveropts2 serveropts1 nl
@@ -479,6 +496,8 @@ lookup(char *s)
 		{ "site_name",			SITE_NAME },
 		{ "site_owner",			SITE_OWNER },
 		{ "socket",			SOCKET },
+		{ "summary_commits_display",	SUMMARY_COMMITS_DISPLAY },
+		{ "summary_tags_display",	SUMMARY_TAGS_DISPLAY },
 		{ "unix_socket",		UNIX_SOCKET },
 		{ "unix_socket_name",		UNIX_SOCKET_NAME },
 	};
@@ -910,6 +929,8 @@ conf_new_server(const char *name)
 
 	srv->max_repos_display = D_MAXREPODISP;
 	srv->max_commits_display = D_MAXCOMMITDISP;
+	srv->summary_commits_display = D_MAXSLCOMMDISP;
+	srv->summary_tags_display = D_MAXSLTAGDISP;
 	srv->max_repos = D_MAXREPO;
 
 	srv->unix_socket = 1;

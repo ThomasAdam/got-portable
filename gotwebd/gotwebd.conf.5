@@ -156,6 +156,10 @@ Set the displayed site name title.
 Set the displayed site owner.
 .It Ic show_site_owner Ar on | off
 Toggle display of the site owner.
+.It Ic summary_commits_display Ar number
+The maximum number of commits to show in the summary page.
+.It Ic summary_tags_display Ar number
+The maximum number of tags to show in the summary page.
 .El
 .Sh FILES
 .Bl -tag -width Ds -compact
@@ -198,6 +202,9 @@ server "localhost-unix" {
 	#max_repos   0
 	#max_repos_display  25
 	#max_commits_display  25
+
+	#summary_commits_display 10
+	#summary_tags_display 3
 }
 
 # Example server context for FCGI over TCP connections:
