@@ -36,7 +36,7 @@ Macros are not expanded inside quotes.
 For example:
 .Bd -literal -offset indent
 lan_addr = "192.168.0.1"
-listen on $lan_addr
+listen on $lan_addr port 9090
 .Ed
 .Pp
 Paths mentioned in
@@ -60,10 +60,15 @@ If not specified then
 will be used.
 .It Ic prefork Ar number
 Run the specified number of server processes.
+.Xr gotwebd 8
+runs 3 server processes by default.
 .It Ic unix_socket Ar on | off
 Controls whether the servers will listen on unix sockets by default.
+Listening on unix sockets is the default.
 .It Ic unix_socket_name Ar path
 Set the path to the default unix socket.
+Defaults to
+.Pa /var/www/run/gotweb.sock .
 .El
 .Sh SERVER CONFIGURATION
 At least one server context must exist for
@@ -87,12 +92,14 @@ The available server configuration directives are as follows:
 .Bl -tag -width Ds
 .It Ic custom_css Ar path
 Set the path to a custom Cascading Style Sheet (CSS) to be used.
-If this option is not specified then a default style sheet will be used.
+If this option is not specified then the default style sheet
+.Sq gotweb.css
+will be used.
 .It Ic listen on Ar address Ic port Ar number
-Configure an address and port for incoming FCGI TCP connections.
+Configure an address and port for incoming FastCGI connections.
 Valid
 .Ar address
-arguments are hostnames, IP4 addresses and IPv6 addresses.
+arguments are hostnames, IPv4 and IPv6 addresses.
 The
 .Ar port
 argument may be number or a service name defined in
@@ -107,37 +114,53 @@ Disable use of unix socket.
 Set the path to the unix socket used by the server.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
+Defaults to
+.Sq got.png .
 .It Ic logo_url Ar url
 Set a hyperlink for the logo.
+Defaults to
+.Lk https://gameoftrees.org .
 .It Ic max_commits_display Ar number
-Set the maximum amount of commits displayed per page.
+Set the maximum amount of commits and tags displayed per page.
+Defaults to 25.
 .It Ic max_repos Ar number
 Set the maximum amount of repositories
 .Xr gotwebd 8
 will work with.
+Defaults to 0, showing all repositories.
 .It Ic max_repos_display Ar number
 Set the maximum amount of repositories displayed on the index screen.
+Defaults to 25.
+Set to zero to show all the repositories without pagination.
 .It Ic repos_path Ar path
 Set the path to the directory which contains Git repositories that
 the server should publish.
+Defaults to
+.Pa /run/gotwebd.sock
+under the chroot.
 .It Ic respect_exportok Ar on | off
 Set whether to display the repository only if it contains the magic
 .Pa git-daemon-export-ok
 file.
+Disabled by default.
 .It Ic show_repo_age Ar on | off
 Toggle display of last repository modification date.
+Enabled by default.
 .It Ic show_repo_cloneurl Ar on | off
 Toggle display of clone URLs for a repository.
 This requires the creation of a
 .Pa cloneurl
 file inside the repository which contains one URL per line.
+Enabled by default.
 .It Ic show_repo_description Ar on | off
 Toggle display of the repository description.
+Enabled by default.
 The
 .Pa description
 file in the repository should be updated with an appropriate description.
 .It Ic show_repo_owner Ar on | off
 Set whether to display the repository owner.
+Enabled by default.
 Displaying the owner requires owner information to be added to the
 .Pa config
 file in the repository.
@@ -150,16 +173,25 @@ owner = "Your Name"
 .Ed
 .It Ic site_link Ar string
 Set the displayed site link name for the index page.
+Defaults to
+.Sq Repos .
 .It Ic site_name Ar string
 Set the displayed site name title.
+Defaults to
+.Sq Gotweb .
 .It Ic site_owner Ar string
 Set the displayed site owner.
+Defaults to
+.Sq Got Owner .
 .It Ic show_site_owner Ar on | off
 Toggle display of the site owner.
+Enabled by default.
 .It Ic summary_commits_display Ar number
 The maximum number of commits to show in the summary page.
+Defaults to 10.
 .It Ic summary_tags_display Ar number
 The maximum number of tags to show in the summary page.
+Defaults to 3.
 .El
 .Sh FILES
 .Bl -tag -width Ds -compact
@@ -169,51 +201,25 @@ Default location of the
 configuration file.
 .El
 .Sh EXAMPLES
-These are the currently configurable items for
-.Xr gotwebd 8
-with their default values.
+A sample configuration:
 .Bd -literal -offset indent
-#
-# gotwebd options
-# all paths relative to /var/www (httpd chroot jail)
-#
-
-prefork 3
-
-server "localhost-unix" {
-	repos_path "/got/public"
-	listen on socket "/run/gotweb.sock"
-
-	site_name       "my public repos"
-	site_owner      "Got Owner"
-	site_link       "repos"
-
-	logo   "got.png"
-	logo_url   "https://gameoftrees.org"
-
-	# on by default
-	#show_site_owner  on
-	#show_repo_owner  on
-	#show_repo_age  on
-	#show_repo_description on
-	#show_repo_cloneurl  on
-	#respect_exportok off
-
-	#max_repos   0
-	#max_repos_display  25
-	#max_commits_display  25
-
-	#summary_commits_display 10
-	#summary_tags_display 3
+server "localhost" {
+	site_name	"my public repos"
+	site_owner	"Flan Hacker"
+	site_link	"Flan' Projects"
 }
-
-# Example server context for FCGI over TCP connections:
-#server "localhost-tcp" {
-#	repos_path "/got/public"
-#	listen on socket off
-#	listen on 127.0.0.1 port 9000
-#	listen on ::1 port 9000
-#}
+.Ed
+.Pp
+Another example, this time listening on a local port instead of the
+implicit
+.Ux
+socket.
+.Bd -literal -offset indent
+server "localhost" {
+	listen on socket off
+	listen on 127.0.0.1 port 9000
+	listen on ::1 port 9000
+}
 .Ed
 .Sh SEE ALSO
 .Xr got 1 ,
