@@ -59,7 +59,6 @@ static const struct querystring_keys querystring_keys[] = {
 	{ "headref",		HEADREF },
 	{ "index_page",		INDEX_PAGE },
 	{ "path",		PATH },
-	{ "page",		PAGE },
 };
 
 static const struct action_keys action_keys[] = {
@@ -231,7 +230,6 @@ gotweb_process_request(struct request *c)
 		if (binary) {
 			struct gotweb_url url = {
 				.index_page = -1,
-				.page = -1,
 				.action = BLOBRAW,
 				.path = qs->path,
 				.commit = qs->commit,
@@ -642,19 +640,6 @@ qa_found:
 				goto done;
 			}
 			break;
-		case PAGE:
-			if (*value == '\0')
-				break;
-			(*qs)->page = strtonum(value, INT64_MIN,
-			    INT64_MAX, &errstr);
-			if (errstr) {
-				error = got_error_from_errno3(__func__,
-				    "strtonum", errstr);
-				goto done;
-			}
-			if ((*qs)->page < 0)
-				(*qs)->page = 0;
-			break;
 		}
 
 		/* entry found */
@@ -775,7 +760,6 @@ gotweb_index_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
 		*prev = (struct gotweb_url){
 			.action = -1,
 			.index_page = qs->index_page - 1,
-			.page = -1,
 		};
 	}
 	if (t->next_disp == srv->max_repos_display &&
@@ -785,7 +769,6 @@ gotweb_index_navs(struct request *c, struct gotweb_url *prev, int *have_prev,
 		*next = (struct gotweb_url){
 			.action = -1,
 			.index_page = qs->index_page + 1,
-			.page = -1,
 		};
 	}
 }
@@ -1064,12 +1047,6 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		r = tp_writef(c->tp, "%spath=%s", sep, tmp);
 		free(tmp);
 		if (r == -1)
-			return -1;
-		sep = "&";
-	}
-
-	if (url->page != -1) {
-		if (tp_writef(c->tp, "%spage=%d", sep, url->page) == -1)
 			return -1;
 		sep = "&";
 	}

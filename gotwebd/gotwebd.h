@@ -385,7 +385,6 @@ struct gotwebd {
 struct gotweb_url {
 	int		 action;
 	int		 index_page;
-	int		 page;
 	const char	*commit;
 	const char	*previd;
 	const char	*prevset;
@@ -405,7 +404,6 @@ struct querystring {
 	char		*headref;
 	int		 index_page;
 	char		*path;
-	int		 page;
 };
 
 struct querystring_keys {
@@ -426,7 +424,6 @@ enum querystring_elements {
 	HEADREF,
 	INDEX_PAGE,
 	PATH,
-	PAGE,
 };
 
 enum query_actions {
