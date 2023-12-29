@@ -75,7 +75,6 @@
 #define D_SHOWDESC		 1
 #define D_SHOWURL		 1
 #define D_RESPECTEXPORTOK	 0
-#define D_MAXREPO		 0
 #define D_MAXREPODISP		 25
 #define D_MAXSLCOMMDISP		 10
 #define D_MAXCOMMITDISP		 25
@@ -298,7 +297,6 @@ struct server {
 	char		 logo_url[GOTWEBD_MAXTEXT];
 	char		 custom_css[PATH_MAX];
 
-	size_t		 max_repos;
 	size_t		 max_repos_display;
 	size_t		 max_commits_display;
 	size_t		 summary_commits_display;
