@@ -791,9 +791,6 @@ gotweb_render_index(struct template *tp)
 		return -1;
 
 	for (d_i = 0; d_i < t->nrepos; d_i++) {
-		if (srv->max_repos > 0 && t->prev_disp == srv->max_repos)
-			break;
-
 		if (strcmp(sd_dent[d_i]->d_name, ".") == 0 ||
 		    strcmp(sd_dent[d_i]->d_name, "..") == 0) {
 			d_skipped++;
@@ -847,11 +844,7 @@ gotweb_render_index(struct template *tp)
 	}
 	t->repos_total = t->nrepos - d_skipped;
 
-	if (srv->max_repos_display == 0)
-		return 0;
-	if (srv->max_repos > 0 && srv->max_repos < srv->max_repos_display)
-		return 0;
-	if (t->repos_total <= srv->max_repos ||
+	if (srv->max_repos_display == 0 ||
 	    t->repos_total <= srv->max_repos_display)
 		return 0;
 

@@ -109,7 +109,7 @@ typedef struct {
 
 %}
 
-%token	LISTEN WWW_PATH MAX_REPOS SITE_NAME SITE_OWNER SITE_LINK LOGO
+%token	LISTEN WWW_PATH SITE_NAME SITE_OWNER SITE_LINK LOGO
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
@@ -369,13 +369,6 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			free($4);
 		}
-		| MAX_REPOS NUMBER {
-			if ($2 <= 0) {
-				yyerror("max_repos is too small: %lld", $2);
-				YYERROR;
-			}
-			new_srv->max_repos = $2;
-		}
 		| SHOW_SITE_OWNER boolean {
 			new_srv->show_site_owner = $2;
 		}
@@ -479,7 +472,6 @@ lookup(char *s)
 		{ "logo",			LOGO },
 		{ "logo_url",			LOGO_URL },
 		{ "max_commits_display",	MAX_COMMITS_DISPLAY },
-		{ "max_repos",			MAX_REPOS },
 		{ "max_repos_display",		MAX_REPOS_DISPLAY },
 		{ "on",				ON },
 		{ "port",			PORT },
@@ -931,7 +923,6 @@ conf_new_server(const char *name)
 	srv->max_commits_display = D_MAXCOMMITDISP;
 	srv->summary_commits_display = D_MAXSLCOMMDISP;
 	srv->summary_tags_display = D_MAXSLTAGDISP;
-	srv->max_repos = D_MAXREPO;
 
 	srv->unix_socket = 1;
 	srv->fcgi_socket = 0;
