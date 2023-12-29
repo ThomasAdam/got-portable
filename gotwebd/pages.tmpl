@@ -113,7 +113,6 @@ nextsep(char *s, char **t)
 
 	memset(&url, 0, sizeof(url));
 	url.index_page = -1;
-	url.page = -1;
 	url.action = TREE;
 	url.path = qs->path;
 	url.commit = qs->commit;
@@ -172,7 +171,6 @@ nextsep(char *s, char **t)
 
 	memset(&u_path, 0, sizeof(u_path));
 	u_path.index_page = -1;
-	u_path.page = -1;
 	u_path.action = SUMMARY;
 !}
 <!doctype html>
@@ -280,32 +278,26 @@ nextsep(char *s, char **t)
 	struct gotweb_url summary = {
 		.action = SUMMARY,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	}, briefs = {
 		.action = BRIEFS,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	}, commits = {
 		.action = COMMITS,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	}, tags = {
 		.action = TAGS,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	}, tree = {
 		.action = TREE,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	}, rss = {
 		.action = RSS,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	};
 !}
@@ -360,21 +352,18 @@ nextsep(char *s, char **t)
 	diff_url = (struct gotweb_url){
 		.action = DIFF,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.headref = qs->headref,
 	};
 	patch_url = (struct gotweb_url){
 		.action = PATCH,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.headref = qs->headref,
 	};
 	tree_url = (struct gotweb_url){
 		.action = TREE,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.headref = qs->headref,
 	};
@@ -518,19 +507,16 @@ nextsep(char *s, char **t)
 	diff = (struct gotweb_url){
 		.action = DIFF,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	};
 	patch = (struct gotweb_url){
 		.action = PATCH,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	};
 	tree = (struct gotweb_url){
 		.action = TREE,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	};
 !}
@@ -591,7 +577,6 @@ nextsep(char *s, char **t)
 
 	memset(&briefs_url, 0, sizeof(briefs_url));
 	briefs_url.index_page = -1,
-	briefs_url.page = -1,
 	briefs_url.action = BRIEFS,
 	briefs_url.path = qs->path,
 	briefs_url.commit = qs->commit,
@@ -684,7 +669,6 @@ nextsep(char *s, char **t)
 
 	memset(&url, 0, sizeof(url));
 	url.index_page = -1;
-	url.page = -1;
 	url.action = BLOB;
 	url.path = t->qs->path;
 	url.file = readme;
@@ -762,7 +746,6 @@ nextsep(char *s, char **t)
 	mode_t			 mode;
 	struct gotweb_url	 url = {
 	       .index_page = -1,
-	       .page = -1,
 	       .commit = rc->commit_id,
 	       .path = qs->path,
 	};
@@ -865,7 +848,6 @@ nextsep(char *s, char **t)
 	struct gotweb_url	 url = {
 		.action = TAG,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.commit = rt->commit_id,
 	};
@@ -957,7 +939,6 @@ nextsep(char *s, char **t)
 	struct gotweb_url	 patch_url, tree_url = {
 		.action = TREE,
 		.index_page = -1,
-		.page = -1,
 		.path = qs->path,
 		.commit = rc->commit_id,
 	};
@@ -1065,7 +1046,6 @@ nextsep(char *s, char **t)
 	struct gotweb_url	 url = {
 		.action = SUMMARY,
 		.index_page = -1,
-		.page = -1,
 		.path = qs->path,
 	};
 
@@ -1153,7 +1133,6 @@ nextsep(char *s, char **t)
 
 	memset(&briefs_url, 0, sizeof(briefs_url));
 	briefs_url.index_page = -1,
-	briefs_url.page = -1,
 	briefs_url.action = BRIEFS,
 	briefs_url.path = qs->path,
 	briefs_url.commit = qs->commit,
@@ -1218,7 +1197,6 @@ nextsep(char *s, char **t)
 	struct gotweb_url	 url = {
 		.action = DIFF,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.commit = bline->id_str,
 	};
@@ -1289,7 +1267,6 @@ date: {{ datebuf }} {{ "\n" }}
 	struct gotweb_url	 summary = {
 		.action = SUMMARY,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 	};
 !}
@@ -1324,7 +1301,6 @@ date: {{ datebuf }} {{ "\n" }}
 	struct gotweb_url	 tag = {
 		.action = TAG,
 		.index_page = -1,
-		.page = -1,
 		.path = repo_dir->name,
 		.commit = rt->commit_id,
 	};
