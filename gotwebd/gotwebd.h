@@ -301,6 +301,8 @@ struct server {
 	size_t		 max_repos;
 	size_t		 max_repos_display;
 	size_t		 max_commits_display;
+	size_t		 summary_commits_display;
+	size_t		 summary_tags_display;
 
 	int		 show_site_owner;
 	int		 show_repo_owner;

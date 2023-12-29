@@ -346,11 +346,11 @@ gotweb_process_request(struct request *c)
 			    error->msg);
 			goto err;
 		}
-		error = got_get_repo_commits(c, D_MAXSLCOMMDISP);
+		error = got_get_repo_commits(c, srv->summary_commits_display);
 		if (error)
 			goto err;
 		qs->action = TAGS;
-		error = got_get_repo_tags(c, D_MAXSLTAGDISP);
+		error = got_get_repo_tags(c, srv->summary_tags_display);
 		if (error) {
 			log_warnx("%s: got_get_repo_tags: %s", __func__,
 			    error->msg);
