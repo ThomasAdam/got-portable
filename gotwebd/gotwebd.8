@@ -139,37 +139,43 @@ Directory for temporary files created by
 Example configuration for
 .Xr httpd.conf 5 :
 .Bd -literal -offset indent
-  types { include "/usr/share/misc/mime.types" }
+types { include "/usr/share/misc/mime.types" }
 
-  # one gotwebd reachable at http://gotweb1.example.com/
-  server "gotweb1.example.com" {
-        listen on * port 80
-        root "/htdocs/gotwebd"
-        location "/" {
-              fastcgi socket "/run/gotweb.sock"
-        }
-  }
+server "example.com" {
+	listen on * port 80
+	root "/htdocs/gotwebd"
+	location "/" {
+		fastcgi socket "/run/gotweb.sock"
+	}
+}
+.Ed
+.Pp
+Hosting multiple
+.Nm gotwebd
+instances on the same HTTP server under different path prefixes, with
+the first reached via the default
+.Ux Ns -domain socket, the second configured to listen on localhost
+port 9000:
+.Bd -literal -offset indent
+server "example.com" {
+	listen on * port 80
 
-  # hosting multiple gotwebd instances on the same HTTP server:
-  # http://gotweb2.example.com/gotwebd-unix/
-  # http://gotweb2.example.com/gotwebd-tcp/
-  server "gotweb2.example.com" {
-        listen on * port 80
-        location "/gotwebd-unix/" {
-              fastcgi socket "/run/gotweb.sock"
-        }
-        location "/gotwebd-unix/*" {
-               root "/htdocs/gotwebd"
-               request strip 1
-        }
-        location "/gotwebd-tcp/" {
-              fastcgi socket tcp 127.0.0.1 9000
-        }
-        location "/gotwebd-tcp/*" {
-               root "/htdocs/gotwebd"
-               request strip 1
-        }
-  }
+	location "/gotwebd-unix/" {
+		fastcgi socket "/run/gotweb.sock"
+	}
+	location "/gotwebd-unix/*" {
+		root "/htdocs/gotwebd"
+		request strip 1
+	}
+
+	location "/gotwebd-tcp/" {
+		fastcgi socket tcp localhost 9000
+	}
+	location "/gotwebd-tcp/*" {
+		root "/htdocs/gotwebd"
+		request strip 1
+	}
+}
 .Ed
 .Sh SEE ALSO
 .Xr got 1 ,
