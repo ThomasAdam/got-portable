@@ -2154,6 +2154,23 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	return err;
 }
 
+const struct got_error *
+got_repo_find_object_id(struct got_object_id *id, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object_id *matched_id = NULL;
+	char *id_str = NULL;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_repo_match_object_id_prefix(&matched_id, id_str,
+	    GOT_OBJ_TYPE_ANY, repo);
+	free(id_str);
+	return err;
+}
+
 static const struct got_error *
 alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
     const char *name, mode_t mode, struct got_object_id *blob_id)
