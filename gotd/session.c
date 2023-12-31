@@ -409,7 +409,6 @@ update_ref(int *shut, struct gotd_session_client *client,
 	struct gotd_imsg_ref_update iref;
 	struct got_object_id old_id, new_id;
 	struct got_object_id *id = NULL;
-	struct got_object *obj = NULL;
 	char *refname = NULL;
 	size_t datalen;
 	int locked = 0;
@@ -439,8 +438,8 @@ update_ref(int *shut, struct gotd_session_client *client,
 
 	memcpy(old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
 	memcpy(new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
-	err = got_object_open(&obj, repo,
-	    iref.delete_ref ? &old_id : &new_id);
+	err = got_repo_find_object_id(iref.delete_ref ? &old_id : &new_id,
+	    repo);
 	if (err)
 		goto done;
 
@@ -559,8 +558,6 @@ done:
 	}
 	if (ref)
 		got_ref_close(ref);
-	if (obj)
-		got_object_close(obj);
 	if (repo)
 		got_repo_close(repo);
 	free(refname);
