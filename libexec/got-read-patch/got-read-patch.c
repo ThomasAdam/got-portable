@@ -592,18 +592,11 @@ done:
 }
 
 static const struct got_error *
-read_patch(struct imsgbuf *ibuf, int fd)
+read_patch(struct imsgbuf *ibuf, FILE *fp)
 {
 	const struct got_error *err = NULL;
-	FILE *fp;
 	int git, patch_found = 0;
 	char *cid = NULL;
-
-	if ((fp = fdopen(fd, "r")) == NULL) {
-		err = got_error_from_errno("fdopen");
-		close(fd);
-		return err;
-	}
 
 	while ((err = patch_start(&git, &cid, fp)) == NULL) {
 		int done, next;
@@ -628,7 +621,6 @@ read_patch(struct imsgbuf *ibuf, int fd)
 	}
 
 done:
-	fclose(fp);
 	free(cid);
 
 	/* ignore trailing gibberish */
@@ -643,6 +635,8 @@ main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
+	FILE *fp = NULL;
+	int fd = -1;
 #if 0
 	static int attached;
 	while (!attached)
@@ -662,12 +656,24 @@ main(int argc, char **argv)
 	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 	if (err)
 		goto done;
-	if (imsg.hdr.type != GOT_IMSG_PATCH_FILE || imsg.fd == -1) {
+	if (imsg.hdr.type != GOT_IMSG_PATCH_FILE) {
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		goto done;
 	}
+	fd = imsg_get_fd(&imsg);
+	if (fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
 
-	err = read_patch(&ibuf, imsg.fd);
+	fp = fdopen(fd, "r");
+	if (fp == NULL) {
+		err = got_error_from_errno("fdopen");
+		goto done;
+	}
+	fd = -1;
+
+	err = read_patch(&ibuf, fp);
 	if (err)
 		goto done;
 	if (imsg_compose(&ibuf, GOT_IMSG_PATCH_EOF, 0, 0, -1,
@@ -678,6 +684,10 @@ main(int argc, char **argv)
 	err = got_privsep_flush_imsg(&ibuf);
 done:
 	imsg_free(&imsg);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fp != NULL && fclose(fp) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (err != NULL) {
 		got_privsep_send_error(&ibuf, err);
 		err = NULL;
