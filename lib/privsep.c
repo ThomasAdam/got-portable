@@ -2274,8 +2274,8 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_GITCONFIG_REMOTES:
 		if (datalen != sizeof(iremotes)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
+			imsg_free(&imsg);
+			return got_error(GOT_ERR_PRIVSEP_LEN);
 		}
 		memcpy(&iremotes, imsg.data, sizeof(iremotes));
 		if (iremotes.nremotes == 0) {
