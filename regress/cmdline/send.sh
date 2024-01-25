@@ -1556,6 +1556,52 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_gitconfig() {
+	local testroot=`test_init send_config`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	git init -q --bare $testroot/upstream-repo
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git init failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+cat >> $testroot/repo/.git/config <<EOF
+[remote "hasnourl"]
+	unrelated = setting
+[remote "foo"]
+	url = $testurl/upstream-repo
+[remote "another"]
+	url = $testurl/some-other-repo
+EOF
+
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_IGNORE_GITCONFIG && got send -q -r $testroot/repo foo)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/upstream-repo > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<-EOF
+		HEAD: refs/heads/master
+		refs/heads/master: $commit_id
+		EOF
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_send_rejected() {
 	local testroot=`test_init send_rejected`
 	local testurl=ssh://127.0.0.1/$testroot
@@ -1633,4 +1679,5 @@ run_test test_send_all_branches
 run_test test_send_to_empty_repo
 run_test test_send_and_fetch_config
 run_test test_send_config
+run_test test_send_gitconfig
 run_test test_send_rejected

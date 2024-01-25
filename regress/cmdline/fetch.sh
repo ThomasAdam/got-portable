@@ -1381,6 +1381,49 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_fetch_gitconfig_remote_repo() {
+	local testroot=`test_init fetch_gotconfig_remote_repo`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	make_single_file_repo $testroot/alternate-repo foo
+	local alt_commit_id=`git_show_head $testroot/alternate-repo`
+
+cat >> $testroot/repo/.git/config <<EOF
+[remote "hasnourl"]
+	unrelated = setting
+[remote "alt"]
+	url = $testurl/alternate-repo
+[remote "another"]
+	url = $testurl/some-other-repo
+EOF
+
+	# unset in a subshell to avoid affecting our environment
+	(unset GOT_IGNORE_GITCONFIG && cd $testroot/repo && got fetch -q alt)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<-EOF
+		HEAD: refs/heads/master
+		refs/heads/master: $commit_id
+		refs/remotes/alt/HEAD: refs/remotes/alt/master
+		refs/remotes/alt/master: $alt_commit_id
+		EOF
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_fetch_delete_remote_refs() {
 	local testroot=`test_init fetch_delete_remote_refs`
 	local testurl=ssh://127.0.0.1/$testroot
@@ -1991,6 +2034,7 @@ run_test test_fetch_replace_symref
 run_test test_fetch_update_headref
 run_test test_fetch_headref_deleted_locally
 run_test test_fetch_gotconfig_remote_repo
+run_test test_fetch_gitconfig_remote_repo
 run_test test_fetch_delete_remote_refs
 run_test test_fetch_honor_wt_conf_bflag
 run_test test_fetch_from_out_of_date_remote
