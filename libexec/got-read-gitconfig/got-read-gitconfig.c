@@ -195,6 +195,17 @@ get_boolean_val(char *val)
 	strcmp(val, "1") == 0);
 }
 
+static int
+skip_node(struct got_gitconfig *gitconfig, struct got_gitconfig_list_node *node)
+{
+	/*
+	 * Skip config nodes which do not describe remotes, and remotes
+	 * which do not have a fetch URL defined (as used by git-annex).
+	 */
+	return (strncasecmp("remote \"", node->field, 8) != 0 ||
+	    got_gitconfig_get_str(gitconfig, node->field, "url") == NULL);
+}
+
 static const struct got_error *
 gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 {
@@ -212,7 +223,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 		return err;
 
 	TAILQ_FOREACH(node, &sections->fields, link) {
-		if (strncasecmp("remote \"", node->field, 8) != 0)
+		if (skip_node(gitconfig, node))
 			continue;
 		nremotes++;
 	}
@@ -232,7 +243,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 	TAILQ_FOREACH(node, &sections->fields, link) {
 		char *name, *end, *mirror;
 
-		if (strncasecmp("remote \"", node->field, 8) != 0)
+		if (skip_node(gitconfig, node))
 			continue;
 
 		name = strdup(node->field + 8);
@@ -247,20 +258,11 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 
 		remotes[i].fetch_url = got_gitconfig_get_str(gitconfig,
 		    node->field, "url");
-		if (remotes[i].fetch_url == NULL) {
-			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
-			goto done;
-		}
 
 		remotes[i].send_url = got_gitconfig_get_str(gitconfig,
 		    node->field, "pushurl");
 		if (remotes[i].send_url == NULL)
-			remotes[i].send_url = got_gitconfig_get_str(gitconfig,
-			    node->field, "url");
-		if (remotes[i].send_url == NULL) {
-			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
-			goto done;
-		}
+			remotes[i].send_url = remotes[i].fetch_url;
 
 		remotes[i].mirror_references = 0;
 		mirror = got_gitconfig_get_str(gitconfig, node->field,
