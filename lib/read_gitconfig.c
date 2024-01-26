@@ -50,6 +50,18 @@ get_boolean_val(char *val)
 	strcmp(val, "1") == 0);
 }
 
+static int
+skip_node(struct got_gitconfig *gitconfig,
+    struct got_gitconfig_list_node *node)
+{
+	/*
+	 * Skip config nodes which do not describe remotes, and remotes
+	 * which do not have a fetch URL defined (as used by git-annex).
+	 */
+	return (strncasecmp("remote \"", node->field, 8) != 0 ||
+	    got_gitconfig_get_str(gitconfig, node->field, "url") == NULL);
+}
+
 const struct got_error *
 got_repo_read_gitconfig(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
@@ -178,7 +190,7 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 		if (err)
 			return err;
 		TAILQ_FOREACH(node, &sections->fields, link) {
-			if (strncasecmp("remote \"", node->field, 8) != 0)
+			if (skip_node(gitconfig, node))
 				continue;
 			nalloc++;
 		}
@@ -195,7 +207,7 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			char *name, *end, *mirror;
 			const char *fetch_url, *send_url;
 
-			if (strncasecmp("remote \"", node->field, 8) != 0)
+			if (skip_node(gitconfig, node) != 0)
 				continue;
 
 			remote = &(*remotes)[i];
@@ -212,12 +224,6 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 
 			fetch_url = got_gitconfig_get_str(gitconfig,
 			    node->field, "url");
-			if (fetch_url == NULL) {
-				err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
-				free(remote->name);
-				remote->name = NULL;
-				goto done;
-			}
 			remote->fetch_url = strdup(fetch_url);
 			if (remote->fetch_url == NULL) {
 				err = got_error_from_errno("strdup");
@@ -231,14 +237,6 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			if (send_url == NULL)
 				send_url = got_gitconfig_get_str(gitconfig,
 				    node->field, "url");
-			if (send_url == NULL) {
-				err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
-				free(remote->name);
-				remote->name = NULL;
-				free(remote->fetch_url);
-				remote->fetch_url = NULL;
-				goto done;
-			}
 			remote->send_url = strdup(send_url);
 			if (remote->send_url == NULL) {
 				err = got_error_from_errno("strdup");
