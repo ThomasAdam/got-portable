@@ -161,6 +161,7 @@ main(int argc, char *argv[])
 			err = got_error_from_errno("fdopen");
 			goto done;
 		}
+		fd = -1;
 
 		if (obj->size + obj->hdrlen <=
 		    GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
@@ -186,17 +187,12 @@ main(int argc, char *argv[])
 		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen, buf);
 done:
 		free(buf);
-		if (f) {
-			if (fclose(f) == EOF && err == NULL)
-				err = got_error_from_errno("fclose");
-		} else if (fd != -1) {
-			if (close(fd) == -1 && err == NULL)
-				err = got_error_from_errno("close");
-		}
-		if (outfd != -1) {
-			if (close(outfd) == -1 && err == NULL)
-				err = got_error_from_errno("close");
-		}
+		if (f && fclose(f) == EOF && err == NULL)
+			err = got_error_from_errno("fclose");
+		if (fd != -1 && close(fd) == -1 && err == NULL)
+			err = got_error_from_errno("close");
+		if (outfd != -1 && close(outfd) == -1 && err == NULL)
+			err = got_error_from_errno("close");
 
 		imsg_free(&imsg);
 		imsg_free(&imsg_outfd);
