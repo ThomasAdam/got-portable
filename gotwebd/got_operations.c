@@ -1005,8 +1005,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	bca.lines = NULL;
 	bca.cb = cb;
 
-	if (asprintf(&path, "%s%s%s", qs->folder ? qs->folder : "",
-	    qs->folder ? "/" : "", qs->file) == -1) {
+	if (asprintf(&path, "%s/%s", qs->folder, qs->file) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
