@@ -267,11 +267,12 @@ list_refs(struct imsg *imsg)
 	size_t datalen;
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
-	int client_fd = imsg->fd;
+	int client_fd;
 	struct got_object_id *head_target_id = NULL;
 
 	TAILQ_INIT(&refs);
 
+	client_fd = imsg_get_fd(imsg);
 	if (client_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
@@ -562,9 +563,6 @@ receive_delta_cache_fd(struct imsg *imsg,
 
 	log_debug("receiving delta cache file");
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ireq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -573,7 +571,10 @@ receive_delta_cache_fd(struct imsg *imsg,
 	if (client->delta_cache_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	client->delta_cache_fd = imsg->fd;
+	client->delta_cache_fd = imsg_get_fd(imsg);
+	if (client->delta_cache_fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	client->report_progress = ireq.report_progress;
 	return NULL;
 }
@@ -587,9 +588,6 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	log_debug("receiving pack pipe descriptor");
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ireq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -598,7 +596,10 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (client->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	client->pack_pipe = imsg->fd;
+	client->pack_pipe = imsg_get_fd(imsg);
+	if (client->pack_pipe == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	return NULL;
 }
 
@@ -776,13 +777,13 @@ recv_connect(struct imsg *imsg)
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	if (repo_read.session_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	repo_read.session_fd = imsg->fd;
+	repo_read.session_fd = imsg_get_fd(imsg);
+	if (repo_read.session_fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	imsg_init(&iev->ibuf, repo_read.session_fd);
 	iev->handler = repo_read_dispatch_session;

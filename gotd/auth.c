@@ -187,6 +187,7 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 	char *username = NULL;
 	size_t len;
 	const size_t maxlen = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
+	int fd = -1;
 
 	log_debug("authentication request received");
 
@@ -196,10 +197,11 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	memcpy(&iauth, imsg->data, datalen);
 
-	if (imsg->fd == -1)
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	if (getpeereid(imsg->fd, &euid, &egid) == -1)
+	if (getpeereid(fd, &euid, &egid) == -1)
 		return got_error_from_errno("getpeerid");
 
 	if (iauth.euid != euid)

@@ -1304,12 +1304,11 @@ recv_connect(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iconnect, imsg->data, sizeof(iconnect));
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
-	client->fd = imsg->fd;
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
+	client->fd = imsg_get_fd(imsg);
+	if (client->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	imsg_init(&client->iev.ibuf, client->fd);
 	client->iev.handler = session_dispatch_client;
@@ -1329,6 +1328,7 @@ recv_repo_child(struct imsg *imsg)
 	struct gotd_imsg_connect_repo_child ichild;
 	struct gotd_session_client *client = &gotd_session_client;
 	size_t datalen;
+	int fd;
 
 	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
@@ -1352,10 +1352,11 @@ recv_repo_child(struct imsg *imsg)
 		return got_error_msg(GOT_ERR_PRIVSEP_MSG,
 		    "bad child process type");
 
-	if (imsg->fd == -1)
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&client->repo_child_iev.ibuf, imsg->fd);
+	imsg_init(&client->repo_child_iev.ibuf, fd);
 	client->repo_child_iev.handler = session_dispatch_repo_child;
 	client->repo_child_iev.events = EV_READ;
 	client->repo_child_iev.handler_arg = NULL;

@@ -241,10 +241,11 @@ list_refs(struct imsg *imsg)
 	size_t datalen;
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
-	int client_fd = imsg->fd;
+	int client_fd;
 
 	TAILQ_INIT(&refs);
 
+	client_fd = imsg_get_fd(imsg);
 	if (client_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
@@ -1225,12 +1226,12 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 
 	imsg_init(&ibuf, client->fd);
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
 	pack = &client->pack;
 	memset(pack, 0, sizeof(*pack));
-	pack->fd = imsg->fd;
+	pack->fd = imsg_get_fd(imsg);
+	if (pack->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	err = got_delta_cache_alloc(&pack->delta_cache);
 	if (err)
 		return err;
@@ -1591,9 +1592,6 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	log_debug("receiving pack pipe descriptor");
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ireq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -1602,7 +1600,10 @@ receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (client->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	client->pack_pipe = imsg->fd;
+	client->pack_pipe = imsg_get_fd(imsg);
+	if (client->pack_pipe == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	return NULL;
 }
 
@@ -1615,9 +1616,6 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	log_debug("receiving pack index output file");
 
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ireq))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -1626,7 +1624,10 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (client->packidx_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	client->packidx_fd = imsg->fd;
+	client->packidx_fd = imsg_get_fd(imsg);
+	if (client->packidx_fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	return NULL;
 }
 
@@ -1754,13 +1755,13 @@ recv_connect(struct imsg *imsg)
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	if (imsg->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	if (repo_write.session_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	repo_write.session_fd = imsg->fd;
+	repo_write.session_fd = imsg_get_fd(imsg);
+	if (repo_write.session_fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	imsg_init(&iev->ibuf, repo_write.session_fd);
 	iev->handler = repo_write_dispatch_session;

@@ -140,7 +140,7 @@ main(int argc, char **argv)
 		goto done;
 	}
 	memcpy(pack_hash, imsg.data, sizeof(pack_hash));
-	pack.fd = imsg.fd;
+	pack.fd = imsg_get_fd(&imsg);
 
 	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 	if (err)
@@ -155,7 +155,7 @@ main(int argc, char **argv)
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	idxfd = imsg.fd;
+	idxfd = imsg_get_fd(&imsg);
 
 	for (i = 0; i < nitems(tmpfiles); i++) {
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
@@ -171,7 +171,7 @@ main(int argc, char **argv)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		tmpfd = imsg.fd;
+		tmpfd = imsg_get_fd(&imsg);
 		tmpfiles[i] = fdopen(tmpfd, "w+");
 		if (tmpfiles[i] == NULL) {
 			err = got_error_from_errno("fdopen");

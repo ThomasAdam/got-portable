@@ -121,6 +121,8 @@ main(int argc, char *argv[])
 #endif
 
 	for (;;) {
+		int fd = -1, outfd = -1;
+
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
 			break;
@@ -149,12 +151,13 @@ main(int argc, char *argv[])
 		}
 		memcpy(&expected_id, imsg.data, sizeof(expected_id));
 
-		if (imsg.fd == -1) {
+		fd = imsg_get_fd(&imsg);
+		if (fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
 
-		err = got_object_read_header(&obj, imsg.fd);
+		err = got_object_read_header(&obj, fd);
 		if (err)
 			goto done;
 
@@ -185,15 +188,16 @@ main(int argc, char *argv[])
 				imsg_free(&imsg_outfd);
 				goto done;
 			}
-			if (imsg_outfd.fd == -1) {
+			outfd = imsg_get_fd(&imsg_outfd);
+			if (outfd == -1) {
 				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 				imsg_free(&imsg_outfd);
 				goto done;
 			}
 			err = send_raw_obj(&ibuf, obj, &expected_id,
-			    imsg.fd, imsg_outfd.fd);
-			imsg.fd = -1; /* imsg.fd is owned by send_raw_obj() */
-			if (close(imsg_outfd.fd) == -1 && err == NULL)
+			    fd, outfd);
+			fd = -1; /* fd is owned by send_raw_obj() */
+			if (close(outfd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 			imsg_free(&imsg_outfd);
 			if (err)
@@ -201,7 +205,7 @@ main(int argc, char *argv[])
 		} else
 			err = got_privsep_send_obj(&ibuf, obj);
 done:
-		if (imsg.fd != -1 && close(imsg.fd) == -1 && err == NULL)
+		if (fd != -1 && close(fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (obj)

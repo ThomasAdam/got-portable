@@ -666,6 +666,7 @@ recv_done(int *packfd, int outfd, struct imsgbuf *ibuf, int chattygot)
 {
 	const struct got_error *err;
 	struct imsg imsg;
+	int fd;
 
 	*packfd = -1;
 
@@ -686,8 +687,9 @@ recv_done(int *packfd, int outfd, struct imsgbuf *ibuf, int chattygot)
 			err = gotd_imsg_recv_error(NULL, &imsg);
 			break;
 		case GOTD_IMSG_PACKFILE_PIPE:
-			if (imsg.fd != -1)
-				*packfd = imsg.fd;
+			fd = imsg_get_fd(&imsg);
+			if (fd != -1)
+				*packfd = fd;
 			else
 				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			break;
@@ -1072,10 +1074,10 @@ recv_packfile(struct imsg *imsg, int infd)
 	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	if (imsg->fd == -1)
+	packfd = imsg_get_fd(imsg);
+	if (packfd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	packfd = imsg->fd;
 	while (!pack_done) {
 		ssize_t r = 0;
 

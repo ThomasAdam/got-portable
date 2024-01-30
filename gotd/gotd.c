@@ -682,7 +682,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iconnect, imsg->data, sizeof(iconnect));
 
-	s = imsg->fd;
+	s = imsg_get_fd(imsg);
 	if (s == -1) {
 		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
