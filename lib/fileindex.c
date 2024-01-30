@@ -1047,8 +1047,13 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 		}
 
 		subdir = fdopendir(subdirfd);
-		if (subdir == NULL)
-			return got_error_from_errno2("fdopendir", path);
+		if (subdir == NULL) {
+			err = got_error_from_errno2("fdopendir", path);
+			close(subdirfd);
+			free(subpath);
+			free(subdirpath);
+			return err;
+		}
 		subdirfd = -1;
 		err = read_dirlist(&subdirlist, subdir, subdirpath);
 		if (err) {

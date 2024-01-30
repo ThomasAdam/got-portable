@@ -87,6 +87,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath,
 	*outfile = fdopen(fd, "w+");
 	if (*outfile == NULL) {
 		err = got_error_from_errno2("fdopen", *path);
+		close(fd);
 		free(*path);
 		*path = NULL;
 	}
