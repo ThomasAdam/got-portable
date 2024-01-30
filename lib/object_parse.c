@@ -282,7 +282,6 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 		f = fdopen(fd, "r");
 		if (f == NULL) {
 			err = got_error_from_errno("fdopen");
-			abort();
 			close(fd);
 			goto done;
 		}
