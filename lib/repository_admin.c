@@ -1522,6 +1522,7 @@ got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
 	packdir = fdopendir(packdir_fd);
 	if (packdir == NULL) {
 		err = got_error_from_errno("fdopendir");
+		close(packdir_fd);
 		goto done;
 	}
 

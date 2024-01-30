@@ -664,6 +664,10 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	    PROC_REPO_READ, -1, &idone, sizeof(idone)) == -1)
 		err = got_error_from_errno("imsg compose PACKFILE_DONE");
 done:
+	if (client->delta_cache_fd != -1 &&
+	    close(client->delta_cache_fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	client->delta_cache_fd = -1;
 	if (delta_cache != NULL && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	imsg_clear(&ibuf);

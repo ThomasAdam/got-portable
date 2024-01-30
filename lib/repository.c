@@ -1426,6 +1426,7 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 	packdir = fdopendir(packdir_fd);
 	if (packdir == NULL) {
 		err = got_error_from_errno("fdopendir");
+		close(packdir_fd);
 		goto done;
 	}
 
@@ -2543,6 +2544,7 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 	packdir = fdopendir(packdir_fd);
 	if (packdir == NULL) {
 		err = got_error_from_errno("fdopendir");
+		close(packdir_fd);
 		goto done;
 	}
 
