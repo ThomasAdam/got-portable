@@ -107,7 +107,6 @@ send_gitconfig_pair(struct imsgbuf *ibuf, const char *key, const char *val)
 	if (imsg_add(wbuf, val, vlen) == -1)
 		return got_error_from_errno("imsg_add GITCONFIG_PAIR");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return got_privsep_flush_imsg(ibuf);
 }
@@ -175,7 +174,6 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 			return got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
 
-		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
 		err = got_privsep_flush_imsg(ibuf);
 		if (err)

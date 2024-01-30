@@ -329,7 +329,6 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 			break;
 		}
 
-		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
 		err = got_privsep_flush_imsg(ibuf);
 		if (err)

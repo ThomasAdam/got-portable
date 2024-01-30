@@ -264,7 +264,6 @@ send_ref_update_ok(struct gotd_session_client *client,
 	if (imsg_add(wbuf, refname, iok.name_len) == -1)
 		return got_error_from_errno("imsg_add REF_UPDATE_OK");
 
-	wbuf->fd = -1;
 	imsg_close(&iev->ibuf, wbuf);
 	gotd_imsg_event_add(iev);
 	return NULL;
@@ -311,7 +310,6 @@ send_ref_update_ng(struct gotd_session_client *client,
 	if (imsg_add(wbuf, ng_err->msg, ing.reason_len) == -1)
 		return got_error_from_errno("imsg_add REF_UPDATE_NG");
 
-	wbuf->fd = -1;
 	imsg_close(&iev->ibuf, wbuf);
 	gotd_imsg_event_add(iev);
 	return NULL;
