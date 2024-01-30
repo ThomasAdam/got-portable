@@ -329,6 +329,7 @@ header.subtitle h2 {
 	text-align: right;
 	width: 60px;
 	padding-right: 20px;
+	user-select: none;
 }
 .blame_code, .blob_code {
 	/* fixes the width of the first tab */
