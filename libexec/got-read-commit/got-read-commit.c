@@ -74,6 +74,7 @@ main(int argc, char *argv[])
 		struct imsg imsg;
 		struct got_commit_object *commit = NULL;
 		struct got_object_id expected_id;
+		int fd = -1;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -102,19 +103,20 @@ main(int argc, char *argv[])
 		}
 		memcpy(&expected_id, imsg.data, sizeof(expected_id));
 
-		if (imsg.fd == -1) {
+		fd = imsg_get_fd(&imsg);
+		if (fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
 
-		err = got_object_read_commit(&commit, imsg.fd, &expected_id, 0);
+		err = got_object_read_commit(&commit, fd, &expected_id, 0);
 		if (err)
 			goto done;
 
 		err = got_privsep_send_commit(&ibuf, commit);
 		got_object_commit_close(commit);
 done:
-		if (imsg.fd != -1 && close(imsg.fd) == -1 && err == NULL)
+		if (fd != -1 && close(fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (err)

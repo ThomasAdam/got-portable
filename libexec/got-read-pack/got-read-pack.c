@@ -268,6 +268,7 @@ receive_file(FILE **f, struct imsgbuf *ibuf, uint32_t imsg_code)
 	const struct got_error *err;
 	struct imsg imsg;
 	size_t datalen;
+	int fd;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
@@ -283,15 +284,16 @@ receive_file(FILE **f, struct imsgbuf *ibuf, uint32_t imsg_code)
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	if (imsg.fd == -1) {
+	fd = imsg_get_fd(&imsg);
+	if (fd == -1) {
 		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
 	}
 
-	*f = fdopen(imsg.fd, "w+");
+	*f = fdopen(fd, "w+");
 	if (*f == NULL) {
 		err = got_error_from_errno("fdopen");
-		close(imsg.fd);
+		close(fd);
 		goto done;
 	}
 done:
@@ -303,19 +305,24 @@ static const struct got_error *
 receive_tempfile(FILE **f, const char *mode, struct imsg *imsg,
     struct imsgbuf *ibuf)
 {
+	const struct got_error *err;
 	size_t datalen;
+	int fd;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	if (imsg->fd == -1)
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	*f = fdopen(imsg->fd, mode);
-	if (*f == NULL)
-		return got_error_from_errno("fdopen");
-	imsg->fd = -1;
+	*f = fdopen(fd, mode);
+	if (*f == NULL) {
+		err = got_error_from_errno("fdopen");
+		close(fd);
+		return err;
+	}
 
 	return NULL;
 }
@@ -906,8 +913,6 @@ raw_delta_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	memcpy(&req, imsg->data, sizeof(req));
 	memcpy(&id, &req.id, sizeof(id));
 
-	imsg->fd = -1;
-
 	err = got_packfile_extract_raw_delta(&delta_buf, &delta_size,
 	    &delta_compressed_size, &delta_offset, &delta_data_offset,
 	    &base_offset, &base_id, &base_size, &result_size,
@@ -1135,11 +1140,6 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 		goto done;
 	}
 
-	if (imsg.fd == -1) {
-		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-		goto done;
-	}
-
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ipackidx)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -1147,10 +1147,10 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	}
 	memcpy(&ipackidx, imsg.data, sizeof(ipackidx));
 
+	p->fd = imsg_get_fd(&imsg);
 	p->len = ipackidx.len;
-	p->fd = dup(imsg.fd);
 	if (p->fd == -1) {
-		err = got_error_from_errno("dup");
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
 	}
 	if (lseek(p->fd, 0, SEEK_SET) == -1) {
@@ -1168,9 +1168,8 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	err = got_packidx_init_hdr(p, 1, ipackidx.packfile_size);
 done:
 	if (err) {
-		if (imsg.fd != -1)
-			close(imsg.fd);
-		got_packidx_close(p);
+		if (p != NULL)
+			got_packidx_close(p);
 	} else
 		*packidx = p;
 	imsg_free(&imsg);
@@ -1875,11 +1874,6 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 		goto done;
 	}
 
-	if (imsg.fd == -1) {
-		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-		goto done;
-	}
-
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(ipack)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -1888,9 +1882,9 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 	memcpy(&ipack, imsg.data, sizeof(ipack));
 
 	pack->filesize = ipack.filesize;
-	pack->fd = dup(imsg.fd);
+	pack->fd = imsg_get_fd(&imsg);
 	if (pack->fd == -1) {
-		err = got_error_from_errno("dup");
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
 	}
 	if (lseek(pack->fd, 0, SEEK_SET) == -1) {
@@ -1917,9 +1911,8 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 #endif
 done:
 	if (err) {
-		if (imsg.fd != -1)
-			close(imsg.fd);
-		free(pack);
+		if (pack != NULL)
+			got_pack_close(pack);
 	} else
 		*packp = pack;
 	imsg_free(&imsg);
@@ -1976,8 +1969,6 @@ main(int argc, char *argv[])
 	}
 
 	for (;;) {
-		imsg.fd = -1;
-
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
 			break;
@@ -1990,8 +1981,10 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.hdr.type == GOT_IMSG_STOP)
+		if (imsg.hdr.type == GOT_IMSG_STOP) {
+			imsg_free(&imsg);
 			break;
+		}
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_TMPFD:
@@ -2083,8 +2076,6 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.fd != -1 && close(imsg.fd) == -1 && err == NULL)
-			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (err)
 			break;

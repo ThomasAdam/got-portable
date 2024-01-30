@@ -893,7 +893,7 @@ main(int argc, char **argv)
 		goto done;
 	}
 	memcpy(&fetch_req, imsg.data, sizeof(fetch_req));
-	fetchfd = imsg.fd;
+	fetchfd = imsg_get_fd(&imsg);
 
 	if (datalen != sizeof(fetch_req) +
 	    fetch_req.worktree_branch_len + fetch_req.remote_head_len) {
@@ -1070,7 +1070,7 @@ main(int argc, char **argv)
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	packfd = imsg.fd;
+	packfd = imsg_get_fd(&imsg);
 
 	err = fetch_pack(fetchfd, packfd, pack_sha1, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,

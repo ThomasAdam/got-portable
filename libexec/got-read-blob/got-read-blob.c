@@ -72,6 +72,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg imsg, imsg_outfd;
 		FILE *f = NULL;
+		int fd = -1, outfd = -1;
 		size_t size;
 		struct got_object *obj = NULL;
 		uint8_t *buf = NULL;
@@ -85,9 +86,7 @@ main(int argc, char *argv[])
 		csum.output_ctx = &ctx;
 
 		memset(&imsg, 0, sizeof(imsg));
-		imsg.fd = -1;
 		memset(&imsg_outfd, 0, sizeof(imsg_outfd));
-		imsg_outfd.fd = -1;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -116,7 +115,8 @@ main(int argc, char *argv[])
 		}
 		memcpy(&expected_id, imsg.data, sizeof(expected_id));
 
-		if (imsg.fd == -1) {
+		fd = imsg_get_fd(&imsg);
+		if (fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
@@ -141,21 +141,22 @@ main(int argc, char *argv[])
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		if (imsg_outfd.fd == -1) {
+		outfd = imsg_get_fd(&imsg_outfd);
+		if (outfd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
 
-		err = got_object_read_header(&obj, imsg.fd);
+		err = got_object_read_header(&obj, fd);
 		if (err)
 			goto done;
 
-		if (lseek(imsg.fd, SEEK_SET, 0) == -1) {
+		if (lseek(fd, SEEK_SET, 0) == -1) {
 			err = got_error_from_errno("lseek");
 			goto done;
 		}
 
-		f = fdopen(imsg.fd, "rb");
+		f = fdopen(fd, "rb");
 		if (f == NULL) {
 			err = got_error_from_errno("fdopen");
 			goto done;
@@ -167,7 +168,7 @@ main(int argc, char *argv[])
 			if (err)
 				goto done;
 		} else {
-			err = got_inflate_to_fd(&size, f, &csum, imsg_outfd.fd);
+			err = got_inflate_to_fd(&size, f, &csum, outfd);
 			if (err)
 				goto done;
 		}
@@ -188,12 +189,12 @@ done:
 		if (f) {
 			if (fclose(f) == EOF && err == NULL)
 				err = got_error_from_errno("fclose");
-		} else if (imsg.fd != -1) {
-			if (close(imsg.fd) == -1 && err == NULL)
+		} else if (fd != -1) {
+			if (close(fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
-		if (imsg_outfd.fd != -1) {
-			if (close(imsg_outfd.fd) == -1 && err == NULL)
+		if (outfd != -1) {
+			if (close(outfd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
 

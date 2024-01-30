@@ -132,13 +132,11 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 
 	/* create a new socket */
 	if ((sock = calloc(1, sizeof(*sock))) == NULL) {
-		if (imsg->fd != -1)
-			close(imsg->fd);
 		return 1;
 	}
 
 	memcpy(&sock->conf, &sock_conf, sizeof(sock->conf));
-	sock->fd = imsg->fd;
+	sock->fd = imsg_get_fd(imsg);
 
 	TAILQ_INSERT_TAIL(&env->sockets, sock, entry);
 
@@ -195,7 +193,7 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 {
 	struct socket *sock;
 	uint8_t *p = imsg->data;
-	int sock_id, match = 0, i;
+	int sock_id, match = 0, i, j;
 
 	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_id))
 		fatalx("%s: wrong size", __func__);
@@ -206,16 +204,18 @@ config_getfd(struct gotwebd *env, struct imsg *imsg)
 		const int nfds = (GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX);
 		for (i = 0; i < nfds; i++) {
 			if (i < PRIV_FDS__MAX && sock->priv_fd[i] == -1) {
+				sock->priv_fd[i] = imsg_get_fd(imsg);
 				log_debug("%s: assigning socket %d priv_fd %d",
-				    __func__, sock_id, imsg->fd);
-				sock->priv_fd[i] = imsg->fd;
+				    __func__, sock_id, sock->priv_fd[i]);
 				match = 1;
 				break;
 			}
-			if (sock->pack_fds[i - PRIV_FDS__MAX] == -1) {
+
+			j = i - PRIV_FDS__MAX;
+			if (sock->pack_fds[j] == -1) {
+				sock->pack_fds[j] = imsg_get_fd(imsg);
 				log_debug("%s: assigning socket %d pack_fd %d",
-				    __func__, sock_id, imsg->fd);
-				sock->pack_fds[i - PRIV_FDS__MAX] = imsg->fd;
+				    __func__, sock_id, sock->pack_fds[j]);
 				match = 1;
 				break;
 			}

@@ -361,9 +361,9 @@ main(int argc, char *argv[])
 
 	for (;;) {
 		struct imsg imsg;
+		int fd = -1;
 
 		memset(&imsg, 0, sizeof(imsg));
-		imsg.fd = -1;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -387,14 +387,15 @@ main(int argc, char *argv[])
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
-			if (imsg.fd == -1){
+			fd = imsg_get_fd(&imsg);
+			if (fd == -1) {
 				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 				break;
 			}
 
 			if (gitconfig)
 				got_gitconfig_close(gitconfig);
-			err = got_gitconfig_open(&gitconfig, imsg.fd);
+			err = got_gitconfig_open(&gitconfig, fd);
 			break;
 		case GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST:
 			err = gitconfig_num_request(&ibuf, gitconfig, "core",
@@ -422,8 +423,8 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.fd != -1) {
-			if (close(imsg.fd) == -1 && err == NULL)
+		if (fd != -1) {
+			if (close(fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
 

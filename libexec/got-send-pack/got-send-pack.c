@@ -137,7 +137,7 @@ recv_packfd(int *packfd, struct imsgbuf *ibuf)
 		goto done;
 	}
 
-	*packfd = imsg.fd;
+	*packfd = imsg_get_fd(&imsg);
 done:
 	imsg_free(&imsg);
 	return err;
@@ -649,7 +649,7 @@ main(int argc, char **argv)
 		goto done;
 	}
 	memcpy(&send_req, imsg.data, sizeof(send_req));
-	sendfd = imsg.fd;
+	sendfd = imsg_get_fd(&imsg);
 	imsg_free(&imsg);
 
 	if (send_req.verbosity > 0)
