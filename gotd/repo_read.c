@@ -141,7 +141,6 @@ send_symref(struct got_reference *symref, struct got_object_id *target_id,
 		goto done;
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 done:
 	free(target_id);
@@ -198,7 +197,6 @@ send_peeled_tag_ref(struct got_reference *ref, struct got_object *obj,
 		goto done;
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 done:
 	got_object_tag_close(tag);
@@ -241,7 +239,6 @@ send_ref(struct got_reference *ref, struct imsgbuf *ibuf)
 	if (imsg_add(wbuf, refname, namelen) == -1)
 		return got_error_from_errno("imsg_add REF");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	err = got_object_open(&obj, repo_read.repo, id);

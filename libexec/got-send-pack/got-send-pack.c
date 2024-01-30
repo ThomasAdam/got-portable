@@ -214,7 +214,6 @@ send_their_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 	if (imsg_add(wbuf, refname, reflen) == -1)
 		return got_error_from_errno("imsg_add SEND_REMOTE_REF");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return got_privsep_flush_imsg(ibuf);
 }
@@ -298,7 +297,6 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 	if (imsg_add(wbuf, errmsg, errmsglen) == -1)
 		return got_error_from_errno("imsg_add SEND_REF_STATUS");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return got_privsep_flush_imsg(ibuf);
 }

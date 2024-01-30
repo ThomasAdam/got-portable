@@ -261,7 +261,6 @@ send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 			return got_error_from_errno("imsg_add FETCH_SYMREFS");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return got_privsep_flush_imsg(ibuf);
 }
@@ -287,7 +286,6 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 	if (imsg_add(wbuf, refname, reflen) == -1)
 		return got_error_from_errno("imsg_add FETCH_REF");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 	return got_privsep_flush_imsg(ibuf);
 }

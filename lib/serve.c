@@ -408,7 +408,6 @@ send_capability(struct got_capability *capa, struct imsgbuf *ibuf)
 			return got_error_from_errno("imsg_add CAPABILITY");
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	return NULL;
@@ -1026,7 +1025,6 @@ recv_ref_update(int *report_status, int outfd, struct imsgbuf *ibuf,
 		return got_error_from_errno("imsg_add REF_UPDATE");
 	if (imsg_add(wbuf, refname, iref.name_len) == -1)
 		return got_error_from_errno("imsg_add REF_UPDATE");
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	err = gotd_imsg_flush(ibuf);

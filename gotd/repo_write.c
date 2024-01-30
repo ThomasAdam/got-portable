@@ -174,7 +174,6 @@ send_peeled_tag_ref(struct got_reference *ref, struct got_object *obj,
 		goto done;
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 done:
 	got_object_tag_close(tag);
@@ -217,7 +216,6 @@ send_ref(struct got_reference *ref, struct imsgbuf *ibuf)
 	if (imsg_add(wbuf, refname, namelen) == -1)
 		return got_error_from_errno("imsg_add REF");
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	err = got_object_open(&obj, repo_write.repo, id);
@@ -1185,7 +1183,6 @@ report_pack_status(const struct got_error *unpack_err)
 		goto done;
 	}
 
-	wbuf->fd = -1;
 	imsg_close(&ibuf, wbuf);
 
 	err = gotd_imsg_flush(&ibuf);
@@ -1558,7 +1555,6 @@ send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 	if (imsg_add(wbuf, refname, iref.name_len) == -1)
 		return got_error_from_errno("imsg_add REF_UPDATE");
 
-	wbuf->fd = -1;
 	imsg_close(&iev->ibuf, wbuf);
 
 	gotd_imsg_event_add(iev);

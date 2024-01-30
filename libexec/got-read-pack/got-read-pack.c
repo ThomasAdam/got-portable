@@ -617,7 +617,6 @@ send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
 		}
 	}
 
-	wbuf->fd = -1;
 	imsg_close(ibuf, wbuf);
 
 	return got_privsep_flush_imsg(ibuf);
