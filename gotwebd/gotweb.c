@@ -205,6 +205,11 @@ gotweb_process_request(struct request *c)
 	}
 
 	if (qs->action == BLOBRAW || qs->action == BLOB) {
+		if (qs->folder == NULL || qs->file == NULL) {
+			error = got_error(GOT_ERR_BAD_QUERYSTRING);
+			goto err;
+		}
+
 		error = got_get_repo_commits(c, 1);
 		if (error)
 			goto err;
@@ -217,6 +222,10 @@ gotweb_process_request(struct request *c)
 
 	switch (qs->action) {
 	case BLAME:
+		if (qs->folder == NULL || qs->file == NULL) {
+			error = got_error(GOT_ERR_BAD_QUERYSTRING);
+			goto err;
+		}
 		error = got_get_repo_commits(c, 1);
 		if (error) {
 			log_warnx("%s: %s", __func__, error->msg);
