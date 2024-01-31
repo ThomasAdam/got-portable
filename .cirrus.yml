@@ -20,7 +20,7 @@ got_alpine_linux_task:
 
 got_freebsd_task:
   freebsd_instance:
-    image_family: freebsd-13-0
+    image_family: freebsd-13-2
   before_build_script: .github/ci/before-install.sh
   build:script: .github/ci/build.sh
   test_script: make install && make tests
