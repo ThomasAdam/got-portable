@@ -254,6 +254,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 {
 	const struct got_error *err;
 	struct got_object_qid *qid;
+	struct got_object_id *merged_id = NULL;
 
 	err = close_branch(graph, commit_id);
 	if (err)
@@ -289,13 +290,16 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 	 * which do not contribute any content to this path.
 	 */
 	if (commit->nparents > 1 && !got_path_is_root_dir(graph->path)) {
-		struct got_object_id *merged_id, *prev_id = NULL;
+		err = got_object_id_by_path(&merged_id, repo, commit, graph->path);
+		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+			return err;
+		/* The requested path does not exist in this merge commit. */
+	}
+	if (commit->nparents > 1 && !got_path_is_root_dir(graph->path) &&
+	    merged_id != NULL) {
+		struct got_object_id *prev_id = NULL;
 		int branches_differ = 0;
 
-		err = got_object_id_by_path(&merged_id, repo, commit,
-		    graph->path);
-		if (err)
-			return err;
 
 		STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
 			struct got_object_id *id = NULL;
