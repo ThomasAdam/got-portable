@@ -769,6 +769,60 @@ test_log_changed_paths() {
 	test_done "$testroot" "$ret"
 }
 
+test_log_merge_commit_nonexistent_path() {
+	local testroot=`test_init log_merge_commit_corner_case 1`
+
+        # Create the following commit graph (most recent commit shown first):
+        #
+        #   o  create dir/beta
+        #   |
+        #   o  merge (does not touch dir)
+        #  / \
+        # o   o  changes which don't touch the directory "dir"
+        #  \ /
+        #   o  initial commit, which includes directory "dir" but not dir/beta
+
+
+	mkdir $testroot/repo/dir
+	touch $testroot/repo/dir/alpha
+	git -C $testroot/repo add dir/alpha
+	git_commit $testroot/repo -m "initial commit"
+
+	git -C $testroot/repo checkout -q -b aux
+	touch $testroot/repo/gamma
+	git -C $testroot/repo add gamma
+	git_commit $testroot/repo -m "change on aux"
+
+	git -C $testroot/repo checkout -q master
+	touch $testroot/repo/delta
+	git -C $testroot/repo add delta
+	git_commit $testroot/repo -m "change on master"
+
+	git -C $testroot/repo merge -q -m "merge" aux
+
+	touch $testroot/repo/dir/beta
+	git -C $testroot/repo add dir/beta
+	git_commit $testroot/repo -m "add beta"
+
+	head_commit=`git_show_head $testroot/repo`
+
+	got log -r $testroot/repo -b dir/beta | grep ^commit > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "log command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "commit $head_commit (master)" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_log_submodule() {
 	local testroot=`test_init log_submodule`
 
@@ -1201,6 +1255,7 @@ run_test test_log_end_at_commit
 run_test test_log_reverse_display
 run_test test_log_in_worktree_different_repo
 run_test test_log_changed_paths
+run_test test_log_merge_commit_nonexistent_path
 run_test test_log_submodule
 run_test test_log_diffstat
 run_test test_log_commit_keywords
