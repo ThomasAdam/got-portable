@@ -515,6 +515,10 @@ dd {
 		text-decoration: none;
 	}
 
+	.blame_line:target, .blob_line:target {
+		background-color: #44475a;
+	}
+
 	#site_owner_wrapper, #np_wrapper {
 		background-color: unset;
 	}
