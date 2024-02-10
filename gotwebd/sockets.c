@@ -88,7 +88,7 @@ int cgi_inflight = 0;
 void
 sockets(struct gotwebd *env, int fd)
 {
-	struct event	 sighup, sigusr1, sigchld;
+	struct event	 sighup, sigint, sigusr1, sigchld, sigterm;
 
 	event_init();
 
@@ -110,10 +110,14 @@ sockets(struct gotwebd *env, int fd)
 
 	signal_set(&sighup, SIGHUP, sockets_sighdlr, env);
 	signal_add(&sighup, NULL);
+	signal_set(&sigint, SIGINT, sockets_sighdlr, env);
+	signal_add(&sigint, NULL);
 	signal_set(&sigusr1, SIGUSR1, sockets_sighdlr, env);
 	signal_add(&sigusr1, NULL);
 	signal_set(&sigchld, SIGCHLD, sockets_sighdlr, env);
 	signal_add(&sigchld, NULL);
+	signal_set(&sigterm, SIGTERM, sockets_sighdlr, env);
+	signal_add(&sigterm, NULL);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath inet recvfd proc exec sendfd unveil",
@@ -386,6 +390,10 @@ sockets_sighdlr(int sig, short event, void *arg)
 		break;
 	case SIGCHLD:
 		break;
+	case SIGINT:
+	case SIGTERM:
+		sockets_shutdown();
+		break;
 	default:
 		log_info("SIGNAL: %d", sig);
 		fatalx("unexpected signal");
@@ -412,6 +420,8 @@ sockets_shutdown(void)
 		free(srv);
 
 	free(gotwebd_env);
+
+	exit(0);
 }
 
 int
