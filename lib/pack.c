@@ -1466,12 +1466,13 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 				accum_bufsz = max_size;
 				if (pack->map) {
 					if (delta_data_offset > SIZE_MAX) {
-						return got_error_fmt(
+						err = got_error_fmt(
 						    GOT_ERR_RANGE,
 						    "delta offset %lld "
 						    "overflows size_t",
 						    (long long)
 						    delta_data_offset);
+						goto done;
 					}
 
 					mapoff = delta_data_offset;
