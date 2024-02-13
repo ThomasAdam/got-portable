@@ -1920,7 +1920,7 @@ update_blob(struct got_worktree *worktree,
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 	struct stat sb;
 	int fd1 = -1, fd2 = -1;
-	int update_timestamps;
+	int update_timestamps = 0;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno("asprintf");
@@ -2044,7 +2044,6 @@ update_blob(struct got_worktree *worktree,
 		goto done;
 
 	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD) {
-		int update_timestamps;
 		struct got_blob_object *blob2 = NULL;
 		char *label_orig = NULL;
 		if (got_fileindex_entry_has_blob(ie)) {
