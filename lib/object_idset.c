@@ -60,7 +60,7 @@ got_object_idset_alloc(void)
 	if (set == NULL)
 		return NULL;
 
-	set->ids = calloc(sizeof(set->ids[0]), GOT_OBJECT_IDSET_MIN_BUCKETS);
+	set->ids = calloc(GOT_OBJECT_IDSET_MIN_BUCKETS, sizeof(set->ids[0]));
 	if (set->ids == NULL) {
 		free(set);
 		return NULL;
