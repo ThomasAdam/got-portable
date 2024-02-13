@@ -1,3 +1,30 @@
+* got 0.96; 2024-02-13
+  see git repository history for per-change authorship information
+- gotwebd: add foldable commit briefs
+- gotwebd: fix (again) the styling for the next/prev buttons
+- gotwebd: add knob for the number of tags and commits in the summary page
+- gotwebd: remove PAGE handling
+- gotwebd: retire max_repos setting
+- gotwebd: guard against missig folder and file parameter in BLOB and BLAME
+- gotwebd: improve copy-paste from BLOB pages
+- gotwebd: fix colour of target lines in dark mode CSS
+- gotwebd.conf.5: show defaults, improve EXAMPLES
+- gotwebd.8: improve EXAMPLES sections
+- fix logging during gotwebd shutdown
+- plug several memory leaks in tog
+- plug object id queue leak when iterating pack index files
+- ensure tmp file is closed and fix UB in diff error path
+- do not crash when a meta-data file in the .got directory is empty
+- make the gotd auth process provide the user's account name for later use
+- avoid opening objects in the gotd session process for no reason
+- use imsg_get_fd() instead of imsg->fd everywhere
+- tolerate remotes without urls in git config file for interop with git-annex
+- plug some fd leaks in the fdopen{,dir} error paths
+- log -b: handle merge commits unrelated to requested changed path history
+- fix use of uninitialized variable in update_blob()
+- plug memory leak in got_pack_dump_delta_chain_to_file()
+- never write accum_buf on error in got_pack_dump_delta_chain_to_file()
+
 * got 0.95; 2023-12-08
   see git repository history for per-change authorship information
 - plug memory leaks in checkout, update, and status commands
