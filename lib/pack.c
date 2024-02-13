@@ -1646,6 +1646,10 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 done:
 	free(base_buf);
+	if (err) {
+		free(accum_buf);
+		accum_buf = NULL;
+	}
 	if (accum_buf) {
 		size_t len = fwrite(accum_buf, 1, accum_size, outfile);
 		free(accum_buf);
