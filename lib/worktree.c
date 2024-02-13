@@ -5895,7 +5895,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 	const struct got_error *err = NULL;
 	char *ct_name = NULL;
 
-	 *new_te = NULL;
+	*new_te = NULL;
 
 	*new_te = calloc(1, sizeof(**new_te));
 	if (*new_te == NULL)

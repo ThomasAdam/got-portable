@@ -116,8 +116,8 @@ request_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
 	int outfd_child;
 
-	 err = pack_child_send_tempfiles(ibuf, pack);
-	 if (err)
+	err = pack_child_send_tempfiles(ibuf, pack);
+	if (err)
 		return err;
 
 	outfd_child = dup(outfd);
@@ -816,8 +816,8 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
 	int outfd_child;
 
-	 err = pack_child_send_tempfiles(ibuf, pack);
-	 if (err)
+	err = pack_child_send_tempfiles(ibuf, pack);
+	if (err)
 		return err;
 
 	outfd_child = dup(outfd);
