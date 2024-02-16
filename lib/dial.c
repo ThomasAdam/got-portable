@@ -302,7 +302,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 		if (strlcpy(cmd, command, sizeof(cmd)) >= sizeof(cmd))
 			err(1, "snprintf");
 		if (execv(GOT_DIAL_PATH_SSH, (char *const *)argv) == -1)
-			err(1, "execv");
+			err(1, "execv %s", GOT_DIAL_PATH_SSH);
 		abort(); /* not reached */
 	} else {
 		if (close(pfd[0]) == -1)

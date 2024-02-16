@@ -123,7 +123,7 @@ got_sigs_sign_tag_ssh(pid_t *newpid, int *in_fd, int *out_fd,
 		if (dup2(out_pfd[1], 1) == -1)
 			err(1, "dup2");
 		if (execv(GOT_TAG_PATH_SSH_KEYGEN, (char **const)argv) == -1)
-			err(1, "execv");
+			err(1, "execv %s", GOT_TAG_PATH_SSH_KEYGEN);
 		abort(); /* not reached */
 	}
 	if (close(in_pfd[0]) == -1)
@@ -349,7 +349,7 @@ got_sigs_verify_tag_ssh(char **msg, struct got_tag_object *tag,
 		if (dup2(out_pfd[1], 1) == -1)
 			err(1, "dup2");
 		if (execv(GOT_TAG_PATH_SSH_KEYGEN, (char **const)argv) == -1)
-			err(1, "execv");
+			err(1, "execv %s", GOT_TAG_PATH_SSH_KEYGEN);
 		abort(); /* not reached */
 	}
 	if (close(in_pfd[0]) == -1) {
