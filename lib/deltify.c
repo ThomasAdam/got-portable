@@ -88,6 +88,9 @@ static const uint32_t geartab[256] = {
     0xf1f6e72c, 0x5551128a, 0x83af87e2, 0x6f0342ba,
 };
 
+static const struct got_error *addblk(struct got_delta_table *, FILE *,
+    uint8_t *, off_t, off_t, off_t, uint32_t);
+
 static uint32_t
 hashblk(const unsigned char *p, off_t n, uint32_t seed)
 {
@@ -95,145 +98,150 @@ hashblk(const unsigned char *p, off_t n, uint32_t seed)
 }
 
 static const struct got_error *
-addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
-    off_t offset, uint32_t h)
+lookup(int *n, struct got_delta_table *dt, FILE *f, off_t file_offset0,
+    off_t len, off_t offset, uint32_t h)
 {
-	const struct got_error *err = NULL;
-	int i;
+	struct got_delta_block *block;
 	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
 	uint8_t buf2[GOT_DELTIFY_MAXCHUNK];
 	size_t r = 0;
+	int i;
 
-	if (len == 0)
-		return NULL;
+	for (i = h % dt->size; dt->offs[i] != 0; i = (i + 1) % dt->size) {
+		block = &dt->blocks[dt->offs[i] - 1];
+		if (block->len != len || block->hash != h)
+			continue;
 
-	i = h % dt->nalloc;
-	while (dt->blocks[i].len != 0) {
-		/*
-		 * Avoid adding duplicate blocks.
-		 * NB: A matching hash is insufficient for detecting equality.
-		 * The hash can only detect inequality.
-		 */
-		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
-			if (r == 0) {
-				if (fseeko(f, file_offset0 + offset, SEEK_SET) == -1)
-					return got_error_from_errno("fseeko");
-				r = fread(buf, 1, len, f);
-				if (r != len) {
-					if (!ferror(f))
-						return NULL;
-					return got_ferror(f, GOT_ERR_IO);
-				}
-			}
-			if (fseeko(f, file_offset0 + dt->blocks[i].offset,
-			    SEEK_SET) == -1)
+		if (r == 0) {
+			if (fseeko(f, file_offset0 + offset, SEEK_SET) == -1)
 				return got_error_from_errno("fseeko");
-			if (fread(buf2, 1, len, f) != len)
+			r = fread(buf, 1, len, f);
+			if (r != len) {
+				if (!ferror(f))
+					break;		/* why? */
 				return got_ferror(f, GOT_ERR_IO);
-			if (memcmp(buf, buf2, len) == 0)
-				return NULL;
+			}
 		}
 
-		i = (i + 1) % dt->nalloc;
-	}
-	assert(dt->blocks[i].len == 0);
-	dt->blocks[i].len = len;
-	dt->blocks[i].offset = offset;
-	dt->blocks[i].hash = h;
-	dt->nblocks++;
-	if (dt->nalloc < dt->nblocks + 256) {
-		struct got_delta_block *db;
-		size_t old_size = dt->nalloc;
-		db = dt->blocks;
-		dt->blocks = calloc(dt->nalloc + 256,
-		    sizeof(struct got_delta_block));
-		if (dt->blocks == NULL) {
-			err = got_error_from_errno("calloc");
-			dt->blocks = db;
-			return err;
-		}
-		dt->nalloc += 256;
-		/*
-		 * Recompute all block positions. Hash-based indices of blocks
-		 * in the array depend on the allocated length of the array.
-		 */
-		dt->nblocks = 0;
-		for (i = 0; i < old_size; i++) {
-			if (db[i].len == 0)
-				continue;
-			err = addblk(dt, f, file_offset0, db[i].len,
-			    db[i].offset, db[i].hash);
-			if (err)
-				break;
-		}
-		free(db);
+		if (fseeko(f, file_offset0 + block->offset, SEEK_SET) == -1)
+			return got_error_from_errno("fseeko");
+		if (fread(buf2, 1, len, f) != len)
+			return got_ferror(f, GOT_ERR_IO);
+		if (memcmp(buf, buf2, len) == 0)
+			break;
 	}
 
-	return err;
+	*n = i;
+	return NULL;
 }
 
 static const struct got_error *
-addblk_mem(struct got_delta_table *dt, uint8_t *data, off_t file_offset0,
+lookup_mem(int *n, struct got_delta_table *dt, uint8_t *basedata,
+    off_t basefile_offset0, uint8_t *p, off_t len, uint32_t h)
+{
+	struct got_delta_block *block;
+	uint8_t *d;
+	int i;
+
+	for (i = h % dt->size; dt->offs[i] != 0; i = (i + 1) % dt->size) {
+		block = &dt->blocks[dt->offs[i] - 1];
+		if (len == block->len && h == block->hash) {
+			d = basedata + basefile_offset0 + block->offset;
+			if (memcmp(d, p, len) == 0)
+				break;
+		}
+	}
+
+	*n = i;
+	return NULL;
+}
+
+static const struct got_error *
+resizeht(struct got_delta_table *dt, FILE *f, off_t offset0, uint8_t *data,
+    off_t len)
+{
+	const struct got_error *err;
+	struct got_delta_block *b;
+	size_t newsize, oldsize;
+	int i, n;
+
+	if (dt->nblocks == dt->nalloc) {
+		newsize = dt->nalloc + 256;
+		b = reallocarray(dt->blocks, newsize, sizeof(*dt->blocks));
+		if (b == NULL)
+			return got_error_from_errno("reallocarray");
+		dt->blocks = b;
+		dt->nalloc = newsize;
+	}
+
+	if (dt->blocks == NULL || dt->len * 100 / dt->size > 70) {
+		oldsize = dt->size;
+		dt->size *= 2;
+		free(dt->offs);
+		dt->offs = calloc(dt->size, sizeof(*dt->offs));
+		if (dt->offs == NULL) {
+			dt->size = oldsize;
+			return got_error_from_errno("calloc");
+		}
+
+		for (i = 0; i < dt->nblocks; ++i) {
+			b = &dt->blocks[i];
+			if (f)
+				err = lookup(&n, dt, f, offset0, b->len,
+				    b->offset, b->hash);
+			else
+				err = lookup_mem(&n, dt, data, offset0,
+				    data + b->offset, b->len, b->hash);
+			if (err) {
+				free(dt->offs);
+				dt->offs = NULL;
+				dt->size = oldsize;
+				return err;
+			}
+			assert(dt->offs[n] == 0);
+			dt->offs[n] = i + 1;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+addblk(struct got_delta_table *dt, FILE *f, uint8_t *data, off_t file_offset0,
     off_t len, off_t offset, uint32_t h)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err;
+	struct got_delta_block *block;
 	int i;
-	uint8_t *block1;
-	uint8_t *block2;
 
 	if (len == 0)
 		return NULL;
 
-	i = h % dt->nalloc;
-	while (dt->blocks[i].len != 0) {
-		/*
-		 * Avoid adding duplicate blocks.
-		 * NB: A matching hash is insufficient for detecting equality.
-		 * The hash can only detect inequality.
-		 */
-		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
-			block1 = data + file_offset0 + dt->blocks[i].offset;
-			block2 = data + file_offset0 + offset;
-			if (memcmp(block1, block2, len) == 0)
-				return NULL;
-		}
+	err = resizeht(dt, f, file_offset0, data, len);
+	if (err)
+		return err;
 
-		i = (i + 1) % dt->nalloc;
-	}
-	assert(dt->blocks[i].len == 0);
-	dt->blocks[i].len = len;
-	dt->blocks[i].offset = offset;
-	dt->blocks[i].hash = h;
+	if (f)
+		err = lookup(&i, dt, f, file_offset0, len, offset, h);
+	else
+		err = lookup_mem(&i, dt, data, file_offset0, data + offset,
+		    len, h);
+	if (err)
+		return err;
+
+	if (dt->offs[i] != 0)
+		return NULL;	/* found */
+
+	dt->offs[i] = dt->nblocks + 1;
+	block = &dt->blocks[dt->nblocks];
+	block->len = len;
+	block->offset = offset;
+	block->hash = h;
+
 	dt->nblocks++;
-	if (dt->nalloc < dt->nblocks + 256) {
-		struct got_delta_block *db;
-		size_t old_size = dt->nalloc;
-		db = dt->blocks;
-		dt->blocks = calloc(dt->nalloc + 256,
-		    sizeof(struct got_delta_block));
-		if (dt->blocks == NULL) {
-			err = got_error_from_errno("calloc");
-			dt->blocks = db;
-			return err;
-		}
-		dt->nalloc += 256;
-		/*
-		 * Recompute all block positions. Hash-based indices of blocks
-		 * in the array depend on the allocated length of the array.
-		 */
-		dt->nblocks = 0;
-		for (i = 0; i < old_size; i++) {
-			if (db[i].len == 0)
-				continue;
-			err = addblk_mem(dt, data, file_offset0, db[i].len,
-			    db[i].offset, db[i].hash);
-			if (err)
-				break;
-		}
-		free(db);
-	}
+	dt->len++;
 
-	return err;
+	return NULL;
 }
 
 static const struct got_error *
@@ -244,24 +252,25 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 	int i;
 	uint32_t h;
 	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
+	struct got_delta_block *b;
 	size_t r;
 
 	*block = NULL;
 
 	h = hashblk(p, len, seed);
-	for (i = h % dt->nalloc; dt->blocks[i].len != 0;
-	     i = (i + 1) % dt->nalloc) {
-		if (dt->blocks[i].hash != h ||
-		    dt->blocks[i].len != len)
+	
+	for (i = h % dt->size; dt->offs[i] != 0; i = (i + 1) % dt->size) {
+		b = &dt->blocks[dt->offs[i] - 1];
+		if (b->hash != h || b->len != len)
 			continue;
-		if (fseeko(basefile, basefile_offset0 + dt->blocks[i].offset,
+		if (fseeko(basefile, basefile_offset0 + b->offset,
 		    SEEK_SET) == -1)
 			return got_error_from_errno("fseeko");
 		r = fread(buf, 1, len, basefile);
 		if (r != len)
 			return got_ferror(basefile, GOT_ERR_IO);
 		if (memcmp(p, buf, len) == 0) {
-			*block = &dt->blocks[i];
+			*block = b;
 			break;
 		}
 	}
@@ -273,24 +282,17 @@ lookupblk_mem(struct got_delta_block **block, struct got_delta_table *dt,
     unsigned char *p, off_t len, uint32_t seed, uint8_t *basedata,
     off_t basefile_offset0)
 {
-	int i;
+	const struct got_error *err;
+	int n;
 	uint32_t h;
-	uint8_t *b;
 
 	*block = NULL;
-
 	h = hashblk(p, len, seed);
-	for (i = h % dt->nalloc; dt->blocks[i].len != 0;
-	     i = (i + 1) % dt->nalloc) {
-		if (dt->blocks[i].hash != h ||
-		    dt->blocks[i].len != len)
-			continue;
-		b = basedata + basefile_offset0 + dt->blocks[i].offset;
-		if (memcmp(p, b, len) == 0) {
-			*block = &dt->blocks[i];
-			break;
-		}
-	}
+	err = lookup_mem(&n, dt, basedata, basefile_offset0, p, len, h);
+	if (err)
+		return err;
+	if (dt->offs[n] != 0)
+		*block = &dt->blocks[dt->offs[n] - 1];
 	return NULL;
 }
 
@@ -371,6 +373,13 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 		goto done;
 	}
 
+	(*dt)->size = 128;
+	(*dt)->offs = calloc((*dt)->size, sizeof(*(*dt)->offs));
+	if ((*dt)->offs == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
 	if (fseeko(f, fileoffset, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
@@ -383,7 +392,7 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 		if (blocklen == 0)
 			break;
 		h = hashblk(buf, blocklen, seed);
-		err = addblk(*dt, f, offset0, blocklen,
+		err = addblk(*dt, f, NULL, offset0, blocklen,
 		    fileoffset - offset0, h);
 		if (err)
 			goto done;
@@ -421,6 +430,13 @@ got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
 		goto done;
 	}
 
+	(*dt)->size = 128;
+	(*dt)->offs = calloc((*dt)->size, sizeof(*(*dt)->offs));
+	if ((*dt)->offs == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
 	while (fileoffset < filesize) {
 		off_t blocklen;
 		err = nextblk_mem(&blocklen, data, fileoffset, filesize);
@@ -429,7 +445,7 @@ got_deltify_init_mem(struct got_delta_table **dt, uint8_t *data,
 		if (blocklen == 0)
 			break;
 		h = hashblk(data + fileoffset, blocklen, seed);
-		err = addblk_mem(*dt, data, offset0, blocklen,
+		err = addblk(*dt, NULL, data, offset0, blocklen,
 		    fileoffset - offset0, h);
 		if (err)
 			goto done;
@@ -451,6 +467,7 @@ got_deltify_free(struct got_delta_table *dt)
 	if (dt == NULL)
 		return;
 	free(dt->blocks);
+	free(dt->offs);
 	free(dt);
 }
 

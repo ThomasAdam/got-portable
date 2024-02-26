@@ -25,6 +25,14 @@ struct got_delta_table {
 	struct got_delta_block	*blocks;
 	int			nblocks;
 	int			nalloc;
+
+	/*
+	 * Index for blocks.  offs[n] is zero when the slot is free,
+	 * otherwise it points to blocks[offs[n] - 1].
+	 */
+	uint32_t		*offs;
+	int			 len;
+	int			 size;
 };
 
 struct got_delta_instruction {
