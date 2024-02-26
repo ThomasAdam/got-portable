@@ -1187,8 +1187,7 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error), sizeof(struct got_imsg_object));
+	const size_t min_datalen = sizeof(struct got_imsg_object);
 
 	*obj = NULL;
 
@@ -1409,9 +1408,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_commit_object));
+	const size_t min_datalen = sizeof(struct got_imsg_commit_object);
 
 	*commit = NULL;
 
@@ -1596,9 +1593,7 @@ const struct got_error *
 got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_tree_object));
+	const size_t min_datalen = sizeof(struct got_imsg_tree_object);
 	struct got_imsg_tree_object *itree;
 	int nentries = 0;
 
@@ -1853,9 +1848,7 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 	struct imsg imsg;
 	struct got_imsg_tag_object *itag;
 	size_t len, datalen;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_tag_object));
+	const size_t min_datalen = sizeof(struct got_imsg_tag_object);
 
 	*tag = NULL;
 
@@ -2210,8 +2203,7 @@ got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error), sizeof(int));
+	const size_t min_datalen = sizeof(int);
 
 	*val = 0;
 
@@ -2488,8 +2480,7 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 	size_t datalen;
 	struct got_imsg_remotes iremotes;
 	struct got_imsg_remote iremote;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error), sizeof(iremotes));
+	const size_t min_datalen = sizeof(iremotes);
 
 	*remotes = NULL;
 	*nremotes = 0;
@@ -2529,8 +2520,7 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 
 	while (*nremotes < iremotes.nremotes) {
 		struct got_remote_repo *remote;
-		const size_t min_datalen =
-		    MIN(sizeof(struct got_imsg_error), sizeof(iremote));
+		const size_t min_datalen = sizeof(iremote);
 		int i;
 
 		err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
