@@ -141,12 +141,16 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
 			return got_error_from_errno("imsg_get");
 	}
 
-	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
+	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen) {
+		imsg_free(imsg);
 		return got_error(GOT_ERR_PRIVSEP_LEN);
+	}
 
 	if (imsg->hdr.type == GOT_IMSG_ERROR) {
 		size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-		return recv_imsg_error(imsg, datalen);
+		err = recv_imsg_error(imsg, datalen);
+		imsg_free(imsg);
+		return err;
 	}
 
 	return NULL;
@@ -3510,10 +3514,8 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 
 	for (;;) {
 		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-		if (err){
-			imsg_free(&imsg);
+		if (err)
 			return err;
-		}
 
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 		if (imsg.hdr.type == GOT_IMSG_COMMIT_PAINTING_DONE) {

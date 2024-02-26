@@ -692,8 +692,8 @@ main(int argc, char **argv)
 		goto done;
 	}
 	err = got_privsep_flush_imsg(&ibuf);
-done:
 	imsg_free(&imsg);
+done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (fp != NULL && fclose(fp) == EOF && err == NULL)
