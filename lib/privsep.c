@@ -141,16 +141,16 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
 			return got_error_from_errno("imsg_get");
 	}
 
-	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen) {
-		imsg_free(imsg);
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	}
-
 	if (imsg->hdr.type == GOT_IMSG_ERROR) {
 		size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 		err = recv_imsg_error(imsg, datalen);
 		imsg_free(imsg);
 		return err;
+	}
+
+	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen) {
+		imsg_free(imsg);
+		return got_error(GOT_ERR_PRIVSEP_LEN);
 	}
 
 	return NULL;
