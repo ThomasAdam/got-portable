@@ -2105,6 +2105,87 @@ test_rebase_merge_commit() {
 	test_done "$testroot" 0
 }
 
+test_rebase_across_merge_commit() {
+	local testroot=`test_init rebase_across_merge_commit`
+	local commit0=`git_show_branch_head $testroot/repo master`
+
+	if ! got checkout $testroot/repo $testroot/wt >/dev/null; then
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "modified delta on master" >$testroot/wt/gamma/delta
+	(cd $testroot/wt && got commit -m 'edit delta') >/dev/null
+	local commit1=`git_show_branch_head $testroot/repo master`
+
+	(cd $testroot/wt && got branch -c $commit0 newbranch1) >/dev/null
+	echo "modified alpha on newbranch1" >$testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha') >/dev/null
+	(cd $testroot/wt && got update) >/dev/null
+	local commit2=`git_show_branch_head $testroot/repo master`
+
+	echo "modified alpha on newbranch1 again" >$testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'edit alpha again') >/dev/null
+	(cd $testroot/wt && got update) >/dev/null
+	local commit3=`git_show_branch_head $testroot/repo newbranch1`
+
+	(cd $testroot/wt && got branch -c $commit0 newbranch2) >/dev/null
+	echo "modified beta on newbranch2" >$testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'edit beta') >/dev/null
+	(cd $testroot/wt && got update) >/dev/null
+	local commit4=`git_show_branch_head $testroot/repo newbranch2`
+
+	echo "modified beta on newbranch2 again" >$testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'edit beta again') >/dev/null
+	(cd $testroot/wt && got update) >/dev/null
+	local commit5=`git_show_branch_head $testroot/repo newbranch2`
+
+	echo -n '' > $testroot/stderr.expected
+
+	(cd $testroot/wt && got merge newbranch1 >$testroot/stdout \
+		2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "merge comand failed unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	local merge_commit=`git_show_branch_head $testroot/repo newbranch2`
+
+	echo "G  alpha" >> $testroot/stdout.expected
+	echo -n "Merged refs/heads/newbranch1 into refs/heads/newbranch2: " \
+		>> $testroot/stdout.expected
+	echo $merge_commit >> $testroot/stdout.expected
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase master) > $testroot/stdout
+
+	local new_commit1=`git_show_head $testroot/repo`
+	local short_orig_commit1=`trim_obj_id 28 $commit1`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "G  gamma/delta"> $testroot/stdout.expected
+	echo "$short_orig_commit1 -> $short_new_commit1: edit delta" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
@@ -2128,3 +2209,4 @@ run_test test_rebase_umask
 run_test test_rebase_out_of_date2
 run_test test_rebase_one_commit
 run_test test_rebase_merge_commit
+run_test test_rebase_across_merge_commit
