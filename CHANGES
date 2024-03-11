@@ -1,3 +1,10 @@
+* got 0.97; 2024-03-11
+  see git repository history for per-change authorship information
+- improve error messages shown upon execv failure 
+- fix 'gotadmin pack' crash upon Ctrl-C due to invalid imsg_free()
+- significantly speed up deltification of large files
+- improve error handling in got_privsep_recv_imsg()
+
 * got 0.96; 2024-02-13
   see git repository history for per-change authorship information
 - gotwebd: add foldable commit briefs
