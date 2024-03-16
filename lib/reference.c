@@ -89,7 +89,10 @@ struct got_reference {
 	struct got_lockfile *lf;
 	time_t mtime;
 
-	/* Cached timestamp for got_ref_cmp_by_commit_timestamp_descending() */
+	/*
+	 * Cached timestamp for got_ref_cmp_by_commit_timestamp_descending()
+	 * and got_ref_cmp_tags().
+	 */
 	time_t committer_time;
 };
 
@@ -650,70 +653,6 @@ got_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
 	return NULL;
 }
 
-const struct got_error *
-got_ref_cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
-    struct got_reference *ref2)
-{
-	const struct got_error *err = NULL;
-	struct got_repository *repo = arg;
-	struct got_object_id *id1, *id2 = NULL;
-	struct got_tag_object *tag1 = NULL, *tag2 = NULL;
-	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
-	time_t time1, time2;
-
-	*cmp = 0;
-
-	err = got_ref_resolve(&id1, repo, ref1);
-	if (err)
-		return err;
-	err = got_object_open_as_tag(&tag1, repo, id1);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			goto done;
-		/* "lightweight" tag */
-		err = got_object_open_as_commit(&commit1, repo, id1);
-		if (err)
-			goto done;
-		time1 = got_object_commit_get_committer_time(commit1);
-	} else
-		time1 = got_object_tag_get_tagger_time(tag1);
-
-	err = got_ref_resolve(&id2, repo, ref2);
-	if (err)
-		goto done;
-	err = got_object_open_as_tag(&tag2, repo, id2);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			goto done;
-		/* "lightweight" tag */
-		err = got_object_open_as_commit(&commit2, repo, id2);
-		if (err)
-			goto done;
-		time2 = got_object_commit_get_committer_time(commit2);
-	} else
-		time2 = got_object_tag_get_tagger_time(tag2);
-
-	/* Put latest tags first. */
-	if (time1 < time2)
-		*cmp = 1;
-	else if (time1 > time2)
-		*cmp = -1;
-	else
-		err = got_ref_cmp_by_name(NULL, cmp, ref2, ref1);
-done:
-	free(id1);
-	free(id2);
-	if (tag1)
-		got_object_tag_close(tag1);
-	if (tag2)
-		got_object_tag_close(tag2);
-	if (commit1)
-		got_object_commit_close(commit1);
-	if (commit2)
-		got_object_commit_close(commit2);
-	return err;
-}
-
 static const struct got_error *
 get_committer_time(struct got_reference *ref, struct got_repository *repo)
 {
@@ -756,6 +695,37 @@ done:
 		got_object_commit_close(commit);
 	if (tag)
 		got_object_tag_close(tag);
+	return err;
+}
+
+const struct got_error *
+got_ref_cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
+    struct got_reference *ref2)
+{
+	const struct got_error *err = NULL;
+	struct got_repository *repo = arg;
+
+	*cmp = 0;
+
+	if (ref1->committer_time == 0) {
+		err = get_committer_time(ref1, repo);
+		if (err)
+			return err;
+	}
+	if (ref2->committer_time == 0) {
+		err = get_committer_time(ref2, repo);
+		if (err)
+			return err;
+	}
+
+	/* Put latest tags first. */
+	if (ref1->committer_time < ref2->committer_time)
+		*cmp = 1;
+	else if (ref1->committer_time > ref2->committer_time)
+		*cmp = -1;
+	else
+		err = got_ref_cmp_by_name(NULL, cmp, ref2, ref1);
+
 	return err;
 }
 
