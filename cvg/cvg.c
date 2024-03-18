@@ -69,6 +69,10 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
+#ifndef GOT_DEFAULT_EDITOR
+#define GOT_DEFAULT_EDITOR "/usr/bin/vi"
+#endif
+
 static volatile sig_atomic_t sigint_received;
 static volatile sig_atomic_t sigpipe_received;
 
@@ -281,7 +285,7 @@ get_editor(char **abspath)
 	}
 
 	if (*abspath == NULL) {
-		*abspath = strdup("/usr/bin/vi");
+		*abspath = strdup(GOT_DEFAULT_EDITOR);
 		if (*abspath == NULL)
 			return got_error_from_errno("strdup");
 	}
