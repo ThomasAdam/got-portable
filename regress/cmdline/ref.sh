@@ -438,6 +438,91 @@ test_ref_list() {
 	test_done "$testroot" "$ret"
 }
 
+test_ref_list_packed_refs() {
+	local testroot=`test_init ref_list_packed_refs`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag=1.0.0
+	local tag2=2.0.0
+
+	# create tag with Git
+	git -C $testroot/repo tag -a -m 'test' $tag
+	# create tag with Got
+	(cd $testroot/repo && got tag -m 'test' $tag2 > /dev/null)
+
+	tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+	local tagger_time=`git_show_tagger_time $testroot/repo $tag`
+	d1=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
+	tag_id2=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
+	local tagger_time2=`git_show_tagger_time $testroot/repo $tag2`
+	d2=`date -u -r $tagger_time2 +"%a %b %e %X %Y UTC"`
+
+	for i in 1 2; do
+		if [ $i -eq 2 ]; then
+			# Move all refs into the packed-refs file
+			git -C $testroot/repo pack-refs --all
+		fi
+
+		got ref -r $testroot/repo -l > $testroot/stdout
+
+		cat > $testroot/stdout.expected <<EOF
+HEAD: refs/heads/master
+refs/heads/master: $commit_id
+refs/tags/1.0.0: $tag_id
+refs/tags/2.0.0: $tag_id2
+EOF
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		got ref -r $testroot/repo -l tags/$tag > $testroot/stdout
+
+		cat > $testroot/stdout.expected <<EOF
+refs/tags/1.0.0: $tag_id
+EOF
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		got ref -r $testroot/repo -l $tag2 > $testroot/stdout
+
+		cat > $testroot/stdout.expected <<EOF
+refs/tags/2.0.0: $tag_id2
+EOF
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		got ref -r $testroot/repo -l tags > $testroot/stdout
+		cat > $testroot/stdout.expected <<EOF
+refs/tags/1.0.0: $tag_id
+refs/tags/2.0.0: $tag_id2
+EOF
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
+}
+
 test_ref_commit_keywords() {
 	local testroot=$(test_init ref_commit_keywords)
 	local repo="$testroot/repo"
@@ -519,4 +604,5 @@ test_parseargs "$@"
 run_test test_ref_create
 run_test test_ref_delete
 run_test test_ref_list
+run_test test_ref_list_packed_refs
 run_test test_ref_commit_keywords
