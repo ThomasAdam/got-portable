@@ -1715,6 +1715,12 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 					    err->msg);
 					break;
 				}
+				/*
+				 * Ensure we re-read the pack index list
+				 * upon next access.
+				 */
+				repo_write.repo->pack_path_mtime.tv_sec = 0;
+				repo_write.repo->pack_path_mtime.tv_nsec = 0;
 			}
 			err = update_refs(iev);
 			if (err) {

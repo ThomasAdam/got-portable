@@ -367,6 +367,10 @@ install_pack(struct gotd_session_client *client, const char *repo_path,
 		goto done;
 	}
 
+	/* Ensure we re-read the pack index list upon next access. */
+	gotd_session.repo->pack_path_mtime.tv_sec = 0;
+	gotd_session.repo->pack_path_mtime.tv_nsec = 0;
+
 	free(client->packidx_path);
 	client->packidx_path = NULL;
 done:
