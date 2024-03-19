@@ -63,8 +63,8 @@ got_poll_fd(int fd, int events, int timeout)
 }
 
 const struct got_error *
-got_poll_read_full(int fd, size_t *len, void *buf, size_t bufsize,
-    size_t minbytes)
+got_poll_read_full_timeout(int fd, size_t *len, void *buf, size_t bufsize,
+    size_t minbytes, int timeout)
 {
 	const struct got_error *err = NULL;
 	size_t have = 0;
@@ -74,7 +74,7 @@ got_poll_read_full(int fd, size_t *len, void *buf, size_t bufsize,
 		return got_error(GOT_ERR_NO_SPACE);
 
 	while (have < minbytes) {
-		err = got_poll_fd(fd, POLLIN, INFTIM);
+		err = got_poll_fd(fd, POLLIN, timeout);
 		if (err)
 			return err;
 		r = read(fd, buf + have, bufsize - have);
@@ -87,6 +87,14 @@ got_poll_read_full(int fd, size_t *len, void *buf, size_t bufsize,
 
 	*len = have;
 	return NULL;
+}
+
+const struct got_error *
+got_poll_read_full(int fd, size_t *len, void *buf, size_t bufsize,
+    size_t minbytes)
+{
+	return got_poll_read_full_timeout(fd, len, buf, bufsize,
+	    minbytes, INFTIM);
 }
 
 const struct got_error *
