@@ -15,6 +15,8 @@
  */
 
 const struct got_error *got_poll_fd(int fd, int events, int timeout);
+const struct got_error *got_poll_read_full_timeout(int, size_t *, void *,
+    size_t, size_t, int);
 const struct got_error *got_poll_read_full(int, size_t *, void *, size_t,
     size_t);
 const struct got_error *got_poll_write_full(int, const void *, off_t);
