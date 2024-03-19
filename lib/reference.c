@@ -857,6 +857,8 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 	const struct got_error *err = NULL;
 	DIR *d = NULL;
 	char *path_subdir;
+	struct got_reference *ref;
+	struct got_reflist_entry *new;
 
 	while (subdir[0] == '/')
 		subdir++;
@@ -865,12 +867,40 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		return got_error_from_errno("asprintf");
 
 	d = opendir(path_subdir);
-	if (d == NULL)
-		goto done;
+	if (d == NULL) {
+		char *refname;
+
+		if (errno != ENOTDIR)
+			goto done;
+
+		/* This could be a regular on-disk reference file. */
+		free(path_subdir);
+		err = got_path_dirname(&path_subdir, subdir);
+		if (err)
+			return err;
+		err = got_path_basename(&refname, subdir);
+		if (err) {
+			free(path_subdir);
+			return err;
+		}
+		err = open_ref(&ref, path_refs, path_subdir, refname,
+		    0, got_repo_get_object_format(repo));
+		free(path_subdir);
+		free(refname);
+		if (err) {
+			if (err->code == GOT_ERR_NOT_REF)
+				return NULL;
+			return err;
+		}
+		err = got_reflist_insert(&new, refs, ref,
+		    cmp_cb, cmp_arg);
+		if (err || new == NULL /* duplicate */)
+			got_ref_close(ref);
+		return err;
+	}
 
 	for (;;) {
 		struct dirent *dent;
-		struct got_reference *ref;
 		char *child;
 		int type;
 
@@ -895,7 +925,6 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 			if (err)
 				goto done;
 			if (ref) {
-				struct got_reflist_entry *new;
 				err = got_reflist_insert(&new, refs, ref,
 				    cmp_cb, cmp_arg);
 				if (err || new == NULL /* duplicate */)
@@ -923,6 +952,33 @@ done:
 		closedir(d);
 	free(path_subdir);
 	return err;
+}
+
+static int
+match_packed_ref(struct got_reference *ref, const char *ref_namespace)
+{
+	const char *name = got_ref_get_name(ref);
+	int namespace_is_absolute = (strncmp(ref_namespace, "refs/", 5) == 0);
+
+	if (namespace_is_absolute) {
+		return (strcmp(name, ref_namespace) == 0 ||
+		    got_path_is_child(name, ref_namespace,
+		    strlen(ref_namespace)));
+	}
+
+	/* Match all "subdirectories" as we do with on-disk refs. */
+	while (*name != '\0') {
+		while (*name == '/')
+			name++;
+		if (strcmp(name, ref_namespace) == 0 ||
+		    got_path_is_child(name, ref_namespace,
+		    strlen(ref_namespace)))
+			return 1;
+		while (*name != '\0' && *name != '/')
+			name++;
+	}
+
+	return 0;
 }
 
 const struct got_error *
@@ -955,14 +1011,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			goto done;
 	} else {
 		/* Try listing a single reference. */
-		const char *refname = ref_namespace;
-		path_refs = get_refs_dir_path(repo, refname);
-		if (path_refs == NULL) {
-			err = got_error_from_errno("get_refs_dir_path");
-			goto done;
-		}
-		err = open_ref(&ref, path_refs, "", refname, 0,
-		    got_repo_get_object_format(repo));
+		err = got_ref_open(&ref, repo, ref_namespace, 0);
 		if (err) {
 			if (err->code != GOT_ERR_NOT_REF)
 				goto done;
@@ -1049,15 +1098,10 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			if (err)
 				goto done;
 			if (ref) {
-				if (ref_namespace) {
-					const char *name;
-					name = got_ref_get_name(ref);
-					if (!got_path_is_child(name,
-					    ref_namespace,
-					    strlen(ref_namespace))) {
-						got_ref_close(ref);
-						continue;
-					}
+				if (ref_namespace &&
+				    !match_packed_ref(ref, ref_namespace)) {
+					got_ref_close(ref);
+					continue;
 				}
 				err = got_reflist_insert(&new, refs, ref,
 				    cmp_cb, cmp_arg);
