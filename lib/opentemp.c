@@ -133,3 +133,13 @@ got_opentemp_truncate(FILE *f)
 		return got_error_from_errno("fseeko");
 	return NULL;
 }
+
+const struct got_error *
+got_opentemp_truncatefd(int fd)
+{
+	if (ftruncate(fd, 0L) == -1)
+		return got_error_from_errno("ftruncate");
+	if (lseek(fd, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("lseek");
+	return NULL;
+}
