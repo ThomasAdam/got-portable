@@ -402,7 +402,7 @@ update_ref(int *shut, struct gotd_session_client *client,
     const char *repo_path, struct imsg *imsg)
 {
 	const struct got_error *err = NULL;
-	struct got_repository *repo = NULL;
+	struct got_repository *repo = gotd_session.repo;
 	struct got_reference *ref = NULL;
 	struct gotd_imsg_ref_update iref;
 	struct got_object_id old_id, new_id;
@@ -429,10 +429,6 @@ update_ref(int *shut, struct gotd_session_client *client,
 		return got_error_from_errno("strndup");
 
 	log_debug("updating ref %s for uid %d", refname, client->euid);
-
-	err = got_repo_open(&repo, repo_path, NULL, NULL);
-	if (err)
-		goto done;
 
 	memcpy(old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
 	memcpy(new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
@@ -556,8 +552,6 @@ done:
 	}
 	if (ref)
 		got_ref_close(ref);
-	if (repo)
-		got_repo_close(repo);
 	free(refname);
 	free(id);
 	return err;
