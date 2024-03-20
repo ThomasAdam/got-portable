@@ -32,7 +32,7 @@
 
 #include "got_lib_poll.h"
 
-int smtp_timeout = 60; /* in seconds */
+static int smtp_timeout = 60; /* in seconds */
 
 __dead static void
 usage(void)
