@@ -324,8 +324,8 @@ notifyflags	: BRANCH STRING {
 					free($2);
 					YYERROR;
 				}
-				free($2);
 			}
+			free($2);
 		}
 		| REFERENCE NAMESPACE STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -335,8 +335,8 @@ notifyflags	: BRANCH STRING {
 					free($3);
 					YYERROR;
 				}
-				free($3);
 			}
+			free($3);
 		}
 		| EMAIL TO STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -347,8 +347,8 @@ notifyflags	: BRANCH STRING {
 					free($3);
 					YYERROR;
 				}
-				free($3);
 			}
+			free($3);
 		}
 		| EMAIL FROM STRING TO STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -360,9 +360,9 @@ notifyflags	: BRANCH STRING {
 					free($5);
 					YYERROR;
 				}
-				free($3);
-				free($5);
 			}
+			free($3);
+			free($5);
 		}
 		| EMAIL TO STRING REPLY TO STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -374,9 +374,9 @@ notifyflags	: BRANCH STRING {
 					free($6);
 					YYERROR;
 				}
-				free($3);
-				free($6);
 			}
+			free($3);
+			free($6);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -389,10 +389,10 @@ notifyflags	: BRANCH STRING {
 					free($8);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($8);
 			}
+			free($3);
+			free($5);
+			free($8);
 		}
 		| EMAIL TO STRING RELAY STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -404,9 +404,9 @@ notifyflags	: BRANCH STRING {
 					free($5);
 					YYERROR;
 				}
-				free($3);
-				free($5);
 			}
+			free($3);
+			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -419,10 +419,10 @@ notifyflags	: BRANCH STRING {
 					free($7);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($7);
 			}
+			free($3);
+			free($5);
+			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -435,10 +435,10 @@ notifyflags	: BRANCH STRING {
 					free($8);
 					YYERROR;
 				}
-				free($3);
-				free($6);
-				free($8);
 			}
+			free($3);
+			free($6);
+			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -452,11 +452,11 @@ notifyflags	: BRANCH STRING {
 					free($10);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($8);
-				free($10);
 			}
+			free($3);
+			free($5);
+			free($8);
+			free($10);
 		}
 		| EMAIL TO STRING RELAY STRING PORT STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -469,10 +469,10 @@ notifyflags	: BRANCH STRING {
 					free($7);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($7);
 			}
+			free($3);
+			free($5);
+			free($7);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -486,11 +486,11 @@ notifyflags	: BRANCH STRING {
 					free($9);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($7);
-				free($9);
 			}
+			free($3);
+			free($5);
+			free($7);
+			free($9);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -504,11 +504,11 @@ notifyflags	: BRANCH STRING {
 					free($10);
 					YYERROR;
 				}
-				free($3);
-				free($6);
-				free($8);
-				free($10);
 			}
+			free($3);
+			free($6);
+			free($8);
+			free($10);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -523,12 +523,12 @@ notifyflags	: BRANCH STRING {
 					free($12);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($8);
-				free($10);
-				free($12);
 			}
+			free($3);
+			free($5);
+			free($8);
+			free($10);
+			free($12);
 		}
 		| EMAIL TO STRING RELAY STRING PORT NUMBER {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -540,9 +540,9 @@ notifyflags	: BRANCH STRING {
 					free($5);
 					YYERROR;
 				}
-				free($3);
-				free($5);
 			}
+			free($3);
+			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT NUMBER {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -555,10 +555,10 @@ notifyflags	: BRANCH STRING {
 					free($7);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($7);
 			}
+			free($3);
+			free($5);
+			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -571,10 +571,10 @@ notifyflags	: BRANCH STRING {
 					free($8);
 					YYERROR;
 				}
-				free($3);
-				free($6);
-				free($8);
 			}
+			free($3);
+			free($6);
+			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -588,11 +588,11 @@ notifyflags	: BRANCH STRING {
 					free($10);
 					YYERROR;
 				}
-				free($3);
-				free($5);
-				free($8);
-				free($10);
 			}
+			free($3);
+			free($5);
+			free($8);
+			free($10);
 		}
 		| URL STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -603,8 +603,8 @@ notifyflags	: BRANCH STRING {
 					free($2);
 					YYERROR;
 				}
-				free($2);
 			}
+			free($2);
 		}
 		| URL STRING USER STRING PASSWORD STRING {
 			if (gotd_proc_id == PROC_GOTD ||
@@ -616,10 +616,10 @@ notifyflags	: BRANCH STRING {
 					free($6);
 					YYERROR;
 				}
-				free($2);
-				free($4);
-				free($6);
 			}
+			free($2);
+			free($4);
+			free($6);
 		}
 		;
 	
