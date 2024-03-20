@@ -24,6 +24,23 @@
 #define GOTD_EMPTY_PATH	"/var/empty"
 #endif
 
+#ifndef GOT_LIBEXECDIR
+#define GOT_LIBEXECDIR /usr/libexec
+#endif
+
+#define GOTD_STRINGIFY(x) #x
+#define GOTD_STRINGVAL(x) GOTD_STRINGIFY(x)
+
+#define GOTD_PROG_NOTIFY_EMAIL	got-notify-email
+#define GOTD_PROG_NOTIFY_HTTP	got-notify-http
+
+#define GOTD_PATH_PROG_NOTIFY_EMAIL \
+	GOTD_STRINGVAL(GOT_LIBEXECDIR) "/" \
+	GOTD_STRINGVAL(GOTD_PROG_NOTIFY_EMAIL)
+#define GOTD_PATH_PROG_NOTIFY_HTTP \
+	GOTD_STRINGVAL(GOT_LIBEXECDIR) "/" \
+	GOTD_STRINGVAL(GOTD_PROG_NOTIFY_HTTP)
+
 #define GOTD_MAXCLIENTS		1024
 #define GOTD_MAX_CONN_PER_UID	4
 #define GOTD_FD_RESERVE		5
@@ -44,6 +61,7 @@ enum gotd_procid {
 	PROC_REPO_READ,
 	PROC_REPO_WRITE,
 	PROC_GITWRAPPER,
+	PROC_NOTIFY,
 	PROC_MAX,
 };
 
@@ -73,6 +91,32 @@ struct gotd_access_rule {
 };
 STAILQ_HEAD(gotd_access_rule_list, gotd_access_rule);
 
+enum gotd_notification_target_type {
+	GOTD_NOTIFICATION_VIA_EMAIL,
+	GOTD_NOTIFICATION_VIA_HTTP
+};
+
+struct gotd_notification_target {
+	STAILQ_ENTRY(gotd_notification_target) entry;
+
+	enum gotd_notification_target_type type;
+	union {
+		struct {
+			char *sender;
+			char *recipient;
+			char *responder;
+			char *hostname;
+			char *port;
+		} email;
+		struct {
+			char *url;
+			char *user;
+			char *password;
+		} http;
+	} conf;
+};
+STAILQ_HEAD(gotd_notification_targets, gotd_notification_target);
+
 struct gotd_repo {
 	TAILQ_ENTRY(gotd_repo)	 entry;
 
@@ -83,6 +127,10 @@ struct gotd_repo {
 	struct got_pathlist_head protected_tag_namespaces;
 	struct got_pathlist_head protected_branch_namespaces;
 	struct got_pathlist_head protected_branches;
+
+	struct got_pathlist_head notification_refs;
+	struct got_pathlist_head notification_ref_namespaces;
+	struct gotd_notification_targets notification_targets;
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
 
@@ -96,6 +144,7 @@ enum gotd_session_state {
 	GOTD_STATE_EXPECT_PACKFILE,
 	GOTD_STATE_EXPECT_DONE,
 	GOTD_STATE_DONE,
+	GOTD_STATE_NOTIFY,
 };
 
 struct gotd_client_capability {
@@ -123,6 +172,8 @@ struct gotd {
 	struct gotd_repolist repos;
 	int nrepos;
 	struct gotd_child_proc *listen_proc;
+	struct gotd_child_proc *notify_proc;
+	int notifications_enabled;
 	struct timeval request_timeout;
 	struct timeval auth_timeout;
 	struct gotd_uid_connection_limit *connection_limits;
@@ -196,6 +247,12 @@ enum gotd_imsg_type {
 	/* Auth child process. */
 	GOTD_IMSG_AUTHENTICATE,
 	GOTD_IMSG_ACCESS_GRANTED,
+
+	/* Notify child process. */
+	GOTD_IMSG_CONNECT_NOTIFIER,
+	GOTD_IMSG_CONNECT_SESSION,
+	GOTD_IMSG_NOTIFY,
+	GOTD_IMSG_NOTIFICATION_SENT
 };
 
 /* Structure for GOTD_IMSG_ERROR. */
@@ -428,6 +485,9 @@ struct gotd_imsg_connect {
 	uint32_t client_id;
 	uid_t euid;
 	gid_t egid;
+	size_t username_len;
+
+	/* Followed by username_len data bytes. */
 };
 
 /* Structure for GOTD_IMSG_CONNECT_REPO_CHILD. */
@@ -446,13 +506,35 @@ struct gotd_imsg_auth {
 	uint32_t client_id;
 };
 
-int enter_chroot(const char *);
+/* Structures for GOTD_IMSG_NOTIFY. */
+enum gotd_notification_action {
+	GOTD_NOTIF_ACTION_CREATED,
+	GOTD_NOTIF_ACTION_REMOVED,
+	GOTD_NOTIF_ACTION_CHANGED
+};
+/* IMSG_NOTIFY session <-> repo_write */
+struct gotd_imsg_notification_content {
+	uint32_t client_id;
+	enum gotd_notification_action action;
+	uint8_t old_id[SHA1_DIGEST_LENGTH];
+	uint8_t new_id[SHA1_DIGEST_LENGTH];
+	size_t refname_len;
+	/* Followed by refname_len data bytes. */
+};
+/* IMSG_NOTIFY session -> notify*/
+struct gotd_imsg_notify {
+	char repo_name[NAME_MAX];
+	char subject_line[64];
+};
+
 int parse_config(const char *, enum gotd_procid, struct gotd *);
-struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd *);
+struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(
     struct gotd_uid_connection_limit *limits, size_t nlimits, uid_t uid);
 int gotd_parseuid(const char *s, uid_t *uid);
+const struct got_error *gotd_parse_url(char **, char **, char **,
+    char **, const char *);
 
 /* imsg.c */
 const struct got_error *gotd_imsg_flush(struct imsgbuf *);

@@ -73,6 +73,7 @@ int		 lookup(char *);
 int		 lgetc(int);
 int		 lungetc(int);
 int		 findeol(void);
+static char	*port_sprintf(int);
 
 TAILQ_HEAD(symhead, sym)	 symhead = TAILQ_HEAD_INITIALIZER(symhead);
 struct sym {
@@ -102,6 +103,14 @@ static int			 conf_protect_branch_namespace(
 				    struct gotd_repo *, char *);
 static int			 conf_protect_branch(struct gotd_repo *,
 				    char *);
+static int			 conf_notify_branch(struct gotd_repo *,
+				    char *);
+static int			 conf_notify_ref_namespace(struct gotd_repo *,
+				    char *);
+static int			 conf_notify_email(struct gotd_repo *,
+				    char *, char *, char *, char *, char *);
+static int			 conf_notify_http(struct gotd_repo *,
+				    char *, char *, char *);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
@@ -117,7 +126,8 @@ typedef struct {
 
 %token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
-%token	PROTECT NAMESPACE BRANCH TAG
+%token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT
+%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -299,6 +309,320 @@ protectflags	: TAG NAMESPACE STRING {
 		}
 		;
 
+notify		: NOTIFY '{' optnl notifyflags_l '}'
+		| NOTIFY notifyflags
+
+notifyflags_l	: notifyflags optnl notifyflags_l
+		| notifyflags optnl
+		;
+
+notifyflags	: BRANCH STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_branch(new_repo, $2)) {
+					free($2);
+					YYERROR;
+				}
+				free($2);
+			}
+		}
+		| REFERENCE NAMESPACE STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_ref_namespace(new_repo, $3)) {
+					free($3);
+					YYERROR;
+				}
+				free($3);
+			}
+		}
+		| EMAIL TO STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    NULL, NULL, NULL)) {
+					free($3);
+					YYERROR;
+				}
+				free($3);
+			}
+		}
+		| EMAIL FROM STRING TO STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    NULL, NULL, NULL)) {
+					free($3);
+					free($5);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+			}
+		}
+		| EMAIL TO STRING REPLY TO STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    $6, NULL, NULL)) {
+					free($3);
+					free($6);
+					YYERROR;
+				}
+				free($3);
+				free($6);
+			}
+		}
+		| EMAIL FROM STRING TO STRING REPLY TO STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    $8, NULL, NULL)) {
+					free($3);
+					free($5);
+					free($8);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($8);
+			}
+		}
+		| EMAIL TO STRING RELAY STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    NULL, $5, NULL)) {
+					free($3);
+					free($5);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+			}
+		}
+		| EMAIL FROM STRING TO STRING RELAY STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    NULL, $7, NULL)) {
+					free($3);
+					free($5);
+					free($7);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($7);
+			}
+		}
+		| EMAIL TO STRING REPLY TO STRING RELAY STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    $6, $8, NULL)) {
+					free($3);
+					free($6);
+					free($8);
+					YYERROR;
+				}
+				free($3);
+				free($6);
+				free($8);
+			}
+		}
+		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    $8, $10, NULL)) {
+					free($3);
+					free($5);
+					free($8);
+					free($10);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($8);
+				free($10);
+			}
+		}
+		| EMAIL TO STRING RELAY STRING PORT STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    NULL, $5, $7)) {
+					free($3);
+					free($5);
+					free($7);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($7);
+			}
+		}
+		| EMAIL FROM STRING TO STRING RELAY STRING PORT STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    NULL, $7, $9)) {
+					free($3);
+					free($5);
+					free($7);
+					free($9);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($7);
+				free($9);
+			}
+		}
+		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    $6, $8, $10)) {
+					free($3);
+					free($6);
+					free($8);
+					free($10);
+					YYERROR;
+				}
+				free($3);
+				free($6);
+				free($8);
+				free($10);
+			}
+		}
+		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    $8, $10, $12)) {
+					free($3);
+					free($5);
+					free($8);
+					free($10);
+					free($12);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($8);
+				free($10);
+				free($12);
+			}
+		}
+		| EMAIL TO STRING RELAY STRING PORT NUMBER {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    NULL, $5, port_sprintf($7))) {
+					free($3);
+					free($5);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+			}
+		}
+		| EMAIL FROM STRING TO STRING RELAY STRING PORT NUMBER {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    NULL, $7, port_sprintf($9))) {
+					free($3);
+					free($5);
+					free($7);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($7);
+			}
+		}
+		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, NULL, $3,
+				    $6, $8, port_sprintf($10))) {
+					free($3);
+					free($6);
+					free($8);
+					YYERROR;
+				}
+				free($3);
+				free($6);
+				free($8);
+			}
+		}
+		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_email(new_repo, $3, $5,
+				    $8, $10, port_sprintf($12))) {
+					free($3);
+					free($5);
+					free($8);
+					free($10);
+					YYERROR;
+				}
+				free($3);
+				free($5);
+				free($8);
+				free($10);
+			}
+		}
+		| URL STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, NULL,
+				    NULL)) {
+					free($2);
+					YYERROR;
+				}
+				free($2);
+			}
+		}
+		| URL STRING USER STRING PASSWORD STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, $4, $6)) {
+					free($2);
+					free($4);
+					free($6);
+					YYERROR;
+				}
+				free($2);
+				free($4);
+				free($6);
+			}
+		}
+		;
+	
 repository	: REPOSITORY STRING {
 			struct gotd_repo *repo;
 
@@ -313,7 +637,9 @@ repository	: REPOSITORY STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_AUTH ||
 			    gotd_proc_id == PROC_REPO_WRITE ||
-			    gotd_proc_id == PROC_GITWRAPPER) {
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_GITWRAPPER |
+			    gotd_proc_id == PROC_NOTIFY) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -325,7 +651,9 @@ repoopts1	: PATH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_AUTH ||
 			    gotd_proc_id == PROC_REPO_WRITE ||
-			    gotd_proc_id == PROC_GITWRAPPER) {
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_GITWRAPPER ||
+			    gotd_proc_id == PROC_NOTIFY) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -385,6 +713,7 @@ repoopts1	: PATH STRING {
 				free($2);
 		}
 		| protect
+		| notify
 		;
 
 repoopts2	: repoopts2 repoopts1 nl
@@ -435,19 +764,29 @@ lookup(char *s)
 		{ "branch",			BRANCH },
 		{ "connection",			CONNECTION },
 		{ "deny",			DENY },
+		{ "email",			EMAIL },
+		{ "from",			FROM },
 		{ "limit",			LIMIT },
 		{ "listen",			LISTEN },
 		{ "namespace",			NAMESPACE },
+		{ "notify",			NOTIFY },
 		{ "on",				ON },
+		{ "password",			PASSWORD },
 		{ "path",			PATH },
 		{ "permit",			PERMIT },
+		{ "port",			PORT },
 		{ "protect",			PROTECT },
+		{ "reference",			REFERENCE },
+		{ "relay",			RELAY },
+		{ "reply",			REPLY },
 		{ "repository",			REPOSITORY },
 		{ "request",			REQUEST },
 		{ "ro",				RO },
 		{ "rw",				RW },
 		{ "tag",			TAG },
 		{ "timeout",			TIMEOUT },
+		{ "to",				TO },
+		{ "url",			URL },
 		{ "user",			USER },
 	};
 	const struct keywords *p;
@@ -919,6 +1258,10 @@ conf_new_repo(const char *name)
 	TAILQ_INIT(&repo->protected_tag_namespaces);
 	TAILQ_INIT(&repo->protected_branch_namespaces);
 	TAILQ_INIT(&repo->protected_branches);
+	TAILQ_INIT(&repo->protected_branches);
+	TAILQ_INIT(&repo->notification_refs);
+	TAILQ_INIT(&repo->notification_ref_namespaces);
+	STAILQ_INIT(&repo->notification_targets);
 
 	if (strlcpy(repo->name, name, sizeof(repo->name)) >=
 	    sizeof(repo->name))
@@ -1075,6 +1418,187 @@ conf_protect_branch(struct gotd_repo *repo, char *branchname)
 	return 0;
 }
 
+static int
+conf_notify_branch(struct gotd_repo *repo, char *branchname)
+{
+	const struct got_error *error;
+	struct got_pathlist_entry *pe;
+	char *refname;
+
+	if (strncmp(branchname, "refs/heads/", 11) != 0) {
+		if (asprintf(&refname, "refs/heads/%s", branchname) == -1) {
+			yyerror("asprintf: %s", strerror(errno));
+			return -1;
+		}
+	} else {
+		refname = strdup(branchname);
+		if (refname == NULL) {
+			yyerror("strdup: %s", strerror(errno));
+			return -1;
+		}
+	}
+
+	if (!refname_is_valid(refname)) {
+		free(refname);
+		return -1;
+	}
+
+	error = got_pathlist_insert(&pe, &repo->notification_refs,
+	    refname, NULL);
+	if (error) {
+		free(refname);
+		yyerror("got_pathlist_insert: %s", error->msg);
+		return -1;
+	}
+	if (pe == NULL)
+		free(refname);
+
+	return 0;
+}
+
+static int
+conf_notify_ref_namespace(struct gotd_repo *repo, char *namespace)
+{
+	const struct got_error *error;
+	struct got_pathlist_entry *pe;
+	char *s;
+
+	got_path_strip_trailing_slashes(namespace);
+	if (!refname_is_valid(namespace))
+		return -1;
+
+	if (asprintf(&s, "%s/", namespace) == -1) {
+		yyerror("asprintf: %s", strerror(errno));
+		return -1;
+	}
+
+	error = got_pathlist_insert(&pe, &repo->notification_ref_namespaces,
+	    s, NULL);
+	if (error) {
+		free(s);
+		yyerror("got_pathlist_insert: %s", error->msg);
+		return -1;
+	}
+	if (pe == NULL)
+		free(s);
+
+	return 0;
+}
+
+static int
+conf_notify_email(struct gotd_repo *repo, char *sender, char *recipient,
+    char *responder, char *hostname, char *port)
+{
+	struct gotd_notification_target *target;
+
+	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		if (target->type != GOTD_NOTIFICATION_VIA_EMAIL)
+			continue;
+		if (strcmp(target->conf.email.recipient, recipient) == 0) {
+			yyerror("duplicate email notification for '%s' in "
+			    "repository '%s'", recipient, repo->name);
+			return -1;
+		}
+	}
+
+	target = calloc(1, sizeof(*target));
+	if (target == NULL)
+		fatal("calloc");
+	target->type = GOTD_NOTIFICATION_VIA_EMAIL;
+	if (sender) {
+		target->conf.email.sender = strdup(sender);
+		if (target->conf.email.sender == NULL)
+			fatal("strdup");
+	}
+	target->conf.email.recipient = strdup(recipient);
+	if (target->conf.email.recipient == NULL)
+		fatal("strdup");
+	if (responder) {
+		target->conf.email.responder = strdup(responder);
+		if (target->conf.email.responder == NULL)
+			fatal("strdup");
+	}
+	if (hostname) {
+		target->conf.email.hostname = strdup(hostname);
+		if (target->conf.email.hostname == NULL)
+			fatal("strdup");
+	}
+	if (port) {
+		target->conf.email.port = strdup(port);
+		if (target->conf.email.port == NULL)
+			fatal("strdup");
+	}
+
+	STAILQ_INSERT_TAIL(&repo->notification_targets, target, entry);
+	return 0;
+}
+
+static int
+conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
+{
+	const struct got_error *error;
+	struct gotd_notification_target *target;
+	char *proto, *host, *port, *request_path;
+	int ret = 0;
+
+	error = gotd_parse_url(&proto, &host, &port, &request_path, url);
+	if (error) {
+		yyerror("invalid HTTP notification URL '%s' in "
+		    "repository '%s': %s", url, repo->name, error->msg);
+		return -1;
+	}
+
+	if (strcmp(proto, "http") != 0 && strcmp(proto, "https") != 0) {
+		yyerror("invalid protocol '%s' in notification URL '%s' in "
+		    "repository '%s", proto, url, repo->name);
+		ret = -1;
+		goto done;
+	}
+
+	if (strcmp(proto, "http") == 0 && (user != NULL || password != NULL)) {
+		log_warnx("%s: WARNING: Using basic authentication over "
+		    "plaintext http:// will leak credentials; https:// is "
+		    "recommended for URL '%s'", getprogname(), url);
+	}
+
+	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		if (target->type != GOTD_NOTIFICATION_VIA_HTTP)
+			continue;
+		if (strcmp(target->conf.http.url, url) == 0) {
+			yyerror("duplicate notification for URL '%s' in "
+			    "repository '%s'", url, repo->name);
+			ret = -1;
+			goto done;
+		}
+	}
+
+	target = calloc(1, sizeof(*target));
+	if (target == NULL)
+		fatal("calloc");
+	target->type = GOTD_NOTIFICATION_VIA_HTTP;
+	target->conf.http.url = strdup(url);
+	if (target->conf.http.url == NULL)
+		fatal("calloc");
+	if (user) {
+		target->conf.http.user = strdup(user);
+		if (target->conf.http.user == NULL)
+			fatal("calloc");
+	}	
+	if (password) {
+		target->conf.http.password = strdup(password);
+		if (target->conf.http.password == NULL)
+			fatal("calloc");
+	}	
+
+	STAILQ_INSERT_TAIL(&repo->notification_targets, target, entry);
+done:
+	free(proto);
+	free(host);
+	free(port);
+	free(request_path);
+	return ret;
+}
+
 int
 symset(const char *nam, const char *val, int persist)
 {
@@ -1131,12 +1655,12 @@ symget(const char *nam)
 }
 
 struct gotd_repo *
-gotd_find_repo_by_name(const char *repo_name, struct gotd *gotd)
+gotd_find_repo_by_name(const char *repo_name, struct gotd_repolist *repos)
 {
 	struct gotd_repo *repo;
 	size_t namelen;
 
-	TAILQ_FOREACH(repo, &gotd->repos, entry) {
+	TAILQ_FOREACH(repo, repos, entry) {
 		namelen = strlen(repo->name);
 		if (strncmp(repo->name, repo_name, namelen) != 0)
 			continue;
@@ -1197,4 +1721,101 @@ gotd_parseuid(const char *s, uid_t *uid)
 	if (errstr)
 		return -1;
 	return 0;
+}
+
+const struct got_error *
+gotd_parse_url(char **proto, char **host, char **port,
+    char **request_path, const char *url)
+{
+	const struct got_error *err = NULL;
+	char *s, *p, *q;
+
+	*proto = *host = *port = *request_path = NULL;
+
+	p = strstr(url, "://");
+	if (!p)
+		return got_error(GOT_ERR_PARSE_URI);
+
+	*proto = strndup(url, p - url);
+	if (*proto == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	s = p + 3;
+
+	p = strstr(s, "/");
+	if (p == NULL || strlen(p) == 1) {
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
+	}
+
+	q = memchr(s, ':', p - s);
+	if (q) {
+		*host = strndup(s, q - s);
+		if (*host == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if ((*host)[0] == '\0') {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+		*port = strndup(q + 1, p - (q + 1));
+		if (*port == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if ((*port)[0] == '\0') {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+	} else {
+		*host = strndup(s, p - s);
+		if (*host == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if ((*host)[0] == '\0') {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+	}
+
+	while (p[0] == '/' && p[1] == '/')
+		p++;
+	*request_path = strdup(p);
+	if (*request_path == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	got_path_strip_trailing_slashes(*request_path);
+	if ((*request_path)[0] == '\0') {
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
+	}
+done:
+	if (err) {
+		free(*proto);
+		*proto = NULL;
+		free(*host);
+		*host = NULL;
+		free(*port);
+		*port = NULL;
+		free(*request_path);
+		*request_path = NULL;
+	}
+	return err;
+}
+
+static char *
+port_sprintf(int p)
+{
+	static char portno[32];
+	int n;
+
+	n = snprintf(portno, sizeof(portno), "%lld", (long long)p);
+	if (n < 0 || (size_t)n >= sizeof(portno))
+		fatalx("port number too long: %lld", (long long)p);
+
+	return portno;
 }

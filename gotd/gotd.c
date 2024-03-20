@@ -46,6 +46,7 @@
 #include "got_repository.h"
 #include "got_object.h"
 #include "got_reference.h"
+#include "got_diff.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
@@ -62,6 +63,7 @@
 #include "session.h"
 #include "repo_read.h"
 #include "repo_write.h"
+#include "notify.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -314,6 +316,9 @@ proc_done(struct gotd_child_proc *proc)
 		disconnect(client);
 	}
 
+	if (proc == gotd.notify_proc)
+		gotd.notify_proc = NULL;
+
 	evtimer_del(&proc->tmo);
 
 	if (proc->iev.ibuf.fd != -1) {
@@ -545,7 +550,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		err = ensure_client_is_not_writing(client);
 		if (err)
 			return err;
-		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd);
+		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 		err = start_auth_child(client, GOTD_AUTH_READ, repo,
@@ -557,7 +562,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		err = ensure_client_is_not_reading(client);
 		if (err)
 			return err;
-		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd);
+		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
 		err = start_auth_child(client,
@@ -749,7 +754,8 @@ static const char *gotd_proc_names[PROC_MAX] = {
 	"session_write",
 	"repo_read",
 	"repo_write",
-	"gitwrapper"
+	"gitwrapper",
+	"notify"
 };
 
 static void
@@ -1134,6 +1140,72 @@ done:
 }
 
 static void
+gotd_dispatch_notifier(int fd, short event, void *arg)
+{
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_child_proc *proc = gotd.notify_proc;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
+	if (proc->iev.ibuf.fd != fd)
+		fatalx("%s: unexpected fd %d", __func__, fd);
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+
+		/*
+		 * Do not exit all of gotd if the notification handler dies.
+		 * We can continue operating without notifications until an
+		 * operator intervenes.
+		 */
+		log_warnx("notify child process (pid %d) closed its imsg pipe "
+		    "unexpectedly", proc->pid);
+		proc_done(proc);
+	}
+}
+
+static void
 gotd_dispatch_auth_child(int fd, short event, void *arg)
 {
 	const struct got_error *err = NULL;
@@ -1234,7 +1306,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		goto done;
 	}
 
-	repo = gotd_find_repo_by_name(client->auth->repo_name, &gotd);
+	repo = gotd_find_repo_by_name(client->auth->repo_name, &gotd.repos);
 	if (repo == NULL) {
 		err = got_error(GOT_ERR_NOT_GIT_REPO);
 		goto done;
@@ -1269,6 +1341,7 @@ connect_session(struct gotd_client *client)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_connect iconnect;
 	int s;
+	struct ibuf *wbuf;
 
 	memset(&iconnect, 0, sizeof(iconnect));
 
@@ -1279,13 +1352,27 @@ connect_session(struct gotd_client *client)
 	iconnect.client_id = client->id;
 	iconnect.euid = client->euid;
 	iconnect.egid = client->egid;
+	iconnect.username_len = strlen(client->username);
 
-	if (gotd_imsg_compose_event(&client->session->iev, GOTD_IMSG_CONNECT,
-	    PROC_GOTD, s, &iconnect, sizeof(iconnect)) == -1) {
+	wbuf = imsg_create(&client->session->iev.ibuf, GOTD_IMSG_CONNECT,
+	    PROC_GOTD, gotd.pid, sizeof(iconnect) + iconnect.username_len);
+	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg compose CONNECT");
 		close(s);
 		return err;
 	}
+	if (imsg_add(wbuf, &iconnect, sizeof(iconnect)) == -1) {
+		close(s);
+		return got_error_from_errno("imsg_add CONNECT");
+	}
+	if (imsg_add(wbuf, client->username, iconnect.username_len) == -1) {
+		close(s);
+		return got_error_from_errno("imsg_add CONNECT");
+	}
+
+	ibuf_fd_set(wbuf, s);
+	imsg_close(&client->session->iev.ibuf, wbuf);
+	gotd_imsg_event_add(&client->session->iev);
 
 	/*
 	 * We are no longer interested in messages from this client.
@@ -1386,7 +1473,7 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 			struct gotd_repo *repo;
 			const char *name = client->session->repo_name;
 
-			repo = gotd_find_repo_by_name(name, &gotd);
+			repo = gotd_find_repo_by_name(name, &gotd.repos);
 			if (repo != NULL) {
 				enum gotd_procid proc_type;
 
@@ -1424,6 +1511,40 @@ done:
 		event_del(&iev->ev);
 		disconnect(client);
 	}
+}
+
+static const struct got_error *
+connect_notifier_and_session(struct gotd_client *client)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *session_iev = &client->session->iev;
+	int pipe[2];
+
+	if (gotd.notify_proc == NULL)
+		return NULL;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, pipe) == -1)
+		return got_error_from_errno("socketpair");
+
+	/* Pass notifier pipe to session . */
+	if (gotd_imsg_compose_event(session_iev, GOTD_IMSG_CONNECT_NOTIFIER,
+	    PROC_GOTD, pipe[0], NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose CONNECT_NOTIFIER");
+		close(pipe[0]);
+		close(pipe[1]);
+		return err;
+	}
+
+	/* Pass session pipe to notifier. */
+	if (gotd_imsg_compose_event(&gotd.notify_proc->iev,
+	    GOTD_IMSG_CONNECT_SESSION, PROC_GOTD, pipe[1], NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose CONNECT_SESSION");
+		close(pipe[1]);
+		return err;
+	}
+
+	return NULL;
 }
 
 static void
@@ -1487,6 +1608,9 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 			break;
 		case GOTD_IMSG_REPO_CHILD_READY:
 			err = connect_session(client);
+			if (err)
+				break;
+			err = connect_notifier_and_session(client);
 			if (err)
 				break;
 			err = connect_repo_child(client, proc);
@@ -1568,6 +1692,9 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 	case PROC_REPO_WRITE:
 		argv[argc++] = (char *)"-W";
 		break;
+	case PROC_NOTIFY:
+		argv[argc++] = (char *)"-N";
+		break;
 	default:
 		fatalx("invalid process id %d", proc_id);
 	}
@@ -1624,6 +1751,37 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	proc->iev.handler_arg = NULL;
 
 	gotd.listen_proc = proc;
+}
+
+static void
+start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
+{
+	struct gotd_child_proc *proc;
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL)
+		fatal("calloc");
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+
+	/* proc->tmo is initialized in main() after event_init() */
+
+	proc->type = PROC_NOTIFY;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1)
+		fatal("socketpair");
+
+	proc->pid = start_child(proc->type, NULL, argv0, confpath,
+	    proc->pipe[1], daemonize, verbosity);
+	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	proc->iev.handler = gotd_dispatch_notifier;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
+	    gotd_dispatch_notifier, &proc->iev);
+
+	gotd.notify_proc = proc;
 }
 
 static const struct got_error *
@@ -1863,6 +2021,25 @@ set_max_datasize(void)
 	setrlimit(RLIMIT_DATA, &rl);
 }
 
+static void
+unveil_notification_helpers(void)
+{
+	const char *helpers[] = {
+	    GOTD_PATH_PROG_NOTIFY_EMAIL,
+	    GOTD_PATH_PROG_NOTIFY_HTTP,
+	};
+	size_t i;
+
+	for (i = 0; i < nitems(helpers); i++) {
+		if (unveil(helpers[i], "x") == 0)
+			continue;
+		fatal("unveil %s", helpers[i]);
+	}
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1877,12 +2054,16 @@ main(int argc, char **argv)
 	struct event evsigint, evsigterm, evsighup, evsigusr1, evsigchld;
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
+	char *default_sender = NULL;
+	char hostname[HOST_NAME_MAX + 1];
+	FILE *diff_f1 = NULL, *diff_f2 = NULL;
+	int diff_fd1 = -1, diff_fd2 = -1;
 
 	TAILQ_INIT(&procs);
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "Adf:LnP:RsSvW")) != -1) {
+	while ((ch = getopt(argc, argv, "Adf:LnNP:RsSvW")) != -1) {
 		switch (ch) {
 		case 'A':
 			proc_id = PROC_AUTH;
@@ -1898,6 +2079,9 @@ main(int argc, char **argv)
 			break;
 		case 'n':
 			noaction = 1;
+			break;
+		case 'N':
+			proc_id = PROC_NOTIFY;
 			break;
 		case 'P':
 			repo_path = realpath(optarg, NULL);
@@ -1968,6 +2152,7 @@ main(int argc, char **argv)
 			fatal("daemon");
 		gotd.pid = getpid();
 		start_listener(argv0, confpath, daemonize, verbosity);
+		start_notifier(argv0, confpath, daemonize, verbosity);
 	} else if (proc_id == PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		if (verbosity) {
@@ -1996,6 +2181,13 @@ main(int argc, char **argv)
 			fatalx("repository path not specified");
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
+	} else if (proc_id == PROC_NOTIFY) {
+		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
+		if (gethostname(hostname, sizeof(hostname)) == -1)
+			fatal("gethostname");
+		if (asprintf(&default_sender, "%s@%s",
+		    pw->pw_name, hostname) == -1)
+			fatal("asprintf");
 	} else
 		fatal("invalid process id %d", proc_id);
 
@@ -2068,11 +2260,14 @@ main(int argc, char **argv)
 #endif
 		if (proc_id == PROC_SESSION_READ)
 			apply_unveil_repo_readonly(repo_path, 1);
-		else
+		else {
 			apply_unveil_repo_readwrite(repo_path);
-
+			repo = gotd_find_repo_by_path(repo_path, &gotd);
+			if (repo == NULL)
+				fatalx("no repository for path %s", repo_path);
+		}
 		session_main(title, repo_path, pack_fds, temp_fds,
-		    &gotd.request_timeout, proc_id);
+		    &gotd.request_timeout, repo, proc_id);
 		/* NOTREACHED */
 		break;
 	case PROC_REPO_READ:
@@ -2098,6 +2293,19 @@ main(int argc, char **argv)
 		exit(0);
 	case PROC_REPO_WRITE:
 		set_max_datasize();
+
+		diff_f1 = got_opentemp();
+		if (diff_f1 == NULL)
+			fatal("got_opentemp");
+		diff_f2 = got_opentemp();
+		if (diff_f2 == NULL)
+			fatal("got_opentemp");
+		diff_fd1 = got_opentempfd();
+		if (diff_fd1 == -1)
+			fatal("got_opentempfd");
+		diff_fd2 = got_opentempfd();
+		if (diff_fd2 == -1)
+			fatal("got_opentempfd");
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2116,9 +2324,23 @@ main(int argc, char **argv)
 		drop_privs(pw);
 
 		repo_write_main(title, repo_path, pack_fds, temp_fds,
+		    diff_f1, diff_f2, diff_fd1, diff_fd2,
 		    &repo->protected_tag_namespaces,
 		    &repo->protected_branch_namespaces,
 		    &repo->protected_branches);
+		/* NOTREACHED */
+		exit(0);
+	case PROC_NOTIFY:
+#ifndef PROFILE
+		if (pledge("stdio proc exec recvfd unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+		/*
+		 * Limit "exec" promise to notification helpers via unveil(2).
+		 */
+		unveil_notification_helpers();
+
+		notify_main(title, &gotd.repos, default_sender);
 		/* NOTREACHED */
 		exit(0);
 	default:
@@ -2130,6 +2352,10 @@ main(int argc, char **argv)
 
 	evtimer_set(&gotd.listen_proc->tmo, kill_proc_timeout,
 	    gotd.listen_proc);
+	if (gotd.notify_proc) {
+		evtimer_set(&gotd.notify_proc->tmo, kill_proc_timeout,
+		    gotd.notify_proc);
+	}
 
 	apply_unveil_selfexec();
 
@@ -2147,10 +2373,13 @@ main(int argc, char **argv)
 	signal_add(&evsigchld, NULL);
 
 	gotd_imsg_event_add(&gotd.listen_proc->iev);
+	if (gotd.notify_proc)
+		gotd_imsg_event_add(&gotd.notify_proc->iev);
 
 	event_dispatch();
 
 	free(repo_path);
+	free(default_sender);
 	gotd_shutdown();
 
 	return 0;

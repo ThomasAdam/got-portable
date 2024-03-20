@@ -63,3 +63,11 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 {
 	return got_error(GOT_ERR_NOT_IMPL);
 }
+
+const struct got_error *
+got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
+    struct got_object_id *commit_id, const char *path,
+    struct got_repository *repo)
+{
+	return NULL;
+}

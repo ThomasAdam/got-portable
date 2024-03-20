@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctype.h>
 #include <event.h>
 #include <errno.h>
 #include <imsg.h>
@@ -39,6 +40,10 @@
 #include "got_object.h"
 #include "got_reference.h"
 #include "got_path.h"
+#include "got_diff.h"
+#include "got_cancel.h"
+#include "got_commit_graph.h"
+#include "got_opentemp.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_delta_cache.h"
@@ -72,6 +77,12 @@ static struct repo_write {
 	struct got_pathlist_head *protected_tag_namespaces;
 	struct got_pathlist_head *protected_branch_namespaces;
 	struct got_pathlist_head *protected_branches;
+	struct {
+		FILE *f1;
+		FILE *f2;
+		int fd1;
+		int fd2;
+	} diff;
 } repo_write;
 
 struct gotd_ref_update {
@@ -1627,6 +1638,574 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 	return NULL;
 }
 
+static char *
+get_datestr(time_t *time, char *datebuf)
+{
+	struct tm mytm, *tm;
+	char *p, *s;
+
+	tm = gmtime_r(time, &mytm);
+	if (tm == NULL)
+		return NULL;
+	s = asctime_r(tm, datebuf);
+	if (s == NULL)
+		return NULL;
+	p = strchr(s, '\n');
+	if (p)
+		*p = '\0';
+	return s;
+}
+
+static const struct got_error *
+notify_removed_ref(const char *refname, uint8_t *sha1,
+    struct gotd_imsgev *iev, int fd)
+{
+	const struct got_error *err;
+	struct got_object_id id;
+	char *id_str;
+
+	memset(&id, 0, sizeof(id));
+	memcpy(id.sha1, sha1, sizeof(id.sha1));
+
+	err = got_object_id_str(&id_str, &id);
+	if (err)
+		return err;
+
+	dprintf(fd, "Removed %s: %s\n", refname, id_str);
+	free(id_str);
+	return err;
+}
+
+static const char *
+format_author(char *author)
+{
+	char *smallerthan;
+
+	smallerthan = strchr(author, '<');
+	if (smallerthan && smallerthan[1] != '\0')
+		author = smallerthan + 1;
+	author[strcspn(author, "@>")] = '\0';
+
+	return author;
+}
+
+static const struct got_error *
+print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo, int fd)
+{
+	const struct got_error *err = NULL;
+	char *id_str = NULL, *logmsg0 = NULL;
+	char *s, *nl;
+	char *committer = NULL, *author = NULL;
+	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
+	struct tm tm;
+	time_t committer_time;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	committer_time = got_object_commit_get_committer_time(commit);
+	if (gmtime_r(&committer_time, &tm) == NULL) {
+		err = got_error_from_errno("gmtime_r");
+		goto done;
+	}
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0) {
+		err = got_error(GOT_ERR_NO_SPACE);
+		goto done;
+	}
+
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		goto done;
+
+	s = logmsg0;
+	while (isspace((unsigned char)s[0]))
+		s++;
+
+	nl = strchr(s, '\n');
+	if (nl) {
+		*nl = '\0';
+	}
+
+	if (strcmp(got_object_commit_get_author(commit),
+	    got_object_commit_get_committer(commit)) != 0) {
+		author = strdup(got_object_commit_get_author(commit));
+		if (author == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		dprintf(fd, "%s%.7s %.8s %s\n", datebuf, id_str,
+		    format_author(author), s);
+	} else {
+		committer = strdup(got_object_commit_get_committer(commit));
+		if (committer == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		dprintf(fd, "%s%.7s %.8s %s\n", datebuf, id_str,
+		    format_author(committer), s);
+	}
+
+	if (fsync(fd) == -1 && err == NULL)
+		err = got_error_from_errno("fsync");
+done:
+	free(id_str);
+	free(logmsg0);
+	free(committer);
+	free(author);
+	return err;
+}
+
+static const struct got_error *
+print_diffstat(struct got_diffstat_cb_arg *dsa, int fd)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, dsa->paths, entry) {
+		struct got_diff_changed_path *cp = pe->data;
+		int pad = dsa->max_path_len - pe->path_len + 1;
+
+		dprintf(fd, " %c  %s%*c | %*d+ %*d-\n", cp->status,
+		     pe->path, pad, ' ', dsa->add_cols + 1, cp->add,
+		     dsa->rm_cols + 1, cp->rm);
+	}
+	dprintf(fd,
+	    "\n%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n\n",
+	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins,
+	    dsa->ins != 1 ? "s" : "", dsa->del, dsa->del != 1 ? "s" : "");
+
+	return NULL;
+}
+
+static const struct got_error *
+print_commit(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo, struct got_pathlist_head *changed_paths,
+    struct got_diffstat_cb_arg *diffstat, int fd)
+{
+	const struct got_error *err = NULL;
+	char *id_str, *datestr, *logmsg0, *logmsg, *line;
+	char datebuf[26];
+	time_t committer_time;
+	const char *author, *committer;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	dprintf(fd, "commit %s\n", id_str);
+	free(id_str);
+	id_str = NULL;
+	dprintf(fd, "from: %s\n", got_object_commit_get_author(commit));
+	author = got_object_commit_get_author(commit);
+	committer = got_object_commit_get_committer(commit);
+	if (strcmp(author, committer) != 0)
+		dprintf(fd, "via: %s\n", committer);
+	committer_time = got_object_commit_get_committer_time(commit);
+	datestr = get_datestr(&committer_time, datebuf);
+	if (datestr)
+		dprintf(fd, "date: %s UTC\n", datestr);
+	if (got_object_commit_get_nparents(commit) > 1) {
+		const struct got_object_id_queue *parent_ids;
+		struct got_object_qid *qid;
+		int n = 1;
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		STAILQ_FOREACH(qid, parent_ids, entry) {
+			err = got_object_id_str(&id_str, &qid->id);
+			if (err)
+				goto done;
+			dprintf(fd, "parent %d: %s\n", n++, id_str);
+			free(id_str);
+			id_str = NULL;
+		}
+	}
+
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		goto done;
+
+	logmsg = logmsg0;
+	do {
+		line = strsep(&logmsg, "\n");
+		if (line)
+			dprintf(fd, " %s\n", line);
+	} while (line);
+	free(logmsg0);
+
+	err = print_diffstat(diffstat, fd);
+	if (err)
+		goto done;
+
+	if (fsync(fd) == -1 && err == NULL)
+		err = got_error_from_errno("fsync");
+done:
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
+get_changed_paths(struct got_pathlist_head *paths,
+    struct got_commit_object *commit, struct got_repository *repo,
+    struct got_diffstat_cb_arg *dsa)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_object_qid *qid;
+	got_diff_blob_cb cb = got_diff_tree_collect_changed_paths;
+	FILE *f1 = repo_write.diff.f1, *f2 = repo_write.diff.f2;
+	int fd1 = repo_write.diff.fd1, fd2 = repo_write.diff.fd2;
+
+	if (dsa)
+		cb = got_diff_tree_compute_diffstat;
+
+	err = got_opentemp_truncate(f1);
+	if (err)
+		return err;
+	err = got_opentemp_truncate(f2);
+	if (err)
+		return err;
+	err = got_opentemp_truncatefd(fd1);
+	if (err)
+		return err;
+	err = got_opentemp_truncatefd(fd2);
+	if (err)
+		return err;
+
+	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (qid != NULL) {
+		struct got_commit_object *pcommit;
+		err = got_object_open_as_commit(&pcommit, repo,
+		    &qid->id);
+		if (err)
+			return err;
+
+		tree_id1 = got_object_id_dup(
+		    got_object_commit_get_tree_id(pcommit));
+		if (tree_id1 == NULL) {
+			got_object_commit_close(pcommit);
+			return got_error_from_errno("got_object_id_dup");
+		}
+		got_object_commit_close(pcommit);
+
+	}
+
+	if (tree_id1) {
+		err = got_object_open_as_tree(&tree1, repo, tree_id1);
+		if (err)
+			goto done;
+	}
+
+	tree_id2 = got_object_commit_get_tree_id(commit);
+	err = got_object_open_as_tree(&tree2, repo, tree_id2);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, "", "", repo,
+	    cb, dsa ? (void *)dsa : paths, dsa ? 1 : 0);
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	free(tree_id1);
+	return err;
+}
+
+static const struct got_error *
+print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
+    struct got_repository *repo, int fd)
+{
+	const struct got_error *err;
+	struct got_commit_graph *graph;
+	struct got_object_id_queue reversed_commits;
+	struct got_object_qid *qid;
+	struct got_commit_object *commit = NULL;
+	struct got_pathlist_head changed_paths;
+	int ncommits = 0;
+	const int shortlog_threshold = 50;
+
+	STAILQ_INIT(&reversed_commits);
+	TAILQ_INIT(&changed_paths);
+
+	/* XXX first-parent only for now */
+	err = got_commit_graph_open(&graph, "/", 1);
+	if (err)
+		return err;
+	err = got_commit_graph_iter_start(graph, root_id, repo,
+	    check_cancelled, NULL);
+	if (err)
+		goto done;
+	for (;;) {
+		struct got_object_id id;
+
+		err = got_commit_graph_iter_next(&id, graph, repo,
+		    check_cancelled, NULL);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
+				err = NULL;
+			break;
+		}
+
+		err = got_object_open_as_commit(&commit, repo, &id);
+		if (err)
+			break;
+
+		if (end_id && got_object_id_cmp(&id, end_id) == 0)
+			break;
+
+		err = got_object_qid_alloc(&qid, &id);
+		if (err)
+			break;
+
+		STAILQ_INSERT_HEAD(&reversed_commits, qid, entry);
+		ncommits++;
+		got_object_commit_close(commit);
+
+		if (end_id == NULL)
+			break;
+	}
+
+	STAILQ_FOREACH(qid, &reversed_commits, entry) {
+		struct got_diffstat_cb_arg dsa = { 0, 0, 0, 0, 0, 0,
+		    &changed_paths, 0, 0, GOT_DIFF_ALGORITHM_PATIENCE };
+
+		err = got_object_open_as_commit(&commit, repo, &qid->id);
+		if (err)
+			break;
+	
+		if (ncommits > shortlog_threshold) {
+			err = print_commit_oneline(commit, &qid->id,
+			    repo, fd);
+			if (err)
+				break;
+		} else {
+			err = get_changed_paths(&changed_paths, commit,
+			    repo, &dsa);
+			if (err)
+				break;
+			err = print_commit(commit, &qid->id, repo,
+			    &changed_paths, &dsa, fd);
+		}
+		got_object_commit_close(commit);
+		commit = NULL;
+		got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
+	}
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	while (!STAILQ_EMPTY(&reversed_commits)) {
+		qid = STAILQ_FIRST(&reversed_commits);
+		STAILQ_REMOVE_HEAD(&reversed_commits, entry);
+		got_object_qid_free(qid);
+	}
+	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
+	got_commit_graph_close(graph);
+	return err;
+}
+
+static const struct got_error *
+print_tag(struct got_object_id *id, 
+    const char *refname, struct got_repository *repo, int fd)
+{
+	const struct got_error *err = NULL;
+	struct got_tag_object *tag = NULL;
+	const char *tagger = NULL;
+	char *id_str = NULL, *tagmsg0 = NULL, *tagmsg, *line, *datestr;
+	char datebuf[26];
+	time_t tagger_time;
+
+	err = got_object_open_as_tag(&tag, repo, id);
+	if (err)
+		return err;
+
+	tagger = got_object_tag_get_tagger(tag);
+	tagger_time = got_object_tag_get_tagger_time(tag);
+	err = got_object_id_str(&id_str,
+	    got_object_tag_get_object_id(tag));
+	if (err)
+		goto done;
+
+	dprintf(fd, "tag %s\n", refname);
+	dprintf(fd, "from: %s\n", tagger);
+	datestr = get_datestr(&tagger_time, datebuf);
+	if (datestr)
+		dprintf(fd, "date: %s UTC\n", datestr);
+
+	switch (got_object_tag_get_object_type(tag)) {
+	case GOT_OBJ_TYPE_BLOB:
+		dprintf(fd, "object: %s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		dprintf(fd, "object: %s %s\n", GOT_OBJ_LABEL_TREE, id_str);
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		dprintf(fd, "object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		dprintf(fd, "object: %s %s\n", GOT_OBJ_LABEL_TAG, id_str);
+		break;
+	default:
+		break;
+	}
+
+	tagmsg0 = strdup(got_object_tag_get_message(tag));
+	if (tagmsg0 == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	tagmsg = tagmsg0;
+	do {
+		line = strsep(&tagmsg, "\n");
+		if (line)
+			dprintf(fd, " %s\n", line);
+	} while (line);
+	free(tagmsg0);
+done:
+	if (tag)
+		got_object_tag_close(tag);
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
+notify_changed_ref(const char *refname, uint8_t *old_sha1,
+    uint8_t *new_sha1, struct gotd_imsgev *iev, int fd)
+{
+	const struct got_error *err;
+	struct got_object_id old_id, new_id;
+	int old_obj_type, new_obj_type;
+	const char *label;
+	char *new_id_str = NULL;
+
+	memset(&old_id, 0, sizeof(old_id));
+	memcpy(old_id.sha1, old_sha1, sizeof(old_id.sha1));
+	memset(&new_id, 0, sizeof(new_id));
+	memcpy(new_id.sha1, new_sha1, sizeof(new_id.sha1));
+
+	err = got_object_get_type(&old_obj_type, repo_write.repo, &old_id);
+	if (err)
+		return err;
+
+	err = got_object_get_type(&new_obj_type, repo_write.repo, &new_id);
+	if (err)
+		return err;
+
+	switch (new_obj_type) {
+	case GOT_OBJ_TYPE_COMMIT:
+		err = print_commits(&new_id,
+		    old_obj_type == GOT_OBJ_TYPE_COMMIT ? &old_id : NULL,
+		    repo_write.repo, fd);
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		err = print_tag(&new_id, refname, repo_write.repo, fd);
+		break;
+	default:
+		err = got_object_type_label(&label, new_obj_type);
+		if (err)
+			goto done;
+		err = got_object_id_str(&new_id_str, &new_id);
+		if (err)
+			goto done;
+		dprintf(fd, "%s: %s object %s\n", refname, label, new_id_str);
+		break;
+	}
+done:
+	free(new_id_str);
+	return err;
+}
+
+static const struct got_error *
+notify_created_ref(const char *refname, uint8_t *sha1,
+    struct gotd_imsgev *iev, int fd)
+{
+	const struct got_error *err;
+	struct got_object_id id;
+	int obj_type;
+
+	memset(&id, 0, sizeof(id));
+	memcpy(id.sha1, sha1, sizeof(id.sha1));
+
+	err = got_object_get_type(&obj_type, repo_write.repo, &id);
+	if (err)
+		return err;
+
+	if (obj_type == GOT_OBJ_TYPE_TAG)
+		return print_tag(&id, refname, repo_write.repo, fd);
+
+	return print_commits(&id, NULL, repo_write.repo, fd);
+}
+
+static const struct got_error *
+render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_notification_content ireq;
+	size_t datalen, len;
+	char *refname;
+	struct ibuf *wbuf;
+	int fd;
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(ireq))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&ireq, imsg->data, sizeof(ireq));
+
+	if (datalen != sizeof(ireq) +  ireq.refname_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	refname = strndup(imsg->data + sizeof(ireq), ireq.refname_len);
+	if (refname == NULL)
+		return got_error_from_errno("strndup");
+
+	switch (ireq.action) {
+	case GOTD_NOTIF_ACTION_CREATED:
+		err = notify_created_ref(refname, ireq.new_id, iev, fd);
+		break;
+	case GOTD_NOTIF_ACTION_REMOVED:
+		err = notify_removed_ref(refname, ireq.old_id, iev, fd);
+		break;
+	case GOTD_NOTIF_ACTION_CHANGED:
+		err = notify_changed_ref(refname, ireq.old_id, ireq.new_id,
+		    iev, fd);
+		break;
+	}
+
+	if (fsync(fd) == -1) {
+		err = got_error_from_errno("fsync");
+		goto done;
+	}
+
+	len = sizeof(ireq) + ireq.refname_len;
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY, PROC_REPO_WRITE,
+	    repo_write.pid, len);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create REF");
+		goto done;
+	}
+	if (imsg_add(wbuf, &ireq, sizeof(ireq)) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+	if (imsg_add(wbuf, refname, ireq.refname_len) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	gotd_imsg_event_add(iev);
+done:
+	free(refname);
+	if (close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+}
+
 static void
 repo_write_dispatch_session(int fd, short event, void *arg)
 {
@@ -1723,6 +2302,13 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			err = update_refs(iev);
 			if (err) {
 				log_warnx("update refs: %s", err->msg);
+			}
+			break;
+		case GOTD_IMSG_NOTIFY:
+			err = render_notification(&imsg, iev);
+			if (err) {
+				log_warnx("render notification: %s", err->msg);
+				shut = 1;
 			}
 			break;
 		default:
@@ -1838,6 +2424,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 void
 repo_write_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds,
+    FILE *diff_f1, FILE *diff_f2, int diff_fd1, int diff_fd2,
     struct got_pathlist_head *protected_tag_namespaces,
     struct got_pathlist_head *protected_branch_namespaces,
     struct got_pathlist_head *protected_branches)
@@ -1860,6 +2447,10 @@ repo_write_main(const char *title, const char *repo_path,
 	repo_write.protected_tag_namespaces = protected_tag_namespaces;
 	repo_write.protected_branch_namespaces = protected_branch_namespaces;
 	repo_write.protected_branches = protected_branches;
+	repo_write.diff.f1 = diff_f1;
+	repo_write.diff.f2 = diff_f2;
+	repo_write.diff.fd1 = diff_fd1;
+	repo_write.diff.fd2 = diff_fd2;
 
 	STAILQ_INIT(&repo_write_client.ref_updates);
 
@@ -1892,6 +2483,14 @@ repo_write_main(const char *title, const char *repo_path,
 
 	event_dispatch();
 done:
+	if (fclose(diff_f1) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (fclose(diff_f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (close(diff_fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (close(diff_fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (err)
 		log_warnx("%s: %s", title, err->msg);
 	repo_write_shutdown();

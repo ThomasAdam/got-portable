@@ -4,7 +4,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
 	test_repo_write test_repo_write_empty test_request_bad \
-	test_repo_write_protected
+	test_repo_write_protected test_email_notification
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
@@ -14,7 +14,9 @@ GOTD_TEST_ROOT=/tmp
 GOTD_DEVUSER?=gotdev
 GOTD_DEVUSER_HOME!=userinfo $(GOTD_DEVUSER) | awk '/^dir/ {print $$2}'
 GOTD_TEST_REPO!?=mktemp -d "$(GOTD_TEST_ROOT)/gotd-test-repo-XXXXXXXXXX"
-GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/test-repo
+GOTD_TEST_REPO_NAME=test-repo
+GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/$(GOTD_TEST_REPO_NAME)
+GOTD_TEST_SMTP_PORT=2525
 
 GOTD_TEST_USER?=${DOAS_USER}
 .if empty(GOTD_TEST_USER)
@@ -37,15 +39,20 @@ PREFIX ?= ${GOTD_TEST_USER_HOME}
 BINDIR ?= ${PREFIX}/bin
 .endif
 
-GOTD_START_CMD?=$(BINDIR)/gotd -vv -f $(PWD)/gotd.conf
+GOTD_START_CMD?=env ${GOTD_ENV} $(BINDIR)/gotd -vv -f $(PWD)/gotd.conf
 GOTD_STOP_CMD?=$(BINDIR)/gotctl -f $(GOTD_SOCK) stop
 GOTD_TRAP=trap "$(GOTD_STOP_CMD)" HUP INT QUIT PIPE TERM
 
+GOTD_ENV=GOT_NOTIFY_EMAIL_TIMEOUT=1
+
 GOTD_TEST_ENV=GOTD_TEST_ROOT=$(GOTD_TEST_ROOT) \
 	GOTD_TEST_REPO_URL=$(GOTD_TEST_REPO_URL) \
+	GOTD_TEST_REPO_NAME=$(GOTD_TEST_REPO_NAME) \
 	GOTD_TEST_REPO=$(GOTD_TEST_REPO) \
 	GOTD_SOCK=$(GOTD_SOCK) \
 	GOTD_DEVUSER=$(GOTD_DEVUSER) \
+	GOTD_USER=$(GOTD_USER) \
+	GOTD_TEST_SMTP_PORT=$(GOTD_TEST_SMTP_PORT) \
 	HOME=$(GOTD_TEST_USER_HOME) \
 	PATH=$(GOTD_TEST_USER_HOME)/bin:$(PATH)
 
@@ -148,6 +155,20 @@ start_gotd_rw_protected: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_email_notification: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo '    notify {' >> $(PWD)/gotd.conf
+	@echo -n '      email to ${GOTD_DEVUSER}' >> $(PWD)/gotd.conf
+	@echo ' relay 127.0.0.1 port ${GOTD_TEST_SMTP_PORT}' >> $(PWD)/gotd.conf
+	@echo "    }" >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
@@ -213,6 +234,11 @@ test_repo_write_protected: prepare_test_repo start_gotd_rw_protected
 test_request_bad: prepare_test_repo_empty start_gotd_ro
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./request_bad.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+
+test_email_notification: prepare_test_repo start_gotd_email_notification
+	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./email_notification.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 
 .include <bsd.regress.mk>

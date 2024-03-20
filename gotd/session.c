@@ -54,14 +54,25 @@
 #include "log.h"
 #include "session.h"
 
+struct gotd_session_notif {
+	STAILQ_ENTRY(gotd_session_notif) entry;
+	int fd;
+	enum gotd_notification_action action;
+	char *refname;
+	struct got_object_id old_id;
+	struct got_object_id new_id;
+};
+STAILQ_HEAD(gotd_session_notifications, gotd_session_notif) notifications;
 
 static struct gotd_session {
 	pid_t pid;
 	const char *title;
 	struct got_repository *repo;
+	struct gotd_repo *repo_cfg;
 	int *pack_fds;
 	int *temp_fds;
 	struct gotd_imsgev parent_iev;
+	struct gotd_imsgev notifier_iev;
 	struct timeval request_timeout;
 	enum gotd_procid proc_id;
 } gotd_session;
@@ -80,6 +91,7 @@ static struct gotd_session_client {
 	struct event			 tmo;
 	uid_t				 euid;
 	gid_t				 egid;
+	char				*username;
 	char				*packfile_path;
 	char				*packidx_path;
 	int				 nref_updates;
@@ -402,6 +414,249 @@ begin_ref_updates(struct gotd_session_client *client, struct imsg *imsg)
 }
 
 static const struct got_error *
+validate_namespace(const char *namespace)
+{
+	size_t len = strlen(namespace);
+
+	if (len < 5 || strncmp("refs/", namespace, 5) != 0 ||
+	    namespace[len - 1] != '/') {
+		return got_error_fmt(GOT_ERR_BAD_REF_NAME,
+		    "reference namespace '%s'", namespace);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+queue_notification(struct got_object_id *old_id, struct got_object_id *new_id,
+    struct got_repository *repo, struct got_reference *ref)
+{
+	const struct got_error *err = NULL;
+	struct gotd_session_client *client = &gotd_session_client;
+	struct gotd_repo *repo_cfg = gotd_session.repo_cfg;
+	struct gotd_imsgev *iev = &client->repo_child_iev;
+	struct got_pathlist_entry *pe;
+	struct gotd_session_notif *notif;
+
+	if (iev->ibuf.fd == -1 ||
+	    STAILQ_EMPTY(&repo_cfg->notification_targets))
+		return NULL; /* notifications unused */
+
+	TAILQ_FOREACH(pe, &repo_cfg->notification_refs, entry) {
+		const char *refname = pe->path;
+		if (strcmp(got_ref_get_name(ref), refname) == 0)
+			break;
+	}
+	if (pe == NULL) {
+		TAILQ_FOREACH(pe, &repo_cfg->notification_ref_namespaces,
+		    entry) {
+			const char *namespace = pe->path;
+
+			err = validate_namespace(namespace);
+			if (err)
+				return err;
+			if (strncmp(namespace, got_ref_get_name(ref),
+			    strlen(namespace)) == 0)
+				break;
+		}
+	}
+
+	/*
+	 * If a branch or a reference namespace was specified in the
+	 * configuration file then only send notifications if a match
+	 * was found.
+	 */
+	if (pe == NULL && (!TAILQ_EMPTY(&repo_cfg->notification_refs) ||
+	    !TAILQ_EMPTY(&repo_cfg->notification_ref_namespaces)))
+		return NULL;
+
+	notif = calloc(1, sizeof(*notif));
+	if (notif == NULL)
+		return got_error_from_errno("calloc");
+
+	notif->fd = -1;
+
+	if (old_id == NULL)
+		notif->action = GOTD_NOTIF_ACTION_CREATED;
+	else if (new_id == NULL)
+		notif->action = GOTD_NOTIF_ACTION_REMOVED;
+	else
+		notif->action = GOTD_NOTIF_ACTION_CHANGED;
+
+	if (old_id != NULL)
+		memcpy(&notif->old_id, old_id, sizeof(notif->old_id));
+	if (new_id != NULL)
+		memcpy(&notif->new_id, new_id, sizeof(notif->new_id));
+
+	notif->refname = strdup(got_ref_get_name(ref));
+	if (notif->refname == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	STAILQ_INSERT_TAIL(&notifications, notif, entry);
+done:
+	if (err && notif) {
+		free(notif->refname);
+		free(notif);
+	}
+	return err;
+}
+
+/* Forward notification content to the NOTIFY process. */
+static const struct got_error *
+forward_notification(struct gotd_session_client *client, struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = &gotd_session.notifier_iev;
+	struct gotd_session_notif *notif;
+	struct gotd_imsg_notification_content icontent;
+	char *refname = NULL;
+	size_t datalen;
+	struct gotd_imsg_notify inotify;
+	const char *action;
+
+	memset(&inotify, 0, sizeof(inotify));
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(icontent))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&icontent, imsg->data, sizeof(icontent));
+	if (datalen != sizeof(icontent) + icontent.refname_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	refname = strndup(imsg->data + sizeof(icontent), icontent.refname_len);
+	if (refname == NULL)
+		return got_error_from_errno("strndup");
+
+	notif = STAILQ_FIRST(&notifications);
+	if (notif == NULL)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	STAILQ_REMOVE(&notifications, notif, gotd_session_notif, entry);
+
+	if (notif->action != icontent.action || notif->fd == -1 ||
+	    strcmp(notif->refname, refname) != 0) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+	if (notif->action == GOTD_NOTIF_ACTION_CREATED) {
+		if (memcmp(notif->new_id.sha1, icontent.new_id,
+		    SHA1_DIGEST_LENGTH) != 0) {
+			err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
+			    "received notification content for unknown event");
+			goto done;
+		}
+	} else if (notif->action == GOTD_NOTIF_ACTION_REMOVED) {
+		if (memcmp(notif->old_id.sha1, icontent.old_id,
+		    SHA1_DIGEST_LENGTH) != 0) {
+			err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
+			    "received notification content for unknown event");
+			goto done;
+		}
+	} else if (memcmp(notif->old_id.sha1, icontent.old_id,
+	    SHA1_DIGEST_LENGTH) != 0 ||
+	    memcmp(notif->new_id.sha1, icontent.new_id,
+	    SHA1_DIGEST_LENGTH) != 0) {
+		err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
+		    "received notification content for unknown event");
+		goto done;
+	}
+
+	switch (notif->action) {
+	case GOTD_NOTIF_ACTION_CREATED:
+		action = "created";
+		break;
+	case GOTD_NOTIF_ACTION_REMOVED:
+		action = "removed";
+		break;
+	case GOTD_NOTIF_ACTION_CHANGED:
+		action = "changed";
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
+	strlcpy(inotify.repo_name, gotd_session.repo_cfg->name,
+	    sizeof(inotify.repo_name));
+
+	snprintf(inotify.subject_line, sizeof(inotify.subject_line),
+	    "%s: %s %s %s", gotd_session.repo_cfg->name,
+	    client->username, action, notif->refname);
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFY,
+	    PROC_SESSION_WRITE, notif->fd, &inotify, sizeof(inotify))
+	    == -1) {
+		err = got_error_from_errno("imsg compose NOTIFY");
+		goto done;
+	}
+	notif->fd = -1;
+done:
+	if (notif->fd != -1)
+		close(notif->fd);
+	free(notif);
+	free(refname);
+	return err;
+}
+
+/* Request notification content from REPO_WRITE process. */
+static const struct got_error *
+request_notification(struct gotd_session_notif *notif)
+{
+	const struct got_error *err = NULL;
+	struct gotd_session_client *client = &gotd_session_client;
+	struct gotd_imsgev *iev = &client->repo_child_iev;
+	struct gotd_imsg_notification_content icontent;
+	struct ibuf *wbuf;
+	size_t len;
+	int fd;
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno("got_opentemp");
+
+	memset(&icontent, 0, sizeof(icontent));
+	icontent.client_id = client->id;
+
+	icontent.action = notif->action;
+	memcpy(&icontent.old_id, &notif->old_id, sizeof(notif->old_id));
+	memcpy(&icontent.new_id, &notif->new_id, sizeof(notif->new_id));
+	icontent.refname_len = strlen(notif->refname);
+
+	len = sizeof(icontent) + icontent.refname_len;
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY,
+	    gotd_session.proc_id, gotd_session.pid, len);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create NOTIFY");
+		goto done;
+	}
+	if (imsg_add(wbuf, &icontent, sizeof(icontent)) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+	if (imsg_add(wbuf, notif->refname, icontent.refname_len) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+
+	notif->fd = dup(fd);
+	if (notif->fd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
+
+	ibuf_fd_set(wbuf, fd);
+	fd = -1;
+
+	imsg_close(&iev->ibuf, wbuf);
+	gotd_imsg_event_add(iev);
+done:
+	if (err && fd != -1)
+		close(fd);
+	return err;
+}
+
+static const struct got_error *
 update_ref(int *shut, struct gotd_session_client *client,
     const char *repo_path, struct imsg *imsg)
 {
@@ -410,6 +665,7 @@ update_ref(int *shut, struct gotd_session_client *client,
 	struct got_reference *ref = NULL;
 	struct gotd_imsg_ref_update iref;
 	struct got_object_id old_id, new_id;
+	struct gotd_session_notif *notif;
 	struct got_object_id *id = NULL;
 	char *refname = NULL;
 	size_t datalen;
@@ -452,6 +708,9 @@ update_ref(int *shut, struct gotd_session_client *client,
 			err = got_ref_write(ref, repo); /* will lock/unlock */
 			if (err)
 				goto done;
+			err = queue_notification(NULL, &new_id, repo, ref);
+			if (err)
+				goto done;
 		} else {
 			err = got_ref_resolve(&id, repo, ref);
 			if (err)
@@ -491,7 +750,9 @@ update_ref(int *shut, struct gotd_session_client *client,
 		err = got_ref_delete(ref, repo);
 		if (err)
 			goto done;
-
+		err = queue_notification(&old_id, NULL, repo, ref);
+		if (err)
+			goto done;
 		free(id);
 		id = NULL;
 	} else {
@@ -520,8 +781,10 @@ update_ref(int *shut, struct gotd_session_client *client,
 			err = got_ref_change_ref(ref, &new_id);
 			if (err)
 				goto done;
-
 			err = got_ref_write(ref, repo);
+			if (err)
+				goto done;
+			err = queue_notification(&old_id, &new_id, repo, ref);
 			if (err)
 				goto done;
 		}
@@ -544,7 +807,17 @@ done:
 		client->nref_updates--;
 		if (client->nref_updates == 0) {
 			send_refs_updated(client);
-			client->flush_disconnect = 1;
+			notif = STAILQ_FIRST(&notifications);
+			if (notif) {
+				client->state = GOTD_STATE_NOTIFY;
+				err = request_notification(notif);
+				if (err) {
+					log_warn("could not send notification: "
+					    "%s", err->msg);
+					client->flush_disconnect = 1;
+				}
+			} else
+				client->flush_disconnect = 1;
 		}
 
 	}
@@ -559,6 +832,21 @@ done:
 	free(refname);
 	free(id);
 	return err;
+}
+
+static const struct got_error *
+recv_notification_content(uint32_t *client_id, struct imsg *imsg)
+{
+	struct gotd_imsg_notification_content inotif;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(inotif))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&inotif, imsg->data, sizeof(inotif));
+
+	*client_id = inotif.client_id;
+	return NULL;
 }
 
 static void
@@ -597,7 +885,7 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 		uint32_t client_id = 0;
 		int do_disconnect = 0;
 		int do_ref_updates = 0, do_ref_update = 0;
-		int do_packfile_install = 0;
+		int do_packfile_install = 0, do_notify = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -628,6 +916,11 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			if (err == NULL)
 				do_ref_update = 1;
 			break;
+		case GOTD_IMSG_NOTIFY:
+			err = recv_notification_content(&client_id, &imsg);
+			if (err == NULL)
+				do_notify = 1;
+			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
@@ -639,6 +932,8 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			else
 				disconnect(client);
 		} else {
+			struct gotd_session_notif *notif;
+
 			if (do_packfile_install)
 				err = install_pack(client,
 				    gotd_session.repo->path, &imsg);
@@ -647,8 +942,21 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			else if (do_ref_update)
 				err = update_ref(&shut, client,
 				    gotd_session.repo->path, &imsg);
+			else if (do_notify)
+				err = forward_notification(client, &imsg);
 			if (err)
 				log_warnx("uid %d: %s", client->euid, err->msg);
+
+			notif = STAILQ_FIRST(&notifications);
+			if (notif && do_notify) {
+				/* Request content for next notification. */
+				err = request_notification(notif);
+				if (err) {
+					log_warn("could not send notification: "
+					    "%s", err->msg);
+					shut = 1;
+				}
+			}
 		}
 		imsg_free(&imsg);
 	}
@@ -1296,15 +1604,23 @@ recv_connect(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(iconnect))
+	if (datalen < sizeof(iconnect))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iconnect, imsg->data, sizeof(iconnect));
+	if (iconnect.username_len == 0 ||
+	    datalen != sizeof(iconnect) + iconnect.username_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
 	client->fd = imsg_get_fd(imsg);
 	if (client->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	client->username = strndup(imsg->data + sizeof(iconnect),
+	    iconnect.username_len);
+	if (client->username == NULL)
+		return got_error_from_errno("strndup");
 
 	imsg_init(&client->iev.ibuf, client->fd);
 	client->iev.handler = session_dispatch_client;
@@ -1314,6 +1630,116 @@ recv_connect(struct imsg *imsg)
 	    session_dispatch_client, &client->iev);
 	gotd_imsg_event_add(&client->iev);
 	evtimer_set(&client->tmo, gotd_request_timeout, client);
+
+	return NULL;
+}
+
+static void
+session_dispatch_notifier(int fd, short event, void *arg)
+{
+	const struct got_error *err;
+	struct gotd_session_client *client = &gotd_session_client;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+	struct gotd_session_notif *notif;
+
+	if (event & EV_READ) {
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+			fatal("imsg_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		n = msgbuf_write(&ibuf->w);
+		if (n == -1 && errno != EAGAIN)
+			fatal("msgbuf_write");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_NOTIFICATION_SENT:
+			if (client->state != GOTD_STATE_NOTIFY) {
+				log_warn("unexpected imsg %d", imsg.hdr.type);
+				break;
+			}
+			notif = STAILQ_FIRST(&notifications);
+			if (notif == NULL) {
+				disconnect(client);
+				break; /* NOTREACHED */
+			}
+			/* Request content for the next notification. */
+			err = request_notification(notif);
+			if (err) {
+				log_warn("could not send notification: %s",
+				    err->msg);
+				disconnect(client);
+			}
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		imsg_clear(&iev->ibuf);
+		imsg_init(&iev->ibuf, -1);
+	}
+}
+
+static const struct got_error *
+recv_notifier(struct imsg *imsg)
+{
+	struct gotd_imsgev *iev = &gotd_session.notifier_iev;
+	struct gotd_session_client *client = &gotd_session_client;
+	size_t datalen;
+	int fd;
+
+	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	/* We should already have received a pipe to the listener. */
+	if (client->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
+		return NULL; /* notifications unused */
+
+	imsg_init(&iev->ibuf, fd);
+	iev->handler = session_dispatch_notifier;
+	iev->events = EV_READ;
+	iev->handler_arg = NULL;
+	event_set(&iev->ev, iev->ibuf.fd, EV_READ,
+	    session_dispatch_notifier, iev);
+	gotd_imsg_event_add(iev);
 
 	return NULL;
 }
@@ -1419,6 +1845,9 @@ session_dispatch(int fd, short event, void *arg)
 		case GOTD_IMSG_DISCONNECT:
 			do_disconnect = 1;
 			break;
+		case GOTD_IMSG_CONNECT_NOTIFIER:
+			err = recv_notifier(&imsg);
+			break;
 		case GOTD_IMSG_CONNECT_REPO_CHILD:
 			err = recv_repo_child(&imsg);
 			if (err)
@@ -1455,10 +1884,12 @@ done:
 void
 session_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds, struct timeval *request_timeout,
-    enum gotd_procid proc_id)
+    struct gotd_repo *repo_cfg, enum gotd_procid proc_id)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
+
+	STAILQ_INIT(&notifications);
 
 	gotd_session.title = title;
 	gotd_session.pid = getpid();
@@ -1466,7 +1897,10 @@ session_main(const char *title, const char *repo_path,
 	gotd_session.temp_fds = temp_fds;
 	memcpy(&gotd_session.request_timeout, request_timeout,
 	    sizeof(gotd_session.request_timeout));
+	gotd_session.repo_cfg = repo_cfg;
 	gotd_session.proc_id = proc_id;
+
+	imsg_init(&gotd_session.notifier_iev.ibuf, -1);
 
 	err = got_repo_open(&gotd_session.repo, repo_path, NULL, pack_fds);
 	if (err)
@@ -1519,10 +1953,23 @@ done:
 void
 gotd_session_shutdown(void)
 {
+	struct gotd_session_notif *notif;
+
 	log_debug("shutting down");
+
+	while (!STAILQ_EMPTY(&notifications)) {
+		notif = STAILQ_FIRST(&notifications);
+		STAILQ_REMOVE_HEAD(&notifications, entry);
+		if (notif->fd != -1)
+			close(notif->fd);
+		free(notif->refname);
+		free(notif);
+	}
+
 	if (gotd_session.repo)
 		got_repo_close(gotd_session.repo);
 	got_repo_pack_fds_close(gotd_session.pack_fds);
 	got_repo_temp_fds_close(gotd_session.temp_fds);
+	free(gotd_session_client.username);
 	exit(0);
 }
