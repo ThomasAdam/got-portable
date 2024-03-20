@@ -38,7 +38,7 @@ int smtp_timeout = 60; /* in seconds */
 __dead static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-f sender ] [-r responder] "
+	fprintf(stderr, "usage: %s [-f sender] [-r responder] "
 	    "[-s subject] [-h hostname] [-p port] recipient\n", getprogname());
 	exit(1);
 }
