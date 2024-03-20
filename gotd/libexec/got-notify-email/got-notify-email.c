@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +41,48 @@ usage(void)
 	fprintf(stderr, "usage: %s [-f sender] [-r responder] "
 	    "[-s subject] [-h hostname] [-p port] recipient\n", getprogname());
 	exit(1);
+}
+
+static int
+dial(const char *host, const char *port)
+{
+	struct addrinfo	 hints, *res, *res0;
+	const char	*cause = NULL;
+	int		 s, error, save_errno;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(host, port, &hints, &res0);
+	if (error)
+		errx(1, "failed to resolve %s:%s: %s", host, port,
+		    gai_strerror(error));
+
+	s = -1;
+	for (res = res0; res; res = res->ai_next) {
+		s = socket(res->ai_family, res->ai_socktype,
+		    res->ai_protocol);
+		if (s == -1) {
+			cause = "socket";
+			continue;
+		}
+
+		if (connect(s, res->ai_addr, res->ai_addrlen) == -1) {
+			cause = "connect";
+			save_errno = errno;
+			close(s);
+			errno = save_errno;
+			s = -1;
+			continue;
+		}
+
+		break;
+	}
+
+	freeaddrinfo(res0);
+	if (s == -1)
+		err(1, "%s", cause);
+	return s;
 }
 
 static char *
@@ -156,37 +199,20 @@ get_datestr(time_t *time, char *datebuf)
 }
 
 static void
-send_email(const char *myfromaddr, const char *fromaddr,
+send_email(int s, const char *myfromaddr, const char *fromaddr,
     const char *recipient, const char *replytoaddr,
-    const char *subject, const char *hostname, const char *port)
+    const char *subject)
 {
 	const struct got_error *error;
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	struct addrinfo hints, *res = NULL;
-	int s = -1, ret;
 	time_t now;
 	char datebuf[26];
 	char *datestr;
 
 	now = time(NULL);
 	datestr = get_datestr(&now, datebuf);
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-
-	ret = getaddrinfo(hostname, port, &hints, &res);
-	if (ret)
-		errx(1, "getaddrinfo: %s", gai_strerror(ret));
-
-	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (s == -1)
-		err(1, "socket");
-
-	if (connect(s, res->ai_addr, res->ai_addrlen) == -1)
-		err(1, "connect %s:%s", hostname, port);
 
 	if (read_smtp_code(s, "220"))
 		errx(1, "unexpected SMTP greeting received");
@@ -266,8 +292,6 @@ send_email(const char *myfromaddr, const char *fromaddr,
 
 	close(s);
 	free(line);
-	if (res)
-		freeaddrinfo(res);
 }
 
 int
@@ -280,7 +304,7 @@ main(int argc, char *argv[])
 	const char *port = "25";
 	const char *errstr;
 	char *timeoutstr;
-	int ch;
+	int ch, s;
 
 	while ((ch = getopt(argc, argv, "f:r:s:h:p:")) != -1) {
 		switch (ch) {
@@ -336,8 +360,15 @@ main(int argc, char *argv[])
 	if (fromaddr == NULL)
 		fromaddr = default_fromaddr;
 
-	send_email(default_fromaddr, fromaddr, recipient, replytoaddr,
-	    subject, hostname, port);
+	s = dial(hostname, port);
+
+#ifndef PROFILE
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	send_email(s, default_fromaddr, fromaddr, recipient, replytoaddr,
+	    subject);
 
 	free(default_fromaddr);
 	return 0;
