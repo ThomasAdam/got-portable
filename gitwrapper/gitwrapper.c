@@ -172,7 +172,7 @@ main(int argc, char *argv[])
 			goto done;
 	}
 
-	repo = gotd_find_repo_by_name(repo_name, &gotd);
+	repo = gotd_find_repo_by_name(repo_name, &gotd.repos);
 
 	/*
 	 * Invoke our custom Git server if the repository was found

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2023 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2024 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,5 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void session_main(const char *, const char *, int *, int *, struct timeval *,
-    struct gotd_repo *, enum gotd_procid);
+void notify_main(const char *, struct gotd_repolist *, const char *);

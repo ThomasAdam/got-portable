@@ -1,5 +1,7 @@
 .PATH:${.CURDIR}/../lib
 
+SUBDIR = libexec
+
 .include "../got-version.mk"
 
 .if ${GOT_RELEASE} == "Yes"
@@ -15,7 +17,11 @@ SRCS=		gotd.c auth.c repo_read.c repo_write.c log.c privsep_stub.c \
 		object_open_io.c object_parse.c opentemp.c pack.c path.c \
 		read_gitconfig.c read_gotconfig.c reference.c repository.c  \
 		hash.c sigs.c pack_create_io.c pollfd.c reference_parse.c \
-		repo_imsg.c pack_index.c session.c object_qid.c
+		repo_imsg.c pack_index.c session.c object_qid.c notify.c \
+		commit_graph.c diffreg.c diff.c \
+		diff_main.c diff_atomize_text.c diff_myers.c diff_output.c \
+		diff_output_plain.c diff_output_unidiff.c \
+		diff_output_edscript.c diff_patience.c
 
 CLEANFILES = parse.h
 
