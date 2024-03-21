@@ -64,6 +64,7 @@ static struct repo_read {
 	int *temp_fds;
 	int session_fd;
 	struct gotd_imsgev session_iev;
+	int refs_listed;
 } repo_read;
 
 static struct repo_read_client {
@@ -260,7 +261,6 @@ list_refs(struct imsg *imsg)
 	struct repo_read_client *client = &repo_read_client;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	struct gotd_imsg_list_refs_internal ireq;
 	size_t datalen;
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
@@ -274,17 +274,15 @@ list_refs(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	if (ireq.client_id == 0)
-		return got_error(GOT_ERR_CLIENT_ID);
-	if (client->id != 0) {
+	if (repo_read.refs_listed) {
 		return got_error_msg(GOT_ERR_CLIENT_ID,
 		    "duplicate list-refs request");
 	}
-	client->id = ireq.client_id;
+	repo_read.refs_listed = 1;
+
 	client->fd = client_fd;
 
 	imsg_init(&ibuf, client_fd);
@@ -580,15 +578,13 @@ static const struct got_error *
 receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	struct repo_read_client *client = &repo_read_client;
-	struct gotd_imsg_packfile_pipe ireq;
 	size_t datalen;
 
 	log_debug("receiving pack pipe descriptor");
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
 
 	if (client->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
@@ -605,7 +601,6 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	const struct got_error *err = NULL;
 	struct repo_read_client *client = &repo_read_client;
-	struct gotd_imsg_packfile_done idone;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	FILE *delta_cache = NULL;
@@ -658,10 +653,8 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	    got_sha1_digest_to_str(packsha1, hex, sizeof(hex)))
 		log_debug("sent pack-%s.pack", hex);
 
-	memset(&idone, 0, sizeof(idone));
-	idone.client_id = client->id;
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_DONE,
-	    PROC_REPO_READ, -1, &idone, sizeof(idone)) == -1)
+	    PROC_REPO_READ, -1, NULL, 0) == -1)
 		err = got_error_from_errno("imsg compose PACKFILE_DONE");
 done:
 	if (client->delta_cache_fd != -1 &&
@@ -709,7 +702,7 @@ repo_read_dispatch_session(int fd, short event, void *arg)
 			break;
 
 		if (imsg.hdr.type != GOTD_IMSG_LIST_REFS_INTERNAL &&
-		    client->id == 0) {
+		    !repo_read.refs_listed) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}

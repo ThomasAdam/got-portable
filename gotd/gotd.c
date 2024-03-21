@@ -1011,7 +1011,6 @@ connect_repo_child(struct gotd_client *client,
 		fatal("socketpair");
 
 	memset(&ireq, 0, sizeof(ireq));
-	ireq.client_id = client->id;
 	ireq.proc_id = repo_proc->type;
 
 	/* Pass repo child pipe to session child process. */

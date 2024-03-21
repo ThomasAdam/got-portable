@@ -293,11 +293,6 @@ struct gotd_imsg_list_refs {
 	int client_is_reading; /* 1 if reading, 0 if writing */
 };
 
-/* Structure for GOTD_IMSG_LIST_REFS_INTERNAL. */
-struct gotd_imsg_list_refs_internal {
-	uint32_t client_id;
-};
-
 /* Structure for GOTD_IMSG_REFLIST. */
 struct gotd_imsg_reflist {
 	size_t nrefs;
@@ -345,25 +340,21 @@ struct gotd_imsg_capability {
 /* Structure for GOTD_IMSG_WANT data. */
 struct gotd_imsg_want {
 	uint8_t object_id[SHA1_DIGEST_LENGTH];
-	uint32_t client_id;
 } __attribute__((__packed__));
 
 /* Structure for GOTD_IMSG_HAVE data. */
 struct gotd_imsg_have {
 	uint8_t object_id[SHA1_DIGEST_LENGTH];
-	uint32_t client_id;
 } __attribute__((__packed__));
 
 /* Structure for GOTD_IMSG_ACK data. */
 struct gotd_imsg_ack {
 	uint8_t object_id[SHA1_DIGEST_LENGTH];
-	uint32_t client_id;
 } __attribute__((__packed__));
 
 /* Structure for GOTD_IMSG_NAK data. */
 struct gotd_imsg_nak {
 	uint8_t object_id[SHA1_DIGEST_LENGTH];
-	uint32_t client_id;
 } __attribute__((__packed__));
 
 /* Structure for GOTD_IMSG_PACKFILE_STATUS data. */
@@ -380,7 +371,6 @@ struct gotd_imsg_ref_update {
 	uint8_t new_id[SHA1_DIGEST_LENGTH];
 	int ref_is_new;
 	int delete_ref;
-	uint32_t client_id;
 	size_t name_len;
 
 	/* Followed by name_len data bytes. */
@@ -389,7 +379,6 @@ struct gotd_imsg_ref_update {
 /* Structure for GOTD_IMSG_REF_UPDATES_START data. */
 struct gotd_imsg_ref_updates_start {
 	int nref_updates;
-	uint32_t client_id;
 
 	/* Followed by nref_updates GOT_IMSG_REF_UPDATE_OK/NG messages. */
 };
@@ -399,7 +388,6 @@ struct gotd_imsg_ref_update_ok {
 	uint8_t old_id[SHA1_DIGEST_LENGTH];
 	uint8_t new_id[SHA1_DIGEST_LENGTH];
 	int ref_is_new;
-	uint32_t client_id;
 	size_t name_len;
 
 	/* Followed by name_len data bytes. */
@@ -409,7 +397,6 @@ struct gotd_imsg_ref_update_ok {
 struct gotd_imsg_ref_update_ng {
 	uint8_t old_id[SHA1_DIGEST_LENGTH];
 	uint8_t new_id[SHA1_DIGEST_LENGTH];
-	uint32_t client_id;
 	size_t name_len;
 	size_t reason_len;
 
@@ -418,7 +405,6 @@ struct gotd_imsg_ref_update_ng {
 
 /* Structure for GOTD_IMSG_SEND_PACKFILE data. */
 struct gotd_imsg_send_packfile {
-	uint32_t client_id;
 	int report_progress;
 
 	/* delta cache file is sent as a file descriptor */
@@ -428,29 +414,16 @@ struct gotd_imsg_send_packfile {
 
 /* Structure for GOTD_IMSG_RECV_PACKFILE data. */
 struct gotd_imsg_recv_packfile {
-	uint32_t client_id;
 	int report_status;
 
 	/* pack destination temp file is sent as a file descriptor */
 };
-
-/* Structure for GOTD_IMSG_PACKFILE_PIPE data. */
-struct gotd_imsg_packfile_pipe {
-	uint32_t client_id;
-};
-
-/* Structure for GOTD_IMSG_PACKIDX_FILE data. */
-struct gotd_imsg_packidx_file {
-	uint32_t client_id;
-};
-
 
 /*
  * Structure for GOTD_IMSG_PACKFILE_PROGRESS and
  * GOTD_IMSG_PACKFILE_READY data.
  */
 struct gotd_imsg_packfile_progress {
-	uint32_t client_id;
 	int ncolored;
 	int nfound;
 	int ntrees;
@@ -463,13 +436,7 @@ struct gotd_imsg_packfile_progress {
 
 /* Structure for GOTD_IMSG_PACKFILE_INSTALL. */
 struct gotd_imsg_packfile_install {
-	uint32_t client_id;
 	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
-};
-
-/* Structure for GOTD_IMSG_PACKFILE_DONE data. */
-struct gotd_imsg_packfile_done {
-	uint32_t client_id;
 };
 
 /* Structure for GOTD_IMSG_DISCONNECT data. */
@@ -489,7 +456,6 @@ struct gotd_imsg_connect {
 
 /* Structure for GOTD_IMSG_CONNECT_REPO_CHILD. */
 struct gotd_imsg_connect_repo_child {
-	uint32_t client_id;
 	enum gotd_procid proc_id;
 
 	/* repo child imsg pipe is passed via imsg fd */
@@ -511,7 +477,6 @@ enum gotd_notification_action {
 };
 /* IMSG_NOTIFY session <-> repo_write */
 struct gotd_imsg_notification_content {
-	uint32_t client_id;
 	enum gotd_notification_action action;
 	uint8_t old_id[SHA1_DIGEST_LENGTH];
 	uint8_t new_id[SHA1_DIGEST_LENGTH];

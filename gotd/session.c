@@ -182,24 +182,21 @@ gotd_session_sighdlr(int sig, short event, void *arg)
 }
 
 static const struct got_error *
-recv_packfile_done(uint32_t *client_id, struct imsg *imsg)
+recv_packfile_done(struct imsg *imsg)
 {
-	struct gotd_imsg_packfile_done idone;
 	size_t datalen;
 
 	log_debug("packfile-done received");
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(idone))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&idone, imsg->data, sizeof(idone));
 
-	*client_id = idone.client_id;
 	return NULL;
 }
 
 static const struct got_error *
-recv_packfile_install(uint32_t *client_id, struct imsg *imsg)
+recv_packfile_install(struct imsg *imsg)
 {
 	struct gotd_imsg_packfile_install inst;
 	size_t datalen;
@@ -211,12 +208,11 @@ recv_packfile_install(uint32_t *client_id, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&inst, imsg->data, sizeof(inst));
 
-	*client_id = inst.client_id;
 	return NULL;
 }
 
 static const struct got_error *
-recv_ref_updates_start(uint32_t *client_id, struct imsg *imsg)
+recv_ref_updates_start(struct imsg *imsg)
 {
 	struct gotd_imsg_ref_updates_start istart;
 	size_t datalen;
@@ -228,12 +224,11 @@ recv_ref_updates_start(uint32_t *client_id, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&istart, imsg->data, sizeof(istart));
 
-	*client_id = istart.client_id;
 	return NULL;
 }
 
 static const struct got_error *
-recv_ref_update(uint32_t *client_id, struct imsg *imsg)
+recv_ref_update(struct imsg *imsg)
 {
 	struct gotd_imsg_ref_update iref;
 	size_t datalen;
@@ -245,7 +240,6 @@ recv_ref_update(uint32_t *client_id, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iref, imsg->data, sizeof(iref));
 
-	*client_id = iref.client_id;
 	return NULL;
 }
 
@@ -259,7 +253,6 @@ send_ref_update_ok(struct gotd_session_client *client,
 	size_t len;
 
 	memset(&iok, 0, sizeof(iok));
-	iok.client_id = client->id;
 	memcpy(iok.old_id, iref->old_id, SHA1_DIGEST_LENGTH);
 	memcpy(iok.new_id, iref->new_id, SHA1_DIGEST_LENGTH);
 	iok.name_len = strlen(refname);
@@ -300,7 +293,6 @@ send_ref_update_ng(struct gotd_session_client *client,
 	size_t len;
 
 	memset(&ing, 0, sizeof(ing));
-	ing.client_id = client->id;
 	memcpy(ing.old_id, iref->old_id, SHA1_DIGEST_LENGTH);
 	memcpy(ing.new_id, iref->new_id, SHA1_DIGEST_LENGTH);
 	ing.name_len = strlen(refname);
@@ -602,7 +594,6 @@ static const struct got_error *
 request_notification(struct gotd_session_notif *notif)
 {
 	const struct got_error *err = NULL;
-	struct gotd_session_client *client = &gotd_session_client;
 	struct gotd_imsgev *iev = &gotd_session.repo_child_iev;
 	struct gotd_imsg_notification_content icontent;
 	struct ibuf *wbuf;
@@ -614,7 +605,6 @@ request_notification(struct gotd_session_notif *notif)
 		return got_error_from_errno("got_opentemp");
 
 	memset(&icontent, 0, sizeof(icontent));
-	icontent.client_id = client->id;
 
 	icontent.action = notif->action;
 	memcpy(&icontent.old_id, &notif->old_id, sizeof(notif->old_id));
@@ -833,7 +823,7 @@ done:
 }
 
 static const struct got_error *
-recv_notification_content(uint32_t *client_id, struct imsg *imsg)
+recv_notification_content(struct imsg *imsg)
 {
 	struct gotd_imsg_notification_content inotif;
 	size_t datalen;
@@ -843,7 +833,6 @@ recv_notification_content(uint32_t *client_id, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&inotif, imsg->data, sizeof(inotif));
 
-	*client_id = inotif.client_id;
 	return NULL;
 }
 
@@ -897,25 +886,25 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			break;
 		case GOTD_IMSG_PACKFILE_DONE:
 			do_disconnect = 1;
-			err = recv_packfile_done(&client_id, &imsg);
+			err = recv_packfile_done(&imsg);
 			break;
 		case GOTD_IMSG_PACKFILE_INSTALL:
-			err = recv_packfile_install(&client_id, &imsg);
+			err = recv_packfile_install(&imsg);
 			if (err == NULL)
 				do_packfile_install = 1;
 			break;
 		case GOTD_IMSG_REF_UPDATES_START:
-			err = recv_ref_updates_start(&client_id, &imsg);
+			err = recv_ref_updates_start(&imsg);
 			if (err == NULL)
 				do_ref_updates = 1;
 			break;
 		case GOTD_IMSG_REF_UPDATE:
-			err = recv_ref_update(&client_id, &imsg);
+			err = recv_ref_update(&imsg);
 			if (err == NULL)
 				do_ref_update = 1;
 			break;
 		case GOTD_IMSG_NOTIFY:
-			err = recv_notification_content(&client_id, &imsg);
+			err = recv_notification_content(&imsg);
 			if (err == NULL)
 				do_notify = 1;
 			break;
@@ -1079,7 +1068,6 @@ forward_want(struct gotd_session_client *client, struct imsg *imsg)
 
 	memset(&iwant, 0, sizeof(iwant));
 	memcpy(iwant.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
-	iwant.client_id = client->id;
 
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_WANT, gotd_session.proc_id, -1,
@@ -1109,7 +1097,6 @@ forward_ref_update(struct gotd_session_client *client, struct imsg *imsg)
 		return got_error_from_errno("malloc");
 	memcpy(iref, imsg->data, datalen);
 
-	iref->client_id = client->id;
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_REF_UPDATE, gotd_session.proc_id, -1,
 	    iref, datalen) == -1)
@@ -1133,7 +1120,6 @@ forward_have(struct gotd_session_client *client, struct imsg *imsg)
 
 	memset(&ihave, 0, sizeof(ihave));
 	memcpy(ihave.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
-	ihave.client_id = client->id;
 
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_HAVE, gotd_session.proc_id, -1,
@@ -1166,8 +1152,6 @@ recv_packfile(struct gotd_session_client *client)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsg_recv_packfile ipack;
-	struct gotd_imsg_packfile_pipe ipipe;
-	struct gotd_imsg_packidx_file ifile;
 	char *basepath = NULL, *pack_path = NULL, *idx_path = NULL;
 	int packfd = -1, idxfd = -1;
 	int pipe[2] = { -1, -1 };
@@ -1180,13 +1164,10 @@ recv_packfile(struct gotd_session_client *client)
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
 		return got_error_from_errno("socketpair");
 
-	memset(&ipipe, 0, sizeof(ipipe));
-	ipipe.client_id = client->id;
-
 	/* Send pack pipe end 0 to repo child process. */
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_PACKFILE_PIPE, gotd_session.proc_id, pipe[0],
-	        &ipipe, sizeof(ipipe)) == -1) {
+	        NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		pipe[0] = -1;
 		goto done;
@@ -1231,11 +1212,9 @@ recv_packfile(struct gotd_session_client *client)
 		goto done;
 	}
 
-	memset(&ifile, 0, sizeof(ifile));
-	ifile.client_id = client->id;
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_PACKIDX_FILE, gotd_session.proc_id,
-	    idxfd, &ifile, sizeof(ifile)) == -1) {
+	    idxfd, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKIDX_FILE");
 		idxfd = -1;
 		goto done;
@@ -1243,7 +1222,6 @@ recv_packfile(struct gotd_session_client *client)
 	idxfd = -1;
 
 	memset(&ipack, 0, sizeof(ipack));
-	ipack.client_id = client->id;
 	if (client_has_capability(client, GOT_CAPA_REPORT_STATUS))
 		ipack.report_status = 1;
 
@@ -1281,16 +1259,13 @@ send_packfile(struct gotd_session_client *client)
 {
 	const struct got_error *err = NULL;
 	struct gotd_imsg_send_packfile ipack;
-	struct gotd_imsg_packfile_pipe ipipe;
 	int pipe[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
 		return got_error_from_errno("socketpair");
 
 	memset(&ipack, 0, sizeof(ipack));
-	memset(&ipipe, 0, sizeof(ipipe));
 
-	ipack.client_id = client->id;
 	if (client_has_capability(client, GOT_CAPA_SIDE_BAND_64K))
 		ipack.report_progress = 1;
 
@@ -1307,12 +1282,9 @@ send_packfile(struct gotd_session_client *client)
 		return err;
 	}
 
-	ipipe.client_id = client->id;
-
 	/* Send pack pipe end 0 to repo child process. */
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD,
-	    pipe[0], &ipipe, sizeof(ipipe)) == -1) {
+	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		close(pipe[1]);
 		return err;
@@ -1570,21 +1542,17 @@ list_refs_request(void)
 	static const struct got_error *err;
 	struct gotd_session_client *client = &gotd_session_client;
 	struct gotd_imsgev *iev = &gotd_session.repo_child_iev;
-	struct gotd_imsg_list_refs_internal ilref;
 	int fd;
 
 	if (gotd_session.state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
-
-	memset(&ilref, 0, sizeof(ilref));
-	ilref.client_id = client->id;
 
 	fd = dup(client->fd);
 	if (fd == -1)
 		return got_error_from_errno("dup");
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LIST_REFS_INTERNAL,
-	    gotd_session.proc_id, fd, &ilref, sizeof(ilref)) == -1) {
+	    gotd_session.proc_id, fd, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose LIST_REFS_INTERNAL");
 		close(fd);
 		return err;
@@ -1767,7 +1735,6 @@ recv_repo_child(struct imsg *imsg)
 
 	memcpy(&ichild, imsg->data, sizeof(ichild));
 
-	client->id = ichild.client_id;
 	if (ichild.proc_id == PROC_REPO_WRITE)
 		client->is_writing = 1;
 	else if (ichild.proc_id == PROC_REPO_READ)
