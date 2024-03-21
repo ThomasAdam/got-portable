@@ -83,6 +83,7 @@ static struct repo_write {
 		int fd1;
 		int fd2;
 	} diff;
+	int refs_listed;
 } repo_write;
 
 struct gotd_ref_update {
@@ -246,7 +247,6 @@ list_refs(struct imsg *imsg)
 	struct repo_write_client *client = &repo_write_client;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	struct gotd_imsg_list_refs_internal ireq;
 	size_t datalen;
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
@@ -259,17 +259,15 @@ list_refs(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	if (ireq.client_id == 0)
-		return got_error(GOT_ERR_CLIENT_ID);
-	if (client->id != 0) {
+	if (repo_write.refs_listed) {
 		return got_error_msg(GOT_ERR_CLIENT_ID,
 		    "duplicate list-refs request");
 	}
-	client->id = ireq.client_id;
+	repo_write.refs_listed = 1;
+
 	client->fd = client_fd;
 	client->nref_updates = 0;
 	client->nref_del = 0;
@@ -1505,7 +1503,6 @@ install_packfile(struct gotd_imsgev *iev)
 	int ret;
 
 	memset(&inst, 0, sizeof(inst));
-	inst.client_id = client->id;
 	memcpy(inst.pack_sha1, client->pack_sha1, SHA1_DIGEST_LENGTH);
 
 	ret = gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_INSTALL,
@@ -1519,13 +1516,11 @@ install_packfile(struct gotd_imsgev *iev)
 static const struct got_error *
 send_ref_updates_start(int nref_updates, struct gotd_imsgev *iev)
 {
-	struct repo_write_client *client = &repo_write_client;
 	struct gotd_imsg_ref_updates_start istart;
 	int ret;
 
 	memset(&istart, 0, sizeof(istart));
 	istart.nref_updates = nref_updates;
-	istart.client_id = client->id;
 
 	ret = gotd_imsg_compose_event(iev, GOTD_IMSG_REF_UPDATES_START,
 	    PROC_REPO_WRITE, -1, &istart, sizeof(istart));
@@ -1539,7 +1534,6 @@ send_ref_updates_start(int nref_updates, struct gotd_imsgev *iev)
 static const struct got_error *
 send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 {
-	struct repo_write_client *client = &repo_write_client;
 	struct gotd_imsg_ref_update iref;
 	const char *refname = got_ref_get_name(ref_update->ref);
 	struct ibuf *wbuf;
@@ -1550,7 +1544,6 @@ send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 	memcpy(iref.new_id, ref_update->new_id.sha1, SHA1_DIGEST_LENGTH);
 	iref.ref_is_new = ref_update->ref_is_new;
 	iref.delete_ref = ref_update->delete_ref;
-	iref.client_id = client->id;
 	iref.name_len = strlen(refname);
 
 	len = sizeof(iref) + iref.name_len;
@@ -1594,15 +1587,13 @@ static const struct got_error *
 receive_pack_pipe(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	struct repo_write_client *client = &repo_write_client;
-	struct gotd_imsg_packfile_pipe ireq;
 	size_t datalen;
 
 	log_debug("receiving pack pipe descriptor");
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
 
 	if (client->pack_pipe != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
@@ -1618,15 +1609,13 @@ static const struct got_error *
 receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	struct repo_write_client *client = &repo_write_client;
-	struct gotd_imsg_packidx_file ireq;
 	size_t datalen;
 
 	log_debug("receiving pack index output file");
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
 
 	if (client->packidx_fd != -1)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
@@ -2239,7 +2228,7 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			break;
 
 		if (imsg.hdr.type != GOTD_IMSG_LIST_REFS_INTERNAL &&
-		    client->id == 0) {
+		    !repo_write.refs_listed) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
