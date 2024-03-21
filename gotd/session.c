@@ -75,10 +75,10 @@ static struct gotd_session {
 	struct gotd_imsgev notifier_iev;
 	struct timeval request_timeout;
 	enum gotd_procid proc_id;
+	enum gotd_session_state	state;
 } gotd_session;
 
 static struct gotd_session_client {
-	enum gotd_session_state		 state;
 	int				 is_writing;
 	struct gotd_client_capability	*capabilities;
 	size_t				 ncapa_alloc;
@@ -809,7 +809,7 @@ done:
 			send_refs_updated(client);
 			notif = STAILQ_FIRST(&notifications);
 			if (notif) {
-				client->state = GOTD_STATE_NOTIFY;
+				gotd_session.state = GOTD_STATE_NOTIFY;
 				err = request_notification(notif);
 				if (err) {
 					log_warn("could not send notification: "
@@ -1377,7 +1377,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			if (err->code == GOT_ERR_PRIVSEP_READ)
 				err = NULL;
 			else if (err->code == GOT_ERR_EOF &&
-			    client->state == GOTD_STATE_EXPECT_CAPABILITIES) {
+			    gotd_session.state ==
+			    GOTD_STATE_EXPECT_CAPABILITIES) {
 				/*
 				 * The client has closed its socket before
 				 * sending its capability announcement.
@@ -1394,7 +1395,8 @@ session_dispatch_client(int fd, short events, void *arg)
 
 		switch (imsg.hdr.type) {
 		case GOTD_IMSG_CAPABILITIES:
-			if (client->state != GOTD_STATE_EXPECT_CAPABILITIES) {
+			if (gotd_session.state !=
+			    GOTD_STATE_EXPECT_CAPABILITIES) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected capabilities received");
 				break;
@@ -1404,7 +1406,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			err = recv_capabilities(client, &imsg);
 			break;
 		case GOTD_IMSG_CAPABILITY:
-			if (client->state != GOTD_STATE_EXPECT_CAPABILITIES) {
+			if (gotd_session.state != GOTD_STATE_EXPECT_CAPABILITIES) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected capability received");
 				break;
@@ -1413,12 +1415,12 @@ session_dispatch_client(int fd, short events, void *arg)
 			if (err || client->ncapabilities < client->ncapa_alloc)
 				break;
 			if (!client->is_writing) {
-				client->state = GOTD_STATE_EXPECT_WANT;
+				gotd_session.state = GOTD_STATE_EXPECT_WANT;
 				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting want-lines",
 				    client->euid);
 			} else if (client->is_writing) {
-				client->state = GOTD_STATE_EXPECT_REF_UPDATE;
+				gotd_session.state = GOTD_STATE_EXPECT_REF_UPDATE;
 				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting ref-update-lines",
 				    client->euid);
@@ -1427,7 +1429,7 @@ session_dispatch_client(int fd, short events, void *arg)
 				    client->euid);
 			break;
 		case GOTD_IMSG_WANT:
-			if (client->state != GOTD_STATE_EXPECT_WANT) {
+			if (gotd_session.state != GOTD_STATE_EXPECT_WANT) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected want-line received");
 				break;
@@ -1441,8 +1443,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			err = forward_want(client, &imsg);
 			break;
 		case GOTD_IMSG_REF_UPDATE:
-			if (client->state != GOTD_STATE_EXPECT_REF_UPDATE &&
-			    client->state !=
+			if (gotd_session.state != GOTD_STATE_EXPECT_REF_UPDATE &&
+			    gotd_session.state !=
 			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected ref-update-line received");
@@ -1456,11 +1458,11 @@ session_dispatch_client(int fd, short events, void *arg)
 			err = forward_ref_update(client, &imsg);
 			if (err)
 				break;
-			client->state = GOTD_STATE_EXPECT_MORE_REF_UPDATES;
+			gotd_session.state = GOTD_STATE_EXPECT_MORE_REF_UPDATES;
 			client->accept_flush_pkt = 1;
 			break;
 		case GOTD_IMSG_HAVE:
-			if (client->state != GOTD_STATE_EXPECT_HAVE) {
+			if (gotd_session.state != GOTD_STATE_EXPECT_HAVE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected have-line received");
 				break;
@@ -1476,17 +1478,17 @@ session_dispatch_client(int fd, short events, void *arg)
 			client->accept_flush_pkt = 1;
 			break;
 		case GOTD_IMSG_FLUSH:
-			if (client->state == GOTD_STATE_EXPECT_WANT ||
-			    client->state == GOTD_STATE_EXPECT_HAVE) {
+			if (gotd_session.state == GOTD_STATE_EXPECT_WANT ||
+			    gotd_session.state == GOTD_STATE_EXPECT_HAVE) {
 				err = ensure_client_is_reading(client);
 				if (err)
 					break;
-			} else if (client->state ==
+			} else if (gotd_session.state ==
 			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
 				err = ensure_client_is_writing(client);
 				if (err)
 					break;
-			} else if (client->state != GOTD_STATE_EXPECT_DONE) {
+			} else if (gotd_session.state != GOTD_STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected flush-pkt received");
 				break;
@@ -1506,22 +1508,22 @@ session_dispatch_client(int fd, short events, void *arg)
 
 			log_debug("received flush-pkt from uid %d",
 			    client->euid);
-			if (client->state == GOTD_STATE_EXPECT_WANT) {
-				client->state = GOTD_STATE_EXPECT_HAVE;
+			if (gotd_session.state == GOTD_STATE_EXPECT_WANT) {
+				gotd_session.state = GOTD_STATE_EXPECT_HAVE;
 				log_debug("uid %d: expecting have-lines",
 				    client->euid);
-			} else if (client->state == GOTD_STATE_EXPECT_HAVE) {
-				client->state = GOTD_STATE_EXPECT_DONE;
+			} else if (gotd_session.state == GOTD_STATE_EXPECT_HAVE) {
+				gotd_session.state = GOTD_STATE_EXPECT_DONE;
 				client->accept_flush_pkt = 1;
 				log_debug("uid %d: expecting 'done'",
 				    client->euid);
-			} else if (client->state ==
+			} else if (gotd_session.state ==
 			    GOTD_STATE_EXPECT_MORE_REF_UPDATES) {
-				client->state = GOTD_STATE_EXPECT_PACKFILE;
+				gotd_session.state = GOTD_STATE_EXPECT_PACKFILE;
 				log_debug("uid %d: expecting packfile",
 				    client->euid);
 				err = recv_packfile(client);
-			} else if (client->state != GOTD_STATE_EXPECT_DONE) {
+			} else if (gotd_session.state != GOTD_STATE_EXPECT_DONE) {
 				/* should not happen, see above */
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected client state");
@@ -1529,8 +1531,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			}
 			break;
 		case GOTD_IMSG_DONE:
-			if (client->state != GOTD_STATE_EXPECT_HAVE &&
-			    client->state != GOTD_STATE_EXPECT_DONE) {
+			if (gotd_session.state != GOTD_STATE_EXPECT_HAVE &&
+			    gotd_session.state != GOTD_STATE_EXPECT_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected flush-pkt received");
 				break;
@@ -1539,7 +1541,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			err = ensure_client_is_reading(client);
 			if (err)
 				break;
-			client->state = GOTD_STATE_DONE;
+			gotd_session.state = GOTD_STATE_DONE;
 			client->accept_flush_pkt = 1;
 			err = send_packfile(client);
 			break;
@@ -1554,7 +1556,7 @@ session_dispatch_client(int fd, short events, void *arg)
 
 	if (err) {
 		if (err->code != GOT_ERR_EOF ||
-		    client->state != GOTD_STATE_EXPECT_PACKFILE)
+		    gotd_session.state != GOTD_STATE_EXPECT_PACKFILE)
 			disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(iev);
@@ -1571,7 +1573,7 @@ list_refs_request(void)
 	struct gotd_imsg_list_refs_internal ilref;
 	int fd;
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (gotd_session.state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	memset(&ilref, 0, sizeof(ilref));
@@ -1588,7 +1590,7 @@ list_refs_request(void)
 		return err;
 	}
 
-	client->state = GOTD_STATE_EXPECT_CAPABILITIES;
+	gotd_session.state = GOTD_STATE_EXPECT_CAPABILITIES;
 	log_debug("uid %d: expecting capabilities", client->euid);
 	return NULL;
 }
@@ -1600,7 +1602,7 @@ recv_connect(struct imsg *imsg)
 	struct gotd_imsg_connect iconnect;
 	size_t datalen;
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (gotd_session.state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
@@ -1675,7 +1677,7 @@ session_dispatch_notifier(int fd, short event, void *arg)
 
 		switch (imsg.hdr.type) {
 		case GOTD_IMSG_NOTIFICATION_SENT:
-			if (client->state != GOTD_STATE_NOTIFY) {
+			if (gotd_session.state != GOTD_STATE_NOTIFY) {
 				log_warn("unexpected imsg %d", imsg.hdr.type);
 				break;
 			}
@@ -1718,7 +1720,7 @@ recv_notifier(struct imsg *imsg)
 	size_t datalen;
 	int fd;
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (gotd_session.state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	/* We should already have received a pipe to the listener. */
@@ -1752,7 +1754,7 @@ recv_repo_child(struct imsg *imsg)
 	size_t datalen;
 	int fd;
 
-	if (client->state != GOTD_STATE_EXPECT_LIST_REFS)
+	if (gotd_session.state != GOTD_STATE_EXPECT_LIST_REFS)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	/* We should already have received a pipe to the listener. */
@@ -1924,7 +1926,8 @@ session_main(const char *title, const char *repo_path,
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	gotd_session_client.state = GOTD_STATE_EXPECT_LIST_REFS;
+	gotd_session.state = GOTD_STATE_EXPECT_LIST_REFS;
+
 	gotd_session_client.fd = -1;
 	gotd_session_client.nref_updates = -1;
 	gotd_session_client.delta_cache_fd = -1;
