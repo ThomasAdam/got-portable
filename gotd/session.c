@@ -75,6 +75,7 @@ static struct gotd_session {
 	struct timeval request_timeout;
 	enum gotd_procid proc_id;
 	enum gotd_session_state	state;
+	struct gotd_imsgev repo_child_iev;
 } gotd_session;
 
 static struct gotd_session_client {
@@ -86,7 +87,6 @@ static struct gotd_session_client {
 	int				 fd;
 	int				 delta_cache_fd;
 	struct gotd_imsgev		 iev;
-	struct gotd_imsgev		 repo_child_iev;
 	struct event			 tmo;
 	uid_t				 euid;
 	gid_t				 egid;
@@ -110,8 +110,8 @@ disconnect(struct gotd_session_client *client)
 	    GOTD_IMSG_DISCONNECT, gotd_session.proc_id, -1, NULL, 0) == -1)
 		log_warn("imsg compose DISCONNECT");
 
-	imsg_clear(&client->repo_child_iev.ibuf);
-	event_del(&client->repo_child_iev.ev);
+	imsg_clear(&gotd_session.repo_child_iev.ibuf);
+	event_del(&gotd_session.repo_child_iev.ev);
 	evtimer_del(&client->tmo);
 	close(client->fd);
 	if (client->delta_cache_fd != -1)
@@ -431,9 +431,8 @@ queue_notification(struct got_object_id *old_id, struct got_object_id *new_id,
     struct got_repository *repo, struct got_reference *ref)
 {
 	const struct got_error *err = NULL;
-	struct gotd_session_client *client = &gotd_session_client;
 	struct gotd_repo *repo_cfg = gotd_session.repo_cfg;
-	struct gotd_imsgev *iev = &client->repo_child_iev;
+	struct gotd_imsgev *iev = &gotd_session.repo_child_iev;
 	struct got_pathlist_entry *pe;
 	struct gotd_session_notif *notif;
 
@@ -604,7 +603,7 @@ request_notification(struct gotd_session_notif *notif)
 {
 	const struct got_error *err = NULL;
 	struct gotd_session_client *client = &gotd_session_client;
-	struct gotd_imsgev *iev = &client->repo_child_iev;
+	struct gotd_imsgev *iev = &gotd_session.repo_child_iev;
 	struct gotd_imsg_notification_content icontent;
 	struct ibuf *wbuf;
 	size_t len;
@@ -1082,8 +1081,9 @@ forward_want(struct gotd_session_client *client, struct imsg *imsg)
 	memcpy(iwant.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
 	iwant.client_id = client->id;
 
-	if (gotd_imsg_compose_event(&client->repo_child_iev, GOTD_IMSG_WANT,
-	    gotd_session.proc_id, -1, &iwant, sizeof(iwant)) == -1)
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
+	    GOTD_IMSG_WANT, gotd_session.proc_id, -1,
+	    &iwant, sizeof(iwant)) == -1)
 		return got_error_from_errno("imsg compose WANT");
 
 	return NULL;
@@ -1110,7 +1110,7 @@ forward_ref_update(struct gotd_session_client *client, struct imsg *imsg)
 	memcpy(iref, imsg->data, datalen);
 
 	iref->client_id = client->id;
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_REF_UPDATE, gotd_session.proc_id, -1,
 	    iref, datalen) == -1)
 		err = got_error_from_errno("imsg compose REF_UPDATE");
@@ -1135,8 +1135,9 @@ forward_have(struct gotd_session_client *client, struct imsg *imsg)
 	memcpy(ihave.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
 	ihave.client_id = client->id;
 
-	if (gotd_imsg_compose_event(&client->repo_child_iev, GOTD_IMSG_HAVE,
-	    gotd_session.proc_id, -1, &ihave, sizeof(ihave)) == -1)
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
+	    GOTD_IMSG_HAVE, gotd_session.proc_id, -1,
+	    &ihave, sizeof(ihave)) == -1)
 		return got_error_from_errno("imsg compose HAVE");
 
 	return NULL;
@@ -1183,7 +1184,7 @@ recv_packfile(struct gotd_session_client *client)
 	ipipe.client_id = client->id;
 
 	/* Send pack pipe end 0 to repo child process. */
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_PACKFILE_PIPE, gotd_session.proc_id, pipe[0],
 	        &ipipe, sizeof(ipipe)) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
@@ -1232,7 +1233,7 @@ recv_packfile(struct gotd_session_client *client)
 
 	memset(&ifile, 0, sizeof(ifile));
 	ifile.client_id = client->id;
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_PACKIDX_FILE, gotd_session.proc_id,
 	    idxfd, &ifile, sizeof(ifile)) == -1) {
 		err = got_error_from_errno("imsg compose PACKIDX_FILE");
@@ -1246,7 +1247,7 @@ recv_packfile(struct gotd_session_client *client)
 	if (client_has_capability(client, GOT_CAPA_REPORT_STATUS))
 		ipack.report_status = 1;
 
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_RECV_PACKFILE, gotd_session.proc_id, packfd,
 	    &ipack, sizeof(ipack)) == -1) {
 		err = got_error_from_errno("imsg compose RECV_PACKFILE");
@@ -1297,7 +1298,7 @@ send_packfile(struct gotd_session_client *client)
 	if (client->delta_cache_fd == -1)
 		return got_error_from_errno("got_opentempfd");
 
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_SEND_PACKFILE, PROC_GOTD, client->delta_cache_fd,
 	    &ipack, sizeof(ipack)) == -1) {
 		err = got_error_from_errno("imsg compose SEND_PACKFILE");
@@ -1309,7 +1310,7 @@ send_packfile(struct gotd_session_client *client)
 	ipipe.client_id = client->id;
 
 	/* Send pack pipe end 0 to repo child process. */
-	if (gotd_imsg_compose_event(&client->repo_child_iev,
+	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
 	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD,
 	    pipe[0], &ipipe, sizeof(ipipe)) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
@@ -1568,7 +1569,7 @@ list_refs_request(void)
 {
 	static const struct got_error *err;
 	struct gotd_session_client *client = &gotd_session_client;
-	struct gotd_imsgev *iev = &client->repo_child_iev;
+	struct gotd_imsgev *iev = &gotd_session.repo_child_iev;
 	struct gotd_imsg_list_refs_internal ilref;
 	int fd;
 
@@ -1779,13 +1780,14 @@ recv_repo_child(struct imsg *imsg)
 	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&client->repo_child_iev.ibuf, fd);
-	client->repo_child_iev.handler = session_dispatch_repo_child;
-	client->repo_child_iev.events = EV_READ;
-	client->repo_child_iev.handler_arg = NULL;
-	event_set(&client->repo_child_iev.ev, client->repo_child_iev.ibuf.fd,
-	    EV_READ, session_dispatch_repo_child, &client->repo_child_iev);
-	gotd_imsg_event_add(&client->repo_child_iev);
+	imsg_init(&gotd_session.repo_child_iev.ibuf, fd);
+	gotd_session.repo_child_iev.handler = session_dispatch_repo_child;
+	gotd_session.repo_child_iev.events = EV_READ;
+	gotd_session.repo_child_iev.handler_arg = NULL;
+	event_set(&gotd_session.repo_child_iev.ev,
+	    gotd_session.repo_child_iev.ibuf.fd, EV_READ,
+	    session_dispatch_repo_child, &gotd_session.repo_child_iev);
+	gotd_imsg_event_add(&gotd_session.repo_child_iev);
 
 	/* The "recvfd" pledge promise is no longer needed. */
 	if (pledge("stdio rpath wpath cpath sendfd fattr flock", NULL) == -1)
