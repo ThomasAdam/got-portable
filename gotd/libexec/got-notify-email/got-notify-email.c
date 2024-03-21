@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 
 #include <errno.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +35,11 @@
 
 #include "got_lib_poll.h"
 
+#define SMTP_LINE_MAX	65535
+
 static int smtp_timeout = 60; /* in seconds */
+static char smtp_buf[SMTP_LINE_MAX];
+static size_t smtp_buflen;
 
 __dead static void
 usage(void)
@@ -112,43 +117,50 @@ static int
 read_smtp_code(int s, const char *code)
 {
 	const struct got_error *error;
-	char buf[4];
-	size_t n;
+	char	*endl;
+	size_t	 linelen;
+	ssize_t	 r;
 
-	error = got_poll_read_full_timeout(s, &n, buf, 3, 3, smtp_timeout);
-	if (error)
-		errx(1, "read: %s", error->msg);
-	if (strncmp(buf, code, 3) != 0) {
-		buf[3] = '\0';
-		warnx("unexpected SMTP message code: %s", buf);
+	for (;;) {
+		endl = memmem(smtp_buf, smtp_buflen, "\r\n", 2);
+		if (endl != NULL)
+			break;
+
+		if (smtp_buflen == sizeof(smtp_buf))
+			errx(1, "line too long");
+
+		error = got_poll_fd(s, POLLIN, smtp_timeout);
+		if (error)
+			errx(1, "poll: %s", error->msg);
+
+		r = read(s, smtp_buf + smtp_buflen,
+		    sizeof(smtp_buf) - smtp_buflen);
+		if (r == -1)
+			err(1, "read");
+		if (r == 0)
+			errx(1, "unexpected EOF");
+		smtp_buflen += r;
+	}
+
+	linelen = endl - smtp_buf;
+	if (linelen < 3)
+		errx(1, "invalid SMTP response");
+
+	if (strncmp(code, smtp_buf, 3) != 0) {
+		smtp_buf[3] = '\0';
+		warnx("unexpected SMTP message code: %s", smtp_buf);
 		return -1;
 	}
 
+	/*
+	 * Normally we would get just one reply, but the regress doesn't
+	 * use a real SMTP server and queues all the replies upfront.
+	 */
+	linelen += 2;
+	memmove(smtp_buf, smtp_buf + linelen, smtp_buflen - linelen);
+	smtp_buflen -= linelen;
+
 	return 0;
-}
-
-static int
-skip_to_crlf(int s)
-{
-	const struct got_error *error;
-	char buf[1];
-	size_t len;
-
-	for (;;) {
-		error = got_poll_read_full_timeout(s, &len, buf, 1, 1,
-		    smtp_timeout);
-		if (error)
-			errx(1, "read: %s", error->msg);
-		if (buf[0] == '\r') {
-			error = got_poll_read_full(s, &len, buf, 1, 1);
-			if (error)
-				errx(1, "read: %s", error->msg);
-			if (buf[0] == '\n')
-				return 0;
-		}
-	}
-
-	return -1;
 }
 
 static int
@@ -217,36 +229,26 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 
 	if (read_smtp_code(s, "220"))
 		errx(1, "unexpected SMTP greeting received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "HELO localhost\r\n"))
 		errx(1, "could not send HELO");
 	if (read_smtp_code(s, "250"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "MAIL FROM:<%s>\r\n", myfromaddr))
 		errx(1, "could not send MAIL FROM");
 	if (read_smtp_code(s, "250"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "RCPT TO:<%s>\r\n", recipient))
 		errx(1, "could not send MAIL FROM");
 	if (read_smtp_code(s, "250"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "DATA\r\n"))
 		errx(1, "could not send MAIL FROM");
 	if (read_smtp_code(s, "354"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "From: %s\r\n", fromaddr))
 		errx(1, "could not send From header");
@@ -280,16 +282,12 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 		errx(1, "could not send data terminator");
 	if (read_smtp_code(s, "250"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	if (send_smtp_msg(s, "QUIT\r\n"))
 		errx(1, "could not send QUIT");
 
 	if (read_smtp_code(s, "221"))
 		errx(1, "unexpected SMTP response received");
-	if (skip_to_crlf(s))
-		errx(1, "invalid SMTP message received");
 
 	close(s);
 	free(line);
