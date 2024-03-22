@@ -486,7 +486,7 @@ listen_main(const char *title, int gotd_socket,
 static void
 listen_shutdown(void)
 {
-	log_debug("shutting down");
+	log_debug("%s: shutting down", gotd_listen.title);
 
 	free(gotd_listen.connection_limits);
 	if (gotd_listen.fd != -1)

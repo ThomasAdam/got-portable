@@ -2493,7 +2493,7 @@ repo_write_shutdown(void)
 	struct repo_write_client *client = &repo_write_client;
 	struct gotd_ref_update *ref_update;
 
-	log_debug("shutting down");
+	log_debug("%s: shutting down", repo_write.title);
 
 	while (!STAILQ_EMPTY(&client->ref_updates)) {
 		ref_update = STAILQ_FIRST(&client->ref_updates);

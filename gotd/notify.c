@@ -517,6 +517,6 @@ notify_main(const char *title, struct gotd_repolist *repos,
 void
 gotd_notify_shutdown(void)
 {
-	log_debug("shutting down");
+	log_debug("%s: shutting down", gotd_notify.title);
 	exit(0);
 }

@@ -1718,7 +1718,7 @@ session_write_shutdown(void)
 {
 	struct gotd_session_notif *notif;
 
-	log_debug("shutting down");
+	log_debug("%s: shutting down", gotd_session.title);
 
 	while (!STAILQ_EMPTY(&notifications)) {
 		notif = STAILQ_FIRST(&notifications);
