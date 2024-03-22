@@ -60,7 +60,8 @@
 #include "log.h"
 #include "listen.h"
 #include "auth.h"
-#include "session.h"
+#include "session_read.h"
+#include "session_write.h"
 #include "repo_read.h"
 #include "repo_write.h"
 #include "notify.h"
@@ -2274,8 +2275,12 @@ main(int argc, char **argv)
 			if (repo == NULL)
 				fatalx("no repository for path %s", repo_path);
 		}
-		session_main(title, repo_path, pack_fds, temp_fds,
-		    &gotd.request_timeout, repo, proc_id);
+		if (proc_id == PROC_SESSION_READ)
+			session_read_main(title, repo_path, pack_fds, temp_fds,
+			    &gotd.request_timeout, repo);
+		else
+			session_write_main(title, repo_path, pack_fds, temp_fds,
+			    &gotd.request_timeout, repo);
 		/* NOTREACHED */
 		break;
 	case PROC_REPO_READ:
