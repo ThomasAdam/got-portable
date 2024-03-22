@@ -131,19 +131,6 @@ struct gotd_repo {
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
 
-enum gotd_session_state {
-	GOTD_STATE_EXPECT_LIST_REFS,
-	GOTD_STATE_EXPECT_CAPABILITIES,
-	GOTD_STATE_EXPECT_WANT,
-	GOTD_STATE_EXPECT_REF_UPDATE,
-	GOTD_STATE_EXPECT_MORE_REF_UPDATES,
-	GOTD_STATE_EXPECT_HAVE,
-	GOTD_STATE_EXPECT_PACKFILE,
-	GOTD_STATE_EXPECT_DONE,
-	GOTD_STATE_DONE,
-	GOTD_STATE_NOTIFY,
-};
-
 struct gotd_client_capability {
 	char *key;
 	char *value;
