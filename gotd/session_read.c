@@ -902,7 +902,7 @@ done:
 static void
 session_read_shutdown(void)
 {
-	log_debug("shutting down");
+	log_debug("%s: shutting down", gotd_session.title);
 
 	if (gotd_session.repo)
 		got_repo_close(gotd_session.repo);

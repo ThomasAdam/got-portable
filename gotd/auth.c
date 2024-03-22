@@ -330,6 +330,6 @@ auth_main(const char *title, struct gotd_repolist *repos,
 static void
 auth_shutdown(void)
 {
-	log_debug("shutting down");
+	log_debug("%s: shutting down", gotd_auth.title);
 	exit(0);
 }

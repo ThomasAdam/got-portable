@@ -917,7 +917,7 @@ repo_read_shutdown(void)
 {
 	struct repo_read_client *client = &repo_read_client;
 
-	log_debug("shutting down");
+	log_debug("%s: shutting down", repo_read.title);
 
 	if (client->have_ids)
 		got_object_idset_free(client->have_ids);
