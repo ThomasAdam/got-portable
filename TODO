@@ -70,7 +70,7 @@ gotd:
   6. enforce a particular blob size limit via gotd.conf
   7. optionally reject merge commits via gotd.conf
 - implement post-commit-event libexec handlers (in lieu of hook scripts):
-  1. commit email notification, plaintext smtp to localhost port 25
+  1. commit email notification, plaintext smtp to localhost port 25 [done]
   2. general-purpose HTTP(s) GET/POST request as commit notification,
      should use a format string to encode commit-info in the request URL
   3. perform the equivalent of 'got send' to another repository
