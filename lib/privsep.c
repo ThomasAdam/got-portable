@@ -178,8 +178,9 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 
 	poll_err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
 	if (poll_err) {
-		fprintf(stderr, "%s: error %d \"%s\": poll: %s\n",
-		    getprogname(), err->code, err->msg, poll_err->msg);
+		if (poll_err->code != GOT_ERR_EOF)
+			fprintf(stderr, "%s: error %d \"%s\": poll: %s\n",
+			    getprogname(), err->code, err->msg, poll_err->msg);
 		return;
 	}
 
