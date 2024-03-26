@@ -103,12 +103,10 @@ find_session_by_fd(int fd)
 			if (s->iev.ibuf.fd == fd)
 				return s;
 		}
-
 	}
 
 	return NULL;
 }
-
 
 static void
 remove_session(struct gotd_notify_session *session)
