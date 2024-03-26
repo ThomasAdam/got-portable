@@ -2166,6 +2166,8 @@ render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 		    iev, fd);
 		break;
 	}
+	if (err != NULL)
+		goto done;
 
 	if (fsync(fd) == -1) {
 		err = got_error_from_errno("fsync");
