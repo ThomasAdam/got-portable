@@ -2133,26 +2133,32 @@ render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_notification_content ireq;
 	size_t datalen, len;
-	char *refname;
+	char *refname = NULL;
 	struct ibuf *wbuf;
-	int fd;
+	int fd = -1;
 
 	fd = imsg_get_fd(imsg);
 	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(ireq))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (datalen < sizeof(ireq)) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
 
 	memcpy(&ireq, imsg->data, sizeof(ireq));
 
-	if (datalen != sizeof(ireq) +  ireq.refname_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (datalen != sizeof(ireq) +  ireq.refname_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
 
 	refname = strndup(imsg->data + sizeof(ireq), ireq.refname_len);
-	if (refname == NULL)
-		return got_error_from_errno("strndup");
+	if (refname == NULL) {
+		err =  got_error_from_errno("strndup");
+		goto done;
+	}
 
 	switch (ireq.action) {
 	case GOTD_NOTIF_ACTION_CREATED:
@@ -2194,7 +2200,7 @@ render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	gotd_imsg_event_add(iev);
 done:
 	free(refname);
-	if (close(fd) == -1 && err == NULL)
+	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err;
 }
