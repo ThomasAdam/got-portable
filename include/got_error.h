@@ -59,7 +59,7 @@
 #define GOT_ERR_PACK_OFFSET	42
 #define GOT_ERR_OBJ_EXISTS	43
 #define GOT_ERR_BAD_OBJ_ID	44
-#define GOT_ERR_ITER_BUSY	45
+/* 45 is currently unused */
 #define GOT_ERR_ITER_COMPLETED	46
 #define GOT_ERR_RANGE		47
 #define GOT_ERR_EXPECTED	48 /* for use in regress tests only */

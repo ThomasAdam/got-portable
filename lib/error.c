@@ -83,7 +83,6 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_PACK_OFFSET,	"bad offset in pack file" },
 	{ GOT_ERR_OBJ_EXISTS,	"object already exists" },
 	{ GOT_ERR_BAD_OBJ_ID,	"bad object id" },
-	{ GOT_ERR_ITER_BUSY,	"iteration already in progress" },
 	{ GOT_ERR_ITER_COMPLETED,"iteration completed" },
 	{ GOT_ERR_RANGE,	"value out of range" },
 	{ GOT_ERR_EXPECTED,	"expected an error but have no error" },

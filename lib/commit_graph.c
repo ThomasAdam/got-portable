@@ -559,15 +559,29 @@ got_commit_graph_close(struct got_commit_graph *graph)
 	free(graph);
 }
 
+static const struct got_error *
+remove_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
+{
+	struct got_object_idset *open_branches = arg;
+
+	return got_object_idset_remove(NULL, open_branches, commit_id);
+}
+
 const struct got_error *
 got_commit_graph_iter_start(struct got_commit_graph *graph,
     struct got_object_id *id, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct got_commit_graph_node *node;
 
-	if (!TAILQ_EMPTY(&graph->iter_list))
-		return got_error(GOT_ERR_ITER_BUSY);
+	/* Clear left-over state from previous iteration attempts. */
+	while ((node = TAILQ_FIRST(&graph->iter_list)))
+		TAILQ_REMOVE(&graph->iter_list, node, entry);
+	err = got_object_idset_for_each(graph->open_branches,
+	    remove_branch_tip, graph->open_branches);
+	if (err)
+		return err;
 
 	err = got_object_idset_add(graph->open_branches, id, NULL);
 	if (err)
