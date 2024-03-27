@@ -24,6 +24,8 @@ got:
 - when fetching pack files got should verify that the requested branch tips
   are present in the pack file sent by the server, before making this pack
   file visible to readers of the repository
+- enforce that log messages are encoded in either ASCII or UTF-8; this
+  mostly matters for -portable since OpenBSD doesn't provide other locales
 
 network protocol:
 - add http(s) transport with libtls, speaking the two Git HTTP protocols
