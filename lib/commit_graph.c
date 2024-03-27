@@ -590,7 +590,6 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node;
 
-	/* First-parent traversal is implicitly topological. */
 	graph->flags &= ~GOT_COMMIT_GRAPH_TOPOSORT;
 
 	/* Clear left-over state from previous iteration attempts. */
