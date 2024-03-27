@@ -2890,7 +2890,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	struct got_object_id *yca_id;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    commit_id, base_commit_id, 1, repo, check_cancelled, NULL);
+	    commit_id, base_commit_id, 1, 0, repo, check_cancelled, NULL);
 	if (err)
 		return err;
 
@@ -11019,7 +11019,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 		goto done;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    old_commit_id, new_commit_id, 1, repo, check_cancelled, NULL);
+	    old_commit_id, new_commit_id, 1, 0, repo, check_cancelled, NULL);
 	if (err)
 		goto done;
 
@@ -11246,6 +11246,63 @@ abort_progress(void *arg, unsigned char status, const char *path)
 		return NULL;
 
 	return update_progress(arg, status, path);
+}
+
+static const struct got_error *
+find_merge_commit_yca(struct got_object_id **new_yca_id,
+    struct got_object_id *branch_head_commit_id,
+    struct got_object_id *yca_id,
+    struct got_object_id *base_commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph *graph = NULL;
+	struct got_commit_object *commit = NULL;
+
+	*new_yca_id = NULL;
+
+	err = got_commit_graph_open(&graph, "/", 1);
+	if (err)
+		return err;
+
+	err = got_commit_graph_iter_start(graph, base_commit_id,
+	    repo, check_cancelled, NULL);
+	if (err)
+		goto done;
+
+	for (;;) {
+		struct got_object_id id;
+
+		err = got_commit_graph_iter_next(&id, graph, repo,
+		    check_cancelled, NULL);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
+				err = NULL;
+			break;
+		}
+
+		err = got_object_open_as_commit(&commit, repo, &id);
+		if (err)
+			break;
+
+		if (got_object_commit_get_nparents(commit) > 1) {
+			/* Search for a better YCA using toposort. */
+			err = got_commit_graph_find_youngest_common_ancestor(
+			    new_yca_id, base_commit_id, branch_head_commit_id,
+			    0, 1, repo, check_cancelled, NULL);
+			break;
+		}
+
+		if (got_object_id_cmp(&id, yca_id) == 0)
+			break;
+		got_object_commit_close(commit);
+		commit = NULL;
+	}
+done:
+	got_commit_graph_close(graph);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
 }
 
 static const struct got_error *
@@ -11499,8 +11556,8 @@ cmd_rebase(int argc, char *argv[])
 		}
 
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-		    base_commit_id, branch_head_commit_id, 1, repo,
-		    check_cancelled, NULL);
+		    base_commit_id, branch_head_commit_id, 1, 0,
+		    repo, check_cancelled, NULL);
 		if (error) {
 			if (error->code == GOT_ERR_ANCESTRY) {
 				error = got_error_msg(GOT_ERR_ANCESTRY,
@@ -11508,6 +11565,24 @@ cmd_rebase(int argc, char *argv[])
 				    "ancestry with work tree's branch");
 			}
 			goto done;
+		}
+
+		/*
+		 * If a merge commit appears between the new base branch tip
+		 * and a YCA found via first-parent traversal then we might
+		 * find a better YCA using topologically sorted commits.
+		 */
+		if (got_object_id_cmp(base_commit_id, yca_id) != 0) {
+			struct got_object_id *better_yca_id;
+			error = find_merge_commit_yca(&better_yca_id,
+			    branch_head_commit_id, yca_id,
+			    base_commit_id, repo);
+			if (error)
+				goto done;
+			if (better_yca_id) {
+				free(yca_id);
+				yca_id = better_yca_id;
+			}
 		}
 
 		if (got_object_id_cmp(base_commit_id, yca_id) == 0) {
@@ -13509,7 +13584,7 @@ cmd_merge(int argc, char *argv[])
 	}
 
 	error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    wt_branch_tip, branch_tip, 0, repo,
+	    wt_branch_tip, branch_tip, 0, 0, repo,
 	    check_cancelled, NULL);
 	if (error && error->code != GOT_ERR_ANCESTRY)
 		goto done;

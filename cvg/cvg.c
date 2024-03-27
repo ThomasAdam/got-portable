@@ -2064,7 +2064,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	struct got_object_id *yca_id;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    commit_id, base_commit_id, 1, repo, check_cancelled, NULL);
+	    commit_id, base_commit_id, 1, 0, repo, check_cancelled, NULL);
 	if (err)
 		return err;
 

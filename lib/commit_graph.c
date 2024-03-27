@@ -701,12 +701,14 @@ find_yca_add_id(struct got_object_id **yca_id, struct got_commit_graph *graph,
  * common ancestors.
  *
  * If first_parent_traversal is nonzero, only linear history is considered.
+ * If toposort is set then sort commits in topological order before
+ * traversing them.
  */
 const struct got_error *
 got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
     struct got_object_id *commit_id, struct got_object_id *commit_id2,
-    int first_parent_traversal,
-    struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
+    int first_parent_traversal, int toposort, struct got_repository *repo,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL, *graph2 = NULL;
@@ -727,15 +729,27 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, commit_id, repo,
-	    cancel_cb, cancel_arg);
-	if (err)
-		goto done;
+	if (toposort) {
+		err = got_commit_graph_toposort(graph, commit_id, repo,
+		    cancel_cb, cancel_arg);
+		if (err)
+			goto done;
 
-	err = got_commit_graph_iter_start(graph2, commit_id2, repo,
-	    cancel_cb, cancel_arg);
-	if (err)
-		goto done;
+		err = got_commit_graph_toposort(graph2, commit_id2, repo,
+		    cancel_cb, cancel_arg);
+		if (err)
+			goto done;
+	} else {
+		err = got_commit_graph_iter_start(graph, commit_id, repo,
+		    cancel_cb, cancel_arg);
+		if (err)
+			goto done;
+
+		err = got_commit_graph_iter_start(graph2, commit_id2, repo,
+		    cancel_cb, cancel_arg);
+		if (err)
+			goto done;
+	}
 
 	for (;;) {
 		if (cancel_cb) {

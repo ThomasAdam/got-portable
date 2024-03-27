@@ -2236,8 +2236,7 @@ test_rebase_merged_history_traversal() {
 	local commit1=`git_show_branch_head $testroot/repo master`
 
 	(cd $testroot/wt && got branch newbranch2) >/dev/null
-	(cd $testroot/wt && got rebase newbranch1) > $testroot/stdout \
-		2> $testroot/stderr
+	(cd $testroot/wt && got rebase newbranch1) > $testroot/stdout
 
 	echo "Forwarding refs/heads/newbranch1 to commit $commit1" > \
 		$testroot/stdout.expected
@@ -2245,8 +2244,9 @@ test_rebase_merged_history_traversal() {
 		>> $testroot/stdout.expected
 
 	if ! cmp -s $testroot/stdout.expected $testroot/stdout; then
-		#diff -u $testroot/stdout.expected $testroot/stdout
-		ret="xfail ($(head -n1 $testroot/stdout))"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
 	fi
 
 	test_done "$testroot" "$ret"
