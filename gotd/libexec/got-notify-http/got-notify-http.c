@@ -618,7 +618,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (response_code >= 200 && response_code < 400)
+	if (response_code >= 200 && response_code < 300)
 		return 0;
 	errx(1, "request failed with code %d", response_code);
 }
