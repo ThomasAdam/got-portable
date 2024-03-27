@@ -254,15 +254,15 @@ The default content of email notifications looks similar to the output of the
 .Cm got log -d
 command.
 .Pp
-.\" Notifications via HTTP require a HTTP or HTTPS server which is accepting
-.\" POST requests with or without HTTP Basic authentication.
-.\" Depending on the use case a custom server-side CGI script may be required
-.\" for the processing of notifications.
-.\" HTTP notifications can achieve functionality
-.\" similar to Git's server-side post-receive hook script with
-.\" .Xr gotd 8
-.\" by triggering arbitrary post-commit actions via the HTTP server.
-.\" .Pp
+Notifications via HTTP require a HTTP or HTTPS server which is accepting
+POST requests with or without HTTP Basic authentication.
+Depending on the use case a custom server-side CGI script may be required
+for the processing of notifications.
+HTTP notifications can achieve functionality
+similar to Git's server-side post-receive hook script with
+.Xr gotd 8
+by triggering arbitrary post-commit actions via the HTTP server.
+.Pp
 The
 .Ic notify
 directive expects parameters which must be enclosed in curly braces.
@@ -329,40 +329,39 @@ and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
 .Pp
-.\" .It Ic url Ar URL Ic user Ar user Ic password Ar password Oc
-.\" Send notifications via HTTP.
-.\" This directive may be specified multiple times to build a list of
-.\" HTTP servers to send notifications to.
-.\" .Pp
-.\" The notification will be sent as a POST request to the given
-.\" .Ar URL ,
-.\" which must be a valid HTTP URL and begin with either
-.\" .Dq http://
-.\" or
-.\" .Dq https:// .
-.\" If HTTPS is used, sending of notifications will only succeed if
-.\" no TLS errors occur.
-.\" .Pp
-.\" The optional
-.\" .Ic user
-.\" and
-.\" .Ic password
-.\" directives enable HTTP Basic authentication.
-.\" If used, both a
-.\" .Ar user
-.\" and a
-.\" .Ar password
-.\" must be specified.
-.\" The
-.\" .Ar password
-.\" must not be an empty string.
-.\" .Pp
-.\" The request body contains a JSON document with the following objects:
-.\" .Bl -tag -width { "notifications" : array }
-.\" .It { "notifications" : array }
-.\" The top-level object contains an array of all notifications in this request.
-.\" .It TODO ...
-.\" .El
+.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oc
+Send notifications via HTTP.
+This directive may be specified multiple times to build a list of
+HTTP servers to send notifications to.
+.Pp
+The notification will be sent as a POST request to the given
+.Ar URL ,
+which must be a valid HTTP URL and begin with either
+.Dq http://
+or
+.Dq https:// .
+If HTTPS is used, sending of notifications will only succeed if
+no TLS errors occur.
+.Pp
+The optional
+.Ic user
+and
+.Ic password
+directives enable HTTP Basic authentication.
+If used, both a
+.Ar user
+and a
+.Ar password
+must be specified.
+The
+.Ar password
+must not be an empty string.
+.Pp
+The request body contains a JSON document with the following objects:
+.Bl -tag -width { "notifications" : array }
+.It { "notifications" : array }
+The top-level object contains an array of all notifications in this request.
+.El
 .El
 .Sh FILES
 .Bl -tag -width Ds -compact

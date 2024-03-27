@@ -1,3 +1,3 @@
-SUBDIR = got-notify-email
+SUBDIR = got-notify-email got-notify-http
 
 .include <bsd.subdir.mk>

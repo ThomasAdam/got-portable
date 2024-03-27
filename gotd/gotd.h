@@ -106,7 +106,10 @@ struct gotd_notification_target {
 			char *port;
 		} email;
 		struct {
-			char *url;
+			int   tls;
+			char *hostname;
+			char *port;
+			char *path;
 			char *user;
 			char *password;
 		} http;

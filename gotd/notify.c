@@ -253,10 +253,23 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 }
 
 static void
-notify_http(struct gotd_notification_target *target, const char *subject_line,
-    int fd)
+notify_http(struct gotd_notification_target *target, int fd)
 {
-	const char *argv[10] = { 0 }; /* TODO */
+	const char *argv[8];
+	int argc = 0;
+
+	argv[argc++] = GOTD_PATH_PROG_NOTIFY_HTTP;
+	if (target->conf.http.tls)
+		argv[argc++] = "-c";
+
+	argv[argc++] = "-h";
+	argv[argc++] = target->conf.http.hostname;
+	argv[argc++] = "-p";
+	argv[argc++] = target->conf.http.port;
+
+	argv[argc++] = target->conf.http.path;
+
+	argv[argc] = NULL;
 
 	run_notification_helper(GOTD_PATH_PROG_NOTIFY_HTTP, argv, fd);
 }
@@ -296,7 +309,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 			notify_email(target, inotify.subject_line, fd);
 			break;
 		case GOTD_NOTIFICATION_VIA_HTTP:
-			notify_http(target, inotify.subject_line, fd);
+			notify_http(target, fd);
 			break;
 		}
 	}
