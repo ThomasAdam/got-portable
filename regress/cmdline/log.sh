@@ -1241,6 +1241,68 @@ test_log_commit_keywords() {
 	test_done "$testroot" "$ret"
 }
 
+test_log_toposort() {
+	local testroot=`test_init log_toposort`
+	local commit0=`git_show_head $testroot/repo`
+	local author_time0=`git_show_author_time $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo aaa > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'change alpha' >/dev/null)
+	local commit1=`git_show_head $testroot/repo`
+	local author_time1=`git_show_author_time $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit0 newbranch
+	(cd $testroot/wt && got update -b newbranch > /dev/null)
+	echo ddd > $testroot/wt/gamma/delta
+	(cd $testroot/wt && got commit -m 'change delta' >/dev/null)
+	local commit2=`git_show_branch_head $testroot/repo newbranch`
+	local author_time2=`git_show_author_time $testroot/repo newbranch`
+
+	echo zzz > $testroot/wt/epsilon/zeta
+	(cd $testroot/wt && got commit -m 'change zeta' >/dev/null)
+	local commit3=`git_show_head $testroot/repo`
+	local author_time3=`git_show_author_time $testroot/repo newbranch`
+
+	(cd $testroot/wt && got update -b master > /dev/null)
+	(cd $testroot/wt && got merge newbranch > /dev/null)
+	local merge_commit=`git_show_head $testroot/repo`
+	local merge_time=`git_show_author_time $testroot/repo`
+
+	local short_commit0=`trim_obj_id 33 $commit0`
+	local short_commit1=`trim_obj_id 33 $commit1`
+	local short_commit2=`trim_obj_id 33 $commit2`
+	local short_commit3=`trim_obj_id 33 $commit3`
+
+	d_0=`date -u -r $author_time0 +"%G-%m-%d"`
+	d_1=`date -u -r $author_time1 +"%G-%m-%d"`
+	d_2=`date -u -r $author_time2 +"%G-%m-%d"`
+	d_3=`date -u -r $author_time3 +"%G-%m-%d"`
+	d_m=`date -u -r $merge_time +"%G-%m-%d"`
+
+	got log -r $testroot/repo -s -b -t > $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+$d_m master  merge refs/heads/newbranch into refs/heads/master
+$d_1 $short_commit1 change alpha
+$d_3 newbranch change zeta
+$d_2 $short_commit2 change delta
+$d_0 $short_commit0 adding the test tree
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
@@ -1259,3 +1321,4 @@ run_test test_log_merge_commit_nonexistent_path
 run_test test_log_submodule
 run_test test_log_diffstat
 run_test test_log_commit_keywords
+run_test test_log_toposort
