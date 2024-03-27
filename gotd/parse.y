@@ -1744,7 +1744,7 @@ gotd_parse_url(char **proto, char **host, char **port,
 	s = p + 3;
 
 	p = strstr(s, "/");
-	if (p == NULL || strlen(p) == 1) {
+	if (p == NULL) {
 		err = got_error(GOT_ERR_PARSE_URI);
 		goto done;
 	}
@@ -1788,7 +1788,6 @@ gotd_parse_url(char **proto, char **host, char **port,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
-	got_path_strip_trailing_slashes(*request_path);
 	if ((*request_path)[0] == '\0') {
 		err = got_error(GOT_ERR_PARSE_URI);
 		goto done;
