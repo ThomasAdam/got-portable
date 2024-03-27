@@ -890,7 +890,7 @@ and gives no special significance to the location of path component separators,
 in a pattern.
 .It Xo
 .Cm log
-.Op Fl bdPpRs
+.Op Fl bdPpRst
 .Op Fl C Ar number
 .Op Fl c Ar commit
 .Op Fl l Ar N
@@ -1038,6 +1038,13 @@ Cannot be used together with the
 or
 .Fl P
 option.
+.It Fl t
+Display commits in topological order.
+This option has no effect without the
+.Fl b 
+option because a linear history is sorted in topological order by definition.
+Topological sorting is disabled by default because the present implementation
+requires that commit history is fully traversed before any output can be shown.
 .It Fl x Ar commit
 Stop traversing commit history immediately after the specified
 .Ar commit

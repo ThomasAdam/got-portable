@@ -4458,7 +4458,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_changed_paths,
     int show_diffstat, int show_patch, const char *search_pattern,
     int diff_context, int limit, int log_branches, int reverse_display_order,
-    struct got_reflist_object_id_map *refs_idmap, int one_line,
+    struct got_reflist_object_id_map *refs_idmap, int one_line, int toposort,
     FILE *tmpfile)
 {
 	const struct got_error *err;
@@ -4480,8 +4480,13 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	err = got_commit_graph_open(&graph, path, !log_branches);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, root_id, repo,
-	    check_cancelled, NULL);
+	if (log_branches && toposort) {
+		err = got_commit_graph_toposort(graph, root_id, repo,
+		    check_cancelled, NULL);
+	} else {
+		err = got_commit_graph_iter_start(graph, root_id, repo,
+		    check_cancelled, NULL);
+	}
 	if (err)
 		goto done;
 	for (;;) {
@@ -4609,7 +4614,7 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-bdPpRs] [-C number] [-c commit] "
+	fprintf(stderr, "usage: %s log [-bdPpRst] [-C number] [-c commit] "
 	    "[-l N] [-r repository-path] [-S search-pattern] [-x commit] "
 	    "[path]\n", getprogname());
 	exit(1);
@@ -4645,6 +4650,7 @@ cmd_log(int argc, char *argv[])
 	int diff_context = -1, ch;
 	int show_changed_paths = 0, show_patch = 0, limit = 0, log_branches = 0;
 	int show_diffstat = 0, reverse_display_order = 0, one_line = 0;
+	int toposort = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
@@ -4662,7 +4668,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bC:c:dl:PpRr:S:sx:")) != -1) {
+	while ((ch = getopt(argc, argv, "bC:c:dl:PpRr:S:stx:")) != -1) {
 		switch (ch) {
 		case 'b':
 			log_branches = 1;
@@ -4707,6 +4713,9 @@ cmd_log(int argc, char *argv[])
 			break;
 		case 's':
 			one_line = 1;
+			break;
+		case 't':
+			toposort = 1;
 			break;
 		case 'x':
 			end_commit = optarg;
@@ -4874,7 +4883,7 @@ cmd_log(int argc, char *argv[])
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_diffstat, show_patch, search_pattern,
 	    diff_context, limit, log_branches, reverse_display_order,
-	    refs_idmap, one_line, tmpfile);
+	    refs_idmap, one_line, toposort, tmpfile);
 done:
 	free(path);
 	free(repo_path);
