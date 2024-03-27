@@ -70,6 +70,7 @@ test_file_changed() {
 	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 14\n" >> $testroot/stdout.expected
 	printf " \n" >> $testroot/stdout.expected
 	printf " make changes\n \n" >> $testroot/stdout.expected
 	printf " M  alpha  |  1+  1-\n\n"  >> $testroot/stdout.expected
@@ -152,6 +153,7 @@ test_many_commits_not_summarized() {
 		printf "commit $commit_id\n" >> $testroot/stdout.expected
 		printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 		printf "date: $commit_time\n" >> $testroot/stdout.expected
+		printf "messagelen: 14\n" >> $testroot/stdout.expected
 		printf " \n" >> $testroot/stdout.expected
 		printf " make changes\n \n" >> $testroot/stdout.expected
 		printf " M  alpha  |  1+  1-\n\n"  \
@@ -308,6 +310,7 @@ test_branch_created() {
 	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 11\n" >> $testroot/stdout.expected
 	printf " \n" >> $testroot/stdout.expected
 	printf " newbranch\n \n" >> $testroot/stdout.expected
 	printf " M  alpha  |  1+  1-\n\n"  >> $testroot/stdout.expected
@@ -430,6 +433,7 @@ test_tag_created() {
 	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
 	printf "date: $d\n" >> $testroot/stdout.expected
 	printf "object: commit $commit_id\n" >> $testroot/stdout.expected
+	printf "messagelen: 9\n" >> $testroot/stdout.expected
 	printf " \n" >> $testroot/stdout.expected
 	printf " new tag\n \n" >> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
@@ -504,6 +508,7 @@ test_tag_changed() {
 	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
 	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 8\n" >> $testroot/stdout.expected
 	printf "object: commit $commit_id\n" >> $testroot/stdout.expected
 	printf " \n" >> $testroot/stdout.expected
 	printf " new tag\n \n" >> $testroot/stdout.expected

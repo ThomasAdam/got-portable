@@ -1815,6 +1815,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	if (err)
 		goto done;
 
+	dprintf(fd, "messagelen: %zu\n", strlen(logmsg0));
+
 	logmsg = logmsg0;
 	do {
 		line = strsep(&logmsg, "\n");
@@ -2045,6 +2047,9 @@ print_tag(struct got_object_id *id,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
+
+	dprintf(fd, "messagelen: %zu\n", strlen(tagmsg0));
+
 	tagmsg = tagmsg0;
 	do {
 		line = strsep(&tagmsg, "\n");
