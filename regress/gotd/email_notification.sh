@@ -508,8 +508,8 @@ test_tag_changed() {
 	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
 	printf "date: $d\n" >> $testroot/stdout.expected
-	printf "messagelen: 8\n" >> $testroot/stdout.expected
 	printf "object: commit $commit_id\n" >> $testroot/stdout.expected
+	printf "messagelen: 9\n" >> $testroot/stdout.expected
 	printf " \n" >> $testroot/stdout.expected
 	printf " new tag\n \n" >> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
