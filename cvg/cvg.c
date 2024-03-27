@@ -2119,7 +2119,7 @@ check_same_branch(struct got_object_id *commit_id,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo,
+	err = got_commit_graph_bfsort(graph, head_commit_id, repo,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
@@ -3783,7 +3783,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	err = got_commit_graph_open(&graph, path, !log_branches);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, root_id, repo,
+	err = got_commit_graph_bfsort(graph, root_id, repo,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;

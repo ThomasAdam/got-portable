@@ -20,7 +20,7 @@ const struct got_error *got_commit_graph_open(struct got_commit_graph **,
     const char *, int);
 void got_commit_graph_close(struct got_commit_graph *);
 
-const struct got_error *got_commit_graph_iter_start(
+const struct got_error *got_commit_graph_bfsort(
     struct got_commit_graph *, struct got_object_id *, struct got_repository *,
     got_cancel_cb, void *);
 const struct got_error *got_commit_graph_toposort(struct got_commit_graph *,

@@ -3878,7 +3878,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	    !s->log_branches);
 	if (err)
 		goto done;
-	err = got_commit_graph_iter_start(thread_graph, s->start_id,
+	err = got_commit_graph_bfsort(thread_graph, s->start_id,
 	    s->repo, NULL, NULL);
 	if (err)
 		goto done;
@@ -4334,7 +4334,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    s->in_repo_path, !s->log_branches);
 		if (err)
 			return err;
-		err = got_commit_graph_iter_start(s->thread_args.graph,
+		err = got_commit_graph_bfsort(s->thread_args.graph,
 		    s->start_id, s->repo, NULL, NULL);
 		if (err)
 			return err;

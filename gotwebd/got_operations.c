@@ -383,7 +383,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 			goto done;
 	}
 
-	error = got_commit_graph_iter_start(graph, id, repo, NULL, NULL);
+	error = got_commit_graph_bfsort(graph, id, repo, NULL, NULL);
 	if (error)
 		goto done;
 

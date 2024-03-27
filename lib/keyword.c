@@ -197,7 +197,7 @@ got_keyword_to_idstr(char **ret, const char *keyword,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph,
+	err = got_commit_graph_bfsort(graph,
 	    head_id != NULL ? head_id : kwid, repo, NULL, NULL);
 	if (err)
 		goto done;
