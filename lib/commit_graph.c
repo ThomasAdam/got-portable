@@ -37,9 +37,20 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
+#include "got_lib_object_qid.h"
+
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
 
 struct got_commit_graph_node {
 	struct got_object_id id;
+
+	/* Used for topological sorting. */
+	struct got_commit_graph_node *parents[2];
+	struct got_commit_graph_node **more_parents;
+	int nparents;
+	int indegree;
 
 	/* Used only during iteration. */
 	time_t timestamp;
@@ -60,6 +71,7 @@ struct got_commit_graph {
 
 	int flags;
 #define GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL		0x01
+#define GOT_COMMIT_GRAPH_TOPOSORT			0x02
 
 	/*
 	 * A set of object IDs of known parent commits which we have not yet
@@ -87,7 +99,8 @@ struct got_commit_graph {
 
 	/*
 	 * Nodes which will be passed to the API user next, sorted by
-	 * commit timestmap.
+	 * commit timestamp. Sorted in topological order only if topological
+	 * sorting was requested.
 	 */
 	struct got_commit_graph_iter_list iter_list;
 };
@@ -180,7 +193,8 @@ add_node(struct got_commit_graph_node **new_node,
 		return got_error_from_errno("calloc");
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
-	err = got_object_idset_add(graph->node_ids, &node->id, NULL);
+	node->nparents = -1;
+	err = got_object_idset_add(graph->node_ids, &node->id, node);
 	if (err)
 		free(node);
 	else
@@ -546,6 +560,7 @@ got_commit_graph_close(struct got_commit_graph *graph)
 
 	while ((node = TAILQ_FIRST(&graph->iter_list))) {
 		TAILQ_REMOVE(&graph->iter_list, node, entry);
+		free(node->more_parents);
 		free(node);
 	}
 
@@ -573,6 +588,9 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node;
+
+	/* First-parent traversal is implicitly topological. */
+	graph->flags &= ~GOT_COMMIT_GRAPH_TOPOSORT;
 
 	/* Clear left-over state from previous iteration attempts. */
 	while ((node = TAILQ_FIRST(&graph->iter_list)))
@@ -614,7 +632,8 @@ got_commit_graph_iter_next(struct got_object_id *id,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_graph_node *node;
+	struct got_commit_graph_node *node, *pnode;
+	int i;
 
 	node = TAILQ_FIRST(&graph->iter_list);
 	if (node == NULL) {
@@ -622,17 +641,33 @@ got_commit_graph_iter_next(struct got_object_id *id,
 		return got_error(GOT_ERR_ITER_COMPLETED);
 	}
 
-	while (TAILQ_NEXT(node, entry) == NULL &&
-	    got_object_idset_num_elements(graph->open_branches) > 0) {
-		err = fetch_commits_from_open_branches(graph, repo,
-		    cancel_cb, cancel_arg);
-		if (err)
-			return err;
+	if (graph->flags & GOT_COMMIT_GRAPH_TOPOSORT) {
+		/* At least one node with in-degree zero must exist. */
+		while (node->indegree != 0)
+			node = TAILQ_NEXT(node, entry);
+	} else {
+		while (TAILQ_NEXT(node, entry) == NULL &&
+		    got_object_idset_num_elements(graph->open_branches) > 0) {
+			err = fetch_commits_from_open_branches(graph, repo,
+			    cancel_cb, cancel_arg);
+			if (err)
+				return err;
+		}
 	}
 
 	memcpy(id, &node->id, sizeof(*id));
 
 	TAILQ_REMOVE(&graph->iter_list, node, entry);
+	if (graph->flags & GOT_COMMIT_GRAPH_TOPOSORT) {
+		/* When visiting a commit decrement in-degree of all parents. */
+		for (i = 0; i < node->nparents; i++) {
+			if (i < nitems(node->parents))
+				pnode = node->parents[i];
+			else
+				pnode = node->more_parents[i];
+			pnode->indegree--;
+		}
+	}
 	free(node);
 	return NULL;
 }
@@ -746,5 +781,166 @@ done:
 		got_commit_graph_close(graph);
 	if (graph2)
 		got_commit_graph_close(graph2);
+	return err;
+}
+
+/*
+ * Sort the graph for traversal in topological order.
+ *
+ * This implementation is based on the description of topological sorting
+ * of git commits by Derrick Stolee at
+ * https://github.blog/2022-08-30-gits-database-internals-ii-commit-history-queries/#topological-sorting
+ * which reads as follows:
+ *
+ * The basic algorithm for topological sorting is Kahn’s algorithm which
+ * follows two big steps:
+ * 1. Walk all reachable commits, counting the number of times a commit appears
+ * as a parent of another commit. Call these numbers the in-degree of the
+ * commit, referencing the number of incoming edges.
+ * 2. Walk the reachable commits, but only visit a commit if its in-degree
+ * value is zero. When visiting a commit, decrement the in-degree value of
+ * each parent.
+ * 
+ * This algorithm works because at least one of our starting points will
+ * have in-degree zero, and then decrementing the in-degree value is similar
+ * to deleting the commit from the graph, always having at least one commit
+ * with in-degree zero.
+ */
+const struct got_error *
+got_commit_graph_toposort(struct got_commit_graph *graph,
+    struct got_object_id *id, struct got_repository *repo,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph_node *node = NULL, *pnode = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id_queue commits;
+	const struct got_object_id_queue *parent_ids;
+	struct got_object_qid *qid = NULL, *pid;
+	int i;
+
+	STAILQ_INIT(&commits);
+
+	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL)
+		return got_commit_graph_iter_start(graph, id, repo,
+		    cancel_cb, cancel_arg);
+
+	/* Clear left-over state from previous iteration attempts. */
+	while ((node = TAILQ_FIRST(&graph->iter_list)))
+		TAILQ_REMOVE(&graph->iter_list, node, entry);
+	err = got_object_idset_for_each(graph->open_branches,
+	    remove_branch_tip, graph->open_branches);
+	if (err)
+		return err;
+
+	graph->flags |= GOT_COMMIT_GRAPH_TOPOSORT;
+
+	/*
+	 * Sorting the commit graph in topological order requires visiting
+	 * every reachable commit. This is very expensive but there are
+	 * ways to speed this up significantly in the future:
+	 * 1) Run this loop in got-read-pack if possible.
+	 * 2) Use Git's commit-graph file to compute the result incrementally.
+	 *    See the blog post linked above for details.
+	 */
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
+		return err;
+	memcpy(&qid->id, id, sizeof(qid->id));
+	STAILQ_INSERT_TAIL(&commits, qid, entry);
+	while (!STAILQ_EMPTY(&commits)) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
+		qid = STAILQ_FIRST(&commits);
+		STAILQ_REMOVE_HEAD(&commits, entry);
+		err = got_object_open_as_commit(&commit, repo, &qid->id);
+		if (err)
+			break;
+
+		node = got_object_idset_get(graph->node_ids, &qid->id);
+		if (node == NULL) {
+			err = add_node(&node, graph, id, repo);
+			if (err)
+				break;
+			TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
+		}
+
+		got_object_qid_free(qid);
+		qid = NULL;
+
+		if (node->timestamp != 0) /* already traversed once */
+			continue;
+
+		if (node->nparents == -1) {
+			node->nparents = got_object_commit_get_nparents(commit);
+			if (node->nparents > nitems(node->parents)) {
+				node->more_parents = calloc(node->nparents,
+				    sizeof(*node->more_parents));
+				if (node->more_parents == NULL) {
+					err = got_error_from_errno("calloc");
+					break;
+				}
+			}
+
+		}
+
+		node->timestamp = got_object_commit_get_committer_time(commit);
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		i = 0;
+		STAILQ_FOREACH(pid, parent_ids, entry) {
+			if (cancel_cb) {
+				err = (*cancel_cb)(cancel_arg);
+				if (err)
+					goto done;
+			}
+
+			/*
+			 * Increment the in-degree counter every time a given
+			 * commit appears as the parent of another commit.
+			 */
+			pnode = got_object_idset_get(graph->node_ids, &pid->id);
+			if (pnode == NULL) {
+				err = add_node(&pnode, graph, &pid->id, repo);
+				if (err)
+					goto done;
+				TAILQ_INSERT_TAIL(&graph->iter_list, pnode,
+				    entry);
+			}
+			pnode->indegree++;
+
+			/*
+			 * Cache parent pointers on the node to make future
+			 * in-degree updates easier.
+			 */
+			if (node->nparents <= nitems(node->parents)) {
+				node->parents[i] = pnode;
+			} else {
+				node->more_parents[i] = pnode;
+				if (i < nitems(node->parents))
+					node->parents[i] = pnode;
+			}
+			i++;
+
+			/* Keep traversing through all parent commits. */
+			err = got_object_qid_alloc_partial(&qid);
+			if (err)
+				goto done;
+			memcpy(&qid->id, &pid->id, sizeof(qid->id));
+			STAILQ_INSERT_TAIL(&commits, qid, entry);
+			qid = NULL;
+		}
+
+		got_object_commit_close(commit);
+		commit = NULL;
+	}
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	got_object_qid_free(qid);
+	got_object_id_queue_free(&commits);
 	return err;
 }
