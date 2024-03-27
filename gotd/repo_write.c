@@ -1923,7 +1923,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, root_id, repo,
+	err = got_commit_graph_bfsort(graph, root_id, repo,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;

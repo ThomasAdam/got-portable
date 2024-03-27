@@ -583,7 +583,7 @@ remove_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 }
 
 const struct got_error *
-got_commit_graph_iter_start(struct got_commit_graph *graph,
+got_commit_graph_bfsort(struct got_commit_graph *graph,
     struct got_object_id *id, struct got_repository *repo,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -740,12 +740,12 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		if (err)
 			goto done;
 	} else {
-		err = got_commit_graph_iter_start(graph, commit_id, repo,
+		err = got_commit_graph_bfsort(graph, commit_id, repo,
 		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 
-		err = got_commit_graph_iter_start(graph2, commit_id2, repo,
+		err = got_commit_graph_bfsort(graph2, commit_id2, repo,
 		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
@@ -836,7 +836,7 @@ got_commit_graph_toposort(struct got_commit_graph *graph,
 	STAILQ_INIT(&commits);
 
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL)
-		return got_commit_graph_iter_start(graph, id, repo,
+		return got_commit_graph_bfsort(graph, id, repo,
 		    cancel_cb, cancel_arg);
 
 	/* Clear left-over state from previous iteration attempts. */

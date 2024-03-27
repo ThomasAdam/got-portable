@@ -580,7 +580,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, start_commit_id, repo,
+	err = got_commit_graph_bfsort(graph, start_commit_id, repo,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;

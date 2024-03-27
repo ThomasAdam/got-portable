@@ -2946,7 +2946,7 @@ check_same_branch(struct got_object_id *commit_id,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo,
+	err = got_commit_graph_bfsort(graph, head_commit_id, repo,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
@@ -4485,7 +4485,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		err = got_commit_graph_toposort(graph, root_id, repo,
 		    check_cancelled, NULL);
 	} else {
-		err = got_commit_graph_iter_start(graph, root_id, repo,
+		err = got_commit_graph_bfsort(graph, root_id, repo,
 		    check_cancelled, NULL);
 	}
 	if (err)
@@ -10874,7 +10874,7 @@ collect_commits(struct got_object_id_queue *commits,
 	if (err)
 		return err;
 
-	err = got_commit_graph_iter_start(graph, iter_start_id, repo,
+	err = got_commit_graph_bfsort(graph, iter_start_id, repo,
 	    check_cancelled, NULL);
 	if (err)
 		goto done;
@@ -11266,7 +11266,7 @@ find_merge_commit_yca(struct got_object_id **new_yca_id,
 	if (err)
 		return err;
 
-	err = got_commit_graph_iter_start(graph, base_commit_id,
+	err = got_commit_graph_bfsort(graph, base_commit_id,
 	    repo, check_cancelled, NULL);
 	if (err)
 		goto done;
