@@ -2692,7 +2692,6 @@ got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
 
 const struct got_error *
 got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
-    struct got_object_id **changed_commit_id,
     struct got_object_id_queue *commit_ids, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -2703,7 +2702,6 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 	int i, done = 0;
 
 	*changed_commit = NULL;
-	*changed_commit_id = NULL;
 
 	while (!done) {
 		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
@@ -2729,23 +2727,9 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 				memcpy(&qid->id, &ids[i], sizeof(ids[i]));
 				STAILQ_INSERT_TAIL(commit_ids, qid, entry);
 
-				/* The last commit may contain a change. */
-				if (i == icommits->ncommits - 1) {
-					*changed_commit_id =
-					    got_object_id_dup(&qid->id);
-					if (*changed_commit_id == NULL) {
-						err = got_error_from_errno(
-						    "got_object_id_dup");
-						break;
-					}
-				}
 			}
 			break;
 		case GOT_IMSG_COMMIT:
-			if (*changed_commit_id == NULL) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
 			err = get_commit_from_imsg(changed_commit, &imsg,
 			    datalen, ibuf);
 			break;

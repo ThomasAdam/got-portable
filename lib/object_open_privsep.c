@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <imsg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -1214,7 +1215,7 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 	struct got_packidx *packidx = NULL;
 	char *path_packfile = NULL;
 	struct got_commit_object *changed_commit = NULL;
-	struct got_object_id *changed_commit_id = NULL;
+	struct got_object_qid *changed_commit_qid = NULL;
 	int idx;
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, commit_id);
@@ -1248,7 +1249,7 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 		goto done;
 
 	err = got_privsep_recv_traversed_commits(&changed_commit,
-	    &changed_commit_id, traversed_commits, pack->privsep_child->ibuf);
+	    traversed_commits, pack->privsep_child->ibuf);
 	if (err)
 		goto done;
 
@@ -1258,13 +1259,13 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 		 * This commit might be opened again soon.
 		 */
 		changed_commit->refcnt++;
-		err = got_repo_cache_commit(repo, changed_commit_id,
+		changed_commit_qid = STAILQ_LAST(traversed_commits, got_object_qid, entry);
+		err = got_repo_cache_commit(repo, &changed_commit_qid->id,
 		    changed_commit);
 		got_object_commit_close(changed_commit);
 	}
 done:
 	free(path_packfile);
-	free(changed_commit_id);
 	return err;
 }
 

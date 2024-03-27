@@ -787,8 +787,8 @@ const struct got_error *got_privsep_recv_gotconfig_remotes(
 const struct got_error *got_privsep_send_commit_traversal_request(
     struct imsgbuf *, struct got_object_id *, int, const char *);
 const struct got_error *got_privsep_recv_traversed_commits(
-    struct got_commit_object **, struct got_object_id **,
-    struct got_object_id_queue *, struct imsgbuf *);
+    struct got_commit_object **, struct got_object_id_queue *,
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_enumerated_tree(size_t *,
     struct imsgbuf *, struct got_object_id *, const char *,
     struct got_parsed_tree_entry *, int);
