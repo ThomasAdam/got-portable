@@ -1538,19 +1538,28 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
 {
 	const struct got_error *error;
 	struct gotd_notification_target *target;
-	char *proto, *host, *port, *request_path;
-	int ret = 0;
+	char *proto, *hostname, *port, *path;
+	int tls = 0, ret = 0;
 
-	error = gotd_parse_url(&proto, &host, &port, &request_path, url);
+	error = gotd_parse_url(&proto, &hostname, &port, &path, url);
 	if (error) {
 		yyerror("invalid HTTP notification URL '%s' in "
 		    "repository '%s': %s", url, repo->name, error->msg);
 		return -1;
 	}
 
+	tls = !strcmp(proto, "https");
+
 	if (strcmp(proto, "http") != 0 && strcmp(proto, "https") != 0) {
 		yyerror("invalid protocol '%s' in notification URL '%s' in "
 		    "repository '%s", proto, url, repo->name);
+		ret = -1;
+		goto done;
+	}
+
+	if ((user != NULL && password == NULL) ||
+	    (user == NULL && password != NULL)) {
+		yyerror("missing username or password");
 		ret = -1;
 		goto done;
 	}
@@ -1564,7 +1573,10 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
 		if (target->type != GOTD_NOTIFICATION_VIA_HTTP)
 			continue;
-		if (strcmp(target->conf.http.url, url) == 0) {
+		if (target->conf.http.tls == tls &&
+		    !strcmp(target->conf.http.hostname, hostname) &&
+		    !strcmp(target->conf.http.port, port) &&
+		    !strcmp(target->conf.http.path, path)) {
 			yyerror("duplicate notification for URL '%s' in "
 			    "repository '%s'", url, repo->name);
 			ret = -1;
@@ -1576,26 +1588,27 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
 	if (target == NULL)
 		fatal("calloc");
 	target->type = GOTD_NOTIFICATION_VIA_HTTP;
-	target->conf.http.url = strdup(url);
-	if (target->conf.http.url == NULL)
-		fatal("calloc");
+	target->conf.http.tls = tls;
+	target->conf.http.hostname = hostname;
+	target->conf.http.port = port;
+	target->conf.http.path = path;
+	hostname = port = path = NULL;
+
 	if (user) {
 		target->conf.http.user = strdup(user);
 		if (target->conf.http.user == NULL)
-			fatal("calloc");
-	}	
-	if (password) {
+			fatal("strdup");
 		target->conf.http.password = strdup(password);
 		if (target->conf.http.password == NULL)
-			fatal("calloc");
+			fatal("strdup");
 	}	
 
 	STAILQ_INSERT_TAIL(&repo->notification_targets, target, entry);
 done:
 	free(proto);
-	free(host);
+	free(hostname);
 	free(port);
-	free(request_path);
+	free(path);
 	return ret;
 }
 
