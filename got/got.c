@@ -7546,11 +7546,10 @@ done:
 
 static const struct got_error *
 get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
-    const char *tag_name, const char *repo_path)
+    const char *tag_name, const char *editor, const char *repo_path)
 {
 	const struct got_error *err = NULL;
 	char *template = NULL, *initial_content = NULL;
-	char *editor = NULL;
 	int initial_content_len;
 	int fd = -1;
 
@@ -7581,15 +7580,11 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	}
 	fd = -1;
 
-	err = get_editor(&editor);
-	if (err)
-		goto done;
 	err = edit_logmsg(tagmsg, editor, *tagmsg_path, initial_content,
 	    initial_content_len, 1);
 done:
 	free(initial_content);
 	free(template);
-	free(editor);
 
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *tagmsg_path);
@@ -7604,7 +7599,7 @@ done:
 static const struct got_error *
 add_tag(struct got_repository *repo, const char *tagger,
     const char *tag_name, const char *commit_arg, const char *tagmsg_arg,
-    const char *signer_id, int verbosity)
+    const char *signer_id, const char *editor, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
@@ -7653,20 +7648,13 @@ add_tag(struct got_repository *repo, const char *tagger,
 
 	if (tagmsg_arg == NULL) {
 		err = get_tag_message(&tagmsg, &tagmsg_path, commit_id_str,
-		    tag_name, got_repo_get_path(repo));
+		    tag_name, editor, got_repo_get_path(repo));
 		if (err) {
 			if (err->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 			    tagmsg_path != NULL)
 				preserve_tagmsg = 1;
 			goto done;
 		}
-		/* Editor is done; we can now apply unveil(2) */
-		err = got_sigs_apply_unveil();
-		if (err)
-			goto done;
-		err = apply_unveil(got_repo_get_path(repo), 0, NULL);
-		if (err)
-			goto done;
 	}
 
 	err = got_object_tag_create(&tag_id, tag_name, commit_id,
@@ -7725,7 +7713,7 @@ cmd_tag(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
 	char *gitconfig_path = NULL, *tagger = NULL, *keyword_idstr = NULL;
-	char *allowed_signers = NULL, *revoked_signers = NULL;
+	char *allowed_signers = NULL, *revoked_signers = NULL, *editor = NULL;
 	const char *signer_id = NULL;
 	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
@@ -7884,16 +7872,23 @@ cmd_tag(int argc, char *argv[])
 		if (signer_id == NULL)
 			signer_id = get_signer_id(repo, worktree);
 
-		if (tagmsg) {
-			if (signer_id) {
-				error = got_sigs_apply_unveil();
-				if (error)
-					goto done;
+		if (tagmsg == NULL) {
+			error = get_editor(&editor);
+			if (error)
+				goto done;
+			if (unveil(editor, "x") != 0) {
+				error = got_error_from_errno2("unveil", editor);
+				goto done;
 			}
-			error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+		}
+		if (signer_id) {
+			error = got_sigs_apply_unveil();
 			if (error)
 				goto done;
 		}
+		error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+		if (error)
+			goto done;
 
 		if (commit_id_arg == NULL) {
 			struct got_reference *head_ref;
@@ -7927,7 +7922,7 @@ cmd_tag(int argc, char *argv[])
 
 		error = add_tag(repo, tagger, tag_name,
 		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg,
-		    signer_id, verbosity);
+		    signer_id, editor, verbosity);
 	}
 done:
 	if (repo) {
@@ -7944,6 +7939,7 @@ done:
 			error = pack_err;
 	}
 	free(cwd);
+	free(editor);
 	free(repo_path);
 	free(gitconfig_path);
 	free(commit_id_str);
