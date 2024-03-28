@@ -62,8 +62,20 @@ test_file_changed() {
 	{"notifications":[{
 		"short":false,
 		"id":"$commit_id",
-		"author":"$GOT_AUTHOR",
+		"author":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"committer":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
 		"date":"$d",
+		"short_message":"make changes",
 		"message":"make changes\n",
 		"diffstat":{},
 		"changes":{}
@@ -131,8 +143,20 @@ test_bad_utf8() {
 	{"notifications":[{
 		"short":false,
 		"id":"$commit_id",
-		"author":"$GOT_AUTHOR",
+		"author":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"committer":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
 		"date":"$d",
+		"short_message":"make\uFFFD\uFFFDchanges",
 		"message":"make\uFFFD\uFFFDchanges\n",
 		"diffstat":{},
 		"changes":{}
@@ -208,8 +232,20 @@ test_many_commits_not_summarized() {
 		{
 			"short":false,
 			"id":"$commit_id",
-			"author":"$GOT_AUTHOR",
+			"author":{
+				"full":"$GOT_AUTHOR",
+				"name":"$GIT_AUTHOR_NAME",
+				"mail":"$GIT_AUTHOR_EMAIL",
+				"user":"$GOT_AUTHOR_11"
+			},
+			"committer":{
+				"full":"$GOT_AUTHOR",
+				"name":"$GIT_AUTHOR_NAME",
+				"mail":"$GIT_AUTHOR_EMAIL",
+				"user":"$GOT_AUTHOR_11"
+			},
 			"date":"$commit_time",
+			"short_message":"make changes",
 			"message":"make changes\n",
 			"diffstat":{},
 			"changes":{}
@@ -289,9 +325,11 @@ test_many_commits_summarized() {
 		{
 			"short":true,
 			"id":"$commit_id",
-			"author":"$GOT_AUTHOR_8",
+			"committer":{
+				"user":"$GOT_AUTHOR_8"
+			},
 			"date":"$commit_time",
-			"message":"make changes"
+			"short_message":"make changes"
 		}
 		EOF
 	done >> $testroot/stdout.expected

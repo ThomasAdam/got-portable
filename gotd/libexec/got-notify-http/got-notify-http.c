@@ -149,6 +149,46 @@ json_field(FILE *fp, const char *key, const char *val, int comma)
 	fprintf(fp, "\"%s", comma ? "," : "");
 }
 
+static void
+json_author(FILE *fp, const char *type, char *address, int comma)
+{
+	char	*gt, *lt, *at, *email, *endname;
+
+	fprintf(fp, "\"%s\":{", type);
+
+	gt = strchr(address, '<');
+	if (gt != NULL) {
+		/* long format, e.g. "Omar Polo <op@openbsd.org>" */
+
+		json_field(fp, "full", address, 1);
+
+		endname = gt;
+		while (endname > address && endname[-1] == ' ')
+			endname--;
+
+		*endname = '\0';
+		json_field(fp, "name", address, 1);
+
+		email = gt + 1;
+		lt = strchr(email, '>');
+		if (lt)
+			*lt = '\0';
+
+		json_field(fp, "mail", email, 1);
+
+		at = strchr(email, '@');
+		if (at)
+			*at = '\0';
+
+		json_field(fp, "user", email, 0);
+	} else {
+		/* short format only shows the username */
+		json_field(fp, "user", address, 0);
+	}
+
+	fprintf(fp, "}%s", comma ? "," : "");
+}
+
 static int
 jsonify_short(FILE *fp)
 {
@@ -187,9 +227,9 @@ jsonify_short(FILE *fp)
 
 		fprintf(fp, "{\"short\":true,");
 		json_field(fp, "id", id, 1);
-		json_field(fp, "author", author, 1);
+		json_author(fp, "committer", author, 1);
 		json_field(fp, "date", date, 1);
-		json_field(fp, "message", message, 0);
+		json_field(fp, "short_message", message, 0);
 		fprintf(fp, "}");
 	}
 
@@ -206,6 +246,7 @@ static int
 jsonify(FILE *fp)
 {
 	const char	*errstr;
+	char		*author = NULL;
 	char		*l;
 	char		*line = NULL;
 	size_t		 linesize = 0;
@@ -254,7 +295,13 @@ jsonify(FILE *fp)
 			if (strncmp(l, "from: ", 6) != 0)
 				errx(1, "unexpected from line");
 			l += 6;
-			json_field(fp, "author", l, 1);
+
+			author = strdup(l);
+			if (author == NULL)
+				err(1, "strdup");
+
+			json_author(fp, "author", l, 1);
+
 			phase = P_VIA;
 			break;
 
@@ -262,10 +309,17 @@ jsonify(FILE *fp)
 			/* optional */
 			if (!strncmp(l, "via: ", 5)) {
 				l += 5;
-				json_field(fp, "via", l, 1);
+				json_author(fp, "committer", l, 1);
 				phase = P_DATE;
 				break;
 			}
+
+			if (author == NULL) /* impossible */
+				err(1, "from not specified");
+			json_author(fp, "committer", author, 1);
+			free(author);
+			author = NULL;
+
 			phase = P_DATE;
 			/* fallthrough */
 
@@ -313,7 +367,6 @@ jsonify(FILE *fp)
 			if (errstr)
 				errx(1, "message len is %s: %s", errstr, l);
 
-			fprintf(fp, "\"message\":\"");
 			phase = P_MSG;
 			break;
 
@@ -329,14 +382,21 @@ jsonify(FILE *fp)
 			 * tolerate one byte less than advertised.
 			 */
 			if (*l == ' ') {
-				escape(fp, l + 1); /* skip leading space */
+				l++; /* skip leading space */
+				linelen--;
 
-				/* avoid pre-pending \n to the commit msg */
-				msgwrote += linelen - 1;
-				if (msgwrote != 0)
+				if (msgwrote == 0 && linelen != 0) {
+					json_field(fp, "short_message", l, 1);
+					fprintf(fp, "\"message\":\"");
+					escape(fp, l);
 					escape(fp, "\n");
+					msgwrote += linelen;
+				} else if (msgwrote != 0) {
+					escape(fp, l);
+					escape(fp, "\n");
+				}
 			}
-			msglen -= linelen;
+			msglen -= linelen + 1;
 			if (msglen <= 1) {
 				fprintf(fp, "\",");
 				msgwrote = 0;
