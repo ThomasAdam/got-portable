@@ -193,7 +193,6 @@ directive parameters may be specified within curly braces.
 The available
 .Cm protect
 parameters are as follows:
-.Pp
 .Bl -tag -width Ds
 .It Ic branch Ar name
 Protect the named branch.
@@ -223,7 +222,7 @@ this namespace represent tags.
 New tags may be created in the namespace.
 Attempts to change or delete existing tags will be denied.
 .Pp
-The 
+The
 .Ar namespace
 argument must be absolute, starting with
 .Dq refs/ .
@@ -267,7 +266,6 @@ The
 .Ic notify
 directive expects parameters which must be enclosed in curly braces.
 The available parameters are as follows:
-.Pp
 .Bl -tag -width Ds
 .It Ic branch Ar name
 Send notifications about commits to the named branch.
@@ -328,7 +326,6 @@ The
 and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
-.Pp
 .It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oc
 Send notifications via HTTP.
 This directive may be specified multiple times to build a list of
@@ -358,9 +355,10 @@ The
 must not be an empty string.
 .Pp
 The request body contains a JSON document with the following objects:
-.Bl -tag -width { "notifications" : array }
+.Bl -tag -width Ds
 .It { "notifications" : array }
 The top-level object contains an array of all notifications in this request.
+.El
 .El
 .El
 .Sh FILES
