@@ -28,9 +28,7 @@ my $pid = open2(my $out, my $in, 'nc', '-l', 'localhost', $port);
 my $clen;
 while (<$out>) {
 	local $/ = "\r\n";
-
 	chomp;
-	say;
 
 	last if /^$/;
 

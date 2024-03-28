@@ -57,13 +57,6 @@ test_file_changed() {
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 
 	cat <<-EOF > $testroot/stdout.expected
-	POST / HTTP/1.1
-	Host: localhost:${GOTD_TEST_HTTP_PORT}
-	Content-Type: application/json
-	Content-Length: 224
-	User-Agent: got-notify-http/${GOT_VERSION_STR}
-	Connection: close
-
 	{"notifications":[{"short":false,"id":"$commit_id","author":"$GOT_AUTHOR","date":"$d","message":"make changes\n","diffstat":{},"changes":{}}]}
 	EOF
 
@@ -119,17 +112,7 @@ test_many_commits_not_summarized() {
 
 	wait %1 # wait for the http "server"
 
-	cat <<-EOF > $testroot/stdout.expected
-	POST / HTTP/1.1
-	Host: localhost:${GOTD_TEST_HTTP_PORT}
-	Content-Type: application/json
-	Content-Length: 4939
-	User-Agent: got-notify-http/${GOT_VERSION_STR}
-	Connection: close
-
-	EOF
-
-	printf '{"notifications":[' >> $testroot/stdout.expected
+	printf '{"notifications":[' > $testroot/stdout.expected
 	comma=""
 	for i in `seq 1 24`; do
 		s=`pop_idx $i "$@"`
@@ -194,17 +177,7 @@ test_many_commits_summarized() {
 
 	wait %1 # wait for the http "server"
 
-	cat <<-EOF > $testroot/stdout.expected
-	POST / HTTP/1.1
-	Host: localhost:${GOTD_TEST_HTTP_PORT}
-	Content-Type: application/json
-	Content-Length: 4864
-	User-Agent: got-notify-http/${GOT_VERSION_STR}
-	Connection: close
-
-	EOF
-
-	printf '{"notifications":[' >> $testroot/stdout.expected
+	printf '{"notifications":[' > $testroot/stdout.expected
 	comma=""
 	for i in `seq 1 51`; do
 		s=`pop_idx $i "$@"`
