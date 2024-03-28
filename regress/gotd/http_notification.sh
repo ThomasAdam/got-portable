@@ -445,9 +445,60 @@ test_branch_created() {
 	test_done "$testroot" "$ret"
 }
 
+test_branch_removed() {
+	local testroot=`test_init branch_removed 1`
+
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	    > $testroot/stdout &
+
+	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
+
+	got send -d newbranch -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	wait %1 # wait for the http "server"
+
+	touch "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"type":"branch-deleted",
+		"ref":"refs/heads/newbranch",
+		"id":"$commit_id"
+	}]}
+	.
+	,j
+	w
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_file_changed
 run_test test_bad_utf8
 run_test test_many_commits_not_summarized
 run_test test_many_commits_summarized
 run_test test_branch_created
+run_test test_branch_removed

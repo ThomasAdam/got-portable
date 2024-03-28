@@ -190,6 +190,33 @@ json_author(FILE *fp, const char *type, char *address, int comma)
 }
 
 static int
+jsonify_branch_rm(FILE *fp, char *line)
+{
+	char	*ref, *id;
+
+	line = strchr(line, ' ');
+	if (line == NULL)
+		errx(1, "invalid branch rm line");
+	line += strspn(line, " ");
+
+	ref = line;
+
+	line = strchr(line, ':');
+	if (line == NULL)
+		errx(1, "invalid branch rm line");
+	*line++ = '\0';
+	id = line + strspn(line, " ");
+
+	fputc('{', fp);
+	json_field(fp, "type", "branch-deleted", 1);
+	json_field(fp, "ref", ref, 1);
+	json_field(fp, "id", id, 0);
+	fputc('}', fp);
+
+	return 0;
+}
+
+static int
 jsonify_commit_short(FILE *fp, char *line)
 {
 	char	*t, *date, *id, *author, *message;
@@ -419,6 +446,12 @@ jsonify(FILE *fp)
 		if (needcomma)
 			fputc(',', fp);
 		needcomma = 1;
+
+		if (strncmp(line, "Removed refs/heads/", 19) == 0) {
+			if (jsonify_branch_rm(fp, line) == -1)
+				err(1, "jsonify_branch_rm");
+			continue;
+		}
 
 		if (strncmp(line, "commit ", 7) == 0) {
 			if (jsonify_commit(fp, &line, &linesize) == -1)
