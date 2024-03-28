@@ -33,6 +33,7 @@
 #include "got_version.h"
 
 #include "bufio.h"
+#include "utf8d.h"
 
 #define USERAGENT	 "got-notify-http/" GOT_VERSION_STR
 
@@ -91,39 +92,50 @@ dial(const char *host, const char *port)
 static void
 escape(FILE *fp, const uint8_t *s)
 {
+	uint32_t codepoint, state;
+	const uint8_t *start = s;
+
+	state = 0;
 	for (; *s; ++s) {
-		/*
-		 * XXX: this is broken for UNICODE: we should leave
-		 * the multibyte characters as-is.
-		 */
+		switch (decode(&state, &codepoint, *s)) {
+		case UTF8_ACCEPT:
+			switch (codepoint) {
+			case '"':
+			case '\\':
+				fprintf(fp, "\\%c", *s);
+				break;
+			case '\b':
+				fprintf(fp, "\\b");
+				break;
+			case '\f':
+				fprintf(fp, "\\f");
+				break;
+			case '\n':
+				fprintf(fp, "\\n");
+				break;
+			case '\r':
+				fprintf(fp, "\\r");
+				break;
+			case '\t':
+				fprintf(fp, "\\t");
+				break;
+			default:
+				/* other control characters */
+				if (codepoint < ' ' || codepoint == 0x7F) {
+					fprintf(fp, "\\u%04x", codepoint);
+					break;
+				}
+				fwrite(start, 1, s - start + 1, fp);
+				break;
+			}
+			start = s + 1;
+			break;
 
-		if (*s >= ' ' && *s <= '~') {
-			fputc(*s, fp);
-			continue;
-		}
-
-		switch (*s) {
-		case '"':
-		case '\\':
-			fprintf(fp, "\\%c", *s);
-			break;
-		case '\b':
-			fprintf(fp, "\\b");
-			break;
-		case '\f':
-			fprintf(fp, "\\f");
-			break;
-		case '\n':
-			fprintf(fp, "\\n");
-			break;
-		case '\r':
-			fprintf(fp, "\\r");
-			break;
-		case '\t':
-			fprintf(fp, "\\t");
-			break;
-		default:
-			fprintf(fp, "\\u%04X", *s);
+		case UTF8_REJECT:
+			/* bad UTF-8 sequence; try to recover */
+			fputs("\\uFFFD", fp);
+			state = UTF8_ACCEPT;
+			start = s + 1;
 			break;
 		}
         }
