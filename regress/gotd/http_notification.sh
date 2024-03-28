@@ -78,8 +78,18 @@ test_file_changed() {
 		"date":"$d",
 		"short_message":"make changes",
 		"message":"make changes\n",
-		"diffstat":{},
-		"changes":{}
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"alpha",
+				"added":1,
+				"removed":1
+			}],
+			"total":{
+				"added":1,
+				"removed":1
+			}
+		}
 	}]}
 	.
 	,j
@@ -160,8 +170,18 @@ test_bad_utf8() {
 		"date":"$d",
 		"short_message":"make\uFFFD\uFFFDchanges",
 		"message":"make\uFFFD\uFFFDchanges\n",
-		"diffstat":{},
-		"changes":{}
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"alpha",
+				"added":1,
+				"removed":1
+			}],
+			"total":{
+				"added":1,
+				"removed":1
+			}
+		}
 	}]}
 	.
 	,j
@@ -250,8 +270,18 @@ test_many_commits_not_summarized() {
 			"date":"$commit_time",
 			"short_message":"make changes",
 			"message":"make changes\n",
-			"diffstat":{},
-			"changes":{}
+			"diffstat":{
+				"files":[{
+					"action":"modified",
+					"file":"alpha",
+					"added":1,
+					"removed":1
+				}],
+				"total":{
+					"added":1,
+					"removed":1
+				}
+			}
 		}
 		EOF
 	done >> $testroot/stdout.expected
@@ -425,8 +455,18 @@ test_branch_created() {
 		"date":"$d",
 		"short_message":"newbranch",
 		"message":"newbranch\n",
-		"diffstat":{},
-		"changes":{}
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"alpha",
+				"added":1,
+				"removed":1
+			}],
+			"total":{
+				"added":1,
+				"removed":1
+			}
+		}
 	}
 	]}
 	.
