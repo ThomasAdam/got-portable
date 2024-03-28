@@ -7945,6 +7945,7 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 
 	*commit_id = NULL;
 	*tmp_branch = NULL;
+	*branch_ref = NULL;
 	*base_commit_id = NULL;
 	*fileindex = NULL;
 
@@ -8019,6 +8020,10 @@ done:
 		if (*tmp_branch) {
 			got_ref_close(*tmp_branch);
 			*tmp_branch = NULL;
+		}
+		if (*branch_ref) {
+			got_ref_close(*branch_ref);
+			*branch_ref = NULL;
 		}
 		if (*fileindex) {
 			got_fileindex_free(*fileindex);
