@@ -56,8 +56,21 @@ test_file_changed() {
 
 	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 
-	cat <<-EOF > $testroot/stdout.expected
-	{"notifications":[{"short":false,"id":"$commit_id","author":"$GOT_AUTHOR","date":"$d","message":"make changes\n","diffstat":{},"changes":{}}]}
+	touch "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"short":false,
+		"id":"$commit_id",
+		"author":"$GOT_AUTHOR",
+		"date":"$d",
+		"message":"make changes\n",
+		"diffstat":{},
+		"changes":{}
+	}]}
+	.
+	,j
+	w
 	EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -118,11 +131,27 @@ test_many_commits_not_summarized() {
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
 		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
-		printf '%s{"short":false,"id":"%s","author":"%s","date":"%s","message":"%s","diffstat":{},"changes":{}}' \
-			"$comma" "$commit_id" "$GOT_AUTHOR" "$commit_time" "make changes\n"
-		comma=","
+
+		echo "$comma"
+		comma=','
+
+		cat <<-EOF
+		{
+			"short":false,
+			"id":"$commit_id",
+			"author":"$GOT_AUTHOR",
+			"date":"$commit_time",
+			"message":"make changes\n",
+			"diffstat":{},
+			"changes":{}
+		}
+		EOF
 	done >> $testroot/stdout.expected
 	echo "]}" >> $testroot/stdout.expected
+	ed -s "$testroot/stdout.expected" <<-EOF
+	,j
+	w
+	EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -183,12 +212,25 @@ test_many_commits_summarized() {
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
 		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
-		printf '%s{"short":true,"id":"%s","author":"%s","date":"%s","message":"%s"}' \
-			"$comma" "$commit_id" "$GOT_AUTHOR_8" \
-			"$commit_time" "make changes"
-		comma=","
+
+		echo "$comma"
+		comma=','
+
+		cat <<-EOF
+		{
+			"short":true,
+			"id":"$commit_id",
+			"author":"$GOT_AUTHOR_8",
+			"date":"$commit_time",
+			"message":"make changes"
+		}
+		EOF
 	done >> $testroot/stdout.expected
 	echo "]}" >> $testroot/stdout.expected
+	ed -s "$testroot/stdout.expected" <<-EOF
+	,j
+	w
+	EOF
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
