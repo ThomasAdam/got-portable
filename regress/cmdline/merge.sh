@@ -713,10 +713,13 @@ test_merge_continue() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
-	echo "D  beta" >> $testroot/stdout.expected
-	echo "A  epsilon/new" >> $testroot/stdout.expected
-	echo "M  gamma/delta" >> $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+D  beta
+A  epsilon/new
+M  gamma/delta
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1005,13 +1008,16 @@ test_merge_abort() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "A  added-file" > $testroot/stdout.expected
-	echo "C  alpha" >> $testroot/stdout.expected
-	echo "D  beta" >> $testroot/stdout.expected
-	echo "A  epsilon/new" >> $testroot/stdout.expected
-	echo "M  gamma/delta" >> $testroot/stdout.expected
-	echo "A  symlink" >> $testroot/stdout.expected
-	echo "?  unversioned-file" >> $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+A  added-file
+C  alpha
+D  beta
+A  epsilon/new
+M  gamma/delta
+A  symlink
+?  unversioned-file
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1186,7 +1192,10 @@ test_merge_in_progress() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1357,7 +1366,10 @@ test_merge_missing_file() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "M  gamma/delta" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+M  gamma/delta
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1433,7 +1445,10 @@ test_merge_no_op() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1666,7 +1681,10 @@ test_merge_interrupt() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "M  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+M  alpha
+Work tree is merging refs/heads/newbranch into refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then

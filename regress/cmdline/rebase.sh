@@ -340,7 +340,10 @@ test_rebase_continue() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+Work tree is rebasing refs/heads/newbranch onto refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -501,10 +504,13 @@ test_rebase_abort() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "A  added-file" > $testroot/stdout.expected
-	echo "C  alpha" >> $testroot/stdout.expected
-	echo "A  epsilon/new" >> $testroot/stdout.expected
-	echo "?  unversioned-file" >> $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+A  added-file
+C  alpha
+A  epsilon/new
+?  unversioned-file
+Work tree is rebasing refs/heads/newbranch onto refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -669,7 +675,10 @@ test_rebase_no_op_change() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+Work tree is rebasing refs/heads/newbranch onto refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -781,7 +790,10 @@ test_rebase_in_progress() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "C  alpha" > $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+C  alpha
+Work tree is rebasing refs/heads/newbranch onto refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then

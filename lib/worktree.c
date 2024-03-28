@@ -7011,6 +7011,70 @@ got_worktree_rebase_in_progress(int *in_progress, struct got_worktree *worktree)
 	return NULL;
 }
 
+const struct got_error *
+got_worktree_rebase_info(char **new_base_branch_name, char **branch_name,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *new_base_branch_ref_name = NULL;
+	char *branch_ref_name = NULL;
+	struct got_reference *branch_ref = NULL, *branch = NULL;
+	struct got_reference *new_base_branch = NULL;
+
+	*new_base_branch_name = NULL;
+	*branch_name = NULL;
+
+	err = get_rebase_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = get_newbase_symref_name(&new_base_branch_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&branch_ref, repo, branch_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&branch, repo,
+	    got_ref_get_symref_target(branch_ref), 0);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&new_base_branch, repo,
+	    new_base_branch_ref_name, 0);
+	if (err)
+		goto done;
+
+	if (!got_ref_is_symbolic(new_base_branch)) {
+		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
+		    "%s is not a symbolic reference",
+		    got_ref_get_name(branch_ref));
+		goto done;
+	}
+
+	*new_base_branch_name = strdup(got_ref_get_symref_target(
+	    new_base_branch));
+	if (*new_base_branch_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	*branch_name = strdup(got_ref_get_name(branch));
+	if (*branch_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+done:
+	free(branch_ref_name);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (new_base_branch)
+		got_ref_close(new_base_branch);
+	if (branch)
+		got_ref_close(branch);
+	return err;
+}
+
 static const struct got_error *
 collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
     const char *diff_path, char **logmsg, void *arg)
@@ -8037,6 +8101,47 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_worktree_histedit_info(char **branch_name,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *branch_ref = NULL;
+	char *branch_ref_name = NULL;
+
+	*branch_name = NULL;
+
+	err = get_histedit_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&branch_ref, repo, branch_ref_name, 0);
+	if (err)
+		goto done;
+
+	if (!got_ref_is_symbolic(branch_ref)) {
+		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
+		    "%s is not a symbolic reference",
+		    got_ref_get_name(branch_ref));
+		goto done;
+	}
+
+	*branch_name = strdup(got_ref_get_symref_target(branch_ref));
+	if (*branch_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+done:
+	free(branch_ref_name);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (err) {
+		free(*branch_name);
+		*branch_name = NULL;
+	}
+	return err;
+}
+
 static const struct got_error *
 delete_histedit_refs(struct got_worktree *worktree, struct got_repository *repo)
 {
@@ -8856,6 +8961,49 @@ done:
 			*fileindex = NULL;
 		}
 		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_info(char **branch_name, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *branch_refname = NULL;
+	struct got_reference *branch_ref = NULL;
+
+	*branch_name = NULL;
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&branch_ref, repo, branch_refname, 0);
+	if (err)
+		goto done;
+
+	if (!got_ref_is_symbolic(branch_ref)) {
+		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
+		    "%s is not a symbolic reference",
+		    got_ref_get_name(branch_ref));
+		goto done;
+	}
+	*branch_name = strdup(got_ref_get_symref_target(branch_ref));
+	if (*branch_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+done:
+	free(branch_refname);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (err) {
+		if (*branch_name) {
+			free(*branch_name);
+			*branch_name = NULL;
+		}
 	}
 	return err;
 }
