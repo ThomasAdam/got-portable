@@ -254,10 +254,12 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 {
 	const char	*errstr;
 	char		*author = NULL;
+	char		*filename, *t;
 	char		*l;
 	ssize_t		 linelen;
 	int		 parent = 0;
 	int		 msglen = 0, msgwrote = 0;
+	int		 n, files = 0;
 	int		 done = 0;
 	enum {
 		P_FROM,
@@ -274,6 +276,7 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 	if (strncmp(l, "commit ", 7) != 0)
 		errx(1, "%s: unexpected line: %s", __func__, l);
 	l += 7;
+
 	fprintf(fp, "{\"type\":\"commit\",\"short\":false,");
 	json_field(fp, "id", l, 1);
 
@@ -362,6 +365,8 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 			if (errstr)
 				errx(1, "message len is %s: %s", errstr, l);
 
+			msglen++;
+
 			phase = P_MSG;
 			break;
 
@@ -376,41 +381,151 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 			 * a \n added at the end of the message,
 			 * tolerate one byte less than advertised.
 			 */
-			if (*l == ' ') {
-				l++; /* skip leading space */
-				linelen--;
+			if (*l != ' ')
+				errx(1, "unexpected line in commit message");
 
-				if (msgwrote == 0 && linelen != 0) {
-					json_field(fp, "short_message", l, 1);
-					fprintf(fp, "\"message\":\"");
-					escape(fp, l);
-					escape(fp, "\n");
-					msgwrote += linelen;
-				} else if (msgwrote != 0) {
-					escape(fp, l);
-					escape(fp, "\n");
-				}
+			l++; /* skip leading space */
+			linelen--;
+
+			if (msgwrote == 0 && linelen != 0) {
+				json_field(fp, "short_message", l, 1);
+				fprintf(fp, "\"message\":\"");
+				escape(fp, l);
+				escape(fp, "\n");
+				msgwrote += linelen;
+			} else if (msgwrote != 0) {
+				escape(fp, l);
+				escape(fp, "\n");
 			}
+
 			msglen -= linelen + 1;
 			if (msglen <= 1) {
 				fprintf(fp, "\",");
-				msgwrote = 0;
 				phase = P_DST;
-			}
-			break;
-
-		case P_DST:
-			/* XXX: ignore the diffstat for now */
-			if (*l == '\0') {
-				fprintf(fp, "\"diffstat\":{},");
-				phase = P_SUM;
 				break;
 			}
 			break;
 
+		case P_DST:
+			if (files == 0 && !strcmp(l, " "))
+				break;
+
+			if (files == 0)
+				fputs("\"diffstat\":{\"files\":[", fp);
+
+			if (*l == '\0') {
+				fputs("],", fp);
+				phase = P_SUM;
+				break;
+			}
+
+			if (*l != ' ')
+				errx(1, "bad diffstat line");
+			l++;
+
+			if (files != 0)
+				fputc(',', fp);
+			fputc('{', fp);
+
+			switch (*l) {
+			case 'A':
+				json_field(fp, "action", "added", 1);
+				break;
+			case 'D':
+				json_field(fp, "action", "deleted", 1);
+				break;
+			case 'M':
+				json_field(fp, "action", "modified", 1);
+				break;
+			case 'm':
+				json_field(fp, "action", "mode changed", 1);
+				break;
+			default:
+				json_field(fp, "action", "unknown", 1);
+				break;
+			}
+
+			l++;
+			while (*l == ' ')
+				*l++ = '\0';
+			if (*l == '\0')
+				errx(1, "invalid diffstat: no filename");
+
+			filename = l;
+			l = strrchr(l, '|');
+			if (l == NULL)
+				errx(1, "invalid diffstat: no separator");
+			t = l - 1;
+			while (t > filename && *t == ' ')
+				*t-- = '\0';
+			json_field(fp, "file", filename, 1);
+
+			l++;
+			while (*l == ' ')
+				l++;
+
+			t = strchr(l, '+');
+			if (t == NULL)
+				errx(1, "invalid diffstat: no added counter");
+			*t++ = '\0';
+
+			n = strtonum(l, 0, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "added counter is %s: %s", errstr, l);
+			fprintf(fp, "\"added\":%d,", n);
+
+			l = ++t;
+			while (*l == ' ')
+				l++;
+
+			t = strchr(l, '-');
+			if (t == NULL)
+				errx(1, "invalid diffstat: no del counter");
+			*t = '\0';
+
+			n = strtonum(l, 0, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "del counter is %s: %s", errstr, l);
+			fprintf(fp, "\"removed\":%d", n);
+
+			fputc('}', fp);
+
+			files++;
+
+			break;
+
 		case P_SUM:
-			/* XXX: ignore the sum of changes for now */
-			fprintf(fp, "\"changes\":{}}");
+			fputs("\"total\":{", fp);
+
+			t = l;
+			l = strchr(l, ' ');
+			if (l == NULL)
+				errx(1, "missing number of additions");
+			*l++ = '\0';
+
+			n = strtonum(t, 0, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "add counter is %s: %s", errstr, t);
+			fprintf(fp, "\"added\":%d,", n);
+
+			l = strchr(l, ',');
+			if (l == NULL)
+				errx(1, "missing number of deletions");
+			l++;
+			while (*l == ' ')
+				l++;
+
+			t = strchr(l, ' ');
+			if (t == NULL)
+				errx(1, "malformed diffstat sum line");
+			*t = '\0';
+
+			n = strtonum(l, 0, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "del counter is %s: %s", errstr, l);
+			fprintf(fp, "\"removed\":%d", n);
+
+			fputs("}}", fp);
 			done = 1;
 			break;
 
@@ -423,6 +538,7 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 		err(1, "getline");
 	if (!done)
 		errx(1, "unexpected EOF");
+	fputc('}', fp);
 
 	return 0;
 }
@@ -519,24 +635,25 @@ jsonify_tag(FILE *fp, char **line, ssize_t *linesize)
 			break;
 
 		case P_MSG:
-			if (*l == ' ') {
-				l++; /* skip leading space */
-				linelen--;
+			if (*l != ' ')
+				errx(1, "unexpected line in tag message");
 
-				if (msgwrote == 0 && linelen != 0) {
-					fprintf(fp, "\"message\":\"");
-					escape(fp, l);
-					escape(fp, "\n");
-					msgwrote += linelen;
-				} else if (msgwrote != 0) {
-					escape(fp, l);
-					escape(fp, "\n");
-				}
+			l++; /* skip leading space */
+			linelen--;
+
+			if (msgwrote == 0 && linelen != 0) {
+				fprintf(fp, "\"message\":\"");
+				escape(fp, l);
+				escape(fp, "\n");
+				msgwrote += linelen;
+			} else if (msgwrote != 0) {
+				escape(fp, l);
+				escape(fp, "\n");
 			}
+
 			msglen -= linelen + 1;
-			if (msglen <= 0) {
+			if (msglen <= 1) {
 				fprintf(fp, "\"");
-				msgwrote = 0;
 				done = 1;
 				break;
 			}
