@@ -12787,8 +12787,9 @@ cmd_histedit(int argc, char *argv[])
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)
 			goto done;
-		error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-		    gitconfig_path, pack_fds);
+		error = got_repo_open(&repo,
+		    got_worktree_get_repo_path(worktree), gitconfig_path,
+		    pack_fds);
 		if (error != NULL)
 			goto done;
 		error = get_editor(&editor);
@@ -13068,7 +13069,8 @@ cmd_histedit(int argc, char *argv[])
 				if (have_changes) {
 					error = histedit_commit(NULL, worktree,
 					    fileindex, tmp_branch, hle,
-					    committer, allow_conflict, editor, repo);
+					    committer, allow_conflict, editor,
+					    repo);
 					if (error)
 						goto done;
 				} else {
