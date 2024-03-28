@@ -652,7 +652,7 @@ jsonify_tag(FILE *fp, char **line, ssize_t *linesize)
 			}
 
 			msglen -= linelen + 1;
-			if (msglen <= 1) {
+			if (msglen <= 0) {
 				fprintf(fp, "\"");
 				done = 1;
 				break;
