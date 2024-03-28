@@ -11975,10 +11975,10 @@ get_folded_commits(struct got_histedit_list_entry *hle)
 
 static const struct got_error *
 histedit_edit_logmsg(struct got_histedit_list_entry *hle,
-    struct got_repository *repo)
+    const char *editor, struct got_repository *repo)
 {
 	char *logmsg_path = NULL, *id_str = NULL, *orig_logmsg = NULL;
-	char *logmsg = NULL, *new_msg = NULL, *editor = NULL;
+	char *logmsg = NULL, *new_msg = NULL;
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
 	int logmsg_len;
@@ -12041,10 +12041,6 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	}
 	fd = -1;
 
-	err = get_editor(&editor);
-	if (err)
-		goto done;
-
 	err = edit_logmsg(&hle->logmsg, editor, logmsg_path, logmsg,
 	    logmsg_len, 0);
 	if (err) {
@@ -12063,7 +12059,6 @@ done:
 	free(logmsg_path);
 	free(logmsg);
 	free(orig_logmsg);
-	free(editor);
 	if (commit)
 		got_object_commit_close(commit);
 	return err;
@@ -12204,18 +12199,13 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 
 static const struct got_error *
 histedit_run_editor(struct got_histedit_list *histedit_cmds,
-    const char *path, struct got_object_id_queue *commits,
-    struct got_repository *repo)
+    const char *editor, const char *path,
+    struct got_object_id_queue *commits, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct stat st, st2;
 	struct timespec timeout;
-	char *editor;
 	FILE *f = NULL;
-
-	err = get_editor(&editor);
-	if (err)
-		return err;
 
 	if (stat(path, &st) == -1) {
 		err = got_error_from_errno2("stat", path);
@@ -12256,20 +12246,19 @@ histedit_run_editor(struct got_histedit_list *histedit_cmds,
 done:
 	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	free(editor);
 	return err;
 }
 
 static const struct got_error *
 histedit_edit_list_retry(struct got_histedit_list *, const struct got_error *,
-    struct got_object_id_queue *, const char *, const char *,
+    struct got_object_id_queue *, const char *, const char *, const char *,
     struct got_repository *);
 
 static const struct got_error *
 histedit_edit_script(struct got_histedit_list *histedit_cmds,
     struct got_object_id_queue *commits, const char *branch_name,
     int edit_logmsg_only, int fold_only, int drop_only, int edit_only,
-    struct got_repository *repo)
+    const char *editor, struct got_repository *repo)
 {
 	const struct got_error *err;
 	FILE *f = NULL;
@@ -12297,13 +12286,14 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 			goto done;
 		}
 		f = NULL;
-		err = histedit_run_editor(histedit_cmds, path, commits, repo);
+		err = histedit_run_editor(histedit_cmds, editor, path,
+		    commits, repo);
 		if (err) {
 			if (err->code != GOT_ERR_HISTEDIT_SYNTAX &&
 			    err->code != GOT_ERR_HISTEDIT_CMD)
 				goto done;
 			err = histedit_edit_list_retry(histedit_cmds, err,
-			    commits, path, branch_name, repo);
+			    commits, editor, path, branch_name, repo);
 		}
 	}
 done:
@@ -12380,7 +12370,8 @@ done:
 static const struct got_error *
 histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
     const struct got_error *edit_err, struct got_object_id_queue *commits,
-    const char *path, const char *branch_name, struct got_repository *repo)
+    const char *editor, const char *path, const char *branch_name,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *prev_err = edit_err;
 	int resp = ' ';
@@ -12393,8 +12384,8 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 			resp = getchar();
 		if (resp == 'c') {
 			histedit_free_list(histedit_cmds);
-			err = histedit_run_editor(histedit_cmds, path, commits,
-			    repo);
+			err = histedit_run_editor(histedit_cmds, editor, path,
+			    commits, repo);
 			if (err) {
 				if (err->code != GOT_ERR_HISTEDIT_SYNTAX &&
 				    err->code != GOT_ERR_HISTEDIT_CMD)
@@ -12407,7 +12398,7 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 		} else if (resp == 'r') {
 			histedit_free_list(histedit_cmds);
 			err = histedit_edit_script(histedit_cmds,
-			    commits, branch_name, 0, 0, 0, 0, repo);
+			    commits, branch_name, 0, 0, 0, 0, editor, repo);
 			if (err) {
 				if (err->code != GOT_ERR_HISTEDIT_SYNTAX &&
 				    err->code != GOT_ERR_HISTEDIT_CMD)
@@ -12497,7 +12488,8 @@ static const struct got_error *
 histedit_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *tmp_branch, struct got_histedit_list_entry *hle,
-    const char *committer, int allow_conflict, struct got_repository *repo)
+    const char *committer, int allow_conflict, const char *editor,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit;
@@ -12505,7 +12497,7 @@ histedit_commit(struct got_pathlist_head *merged_paths,
 
 	if ((hle->cmd->code == GOT_HISTEDIT_EDIT || get_folded_commits(hle))
 	    && hle->logmsg == NULL) {
-		err = histedit_edit_logmsg(hle, repo);
+		err = histedit_edit_logmsg(hle, editor, repo);
 		if (err)
 			return err;
 	}
@@ -12603,6 +12595,7 @@ cmd_histedit(int argc, char *argv[])
 	int drop_only = 0, edit_logmsg_only = 0, fold_only = 0, edit_only = 0;
 	int allow_conflict = 0, list_backups = 0, delete_backups = 0;
 	const char *edit_script_path = NULL;
+	char *editor = NULL;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
 	const struct got_object_id_queue *parent_ids;
@@ -12758,15 +12751,6 @@ cmd_histedit(int argc, char *argv[])
 	else if (argc != 0)
 		usage_histedit();
 
-	/*
-	 * This command cannot apply unveil(2) in all cases because the
-	 * user may choose to run an editor to edit the histedit script
-	 * and to edit individual commit log messages.
-	 * unveil(2) traverses exec(2); if an editor is used we have to
-	 * apply unveil after edit script and log messages have been written.
-	 * XXX TODO: Make use of unveil(2) where possible.
-	 */
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -12804,15 +12788,33 @@ cmd_histedit(int argc, char *argv[])
 		    GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX,
 		    argc == 1 ? argv[0] : NULL, delete_backups, repo);
 		goto done; /* nothing else to do */
+	} else {
+		error = get_gitconfig_path(&gitconfig_path);
+		if (error)
+			goto done;
+		error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+		    gitconfig_path, pack_fds);
+		if (error != NULL)
+			goto done;
+		error = get_editor(&editor);
+		if (error)
+			goto done;
+		if (unveil(editor, "x") != 0) {
+			error = got_error_from_errno2("unveil", editor);
+			goto done;
+		}
+		if (edit_script_path) {
+			if (unveil(edit_script_path, "r") != 0) {
+				error = got_error_from_errno2("unveil",
+				    edit_script_path);
+				goto done;
+			}
+		}
+		error = apply_unveil(got_repo_get_path(repo), 0,
+		    got_worktree_get_root_path(worktree));
+		if (error)
+			goto done;
 	}
-
-	error = get_gitconfig_path(&gitconfig_path);
-	if (error)
-		goto done;
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    gitconfig_path, pack_fds);
-	if (error != NULL)
-		goto done;
 
 	if (worktree != NULL && !list_backups && !delete_backups) {
 		error = worktree_has_logmsg_ref("histedit", worktree, repo);
@@ -13009,7 +13011,7 @@ cmd_histedit(int argc, char *argv[])
 				branch_name += 11;
 			error = histedit_edit_script(&histedit_cmds, &commits,
 			    branch_name, edit_logmsg_only, fold_only,
-			    drop_only, edit_only, repo);
+			    drop_only, edit_only, editor, repo);
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
@@ -13071,7 +13073,7 @@ cmd_histedit(int argc, char *argv[])
 				if (have_changes) {
 					error = histedit_commit(NULL, worktree,
 					    fileindex, tmp_branch, hle,
-					    committer, allow_conflict, repo);
+					    committer, allow_conflict, editor, repo);
 					if (error)
 						goto done;
 				} else {
@@ -13142,13 +13144,13 @@ cmd_histedit(int argc, char *argv[])
 				goto done;
 			continue;
 		} else if (hle->cmd->code == GOT_HISTEDIT_MESG) {
-			error = histedit_edit_logmsg(hle, repo);
+			error = histedit_edit_logmsg(hle, editor, repo);
 			if (error)
 				goto done;
 		}
 
 		error = histedit_commit(&merged_paths, worktree, fileindex,
-		    tmp_branch, hle, committer, allow_conflict, repo);
+		    tmp_branch, hle, committer, allow_conflict, editor, repo);
 		got_pathlist_free(&merged_paths, GOT_PATHLIST_FREE_PATH);
 		if (error)
 			goto done;
@@ -13183,6 +13185,7 @@ cmd_histedit(int argc, char *argv[])
 		    branch, repo);
 done:
 	free(cwd);
+	free(editor);
 	free(committer);
 	free(gitconfig_path);
 	got_object_id_queue_free(&commits);
