@@ -6423,6 +6423,56 @@ print:
 }
 
 static const struct got_error *
+show_operation_in_progress(struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *new_base_branch_name = NULL;
+	char *branch_name = NULL;
+	int rebase_in_progress, histedit_in_progress, merge_in_progress;
+
+	err = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
+	if (err)
+		return err;
+	if (rebase_in_progress) {
+		err = got_worktree_rebase_info(&new_base_branch_name,
+		    &branch_name, worktree, repo);
+		if (err)
+			return err;
+		printf("Work tree is rebasing %s onto %s\n",
+		    branch_name, new_base_branch_name);
+	}
+
+	err = got_worktree_histedit_in_progress(&histedit_in_progress,
+	    worktree);
+	if (err)
+		return err;
+	if (histedit_in_progress) {
+		err = got_worktree_histedit_info(&branch_name, worktree, repo);
+		if (err)
+			return err;
+		printf("Work tree is editing the history of %s\n", branch_name);
+	}
+
+	err = got_worktree_merge_in_progress(&merge_in_progress,
+	    worktree, repo);
+	if (err)
+		return err;
+	if (merge_in_progress) {
+		err = got_worktree_merge_info(&branch_name, worktree,
+		    repo);
+		if (err)
+			return err;
+		printf("Work tree is merging %s into %s\n", branch_name,
+		    got_worktree_get_head_ref_name(worktree));
+	}
+
+	free(new_base_branch_name);
+	free(branch_name);
+	return NULL;
+}
+
+static const struct got_error *
 cmd_status(int argc, char *argv[])
 {
 	const struct got_error *close_err, *error = NULL;
@@ -6521,6 +6571,10 @@ cmd_status(int argc, char *argv[])
 
 	error = got_worktree_status(worktree, &paths, repo, no_ignores,
 	    print_status, &st, check_cancelled, NULL);
+	if (error)
+		goto done;
+
+	error = show_operation_in_progress(worktree, repo);
 done:
 	if (pack_fds) {
 		const struct got_error *pack_err =

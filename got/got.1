@@ -823,6 +823,12 @@ Changes created on top of staged changes are indicated in the first column:
 .It MA Ta file was modified after having been staged for addition
 .El
 .Pp
+If the work tree contains the results of an interrupted
+.Cm got rebase ,
+.Cm got histedit, or
+.Cm got merge
+operation then display a message which shows the branches involved.
+.Pp
 The options for
 .Cm got status
 are as follows:

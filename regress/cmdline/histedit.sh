@@ -1186,7 +1186,10 @@ test_histedit_path_prefix_edit() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo "M  zeta"> $testroot/stdout.expected
+	cat > $testroot/stdout.expected <<EOF
+M  zeta
+Work tree is editing the history of refs/heads/master
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then

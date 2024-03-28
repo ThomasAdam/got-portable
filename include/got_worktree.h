@@ -319,6 +319,9 @@ const struct got_error *got_worktree_rebase_continue(struct got_object_id **,
 /* Check whether a, potentially interrupted, rebase operation is in progress. */
 const struct got_error *got_worktree_rebase_in_progress(int *,
     struct got_worktree *);
+/* Return information about an in-progress rebase operation. */
+const struct got_error *got_worktree_rebase_info(char **new_base_branch_name,
+    char **branch_name, struct got_worktree *, struct got_repository *);
 
 /*
  * Merge changes from the commit currently being rebased into the work tree.
@@ -391,6 +394,10 @@ const struct got_error *got_worktree_histedit_continue(struct got_object_id **,
 /* Check whether a histedit operation is in progress. */
 const struct got_error *got_worktree_histedit_in_progress(int *,
     struct got_worktree *);
+/* Return information about an in-progress histedit operation. */
+const struct got_error *got_worktree_histedit_info(
+    char **branch_nane, struct got_worktree *,
+    struct got_repository *);
 
 /*
  * Merge changes from the commit currently being edited into the work tree.
@@ -507,6 +514,10 @@ const struct got_error *got_worktree_merge_complete(
 /* Check whether a merge operation is in progress. */
 const struct got_error *got_worktree_merge_in_progress(int *,
     struct got_worktree *, struct got_repository *);
+/* Return information about an in-progress merge operation. */
+const struct got_error *
+got_worktree_merge_info(char **branch_name, struct got_worktree *,
+    struct got_repository *);
 
 /*
  * Prepare for merging a branch into the work tree's current branch: lock the
