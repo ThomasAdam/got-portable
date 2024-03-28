@@ -9150,10 +9150,6 @@ done:
 
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", a->logmsg_path);
-
-	/* Editor is done; we can now apply unveil(2) */
-	if (err == NULL)
-		err = apply_unveil(a->repo_path, 0, a->worktree_path);
 	if (err) {
 		free(*logmsg);
 		*logmsg = NULL;
@@ -9423,15 +9419,18 @@ cmd_commit(int argc, char *argv[])
 	if (author == NULL)
 		author = committer;
 
-	/*
-	 * unveil(2) traverses exec(2); if an editor is used we have
-	 * to apply unveil after the log message has been written.
-	 */
-	if (logmsg == NULL || strlen(logmsg) == 0)
+	if (logmsg == NULL || strlen(logmsg) == 0) {
 		error = get_editor(&editor);
-	else
-		error = apply_unveil(got_repo_get_path(repo), 0,
-		    got_worktree_get_root_path(worktree));
+		if (error)
+			goto done;
+		if (unveil(editor, "x") != 0) {
+			error = got_error_from_errno2("unveil", editor);
+			goto done;
+		}
+	}
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
