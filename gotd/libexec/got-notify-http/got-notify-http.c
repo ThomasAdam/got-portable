@@ -428,6 +428,135 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 }
 
 static int
+jsonify_tag(FILE *fp, char **line, ssize_t *linesize)
+{
+	const char	*errstr;
+	char		*l;
+	ssize_t		 linelen;
+	int		 msglen = 0, msgwrote = 0;
+	int		 done = 0;
+	enum {
+		P_FROM,
+		P_DATE,
+		P_OBJECT,
+		P_MSGLEN,
+		P_MSG,
+	} phase = P_FROM;
+
+	l = *line;
+	if (strncmp(l, "tag ", 4) != 0)
+		errx(1, "%s: unexpected line: %s", __func__, l);
+	l += 4;
+
+	fputc('{', fp);
+	json_field(fp, "type", "tag", 1);
+	json_field(fp, "tag", l, 1);
+
+	while (!done) {
+		if ((linelen = getline(line, linesize, stdin)) == -1)
+			break;
+
+		if ((*line)[linelen - 1] == '\n')
+			(*line)[--linelen] = '\0';
+
+		l = *line;
+		switch (phase) {
+		case P_FROM:
+			if (strncmp(l, "from: ", 6) != 0)
+				errx(1, "unexpected from line");
+			l += 6;
+
+			json_author(fp, "tagger", l, 1);
+
+			phase = P_DATE;
+			break;
+
+		case P_DATE:
+			/* optional */
+			if (!strncmp(l, "date: ", 6)) {
+				l += 6;
+				json_field(fp, "date", l, 1);
+				phase = P_OBJECT;
+				break;
+			}
+			phase = P_OBJECT;
+			/* fallthough */
+
+		case P_OBJECT:
+			/* optional */
+			if (!strncmp(l, "object: ", 8)) {
+				char *type, *id;
+
+				l += 8;
+				type = l;
+				id = strchr(l, ' ');
+				if (id == NULL)
+					errx(1, "malformed tag object line");
+				*id++ = '\0';
+
+				fputs("\"object\":{", fp);
+				json_field(fp, "type", type, 1);
+				json_field(fp, "id", id, 0);
+				fputs("},", fp);
+
+				phase = P_MSGLEN;
+				break;
+			}
+			phase = P_MSGLEN;
+			/* fallthrough */
+
+		case P_MSGLEN:
+			if (strncmp(l, "messagelen: ", 12) != 0)
+				errx(1, "unexpected messagelen line");
+			l += 12;
+			msglen = strtonum(l, 1, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "message len is %s: %s", errstr, l);
+
+			msglen++;
+
+			phase = P_MSG;
+			break;
+
+		case P_MSG:
+			if (*l == ' ') {
+				l++; /* skip leading space */
+				linelen--;
+
+				if (msgwrote == 0 && linelen != 0) {
+					fprintf(fp, "\"message\":\"");
+					escape(fp, l);
+					escape(fp, "\n");
+					msgwrote += linelen;
+				} else if (msgwrote != 0) {
+					escape(fp, l);
+					escape(fp, "\n");
+				}
+			}
+			msglen -= linelen + 1;
+			if (msglen <= 0) {
+				fprintf(fp, "\"");
+				msgwrote = 0;
+				done = 1;
+				break;
+			}
+			break;
+
+		default:
+			/* unreachable */
+			errx(1, "unexpected line: %s", *line);
+		}
+	}
+	if (ferror(stdin))
+		err(1, "getline");
+	if (!done)
+		errx(1, "unexpected EOF");
+	fputc('}', fp);
+
+	return 0;
+}
+
+static int
 jsonify(FILE *fp)
 {
 	char		*line = NULL;
@@ -462,6 +591,12 @@ jsonify(FILE *fp)
 		if (*line >= '0' && *line <= '9') {
 			if (jsonify_commit_short(fp, line) == -1)
 				err(1, "jsonify_commit_short");
+			continue;
+		}
+
+		if (strncmp(line, "tag ", 4) == 0) {
+			if (jsonify_tag(fp, &line, &linesize) == -1)
+				err(1, "jsonify_tag");
 			continue;
 		}
 

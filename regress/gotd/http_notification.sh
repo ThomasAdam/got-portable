@@ -495,6 +495,71 @@ test_branch_removed() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_created() {
+	local testroot=`test_init tag_created 1`
+
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got tag -r $testroot/repo-clone -m "new tag" 1.0 > /dev/null
+	local commit_id=`git_show_head $testroot/repo-clone`
+	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
+
+	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	    >$testroot/stdout &
+
+	got send -t 1.0 -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	wait %1 # wait for the http "server"
+
+	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
+
+	touch "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"type":"tag",
+		"tag":"refs/tags/1.0",
+		"tagger":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"date":"$d",
+		"object":{
+			"type":"commit",
+			"id":"$commit_id"
+		},
+		"message":"new tag\n\n"
+	}]}
+	.
+	,j
+	w
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_file_changed
 run_test test_bad_utf8
@@ -502,3 +567,4 @@ run_test test_many_commits_not_summarized
 run_test test_many_commits_summarized
 run_test test_branch_created
 run_test test_branch_removed
+run_test test_tag_created
