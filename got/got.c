@@ -9423,6 +9423,13 @@ cmd_commit(int argc, char *argv[])
 			goto done;
 		}
 	}
+	if (prepared_logmsg) {
+		if (unveil(prepared_logmsg, "r") != 0) {
+			error = got_error_from_errno2("unveil",
+			    prepared_logmsg);
+			goto done;
+		}
+	}
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree));
