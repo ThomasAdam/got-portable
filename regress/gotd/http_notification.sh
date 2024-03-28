@@ -60,6 +60,7 @@ test_file_changed() {
 	ed -s "$testroot/stdout.expected" <<-EOF
 	a
 	{"notifications":[{
+		"type":"commit",
 		"short":false,
 		"id":"$commit_id",
 		"author":{
@@ -141,6 +142,7 @@ test_bad_utf8() {
 	ed -s "$testroot/stdout.expected" <<-EOF
 	a
 	{"notifications":[{
+		"type":"commit",
 		"short":false,
 		"id":"$commit_id",
 		"author":{
@@ -230,6 +232,7 @@ test_many_commits_not_summarized() {
 
 		cat <<-EOF
 		{
+			"type":"commit",
 			"short":false,
 			"id":"$commit_id",
 			"author":{
@@ -323,6 +326,7 @@ test_many_commits_summarized() {
 
 		cat <<-EOF
 		{
+			"type":"commit",
 			"short":true,
 			"id":"$commit_id",
 			"committer":{

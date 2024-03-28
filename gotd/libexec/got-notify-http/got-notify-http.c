@@ -212,7 +212,7 @@ jsonify_commit_short(FILE *fp, char *line)
 
 	message = t;
 
-	fprintf(fp, "{\"short\":true,");
+	fprintf(fp, "{\"type\":\"commit\",\"short\":true,");
 	json_field(fp, "id", id, 1);
 	json_author(fp, "committer", author, 1);
 	json_field(fp, "date", date, 1);
@@ -247,7 +247,7 @@ jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 	if (strncmp(l, "commit ", 7) != 0)
 		errx(1, "%s: unexpected line: %s", __func__, l);
 	l += 7;
-	fprintf(fp, "{\"short\":false,");
+	fprintf(fp, "{\"type\":\"commit\",\"short\":false,");
 	json_field(fp, "id", l, 1);
 
 	while (!done) {
