@@ -833,6 +833,29 @@ cmd_import(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	path_dir = realpath(argv[0], NULL);
+	if (path_dir == NULL) {
+		error = got_error_from_errno2("realpath", argv[0]);
+		goto done;
+	}
+	got_path_strip_trailing_slashes(path_dir);
+
+	error = get_editor(&editor);
+	if (error)
+		goto done;
+
+	if (unveil(path_dir, "r") != 0) {
+		error = got_error_from_errno2("unveil", path_dir);
+		goto done;
+	}
+	if (unveil(editor, "x") != 0) {
+		error = got_error_from_errno2("unveil", editor);
+		goto done;
+	}
+	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+	if (error)
+		goto done;
+
 	error = get_author(&author, repo, NULL);
 	if (error)
 		return error;
@@ -871,21 +894,7 @@ cmd_import(int argc, char *argv[])
 		goto done;
 	}
 
-	path_dir = realpath(argv[0], NULL);
-	if (path_dir == NULL) {
-		error = got_error_from_errno2("realpath", argv[0]);
-		goto done;
-	}
-	got_path_strip_trailing_slashes(path_dir);
-
-	/*
-	 * unveil(2) traverses exec(2); if an editor is used we have
-	 * to apply unveil after the log message has been written.
-	 */
 	if (logmsg == NULL || *logmsg == '\0') {
-		error = get_editor(&editor);
-		if (error)
-			goto done;
 		free(logmsg);
 		error = collect_import_msg(&logmsg, &logmsg_path, editor,
 		    path_dir, refname);
@@ -895,20 +904,6 @@ cmd_import(int argc, char *argv[])
 				preserve_logmsg = 1;
 			goto done;
 		}
-	}
-
-	if (unveil(path_dir, "r") != 0) {
-		error = got_error_from_errno2("unveil", path_dir);
-		if (logmsg_path)
-			preserve_logmsg = 1;
-		goto done;
-	}
-
-	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
-	if (error) {
-		if (logmsg_path)
-			preserve_logmsg = 1;
-		goto done;
 	}
 
 	error = got_repo_import(&new_commit_id, path_dir, logmsg,
