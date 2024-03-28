@@ -102,7 +102,7 @@ test_bad_utf8() {
 		test_done "$testroot" 1
 	fi
 
-	# invalid utf8 sequenc
+	# invalid utf8 sequence
 	commit_msg="make$(printf '\xED\xA0\x80')changes"
 
 	echo "changed" > $testroot/wt/alpha
