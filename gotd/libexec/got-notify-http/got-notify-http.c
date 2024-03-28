@@ -190,72 +190,49 @@ json_author(FILE *fp, const char *type, char *address, int comma)
 }
 
 static int
-jsonify_short(FILE *fp)
+jsonify_commit_short(FILE *fp, char *line)
 {
 	char	*t, *date, *id, *author, *message;
-	char	*line = NULL;
-	size_t	 linesize = 0;
-	ssize_t	 linelen;
-	int	 needcomma = 0;
 
-	fprintf(fp, "{\"notifications\":[");
-	while ((linelen = getline(&line, &linesize, stdin)) != -1) {
-		if (line[linelen - 1] == '\n')
-			line[--linelen] = '\0';
+	t = line;
+	date = t;
+	if ((t = strchr(t, ' ')) == NULL)
+      			errx(1, "malformed line");
+	*t++ = '\0';
 
-		if (needcomma)
-			fputc(',', fp);
-		needcomma = 1;
+	id = t;
+	if ((t = strchr(t, ' ')) == NULL)
+      			errx(1, "malformed line");
+	*t++ = '\0';
 
-		t = line;
-		date = t;
-		if ((t = strchr(t, ' ')) == NULL)
-       			errx(1, "malformed line");
-		*t++ = '\0';
+	author = t;
+	if ((t = strchr(t, ' ')) == NULL)
+      			errx(1, "malformed line");
+	*t++ = '\0';
 
-		id = t;
-		if ((t = strchr(t, ' ')) == NULL)
-       			errx(1, "malformed line");
-		*t++ = '\0';
+	message = t;
 
-		author = t;
-		if ((t = strchr(t, ' ')) == NULL)
-       			errx(1, "malformed line");
-		*t++ = '\0';
-
-		message = t;
-
-		fprintf(fp, "{\"short\":true,");
-		json_field(fp, "id", id, 1);
-		json_author(fp, "committer", author, 1);
-		json_field(fp, "date", date, 1);
-		json_field(fp, "short_message", message, 0);
-		fprintf(fp, "}");
-	}
-
-	if (ferror(stdin))
-		err(1, "getline");
-	free(line);
-
-	fprintf(fp, "]}");
+	fprintf(fp, "{\"short\":true,");
+	json_field(fp, "id", id, 1);
+	json_author(fp, "committer", author, 1);
+	json_field(fp, "date", date, 1);
+	json_field(fp, "short_message", message, 0);
+	fprintf(fp, "}");
 
 	return 0;
 }
 
 static int
-jsonify(FILE *fp)
+jsonify_commit(FILE *fp, char **line, ssize_t *linesize)
 {
 	const char	*errstr;
 	char		*author = NULL;
 	char		*l;
-	char		*line = NULL;
-	size_t		 linesize = 0;
 	ssize_t		 linelen;
 	int		 parent = 0;
 	int		 msglen = 0, msgwrote = 0;
-	int		 needcomma = 0;
+	int		 done = 0;
 	enum {
-		P_COMMIT,
 		P_FROM,
 		P_VIA,
 		P_DATE,
@@ -264,33 +241,24 @@ jsonify(FILE *fp)
 		P_MSG,
 		P_DST,
 		P_SUM,
-	} phase = P_COMMIT;
+	} phase = P_FROM;
 
-	fprintf(fp, "{\"notifications\":[");
-	while ((linelen = getline(&line, &linesize, stdin)) != -1) {
-		if (line[linelen - 1] == '\n')
-			line[--linelen] = '\0';
+	l = *line;
+	if (strncmp(l, "commit ", 7) != 0)
+		errx(1, "%s: unexpected line: %s", __func__, l);
+	l += 7;
+	fprintf(fp, "{\"short\":false,");
+	json_field(fp, "id", l, 1);
 
-		l = line;
-		switch (phase) {
-		case P_COMMIT:
-			if (*line == '\0')
-				continue;
-
-			if (strncmp(l, "commit ", 7) != 0)
-				errx(1, "unexpected commit line: %s", line);
-			l += 7;
-
-			if (needcomma)
-				fputc(',', fp);
-			needcomma = 1;
-
-			fprintf(fp, "{\"short\":false,");
-			json_field(fp, "id", l, 1);
-
-			phase = P_FROM;
+	while (!done) {
+		if ((linelen = getline(line, linesize, stdin)) == -1)
 			break;
 
+		if ((*line)[linelen - 1] == '\n')
+			(*line)[--linelen] = '\0';
+
+		l = *line;
+		switch (phase) {
 		case P_FROM:
 			if (strncmp(l, "from: ", 6) != 0)
 				errx(1, "unexpected from line");
@@ -406,7 +374,7 @@ jsonify(FILE *fp)
 
 		case P_DST:
 			/* XXX: ignore the diffstat for now */
-			if (*line == '\0') {
+			if (*l == '\0') {
 				fprintf(fp, "\"diffstat\":{},");
 				phase = P_SUM;
 				break;
@@ -416,20 +384,58 @@ jsonify(FILE *fp)
 		case P_SUM:
 			/* XXX: ignore the sum of changes for now */
 			fprintf(fp, "\"changes\":{}}");
-			/* restart the state machine */
-			phase = P_COMMIT;
+			done = 1;
 			break;
 
 		default:
-			errx(1, "unimplemented");
+			/* unreachable */
+			errx(1, "unexpected line: %s", *line);
 		}
 	}
 	if (ferror(stdin))
 		err(1, "getline");
-	if (phase != P_COMMIT)
+	if (!done)
 		errx(1, "unexpected EOF");
-	free(line);
 
+	return 0;
+}
+
+static int
+jsonify(FILE *fp)
+{
+	char		*line = NULL;
+	size_t		 linesize = 0;
+	ssize_t		 linelen;
+	int		 needcomma = 0;
+
+	fprintf(fp, "{\"notifications\":[");
+	while ((linelen = getline(&line, &linesize, stdin)) != -1) {
+		if (line[linelen - 1] == '\n')
+			line[--linelen] = '\0';
+
+		if (*line == '\0')
+			continue;
+
+		if (needcomma)
+			fputc(',', fp);
+		needcomma = 1;
+
+		if (strncmp(line, "commit ", 7) == 0) {
+			if (jsonify_commit(fp, &line, &linesize) == -1)
+				err(1, "jsonify_commit");
+			continue;
+		}
+
+		if (*line >= '0' && *line <= '9') {
+			if (jsonify_commit_short(fp, line) == -1)
+				err(1, "jsonify_commit_short");
+			continue;
+		}
+
+		errx(1, "unexpected line: %s", line);
+	}
+	if (ferror(stdin))
+		err(1, "getline");
 	fprintf(fp, "]}");
 
 	return 0;
@@ -535,18 +541,7 @@ main(int argc, char **argv)
 	if (tmpfp == NULL)
 		err(1, "opentemp");
 
-	/* detect the format of the input */
-	ch = fgetc(stdin);
-	if (ch == EOF)
-		errx(1, "unexpected EOF");
-	ungetc(ch, stdin);
-	if (ch == 'c') {
-		/* starts with "commit" so it's the long format */
-		jsonify(tmpfp);
-	} else {
-		/* starts with the date so it's the short format */
-		jsonify_short(tmpfp);
-	}
+	jsonify(tmpfp);
 
 	paylen = ftello(tmpfp);
 	if (paylen == -1)
