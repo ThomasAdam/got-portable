@@ -429,7 +429,7 @@ protect_require_yca(struct got_object_id *tip_id,
 	err = got_ref_resolve(&expected_yca_id, repo_write.repo, ref);
 	if (err)
 		return err;
-	
+
 	err = got_object_get_type(&obj_type, repo_write.repo, expected_yca_id);
 	if (err)
 		goto done;
@@ -1964,7 +1964,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		err = got_object_open_as_commit(&commit, repo, &qid->id);
 		if (err)
 			break;
-	
+
 		if (ncommits > shortlog_threshold) {
 			err = print_commit_oneline(commit, &qid->id,
 			    repo, fd);
@@ -1996,7 +1996,7 @@ done:
 }
 
 static const struct got_error *
-print_tag(struct got_object_id *id, 
+print_tag(struct got_object_id *id,
     const char *refname, struct got_repository *repo, int fd)
 {
 	const struct got_error *err = NULL;
