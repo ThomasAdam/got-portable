@@ -62,7 +62,8 @@ gotd_SOURCES = gotd.c \
 	repo_imsg.c \
 	repo_read.c \
 	repo_write.c \
-	session.c
+	session_read.c \
+	session_write.c
 
 if !HOST_OPENBSD
 gotd_SOURCES += chroot-notobsd.c
