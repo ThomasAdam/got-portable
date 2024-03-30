@@ -107,6 +107,7 @@ AC_CHECK_HEADERS([ \
 	sys/socket.h \
 	sys/time.h \
 	sys/tree.h \
+	tls.h \
 	util.h \
 	unistd.h \
 	wchar.h \
@@ -763,11 +764,18 @@ AC_CHECK_DECL(
 	[#include <sys/tree.h>]
 )
 
-if test "x$found_sys_tree_h" = xyes; then
-	AC_DEFINE([HAVE_TREE_H], [1], [sys/tree.h])
-else
-	AC_MSG_NOTICE("Using compat/tree.h")
-fi
+#FIXME: May need OS-wrapping.
+PKG_CHECK_MODULES(
+	LIBTLS,
+	[libtls],
+	[
+		libtls_CFLAGS="$LIBTLS_CFLAGS"
+		libtls_LIBS="$LIBTLS_LIBS"
+		AC_SUBST(libtls_CFLAGS)
+		AC_SUBST(libtls_LIBS)
+	],
+	AC_MSG_ERROR(["*** Couldn't find libtls ***"])
+)
 
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)
@@ -925,6 +933,7 @@ if test "x$enable_gotd" = "xyes"; then
 	AC_CONFIG_FILES([gotd/Makefile])
 	AC_CONFIG_FILES([gotd/libexec/Makefile])
 	AC_CONFIG_FILES([gotd/libexec/got-notify-email/Makefile])
+	AC_CONFIG_FILES([gotd/libexec/got-notify-http/Makefile])
 	AC_CONFIG_FILES([gotsh/Makefile])
 	AC_CONFIG_FILES([gotctl/Makefile])
 fi

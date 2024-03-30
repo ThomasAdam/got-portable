@@ -14,7 +14,8 @@ if [ "$CIRRUS_OS" = "linux" ]; then
 				zlib1g-dev \
 				git \
 				athena-jot \
-				ed
+				ed \
+				libtls-dev
 fi
 
 if [ "$CIRRUS_OS" = "freebsd" ]; then
@@ -22,7 +23,8 @@ if [ "$CIRRUS_OS" = "freebsd" ]; then
 		automake \
 		pkgconf \
 		git \
-		libevent
+		libevent \
+		libretls
 fi
 
 if [ "$CIRRUS_OS" = "darwin" ]; then
@@ -33,5 +35,6 @@ if [ "$CIRRUS_OS" = "darwin" ]; then
 		ncurses \
 		ossp-uuid \
 		git \
-		libevent
+		libevent \
+		libretls
 fi

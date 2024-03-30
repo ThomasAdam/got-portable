@@ -14,9 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -24,8 +25,6 @@
 #include <errno.h>
 #include <event.h>
 #include <limits.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>

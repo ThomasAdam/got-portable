@@ -25,14 +25,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <tls.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "bufio.h"
