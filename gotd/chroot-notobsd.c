@@ -17,6 +17,7 @@
 #include "got_compat.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 
 #include "log.h"
