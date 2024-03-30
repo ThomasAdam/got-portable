@@ -1,0 +1,1 @@
+SUBDIRS = got-notify-email

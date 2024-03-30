@@ -923,6 +923,8 @@ AC_CONFIG_FILES([Makefile
 if test "x$enable_gotd" = "xyes"; then
 	AC_CONFIG_FILES([gitwrapper/Makefile])
 	AC_CONFIG_FILES([gotd/Makefile])
+	AC_CONFIG_FILES([gotd/libexec/Makefile])
+	AC_CONFIG_FILES([gotd/libexec/got-notify-email/Makefile])
 	AC_CONFIG_FILES([gotsh/Makefile])
 	AC_CONFIG_FILES([gotctl/Makefile])
 fi

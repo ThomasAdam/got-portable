@@ -33,6 +33,7 @@ got/got
 gotadmin/gotadmin
 gotctl/gotctl
 gotd/gotd
+gotd/libexec/got-notify-email/got-notify-email
 gotd/parse.c
 gotsh/gotsh
 gotwebd/gotwebd

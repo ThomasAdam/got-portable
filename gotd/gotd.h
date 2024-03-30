@@ -527,6 +527,7 @@ struct gotd_imsg_notify {
 	char subject_line[64];
 };
 
+int enter_chroot(const char *);
 int parse_config(const char *, enum gotd_procid, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);

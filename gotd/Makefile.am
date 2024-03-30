@@ -1,27 +1,29 @@
 sbin_PROGRAMS = gotd
 
+SUBDIRS=libexec
+
 include $(top_builddir)/Makefile.common
 
 AM_CPPFLAGS += -DGOTD_EMPTY_PATH='"@GOTD_EMPTY_PATHC@"'
 
 gotd_SOURCES = gotd.c \
-	auth.c \
-	imsg.c \
-	listen.c \
-	log.c \
-	parse.y \
-	privsep_stub.c \
-	repo_imsg.c \
-	repo_read.c \
-	repo_write.c \
-	session.c \
 	$(top_srcdir)/lib/bloom.c \
 	$(top_srcdir)/lib/buf.c \
+	$(top_srcdir)/lib/commit_graph.c \
 	$(top_srcdir)/lib/date.c \
 	$(top_srcdir)/lib/deflate.c \
 	$(top_srcdir)/lib/delta.c \
 	$(top_srcdir)/lib/delta_cache.c \
 	$(top_srcdir)/lib/deltify.c \
+	$(top_srcdir)/lib/diff.c \
+	$(top_srcdir)/lib/diff_atomize_text.c \
+	$(top_srcdir)/lib/diff_main.c \
+	$(top_srcdir)/lib/diff_myers.c \
+	$(top_srcdir)/lib/diff_output.c \
+	$(top_srcdir)/lib/diff_output_plain.c \
+	$(top_srcdir)/lib/diff_output_unidiff.c \
+	$(top_srcdir)/lib/diff_patience.c \
+	$(top_srcdir)/lib/diffreg.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/gitconfig.c \
 	$(top_srcdir)/lib/gotconfig.c \
@@ -49,7 +51,18 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/reference.c \
 	$(top_srcdir)/lib/reference_parse.c \
 	$(top_srcdir)/lib/repository.c \
-	$(top_srcdir)/lib/sigs.c
+	$(top_srcdir)/lib/sigs.c \
+	auth.c \
+	imsg.c \
+	listen.c \
+	log.c \
+	notify.c \
+	parse.y \
+	privsep_stub.c \
+	repo_imsg.c \
+	repo_read.c \
+	repo_write.c \
+	session.c
 
 if !HOST_OPENBSD
 gotd_SOURCES += chroot-notobsd.c

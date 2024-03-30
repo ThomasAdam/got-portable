@@ -14,18 +14,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 
 #include <errno.h>
 #include <event.h>
-#include <siphash.h>
 #include <limits.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

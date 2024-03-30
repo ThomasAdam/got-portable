@@ -1519,11 +1519,15 @@ connect_notifier_and_session(struct gotd_client *client)
 	const struct got_error *err = NULL;
 	struct gotd_imsgev *session_iev = &client->session->iev;
 	int pipe[2];
+	int sock_flags = SOCK_STREAM|SOCK_NONBLOCK;
 
 	if (gotd.notify_proc == NULL)
 		return NULL;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, pipe) == -1)
 		return got_error_from_errno("socketpair");
 
@@ -1757,6 +1761,8 @@ static void
 start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 {
 	struct gotd_child_proc *proc;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+
 
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
@@ -1768,7 +1774,10 @@ start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	proc->type = PROC_NOTIFY;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 
@@ -2055,7 +2064,7 @@ main(int argc, char **argv)
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
 	char *default_sender = NULL;
-	char hostname[HOST_NAME_MAX + 1];
+	char hostname[_POSIX_HOST_NAME_MAX + 1];
 	FILE *diff_f1 = NULL, *diff_f2 = NULL;
 	int diff_fd1 = -1, diff_fd2 = -1;
 
