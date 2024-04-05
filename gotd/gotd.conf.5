@@ -354,10 +354,124 @@ The
 .Ar password
 must not be an empty string.
 .Pp
-The request body contains a JSON document with the following objects:
+The request body contains a JSON object with a
+.Dq notifications
+property containing an array of notification objects.
+Each notification object has a
+.Sq type
+property.
+Depending on the type, each notification object has different fields.
+The types are:
 .Bl -tag -width Ds
-.It { "notifications" : array }
-The top-level object contains an array of all notifications in this request.
+.It Dv commit
+The commit notification object has the following fields.
+Except where noted, all are optional.
+.Bl -tag -width Ds
+.It Dv short
+Boolean, indicates whether the object has all the fields set.
+When several commits are batched in a single send operation, not all of
+the fields are available for each commit object.
+.It Dv id
+The commit ID as string, may be abbreviated.
+.It Dv committer
+An object with the committer information with the following fields:
+.Pp
+.Bl -tag -compact -width Ds
+.It Dv full
+Committer's full name.
+.It Dv name
+Committer's name.
+.It Dv mail
+Committer's mail address.
+.It Dv user
+Committer's username.
+This is the only field guaranteed to be set.
+.El
+.It Dv author
+An object with the author information.
+Has the same fields as the
+.Dv committer
+but may be unset.
+.It Dv date
+String representation of the date as
+.Xr strftime 3
+.Sq %G-%m-%d
+if
+.Dv short
+is set or
+.Sq %a %b %e %X %Y UTC
+otherwise.
+.It Dv short_message
+The first line of the commit message.
+This field is always set.
+.It Dv message
+The complete commit message, may be unset.
+.It Dv diffstat
+An object with the summarized changes, may be unset.
+Contains a
+.Dv files
+field with an array of objects describing the changes per-file and a
+.Dv total
+field with the cumulative changes.
+The changes per-file contains the following fields:
+.Pp
+.Bl -tag -compact -width removed
+.It Dv action
+A string describing the action, can be
+.Dq added ,
+.Dq deleted ,
+.Dq modified ,
+.Dq mode changed ,
+or
+.Dq unknown .
+.It Dv file
+The file path.
+.It Dv added
+The number of lines added.
+.It Dv removed
+The number of lines removed.
+.El
+.Pp
+The
+.Dv total
+object contains two fields:
+.Dv added
+and
+.Dv removed
+which are the number of added and removed lines respectively.
+.El
+.It Dv branch-deleted
+The branch deleted notifications has the following fields, all guaranteed
+to be set:
+.Bl -tag -compact -width Ds
+.It Dv ref
+The removed branch reference.
+.It Dv id
+The hash of the commit pointed by the deleted branch.
+.El
+.It Dv tag
+The tag notification has the following fields, all guaranteed to be set:
+.Bl -tag -width Ds
+.It tag
+The tag reference.
+.It tagger
+The user information, with the same format of the
+.Dv committer
+field for the
+.Dv commit
+notification but with all the field guaranteed to be set.
+.It Dv date
+The tag date.
+.It Dv object
+The object being tagged.
+It contains the fields
+.Dv type
+with the object type and
+.Dv id
+with the object id being tagged.
+.It Dv message
+The tag message.
+.El
 .El
 .El
 .El
