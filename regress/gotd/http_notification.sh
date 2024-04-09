@@ -245,7 +245,7 @@ test_many_commits_not_summarized() {
 	for i in `seq 1 24`; do
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
-		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
+		commit_time=$(echo "$s" | sed -e "s/^$commit_id //g")
 
 		echo "$comma"
 		comma=','
@@ -349,7 +349,7 @@ test_many_commits_summarized() {
 	for i in `seq 1 51`; do
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
-		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
+		commit_time=$(echo "$s" | sed -e "s/^$commit_id //g")
 
 		echo "$comma"
 		comma=','
