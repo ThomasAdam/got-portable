@@ -149,7 +149,7 @@ test_many_commits_not_summarized() {
 	for i in `seq 1 24`; do
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
-		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
+		commit_time=$(echo "$s" | sed -e "s/^$commit_id //g")
 		printf "commit $commit_id\n" >> $testroot/stdout.expected
 		printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
 		printf "date: $commit_time\n" >> $testroot/stdout.expected
@@ -235,7 +235,7 @@ test_many_commits_summarized() {
 	for i in `seq 1 51`; do
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
-		commit_time=$(echo $s | sed -e "s/^$commit_id //g")
+		commit_time=$(echo "$s" | sed -e "s/^$commit_id //g")
 		printf "$commit_time $commit_id $GOT_AUTHOR_8 make changes\n" \
 			>> $testroot/stdout.expected
 	done
