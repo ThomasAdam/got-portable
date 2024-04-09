@@ -102,7 +102,7 @@ set_default_fromaddr(void)
 		errx(1, "my UID %d was not found in password database",
 		    getuid());
 	}
-	
+
 	if (gethostname(hostname, sizeof(hostname)) == -1)
 		err(1, "gethostname");
 
@@ -337,7 +337,7 @@ main(int argc, char *argv[])
 	/* used by the regression test suite */
 	timeoutstr = getenv("GOT_NOTIFY_EMAIL_TIMEOUT");
 	if (timeoutstr) {
-		smtp_timeout = strtonum(timeoutstr, 0, 600, &errstr); 
+		smtp_timeout = strtonum(timeoutstr, 0, 600, &errstr);
 		if (errstr != NULL)
 			errx(1, "timeout in seconds is %s: %s",
 			    errstr, timeoutstr);
