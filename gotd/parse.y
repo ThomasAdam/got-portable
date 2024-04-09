@@ -253,7 +253,8 @@ conflags_l	: conflags optnl conflags_l
 
 conflags	: REQUEST TIMEOUT timeout		{
 			if ($3.tv_sec <= 0) {
-				yyerror("invalid timeout: %lld", $3.tv_sec);
+				yyerror("invalid timeout: %lld",
+				    (long long)$3.tv_sec);
 				YYERROR;
 			}
 			memcpy(&gotd->request_timeout, &$3,
