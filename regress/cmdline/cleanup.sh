@@ -256,7 +256,7 @@ test_cleanup_redundant_pack_files() {
 	touch "${kpack%.pack}.keep"
 
 	# create a few pack files with different objects
-	for i in `jot 5`; do
+	for i in `seq 5`; do
 		echo "alpha $i" > $testroot/repo/alpha
 		git_commit "$testroot/repo" -m "edit #$i"
 		gotadmin pack -r "$testroot/repo" >/dev/null
@@ -295,7 +295,7 @@ test_cleanup_redundant_pack_files() {
 	fi
 
 	# create one more non-redundant pack
-	for i in `jot 5`; do
+	for i in `seq 5`; do
 		echo "alpha again $i" > $testroot/repo/alpha
 		git_commit "$testroot/repo" -m "edit $i"
 	done
@@ -316,7 +316,7 @@ test_cleanup_redundant_pack_files() {
 	# create some commits on a separate branch
 	git -C "$testroot/repo" checkout -q -b newbranch
 
-	for i in `jot 5`; do
+	for i in `seq 5`; do
 		echo "alpha $i" > $testroot/repo/alpha
 		git_commit "$testroot/repo" -m "edit #$i"
 		gotadmin pack -r "$testroot/repo" >/dev/null

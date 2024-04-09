@@ -205,7 +205,7 @@ test_blame_all_lines_replaced() {
 		return 1
 	fi
 
-	jot 8 > $testroot/wt/alpha
+	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
 	local short_commit1=`trim_obj_id 32 $commit1`
@@ -242,7 +242,7 @@ test_blame_lines_shifted_up() {
 		return 1
 	fi
 
-	jot 8 > $testroot/wt/alpha
+	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
 	local short_commit1=`trim_obj_id 32 $commit1`
@@ -256,11 +256,11 @@ test_blame_lines_shifted_up() {
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`
 
-	jot 2 > $testroot/wt/alpha
+	seq 2 > $testroot/wt/alpha
 	echo foo >> $testroot/wt/alpha
 	echo bar >> $testroot/wt/alpha
 	echo baz >> $testroot/wt/alpha
-	jot 8 6 8 1 >> $testroot/wt/alpha
+	seq 6 8 >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
 	local short_commit3=`trim_obj_id 32 $commit3`
@@ -301,7 +301,7 @@ test_blame_lines_shifted_down() {
 		return 1
 	fi
 
-	jot 8 > $testroot/wt/alpha
+	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
 	local short_commit1=`trim_obj_id 32 $commit1`
@@ -315,11 +315,11 @@ test_blame_lines_shifted_down() {
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`
 
-	jot 2 > $testroot/wt/alpha
+	seq 2 > $testroot/wt/alpha
 	echo foo >> $testroot/wt/alpha
 	echo bar >> $testroot/wt/alpha
 	echo baz >> $testroot/wt/alpha
-	jot 8 3 8 1 >> $testroot/wt/alpha
+	seq 3 8 >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
 	local short_commit3=`trim_obj_id 32 $commit3`

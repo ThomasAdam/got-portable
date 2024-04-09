@@ -407,7 +407,7 @@ test_revert_missing_directory() {
 test_revert_patch() {
 	local testroot=`test_init revert_patch`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
@@ -892,7 +892,7 @@ test_revert_patch_removed() {
 test_revert_patch_one_change() {
 	local testroot=`test_init revert_patch_one_change`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
