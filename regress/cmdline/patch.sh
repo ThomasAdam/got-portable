@@ -26,7 +26,7 @@ test_patch_basic() {
 		return 1
 	fi
 
-	jot 100 > $testroot/wt/numbers
+	seq 100 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		>/dev/null
 	ret=$?
@@ -132,7 +132,7 @@ EOF
 		return 1
 	fi
 
-	jot 5 > $testroot/wt/eta.expected
+	seq 5 > $testroot/wt/eta.expected
 	cmp -s $testroot/wt/eta.expected $testroot/wt/eta
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -141,7 +141,7 @@ EOF
 		return 1
 	fi
 
-	jot 103 | sed -e 's/^6$/six/' -e 's/60/sixty/' \
+	seq 103 | sed -e 's/^6$/six/' -e 's/60/sixty/' \
 		> $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers.expected $testroot/wt/numbers
 	ret=$?
@@ -161,7 +161,7 @@ test_patch_dont_apply() {
 		return 1
 	fi
 
-	jot 100 > $testroot/wt/numbers
+	seq 100 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m 'add numbers') \
 		>/dev/null
 	ret=$?
@@ -774,10 +774,10 @@ test_patch_with_offset() {
  93
 EOF
 
-	jot 100 > $testroot/wt/numbers
+	seq 100 > $testroot/wt/numbers
 	ed -s "$testroot/wt/numbers" <<EOF
 1,10d
-50r !jot 20
+50r !seq 20
 w
 q
 EOF
@@ -1298,7 +1298,7 @@ test_patch_merge_simple() {
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
+	seq 10 > $testroot/wt/numbers
 	chmod +x $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		> /dev/null
@@ -1308,7 +1308,7 @@ test_patch_merge_simple() {
 		return 1
 	fi
 
-	jot 10 | sed 's/4/four/g' > $testroot/wt/numbers
+	seq 10 | sed 's/4/four/g' > $testroot/wt/numbers
 
 	(cd $testroot/wt && got diff > $testroot/old.diff \
 		&& got revert numbers) >/dev/null
@@ -1318,7 +1318,7 @@ test_patch_merge_simple() {
 		return 1
 	fi
 
-	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
+	seq 10 | sed 's/6/six/g' > $testroot/wt/numbers
 	(cd $testroot/wt && got commit -m 'edit numbers') \
 		> /dev/null
 	ret=$?
@@ -1344,7 +1344,7 @@ test_patch_merge_simple() {
 		return 1
 	fi
 
-	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	seq 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1364,7 +1364,7 @@ test_patch_merge_simple() {
 test_patch_merge_gitdiff() {
 	local testroot=`test_init patch_merge_gitdiff`
 
-	jot 10 > $testroot/repo/numbers
+	seq 10 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers && \
 		git_commit $testroot/repo -m "nums"
 	ret=$?
@@ -1373,7 +1373,7 @@ test_patch_merge_gitdiff() {
 		return 1
 	fi
 
-	jot 10 | sed 's/4/four/g' > $testroot/repo/numbers
+	seq 10 | sed 's/4/four/g' > $testroot/repo/numbers
 	git -C $testroot/repo diff > $testroot/old.diff
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1382,9 +1382,9 @@ test_patch_merge_gitdiff() {
 	fi
 
 	# restore numbers
-	jot 10 > $testroot/repo/numbers
+	seq 10 > $testroot/repo/numbers
 
-	jot 10 | sed 's/6/six/g' > $testroot/repo/numbers
+	seq 10 | sed 's/6/six/g' > $testroot/repo/numbers
 	git -C $testroot/repo add numbers && \
 		git_commit $testroot/repo -m "edit"
 	ret=$?
@@ -1427,7 +1427,7 @@ test_patch_merge_base_provided() {
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
+	seq 10 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		>/dev/null
 	ret=$?
@@ -1438,13 +1438,13 @@ test_patch_merge_base_provided() {
 
 	local commit_id=`git_show_head $testroot/repo`
 
-	jot 10 | sed s/4/four/ > $testroot/wt/numbers
+	seq 10 | sed s/4/four/ > $testroot/wt/numbers
 
 	# get rid of the metadata
 	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > patch) \
 		>/dev/null
 
-	jot 10 | sed s/6/six/ > $testroot/wt/numbers
+	seq 10 | sed s/6/six/ > $testroot/wt/numbers
 	(cd $testroot/wt && got commit -m 'edit numbers') >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1468,7 +1468,7 @@ test_patch_merge_base_provided() {
 		return 1
 	fi
 
-	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	seq 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1487,7 +1487,7 @@ test_patch_merge_conflict() {
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
+	seq 10 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		> /dev/null
 	ret=$?
@@ -1498,7 +1498,7 @@ test_patch_merge_conflict() {
 
 	local commit_id=`git_show_head $testroot/repo`
 
-	jot 10 | sed 's/6/six/g' > $testroot/wt/numbers
+	seq 10 | sed 's/6/six/g' > $testroot/wt/numbers
 	echo ALPHA > $testroot/wt/alpha
 
 	(cd $testroot/wt && got diff > $testroot/old.diff \
@@ -1509,8 +1509,8 @@ test_patch_merge_conflict() {
 		return 1
 	fi
 
-	jot 10 | sed 's/6/3+3/g' > $testroot/wt/numbers
-	jot -c 3 a > $testroot/wt/alpha
+	seq 10 | sed 's/6/3+3/g' > $testroot/wt/numbers
+	printf '%s\n' a b c > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'edit alpha and numbers') \
 		> /dev/null
 	ret=$?
@@ -1702,7 +1702,7 @@ test_patch_merge_reverse() {
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
+	seq 10 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		> /dev/null
 	ret=$?
@@ -1713,7 +1713,7 @@ test_patch_merge_reverse() {
 
 	local commit_id=`git_show_head $testroot/repo`
 
-	jot 10 | sed s/5/five/g > $testroot/wt/numbers
+	seq 10 | sed s/5/five/g > $testroot/wt/numbers
 	(cd $testroot/wt && got diff > $testroot/wt/patch \
 		&& got commit -m 'edit numbers') > /dev/null
 	ret=$?
@@ -1722,7 +1722,7 @@ test_patch_merge_reverse() {
 		return 1
 	fi
 
-	jot 10 | sed -e s/5/five/g -e s/6/six/g > $testroot/wt/numbers
+	seq 10 | sed -e s/5/five/g -e s/6/six/g > $testroot/wt/numbers
 	(cd $testroot/wt && got commit -m 'edit numbers again') >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1966,7 +1966,7 @@ test_patch_commit_keywords() {
 		return 1
 	fi
 
-	jot 10 > $testroot/wt/numbers
+	seq 10 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		>/dev/null
 	ret=$?
@@ -1975,13 +1975,13 @@ test_patch_commit_keywords() {
 		return 1
 	fi
 
-	jot 10 | sed s/4/four/ > $testroot/wt/numbers
+	seq 10 | sed s/4/four/ > $testroot/wt/numbers
 
 	# get rid of the metadata
 	(cd $testroot/wt && got diff | sed -n '/^---/,$p' > patch) \
 		>/dev/null
 
-	jot 10 | sed s/6/six/ > $testroot/wt/numbers
+	seq 10 | sed s/6/six/ > $testroot/wt/numbers
 	(cd $testroot/wt && got commit -m 'edit numbers') >/dev/null
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -2005,7 +2005,7 @@ test_patch_commit_keywords() {
 		return 1
 	fi
 
-	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	seq 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -2030,7 +2030,7 @@ test_patch_commit_keywords() {
 		return 1
 	fi
 
-	jot 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
+	seq 10 | sed -e s/4/four/ -e s/6/six/ > $testroot/wt/numbers.expected
 	cmp -s $testroot/wt/numbers $testroot/wt/numbers.expected
 	ret=$?
 	if [ $ret -ne 0 ]; then

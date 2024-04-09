@@ -1440,7 +1440,7 @@ test_stage_commit() {
 test_stage_patch() {
 	local testroot=`test_init stage_patch`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
@@ -1730,7 +1730,7 @@ EOF
 test_stage_patch_twice() {
 	local testroot=`test_init stage_patch_twice`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
@@ -2228,7 +2228,7 @@ test_stage_patch_reversed() {
 test_stage_patch_quit() {
 	local testroot=`test_init stage_patch_quit`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
 	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"
@@ -2340,7 +2340,7 @@ EOF
 test_stage_patch_incomplete_script() {
 	local testroot=`test_init stage_incomplete_script`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
 	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"

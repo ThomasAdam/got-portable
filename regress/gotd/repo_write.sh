@@ -175,7 +175,7 @@ test_fetch_more_history() {
 	# Create some more commit history on the main branch.
 	# History needs to be deep enough to trick 'git pull' into sending
 	# a lot of 'have' lines, which triggered a bug in gotd.
-	for i in `jot 50`; do
+	for i in `seq 50`; do
 		echo "more alpha" >> $testroot/wt/alpha
 		(cd $testroot/wt && got commit -m 'more changes' > /dev/null)
 	done

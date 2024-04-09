@@ -186,7 +186,7 @@ test_unstage_nonexistent() {
 test_unstage_patch() {
 	local testroot=`test_init unstage_patch`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	git -C $testroot/repo add numbers
 	git_commit $testroot/repo -m "added numbers file"
 	local commit_id=`git_show_head $testroot/repo`
@@ -819,7 +819,7 @@ test_unstage_patch_removed() {
 test_unstage_patch_quit() {
 	local testroot=`test_init unstage_patch_quit`
 
-	jot 16 > $testroot/repo/numbers
+	seq 16 > $testroot/repo/numbers
 	echo zzz > $testroot/repo/zzz
 	git -C $testroot/repo add numbers zzz
 	git_commit $testroot/repo -m "added files"
