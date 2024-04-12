@@ -4,8 +4,8 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_denied_user test_repo_read_denied_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
 	test_repo_write test_repo_write_empty test_request_bad \
-	test_repo_write_protected test_email_notification \
-	test_http_notification
+	test_repo_write_protected test_repo_write_readonly \
+	test_email_notification test_http_notification
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
@@ -247,6 +247,12 @@ test_repo_write_protected: prepare_test_repo start_gotd_rw_protected
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 	
+test_repo_write_readonly: prepare_test_repo_empty start_gotd_ro
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./repo_write_readonly.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
+
 test_request_bad: prepare_test_repo_empty start_gotd_ro
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./request_bad.sh'
