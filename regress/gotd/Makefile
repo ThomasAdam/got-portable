@@ -79,6 +79,15 @@ start_gotd_ro: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_implicit_ro: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 start_gotd_ro_group: ensure_root
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
@@ -247,7 +256,7 @@ test_repo_write_protected: prepare_test_repo start_gotd_rw_protected
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 	
-test_repo_write_readonly: prepare_test_repo_empty start_gotd_ro
+test_repo_write_readonly: prepare_test_repo_empty start_gotd_implicit_ro
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_write_readonly.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
