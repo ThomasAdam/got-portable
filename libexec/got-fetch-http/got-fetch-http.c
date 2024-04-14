@@ -229,7 +229,7 @@ http_open(int https, const char *method, const char *host, const char *port,
 		err(1, "asprintf");
 
 	if (verbose > 0)
-		fprintf(stderr, "%s: %s", getprogname(), req);
+		fprintf(stderr, "%s: request: %s", getprogname(), req);
 
 	if (fwrite(req, 1, r, fp) != r) {
 		free(req);
@@ -254,6 +254,9 @@ http_parse_reply(FILE *fp, int *chunked, const char *expected_ctype)
 		warn("%s: getline", __func__);
 		return -1;
 	}
+
+	if (verbose > 0)
+		fprintf(stderr, "%s: response: %s", getprogname(), line);
 
 	if ((cp = strchr(line, '\r')) == NULL) {
 		warnx("malformed HTTP response");
