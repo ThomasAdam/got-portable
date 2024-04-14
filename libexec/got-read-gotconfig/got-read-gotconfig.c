@@ -382,7 +382,11 @@ validate_protocol(const char *protocol, const char *repo_name)
 
 	if (strcmp(protocol, "ssh") != 0 &&
 	    strcmp(protocol, "git+ssh") != 0 &&
-	    strcmp(protocol, "git") != 0) {
+	    strcmp(protocol, "git") != 0 &&
+	    strcmp(protocol, "git+http") != 0 &&
+	    strcmp(protocol, "http") != 0 &&
+	    strcmp(protocol, "https") != 0 &&
+	    strcmp(protocol, "git+https") != 0) {
 		snprintf(msg, sizeof(msg),"unknown protocol \"%s\" "
 		    "for remote repository \"%s\"", protocol, repo_name);
 		return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);

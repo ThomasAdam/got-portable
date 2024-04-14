@@ -48,6 +48,7 @@
 #define GOT_PROG_FETCH_PACK	got-fetch-pack
 #define GOT_PROG_INDEX_PACK	got-index-pack
 #define GOT_PROG_SEND_PACK	got-send-pack
+#define GOT_PROG_HTTP		got-http
 
 #define GOT_STRINGIFY(x) #x
 #define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
@@ -77,6 +78,8 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_SEND_PACK)
 #define GOT_PATH_PROG_INDEX_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_INDEX_PACK)
+#define GOT_PATH_PROG_HTTP \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_HTTP)
 
 enum got_imsg_type {
 	/* An error occured while processing a request. */

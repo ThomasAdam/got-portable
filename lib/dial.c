@@ -20,22 +20,31 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <netdb.h>
 
 #include <assert.h>
 #include <err.h>
 #include <limits.h>
+#include <sha1.h>
+#include <stdint.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <imsg.h>
 
 #include "got_error.h"
 #include "got_path.h"
+#include "got_object.h"
 
 #include "got_compat.h"
 
 #include "got_lib_dial.h"
+#include "got_lib_delta.h"
+#include "got_lib_object.h"
+#include "got_lib_privsep.h"
 #include "got_dial.h"
 
 #ifndef nitems
@@ -65,6 +74,13 @@ got_dial_apply_unveil(const char *proto)
 		if (unveil(GOT_DIAL_PATH_SSH, "x") != 0) {
 			return got_error_from_errno2("unveil",
 			    GOT_DIAL_PATH_SSH);
+		}
+	}
+
+	if (strstr(proto, "http") != NULL) {
+		if (unveil(GOT_PATH_PROG_HTTP, "x") != 0) {
+			return got_error_from_errno2("unveil",
+			    GOT_PATH_PROG_HTTP);
 		}
 	}
 
@@ -369,6 +385,62 @@ done:
 	} else
 		*newfd = fd;
 	return err;
+}
+
+const struct got_error *
+got_dial_http(pid_t *newpid, int *newfd, const char *host,
+    const char *port, const char *path, int verbosity, int tls)
+{
+	const struct got_error *error = NULL;
+	int pid, pfd[2];
+	const char *argv[8];
+	int i = 0;
+
+	*newpid = -1;
+	*newfd = -1;
+
+	if (!port)
+		port = tls ? "443" : "80";
+
+	argv[i++] = GOT_PATH_PROG_HTTP;
+	if (verbosity == -1)
+		argv[i++] = "-q";
+	else if (verbosity > 0)
+		argv[i++] = "-v";
+	argv[i++] = "--";
+	argv[i++] = tls ? "https" : "http";
+	argv[i++] = host;
+	argv[i++] = port;
+	argv[i++] = path;
+	argv[i++] = NULL;
+	assert(i <= nitems(argv));
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pfd) == -1)
+		return got_error_from_errno("socketpair");
+
+	pid = fork();
+	if (pid == -1) {
+		error = got_error_from_errno("fork");
+		close(pfd[0]);
+		close(pfd[1]);
+		return error;
+	} else if (pid == 0) {
+		if (close(pfd[1]) == -1)
+			err(1, "close");
+		if (dup2(pfd[0], 0) == -1)
+			err(1, "dup2");
+		if (dup2(pfd[0], 1) == -1)
+			err(1, "dup2");
+		if (execv(GOT_PATH_PROG_HTTP, (char *const *)argv) == -1)
+			err(1, "execv");
+		abort(); /* not reached */
+	} else {
+		if (close(pfd[0]) == -1)
+			return got_error_from_errno("close");
+		*newpid = pid;
+		*newfd = pfd[1];
+		return NULL;
+	}
 }
 
 const struct got_error *
