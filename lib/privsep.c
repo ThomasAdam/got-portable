@@ -3559,7 +3559,7 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_FETCH_PACK,
 	    GOT_PATH_PROG_INDEX_PACK,
 	    GOT_PATH_PROG_SEND_PACK,
-	    /* GOT_PATH_PROG_HTTP explicitly excluded */
+	    /* GOT_PATH_PROG_FETCH_HTTP explicitly excluded */
 	};
 	size_t i;
 
