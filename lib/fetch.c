@@ -92,8 +92,12 @@ got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
 	else if (strcmp(proto, "git") == 0)
 		err = got_dial_git(fetchfd, host, port, server_path,
 		    GOT_DIAL_CMD_FETCH);
-	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
-		err = got_error_path(proto, GOT_ERR_NOT_IMPL);
+	else if (strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+http") == 0 ||
+	    strcmp(proto, "https") == 0 ||
+	    strcmp(proto, "git+https") == 0)
+		err = got_dial_http(fetchpid, fetchfd, host, port,
+		    server_path, verbosity, strstr(proto, "https") != NULL);
 	else
 		err = got_error_path(proto, GOT_ERR_BAD_PROTO);
 	return err;

@@ -25,5 +25,8 @@ const struct got_error *got_dial_ssh(pid_t *newpid, int *newfd,
     const char *host, const char *port, const char *path,
     const char *command, int verbosity);
 
+const struct got_error *got_dial_http(pid_t *newpid, int *newfd,
+    const char *host, const char *port, const char *path, int, int);
+
 const struct got_error *got_dial_parse_command(char **command,
     char **repo_path, const char *gitcmd);

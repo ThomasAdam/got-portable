@@ -1646,16 +1646,16 @@ cmd_clone(int argc, char *argv[])
 			err(1, "pledge");
 #endif
 	} else if (strcmp(proto, "git+ssh") == 0 ||
-	    strcmp(proto, "ssh") == 0) {
+	    strcmp(proto, "ssh") == 0 ||
+	    strcmp(proto, "git+http") == 0 ||
+	    strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+https") == 0 ||
+	    strcmp(proto, "https") == 0) {
 #ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
 		    "sendfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-	} else if (strcmp(proto, "http") == 0 ||
-	    strcmp(proto, "git+http") == 0) {
-		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
-		goto done;
 	} else {
 		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
 		goto done;
@@ -2528,16 +2528,16 @@ cmd_fetch(int argc, char *argv[])
 			err(1, "pledge");
 #endif
 	} else if (strcmp(proto, "git+ssh") == 0 ||
-	    strcmp(proto, "ssh") == 0) {
+	    strcmp(proto, "ssh") == 0 ||
+	    strcmp(proto, "git+http") == 0 ||
+	    strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+https") == 0 ||
+	    strcmp(proto, "https") == 0) {
 #ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
 		    "sendfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-	} else if (strcmp(proto, "http") == 0 ||
-	    strcmp(proto, "git+http") == 0) {
-		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
-		goto done;
 	} else {
 		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
 		goto done;
