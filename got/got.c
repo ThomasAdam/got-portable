@@ -1697,6 +1697,11 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd",
+	     NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (!list_refs_only) {
 		error = got_repo_init(repo_path, NULL);
 		if (error)
@@ -2568,7 +2573,11 @@ cmd_fetch(int argc, char *argv[])
 	    server_path, verbosity);
 	if (error)
 		goto done;
-
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd",
+	     NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (!have_bflag) {
 		/*
 		 * If set, get this remote's HEAD ref target so
