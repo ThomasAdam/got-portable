@@ -78,9 +78,9 @@ got_dial_apply_unveil(const char *proto)
 	}
 
 	if (strstr(proto, "http") != NULL) {
-		if (unveil(GOT_PATH_PROG_HTTP, "x") != 0) {
+		if (unveil(GOT_PATH_PROG_FETCH_HTTP, "x") != 0) {
 			return got_error_from_errno2("unveil",
-			    GOT_PATH_PROG_HTTP);
+			    GOT_PATH_PROG_FETCH_HTTP);
 		}
 	}
 
@@ -402,7 +402,7 @@ got_dial_http(pid_t *newpid, int *newfd, const char *host,
 	if (!port)
 		port = tls ? "443" : "80";
 
-	argv[i++] = GOT_PATH_PROG_HTTP;
+	argv[i++] = GOT_PATH_PROG_FETCH_HTTP;
 	if (verbosity == -1)
 		argv[i++] = "-q";
 	else if (verbosity > 0)
@@ -431,7 +431,7 @@ got_dial_http(pid_t *newpid, int *newfd, const char *host,
 			err(1, "dup2");
 		if (dup2(pfd[0], 1) == -1)
 			err(1, "dup2");
-		if (execv(GOT_PATH_PROG_HTTP, (char *const *)argv) == -1)
+		if (execv(GOT_PATH_PROG_FETCH_HTTP, (char *const *)argv) == -1)
 			err(1, "execv");
 		abort(); /* not reached */
 	} else {
