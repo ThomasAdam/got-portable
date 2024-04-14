@@ -181,6 +181,25 @@ to use:
 .Mt user@hostname
 .It ssh
 Short alias for git+ssh.
+.It http
+The
+.Dq smart
+HTTP Git protocol.
+Supported by
+.Cm got clone
+and
+.Cm got fetch ,
+but not by
+.Cm got send .
+Not compatible with Git HTTP servers using the
+.Dq dumb
+protocol.
+Use of this protocol is discouraged since it supports neither authentication
+nor encryption.
+.It https
+The
+.Dq smart
+Git HTTP protocol wrapped in SSL/TLS.
 .El
 .Pp
 Objects in the cloned repository are stored in a pack file which is downloaded
@@ -3815,11 +3834,10 @@ access via SSH.
 Such sites will require an account to be created, and a public SSH key to be
 uploaded to this account, before repository access via ssh:// URLs will work.
 .Pp
-Use of HTTP URLs currently requires
-.Xr git 1 :
+Most sites offer anonymous repository access via HTTPS:
 .Pp
 .Dl $ cd /var/git/
-.Dl $ git clone --bare https://github.com/openbsd/src.git
+.Dl $ got clone https://github.com/openbsd/src.git
 .Pp
 Alternatively, for quick and dirty local testing of
 .Nm
@@ -3943,15 +3961,6 @@ branch:
 .Pp
 .Dl $ cd /usr/src
 .Dl $ got fetch
-.Pp
-In a repository created with a HTTP URL and
-.Cm git clone --bare
-the
-.Xr git-fetch 1
-command must be used instead:
-.Pp
-.Dl $ cd /var/git/src.git
-.Dl $ git fetch origin master:refs/remotes/origin/master
 .Pp
 Rebase the local
 .Dq master
@@ -4300,11 +4309,6 @@ At present, the user has to fall back on
 to perform some tasks.
 In particular:
 .Bl -bullet
-.It
-Reading from remote repositories over HTTP or HTTPS protocols requires
-.Xr git-clone 1
-and
-.Xr git-fetch 1 .
 .It
 Writing to remote repositories over HTTP or HTTPS protocols requires
 .Xr git-push 1 .
