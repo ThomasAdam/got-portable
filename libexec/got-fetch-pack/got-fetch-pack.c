@@ -611,10 +611,6 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			 */
 			break;
 		}
-		if (n > 1 && buf[0] == 0x2) {
-			/* XXX: sideband? */
-			break;
-		}
 		if (n < 4 + SHA1_DIGEST_STRING_LENGTH ||
 		    strncmp(buf, "ACK ", 4) != 0) {
 			err = got_error_msg(GOT_ERR_BAD_PACKET,
