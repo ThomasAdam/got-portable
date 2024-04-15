@@ -62,6 +62,7 @@ test_file_changed() {
 	{"notifications":[{
 		"type":"commit",
 		"short":false,
+		"repo":"test-repo",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -154,6 +155,7 @@ test_bad_utf8() {
 	{"notifications":[{
 		"type":"commit",
 		"short":false,
+		"repo":"test-repo",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -254,6 +256,7 @@ test_many_commits_not_summarized() {
 		{
 			"type":"commit",
 			"short":false,
+			"repo":"test-repo",
 			"id":"$commit_id",
 			"author":{
 				"full":"$GOT_AUTHOR",
@@ -358,6 +361,7 @@ test_many_commits_summarized() {
 		{
 			"type":"commit",
 			"short":true,
+			"repo":"test-repo",
 			"id":"$commit_id",
 			"committer":{
 				"user":"$GOT_AUTHOR_8"
@@ -439,6 +443,7 @@ test_branch_created() {
 	{
 		"type":"commit",
 		"short":false,
+		"repo":"test-repo",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -516,6 +521,7 @@ test_branch_removed() {
 	a
 	{"notifications":[{
 		"type":"branch-deleted",
+		"repo":"test-repo",
 		"ref":"refs/heads/newbranch",
 		"id":"$commit_id"
 	}]}
@@ -570,6 +576,7 @@ test_tag_created() {
 	a
 	{"notifications":[{
 		"type":"tag",
+		"repo":"test-repo",
 		"tag":"refs/tags/1.0",
 		"tagger":{
 			"full":"$GOT_AUTHOR",
@@ -650,6 +657,7 @@ test_tag_changed() {
 	a
 	{"notifications":[{
 		"type":"tag",
+		"repo":"test-repo",
 		"tag":"refs/tags/1.0",
 		"tagger":{
 			"full":"$GOT_AUTHOR",

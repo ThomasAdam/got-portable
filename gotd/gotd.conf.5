@@ -371,6 +371,8 @@ Except where noted, all are optional.
 Boolean, indicates whether the object has all the fields set.
 When several commits are batched in a single send operation, not all of
 the fields are available for each commit object.
+.It Dv repo
+The repository name as string.
 .It Dv id
 The commit ID as string, may be abbreviated.
 .It Dv committer
@@ -444,6 +446,8 @@ which are the number of added and removed lines respectively.
 The branch deleted notifications has the following fields, all guaranteed
 to be set:
 .Bl -tag -compact -width Ds
+.It Dv repo
+The repository name as string.
 .It Dv ref
 The removed branch reference.
 .It Dv id
@@ -452,6 +456,8 @@ The hash of the commit pointed by the deleted branch.
 .It Dv tag
 The tag notification has the following fields, all guaranteed to be set:
 .Bl -tag -width Ds
+.It repo
+The repository name as string.
 .It tag
 The tag reference.
 .It tagger

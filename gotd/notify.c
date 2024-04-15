@@ -251,15 +251,17 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 }
 
 static void
-notify_http(struct gotd_notification_target *target, int fd)
+notify_http(struct gotd_notification_target *target, const char *repo, int fd)
 {
-	const char *argv[8];
+	const char *argv[10];
 	int argc = 0;
 
 	argv[argc++] = GOTD_PATH_PROG_NOTIFY_HTTP;
 	if (target->conf.http.tls)
 		argv[argc++] = "-c";
 
+	argv[argc++] = "-r";
+	argv[argc++] = repo;
 	argv[argc++] = "-h";
 	argv[argc++] = target->conf.http.hostname;
 	argv[argc++] = "-p";
@@ -307,7 +309,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 			notify_email(target, inotify.subject_line, fd);
 			break;
 		case GOTD_NOTIFICATION_VIA_HTTP:
-			notify_http(target, fd);
+			notify_http(target, repo->name, fd);
 			break;
 		}
 	}
