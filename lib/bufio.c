@@ -287,6 +287,8 @@ bufio_read(struct bufio *bio)
 			bio->wantev = BUFIO_WANT_WRITE;
 			return (-1);
 		case -1:
+			bio->wantev = 0;
+			errno = 0;
 			return (-1);
 		default:
 			bio->wantev = 0;
