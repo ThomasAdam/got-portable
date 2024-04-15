@@ -524,11 +524,6 @@ main(int argc, char **argv)
 	const char	*host, *port, *path;
 	int		 https = 0;
 	int		 ch;
-#if 0
-	static int attached;
-	while (!attached)
-		sleep(1);
-#endif
 
 #if !DEBUG_HTTP || defined(PROFILE)
 	if (pledge("stdio rpath inet dns", NULL) == -1)
