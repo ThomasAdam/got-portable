@@ -3,7 +3,7 @@
 .include "../../got-version.mk"
 
 PROG=		got-fetch-http
-SRCS=		got-fetch-http.c hash.c error.c inflate.c pollfd.c
+SRCS=		got-fetch-http.c bufio.c hash.c error.c inflate.c pollfd.c
 
 CPPFLAGS= -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 

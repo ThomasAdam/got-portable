@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2024 Tobias Heider <me@tobhe.de>
  * Copyright (c) 2022 Omar Polo <op@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -30,6 +31,8 @@
 
 #include "got_version.h"
 
+#include "bufio.h"
+
 #define UPLOAD_PACK_ADV "application/x-git-upload-pack-advertisement"
 #define UPLOAD_PACK_REQ "application/x-git-upload-pack-request"
 #define UPLOAD_PACK_RES "application/x-git-upload-pack-result"
@@ -39,11 +42,49 @@
 #define MINIMUM(a, b)	((a) < (b) ? (a) : (b))
 #define hasprfx(str, p)	(strncasecmp(str, p, strlen(p)) == 0)
 
-#define DEBUG_HTTP 1
+#define DEBUG_HTTP 0
 
 FILE *tmp;
 
 static int	verbose;
+
+static char *
+bufio_getdelim_sync(struct bufio *bio, const char *nl, size_t *len)
+{
+	int	r;
+
+	do {
+		r = bufio_read(bio);
+		if (r == -1 && errno != EAGAIN)
+			errx(1, "bufio_read: %s", bufio_io_err(bio));
+	} while (r == -1 && errno == EAGAIN);
+	return buf_getdelim(&bio->rbuf, nl, len);
+}
+
+static size_t
+bufio_drain_sync(struct bufio *bio, void *d, size_t len)
+{
+	int	r;
+
+	do {
+		r = bufio_read(bio);
+		if (r == -1 && errno != EAGAIN)
+			errx(1, "bufio_read: %s", bufio_io_err(bio));
+	} while (r == -1 && errno == EAGAIN);
+	return bufio_drain(bio, d, len);
+}
+
+static void
+bufio_close_sync(struct bufio *bio)
+{
+	int	 r;
+
+	do {
+		r = bufio_close(bio);
+		if (r == -1 && errno == EAGAIN)
+			errx(1, "bufio_read: %s", bufio_io_err(bio));
+	} while (r == -1 && errno == EAGAIN);
+}
 
 static long long
 hexstrtonum(const char *str, long long min, long long max, const char **errstr)
@@ -68,87 +109,11 @@ hexstrtonum(const char *str, long long min, long long max, const char **errstr)
 }
 
 static int
-stdio_tls_write(void *arg, const char *buf, int len)
-{
-	struct tls	*ctx = arg;
-	ssize_t		 ret;
-
-	do {
-		ret = tls_write(ctx, buf, len);
-	} while (ret == TLS_WANT_POLLIN || ret == TLS_WANT_POLLOUT);
-
-	if (ret == -1)
-		warn("tls_write: %s", tls_error(ctx));
-
-	return ret;
-}
-
-static int
-stdio_tls_read(void *arg, char *buf, int len)
-{
-	struct tls	*ctx = arg;
-	ssize_t		 ret;
-
-	do {
-		ret = tls_read(ctx, buf, len);
-	} while (ret == TLS_WANT_POLLIN || ret == TLS_WANT_POLLOUT);
-
-	if (ret == -1)
-		warn("tls_read: %s", tls_error(ctx));
-
-	return ret;
-}
-
-static int
-stdio_tls_close(void *arg)
-{
-	struct tls	*ctx = arg;
-	int		 ret;
-
-	do {
-		ret = tls_close(ctx);
-	} while (ret == TLS_WANT_POLLIN || ret == TLS_WANT_POLLOUT);
-
-	return ret;
-}
-
-static FILE *
 dial(int https, const char *host, const char *port)
 {
-	FILE			*fp;
-	struct tls		*ctx;
-	struct tls_config	*conf;
 	struct addrinfo		 hints, *res, *res0;
-	int			 r, error, saved_errno, fd = -1;
+	int			 error, saved_errno, fd = -1;
 	const char		*cause = NULL;
-
-	if (https) {
-		if ((conf = tls_config_new()) == NULL)
-			errx(1, "failed to create TLS configuration");
-		if ((ctx = tls_client()) == NULL)
-			errx(1, "failed to create TLS client");
-		if (tls_configure(ctx, conf) == -1)
-			errx(1, "TLS configuration failure: %s",
-			    tls_error(ctx));
-		tls_config_free(conf);
-
-		if (tls_connect(ctx, host, port) == -1) {
-			warnx("connect to %s:%s: %s", host, port,
-			    tls_error(ctx));
-			tls_close(ctx);
-			return NULL;
-		}
-		do {
-			r = tls_handshake(ctx);
-		} while (r == TLS_WANT_POLLIN || r == TLS_WANT_POLLOUT);
-		fp = funopen(ctx, stdio_tls_read, stdio_tls_write, NULL,
-		    stdio_tls_close);
-		if (fp == NULL) {
-			warn("funopen");
-			tls_free(ctx);
-		}
-		return fp;
-	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -156,7 +121,7 @@ dial(int https, const char *host, const char *port)
 	error = getaddrinfo(host, port, &hints, &res0);
 	if (error) {
 		warnx("%s", gai_strerror(error));
-		return NULL;
+		return -1;
 	}
 
 	for (res = res0; res; res = res->ai_next) {
@@ -180,29 +145,20 @@ dial(int https, const char *host, const char *port)
 
 	if (fd == -1) {
 		warn("%s", cause);
-		return NULL;
+		return -1;
 	}
 
-	if ((fp = fdopen(fd, "r+")) == NULL) {
-		warn("fdopen");
-		close(fd);
-	}
-	return fp;
+	return fd;
 }
 
-static FILE *
-http_open(int https, const char *method, const char *host, const char *port,
-    const char *path, const char *path_sufx, const char *query,
-    const char *ctype)
+static int
+http_open(struct bufio *bio, int https, const char *method, const char *host, const char *port,
+    const char *path, const char *path_sufx, const char *query, const char *ctype)
 {
-	FILE		*fp;
 	const char	*chdr = NULL, *te = "";
 	char		*p, *req;
 	int		 r;
-
-	if ((fp = dial(https, host, port)) == NULL)
-		return NULL;
-
+	
 	if (path_sufx != NULL && *path && path[strlen(path) - 1] == '/')
 		path_sufx++; /* skip the slash */
 
@@ -224,65 +180,70 @@ http_open(int https, const char *method, const char *host, const char *port,
 	    "%s%s%s\r\n",
 	    method, p, host, GOT_USERAGENT,
 	    chdr ? chdr : "", ctype ? ctype : "", te);
-	free(p);
 	if (r == -1)
 		err(1, "asprintf");
+	free(p);
 
 	if (verbose > 0)
 		fprintf(stderr, "%s: request: %s", getprogname(), req);
+	
 
-	if (fwrite(req, 1, r, fp) != r) {
-		free(req);
-		fclose(fp);
-		return NULL;
-	}
+	r = bufio_compose(bio, req, r);
+	if (r == -1)
+		err(1, "bufio_compose_fmt");
 	free(req);
 
-	return fp;
+	do {
+		r = bufio_write(bio);
+		if (r == -1 && errno != EAGAIN)
+			errx(1, "bufio_read: %s", bufio_io_err(bio));
+	} while (bio->wbuf.len != 0);
+
+	return 0;
 }
 
 static int
-http_parse_reply(FILE *fp, int *chunked, const char *expected_ctype)
+http_parse_reply(struct bufio *bio, int *chunked, const char *expected_ctype)
 {
-	char		*cp, *line = NULL;
-	size_t		 linesize = 0;
-	ssize_t		 linelen;
+	char		*cp, *line;
+	size_t		 linelen;
 
 	*chunked = 0;
 
-	if ((linelen = getline(&line, &linesize, fp)) == -1) {
-		warn("%s: getline", __func__);
+	line = bufio_getdelim_sync(bio, "\r\n", &linelen);
+	if (line == NULL) {
+		warnx("%s: bufio_getdelim_sync()", __func__);
 		return -1;
 	}
 
 	if (verbose > 0)
 		fprintf(stderr, "%s: response: %s", getprogname(), line);
 
-	if ((cp = strchr(line, '\r')) == NULL) {
-		warnx("malformed HTTP response");
-		goto err;
-	}
-	*cp = '\0';
-
 	if ((cp = strchr(line, ' ')) == NULL) {
 		warnx("malformed HTTP response");
-		goto err;
+		return -1;
 	}
 	cp++;
 
 	if (strncmp(cp, "200 ", 4) != 0) {
 		warnx("malformed HTTP response");
-		goto err;
+		return -1;
 	}
+	buf_drain(&bio->rbuf, linelen);
 
-	while ((linelen = getline(&line, &linesize, fp)) != -1) {
-		if (line[linelen-1] == '\n')
-			line[--linelen] = '\0';
-		if (linelen > 0 && line[linelen-1] == '\r')
-			line[--linelen] = '\0';
-
-		if (*line == '\0')
+	while(1) {
+		line = bufio_getdelim_sync(bio, "\r\n", &linelen);
+		if (line == NULL) {
+			warnx("%s: bufio_getdelim_sync()", __func__);
+			return -1;
+		}
+		if (*line == '\0') {
+			buf_drain(&bio->rbuf, linelen);
 			break;
+		}
+#if DEBUG_HTTP
+		fprintf(stderr, "%s: %s\n", __func__, line);
+#endif
 
 		if (hasprfx(line, "content-type:")) {
 			cp = strchr(line, ':') + 1;
@@ -291,68 +252,52 @@ http_parse_reply(FILE *fp, int *chunked, const char *expected_ctype)
 			if (strcmp(cp, expected_ctype) != 0) {
 				warnx("server not using the \"smart\" "
 				    "HTTP protocol.");
-				goto err;
+				return -1;
 			}
 		}
-
 		if (hasprfx(line, "transfer-encoding:")) {
 			cp = strchr(line, ':') + 1;
 			cp += strspn(cp, " \t");
 			cp[strcspn(cp, " \t")] = '\0';
 			if (strcmp(cp, "chunked") != 0) {
 				warnx("unknown transfer-encoding");
-				goto err;
+				return -1;
 			}
 			*chunked = 1;
 		}
+		buf_drain(&bio->rbuf, linelen);
 	}
 
-	free(line);
 	return 0;
-
-err:
-	free(line);
-	return -1;
 }
 
 static ssize_t
-http_read(FILE *fp, int chunked, size_t *chunksz, void *buf, size_t bufsz)
+http_read(struct bufio *bio, int chunked, size_t *chunksz, char *buf, size_t bufsz)
 {
 	const char	*errstr;
-	char		*cp, *line = NULL;
-	size_t		 r, linesize = 0;
+	char		*line = NULL;
+	size_t		 r;
 	ssize_t		 ret = 0, linelen;
 
 	if (!chunked) {
-		r = fread(buf, 1, bufsz, fp);
-		if (r == 0 && ferror(fp))
+		r = bufio_drain_sync(bio, buf, bufsz);
+		if (r == 0)
 			return -1;
-#if DEBUG_HTTP
-		fwrite(buf, 1, r, stderr);
-#endif
 		return r;
 	}
 
 	while (bufsz > 0) {
 		if (*chunksz == 0) {
 		again:
-			if ((linelen = getline(&line, &linesize, fp)) == -1) {
-				if (ferror(fp)) {
-					warn("%s: getline", __func__);
-					ret = -1;
-				}
+			line = bufio_getdelim_sync(bio, "\r\n", &linelen);
+			if (line == NULL) {
+				buf_drain(&bio->rbuf, linelen);
 				break;
 			}
-
-			if ((cp = strchr(line, '\r')) == NULL) {
-				warnx("invalid HTTP chunk: missing CR");
-				ret = -1;
-				break;
-			}
-			*cp = '\0';
-
-			if (*line == '\0')
+			if (*line == '\0') {
+				buf_drain(&bio->rbuf, linelen);
 				goto again; /* was the CRLF after the chunk */
+			}
 
 			*chunksz = hexstrtonum(line, 0, INT_MAX, &errstr);
 			if (errstr != NULL) {
@@ -362,14 +307,15 @@ http_read(FILE *fp, int chunked, size_t *chunksz, void *buf, size_t bufsz)
 				break;
 			}
 
-			if (*chunksz == 0)
+			if (*chunksz == 0) {
+				buf_drain(&bio->rbuf, linelen);
 				break;
+			}
+			buf_drain(&bio->rbuf, linelen);
 		}
 
-		r = fread(buf, 1, MINIMUM(*chunksz, bufsz), fp);
+		r = bufio_drain_sync(bio, buf, MINIMUM(*chunksz, bufsz));
 		if (r == 0) {
-			if (ferror(fp))
-				ret = -1;
 			break;
 		}
 
@@ -384,73 +330,84 @@ http_read(FILE *fp, int chunked, size_t *chunksz, void *buf, size_t bufsz)
 		*chunksz -= r;
 	}
 
-	free(line);
 	return ret;
 }
 
-static void
-http_chunk(FILE *fp, const void *buf, size_t len)
+static int
+http_chunk(struct bufio *bio, const void *buf, size_t len)
 {
-	/* fprintf(stderr, "> %.*s", (int)len, (char *)buf); */
+	int r;
 
-	fprintf(fp, "%zx\r\n", len);
-	if (fwrite(buf, 1, len, fp) != len ||
-	    fwrite("\r\n", 1, 2, fp) != 2)
-		err(1, "%s fwrite", __func__);
+	if (bufio_compose_fmt(bio, "%zx\r\n", len) ||
+	    bufio_compose(bio, buf, len) ||
+	    bufio_compose(bio, "\r\n", 2))
+		return 1;
+
+	do {
+		r = bufio_write(bio);
+		if (r == -1 && errno != EAGAIN)
+			errx(1, "bufio_read: %s", bufio_io_err(bio));
+	} while (bio->wbuf.len != 0);
+
+	return 0;
 }
 
 static int
 get_refs(int https, const char *host, const char *port, const char *path)
 {
+	struct bufio	 bio;
 	char		 buf[HTTP_BUFSIZ];
 	const char	*errstr, *sufx = "/info/refs";
-	FILE		*fp;
 	size_t		 skip, chunksz = 0;
 	ssize_t		 r;
 	int		 chunked;
+	int		 sock;
+	int		 ret = -1;
 
-	fp = http_open(https, "GET", host, port, path, sufx,
-	    "service=git-upload-pack", NULL);
-	if (fp == NULL)
+	if ((sock = dial(https, host, port)) == -1)
 		return -1;
 
-	if (http_parse_reply(fp, &chunked, UPLOAD_PACK_ADV) == -1) {
-		fclose(fp);
-		return -1;
+	if (bufio_init(&bio)) {
+		warnx("bufio_init");
+		goto err;
 	}
+	bufio_set_fd(&bio, sock);
+	if (https && bufio_starttls(&bio, host, 0, NULL, 0, NULL, 0) == -1) {
+		warnx("bufio_starttls");
+		goto err;
+	}
+
+	if (http_open(&bio, https, "GET", host, port, path, sufx,
+	    "service=git-upload-pack", NULL) == -1)
+		goto err;
+
+	if (http_parse_reply(&bio, &chunked, UPLOAD_PACK_ADV) == -1)
+		goto err;
 
 	/* skip first pack; why git over http is like this? */
-	r = http_read(fp, chunked, &chunksz, buf, 4);
-	if (r <= 0) {
-		fclose(fp);
-		return -1;
-	}
+	r = http_read(&bio, chunked, &chunksz, buf, 4);
+	if (r <= 0)
+		goto err;
 	buf[4] = '\0';
 	skip = hexstrtonum(buf, 0, INT_MAX, &errstr);
 	if (errstr != NULL) {
 		warnx("pktlen is %s", errstr);
-		fclose(fp);
-		return -1;
+		goto err;
 	}
 
 	/* TODO: validate it's # service=git-upload-pack\n */
 	while (skip > 0) {
-		r = http_read(fp, chunked, &chunksz, buf,
+		r = http_read(&bio, chunked, &chunksz, buf,
 		    MINIMUM(skip, sizeof(buf)));
-		if (r <= 0) {
-			fclose(fp);
-			return -1;
-		}
-
+		if (r <= 0)
+			goto err;
 		skip -= r;
 	}
 
 	for (;;) {
-		r = http_read(fp, chunked, &chunksz, buf, sizeof(buf));
-		if (r == -1) {
-			fclose(fp);
-			return -1;
-		}
+		r = http_read(&bio, chunked, &chunksz, buf, sizeof(buf));
+		if (r == -1)
+			goto err;
 
 		if (r == 0)
 			break;
@@ -459,26 +416,43 @@ get_refs(int https, const char *host, const char *port, const char *path)
 	}
 
 	fflush(stdout);
-	fclose(fp);
-	return 0;
+	ret = 0;
+err:
+	bufio_close_sync(&bio);
+	bufio_free(&bio);
+	return ret;
 }
 
 static int
 upload_request(int https, const char *host, const char *port, const char *path,
     FILE *in)
 {
+	struct bufio	 bio;
 	const char	*errstr;
 	char		 buf[HTTP_BUFSIZ];
-	FILE		*fp;
 	ssize_t		 r;
 	size_t		 chunksz = 0;
 	long long	 t;
 	int		 chunked;
+	int		 sock;
+	int		 ret = -1;
 
-	fp = http_open(https, "POST", host, port, path, "/git-upload-pack",
-	    NULL, UPLOAD_PACK_REQ);
-	if (fp == NULL)
+	if ((sock = dial(https, host, port)) == -1)
 		return -1;
+
+	if (bufio_init(&bio)) {
+		warnx("bufio_init");
+		goto err;
+	}
+	bufio_set_fd(&bio, sock);
+	if (https && bufio_starttls(&bio, host, 0, NULL, 0, NULL, 0) == -1) {
+		warnx("bufio_starttls");
+		goto err;
+	}
+
+	if (http_open(&bio, https, "POST", host, port, path, "/git-upload-pack",
+	    NULL, UPLOAD_PACK_REQ) == -1)
+		goto err;
 
 	for (;;) {
 		r = fread(buf, 1, 4, in);
@@ -495,8 +469,9 @@ upload_request(int https, const char *host, const char *port, const char *path,
 		/* no idea why 0000 is not enough. */
 		if (t == 0) {
 			const char *x = "00000009done\n";
-			http_chunk(fp, x, strlen(x));
-			http_chunk(fp, NULL, 0);
+			if (http_chunk(&bio, x, strlen(x)) ||
+			    http_chunk(&bio, NULL, 0))
+				goto err;
 			break;
 		}
 
@@ -509,18 +484,17 @@ upload_request(int https, const char *host, const char *port, const char *path,
 		if (r != t - 4)
 			goto err;
 
-		http_chunk(fp, buf, t);
+		if (http_chunk(&bio, buf, t))
+			goto err;
 	}
 
-	if (http_parse_reply(fp, &chunked, UPLOAD_PACK_RES) == -1)
+	if (http_parse_reply(&bio, &chunked, UPLOAD_PACK_RES) == -1)
 		goto err;
 
 	for (;;) {
-		r = http_read(fp, chunked, &chunksz, buf, sizeof(buf));
-		if (r == -1) {
-			fclose(fp);
-			return -1;
-		}
+		r = http_read(&bio, chunked, &chunksz, buf, sizeof(buf));
+		if (r == -1)
+			goto err;
 
 		if (r == 0)
 			break;
@@ -528,12 +502,11 @@ upload_request(int https, const char *host, const char *port, const char *path,
 		fwrite(buf, 1, r, stdout);
 	}
 
-	fclose(fp);
-	return 0;
-
+	ret = 0;
 err:
-	fclose(fp);
-	return -1;
+	bufio_close_sync(&bio);
+	bufio_free(&bio);
+	return ret;
 }
 
 static __dead void
@@ -558,7 +531,7 @@ main(int argc, char **argv)
 #endif
 
 #if !DEBUG_HTTP || defined(PROFILE)
-	if (pledge("stdio inet dns", NULL) == -1)
+	if (pledge("stdio rpath inet dns", NULL) == -1)
 		err(1, "pledge");
 #endif
 
