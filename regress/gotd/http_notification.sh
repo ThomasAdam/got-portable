@@ -17,6 +17,9 @@
 . ../cmdline/common.sh
 . ./common.sh
 
+# flan:password encoded in base64
+AUTH="ZmxhbjpwYXNzd29yZA=="
+
 test_file_changed() {
 	local testroot=`test_init file_changed 1`
 
@@ -41,7 +44,7 @@ test_file_changed() {
 	local commit_id=`git_show_head $testroot/repo-clone`
 	local author_time=`git_show_author_time $testroot/repo-clone`
 
-	timeout 5 ./http-server -p $GOTD_TEST_HTTP_PORT \
+	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
 	    > $testroot/stdout &
 
 	got send -b main -q -r $testroot/repo-clone
@@ -134,7 +137,7 @@ test_bad_utf8() {
 	local commit_id=`git_show_head $testroot/repo-clone`
 	local author_time=`git_show_author_time $testroot/repo-clone`
 
-	timeout 5 ./http-server -p $GOTD_TEST_HTTP_PORT \
+	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
 	    > $testroot/stdout &
 
 	got send -b main -q -r $testroot/repo-clone
@@ -229,7 +232,7 @@ test_many_commits_not_summarized() {
 		set -- "$@" "$commit_id $d"
 	done
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
 	got send -b main -q -r $testroot/repo-clone
@@ -334,7 +337,7 @@ test_many_commits_summarized() {
 		set -- "$@" "$short_commit_id $d"
 	done
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
 	got send -b main -q -r $testroot/repo-clone
@@ -414,7 +417,7 @@ test_branch_created() {
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
 	local author_time=`git_show_author_time $testroot/repo-clone $commit_id`
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
 	got send -b newbranch -q -r $testroot/repo-clone
@@ -501,7 +504,7 @@ test_branch_removed() {
 		return 1
 	fi
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
@@ -556,7 +559,7 @@ test_tag_created() {
 	local commit_id=`git_show_head $testroot/repo-clone`
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    >$testroot/stdout &
 
 	got send -t 1.0 -q -r $testroot/repo-clone
@@ -634,7 +637,7 @@ test_tag_changed() {
 	got tag -r $testroot/repo-clone -m "new tag" 1.0 > /dev/null
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 
-	timeout 5 ./http-server -p "$GOTD_TEST_HTTP_PORT" \
+	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
 	got send -f -t 1.0 -q -r $testroot/repo-clone
