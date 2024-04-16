@@ -732,17 +732,70 @@ jsonify(FILE *fp, const char *repo)
 	return 0;
 }
 
+static char
+sixet2ch(int c)
+{
+	c &= 0x3F;
+
+	if (c < 26)
+		return 'A' + c;
+	c -= 26;
+	if (c < 26)
+		return 'a' + c;
+	c -= 26;
+	if (c < 10)
+		return '0' + c;
+	c -= 10;
+	if (c == 0)
+		return '+';
+	if (c == 1)
+		return '/';
+
+	errx(1, "invalid sixet 0x%x", c);
+}
+
 static char *
 basic_auth(const char *username, const char *password)
 {
-	char	*tmp;
-	int	 len;
+	char	*str, *tmp, *end, *s, *p;
+	char	 buf[3];
+	int	 len, i, r;
 
-	len = asprintf(&tmp, "%s:%s", username, password);
-	if (len == -1)
+	r = asprintf(&str, "%s:%s", username, password);
+	if (r == -1)
 		err(1, "asprintf");
 
-	/* XXX base64-ify */
+	/*
+	 * Will need 4 * r/3 bytes to encode the string, plus a
+	 * rounding to the next multiple of 4 for padding, plus NUL.
+	 */
+	len = 4 * r / 3;
+	len = (len + 3) & ~3;
+	len++;
+
+	tmp = calloc(1, len);
+	if (tmp == NULL)
+		err(1, "malloc");
+
+	s = str;
+	p = tmp;
+	while (*s != '\0') {
+		memset(buf, 0, sizeof(buf));
+		for (i = 0; i < 3 && *s != '\0'; ++i, ++s)
+			buf[i] = *s;
+
+		*p++ = sixet2ch(buf[0] >> 2);
+		*p++ = sixet2ch((buf[1] >> 4) | (buf[0] << 4));
+		if (i > 1)
+			*p++ = sixet2ch((buf[1] << 2) | (buf[2] >> 6));
+		if (i > 2)
+			*p++ = sixet2ch(buf[2]);
+	}
+
+	for (end = tmp + len - 1; p < end; ++p)
+		*p = '=';
+
+	free(str);
 	return tmp;
 }
 

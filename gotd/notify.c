@@ -159,7 +159,8 @@ gotd_notify_sighdlr(int sig, short event, void *arg)
 }
 
 static void
-run_notification_helper(const char *prog, const char **argv, int fd)
+run_notification_helper(const char *prog, const char **argv, int fd,
+    const char *user, const char *pass)
 {
 	const struct got_error *err = NULL;
 	pid_t pid;
@@ -182,6 +183,11 @@ run_notification_helper(const char *prog, const char **argv, int fd)
 		}
 
 		closefrom(STDERR_FILENO + 1);
+
+		if (user != NULL && pass != NULL) {
+			setenv("GOT_NOTIFY_HTTP_USER", user, 1);
+			setenv("GOT_NOTIFY_HTTP_PASS", pass, 1);
+		}
 
 		if (execv(prog, (char *const *)argv) == -1) {
 			fprintf(stderr, "%s: exec %s: %s\n", getprogname(),
@@ -247,7 +253,8 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 
 	argv[i] = NULL;
 
-	run_notification_helper(GOTD_PATH_PROG_NOTIFY_EMAIL, argv, fd);
+	run_notification_helper(GOTD_PATH_PROG_NOTIFY_EMAIL, argv, fd,
+	    NULL, NULL);
 }
 
 static void
@@ -271,7 +278,8 @@ notify_http(struct gotd_notification_target *target, const char *repo, int fd)
 
 	argv[argc] = NULL;
 
-	run_notification_helper(GOTD_PATH_PROG_NOTIFY_HTTP, argv, fd);
+	run_notification_helper(GOTD_PATH_PROG_NOTIFY_HTTP, argv, fd,
+	    target->conf.http.user, target->conf.http.password);
 }
 
 static const struct got_error *

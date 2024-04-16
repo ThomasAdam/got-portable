@@ -188,7 +188,7 @@ start_gotd_http_notification: ensure_root
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
 	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
 	@echo '    notify {' >> $(PWD)/gotd.conf
-	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/"' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password"' >> $(PWD)/gotd.conf
 	@echo "    }" >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
