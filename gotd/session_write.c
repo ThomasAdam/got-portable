@@ -901,7 +901,7 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			break;
 		}
 
-		if (do_disconnect) {
+		if (do_disconnect || err) {
 			if (err)
 				disconnect_on_error(client, err);
 			else
