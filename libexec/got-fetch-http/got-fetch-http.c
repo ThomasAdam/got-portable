@@ -421,31 +421,45 @@ get_refs(int https, const char *host, const char *port, const char *path)
 
 		fwrite(buf, 1, r, stdout);
 
+		t = 0;
 		n = 0;
-		while (verbose && n + 4 < r) {
+		while (n + 4 <= r) {
 			buf[n + 4] = '\0';
 			t = hexstrtonum(&buf[n], 0, sizeof(buf) - n, &errstr);
 			if (errstr != NULL) {
-				warnx("pktline len is %s", errstr);
+				fprintf(stderr, "pktline len is %s", errstr);
 				goto err;
+			}
+
+			if (t == 0) {
+				if (verbose) {
+					fprintf(stderr, "%s: readpkt: 0000\n",
+					    getprogname());
+				}
+				break;
 			}
 
 			if (t < 6) {
-				warnx("pktline len is too small");
+				fprintf(stderr, "pktline len is too small");
 				goto err;
 			}
 
-			fprintf(stderr, "%s: readpkt: %lld:\t",
-			    getprogname(), t - 4);
-			for (i = 5; i < t; i++) {
-				if (isprint((unsigned char)buf[n + i]))
-					fputc(buf[n + i], stderr);
-				else
-					fprintf(stderr, "[0x%.2x]", buf[n + i]);
+			if (verbose) {
+				fprintf(stderr, "%s: readpkt: %lld:\t",
+				    getprogname(), t - 4);
+				for (i = 5; i < t; i++) {
+					if (isprint((unsigned char)buf[n + i]))
+						fputc(buf[n + i], stderr);
+					else
+						fprintf(stderr, "[0x%.2x]",
+						    buf[n + i]);
+				}
+				fputc('\n', stderr);
 			}
-			fputc('\n', stderr);
 			n += t;
 		}
+		if (t == 0)
+			break;
 	}
 
 	fflush(stdout);
