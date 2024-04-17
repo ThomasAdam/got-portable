@@ -869,6 +869,7 @@ test_clone_basic_http() {
 
 	timeout 5 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
 	    > $testroot/http-server.log &
+	trap "kill %1" HUP INT QUIT PIPE TERM
 
 	sleep 1 # server starts up
 
