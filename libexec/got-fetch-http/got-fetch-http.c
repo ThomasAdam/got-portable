@@ -533,7 +533,7 @@ main(int argc, char **argv)
 	int		 ch;
 
 #if !DEBUG_HTTP || defined(PROFILE)
-	if (pledge("stdio rpath inet dns", NULL) == -1)
+	if (pledge("stdio rpath inet dns unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -557,12 +557,21 @@ main(int argc, char **argv)
 
 	https = strcmp(argv[0], "https") == 0;
 #ifndef PROFILE
-	if (!https) {
+	if (https) {
+		if (unveil("/etc/ssl/cert.pem", "r") == -1)
+			err(1, "unveil /etc/ssl/cert.pem");
+	} else {
 		/* drop "rpath" */
-		if (pledge("stdio inet dns", NULL) == -1)
+		if (pledge("stdio inet dns unveil", NULL) == -1)
 			err(1, "pledge");
 	}
+#else
+	if (unveil("gmon.out", "rwc") != 0)
+		err(1, "unveil gmon.out");
 #endif
+	if (unveil(NULL, NULL) == -1)
+		err(1, "unveil NULL");
+
 	host = argv[1];
 	port = argv[2];
 	path = argv[3];
