@@ -1,0 +1,180 @@
+#!/usr/bin/env perl
+#
+# Copyright (c) 2024 Omar Polo <op@openbsd.org>
+# Copyright (c) 2024 Stefan Sperling <stsp@openbsd.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use v5.36;
+use IPC::Open2;
+use Getopt::Long qw(:config bundling);
+use HTTP::Daemon;
+use HTTP::Status;
+use HTTP::Request;
+
+my $port = 8000;
+
+my $usage = "usage: $0 [-p port] repo_root_path\n";
+GetOptions("p:i" => \$port) or die($usage);
+
+# $HTTP::Daemon::DEBUG = 1;
+
+my $server = HTTP::Daemon->new(
+	Domain => AF_INET,
+	Type => SOCK_STREAM,
+	Proto => 'tcp',
+	LocalHost => '127.0.0.1',
+	LocalPort => $port,
+	ReusePort => 1,
+	Listen => 1,
+) || die "Could not open socket 127.0.0.1:$port: $IO::Socket::errstr";
+
+$ENV{GIT_HTTP_EXPORT_ALL} = '';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+my $repo_root = $ARGV[0];
+
+my $clientbuf;
+my $cr;
+my $gitbuf;
+my $gw;
+my $w;
+my $bufsize = 65536;
+my $timeout = 10;
+my $ev;
+my $resp;
+my $ret;
+my $gitpid = -1;
+
+sub handle_get {
+	my ($req, $client) = @_;
+	my $done = 0;
+
+	my $path = $req->uri->path;
+	$ENV{PATH_TRANSLATED} = "/$repo_root/$path";
+	$ENV{REQUEST_METHOD} = 'GET';
+	$ENV{QUERY_STRING} = $req->uri->query;
+
+	my $gitpid = open2(my $gitout, my $gitin, 'git', 'http-backend');
+
+	close($gitin);
+
+	my $headers = HTTP::Headers->new;
+	my ($status_code, $status) = (200, "OK");
+	while (<$gitout>) {
+		local $/ = "\r\n";
+		chomp;
+		last if m/^$/;
+
+		if (m/^Status: ([0-9]+)(.*)$/) {
+			($status_code, $status) = ($1, $2);
+			chomp $status;
+			next;
+		}
+
+		# XXX we don't support 'folded' headers
+		my ($name, $value) = split(':', $_);
+		$headers->header($name => $value);
+	}
+
+	my $resp = HTTP::Response->new($status_code, $status, $headers,
+	    sub {
+		    my $r = read($gitout, my $buf, 1024);
+		    warn "error reading git output: $!" unless defined $r;
+		    return undef if not defined($r) or $r == 0;
+		    return $buf;
+	    });
+
+	$client->send_response($resp);
+
+	close($gitout);
+	waitpid($gitpid, 0);
+
+	printf "GET %s: 200 OK\n", $req->uri->path;
+}
+
+sub handle_post {
+	my ($req, $client) = @_;
+	my $done = 0;
+
+	my $path = $req->uri->path;
+	$ENV{PATH_TRANSLATED} = "/$repo_root/$path";
+	$ENV{REQUEST_METHOD} = 'POST';
+	$ENV{QUERY_STRING} = "";
+	$ENV{CONTENT_TYPE} = $req->header('Content-Type');
+
+	my $gitpid = open2(my $gitout, my $gitin, 'git', 'http-backend');
+
+	my $content = $req->content();
+	my $len = length($content);
+	while ($len > 0) {
+		my $w = syswrite($gitin, $content, $len);
+		last if $w <= 0;
+		$len -= $w;
+		$content = substr($content, $w);
+	}
+
+	die "failed to upload payload" if ($len != 0);
+
+	close($gitin);
+
+	my $headers = HTTP::Headers->new;
+	my ($status_code, $status) = (200, "OK");
+	while (<$gitout>) {
+		local $/ = "\r\n";
+		chomp;
+		last if m/^$/;
+
+		if (m/^Status: ([0-9]+)(.*)$/) {
+			($status_code, $status) = ($1, $2);
+			chomp $status;
+			next;
+		}
+
+		# XXX we don't support 'folded' headers
+		my ($name, $value) = split(':', $_);
+		$headers->header($name => $value);
+	}
+
+	my $resp = HTTP::Response->new($status_code, $status, $headers,
+	    sub {
+		    my $r = read($gitout, my $buf, 1024);
+		    if (not defined($r) or $r == 0) {
+			    warn "read error: $!" unless defined $r;
+			    return undef;
+		    }
+		    return $buf;
+	    });
+
+	$client->send_response($resp);
+
+	close($gitout);
+	waitpid($gitpid, 0);
+
+	printf "POST %s: 200 OK\n", $req->uri->path;
+}
+
+while (1) {
+	my $client = $server->accept();
+
+	while (my $req = $client->get_request) {
+		if ($req->method eq "GET") {
+			handle_get($req, $client);
+		} elsif ($req->method eq "POST") {
+			handle_post($req, $client);
+		}
+	}
+
+	$client->close();
+}
