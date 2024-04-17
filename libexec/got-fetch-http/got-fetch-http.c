@@ -19,7 +19,6 @@
 #include <sys/socket.h>
 
 #include <err.h>
-#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <netdb.h>
@@ -218,7 +217,7 @@ http_parse_reply(struct bufio *bio, int *chunked, const char *expected_ctype)
 	}
 
 	if (verbose > 0)
-		fprintf(stderr, "%s: response: %s\n", getprogname(), line);
+		fprintf(stderr, "%s: response: %s", getprogname(), line);
 
 	if ((cp = strchr(line, ' ')) == NULL) {
 		warnx("malformed HTTP response");
@@ -364,8 +363,6 @@ get_refs(int https, const char *host, const char *port, const char *path)
 	int		 chunked;
 	int		 sock;
 	int		 ret = -1;
-	int		 i, n;
-	long long	 t;
 
 	if ((sock = dial(https, host, port)) == -1)
 		return -1;
@@ -416,50 +413,7 @@ get_refs(int https, const char *host, const char *port, const char *path)
 		if (r == 0)
 			break;
 
-		if (r < 4)
-			goto err;
-
 		fwrite(buf, 1, r, stdout);
-
-		t = 0;
-		n = 0;
-		while (n + 4 <= r) {
-			buf[n + 4] = '\0';
-			t = hexstrtonum(&buf[n], 0, sizeof(buf) - n, &errstr);
-			if (errstr != NULL) {
-				fprintf(stderr, "pktline len is %s", errstr);
-				goto err;
-			}
-
-			if (t == 0) {
-				if (verbose) {
-					fprintf(stderr, "%s: readpkt: 0000\n",
-					    getprogname());
-				}
-				break;
-			}
-
-			if (t < 6) {
-				fprintf(stderr, "pktline len is too small");
-				goto err;
-			}
-
-			if (verbose) {
-				fprintf(stderr, "%s: readpkt: %lld:\t",
-				    getprogname(), t - 4);
-				for (i = 5; i < t; i++) {
-					if (isprint((unsigned char)buf[n + i]))
-						fputc(buf[n + i], stderr);
-					else
-						fprintf(stderr, "[0x%.2x]",
-						    buf[n + i]);
-				}
-				fputc('\n', stderr);
-			}
-			n += t;
-		}
-		if (t == 0)
-			break;
 	}
 
 	fflush(stdout);
@@ -534,19 +488,6 @@ upload_request(int https, const char *host, const char *port, const char *path,
 		r = fread(buf + 4, 1, t - 4, in);
 		if (r != t - 4)
 			goto err;
-
-		if (verbose) {
-			int i;
-			fprintf(stderr, "%s: writepkt: %.4x:\t",
-			    getprogname(), (unsigned int)t);
-			for (i = 4; i < t; i++) {
-				if (isprint((unsigned char)buf[i]))
-					fputc(buf[i], stderr);
-				else
-					fprintf(stderr, "[0x%.2x]", buf[i]);
-			}
-			fputc('\n', stderr);
-		}
 
 		if (http_chunk(&bio, buf, t))
 			goto err;
