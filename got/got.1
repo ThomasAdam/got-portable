@@ -184,16 +184,28 @@ Short alias for git+ssh.
 .It http
 The
 .Dq smart
-HTTP Git protocol.
-Supported by
+Git HTTP protocol.
+Not compatible with servers using the
+.Dq dumb
+Git HTTP protocol.
+.Pp
+The
+.Dq smart
+Git HTTP protocol is supported by
 .Cm got clone
 and
 .Cm got fetch ,
 but not by
 .Cm got send .
-Not compatible with Git HTTP servers using the
-.Dq dumb
-protocol.
+Sending from a repository cloned over HTTP will require use of the
+.Ic send
+directive in
+.Xr got.conf 5
+to ensure that the
+.Dq ssh://
+protocol will be used by
+.Cm got send .
+.Pp
 Use of this protocol is discouraged since it supports neither authentication
 nor encryption.
 .It https
