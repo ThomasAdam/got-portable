@@ -45,18 +45,6 @@ $SIG{'PIPE'} = 'IGNORE';
 
 my $repo_root = $ARGV[0];
 
-my $clientbuf;
-my $cr;
-my $gitbuf;
-my $gw;
-my $w;
-my $bufsize = 65536;
-my $timeout = 10;
-my $ev;
-my $resp;
-my $ret;
-my $gitpid = -1;
-
 sub handle_get {
 	my ($req, $client) = @_;
 	my $done = 0;
