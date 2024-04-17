@@ -2021,7 +2021,7 @@ EOF
 }
 
 test_fetch_basic_http() {
-	local testroot=`test_init fetch_basic`
+	local testroot=`test_init fetch_basic_http`
 	local testurl=http://127.0.0.1:$GOT_TEST_HTTP_PORT
 	local commit_id=`git_show_head $testroot/repo`
 
