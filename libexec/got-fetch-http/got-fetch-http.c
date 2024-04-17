@@ -43,8 +43,6 @@
 #define MINIMUM(a, b)	((a) < (b) ? (a) : (b))
 #define hasprfx(str, p)	(strncasecmp(str, p, strlen(p)) == 0)
 
-#define DEBUG_HTTP 0
-
 FILE *tmp;
 
 static int	verbose;
@@ -242,9 +240,6 @@ http_parse_reply(struct bufio *bio, int *chunked, const char *expected_ctype)
 			buf_drain(&bio->rbuf, linelen);
 			break;
 		}
-#if DEBUG_HTTP
-		fprintf(stderr, "%s: %s\n", __func__, line);
-#endif
 
 		if (hasprfx(line, "content-type:")) {
 			cp = strchr(line, ':') + 1;
@@ -320,11 +315,6 @@ http_read(struct bufio *bio, int chunked, size_t *chunksz, char *buf, size_t buf
 			break;
 		}
 
-#if DEBUG_HTTP
-		if (tmp)
-			fwrite(buf, 1, r, tmp);
-		/* fwrite(buf, 1, r, stderr); */
-#endif
 		ret += r;
 		buf += r;
 		bufsz -= r;
@@ -532,7 +522,7 @@ main(int argc, char **argv)
 	int		 https = 0;
 	int		 ch;
 
-#if !DEBUG_HTTP || defined(PROFILE)
+#ifndef PROFILE
 	if (pledge("stdio rpath inet dns unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
@@ -578,10 +568,6 @@ main(int argc, char **argv)
 
 	if (get_refs(https, host, port, path) == -1)
 		errx(1, "failed to get refs");
-
-#if DEBUG_HTTP
-	tmp = fopen("/tmp/pck", "w");
-#endif
 
 	pfd.fd = 0;
 	pfd.events = POLLIN;
