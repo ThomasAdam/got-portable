@@ -36,7 +36,9 @@ binaries in $PATH. Any tests written as shell scripts also depend on git(1).
 Tests which use the got clone, fetch, and send commands will fail if
 'ssh 127.0.0.1' does not succeed non-interactively.
 
- $ doas pkg_add git
+Tests for HTTP protocol support rely on the HTTP::Daemon Perl module.
+
+ $ doas pkg_add git p5-http-daemon
  $ make regress
 
 To test with packed repositories, run:
