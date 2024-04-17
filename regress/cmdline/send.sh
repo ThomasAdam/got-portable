@@ -1665,6 +1665,65 @@ EOF
 	test_done "$testroot" 0
 }
 
+test_send_basic_http() {
+	local testroot=`test_init send_basic_http`
+	local testurl=http://127.0.0.1:$GOT_TEST_HTTP_PORT
+	local commit_id=`git_show_head $testroot/repo`
+
+	timeout 5 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
+	    > $testroot/http-server.log &
+
+	sleep 1 # server starts up
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cat > $testroot/repo/.git/got.conf <<EOF
+remote "origin" {
+	protocol http
+	server 127.0.0.1
+	port $GOT_TEST_HTTP_PORT
+	repository "/repo-clone"
+}
+EOF
+	got tag -r $testroot/repo -m '1.0' 1.0 >/dev/null
+	tag_id=`got ref -r $testroot/repo -l | grep "^refs/tags/1.0" \
+		| tr -d ' ' | cut -d: -f2`
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git -C $testroot/repo rm -q beta
+	(cd $testroot/repo && ln -s epsilon/zeta symlink)
+	git -C $testroot/repo add symlink
+	echo "new file alpha" > $testroot/repo/new
+	git -C $testroot/repo add new
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send command succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	kill %1
+	wait %1 # wait for http-server
+
+	echo "got: http: feature not implemented" > $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_send_rebase_required
@@ -1681,3 +1740,4 @@ run_test test_send_and_fetch_config
 run_test test_send_config
 run_test test_send_gitconfig
 run_test test_send_rejected
+run_test test_send_basic_http
