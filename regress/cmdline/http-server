@@ -136,14 +136,14 @@ sub handle_post {
 	}
 
 	my $resp = HTTP::Response->new($status_code, $status, $headers,
-	    sub {
-		    my $r = read($gitout, my $buf, 1024);
-		    if (not defined($r) or $r == 0) {
-			    warn "read error: $!" unless defined $r;
-			    return undef;
-		    }
-		    return $buf;
-	    });
+		sub {
+			my $r = read($gitout, my $buf, 1024);
+			if (not defined($r) or $r == 0) {
+				warn "read error: $!" unless defined $r;
+				return undef;
+			}
+			return $buf;
+		});
 
 	$client->send_response($resp);
 
