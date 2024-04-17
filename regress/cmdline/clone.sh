@@ -862,6 +862,136 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_clone_basic_http() {
+	local testroot=`test_init clone_basic_http`
+	local testurl=http://127.0.0.1:${GOT_TEST_HTTP_PORT}
+	local commit_id=`git_show_head $testroot/repo`
+
+	timeout 5 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
+	    > $testroot/http-server.log &
+
+	sleep 1 # server starts up
+
+	# Test our custom HTTP server with git clone. Should succeed.
+	git clone -q $testurl/repo $testroot/repo-clone-with-git
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Test got clone with our custom HTTP server.
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	kill %1
+	wait %1 # wait for http-server
+
+	got log -l0 -p -r $testroot/repo > $testroot/log-repo
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got log command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	got log -l0 -p -r $testroot/repo-clone | \
+		sed 's@master, origin/master@master@g' \
+		> $testroot/log-repo-clone
+
+	cmp -s $testroot/log-repo $testroot/log-repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "log -p output of cloned repository differs" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol http
+	port 8080
+	repository "/repo"
+	branch { "master" }
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = $testurl/repo
+	fetch = refs/heads/master:refs/remotes/origin/master
+	fetch = refs/tags/*:refs/tags/*
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_clone_basic
 run_test test_clone_quoting
@@ -875,3 +1005,4 @@ run_test test_clone_branch_and_reference
 run_test test_clone_reference_mirror
 run_test test_clone_multiple_branches
 run_test test_clone_dangling_headref
+run_test test_clone_basic_http
