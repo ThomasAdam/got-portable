@@ -173,6 +173,12 @@ while (1) {
 			handle_get($req, $client);
 		} elsif ($req->method eq "POST") {
 			handle_post($req, $client);
+		} else {
+			warn "unknown method ". $req->method . "\n";
+			my $res = HTTP::Response->new(405,
+			    "Method not Allowed");
+
+			last;
 		}
 	}
 
