@@ -185,7 +185,7 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 	free(p);
 
 	if (verbose > 0)
-		fprintf(stderr, "%s: request: %s", getprogname(), req);
+		fprintf(stderr, "%s: request: %s\n", getprogname(), req);
 	
 
 	r = bufio_compose(bio, req, r);
@@ -217,7 +217,7 @@ http_parse_reply(struct bufio *bio, int *chunked, const char *expected_ctype)
 	}
 
 	if (verbose > 0)
-		fprintf(stderr, "%s: response: %s", getprogname(), line);
+		fprintf(stderr, "%s: response: %s\n", getprogname(), line);
 
 	if ((cp = strchr(line, ' ')) == NULL) {
 		warnx("malformed HTTP response");
