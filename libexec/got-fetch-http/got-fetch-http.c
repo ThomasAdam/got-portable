@@ -556,7 +556,13 @@ main(int argc, char **argv)
 		usage();
 
 	https = strcmp(argv[0], "https") == 0;
-
+#ifndef PROFILE
+	if (!https) {
+		/* drop "rpath" */
+		if (pledge("stdio inet dns", NULL) == -1)
+			err(1, "pledge");
+	}
+#endif
 	host = argv[1];
 	port = argv[2];
 	path = argv[3];
