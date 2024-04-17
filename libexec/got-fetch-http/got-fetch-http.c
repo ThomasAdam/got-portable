@@ -31,13 +31,14 @@
 
 #include "got_version.h"
 
+#include "got_lib_pkt.h"
+
 #include "bufio.h"
 
 #define UPLOAD_PACK_ADV "application/x-git-upload-pack-advertisement"
 #define UPLOAD_PACK_REQ "application/x-git-upload-pack-request"
 #define UPLOAD_PACK_RES "application/x-git-upload-pack-result"
 
-#define HTTP_BUFSIZ	4096
 #define	GOT_USERAGENT	"got/" GOT_VERSION_STR
 #define MINIMUM(a, b)	((a) < (b) ? (a) : (b))
 #define hasprfx(str, p)	(strncasecmp(str, p, strlen(p)) == 0)
@@ -356,7 +357,7 @@ static int
 get_refs(int https, const char *host, const char *port, const char *path)
 {
 	struct bufio	 bio;
-	char		 buf[HTTP_BUFSIZ];
+	char		 buf[GOT_PKT_MAX];
 	const char	*errstr, *sufx = "/info/refs";
 	size_t		 skip, chunksz = 0;
 	ssize_t		 r;
@@ -430,7 +431,7 @@ upload_request(int https, const char *host, const char *port, const char *path,
 {
 	struct bufio	 bio;
 	const char	*errstr;
-	char		 buf[HTTP_BUFSIZ];
+	char		 buf[GOT_PKT_MAX];
 	ssize_t		 r;
 	size_t		 chunksz = 0;
 	long long	 t;
