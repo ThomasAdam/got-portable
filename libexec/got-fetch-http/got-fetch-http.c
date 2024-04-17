@@ -431,7 +431,11 @@ upload_request(int https, const char *host, const char *port, const char *path,
 
 	if ((sock = dial(https, host, port)) == -1)
 		return -1;
-
+#ifndef PROFILE
+	/* TODO: can we push this upwards such that get_refs() is covered? */
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (bufio_init(&bio)) {
 		warnx("bufio_init");
 		goto err;
