@@ -1575,6 +1575,18 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
 		goto done;
 	}
 
+	if (port == NULL) {
+		if (strcmp(proto, "http") == 0)
+			port = strdup("80");
+		if (strcmp(proto, "https") == 0)
+			port = strdup("443");
+		if (port == NULL) {
+			error = got_error_from_errno("strdup");
+			ret = -1;
+			goto done;
+		}
+	}
+
 	if ((user != NULL && password == NULL) ||
 	    (user == NULL && password != NULL)) {
 		yyerror("missing username or password");
