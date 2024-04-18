@@ -326,7 +326,7 @@ The
 and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
-.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oc
+.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc
 Send notifications via HTTP.
 This directive may be specified multiple times to build a list of
 HTTP servers to send notifications to.
@@ -353,6 +353,13 @@ must be specified.
 The
 .Ar password
 must not be an empty string.
+Unless the
+.Ic insecure
+option is specified the notification target
+.Ar URL
+must be a
+.Dq https://
+URL to avoid leaking of authentication credentials.
 .Pp
 The request body contains a JSON object with a
 .Dq notifications

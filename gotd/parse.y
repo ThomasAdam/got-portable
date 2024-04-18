@@ -110,7 +110,7 @@ static int			 conf_notify_ref_namespace(struct gotd_repo *,
 static int			 conf_notify_email(struct gotd_repo *,
 				    char *, char *, char *, char *, char *);
 static int			 conf_notify_http(struct gotd_repo *,
-				    char *, char *, char *);
+				    char *, char *, char *, int);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
@@ -127,7 +127,7 @@ typedef struct {
 %token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 %token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT
-%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD
+%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD INSECURE
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -600,7 +600,7 @@ notifyflags	: BRANCH STRING {
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, NULL,
-				    NULL)) {
+				    NULL, 0)) {
 					free($2);
 					YYERROR;
 				}
@@ -611,7 +611,22 @@ notifyflags	: BRANCH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6)) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 0)) {
+					free($2);
+					free($4);
+					free($6);
+					YYERROR;
+				}
+			}
+			free($2);
+			free($4);
+			free($6);
+		}
+		| URL STRING USER STRING PASSWORD STRING INSECURE {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 1)) {
 					free($2);
 					free($4);
 					free($6);
@@ -767,6 +782,7 @@ lookup(char *s)
 		{ "deny",			DENY },
 		{ "email",			EMAIL },
 		{ "from",			FROM },
+		{ "insecure",			INSECURE },
 		{ "limit",			LIMIT },
 		{ "listen",			LISTEN },
 		{ "namespace",			NAMESPACE },
@@ -1535,7 +1551,8 @@ conf_notify_email(struct gotd_repo *repo, char *sender, char *recipient,
 }
 
 static int
-conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
+conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
+    int insecure)
 {
 	const struct got_error *error;
 	struct gotd_notification_target *target;
@@ -1565,10 +1582,13 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password)
 		goto done;
 	}
 
-	if (strcmp(proto, "http") == 0 && (user != NULL || password != NULL)) {
-		log_warnx("%s: WARNING: Using basic authentication over "
-		    "plaintext http:// will leak credentials; https:// is "
-		    "recommended for URL '%s'", getprogname(), url);
+	if (!insecure && strcmp(proto, "http") == 0 &&
+	    (user != NULL || password != NULL)) {
+		yyerror("%s: HTTP notifications with basic authentication "
+		    "over plaintext HTTP will leak credentials; add the "
+		    "'insecure' config keyword if this is intentional", url);
+		ret = -1;
+		goto done;
 	}
 
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
