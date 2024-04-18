@@ -165,7 +165,7 @@ while (1) {
 			warn "unknown method ". $req->method . "\n";
 			my $res = HTTP::Response->new(405,
 			    "Method not Allowed");
-
+			$client->send_response($res);
 			last;
 		}
 	}
