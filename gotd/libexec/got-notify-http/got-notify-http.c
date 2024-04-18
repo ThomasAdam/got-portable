@@ -25,8 +25,10 @@
 #include <netdb.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "got_opentemp.h"
@@ -34,6 +36,7 @@
 
 #include "bufio.h"
 #include "utf8d.h"
+#include "log.h"
 
 #define USERAGENT	 "got-notify-http/" GOT_VERSION_STR
 
@@ -836,6 +839,8 @@ main(int argc, char **argv)
 		err(1, "pledge");
 #endif
 
+	log_init(0, LOG_DAEMON);
+
 	while ((ch = getopt(argc, argv, "ch:p:r:")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -867,16 +872,16 @@ main(int argc, char **argv)
 	password = getenv("GOT_NOTIFY_HTTP_PASS");
 	if ((username != NULL && password == NULL) ||
 	    (username == NULL && password != NULL))
-		errx(1, "username or password are not specified");
+		fatalx("username or password are not specified");
 	if (username && *password == '\0')
-		errx(1, "password can't be empty");
+		fatalx("password can't be empty");
 
 	/* used by the regression test suite */
 	timeoutstr = getenv("GOT_NOTIFY_TIMEOUT");
 	if (timeoutstr) {
 		http_timeout = strtonum(timeoutstr, 0, 600, &errstr);
 		if (errstr != NULL)
-			errx(1, "timeout in seconds is %s: %s",
+			fatalx("timeout in seconds is %s: %s",
 			    errstr, timeoutstr);
 	}
 
@@ -885,15 +890,15 @@ main(int argc, char **argv)
 
 	tmpfp = got_opentemp();
 	if (tmpfp == NULL)
-		err(1, "opentemp");
+		fatal("opentemp");
 
 	jsonify(tmpfp, repo);
 
 	paylen = ftello(tmpfp);
 	if (paylen == -1)
-		err(1, "ftello");
+		fatal("ftello");
 	if (fseeko(tmpfp, 0, SEEK_SET) == -1)
-		err(1, "fseeko");
+		fatal("fseeko");
 
 #ifndef PROFILE
 	/* drop tmppath */
@@ -905,15 +910,15 @@ main(int argc, char **argv)
 	pfd.fd = dial(host, port);
 
 	if ((flags = fcntl(pfd.fd, F_GETFL)) == -1)
-		err(1, "fcntl(F_GETFL)");
+		fatal("fcntl(F_GETFL)");
 	if (fcntl(pfd.fd, F_SETFL, flags | O_NONBLOCK) == -1)
-		err(1, "fcntl(F_SETFL)");
+		fatal("fcntl(F_SETFL)");
 
 	if (bufio_init(&bio) == -1)
-		err(1, "bufio_init");
+		fatal("bufio_init");
 	bufio_set_fd(&bio, pfd.fd);
 	if (tls && bufio_starttls(&bio, host, 0, NULL, 0, NULL, 0) == -1)
-		err(1, "bufio_starttls");
+		fatal("bufio_starttls");
 
 #ifndef PROFILE
 	/* drop rpath dns inet */
@@ -936,19 +941,19 @@ main(int argc, char **argv)
 	    nonstd ? ":" : "", nonstd ? port : "",
 	    (long long)paylen, USERAGENT);
 	if (ret == -1)
-		err(1, "bufio_compose_fmt");
+		fatal("bufio_compose_fmt");
 
 	if (username) {
 		auth = basic_auth(username, password);
 		ret = bufio_compose_fmt(&bio, "Authorization: basic %s\r\n",
 		    auth);
 		if (ret == -1)
-			err(1, "bufio_compose_fmt");
+			fatal("bufio_compose_fmt");
 		free(auth);
 	}
 
 	if (bufio_compose(&bio, "\r\n", 2) == -1)
-		err(1, "bufio_compose");
+		fatal("bufio_compose");
 
 	while (!done) {
 		struct timespec	 elapsed, start, stop;
@@ -958,23 +963,23 @@ main(int argc, char **argv)
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		ret = ppoll(&pfd, 1, &timeout, NULL);
 		if (ret == -1)
-			err(1, "poll");
+			fatal("poll");
 		clock_gettime(CLOCK_MONOTONIC, &stop);
 		timespecsub(&stop, &start, &elapsed);
 		timespecsub(&timeout, &elapsed, &timeout);
 		if (ret == 0 || timeout.tv_sec <= 0)
-			errx(1, "timeout");
+			fatalx("timeout");
 
 		if (bio.wbuf.len > 0 && (pfd.revents & POLLOUT)) {
 			if (bufio_write(&bio) == -1 && errno != EAGAIN)
-				errx(1, "bufio_write: %s", bufio_io_err(&bio));
+				fatalx("bufio_write: %s", bufio_io_err(&bio));
 		}
 		if (pfd.revents & POLLIN) {
 			r = bufio_read(&bio);
 			if (r == -1 && errno != EAGAIN)
-				errx(1, "bufio_read: %s", bufio_io_err(&bio));
+				fatalx("bufio_read: %s", bufio_io_err(&bio));
 			if (r == 0)
-				errx(1, "unexpected EOF");
+				fatalx("unexpected EOF");
 
 			for (;;) {
 				line = buf_getdelim(&bio.rbuf, "\r\n", &len);
@@ -994,22 +999,22 @@ main(int argc, char **argv)
 				}
 				spc = strchr(line, ' ');
 				if (spc == NULL)
-					errx(1, "bad reply");
+					fatalx("bad HTTP response from server");
 				*spc++ = '\0';
 				if (strcasecmp(line, "HTTP/1.1") != 0)
-					errx(1, "unexpected protocol: %s",
+					log_warnx("unexpected protocol: %s",
 					    line);
 				line = spc;
 
 				spc = strchr(line, ' ');
 				if (spc == NULL)
-					errx(1, "bad reply");
+					fatalx("bad HTTP response from server");
 				*spc++ = '\0';
 
 				response_code = strtonum(line, 100, 599,
 				    &errstr);
 				if (errstr != NULL)
-					errx(1, "response code is %s: %s",
+					log_warnx("response code is %s: %s",
 					    errstr, line);
 
 				buf_drain(&bio.rbuf, len);
@@ -1022,16 +1027,16 @@ main(int argc, char **argv)
 			len = fread(buf, 1, sizeof(buf), tmpfp);
 			if (len == 0) {
 				if (ferror(tmpfp))
-					err(1, "fread");
+					fatal("fread");
 				continue;
 			}
 
 			if (bufio_compose(&bio, buf, len) == -1)
-				err(1, "buf_compose");
+				fatal("buf_compose");
 		}
 	}
 
 	if (response_code >= 200 && response_code < 300)
 		return 0;
-	errx(1, "request failed with code %d", response_code);
+	fatal("request failed with code %d", response_code);
 }
