@@ -972,58 +972,56 @@ main(int argc, char **argv)
 		if (ret == 0 || timeout.tv_sec <= 0)
 			fatalx("timeout");
 
-		if (bio.wbuf.len > 0 && (pfd.revents & POLLOUT)) {
+		if (bio.wbuf.len > 0) {
 			if (bufio_write(&bio) == -1 && errno != EAGAIN)
 				fatalx("bufio_write: %s", bufio_io_err(&bio));
 		}
-		if (pfd.revents & POLLIN) {
-			r = bufio_read(&bio);
-			if (r == -1 && errno != EAGAIN)
-				fatalx("bufio_read: %s", bufio_io_err(&bio));
-			if (r == 0)
-				fatalx("unexpected EOF");
 
-			for (;;) {
-				line = buf_getdelim(&bio.rbuf, "\r\n", &len);
-				if (line == NULL)
-					break;
-				if (response_code && *line == '\0') {
-					/*
-					 * end of headers, don't bother
-					 * reading the body, if there is.
-					 */
-					done = 1;
-					break;
-				}
-				if (response_code) {
-					buf_drain(&bio.rbuf, len);
-					continue;
-				}
-				spc = strchr(line, ' ');
-				if (spc == NULL)
-					fatalx("bad HTTP response from server");
-				*spc++ = '\0';
-				if (strcasecmp(line, "HTTP/1.1") != 0)
-					log_warnx("unexpected protocol: %s",
-					    line);
-				line = spc;
+		r = bufio_read(&bio);
+		if (r == -1 && errno != EAGAIN)
+			fatalx("bufio_read: %s", bufio_io_err(&bio));
+		if (r == 0)
+			fatalx("unexpected EOF");
 
-				spc = strchr(line, ' ');
-				if (spc == NULL)
-					fatalx("bad HTTP response from server");
-				*spc++ = '\0';
-
-				response_code = strtonum(line, 100, 599,
-				    &errstr);
-				if (errstr != NULL)
-					log_warnx("response code is %s: %s",
-					    errstr, line);
-
-				buf_drain(&bio.rbuf, len);
-			}
-			if (done)
+		for (;;) {
+			line = buf_getdelim(&bio.rbuf, "\r\n", &len);
+			if (line == NULL)
 				break;
+			if (response_code && *line == '\0') {
+				/*
+				 * end of headers, don't bother
+				 * reading the body, if there is.
+				 */
+				done = 1;
+				break;
+			}
+			if (response_code) {
+				buf_drain(&bio.rbuf, len);
+				continue;
+			}
+			spc = strchr(line, ' ');
+			if (spc == NULL)
+				fatalx("bad HTTP response from server");
+			*spc++ = '\0';
+			if (strcasecmp(line, "HTTP/1.1") != 0)
+				log_warnx("unexpected protocol: %s", line);
+			line = spc;
+
+			spc = strchr(line, ' ');
+			if (spc == NULL)
+				fatalx("bad HTTP response from server");
+			*spc++ = '\0';
+
+			response_code = strtonum(line, 100, 599,
+			    &errstr);
+			if (errstr != NULL)
+				log_warnx("response code is %s: %s",
+				    errstr, line);
+
+			buf_drain(&bio.rbuf, len);
 		}
+		if (done)
+			break;
 
 		if (!feof(tmpfp) && bio.wbuf.len < sizeof(buf)) {
 			len = fread(buf, 1, sizeof(buf), tmpfp);
