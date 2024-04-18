@@ -24,8 +24,8 @@
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -35,8 +35,8 @@
 #include "got_version.h"
 
 #include "bufio.h"
-#include "utf8d.h"
 #include "log.h"
+#include "utf8d.h"
 
 #define USERAGENT	 "got-notify-http/" GOT_VERSION_STR
 
