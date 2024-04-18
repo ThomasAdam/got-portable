@@ -2253,6 +2253,8 @@ main(int argc, char **argv)
 		 */
 		apply_unveil_none();
 
+		drop_privs(pw);
+
 		auth_main(title, &gotd.repos, repo_path);
 		/* NOTREACHED */
 		break;
@@ -2275,6 +2277,9 @@ main(int argc, char **argv)
 			if (repo == NULL)
 				fatalx("no repository for path %s", repo_path);
 		}
+
+		drop_privs(pw);
+
 		if (proc_id == PROC_SESSION_READ)
 			session_read_main(title, repo_path, pack_fds, temp_fds,
 			    &gotd.request_timeout, repo);
@@ -2352,6 +2357,8 @@ main(int argc, char **argv)
 		 * Limit "exec" promise to notification helpers via unveil(2).
 		 */
 		unveil_notification_helpers();
+
+		drop_privs(pw);
 
 		notify_main(title, &gotd.repos, default_sender);
 		/* NOTREACHED */
