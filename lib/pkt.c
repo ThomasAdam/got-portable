@@ -58,6 +58,30 @@ got_pkt_flushpkt(int fd, int chattygot)
 	return NULL;
 }
 
+const struct got_error *
+got_pkt_readlen(int *len, const char *str, int chattygot)
+{
+	int	 i;
+
+	*len = 0;
+	for (i = 0; i < 4; i++) {
+		if ('0' <= str[i] && str[i] <= '9') {
+			*len *= 16;
+			*len += str[i] - '0';
+		} else if ('a' <= str[i] && str[i] <= 'f') {
+			*len *= 16;
+			*len += str[i] - 'a' + 10;
+		} else {
+			if (chattygot)
+				fprintf(stderr, "%s: bad length: '.4%s'\n",
+				    getprogname(), str);
+			return got_error_msg(GOT_ERR_BAD_PACKET,
+			    "packet length has invalid format");
+		}
+	}
+	return NULL;
+}
+
 /*
  * Packet header contains a 4-byte hexstring which specifies the length
  * of data which follows.
@@ -65,12 +89,10 @@ got_pkt_flushpkt(int fd, int chattygot)
 const struct got_error *
 got_pkt_readhdr(int *datalen, int fd, int chattygot)
 {
-	static const struct got_error *err = NULL;
-	char lenstr[5];
-	long len;
-	char *e;
-	int n, i;
+	static const struct got_error *err;
+	char lenstr[4];
 	ssize_t r;
+	int n;
 
 	*datalen = 0;
 
@@ -87,35 +109,12 @@ got_pkt_readhdr(int *datalen, int fd, int chattygot)
 		return got_error_msg(GOT_ERR_BAD_PACKET,
 		    "wrong packet header length");
 
-	lenstr[4] = '\0';
-	for (i = 0; i < 4; i++) {
-		if (!isprint((unsigned char)lenstr[i]))
-			return got_error_msg(GOT_ERR_BAD_PACKET,
-			    "unprintable character in packet length field");
-	}
-	for (i = 0; i < 4; i++) {
-		if (!isxdigit((unsigned char)lenstr[i])) {
-			if (chattygot)
-				fprintf(stderr, "%s: bad length: '%s'\n",
-				    getprogname(), lenstr);
-			return got_error_msg(GOT_ERR_BAD_PACKET,
-			    "packet length not specified in hex");
-		}
-	}
-	errno = 0;
-	len = strtol(lenstr, &e, 16);
-	if (lenstr[0] == '\0' || *e != '\0')
-		return got_error(GOT_ERR_BAD_PACKET);
-	if (errno == ERANGE && (len == LONG_MAX || len == LONG_MIN))
-		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
-	if (len > INT_MAX || len < INT_MIN)
-		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
-	n = len;
+	err = got_pkt_readlen(&n, lenstr, chattygot);
 	if (n == 0)
-		return NULL;
+		return err;
 	if (n <= 4)
 		return got_error_msg(GOT_ERR_BAD_PACKET, "packet too short");
-	n  -= 4;
+	n -= 4;
 
 	*datalen = n;
 	return NULL;

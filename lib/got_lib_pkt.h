@@ -20,6 +20,7 @@
 const struct got_error *got_pkt_readn(ssize_t *off, int fd, void *buf,
     size_t n);
 const struct got_error *got_pkt_flushpkt(int fd, int chattygot);
+const struct got_error *got_pkt_readlen(int *len, const char *str, int chattygot);
 const struct got_error *got_pkt_readhdr(int *datalen, int fd, int chattygot);
 const struct got_error *got_pkt_readpkt(int *outlen, int fd, char *buf,
     int buflen, int chattygot);
