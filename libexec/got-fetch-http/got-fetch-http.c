@@ -466,13 +466,11 @@ upload_request(int https, const char *host, const char *port, const char *path,
 			goto err;
 		}
 
-		/* no idea why 0000 is not enough. */
 		if (t == 0) {
-			const char *x = "00000009done\n";
-			if (http_chunk(&bio, x, strlen(x)) ||
-			    http_chunk(&bio, NULL, 0))
+			const char *flushpkt = "0000";
+			if (http_chunk(&bio, flushpkt, strlen(flushpkt)))
 				goto err;
-			break;
+			continue; /* got-fetch-pack will send "done" */
 		}
 
 		if (t < 6) {
@@ -486,6 +484,16 @@ upload_request(int https, const char *host, const char *port, const char *path,
 
 		if (http_chunk(&bio, buf, t))
 			goto err;
+
+		/*
+		 * Once got-fetch-pack is done the server will
+		 * send pack file data.
+		 */
+		if (t == 9 && strncmp(buf + 4, "done\n", 5) == 0) {
+			if (http_chunk(&bio, NULL, 0))
+				goto err;
+			break;
+		}
 	}
 
 	if (http_parse_reply(&bio, &chunked, UPLOAD_PACK_RES) == -1)
