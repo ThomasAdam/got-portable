@@ -23,12 +23,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <syslog.h>
 #include <getopt.h>
 #include <err.h>
 #include <pwd.h>
 #include <netdb.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "log.h"
 
 #include "got_error.h"
 
@@ -60,7 +63,7 @@ dial(const char *host, const char *port)
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(host, port, &hints, &res0);
 	if (error)
-		errx(1, "failed to resolve %s:%s: %s", host, port,
+		fatalx("failed to resolve %s:%s: %s", host, port,
 		    gai_strerror(error));
 
 	s = -1;
@@ -86,7 +89,7 @@ dial(const char *host, const char *port)
 
 	freeaddrinfo(res0);
 	if (s == -1)
-		err(1, "%s", cause);
+		fatal("%s", cause);
 	return s;
 }
 
@@ -99,15 +102,15 @@ set_default_fromaddr(void)
 
 	pw = getpwuid(getuid());
 	if (pw == NULL) {
-		errx(1, "my UID %d was not found in password database",
+		fatalx("my UID %d was not found in password database",
 		    getuid());
 	}
 
 	if (gethostname(hostname, sizeof(hostname)) == -1)
-		err(1, "gethostname");
+		fatal("gethostname");
 
 	if (asprintf(&s, "%s@%s", pw->pw_name, hostname) == -1)
-		err(1, "asprintf");
+		fatal("asprintf");
 
 	return s;
 }
@@ -126,28 +129,28 @@ read_smtp_code(int s, const char *code)
 			break;
 
 		if (smtp_buflen == sizeof(smtp_buf))
-			errx(1, "line too long");
+			fatalx("line too long");
 
 		error = got_poll_fd(s, POLLIN, smtp_timeout);
 		if (error)
-			errx(1, "poll: %s", error->msg);
+			fatalx("poll: %s", error->msg);
 
 		r = read(s, smtp_buf + smtp_buflen,
 		    sizeof(smtp_buf) - smtp_buflen);
 		if (r == -1)
-			err(1, "read");
+			fatal("read");
 		if (r == 0)
-			errx(1, "unexpected EOF");
+			fatalx("unexpected EOF");
 		smtp_buflen += r;
 	}
 
 	linelen = endl - smtp_buf;
 	if (linelen < 3)
-		errx(1, "invalid SMTP response");
+		fatalx("invalid SMTP response");
 
 	if (strncmp(code, smtp_buf, 3) != 0) {
 		smtp_buf[3] = '\0';
-		warnx("unexpected SMTP message code: %s", smtp_buf);
+		log_warnx("unexpected SMTP message code: %s", smtp_buf);
 		return -1;
 	}
 
@@ -174,18 +177,18 @@ send_smtp_msg(int s, const char *fmt, ...)
 	len = vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 	if (len < 0) {
-		warn("vsnprintf");
+		log_warn("vsnprintf");
 		return -1;
 	}
 	if (len >= sizeof(buf)) {
-		warnx("%s: buffer too small for message '%s...'",
+		log_warnx("%s: buffer too small for message '%s...'",
 		    __func__, buf);
 		return -1;
 	}
 
 	error = got_poll_write_full(s, buf, len);
 	if (error) {
-		warnx("write: %s", error->msg);
+		log_warnx("write: %s", error->msg);
 		return -1;
 	}
 
@@ -227,66 +230,66 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 	datestr = get_datestr(&now, datebuf);
 
 	if (read_smtp_code(s, "220"))
-		errx(1, "unexpected SMTP greeting received");
+		fatalx("unexpected SMTP greeting received");
 
 	if (send_smtp_msg(s, "HELO localhost\r\n"))
-		errx(1, "could not send HELO");
+		fatalx("could not send HELO");
 	if (read_smtp_code(s, "250"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	if (send_smtp_msg(s, "MAIL FROM:<%s>\r\n", myfromaddr))
-		errx(1, "could not send MAIL FROM");
+		fatalx("could not send MAIL FROM");
 	if (read_smtp_code(s, "250"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	if (send_smtp_msg(s, "RCPT TO:<%s>\r\n", recipient))
-		errx(1, "could not send MAIL FROM");
+		fatalx("could not send MAIL FROM");
 	if (read_smtp_code(s, "250"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	if (send_smtp_msg(s, "DATA\r\n"))
-		errx(1, "could not send MAIL FROM");
+		fatalx("could not send MAIL FROM");
 	if (read_smtp_code(s, "354"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	if (send_smtp_msg(s, "From: %s\r\n", fromaddr))
-		errx(1, "could not send From header");
+		fatalx("could not send From header");
 	if (send_smtp_msg(s, "To: %s\r\n", recipient))
-		errx(1, "could not send To header");
+		fatalx("could not send To header");
 	if (replytoaddr) {
 		if (send_smtp_msg(s, "Reply-To: %s\r\n", replytoaddr))
-			errx(1, "could not send Reply-To header");
+			fatalx("could not send Reply-To header");
 	}
 	if (send_smtp_msg(s, "Date: %s +0000 (UTC)\r\n", datestr))
-		errx(1, "could not send Date header");
+		fatalx("could not send Date header");
 
 	if (send_smtp_msg(s, "Subject: %s\r\n", subject))
-		errx(1, "could not send Subject header");
+		fatalx("could not send Subject header");
 
 	if (send_smtp_msg(s, "\r\n"))
-		errx(1, "could not send body delimiter");
+		fatalx("could not send body delimiter");
 
 	while ((linelen = getline(&line, &linesize, stdin)) != -1) {
 		if (line[0] == '.') { /* dot stuffing */
 			error = got_poll_write_full(s, ".", 1);
 			if (error)
-				errx(1, "write: %s", error->msg);
+				fatalx("write: %s", error->msg);
 		}
 		error = got_poll_write_full(s, line, linelen);
 		if (error)
-			errx(1, "write: %s", error->msg);
+			fatalx("write: %s", error->msg);
 	}
 
 	if (send_smtp_msg(s, "\r\n.\r\n"))
-		errx(1, "could not send data terminator");
+		fatalx("could not send data terminator");
 	if (read_smtp_code(s, "250"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	if (send_smtp_msg(s, "QUIT\r\n"))
-		errx(1, "could not send QUIT");
+		fatalx("could not send QUIT");
 
 	if (read_smtp_code(s, "221"))
-		errx(1, "unexpected SMTP response received");
+		fatalx("unexpected SMTP response received");
 
 	close(s);
 	free(line);
@@ -304,6 +307,7 @@ main(int argc, char *argv[])
 	char *timeoutstr;
 	int ch, s;
 
+	log_init(0, LOG_DAEMON);
 	while ((ch = getopt(argc, argv, "f:r:s:h:p:")) != -1) {
 		switch (ch) {
 		case 'h':
@@ -339,7 +343,7 @@ main(int argc, char *argv[])
 	if (timeoutstr) {
 		smtp_timeout = strtonum(timeoutstr, 0, 600, &errstr);
 		if (errstr != NULL)
-			errx(1, "timeout in seconds is %s: %s",
+			fatalx("timeout in seconds is %s: %s",
 			    errstr, timeoutstr);
 	}
 
