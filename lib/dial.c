@@ -432,7 +432,7 @@ got_dial_http(pid_t *newpid, int *newfd, const char *host,
 		if (dup2(pfd[0], 1) == -1)
 			err(1, "dup2");
 		if (execv(GOT_PATH_PROG_FETCH_HTTP, (char *const *)argv) == -1)
-			err(1, "execv");
+			err(1, "execv %s", GOT_PATH_PROG_FETCH_HTTP);
 		abort(); /* not reached */
 	} else {
 		if (close(pfd[0]) == -1)
