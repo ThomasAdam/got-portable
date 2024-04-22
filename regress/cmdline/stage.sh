@@ -72,14 +72,13 @@ test_stage_directory() {
 
 	(cd $testroot/wt && got stage -R . > $testroot/stdout)
 
-	echo 'G  test' >> $testroot/stdout.expected
+	echo ' A test' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
-		return 1
 	fi
+	test_done "$testroot" "$ret"
 }
 
 test_stage_no_changes() {
@@ -3078,6 +3077,7 @@ EOF
 
 test_parseargs "$@"
 run_test test_stage_basic
+run_test test_stage_directory
 run_test test_stage_no_changes
 run_test test_stage_unversioned
 run_test test_stage_nonexistent
