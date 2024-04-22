@@ -37,7 +37,7 @@ test_stage_basic() {
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
 	echo ' A foo' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage > $testroot/stdout)
+	(cd $testroot/wt && got stage -R > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -45,6 +45,41 @@ test_stage_basic() {
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
+}
+
+test_stage_directory() {
+	local testroot=`test_init stage_directory`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && echo -n > test && got add test > /dev/null)
+	(cd $testroot/wt && got stage . > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	echo "got: staging directories requires -R option" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -R . > $testroot/stdout)
+
+	echo 'G  test' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 }
 
 test_stage_no_changes() {
@@ -109,7 +144,7 @@ test_stage_unversioned() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage > $testroot/stdout)
+	(cd $testroot/wt && got stage -R > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
@@ -189,7 +224,7 @@ test_stage_list() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
 
-	(cd $testroot/wt && got stage -l > $testroot/stdout)
+	(cd $testroot/wt && got stage -Rl > $testroot/stdout)
 	(cd $testroot/wt && got diff -s alpha | grep '^blob +' | \
 		cut -d' ' -f3 | tr -d '\n' > $testroot/stdout.expected)
 	echo " M alpha" >> $testroot/stdout.expected
@@ -1276,7 +1311,7 @@ test_stage_commit_out_of_date() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got unstage > /dev/null)
+	(cd $testroot/wt && got unstage -R > /dev/null)
 	(cd $testroot/wt && got update > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1300,7 +1335,7 @@ test_stage_commit_out_of_date() {
 	# resolve conflict
 	echo "resolved file" > $testroot/wt/alpha
 
-	(cd $testroot/wt && got stage > /dev/null)
+	(cd $testroot/wt && got stage -R > /dev/null)
 
 	(cd $testroot/wt && got commit -m "try again" > $testroot/stdout)
 	ret=$?
@@ -1623,7 +1658,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/wt && got unstage >/dev/null)
+	(cd $testroot/wt && got unstage -R >/dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
@@ -2252,7 +2287,7 @@ test_stage_patch_quit() {
 	# stage first hunk and quit; and don't pass a path argument to
 	# ensure that we don't skip asking about the 'zzz' file after 'quit'
 	printf "y\nq\nn\n" > $testroot/patchscript
-	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+	(cd $testroot/wt && got stage -R -F $testroot/patchscript -p \
 		> $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -2362,7 +2397,7 @@ test_stage_patch_incomplete_script() {
 
 	# stage first hunk and then stop responding; got should error out
 	printf "y\n" > $testroot/patchscript
-	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+	(cd $testroot/wt && got stage -R -F $testroot/patchscript -p \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -2464,7 +2499,7 @@ test_stage_symlink() {
 	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
-	(cd $testroot/wt && got stage > $testroot/stdout 2> $testroot/stderr)
+	(cd $testroot/wt && got stage -R > $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got stage succeeded unexpectedly" >&2
@@ -2482,7 +2517,7 @@ test_stage_symlink() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage -S > $testroot/stdout)
+	(cd $testroot/wt && got stage -RS > $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
  M alpha.link
@@ -2778,7 +2813,7 @@ test_stage_patch_symlink() {
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
 	printf "y\nn\ny\nn\ny\ny\ny" > $testroot/patchscript
-	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+	(cd $testroot/wt && got stage -R -F $testroot/patchscript -p \
 		> $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
