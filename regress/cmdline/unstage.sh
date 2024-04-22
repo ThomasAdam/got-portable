@@ -100,9 +100,8 @@ test_unstage_directory() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
-		return 1
 	fi
+	test_done "$testroot" "$ret"
 }
 
 test_unstage_unversioned() {
