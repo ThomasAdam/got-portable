@@ -29,6 +29,7 @@
 #include <tls.h>
 #include <unistd.h>
 
+#include "got_error.h"
 #include "got_version.h"
 
 #include "got_lib_pkt.h"
@@ -346,14 +347,16 @@ http_chunk(struct bufio *bio, const void *buf, size_t len)
 static int
 get_refs(int https, const char *host, const char *port, const char *path)
 {
-	struct bufio	 bio;
-	char		 buf[GOT_PKT_MAX];
-	const char	*errstr, *sufx = "/info/refs";
-	size_t		 skip, chunksz = 0;
-	ssize_t		 r;
-	int		 chunked;
-	int		 sock;
-	int		 ret = -1;
+	struct bufio		 bio;
+	char			 buf[GOT_PKT_MAX];
+	const struct got_error	*e;
+	const char		*sufx = "/info/refs";
+	size_t			 chunksz = 0;
+	ssize_t			 r;
+	int			 skip;
+	int			 chunked;
+	int			 sock;
+	int			 ret = -1;
 
 	if ((sock = dial(https, host, port)) == -1)
 		return -1;
@@ -380,10 +383,10 @@ get_refs(int https, const char *host, const char *port, const char *path)
 	r = http_read(&bio, chunked, &chunksz, buf, 4);
 	if (r <= 0)
 		goto err;
-	buf[4] = '\0';
-	skip = hexstrtonum(buf, 0, INT_MAX, &errstr);
-	if (errstr != NULL) {
-		warnx("pktlen is %s", errstr);
+
+	e = got_pkt_readlen(&skip, buf, verbose);
+	if (e) {
+		warnx("%s", e->msg);
 		goto err;
 	}
 
@@ -419,15 +422,15 @@ static int
 upload_request(int https, const char *host, const char *port, const char *path,
     FILE *in)
 {
-	struct bufio	 bio;
-	const char	*errstr;
-	char		 buf[GOT_PKT_MAX];
-	ssize_t		 r;
-	size_t		 chunksz = 0;
-	long long	 t;
-	int		 chunked;
-	int		 sock;
-	int		 ret = -1;
+	struct bufio		 bio;
+	char			 buf[GOT_PKT_MAX];
+	const struct got_error	*e;
+	ssize_t			 r;
+	size_t			 chunksz = 0;
+	int			 t;
+	int			 chunked;
+	int			 sock;
+	int			 ret = -1;
 
 	if ((sock = dial(https, host, port)) == -1)
 		return -1;
@@ -459,10 +462,9 @@ upload_request(int https, const char *host, const char *port, const char *path,
 		if (r != 4)
 			goto err;
 
-		buf[4] = '\0';
-		t = hexstrtonum(buf, 0, sizeof(buf), &errstr);
-		if (errstr != NULL) {
-			warnx("pktline len is %s", errstr);
+		e = got_pkt_readlen(&t, buf, verbose);
+		if (e) {
+			warnx("%s", e->msg);
 			goto err;
 		}
 
