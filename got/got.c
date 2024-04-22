@@ -8029,7 +8029,7 @@ add_progress(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
-check_paths_contains_dir(int *contains_dir, struct got_worktree *worktree,
+pathlist_contains_directory(int *contains_dir, struct got_worktree *worktree,
     struct got_pathlist_head *paths)
 {
 	const struct got_error *error = NULL;
@@ -8135,7 +8135,8 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = check_paths_contains_dir(&contains_dir, worktree, &paths);
+		error = pathlist_contains_directory(&contains_dir, worktree,
+		    &paths);
 		if (error != NULL)
 			goto done;
 
@@ -8282,7 +8283,8 @@ cmd_remove(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = check_paths_contains_dir(&contains_dir, worktree, &paths);
+		error = pathlist_contains_directory(&contains_dir, worktree,
+		    &paths);
 		if (error != NULL)
 			goto done;
 
@@ -8996,7 +8998,8 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = check_paths_contains_dir(&contains_dir, worktree, &paths);
+		error = pathlist_contains_directory(&contains_dir, worktree,
+		    &paths);
 		if (error != NULL)
 			goto done;
 
@@ -13923,7 +13926,7 @@ cmd_stage(int argc, char *argv[])
 		    print_stage, NULL, check_cancelled, NULL);
 	else {
 		if (!can_recurse) {
-			error = check_paths_contains_dir(&contains_dir,
+			error = pathlist_contains_directory(&contains_dir,
 			    worktree, &paths);
 			if (error != NULL)
 				goto done;
@@ -14059,7 +14062,7 @@ cmd_unstage(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = check_paths_contains_dir(&contains_dir,
+		error = pathlist_contains_directory(&contains_dir,
 		    worktree, &paths);
 		if (error != NULL)
 			goto done;
