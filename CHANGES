@@ -1,3 +1,27 @@
+* got 0.98; 2024-04-23
+  see git repository history for per-change authorship information
+- speed up got tag -l by caching timestamps in got_ref_cmp_tags() 
+- provide a macro for vi(1) path for use by -portable at compile time
+- avoid a rename/stat race when gotd installs a new pack and then uses it
+- make 'got ref -l' output consistent when packed references exist
+- make 'got ref -l' work consistently when a reference argument is given
+- add initial support for notifications to gotd(8), via email and http/json
+- display process title in syslog when a gotd child process exits
+- hide a pointless end-of-file error on imsg pipe in libexec helpers
+- plug a memory leak in 'got blame'
+- add support for topological sorting to the commit graph
+- add log -t option which enables topological sorting of commits
+- make 'got rebase' find a merge base with topological sorting if needed
+- call unveil(2) earlier during import, commit, histedit, and tag commands
+- make 'got status' display interrupted rebase, histedit, and merge operations
+- got.1: escape Eq since it's a GNU roff macro, to fix rendering in -portable
+- regress: use seq instead of jot, for portability reasons
+- get rid of unnecessary "dns inet" pledge promises while fetching via git://
+- add http clone/fetch support using a new got-fetch-http helper
+- drop git+ssh protocol name from documentation; Git has done the same
+- require -R option for staging or unstaging directory contents
+- got patch: fix applying on empty files
+
 * got 0.97; 2024-03-11
   see git repository history for per-change authorship information
 - improve error messages shown upon execv failure 
