@@ -415,15 +415,18 @@ locate_hunk(FILE *orig, struct got_patch_hunk *h, off_t *pos, int *lineno)
 	int mangled = 0, match_lineno = -1;
 
 	for (;;) {
+		(*lineno)++;
 		linelen = getline(&line, &linesize, orig);
 		if (linelen == -1) {
 			if (ferror(orig))
 				err = got_error_from_errno("getline");
-			else if (match == -1)
+			/* An EOF is fine iff the target file is empty. */
+			if (feof(orig) && match == -1 && h->old_lines != 0)
 				err = got_error(GOT_ERR_HUNK_FAILED);
+			match = 0;
+			match_lineno = (*lineno)-1;
 			break;
 		}
-		(*lineno)++;
 
 		if ((mode == ' ' && lines_eq(l, line, linelen, &mangled)) ||
 		    (mode == '-' && lines_eq(l, line, linelen, &mangled)) ||

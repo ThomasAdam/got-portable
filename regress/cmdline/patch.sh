@@ -811,6 +811,41 @@ EOF
 	test_done $testroot $ret
 }
 
+test_patch_empty_file() {
+	local testroot=`test_init patch_empty_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo -n > $testroot/wt/alpha
+	(cd "$testroot/wt" && got commit -m 'edit alpha' alpha) >/dev/null
+	cat <<EOF >$testroot/wt/patch
+--- alpha
++++ alpha
+@@ -0,0 +1 @@
++alpha
+EOF
+
+	(cd $testroot/wt && got patch patch) > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done $testroot $ret
+}
+
 test_patch_prefer_new_path() {
 	local testroot=`test_init patch_orig`
 
@@ -2052,6 +2087,7 @@ run_test test_patch_nop
 run_test test_patch_preserve_perm
 run_test test_patch_create_dirs
 run_test test_patch_with_offset
+run_test test_patch_empty_file
 run_test test_patch_prefer_new_path
 run_test test_patch_no_newline
 run_test test_patch_strip
