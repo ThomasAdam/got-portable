@@ -1629,24 +1629,6 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 	return NULL;
 }
 
-static char *
-get_datestr(time_t *time, char *datebuf)
-{
-	struct tm mytm, *tm;
-	char *p, *s;
-
-	tm = gmtime_r(time, &mytm);
-	if (tm == NULL)
-		return NULL;
-	s = asctime_r(tm, datebuf);
-	if (s == NULL)
-		return NULL;
-	p = strchr(s, '\n');
-	if (p)
-		*p = '\0';
-	return s;
-}
-
 static const struct got_error *
 notify_removed_ref(const char *refname, uint8_t *sha1,
     struct gotd_imsgev *iev, int fd)
@@ -1688,8 +1670,6 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 	char *id_str = NULL, *logmsg0 = NULL;
 	char *s, *nl;
 	char *committer = NULL, *author = NULL;
-	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
-	struct tm tm;
 	time_t committer_time;
 
 	err = got_object_id_str(&id_str, id);
@@ -1697,14 +1677,6 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 		return err;
 
 	committer_time = got_object_commit_get_committer_time(commit);
-	if (gmtime_r(&committer_time, &tm) == NULL) {
-		err = got_error_from_errno("gmtime_r");
-		goto done;
-	}
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0) {
-		err = got_error(GOT_ERR_NO_SPACE);
-		goto done;
-	}
 
 	err = got_object_commit_get_logmsg(&logmsg0, commit);
 	if (err)
@@ -1726,16 +1698,12 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		dprintf(fd, "%s%.7s %.8s %s\n", datebuf, id_str,
-		    format_author(author), s);
+		dprintf(fd, "%lld %.7s %.8s %s\n", (long long)committer_time,
+		    id_str, format_author(author), s);
 	} else {
 		committer = strdup(got_object_commit_get_committer(commit));
-		if (committer == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		dprintf(fd, "%s%.7s %.8s %s\n", datebuf, id_str,
-		    format_author(committer), s);
+		dprintf(fd, "%lld %.7s %.8s %s\n", (long long)committer_time,
+		    id_str, format_author(committer), s);
 	}
 
 	if (fsync(fd) == -1 && err == NULL)
@@ -1775,8 +1743,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_diffstat_cb_arg *diffstat, int fd)
 {
 	const struct got_error *err = NULL;
-	char *id_str, *datestr, *logmsg0, *logmsg, *line;
-	char datebuf[26];
+	char *id_str, *logmsg0, *logmsg, *line;
 	time_t committer_time;
 	const char *author, *committer;
 
@@ -1793,9 +1760,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	if (strcmp(author, committer) != 0)
 		dprintf(fd, "via: %s\n", committer);
 	committer_time = got_object_commit_get_committer_time(commit);
-	datestr = get_datestr(&committer_time, datebuf);
-	if (datestr)
-		dprintf(fd, "date: %s UTC\n", datestr);
+	dprintf(fd, "date: %lld\n", (long long)committer_time);
 	if (got_object_commit_get_nparents(commit) > 1) {
 		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *qid;
@@ -2004,8 +1969,7 @@ print_tag(struct got_object_id *id,
 	const struct got_error *err = NULL;
 	struct got_tag_object *tag = NULL;
 	const char *tagger = NULL;
-	char *id_str = NULL, *tagmsg0 = NULL, *tagmsg, *line, *datestr;
-	char datebuf[26];
+	char *id_str = NULL, *tagmsg0 = NULL, *tagmsg, *line;
 	time_t tagger_time;
 
 	err = got_object_open_as_tag(&tag, repo, id);
@@ -2021,9 +1985,7 @@ print_tag(struct got_object_id *id,
 
 	dprintf(fd, "tag %s\n", refname);
 	dprintf(fd, "from: %s\n", tagger);
-	datestr = get_datestr(&tagger_time, datebuf);
-	if (datestr)
-		dprintf(fd, "date: %s UTC\n", datestr);
+	dprintf(fd, "date: %lld\n", (long long)tagger_time);
 
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_BLOB:

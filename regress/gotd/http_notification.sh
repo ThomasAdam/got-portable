@@ -57,8 +57,6 @@ test_file_changed() {
 
 	wait %1 # wait for the http "server"
 
-	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-
 	touch "$testroot/stdout.expected"
 	ed -s "$testroot/stdout.expected" <<-EOF
 	a
@@ -79,7 +77,7 @@ test_file_changed() {
 			"mail":"$GIT_AUTHOR_EMAIL",
 			"user":"$GOT_AUTHOR_11"
 		},
-		"date":"$d",
+		"date":$author_time,
 		"short_message":"make changes",
 		"message":"make changes\n",
 		"diffstat":{
@@ -150,8 +148,6 @@ test_bad_utf8() {
 
 	wait %1 # wait for the http "server"
 
-	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-
 	touch "$testroot/stdout.expected"
 	ed -s "$testroot/stdout.expected" <<-EOF
 	a
@@ -172,7 +168,7 @@ test_bad_utf8() {
 			"mail":"$GIT_AUTHOR_EMAIL",
 			"user":"$GOT_AUTHOR_11"
 		},
-		"date":"$d",
+		"date":$author_time,
 		"short_message":"make\uFFFD\uFFFDchanges",
 		"message":"make\uFFFD\uFFFDchanges\n",
 		"diffstat":{
@@ -228,8 +224,7 @@ test_many_commits_not_summarized() {
 		(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
 		local commit_id=`git_show_head $testroot/repo-clone`
 		local author_time=`git_show_author_time $testroot/repo-clone`
-		d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-		set -- "$@" "$commit_id $d"
+		set -- "$@" "$commit_id $author_time"
 	done
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
@@ -273,7 +268,7 @@ test_many_commits_not_summarized() {
 				"mail":"$GIT_AUTHOR_EMAIL",
 				"user":"$GOT_AUTHOR_11"
 			},
-			"date":"$commit_time",
+			"date":$commit_time,
 			"short_message":"make changes",
 			"message":"make changes\n",
 			"diffstat":{
@@ -333,8 +328,7 @@ test_many_commits_summarized() {
 		local commit_id=`git_show_head $testroot/repo-clone`
 		local short_commit_id=`trim_obj_id 33 $commit_id`
 		local author_time=`git_show_author_time $testroot/repo-clone`
-		d=`date -u -r $author_time +"%G-%m-%d"`
-		set -- "$@" "$short_commit_id $d"
+		set -- "$@" "$short_commit_id $author_time"
 	done
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
@@ -355,7 +349,7 @@ test_many_commits_summarized() {
 	for i in `seq 1 51`; do
 		s=`pop_idx $i "$@"`
 		commit_id=$(echo $s | cut -d' ' -f1)
-		commit_time=$(echo "$s" | sed -e "s/^$commit_id //g")
+		commit_time=$(echo "$s" | cut -d' ' -f2)
 
 		echo "$comma"
 		comma=','
@@ -369,7 +363,7 @@ test_many_commits_summarized() {
 			"committer":{
 				"user":"$GOT_AUTHOR_8"
 			},
-			"date":"$commit_time",
+			"date":$commit_time,
 			"short_message":"make changes"
 		}
 		EOF
@@ -430,8 +424,6 @@ test_branch_created() {
 
 	wait %1 # wait for the http "server"
 
-	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-
 	# in the future it should contain something like this too
 	# {
 	# 	"type":"new-branch",
@@ -460,7 +452,7 @@ test_branch_created() {
 			"mail":"$GIT_AUTHOR_EMAIL",
 			"user":"$GOT_AUTHOR_11"
 		},
-		"date":"$d",
+		"date":$author_time,
 		"short_message":"newbranch",
 		"message":"newbranch\n",
 		"diffstat":{
@@ -572,8 +564,6 @@ test_tag_created() {
 
 	wait %1 # wait for the http "server"
 
-	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
-
 	touch "$testroot/stdout.expected"
 	ed -s "$testroot/stdout.expected" <<-EOF
 	a
@@ -587,7 +577,7 @@ test_tag_created() {
 			"mail":"$GIT_AUTHOR_EMAIL",
 			"user":"$GOT_AUTHOR_11"
 		},
-		"date":"$d",
+		"date":$tagger_time,
 		"object":{
 			"type":"commit",
 			"id":"$commit_id"
@@ -650,8 +640,6 @@ test_tag_changed() {
 
 	wait %1 # wait for the http "server"
 
-	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
-
 	# XXX: at the moment this is exactly the same as the "new tag"
 	# notification
 
@@ -668,7 +656,7 @@ test_tag_changed() {
 			"mail":"$GIT_AUTHOR_EMAIL",
 			"user":"$GOT_AUTHOR_11"
 		},
-		"date":"$d",
+		"date":$tagger_time,
 		"object":{
 			"type":"commit",
 			"id":"$commit_id"
