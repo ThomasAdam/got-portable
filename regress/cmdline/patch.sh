@@ -823,25 +823,80 @@ test_patch_empty_file() {
 
 	echo -n > $testroot/wt/alpha
 	(cd "$testroot/wt" && got commit -m 'edit alpha' alpha) >/dev/null
+
+	# try a patch which re-adds file contents; should suceeed
 	cat <<EOF >$testroot/wt/patch
 --- alpha
 +++ alpha
 @@ -0,0 +1 @@
 +alpha
 EOF
-
 	(cd $testroot/wt && got patch patch) > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done $testroot $ret
 		return 1
 	fi
-
 	echo 'M  alpha' > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert -R . > /dev/null)
+
+	# try a patch which edits the file; should fail
+	cat <<EOF >$testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++beta
+EOF
+	(cd $testroot/wt && got patch patch) > $testroot/stdout \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got patch suceeded unexpectedly" >&2
+		test_done $testroot $ret
+		return 1
+	fi
+
+	echo 'got: patch failed to apply' > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done $testroot $ret
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert -R . > /dev/null)
+
+	# try a patch which deletes lines from the file; should fail
+	cat <<EOF >$testroot/wt/patch
+--- alpha
++++ alpha
+@@ -1,2 +0 @@
+-alpha
+-beta
+EOF
+	(cd $testroot/wt && got patch patch) > $testroot/stdout \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got patch suceeded unexpectedly" >&2
+		test_done $testroot $ret
+		return 1
+	fi
+	echo 'got: patch failed to apply' > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done $testroot $ret
 }
