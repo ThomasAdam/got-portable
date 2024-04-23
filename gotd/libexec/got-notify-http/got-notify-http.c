@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "got_opentemp.h"
@@ -155,6 +156,12 @@ json_field(FILE *fp, const char *key, const char *val, int comma)
 }
 
 static void
+json_date(FILE *fp, const char *key, const char *date, int comma)
+{
+	fprintf(fp, "\"%s\":%s%s", key, date, comma ? "," : "");
+}
+
+static void
 json_author(FILE *fp, const char *type, char *address, int comma)
 {
 	char	*gt, *lt, *at, *email, *endname;
@@ -249,7 +256,7 @@ jsonify_commit_short(FILE *fp, char *line, const char *repo)
 	json_field(fp, "repo", repo, 1);
 	json_field(fp, "id", id, 1);
 	json_author(fp, "committer", author, 1);
-	json_field(fp, "date", date, 1);
+	json_date(fp, "date", date, 1);
 	json_field(fp, "short_message", message, 0);
 	fprintf(fp, "}");
 
@@ -333,7 +340,7 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 			/* optional */
 			if (!strncmp(l, "date: ", 6)) {
 				l += 6;
-				json_field(fp, "date", l, 1);
+				json_date(fp, "date", l, 1);
 				phase = P_PARENT;
 				break;
 			}
@@ -600,7 +607,7 @@ jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 			/* optional */
 			if (!strncmp(l, "date: ", 6)) {
 				l += 6;
-				json_field(fp, "date", l, 1);
+				json_date(fp, "date", l, 1);
 				phase = P_OBJECT;
 				break;
 			}

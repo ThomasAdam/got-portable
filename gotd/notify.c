@@ -240,7 +240,7 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 		argv[i++] = "-h";
 		argv[i++] = target->conf.email.hostname;
 	}
-	
+
 	if (target->conf.email.port) {
 		argv[i++] = "-p";
 		argv[i++] = target->conf.email.port;

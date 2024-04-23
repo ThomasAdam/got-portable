@@ -19,12 +19,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <syslog.h>
 #include <getopt.h>
 #include <err.h>
@@ -215,6 +217,39 @@ get_datestr(time_t *time, char *datebuf)
 	return s;
 }
 
+static const struct got_error *
+print_date(int s, char *date, int shortfmt)
+{
+	const struct got_error	*error;
+	struct tm		 tm;
+	char			*t, datebuf[26];
+	const char		*errstr;
+	time_t			 ts;
+
+	date[strcspn(date, " \n")] = '\0';
+
+	ts = strtonum(date, INT64_MIN, INT64_MAX, &errstr);
+	if (errstr)
+		return got_error_set_errno(EINVAL, errstr);
+	if (gmtime_r(&ts, &tm) == NULL)
+		return got_error_set_errno(EINVAL, "gmtime_r");
+
+	if (!shortfmt) {
+		t = asctime_r(&tm, datebuf);
+		if (t == NULL)
+			return got_error_set_errno(EINVAL, "invalid timestamp");
+		t[strcspn(t, "\n")] = '\0';
+		error = got_poll_write_full(s, t, strlen(t));
+		if (error)
+			return error;
+		return got_poll_write_full(s, " UTC\n", 5);
+	}
+
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0)
+		return got_error_set_errno(EINVAL, "invalid timestamp");
+	return got_poll_write_full(s, datebuf, strlen(datebuf));
+}
+
 static void
 send_email(int s, const char *myfromaddr, const char *fromaddr,
     const char *recipient, const char *replytoaddr,
@@ -225,6 +260,7 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 	size_t linesize = 0;
 	ssize_t linelen;
 	time_t now;
+	int firstline = 1, shortfmt = 0;
 	char datebuf[26];
 	char *datestr;
 
@@ -272,11 +308,39 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 		fatalx("could not send body delimiter");
 
 	while ((linelen = getline(&line, &linesize, stdin)) != -1) {
+		if (firstline && isdigit((unsigned char)line[0]))
+			shortfmt = 1;
+		firstline = 0;
+
 		if (line[0] == '.') { /* dot stuffing */
 			error = got_poll_write_full(s, ".", 1);
 			if (error)
 				fatalx("write: %s", error->msg);
 		}
+
+		if (shortfmt) {
+			char *t;
+			t = strchr(line, ' ');
+			if (t != NULL) {
+				*t++ = '\0';
+				error = print_date(s, line, shortfmt);
+				if (error)
+					fatalx("write: %s", error->msg);
+				error = got_poll_write_full(s, t, strlen(t));
+				continue;
+			}
+		}
+
+		if (!shortfmt && !strncmp(line, "date: ", 6)) {
+			error = got_poll_write_full(s, line, 6);
+			if (error)
+				fatalx("write: %s", error->msg);
+			error = print_date(s, line + 6, shortfmt);
+			if (error)
+				fatalx("write: %s", error->msg);
+			continue;
+		}
+
 		error = got_poll_write_full(s, line, linelen);
 		if (error)
 			fatalx("write: %s", error->msg);

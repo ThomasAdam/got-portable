@@ -402,14 +402,7 @@ Has the same fields as the
 .Dv committer
 but may be unset.
 .It Dv date
-String representation of the date as
-.Xr strftime 3
-.Sq %G-%m-%d
-if
-.Dv short
-is set or
-.Sq %a %b %e %X %Y UTC
-otherwise.
+Number, representing the number of seconds since the Epoch in UTC.
 .It Dv short_message
 The first line of the commit message.
 This field is always set.
@@ -474,7 +467,7 @@ field for the
 .Dv commit
 notification but with all the field guaranteed to be set.
 .It Dv date
-The tag date.
+Number, representing the number of seconds since the Epoch in UTC.
 .It Dv object
 The object being tagged.
 It contains the fields
