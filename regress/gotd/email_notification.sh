@@ -202,7 +202,7 @@ test_many_commits_summarized() {
 		local commit_id=`git_show_head $testroot/repo-clone`
 		local short_commit_id=`trim_obj_id 33 $commit_id`
 		local author_time=`git_show_author_time $testroot/repo-clone`
-		d=`date -u -r $author_time +"%G-%m-%d"`
+		d=`date -u -r $author_time +"%F"`
 		set -- "$@" "$short_commit_id $d"
 	done
 

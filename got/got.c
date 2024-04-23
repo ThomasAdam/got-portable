@@ -4251,7 +4251,7 @@ print_commit_oneline(struct got_commit_object *commit, struct got_object_id *id,
 		err = got_error_from_errno("gmtime_r");
 		goto done;
 	}
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0) {
+	if (strftime(datebuf, sizeof(datebuf), "%F ", &tm) == 0) {
 		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
@@ -5727,8 +5727,7 @@ blame_cb(void *arg, int nlines, int lineno,
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("gmtime_r");
-	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%G-%m-%d",
-	    &tm) == 0) {
+	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%F", &tm) == 0) {
 		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
@@ -10967,7 +10966,7 @@ get_commit_brief_str(char **brief_str, struct got_commit_object *commit)
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("gmtime_r");
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d", &tm) == 0)
+	if (strftime(datebuf, sizeof(datebuf), "%F", &tm) == 0)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	author0 = strdup(got_object_commit_get_author(commit));

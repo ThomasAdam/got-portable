@@ -41,7 +41,7 @@ test_blame_basic()
 	(cd $testroot/wt && got commit -m "c change" > /dev/null)
 	local commit_id4=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 WAIT_FOR_UI	wait for blame to finish
@@ -83,7 +83,7 @@ test_blame_commit_keywords()
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 	local author_time=$(git_show_author_time "$repo")
-	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+	local ymd=$(date -u -r $author_time +"%F")
 
 	set -- "$id"
 
@@ -168,7 +168,7 @@ test_blame_commit_keywords()
 	done
 
 	author_time=$(git_show_author_time "$repo")
-	ymd=$(date -u -r $author_time +"%G-%m-%d")
+	ymd=$(date -u -r $author_time +"%F")
 
 	# :base:- keyword in work tree
 	cat <<-EOF >$testroot/view.expected
