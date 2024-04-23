@@ -319,9 +319,9 @@ no" > /dev/null)
 	local commit_id2=`git_show_head $testroot/repo`
 	local author_time2=`git_show_author_time $testroot/repo`
 
-	d=`date -u -r $author_time1 +"%G-%m-%d"`
+	d=`date -u -r $author_time1 +"%F"`
 	printf "$d %-7s test oneline\n" master > $testroot/stdout.expected
-	d=`date -u -r $author_time2 +"%G-%m-%d"`
+	d=`date -u -r $author_time2 +"%F"`
 	printf "$d %.7s test oneline\n" $commit_id1 >> $testroot/stdout.expected
 
 	(cd $testroot/repo && got log -s | head -n 2 > $testroot/stdout)
@@ -963,7 +963,7 @@ EOF
 test_log_commit_keywords() {
 	local testroot=$(test_init log_commit_keywords)
 	local commit_time=`git_show_author_time $testroot/repo`
-	local d=`date -u -r $commit_time +"%G-%m-%d"`
+	local d=`date -u -r $commit_time +"%F"`
 
 	set -- "$(git_show_head $testroot/repo)"
 
@@ -1280,11 +1280,11 @@ test_log_toposort() {
 	local short_commit2=`trim_obj_id 33 $commit2`
 	local short_commit3=`trim_obj_id 33 $commit3`
 
-	d_0=`date -u -r $author_time0 +"%G-%m-%d"`
-	d_1=`date -u -r $author_time1 +"%G-%m-%d"`
-	d_2=`date -u -r $author_time2 +"%G-%m-%d"`
-	d_3=`date -u -r $author_time3 +"%G-%m-%d"`
-	d_m=`date -u -r $merge_time +"%G-%m-%d"`
+	d_0=`date -u -r $author_time0 +"%F"`
+	d_1=`date -u -r $author_time1 +"%F"`
+	d_2=`date -u -r $author_time2 +"%F"`
+	d_3=`date -u -r $author_time3 +"%F"`
+	d_m=`date -u -r $merge_time +"%F"`
 
 	got log -r $testroot/repo -s -b -t > $testroot/stdout
 	cat > $testroot/stdout.expected <<EOF

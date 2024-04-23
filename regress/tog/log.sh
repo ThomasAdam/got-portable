@@ -23,7 +23,7 @@ test_log_hsplit_diff()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 KEY_ENTER	open diff view of selected commit
@@ -78,7 +78,7 @@ test_log_vsplit_diff()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 	local blobid_alpha=`get_blob_id $testroot/repo "" alpha`
 	local blobid_beta=`get_blob_id $testroot/repo "" beta`
 
@@ -134,7 +134,7 @@ test_log_show_author()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 	local head_id_len8=`trim_obj_id 32 $head_id`
 
 	echo "mod alpha" > $testroot/repo/alpha
@@ -177,7 +177,7 @@ test_log_scroll_right()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 	local msg="scroll this log message to the right four characters"
 	local scrolled_msg="ter] scroll this log message to the right four character"
 
@@ -217,7 +217,7 @@ test_log_hsplit_ref()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 R		open ref view
@@ -258,7 +258,7 @@ test_log_hsplit_tree()
 	local head_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
-	local ymd=`date -u -r $author_time +"%G-%m-%d"`
+	local ymd=`date -u -r $author_time +"%F"`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 T		open tree view
@@ -361,7 +361,7 @@ test_log_commit_keywords()
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 	local author_time=$(git_show_author_time "$repo")
-	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+	local ymd=$(date -u -r $author_time +"%F")
 
 	set -- "$id"
 
@@ -519,7 +519,7 @@ test_log_show_base_commit()
 
 	local head_id=$(git_show_head "$repo")
 	local author_time=$(git_show_author_time "$repo")
-	local ymd=$(date -u -r "$author_time" +"%G-%m-%d")
+	local ymd=$(date -u -r "$author_time" +"%F")
 
 	# check up-to-date base commit marker prefixes base commit log message
 	cat <<-EOF >$TOG_TEST_SCRIPT
@@ -638,7 +638,7 @@ test_log_limit_view()
 		return 1
 	fi
 	local author_time=$(git_show_author_time "$repo")
-	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+	local ymd=$(date -u -r $author_time +"%F")
 	local id=$(git_show_head "$repo")
 
 	# check base commit marker is not drawn
@@ -698,7 +698,7 @@ test_log_search()
 	done
 
 	local author_time=$(git_show_author_time "$repo")
-	local ymd=$(date -u -r $author_time +"%G-%m-%d")
+	local ymd=$(date -u -r $author_time +"%F")
 
 	cat <<-EOF >$TOG_TEST_SCRIPT
 	/alpha commit 8

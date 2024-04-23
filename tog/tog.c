@@ -2459,7 +2459,7 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("gmtime_r");
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0)
+	if (strftime(datebuf, sizeof(datebuf), "%F ", &tm) == 0)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	if (avail <= date_display_cols)
@@ -8790,7 +8790,7 @@ show_ref_view(struct tog_view *view)
 			free(id);
 			if (gmtime_r(&t, &tm) == NULL)
 				return got_error_from_errno("gmtime_r");
-			if (strftime(ymd, sizeof(ymd), "%G-%m-%d  ", &tm) == 0)
+			if (strftime(ymd, sizeof(ymd), "%F  ", &tm) == 0)
 				return got_error(GOT_ERR_NO_SPACE);
 		}
 		if (got_ref_is_symbolic(re->ref)) {

@@ -242,7 +242,7 @@ print_date(int s, char *date, int shortfmt)
 		return got_poll_write_full(s, " UTC\n", 5);
 	}
 
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0)
+	if (strftime(datebuf, sizeof(datebuf), "%F ", &tm) == 0)
 		return got_error_set_errno(EINVAL, "invalid timestamp");
 	return got_poll_write_full(s, datebuf, strlen(datebuf));
 }

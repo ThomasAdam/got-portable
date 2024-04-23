@@ -944,8 +944,7 @@ got_gotweb_blame_cb(void *arg, int nlines, int lineno,
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (gmtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("gmtime_r");
-	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%G-%m-%d",
-	    &tm) == 0) {
+	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%F", &tm) == 0) {
 		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
