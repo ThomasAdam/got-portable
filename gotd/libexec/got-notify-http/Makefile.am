@@ -3,6 +3,7 @@ libexec_PROGRAMS = got-notify-http
 include $(top_builddir)/Makefile.common
 
 got_notify_http_SOURCES = got-notify-http.c \
+	$(top_srcdir)/gotd/log.c \
 	$(top_srcdir)/lib/bufio.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/hash.c \
