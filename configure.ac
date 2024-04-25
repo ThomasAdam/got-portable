@@ -911,6 +911,7 @@ AC_CONFIG_FILES([Makefile
 		 compat/Makefile
 		 libexec/Makefile
 		 libexec/got-read-tree/Makefile
+		 libexec/got-fetch-http/Makefile
 		 libexec/got-fetch-pack/Makefile
 		 libexec/got-index-pack/Makefile
 		 libexec/got-read-blob/Makefile

@@ -1,4 +1,5 @@
-SUBDIRS = got-fetch-pack \
+SUBDIRS = got-fetch-http \
+	  got-fetch-pack \
 	  got-index-pack \
 	  got-read-blob \
 	  got-read-commit \
