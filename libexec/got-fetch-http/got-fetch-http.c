@@ -276,12 +276,8 @@ http_read(struct bufio *bio, int chunked, size_t *chunksz, char *buf, size_t buf
 	size_t		 r;
 	ssize_t		 ret = 0, linelen;
 
-	if (!chunked) {
-		r = bufio_drain_sync(bio, buf, bufsz);
-		if (r == 0)
-			return -1;
-		return r;
-	}
+	if (!chunked)
+		return bufio_drain_sync(bio, buf, bufsz);
 
 	while (bufsz > 0) {
 		if (*chunksz == 0) {
