@@ -21,7 +21,12 @@ endif
 
 include $(top_builddir)/Makefile.common
 
-EXTRA_DIST = CHANGES CHANGELOG LICENCE README.portable util/got-portable-ver.sh
+EXTRA_DIST = CHANGES \
+	     CHANGELOG \
+	     LICENCE \
+	     README.portable \
+	     regress \
+	     util/got-portable-ver.sh
 
 LDADD = $(LIBOBJS)
 if HOST_FREEBSD
