@@ -68,7 +68,6 @@ man1_MANS = cvg.1
 LDADD = -L$(top_builddir)/compat \
 	-lopenbsd-compat -lm
 LDADD += $(libbsd_LIBS) \
-	 $(libevent_LIBS) \
 	 $(zlib_LIBS) \
 	 $(libuuid_LIBS) \
 	 $(libutil_LIBS) \
@@ -77,5 +76,5 @@ if HOST_FREEBSD
 LDADD += -lmd
 endif
 
-AM_CPPFLAGS += $(libbsd_CFLAGS) $(libevent_CFLAGS) $(zlib_CFLAGS) \
+AM_CPPFLAGS += $(libbsd_CFLAGS) $(zlib_CFLAGS) \
 	       $(libuuid_CFLAGS) $(libmd_CFLAGS)
