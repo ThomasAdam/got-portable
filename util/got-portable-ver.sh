@@ -8,7 +8,7 @@
 #
 # Intended to be called from configure.ac (via autogen.sh)
 GOT_RELEASE=yes
-GOT_PORTABLE_VER=0.97
+GOT_PORTABLE_VER=0.98
 
 [ -d ".git" -a "$GOT_RELEASE" = "no" ] || { echo "$GOT_PORTABLE_VER" ; exit ; }
 

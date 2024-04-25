@@ -6,6 +6,16 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.98 (2024-04-25)
+
+* Changes from got-0.98
+
+  The -portable release also includes the following changes:
+
+  - GOT_DEFAULT_EDITOR can now be passed as a #define so that the path to
+    vi(1) can be changed.  Default is /usr/bin/vi
+  - regress: drop jot as a dependency and use seq(1)
+
 # got-portable 0.97 (2024-03-11)
 
 * Changes from got-0.97
