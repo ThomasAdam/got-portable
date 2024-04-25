@@ -42,6 +42,7 @@ gotwebd/pages.c
 gotwebd/parse.c
 include/got_compat.h
 include/got_compat.h.in
+libexec/got-fetch-http/got-fetch-http
 libexec/got-fetch-pack/got-fetch-pack
 libexec/got-index-pack/got-index-pack
 libexec/got-read-blob/got-read-blob
