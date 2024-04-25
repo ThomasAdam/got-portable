@@ -6,6 +6,12 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.98.2 (2024-04-25)
+
+* Changes from 0.98.1
+
+  - Include missing got helper got-fetch-http 
+
 # got-portable 0.98.1 (2024-04-25)
 
 * Changes from got-portable-0.98
