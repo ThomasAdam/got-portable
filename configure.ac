@@ -22,9 +22,9 @@ AC_CANONICAL_HOST
 
 AC_CONFIG_SUBDIRS([template])
 AC_ARG_ENABLE([gotd],
-	AS_HELP_STRING([--enable gotd], [build gotd and gotsh]))
+	AS_HELP_STRING([--enable-gotd], [build gotd and gotsh]))
 AC_ARG_ENABLE([cvg],
-	       AS_HELP_STRING([--enable cvg],
+	       AS_HELP_STRING([--enable-cvg],
 			      [EXPERIMENTAL: cvg - cvs-like-git]))
 
 # Override gotd's empty_path location.
