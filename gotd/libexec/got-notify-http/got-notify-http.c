@@ -1043,5 +1043,5 @@ main(int argc, char **argv)
 
 	if (response_code >= 200 && response_code < 300)
 		return 0;
-	fatal("request failed with code %d", response_code);
+	fatalx("request failed with code %d", response_code);
 }
