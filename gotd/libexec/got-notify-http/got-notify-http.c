@@ -814,6 +814,16 @@ bufio2poll(struct bufio *bio)
 {
 	int f, ret = 0;
 
+	/*
+	 * If we have data queued up, retry for both POLLIN and POLLOUT
+	 * since we want to push this data to the server while still
+	 * processing an eventual reply.  Otherwise, we could wait
+	 * indefinitely for the server to reply without us having
+	 * sent the HTTP request completely.
+	 */
+	if (bio->wbuf.len)
+		return POLLIN|POLLOUT;
+
 	f = bufio_ev(bio);
 	if (f & BUFIO_WANT_READ)
 		ret |= POLLIN;
