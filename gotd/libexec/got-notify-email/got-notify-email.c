@@ -432,6 +432,12 @@ main(int argc, char *argv[])
 #ifndef PROFILE
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
+
+	/* revoke fs access */
+	if (landlock_no_fs() == -1)
+		err(1, "landlock_no_fs");
+	if (cap_enter() == -1)
+		err(1, "cap_enter");
 #endif
 
 	send_email(s, default_fromaddr, fromaddr, recipient, replytoaddr,

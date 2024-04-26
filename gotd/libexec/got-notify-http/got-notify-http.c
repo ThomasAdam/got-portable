@@ -933,6 +933,12 @@ main(int argc, char **argv)
 	/* drop rpath dns inet */
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
+
+	/* revoke fs access */
+	if (landlock_no_fs() == -1)
+		err(1, "landlock_no_fs");
+	if (cap_enter() == -1)
+		err(1, "cap_enter");
 #endif
 
 	if ((!tls && strcmp(port, "80") != 0) ||
