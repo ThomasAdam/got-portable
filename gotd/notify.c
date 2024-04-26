@@ -116,6 +116,7 @@ remove_session(struct gotd_notify_session *session)
 	slot = session_hash(session->id) % nitems(gotd_notify_sessions);
 	STAILQ_REMOVE(&gotd_notify_sessions[slot], session,
 	    gotd_notify_session, entry);
+	close(session->iev.ibuf.fd);
 	free(session);
 }
 
