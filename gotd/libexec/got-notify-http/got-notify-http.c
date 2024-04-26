@@ -91,7 +91,7 @@ dial(const char *host, const char *port)
 
 	freeaddrinfo(res0);
 	if (s == -1)
-		err(1, "%s", cause);
+		fatal("%s", cause);
 	return s;
 }
 
@@ -311,7 +311,7 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 
 			author = strdup(l);
 			if (author == NULL)
-				err(1, "strdup");
+				fatal("strdup");
 
 			json_author(fp, "author", l, 1);
 
@@ -328,7 +328,7 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 			}
 
 			if (author == NULL) /* impossible */
-				err(1, "from not specified");
+				fatalx("from not specified");
 			json_author(fp, "committer", author, 1);
 			free(author);
 			author = NULL;
@@ -550,9 +550,9 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 		}
 	}
 	if (ferror(stdin))
-		err(1, "getline");
+		fatalx("getline");
 	if (!done)
-		errx(1, "%s: unexpected EOF", __func__);
+		fatalx("%s: unexpected EOF", __func__);
 	fputc('}', fp);
 
 	return 0;
@@ -681,9 +681,9 @@ jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 		}
 	}
 	if (ferror(stdin))
-		err(1, "getline");
+		fatal("getline");
 	if (!done)
-		errx(1, "%s: unexpected EOF", __func__);
+		fatalx("%s: unexpected EOF", __func__);
 	fputc('}', fp);
 
 	return 0;
@@ -711,32 +711,32 @@ jsonify(FILE *fp, const char *repo)
 
 		if (strncmp(line, "Removed refs/heads/", 19) == 0) {
 			if (jsonify_branch_rm(fp, line, repo) == -1)
-				err(1, "jsonify_branch_rm");
+				fatal("jsonify_branch_rm");
 			continue;
 		}
 
 		if (strncmp(line, "commit ", 7) == 0) {
 			if (jsonify_commit(fp, repo, &line, &linesize) == -1)
-				err(1, "jsonify_commit");
+				fatal("jsonify_commit");
 			continue;
 		}
 
 		if (*line >= '0' && *line <= '9') {
 			if (jsonify_commit_short(fp, line, repo) == -1)
-				err(1, "jsonify_commit_short");
+				fatal("jsonify_commit_short");
 			continue;
 		}
 
 		if (strncmp(line, "tag ", 4) == 0) {
 			if (jsonify_tag(fp, repo, &line, &linesize) == -1)
-				err(1, "jsonify_tag");
+				fatal("jsonify_tag");
 			continue;
 		}
 
 		errx(1, "unexpected line: %s", line);
 	}
 	if (ferror(stdin))
-		err(1, "getline");
+		fatal("getline");
 	fprintf(fp, "]}");
 
 	return 0;
@@ -773,7 +773,7 @@ basic_auth(const char *username, const char *password)
 
 	r = asprintf(&str, "%s:%s", username, password);
 	if (r == -1)
-		err(1, "asprintf");
+		fatal("asprintf");
 
 	/*
 	 * Will need 4 * r/3 bytes to encode the string, plus a
@@ -785,7 +785,7 @@ basic_auth(const char *username, const char *password)
 
 	tmp = calloc(1, len);
 	if (tmp == NULL)
-		err(1, "malloc");
+		fatal("calloc");
 
 	s = str;
 	p = tmp;
