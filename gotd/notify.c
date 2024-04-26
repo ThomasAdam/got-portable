@@ -452,9 +452,9 @@ notify_dispatch(int fd, short event, void *arg)
 
 	if (event & EV_WRITE) {
 		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN && errno != EPIPE)
+		if (n == -1 && errno != EAGAIN)
 			fatal("msgbuf_write");
-		if (n == 0 || (n == -1 && errno == EPIPE)) {
+		if (n == 0) {
 			/* Connection closed. */
 			shut = 1;
 			goto done;
