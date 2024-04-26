@@ -2,18 +2,22 @@
 # configure flags so that no files are missing.  This is irrespective of
 # whether the end-user will enable this; this step is here so that all the
 # relevant files are included in the distribution.
-AM_DISTCHECK_CONFIGURE_FLAGS= \
-	--enable-cvg \
-	--enable-gotd
+AM_DISTCHECK_CONFIGURE_FLAGS= --enable-cvg
 
-SUBDIRS = compat libexec got tog gotadmin template gotwebd
+SUBDIRS = compat \
+	  gitwrapper \
+	  got \
+	  gotadmin \
+	  gotctl \
+	  gotd \
+	  gotsh \
+	  gotwebd \
+	  libexec \
+	  template \
+	  tog
 
 # -portable: re-enable once upstream is happy:  cvg
 # TODO: gotd gotsh template
-
-if GOTD_ENABLED
-SUBDIRS += gotd gotsh gotctl gitwrapper
-endif
 
 if CVG_ENABLED
 SUBDIRS += cvg

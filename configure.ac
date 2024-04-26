@@ -21,8 +21,6 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 
 AC_CONFIG_SUBDIRS([template])
-AC_ARG_ENABLE([gotd],
-	AS_HELP_STRING([--enable-gotd], [build gotd and gotsh]))
 AC_ARG_ENABLE([cvg],
 	       AS_HELP_STRING([--enable-cvg],
 			      [EXPERIMENTAL: cvg - cvs-like-git]))
@@ -904,13 +902,21 @@ LIBS=""
 
 AH_BOTTOM([#include "got_compat2.h"])
 
-AM_CONDITIONAL([GOTD_ENABLED], [test "x$enable_gotd" = xyes])
 AM_CONDITIONAL([CVG_ENABLED], [test "x$enable_cvg" = xyes])
 
 AC_CONFIG_FILES([Makefile
 		 compat/Makefile
+		 gitwrapper/Makefile
+		 got/Makefile
+		 gotadmin/Makefile
+		 gotctl/Makefile
+		 gotd/Makefile
+		 gotd/libexec/Makefile
+		 gotd/libexec/got-notify-email/Makefile
+		 gotd/libexec/got-notify-http/Makefile
+		 gotsh/Makefile
+		 gotwebd/Makefile
 		 libexec/Makefile
-		 libexec/got-read-tree/Makefile
 		 libexec/got-fetch-http/Makefile
 		 libexec/got-fetch-pack/Makefile
 		 libexec/got-index-pack/Makefile
@@ -922,22 +928,10 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-read-pack/Makefile
 		 libexec/got-read-patch/Makefile
 		 libexec/got-read-tag/Makefile
+		 libexec/got-read-tree/Makefile
 		 libexec/got-send-pack/Makefile
-		 got/Makefile
-		 gotadmin/Makefile
-		 gotwebd/Makefile
 		 tog/Makefile
 		 Makefile.common:Makefile.common.in])
-
-if test "x$enable_gotd" = "xyes"; then
-	AC_CONFIG_FILES([gitwrapper/Makefile])
-	AC_CONFIG_FILES([gotd/Makefile])
-	AC_CONFIG_FILES([gotd/libexec/Makefile])
-	AC_CONFIG_FILES([gotd/libexec/got-notify-email/Makefile])
-	AC_CONFIG_FILES([gotd/libexec/got-notify-http/Makefile])
-	AC_CONFIG_FILES([gotsh/Makefile])
-	AC_CONFIG_FILES([gotctl/Makefile])
-fi
 
 if test "x$enable_cvg" = "xyes"; then
 	AC_CONFIG_FILES([cvg/Makefile])
@@ -950,12 +944,6 @@ helpers="$(eval echo ${libexecdir})"
 manpages="$(eval echo ${mandir})"
 gotdep="$GOTD_EMPTY_PATHC"
 gotgwlep="$GITWRAPPER_LIBEXEC_PATHC"
-
-if test -z "$enable_gotd"; then
-	enable_gotd="no"
-	gotdep="N/A"
-	gotgwlep="N/A"
-fi
 
 if test -z "$enable_cvg"; then
 	enable_cvg="no"
@@ -979,7 +967,7 @@ Configured got-portable with:
  Bison:            $YACC
  CFlags:           $CFLAGS
  cvg:		   ${enable_cvg}
- Gotd:             ${enable_gotd}
+ Gotd:
    Empty Path:     ${gotdep}
    Gitwrapper:     ${gotgwlep}
  Helpers:          ${helpers}
