@@ -353,9 +353,9 @@ notify_dispatch_session(int fd, short event, void *arg)
 
 	if (event & EV_WRITE) {
 		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (n == -1 && errno != EAGAIN && errno != EPIPE)
 			fatal("msgbuf_write");
-		if (n == 0) {
+		if (n == 0 || (n == -1 && errno == EPIPE)) {
 			/* Connection closed. */
 			shut = 1;
 			goto done;
@@ -452,9 +452,9 @@ notify_dispatch(int fd, short event, void *arg)
 
 	if (event & EV_WRITE) {
 		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (n == -1 && errno != EAGAIN && errno != EPIPE)
 			fatal("msgbuf_write");
-		if (n == 0) {
+		if (n == 0 || (n == -1 && errno == EPIPE)) {
 			/* Connection closed. */
 			shut = 1;
 			goto done;
