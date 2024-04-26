@@ -550,7 +550,7 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 	if (ferror(stdin))
 		err(1, "getline");
 	if (!done)
-		errx(1, "unexpected EOF");
+		errx(1, "%s: unexpected EOF", __func__);
 	fputc('}', fp);
 
 	return 0;
@@ -681,7 +681,7 @@ jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 	if (ferror(stdin))
 		err(1, "getline");
 	if (!done)
-		errx(1, "unexpected EOF");
+		errx(1, "%s: unexpected EOF", __func__);
 	fputc('}', fp);
 
 	return 0;
@@ -986,7 +986,7 @@ main(int argc, char **argv)
 		if (r == -1 && errno != EAGAIN)
 			fatalx("bufio_read: %s", bufio_io_err(&bio));
 		if (r == 0)
-			fatalx("unexpected EOF");
+			fatalx("unexpected EOF from upstream HTTP server");
 
 		for (;;) {
 			line = buf_getdelim(&bio.rbuf, "\r\n", &len);
