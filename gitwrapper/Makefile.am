@@ -24,7 +24,6 @@ man1_MANS = gitwrapper.1
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 LDADD += $(libbsd_LIBS) \
-	 $(libevent_LIBS) \
 	 $(libuuid_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
