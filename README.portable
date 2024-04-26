@@ -15,6 +15,9 @@ The following operating systems are supported:
 DEPENDENCIES
 ============
 
+Note that the names of these libraries are indicative only; the names might
+vary.
+
 Linux:
 
 * `libncurses` (for tog(1))
@@ -25,11 +28,13 @@ Linux:
 * `pkg-config` (for searching libraries)
 * `bison` (for configuration file grammar)
 * `libevent` (for gotwebd)
+* `libtls` (may be known as `libretls`)
 
 FreeBSD:
 
 * `automake`
 * `pkgconf`
+* `libretls`
 * `libevent` (for gotwebd)
 
 NetBSD:
@@ -38,6 +43,7 @@ NetBSD:
 * `libuuid`
 * `ncuresesw`
 * `libevent` (for gotwebd)
+* `libretls`
 
 DragonFlyBSD:
 
@@ -45,6 +51,7 @@ DragonFlyBSD:
 * `pkgconf`
 * `openssl`
 * `libevent` (for gotwebd)
+* `libretls`
 
 Darwin (MacOS):
 
@@ -55,6 +62,7 @@ Darwin (MacOS):
 * `openssl`
 * `ossp-uuid`
 * `libevent` (for gotwebd)
+* `libretls`
 
 TESTS (REGRESS)
 ===============
