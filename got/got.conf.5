@@ -126,14 +126,14 @@ Defines the protocol to use for communicating with the remote repository's
 server.
 .Pp
 The following protocol schemes are supported:
-.Bl -tag -width git+ssh
+.Bl -tag -width https
 .It git
 The Git protocol as implemented by the
 .Xr git-daemon 1
 server.
 Use of this protocol is discouraged since it supports neither authentication
 nor encryption.
-.It git+ssh
+.It git
 The Git protocol wrapped in an authenticated and encrypted
 .Xr ssh 1
 tunnel.
@@ -141,8 +141,35 @@ With this protocol the hostname may contain an embedded username for
 .Xr ssh 1
 to use:
 .Mt user@hostname
-.It ssh
-Short alias for git+ssh.
+.It http
+The
+.Dq smart
+Git HTTP protocol.
+Not compatible with servers using the
+.Dq dumb
+Git HTTP protocol.
+.Pp
+The
+.Dq smart
+Git HTTP protocol is supported by
+.Cm got clone
+and
+.Cm got fetch ,
+but not by
+.Cm got send .
+To send from a repository cloned over HTTP, add a
+.Ic send
+block (see below) to ensure that the
+.Dq ssh://
+protocol will be used by
+.Cm got send .
+.Pp
+Use of this protocol is discouraged since it supports neither authentication
+nor encryption.
+.It https
+The
+.Dq smart
+Git HTTP protocol wrapped in SSL/TLS.
 .El
 .It Ic port Ar port
 Defines the port to use for connecting to the remote repository's server.

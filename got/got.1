@@ -164,7 +164,7 @@ the server:
 .Lk scheme://hostname:port/path/to/repository
 .Pp
 The following protocol schemes are supported:
-.Bl -tag -width git+ssh
+.Bl -tag -width https
 .It git
 The Git protocol as implemented by the
 .Xr git-daemon 1
@@ -195,9 +195,9 @@ and
 .Cm got fetch ,
 but not by
 .Cm got send .
-Sending from a repository cloned over HTTP will require use of the
+Sending from a repository cloned over HTTP will require use of a
 .Ic send
-directive in
+block in
 .Xr got.conf 5
 to ensure that the
 .Dq ssh://
