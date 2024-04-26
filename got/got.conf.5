@@ -297,8 +297,8 @@ author "Flan Hacker <flan_hacker@openbsd.org>"
 Remote repository specification for the Game of Trees repository:
 .Bd -literal -offset indent
 remote "origin" {
-	server git.gameoftrees.org
-	protocol git
+	server anonymous@got.gameoftrees.org
+	protocol ssh
 	repository got
 	branch { "main" }
 }
