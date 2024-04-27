@@ -151,7 +151,8 @@ AC_CHECK_DECL(
 	[#include <sys/prctl.h>]
 )
 
-AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes])
+AM_CONDITIONAL([HAVE_SHA2], [test "x$ac_cv_header_sha2_h" = xyes || \
+	test "x$ac_cv_header_sha256_h" = xyes])
 
 AC_CACHE_CHECK([whether getopt has optreset support],
 		ac_cv_have_getopt_optreset, [

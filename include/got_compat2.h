@@ -211,22 +211,13 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #if defined(__APPLE__)
 #define COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonDigest.h>
-
-#define SHA512_BLOCK_LENGTH		128
-typedef struct _SHA2_CTX {
-	union {
-		u_int32_t	st32[8];
-		u_int64_t	st64[8];
-	} state;
-	u_int64_t	bitcount[2];
-	u_int8_t	buffer[SHA512_BLOCK_LENGTH];
-} SHA2_CTX;
 #endif
 
-#if defined(__APPLE__) || defined(__NetBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #define SHA256Init SHA256_Init
 #define SHA256Update SHA256_Update
 #define SHA256Final SHA256_Final
+#define SHA2_CTX SHA256_CTX
 #endif
 
 #ifndef __APPLE__
@@ -238,8 +229,6 @@ typedef struct _SHA2_CTX {
 #endif
 #ifdef HAVE_SHA2_H
 #    include <sha2.h>
-#else
-#    include "sha2.h"
 #endif
 #ifdef HAVE_SHA256_H
 #    include <sha256.h>
