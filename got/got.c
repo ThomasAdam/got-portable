@@ -8028,42 +8028,6 @@ add_progress(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
-pathlist_contains_directory(int *contains_dir, struct got_worktree *worktree,
-    struct got_pathlist_head *paths)
-{
-	const struct got_error *error = NULL;
-	struct got_pathlist_entry *pe;
-	struct stat sb;
-	char *ondisk_path;
-
-	*contains_dir = 0;
-
-	TAILQ_FOREACH(pe, paths, entry) {
-		if (asprintf(&ondisk_path, "%s/%s",
-		    got_worktree_get_root_path(worktree),
-		    pe->path) == -1) {
-			return got_error_from_errno("asprintf");
-		}
-		if (lstat(ondisk_path, &sb) == -1) {
-			if (errno == ENOENT) {
-				free(ondisk_path);
-				continue;
-			}
-			error = got_error_from_errno2("lstat",
-			    ondisk_path);
-			free(ondisk_path);
-			return error;
-		}
-		free(ondisk_path);
-		if (S_ISDIR(sb.st_mode)) {
-			*contains_dir = 1;
-			return NULL;
-		}
-	}
-	return NULL;
-}
-
-static const struct got_error *
 cmd_add(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -8071,7 +8035,8 @@ cmd_add(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	int ch, contains_dir, can_recurse = 0, no_ignores = 0;
+	struct got_pathlist_entry *pe;
+	int ch, can_recurse = 0, no_ignores = 0;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
@@ -8134,15 +8099,31 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = pathlist_contains_directory(&contains_dir, worktree,
-		    &paths);
-		if (error != NULL)
-			goto done;
-
-		if (contains_dir) {
-			error = got_error_msg(GOT_ERR_BAD_PATH,
-			    "adding directories requires -R option");
-			goto done;
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			    pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "adding directories requires -R option");
+				goto done;
+			}
 		}
 	}
 
@@ -8198,8 +8179,9 @@ cmd_remove(int argc, char *argv[])
 	const char *status_codes = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	int contains_dir, ch, i, delete_local_mods = 0, can_recurse = 0;
-	int ignore_missing_paths = 0, keep_on_disk = 0;
+	struct got_pathlist_entry *pe;
+	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0, i;
+	int ignore_missing_paths = 0;
 	int *pack_fds = NULL;
 
 	TAILQ_INIT(&paths);
@@ -8282,15 +8264,31 @@ cmd_remove(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = pathlist_contains_directory(&contains_dir, worktree,
-		    &paths);
-		if (error != NULL)
-			goto done;
-
-		if (contains_dir) {
-			error = got_error_msg(GOT_ERR_BAD_PATH,
-			    "removing directories requires -R option");
-			goto done;
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			    pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "removing directories requires -R option");
+				goto done;
+			}
 		}
 	}
 
@@ -8914,7 +8912,8 @@ cmd_revert(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	char *cwd = NULL, *path = NULL;
 	struct got_pathlist_head paths;
-	int ch, contains_dir, can_recurse = 0, pflag = 0;
+	struct got_pathlist_entry *pe;
+	int ch, can_recurse = 0, pflag = 0;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
@@ -8997,15 +8996,31 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	if (!can_recurse) {
-		error = pathlist_contains_directory(&contains_dir, worktree,
-		    &paths);
-		if (error != NULL)
-			goto done;
-
-		if (contains_dir) {
-			error = got_error_msg(GOT_ERR_BAD_PATH,
-			    "reverting directories requires -R option");
-			goto done;
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			    pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "reverting directories requires -R option");
+				goto done;
+			}
 		}
 	}
 
@@ -13791,7 +13806,7 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage [-lpRS] [-F response-script] "
+	fprintf(stderr, "usage: %s stage [-lpS] [-F response-script] "
 	    "[path ...]\n", getprogname());
 	exit(1);
 }
@@ -13831,8 +13846,7 @@ cmd_stage(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	int ch, contains_dir;
-	int can_recurse = 0, list_stage = 0, pflag = 0, allow_bad_symlinks = 0;
+	int ch, list_stage = 0, pflag = 0, allow_bad_symlinks = 0;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
@@ -13846,7 +13860,7 @@ cmd_stage(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "F:lpRS")) != -1) {
+	while ((ch = getopt(argc, argv, "F:lpS")) != -1) {
 		switch (ch) {
 		case 'F':
 			patch_script_path = optarg;
@@ -13856,9 +13870,6 @@ cmd_stage(int argc, char *argv[])
 			break;
 		case 'p':
 			pflag = 1;
-			break;
-		case 'R':
-			can_recurse = 1;
 			break;
 		case 'S':
 			allow_bad_symlinks = 1;
@@ -13924,18 +13935,6 @@ cmd_stage(int argc, char *argv[])
 		error = got_worktree_status(worktree, &paths, repo, 0,
 		    print_stage, NULL, check_cancelled, NULL);
 	else {
-		if (!can_recurse) {
-			error = pathlist_contains_directory(&contains_dir,
-			    worktree, &paths);
-			if (error != NULL)
-				goto done;
-
-			if (contains_dir) {
-				error = got_error_msg(GOT_ERR_BAD_PATH,
-				    "staging directories requires -R option");
-				goto done;
-			}
-		}
 		cpa.patch_script_file = patch_script_file;
 		cpa.action = "stage";
 		error = got_worktree_stage(worktree, &paths,
@@ -13968,7 +13967,7 @@ done:
 __dead static void
 usage_unstage(void)
 {
-	fprintf(stderr, "usage: %s unstage [-pR] [-F response-script] "
+	fprintf(stderr, "usage: %s unstage [-p] [-F response-script] "
 	    "[path ...]\n", getprogname());
 	exit(1);
 }
@@ -13982,7 +13981,7 @@ cmd_unstage(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	int ch, contains_dir, can_recurse = 0, pflag = 0;
+	int ch, pflag = 0;
 	struct got_update_progress_arg upa;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
@@ -13997,13 +13996,10 @@ cmd_unstage(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "F:Rp")) != -1) {
+	while ((ch = getopt(argc, argv, "F:p")) != -1) {
 		switch (ch) {
 		case 'F':
 			patch_script_path = optarg;
-			break;
-		case 'R':
-			can_recurse = 1;
 			break;
 		case 'p':
 			pflag = 1;
@@ -14059,19 +14055,6 @@ cmd_unstage(int argc, char *argv[])
 	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
-
-	if (!can_recurse) {
-		error = pathlist_contains_directory(&contains_dir,
-		    worktree, &paths);
-		if (error != NULL)
-			goto done;
-
-		if (contains_dir) {
-			error = got_error_msg(GOT_ERR_BAD_PATH,
-			    "unstaging directories requires -R option");
-			goto done;
-		}
-	}
 
 	cpa.patch_script_file = patch_script_file;
 	cpa.action = "unstage";

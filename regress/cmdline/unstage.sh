@@ -36,7 +36,7 @@ test_unstage_basic() {
 	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
 
-	(cd $testroot/wt && got unstage -R > $testroot/stdout)
+	(cd $testroot/wt && got unstage > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got unstage command failed unexpectedly" >&2
@@ -67,43 +67,6 @@ test_unstage_basic() {
 	test_done "$testroot" "$ret"
 }
 
-test_unstage_directory() {
-	local testroot=`test_init unstage_directory`
-
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	(cd $testroot/wt && echo -n > test && got add test > /dev/null \
-		&& got stage test > /dev/null)
-
-	(cd $testroot/wt && got unstage . > $testroot/stdout 2> $testroot/stderr)
-	ret=$?
-	echo "got: unstaging directories requires -R option" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	(cd $testroot/wt && got unstage -R . > $testroot/stdout)
-
-	echo 'G  test' >> $testroot/stdout.expected
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-	fi
-	test_done "$testroot" "$ret"
-}
-
 test_unstage_unversioned() {
 	local testroot=`test_init unstage_unversioned`
 
@@ -122,7 +85,7 @@ test_unstage_unversioned() {
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
 	echo ' A foo' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	touch $testroot/wt/unversioned-file
 
@@ -139,7 +102,7 @@ test_unstage_unversioned() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got unstage -R > $testroot/stdout)
+	(cd $testroot/wt && got unstage > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got unstage command failed unexpectedly" >&2
@@ -158,7 +121,7 @@ test_unstage_unversioned() {
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	# unstaging an unversioned path is a no-op
 	(cd $testroot/wt && got unstage unversioned > $testroot/stdout)
@@ -200,7 +163,7 @@ test_unstage_nonexistent() {
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
 	echo ' A foo' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	# unstaging a non-existent file is a no-op
 	(cd $testroot/wt && got unstage nonexistent-file > $testroot/stdout)
@@ -242,7 +205,7 @@ test_unstage_patch() {
 	w
 	EOF
 
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
@@ -252,7 +215,7 @@ test_unstage_patch() {
 
 	# don't unstage any hunks
 	printf "n\nn\nn\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -316,7 +279,7 @@ EOF
 
 	# unstage middle hunk
 	printf "n\ny\nn\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
@@ -441,7 +404,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage -R >/dev/null)
+	(cd $testroot/wt && got stage >/dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
@@ -461,7 +424,7 @@ EOF
 
 	# unstage last hunk
 	printf "n\nn\ny\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
@@ -583,7 +546,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage -R >/dev/null)
+	(cd $testroot/wt && got stage >/dev/null)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got stage command failed unexpectedly" >&2
@@ -603,7 +566,7 @@ EOF
 
 	# unstage all hunks
 	printf "y\ny\ny\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
@@ -727,10 +690,10 @@ test_unstage_patch_added() {
 	echo "new" > $testroot/wt/epsilon/new
 	(cd $testroot/wt && got add epsilon/new > /dev/null)
 
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	printf "y\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		epsilon/new > $testroot/stdout)
 
 	echo "A  epsilon/new" > $testroot/stdout.expected
@@ -795,10 +758,10 @@ test_unstage_patch_removed() {
 	fi
 
 	(cd $testroot/wt && got rm beta > /dev/null)
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	printf "y\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		beta > $testroot/stdout)
 
 	echo "D  beta" > $testroot/stdout.expected
@@ -876,12 +839,12 @@ test_unstage_patch_quit() {
 	w
 	EOF
 	(cd $testroot/wt && got rm zzz > /dev/null)
-	(cd $testroot/wt && got stage -R > /dev/null)
+	(cd $testroot/wt && got stage > /dev/null)
 
 	# unstage first hunk and quit; and don't pass a path argument to
 	# ensure that we don't skip asking about the 'zzz' file after 'quit'
 	printf "y\nq\nn\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		> $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1040,7 +1003,7 @@ test_unstage_symlink() {
 	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
-	(cd $testroot/wt && got stage -RS > /dev/null)
+	(cd $testroot/wt && got stage -S > /dev/null)
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cat > $testroot/stdout.expected <<EOF
@@ -1060,7 +1023,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/wt && got unstage -R > $testroot/stdout)
+	(cd $testroot/wt && got unstage > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got unstage command failed unexpectedly" >&2
@@ -1235,7 +1198,7 @@ test_unstage_patch_symlink() {
 	(cd $testroot/wt && ln -sf beta zeta3.link)
 	(cd $testroot/wt && got add zeta3.link > /dev/null)
 
-	(cd $testroot/wt && got stage -RS > /dev/null)
+	(cd $testroot/wt && got stage -S > /dev/null)
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cat > $testroot/stdout.expected <<EOF
@@ -1259,7 +1222,7 @@ EOF
 	fi
 
 	printf "y\nn\ny\nn\ny\ny\nn\ny\ny\n" > $testroot/patchscript
-	(cd $testroot/wt && got unstage -R -F $testroot/patchscript -p \
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
 		> $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1477,7 +1440,6 @@ EOF
 
 test_parseargs "$@"
 run_test test_unstage_basic
-run_test test_unstage_directory
 run_test test_unstage_unversioned
 run_test test_unstage_nonexistent
 run_test test_unstage_patch
