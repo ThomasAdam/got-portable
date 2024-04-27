@@ -39,8 +39,7 @@
 #ifndef _SSHSHA2_H
 #define _SSHSHA2_H
 
-#if !defined(HAVE_SHA256UPDATE) || !defined(HAVE_SHA384UPDATE) || \
-    !defined(HAVE_SHA512UPDATE)
+#if !defined(HAVE_SHA256UPDATE)
 
 /*** SHA-256/384/512 Various Length Definitions ***********************/
 #define SHA224_BLOCK_LENGTH		64
@@ -109,7 +108,7 @@ char *SHA256Data(const u_int8_t *, size_t, char *)
 	__attribute__((__bounded__(__minbytes__,3,SHA256_DIGEST_STRING_LENGTH)));
 #endif /* HAVE_SHA256UPDATE */
 
-#ifndef HAVE_SHA384UPDATE
+#if 0
 void SHA384Init(SHA2_CTX *);
 void SHA384Transform(u_int64_t state[8], const u_int8_t [SHA384_BLOCK_LENGTH]);
 void SHA384Update(SHA2_CTX *, const u_int8_t *, size_t)
@@ -126,9 +125,7 @@ char *SHA384FileChunk(const char *, char *, off_t, off_t)
 char *SHA384Data(const u_int8_t *, size_t, char *)
 	__attribute__((__bounded__(__string__,1,2)))
 	__attribute__((__bounded__(__minbytes__,3,SHA384_DIGEST_STRING_LENGTH)));
-#endif /* HAVE_SHA384UPDATE */
 
-#ifndef HAVE_SHA512UPDATE
 void SHA512Init(SHA2_CTX *);
 void SHA512Transform(u_int64_t state[8], const u_int8_t [SHA512_BLOCK_LENGTH]);
 void SHA512Update(SHA2_CTX *, const u_int8_t *, size_t)
@@ -145,9 +142,7 @@ char *SHA512FileChunk(const char *, char *, off_t, off_t)
 char *SHA512Data(const u_int8_t *, size_t, char *)
 	__attribute__((__bounded__(__string__,1,2)))
 	__attribute__((__bounded__(__minbytes__,3,SHA512_DIGEST_STRING_LENGTH)));
-#endif /* HAVE_SHA512UPDATE */
 
-#if 0
 void SHA512_256Init(SHA2_CTX *);
 void SHA512_256Transform(u_int64_t state[8], const u_int8_t [SHA512_256_BLOCK_LENGTH]);
 void SHA512_256Update(SHA2_CTX *, const u_int8_t *, size_t)
@@ -167,6 +162,6 @@ char *SHA512_256Data(const u_int8_t *, size_t, char *)
 __END_DECLS
 #endif /* 0 */
 
-#endif /* HAVE_SHA{256,384,512}UPDATE */
+#endif /* HAVE_SHA256UPDATE */
 
 #endif /* _SSHSHA2_H */

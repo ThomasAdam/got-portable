@@ -414,11 +414,7 @@ AM_CONDITIONAL([HOST_DRAGONFLYBSD], [test "$PLATFORM" = "dragonflybsd"])
 # this way on OpenBSD breaks <sha2.h> inclusion.
 # FIXME: this needs addressing.
 if test "x$PLATFORM" != "xopenbsd"; then
-	AC_CHECK_FUNCS([ \
-		SHA256Update \
-		SHA384Update \
-		SHA512Update \
-	])
+	AC_CHECK_FUNCS([SHA256Update])
 fi
 
 # Look for yacc.

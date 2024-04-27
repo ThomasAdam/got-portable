@@ -216,6 +216,7 @@ static const u_int32_t sha256_initial_hash_value[8] = {
 	0x5be0cd19UL
 };
 
+#if 0
 /* Hash constant words K for SHA-384 and SHA-512: */
 static const u_int64_t K512[80] = {
 	0x428a2f98d728ae22ULL, 0x7137449123ef65cdULL,
@@ -273,7 +274,6 @@ static const u_int64_t sha512_initial_hash_value[8] = {
 };
 
 #if !defined(SHA2_SMALL)
-#if 0
 /* Initial hash value H for SHA-224: */
 static const u_int32_t sha224_initial_hash_value[8] = {
 	0xc1059ed8UL,
@@ -285,7 +285,6 @@ static const u_int32_t sha224_initial_hash_value[8] = {
 	0x64f98fa7UL,
 	0xbefa4fa4UL
 };
-#endif /* 0 */
 
 /* Initial hash value H for SHA-384 */
 static const u_int64_t sha384_initial_hash_value[8] = {
@@ -299,7 +298,6 @@ static const u_int64_t sha384_initial_hash_value[8] = {
 	0x47b5481dbefa4fa4ULL
 };
 
-#if 0
 /* Initial hash value H for SHA-512-256 */
 static const u_int64_t sha512_256_initial_hash_value[8] = {
 	0x22312194fc2bf72cULL,
@@ -629,7 +627,7 @@ SHA256Final(u_int8_t digest[SHA256_DIGEST_LENGTH], SHA2_CTX *context)
 }
 DEF_WEAK(SHA256Final);
 
-
+#if 0
 /*** SHA-512: *********************************************************/
 void
 SHA512Init(SHA2_CTX *context)
@@ -968,7 +966,7 @@ SHA384Final(u_int8_t digest[SHA384_DIGEST_LENGTH], SHA2_CTX *context)
 }
 DEF_WEAK(SHA384Final);
 
-#if 0
+
 /*** SHA-512/256: *********************************************************/
 void
 SHA512_256Init(SHA2_CTX *context)
