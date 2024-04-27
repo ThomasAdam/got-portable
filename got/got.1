@@ -3460,7 +3460,7 @@ Alternatively, the merge may be aborted with
 .Tg sg
 .It Xo
 .Cm stage
-.Op Fl lpRS
+.Op Fl lpS
 .Op Fl F Ar response-script
 .Op Ar path ...
 .Xc
@@ -3540,13 +3540,6 @@ If a file is in modified status, individual patches derived from the
 modified file content can be staged.
 Files in added or deleted status may only be staged or rejected in
 their entirety.
-.It Fl R
-Permit recursion into directories.
-If this option is not specified,
-.Cm got stage
-will refuse to run if a specified
-.Ar path
-is a directory.
 .It Fl S
 Allow staging of symbolic links which point outside of the path space
 that is under version control.
@@ -3589,7 +3582,7 @@ and may then be staged again if necessary.
 .Tg ug
 .It Xo
 .Cm unstage
-.Op Fl pR
+.Op Fl p
 .Op Fl F Ar response-script
 .Op Ar path ...
 .Xc
@@ -3638,13 +3631,6 @@ select or reject changes for unstaging based on
 If a file is staged in modified status, individual patches derived from the
 staged file content can be unstaged.
 Files staged in added or deleted status may only be unstaged in their entirety.
-.It Fl R
-Permit recursion into directories.
-If this option is not specified,
-.Cm got unstage
-will refuse to run if a specified
-.Ar path
-is a directory.
 .El
 .It Xo
 .Cm cat
