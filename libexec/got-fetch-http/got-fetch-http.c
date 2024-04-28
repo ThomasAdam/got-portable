@@ -18,6 +18,7 @@
 #include "got_compat.h"
 
 #include <sys/types.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 
 #include <err.h>
@@ -32,6 +33,7 @@
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_path.h"
 #include "got_version.h"
 
 #include "got_lib_pkt.h"
@@ -161,17 +163,14 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 	char		*p, *req;
 	int		 r;
 	
-	if (path_sufx != NULL && *path && path[strlen(path) - 1] == '/')
-		path_sufx++; /* skip the slash */
-
 	if (strcmp(method, "POST") == 0)
 		te = "\r\nTransfer-Encoding: chunked\r\n";
 
 	if (ctype)
 		chdr = "Content-Type: ";
 
-	r = asprintf(&p, "%s/%s%s%s", path, path_sufx,
-	    query ? "?" : "", query ? query : "");
+	r = asprintf(&p, "%s%s/%s%s%s", got_path_is_absolute(path) ? "" :"/",
+	    path, path_sufx, query ? "?" : "", query ? query : "");
 	if (r == -1)
 		err(1, "asprintf");
 
@@ -348,7 +347,6 @@ get_refs(int https, const char *host, const char *port, const char *path)
 	struct bufio		 bio;
 	char			 buf[GOT_PKT_MAX];
 	const struct got_error	*e;
-	const char		*sufx = "/info/refs";
 	size_t			 chunksz = 0;
 	ssize_t			 r;
 	int			 skip;
@@ -369,7 +367,7 @@ get_refs(int https, const char *host, const char *port, const char *path)
 		goto err;
 	}
 
-	if (http_open(&bio, https, "GET", host, port, path, sufx,
+	if (http_open(&bio, https, "GET", host, port, path, "info/refs",
 	    "service=git-upload-pack", NULL) == -1)
 		goto err;
 
@@ -447,7 +445,7 @@ upload_request(int https, const char *host, const char *port, const char *path,
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (http_open(&bio, https, "POST", host, port, path, "/git-upload-pack",
+	if (http_open(&bio, https, "POST", host, port, path, "git-upload-pack",
 	    NULL, UPLOAD_PACK_REQ) == -1)
 		goto err;
 
@@ -530,7 +528,8 @@ int
 main(int argc, char **argv)
 {
 	struct pollfd	 pfd;
-	const char	*host, *port, *path;
+	const char	*host, *port;
+	char		*path;
 	int		 https = 0;
 	int		 ch;
 
@@ -577,6 +576,7 @@ main(int argc, char **argv)
 	host = argv[1];
 	port = argv[2];
 	path = argv[3];
+	got_path_strip_trailing_slashes(path);
 
 	if (get_refs(https, host, port, path) == -1)
 		errx(1, "failed to get refs");
