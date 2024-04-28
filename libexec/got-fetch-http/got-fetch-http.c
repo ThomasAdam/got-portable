@@ -168,7 +168,7 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 	if (ctype)
 		chdr = "Content-Type: ";
 
-	r = asprintf(&p, "%s/%s%s%s", path, path_sufx,
+	r = asprintf(&p, "/%s%s%s%s", path, path_sufx,
 	    query ? "?" : "", query ? query : "");
 	if (r == -1)
 		err(1, "asprintf");
