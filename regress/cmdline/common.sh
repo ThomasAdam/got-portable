@@ -27,10 +27,7 @@ export GOT_LOG_DEFAULT_LIMIT=0
 export GOT_TEST_ROOT="/tmp"
 export GOT_IGNORE_GITCONFIG=1
 export GOT_VERSION_STR=`got --version | cut -d ' ' -f2`
-
-if [ -z "$GOT_TEST_HTTP_PORT" ]; then
-	export GOT_TEST_HTTP_PORT=8080
-fi
+export GOT_TEST_HTTP_PORT=${GOT_TEST_HTTP_PORT:-8080}
 
 export LC_ALL=C
 
