@@ -85,10 +85,8 @@ static const struct got_error *gotweb_parse_querystring(struct querystring **,
 static const struct got_error *gotweb_assign_querystring(struct querystring **,
     char *, char *);
 static int gotweb_render_index(struct template *);
-static const struct got_error *gotweb_init_repo_dir(struct repo_dir **,
-    const char *);
-static const struct got_error *gotweb_load_got_path(struct request *c,
-    struct repo_dir *);
+static const struct got_error *gotweb_load_got_path(struct repo_dir **,
+    const char *, struct request *);
 static const struct got_error *gotweb_get_repo_description(char **,
     struct server *, const char *, int);
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
@@ -196,10 +194,7 @@ gotweb_process_request(struct request *c)
 	}
 
 	if (qs->action != INDEX) {
-		error = gotweb_init_repo_dir(&repo_dir, qs->path);
-		if (error)
-			goto err;
-		error = gotweb_load_got_path(c, repo_dir);
+		error = gotweb_load_got_path(&repo_dir, qs->path, c);
 		c->t->repo_dir = repo_dir;
 		if (error && error->code != GOT_ERR_LONELY_PACKIDX)
 			goto err;
@@ -822,11 +817,8 @@ gotweb_render_index(struct template *tp)
 			continue;
 		}
 
-		error = gotweb_init_repo_dir(&repo_dir, sd_dent[d_i]->d_name);
-		if (error)
-			continue;
-
-		error = gotweb_load_got_path(c, repo_dir);
+		error = gotweb_load_got_path(&repo_dir, sd_dent[d_i]->d_name,
+		    c);
 		if (error && error->code != GOT_ERR_LONELY_PACKIDX) {
 			if (error->code != GOT_ERR_NOT_GIT_REPO)
 				log_warnx("%s: %s: %s", __func__,
@@ -1073,35 +1065,54 @@ gotweb_render_absolute_url(struct request *c, struct gotweb_url *url)
 }
 
 static const struct got_error *
-gotweb_load_got_path(struct request *c, struct repo_dir *repo_dir)
+gotweb_load_got_path(struct repo_dir **rp, const char *dir,
+    struct request *c)
 {
 	const struct got_error *error = NULL;
 	struct socket *sock = c->sock;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
+	struct repo_dir *repo_dir;
 	DIR *dt;
 	char *dir_test;
 
-	if (asprintf(&dir_test, "%s/%s/%s", srv->repos_path, repo_dir->name,
+	*rp = calloc(1, sizeof(**rp));
+	if (*rp == NULL)
+		return got_error_from_errno("calloc");
+	repo_dir = *rp;
+
+	if (asprintf(&dir_test, "%s/%s/%s", srv->repos_path, dir,
 	    GOTWEB_GIT_DIR) == -1)
 		return got_error_from_errno("asprintf");
 
 	dt = opendir(dir_test);
 	if (dt == NULL) {
 		free(dir_test);
-		if (asprintf(&dir_test, "%s/%s", srv->repos_path,
-		    repo_dir->name) == -1)
+		if (asprintf(&dir_test, "%s/%s", srv->repos_path, dir) == -1)
 			return got_error_from_errno("asprintf");
 		dt = opendir(dir_test);
 		if (dt == NULL) {
 			free(dir_test);
-			return got_error_path(repo_dir->name,
-			    GOT_ERR_NOT_GIT_REPO);
+			if (asprintf(&dir_test, "%s/%s%s", srv->repos_path,
+			    dir, GOTWEB_GIT_DIR) == -1)
+				return got_error_from_errno("asprintf");
+			dt = opendir(dir_test);
+			if (dt == NULL) {
+				free(dir_test);
+				return got_error_path(dir,
+				    GOT_ERR_NOT_GIT_REPO);
+			}
 		}
 	}
 
 	repo_dir->path = dir_test;
 	dir_test = NULL;
+
+	repo_dir->name = strdup(repo_dir->path + strlen(srv->repos_path) + 1);
+	if (repo_dir->name == NULL) {
+		error = got_error_from_errno("strdup");
+		goto err;
+	}
 
 	if (srv->respect_exportok &&
 	    faccessat(dirfd(dt), "git-daemon-export-ok", F_OK, 0) == -1) {
@@ -1135,29 +1146,6 @@ err:
 		t->repo = NULL;
 	}
 	return error;
-}
-
-static const struct got_error *
-gotweb_init_repo_dir(struct repo_dir **repo_dir, const char *dir)
-{
-	const struct got_error *error;
-
-	*repo_dir = calloc(1, sizeof(**repo_dir));
-	if (*repo_dir == NULL)
-		return got_error_from_errno("calloc");
-
-	if (asprintf(&(*repo_dir)->name, "%s", dir) == -1) {
-		error = got_error_from_errno("asprintf");
-		free(*repo_dir);
-		*repo_dir = NULL;
-		return error;
-	}
-	(*repo_dir)->owner = NULL;
-	(*repo_dir)->description = NULL;
-	(*repo_dir)->url = NULL;
-	(*repo_dir)->path = NULL;
-
-	return NULL;
 }
 
 static const struct got_error *
