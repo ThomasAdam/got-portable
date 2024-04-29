@@ -380,6 +380,10 @@ When several commits are batched in a single send operation, not all of
 the fields are available for each commit object.
 .It Dv repo
 The repository name as string.
+.It Dv auth_user
+The committer's user account as authenticated by
+.Xr gotd 8
+as a string.
 .It Dv id
 The commit ID as string, may be abbreviated.
 .It Dv committer
@@ -448,6 +452,10 @@ to be set:
 .Bl -tag -compact -width Ds
 .It Dv repo
 The repository name as string.
+.It Dv auth_user
+The committer's user account as authenticated by
+.Xr gotd 8
+as a string.
 .It Dv ref
 The removed branch reference.
 .It Dv id
@@ -458,6 +466,10 @@ The tag notification has the following fields, all guaranteed to be set:
 .Bl -tag -width Ds
 .It repo
 The repository name as string.
+.It Dv auth_user
+The committer's user account as authenticated by
+.Xr gotd 8
+as a string.
 .It tag
 The tag reference.
 .It tagger

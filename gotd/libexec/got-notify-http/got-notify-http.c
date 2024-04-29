@@ -46,7 +46,7 @@ static int		 http_timeout = 300;	/* 5 minutes in seconds */
 __dead static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-c] -r repo -h host -p port path\n",
+	fprintf(stderr, "usage: %s [-c] -r repo -h host -p port -u user path\n",
 	    getprogname());
 	exit(1);
 }
@@ -200,7 +200,7 @@ json_author(FILE *fp, const char *type, char *address, int comma)
 }
 
 static int
-jsonify_branch_rm(FILE *fp, char *line, const char *repo)
+jsonify_branch_rm(FILE *fp, char *line, const char *repo, const char *user)
 {
 	char	*ref, *id;
 
@@ -220,6 +220,8 @@ jsonify_branch_rm(FILE *fp, char *line, const char *repo)
 	fputc('{', fp);
 	json_field(fp, "type", "branch-deleted", 1);
 	json_field(fp, "repo", repo, 1);
+	if (user)
+		json_field(fp, "auth_user", user, 1);
 	json_field(fp, "ref", ref, 1);
 	json_field(fp, "id", id, 0);
 	fputc('}', fp);
@@ -228,7 +230,7 @@ jsonify_branch_rm(FILE *fp, char *line, const char *repo)
 }
 
 static int
-jsonify_commit_short(FILE *fp, char *line, const char *repo)
+jsonify_commit_short(FILE *fp, char *line, const char *repo, const char *user)
 {
 	char	*t, *date, *id, *author, *message;
 
@@ -252,6 +254,8 @@ jsonify_commit_short(FILE *fp, char *line, const char *repo)
 
 	fprintf(fp, "{\"type\":\"commit\",\"short\":true,");
 	json_field(fp, "repo", repo, 1);
+	if (user)
+		json_field(fp, "auth_user", user, 1);
 	json_field(fp, "id", id, 1);
 	json_author(fp, "committer", author, 1);
 	json_date(fp, "date", date, 1);
@@ -262,7 +266,8 @@ jsonify_commit_short(FILE *fp, char *line, const char *repo)
 }
 
 static int
-jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
+jsonify_commit(FILE *fp, const char *repo, const char *user,
+    char **line, ssize_t *linesize)
 {
 	const char	*errstr;
 	char		*author = NULL;
@@ -291,6 +296,8 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 
 	fprintf(fp, "{\"type\":\"commit\",\"short\":false,");
 	json_field(fp, "repo", repo, 1);
+	if (user)
+		json_field(fp, "auth_user", user, 1);
 	json_field(fp, "id", l, 1);
 
 	while (!done) {
@@ -557,7 +564,8 @@ jsonify_commit(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 }
 
 static int
-jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
+jsonify_tag(FILE *fp, const char *repo, const char *user,
+    char **line, ssize_t *linesize)
 {
 	const char	*errstr;
 	char		*l;
@@ -580,6 +588,8 @@ jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 	fputc('{', fp);
 	json_field(fp, "type", "tag", 1);
 	json_field(fp, "repo", repo, 1);
+	if (user)
+		json_field(fp, "auth_user", user, 1);
 	json_field(fp, "tag", l, 1);
 
 	while (!done) {
@@ -688,7 +698,7 @@ jsonify_tag(FILE *fp, const char *repo, char **line, ssize_t *linesize)
 }
 
 static int
-jsonify(FILE *fp, const char *repo)
+jsonify(FILE *fp, const char *repo, const char *user)
 {
 	char		*line = NULL;
 	size_t		 linesize = 0;
@@ -708,25 +718,26 @@ jsonify(FILE *fp, const char *repo)
 		needcomma = 1;
 
 		if (strncmp(line, "Removed refs/heads/", 19) == 0) {
-			if (jsonify_branch_rm(fp, line, repo) == -1)
+			if (jsonify_branch_rm(fp, line, repo, user) == -1)
 				fatal("jsonify_branch_rm");
 			continue;
 		}
 
 		if (strncmp(line, "commit ", 7) == 0) {
-			if (jsonify_commit(fp, repo, &line, &linesize) == -1)
+			if (jsonify_commit(fp, repo, user,
+			    &line, &linesize) == -1)
 				fatal("jsonify_commit");
 			continue;
 		}
 
 		if (*line >= '0' && *line <= '9') {
-			if (jsonify_commit_short(fp, line, repo) == -1)
+			if (jsonify_commit_short(fp, line, repo, user) == -1)
 				fatal("jsonify_commit_short");
 			continue;
 		}
 
 		if (strncmp(line, "tag ", 4) == 0) {
-			if (jsonify_tag(fp, repo, &line, &linesize) == -1)
+			if (jsonify_tag(fp, repo, user, &line, &linesize) == -1)
 				fatal("jsonify_tag");
 			continue;
 		}
@@ -843,6 +854,7 @@ main(int argc, char **argv)
 	const char	*errstr;
 	const char	*repo = NULL;
 	const char	*host = NULL, *port = NULL, *path = NULL;
+	const char	*gotd_auth_user = NULL;
 	char		*auth, *line, *spc;
 	size_t		 len;
 	ssize_t		 r;
@@ -858,7 +870,7 @@ main(int argc, char **argv)
 
 	log_init(0, LOG_DAEMON);
 
-	while ((ch = getopt(argc, argv, "ch:p:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "ch:p:r:u:")) != -1) {
 		switch (ch) {
 		case 'c':
 			tls = 1;
@@ -871,6 +883,9 @@ main(int argc, char **argv)
 			break;
 		case 'r':
 			repo = optarg;
+			break;
+		case 'u':
+			gotd_auth_user = optarg;
 			break;
 		default:
 			usage();
@@ -909,7 +924,7 @@ main(int argc, char **argv)
 	if (tmpfp == NULL)
 		fatal("opentemp");
 
-	jsonify(tmpfp, repo);
+	jsonify(tmpfp, repo, gotd_auth_user);
 
 	paylen = ftello(tmpfp);
 	if (paylen == -1)

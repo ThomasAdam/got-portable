@@ -497,6 +497,7 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	size_t datalen;
 	struct gotd_imsg_notify inotify;
 	const char *action;
+	struct ibuf *wbuf;
 
 	memset(&inotify, 0, sizeof(inotify));
 
@@ -566,13 +567,28 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	    "%s: %s %s %s", gotd_session.repo_cfg->name,
 	    client->username, action, notif->refname);
 
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFY,
-	    PROC_SESSION_WRITE, notif->fd, &inotify, sizeof(inotify))
-	    == -1) {
-		err = got_error_from_errno("imsg compose NOTIFY");
+	inotify.username_len = strlen(client->username);
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY,
+	    PROC_SESSION_WRITE, gotd_session.pid,
+	    sizeof(inotify) + inotify.username_len);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create NOTIFY");
 		goto done;
 	}
+	if (imsg_add(wbuf, &inotify, sizeof(inotify)) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+	if (imsg_add(wbuf, client->username, inotify.username_len) == -1) {
+		err = got_error_from_errno("imsg_add NOTIFY");
+		goto done;
+	}
+
+	ibuf_fd_set(wbuf, notif->fd);
 	notif->fd = -1;
+
+	imsg_close(&iev->ibuf, wbuf);
+	gotd_imsg_event_add(iev);
 done:
 	if (notif->fd != -1)
 		close(notif->fd);

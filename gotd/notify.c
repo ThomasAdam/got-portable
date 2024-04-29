@@ -261,9 +261,10 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 }
 
 static void
-notify_http(struct gotd_notification_target *target, const char *repo, int fd)
+notify_http(struct gotd_notification_target *target, const char *repo,
+    const char *username, int fd)
 {
-	const char *argv[10];
+	const char *argv[12];
 	int argc = 0;
 
 	argv[argc++] = GOTD_PATH_PROG_NOTIFY_HTTP;
@@ -276,6 +277,8 @@ notify_http(struct gotd_notification_target *target, const char *repo, int fd)
 	argv[argc++] = target->conf.http.hostname;
 	argv[argc++] = "-p";
 	argv[argc++] = target->conf.http.port;
+	argv[argc++] = "-u";
+	argv[argc++] = username;
 
 	argv[argc++] = target->conf.http.path;
 
@@ -294,12 +297,15 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	struct gotd_repo *repo;
 	struct gotd_notification_target *target;
 	int fd;
+	char *username = NULL;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(inotify))
+	if (datalen < sizeof(inotify))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	memcpy(&inotify, imsg->data, datalen);
+	memcpy(&inotify, imsg->data, sizeof(inotify));
+	if (datalen != sizeof(inotify) + inotify.username_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	repo = gotd_find_repo_by_name(inotify.repo_name, gotd_notify.repos);
 	if (repo == NULL)
@@ -309,10 +315,15 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
+	username = strndup(imsg->data + sizeof(inotify), inotify.username_len);
+	if (username == NULL)
+		return got_error_from_errno("strndup");
+
 	if (lseek(fd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
+
 
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
 		switch (target->type) {
@@ -320,7 +331,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 			notify_email(target, inotify.subject_line, fd);
 			break;
 		case GOTD_NOTIFICATION_VIA_HTTP:
-			notify_http(target, repo->name, fd);
+			notify_http(target, repo->name, username, fd);
 			break;
 		}
 	}
@@ -332,6 +343,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	}
 done:
 	close(fd);
+	free(username);
 	return err;
 }
 
