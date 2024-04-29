@@ -64,6 +64,7 @@ test_file_changed() {
 		"type":"commit",
 		"short":false,
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -155,6 +156,7 @@ test_bad_utf8() {
 		"type":"commit",
 		"short":false,
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -255,6 +257,7 @@ test_many_commits_not_summarized() {
 			"type":"commit",
 			"short":false,
 			"repo":"test-repo",
+			"auth_user":"${GOTD_DEVUSER}",
 			"id":"$commit_id",
 			"author":{
 				"full":"$GOT_AUTHOR",
@@ -359,6 +362,7 @@ test_many_commits_summarized() {
 			"type":"commit",
 			"short":true,
 			"repo":"test-repo",
+			"auth_user":"${GOTD_DEVUSER}",
 			"id":"$commit_id",
 			"committer":{
 				"user":"$GOT_AUTHOR_8"
@@ -439,6 +443,7 @@ test_branch_created() {
 		"type":"commit",
 		"short":false,
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"id":"$commit_id",
 		"author":{
 			"full":"$GOT_AUTHOR",
@@ -517,6 +522,7 @@ test_branch_removed() {
 	{"notifications":[{
 		"type":"branch-deleted",
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"ref":"refs/heads/newbranch",
 		"id":"$commit_id"
 	}]}
@@ -570,6 +576,7 @@ test_tag_created() {
 	{"notifications":[{
 		"type":"tag",
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"tag":"refs/tags/1.0",
 		"tagger":{
 			"full":"$GOT_AUTHOR",
@@ -649,6 +656,7 @@ test_tag_changed() {
 	{"notifications":[{
 		"type":"tag",
 		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
 		"tag":"refs/tags/1.0",
 		"tagger":{
 			"full":"$GOT_AUTHOR",

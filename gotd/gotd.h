@@ -480,6 +480,8 @@ struct gotd_imsg_notification_content {
 struct gotd_imsg_notify {
 	char repo_name[NAME_MAX];
 	char subject_line[64];
+	size_t username_len;
+	/* Followed by username_len data bytes. */
 };
 
 int enter_chroot(const char *);
