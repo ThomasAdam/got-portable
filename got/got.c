@@ -8636,76 +8636,80 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 	return NULL;
 }
 
+#define CHOOSE_PATCH_VALID_RESPONSES	"ynq"
+
 static const struct got_error *
 choose_patch(int *choice, void *arg, unsigned char status, const char *path,
     FILE *patch_file, int n, int nchanges)
 {
 	const struct got_error *err = NULL;
-	char *line = NULL;
+	char *nl, *line = NULL;
+	FILE *fp = stdin;
 	size_t linesize = 0;
 	ssize_t linelen;
-	int resp = ' ';
+	int interactive = 1;
 	struct choose_patch_arg *a = arg;
 
 	*choice = GOT_PATCH_CHOICE_NONE;
 
 	if (a->patch_script_file) {
-		char *nl;
+		interactive = 0;
+		fp = a->patch_script_file;
+	}
+
+	for (;;) {
 		err = show_change(status, path, patch_file, n, nchanges,
 		    a->action);
 		if (err)
 			return err;
-		linelen = getline(&line, &linesize, a->patch_script_file);
+
+		linelen = getline(&line, &linesize, fp);
 		if (linelen == -1) {
-			if (ferror(a->patch_script_file))
+			free(line);
+			if (ferror(fp))
 				return got_error_from_errno("getline");
+			if (feof(fp))
+				return got_error(GOT_ERR_EOF);
 			return NULL;
 		}
+
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		if (strcmp(line, "y") == 0) {
-			*choice = GOT_PATCH_CHOICE_YES;
-			printf("y\n");
-		} else if (strcmp(line, "n") == 0) {
-			*choice = GOT_PATCH_CHOICE_NO;
-			printf("n\n");
-		} else if (strcmp(line, "q") == 0 &&
-		    status == GOT_STATUS_MODIFY) {
-			*choice = GOT_PATCH_CHOICE_QUIT;
-			printf("q\n");
-		} else
+		if (strlen(line) != 1 ||
+		    !strchr(CHOOSE_PATCH_VALID_RESPONSES, line[0])) {
 			printf("invalid response '%s'\n", line);
-		free(line);
-		return NULL;
-	}
-
-	while (resp != 'y' && resp != 'n' && resp != 'q') {
-		err = show_change(status, path, patch_file, n, nchanges,
-		    a->action);
-		if (err)
-			return err;
-		resp = getchar();
-		if (resp == '\n')
-			resp = getchar();
-		if (status == GOT_STATUS_MODIFY) {
-			if (resp != 'y' && resp != 'n' && resp != 'q') {
-				printf("invalid response '%c'\n", resp);
-				resp = ' ';
-			}
-		} else if (resp != 'y' && resp != 'n') {
-				printf("invalid response '%c'\n", resp);
-				resp = ' ';
+			if (interactive)
+				continue;
 		}
+
+		if (interactive) {
+			if (status != GOT_STATUS_MODIFY && line[0] == 'q') {
+				printf("invalid response '%s'\n", line);
+				continue;
+			}
+		}
+
+		break;
 	}
 
-	if (resp == 'y')
+	switch (line[0]) {
+	case 'y':
 		*choice = GOT_PATCH_CHOICE_YES;
-	else if (resp == 'n')
+		break;
+	case 'n':
 		*choice = GOT_PATCH_CHOICE_NO;
-	else if (resp == 'q' && status == GOT_STATUS_MODIFY)
-		*choice = GOT_PATCH_CHOICE_QUIT;
+		break;
+	case 'q':
+		if (status == GOT_STATUS_MODIFY)
+			*choice = GOT_PATCH_CHOICE_QUIT;
+		break;
+	}
 
+	if (!interactive)
+		printf("%c\n", line[0]);
+
+	free(line);
 	return NULL;
 }
 
