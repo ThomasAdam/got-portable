@@ -2396,7 +2396,7 @@ stage this change? [y/n/q] y
 M  numbers (change 2 of 3)
 EOF
 	echo -n "stage this change? [y/n/q] " >> $testroot/stdout.expected
-	echo "got: invalid patch choice" > $testroot/stderr.expected
+	echo "got: unexpected end of file" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
