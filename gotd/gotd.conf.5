@@ -364,11 +364,20 @@ URL to avoid leaking of authentication credentials.
 The request body contains a JSON object with a
 .Dq notifications
 property containing an array of notification objects.
-Each notification object has a
-.Sq type
-property.
-Depending on the type, each notification object has different fields.
-The types are:
+The following notification object properties are always present:
+.Bl -tag -width auth_user
+.It Dv repo
+The repository name as a string.
+.It Dv auth_user
+The committer's user account as authenticated by
+.Xr gotd 8
+as a string.
+.It Dv type
+The notification object type as a string.
+.El
+.Pp
+Each notification object carries additional type-specific properties.
+The types and their type-specific properties are:
 .Bl -tag -width Ds
 .It Dv commit
 The commit notification object has the following fields.
@@ -378,12 +387,6 @@ Except where noted, all are optional.
 Boolean, indicates whether the object has all the fields set.
 When several commits are batched in a single send operation, not all of
 the fields are available for each commit object.
-.It Dv repo
-The repository name as string.
-.It Dv auth_user
-The committer's user account as authenticated by
-.Xr gotd 8
-as a string.
 .It Dv id
 The commit ID as string, may be abbreviated.
 .It Dv committer
@@ -450,12 +453,6 @@ which are the number of added and removed lines respectively.
 The branch deleted notifications has the following fields, all guaranteed
 to be set:
 .Bl -tag -width Ds
-.It Dv repo
-The repository name as string.
-.It Dv auth_user
-The committer's user account as authenticated by
-.Xr gotd 8
-as a string.
 .It Dv ref
 The removed branch reference.
 .It Dv id
@@ -464,12 +461,6 @@ The hash of the commit pointed by the deleted branch.
 .It Dv tag
 The tag notification has the following fields, all guaranteed to be set:
 .Bl -tag -width Ds
-.It repo
-The repository name as string.
-.It Dv auth_user
-The committer's user account as authenticated by
-.Xr gotd 8
-as a string.
 .It tag
 The tag reference.
 .It tagger
