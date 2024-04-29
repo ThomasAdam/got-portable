@@ -71,8 +71,8 @@ struct gotd_imsgev {
 };
 
 enum gotd_access {
-	GOTD_ACCESS_PERMITTED = 1,
-	GOTD_ACCESS_DENIED
+	GOTD_ACCESS_DENIED = -1,
+	GOTD_ACCESS_PERMITTED = 1
 };
 
 struct gotd_access_rule {
