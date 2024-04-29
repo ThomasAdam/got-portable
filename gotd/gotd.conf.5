@@ -406,7 +406,7 @@ This is the only field guaranteed to be set.
 .It Dv author
 An object with the author information.
 Has the same fields as the
-.Dv committer
+.Sq committer
 but may be unset.
 .It Dv date
 Number, representing the number of seconds since the Epoch in UTC.
@@ -418,9 +418,9 @@ The complete commit message, may be unset.
 .It Dv diffstat
 An object with the summarized changes, may be unset.
 Contains a
-.Dv files
+.Sq files
 field with an array of objects describing the changes per-file and a
-.Dv total
+.Sq total
 field with the cumulative changes.
 The changes per-file contains the following fields:
 .Pp
@@ -442,11 +442,11 @@ The number of lines removed.
 .El
 .Pp
 The
-.Dv total
+.Sq total
 object contains two fields:
-.Dv added
+.Sq added
 and
-.Dv removed
+.Sq removed
 which are the number of added and removed lines respectively.
 .El
 .It Dv branch-deleted
@@ -465,18 +465,18 @@ The tag notification has the following fields, all guaranteed to be set:
 The tag reference.
 .It tagger
 The user information, with the same format of the
-.Dv committer
+.Sq committer
 field for the
-.Dv commit
+.Sq commit
 notification but with all the field guaranteed to be set.
 .It Dv date
 Number, representing the number of seconds since the Epoch in UTC.
 .It Dv object
 The object being tagged.
 It contains the fields
-.Dv type
+.Sq type
 with the object type and
-.Dv id
+.Sq id
 with the object id being tagged.
 .It Dv message
 The tag message.
