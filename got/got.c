@@ -8702,6 +8702,10 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 		if (status == GOT_STATUS_MODIFY)
 			*choice = GOT_PATCH_CHOICE_QUIT;
 		break;
+	default:
+		printf("invalid response '%s'\n", line);
+		free(line);
+		return NULL;
 	}
 
 	if (!interactive)
