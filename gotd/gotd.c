@@ -588,7 +588,7 @@ gotd_request(int fd, short events, void *arg)
 				msgbuf_clear(&ibuf->w);
 				continue;
 			} else if (n == -1 && errno != EAGAIN) {
-				err = got_error_from_errno("imsg_flush");
+				err = got_error_from_errno("msgbuf_write");
 				disconnect_on_error(client, err);
 				return;
 			}
