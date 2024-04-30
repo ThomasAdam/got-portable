@@ -222,7 +222,7 @@ jsonify_branch_rm(FILE *fp, char *line, const char *repo, const char *user)
 	fputc('{', fp);
 	json_field(fp, "type", "branch-deleted", 1);
 	json_field(fp, "repo", repo, 1);
-	json_field(fp, "auth_user", user, 1);
+	json_field(fp, "authenticated_user", user, 1);
 	json_field(fp, "ref", ref, 1);
 	json_field(fp, "id", id, 0);
 	fputc('}', fp);
@@ -255,7 +255,7 @@ jsonify_commit_short(FILE *fp, char *line, const char *repo, const char *user)
 
 	fprintf(fp, "{\"type\":\"commit\",\"short\":true,");
 	json_field(fp, "repo", repo, 1);
-	json_field(fp, "auth_user", user, 1);
+	json_field(fp, "authenticated_user", user, 1);
 	json_field(fp, "id", id, 1);
 	json_author(fp, "committer", author, 1);
 	json_date(fp, "date", date, 1);
@@ -296,7 +296,7 @@ jsonify_commit(FILE *fp, const char *repo, const char *user,
 
 	fprintf(fp, "{\"type\":\"commit\",\"short\":false,");
 	json_field(fp, "repo", repo, 1);
-	json_field(fp, "auth_user", user, 1);
+	json_field(fp, "authenticated_user", user, 1);
 	json_field(fp, "id", l, 1);
 
 	while (!done) {
@@ -587,7 +587,7 @@ jsonify_tag(FILE *fp, const char *repo, const char *user,
 	fputc('{', fp);
 	json_field(fp, "type", "tag", 1);
 	json_field(fp, "repo", repo, 1);
-	json_field(fp, "auth_user", user, 1);
+	json_field(fp, "authenticated_user", user, 1);
 	json_field(fp, "tag", l, 1);
 
 	while (!done) {

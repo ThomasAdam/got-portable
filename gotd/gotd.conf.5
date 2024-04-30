@@ -365,10 +365,10 @@ The request body contains a JSON object with a
 .Dq notifications
 property containing an array of notification objects.
 The following notification object properties are always present:
-.Bl -tag -width auth_user
+.Bl -tag -width authenticated_user
 .It Dv repo
 The repository name as a string.
-.It Dv auth_user
+.It Dv authenticated_user
 The committer's user account as authenticated by
 .Xr gotd 8
 as a string.
