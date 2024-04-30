@@ -107,6 +107,72 @@ test_file_changed() {
 		return 1
 	fi
 
+	# Try the same thing again with 'git push' instead of 'got send'
+	echo "change alpha once more" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'make more changes' > /dev/null)
+	local commit_id=`git_show_head $testroot/repo-clone`
+	local author_time=`git_show_author_time $testroot/repo-clone`
+
+	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
+	    > $testroot/stdout &
+
+	git -C $testroot/repo-clone push -q origin main
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git push failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	wait %1 # wait for the http "server"
+
+	echo -n > "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"type":"commit",
+		"short":false,
+		"repo":"test-repo",
+		"auth_user":"${GOTD_DEVUSER}",
+		"id":"$commit_id",
+		"author":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"committer":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"date":$author_time,
+		"short_message":"make more changes",
+		"message":"make more changes\n",
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"alpha",
+				"added":1,
+				"removed":1
+			}],
+			"total":{
+				"added":1,
+				"removed":1
+			}
+		}
+	}]}
+	.
+	,j
+	w
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
 	test_done "$testroot" "$ret"
 }
 
