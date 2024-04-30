@@ -148,7 +148,7 @@ gotd_request_timeout(int fd, short events, void *arg)
 {
 	struct gotd_session_client *client = arg;
 
-	log_debug("disconnecting uid %d due to timeout", client->euid);
+	log_warn("disconnecting uid %d due to timeout", client->euid);
 	disconnect(client);
 }
 
