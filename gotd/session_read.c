@@ -461,15 +461,7 @@ session_dispatch_client(int fd, short events, void *arg)
 	if (events & EV_WRITE) {
 		while (ibuf->w.queued) {
 			n = msgbuf_write(&ibuf->w);
-			if (n == -1 && errno == EPIPE) {
-				/*
-				 * The client has closed its socket.
-				 * This can happen when Git clients are
-				 * done sending pack file data.
-				 */
-				msgbuf_clear(&ibuf->w);
-				continue;
-			} else if (n == -1 && errno != EAGAIN) {
+			if (n == -1 && errno != EAGAIN) {
 				err = got_error_from_errno("imsg_flush");
 				disconnect_on_error(client, err);
 				return;
