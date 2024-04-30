@@ -1414,6 +1414,7 @@ recv_connect(struct imsg *imsg)
 	    session_dispatch_client, &client->iev);
 	gotd_imsg_event_add(&client->iev);
 	evtimer_set(&client->tmo, gotd_request_timeout, client);
+	evtimer_add(&client->tmo, &gotd_session.request_timeout);
 
 	return NULL;
 }
