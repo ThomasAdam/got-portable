@@ -1341,7 +1341,8 @@ session_dispatch_client(int fd, short events, void *arg)
 
 	if (err) {
 		if (err->code != GOT_ERR_EOF ||
-		    gotd_session.state != GOTD_STATE_EXPECT_PACKFILE)
+		    (gotd_session.state != GOTD_STATE_EXPECT_PACKFILE &&
+		    gotd_session.state != GOTD_STATE_NOTIFY))
 			disconnect_on_error(client, err);
 	} else {
 		gotd_imsg_event_add(iev);
