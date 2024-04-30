@@ -8683,11 +8683,10 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 				continue;
 		}
 
-		if (interactive) {
-			if (status != GOT_STATUS_MODIFY && line[0] == 'q') {
-				printf("invalid response '%s'\n", line);
-				continue;
-			}
+		/* ADD and DELETE do not accept 'q' response currently. */
+		if (status != GOT_STATUS_MODIFY && line[0] == 'q') {
+			printf("invalid response '%s'\n", line);
+			continue;
 		}
 
 		break;
