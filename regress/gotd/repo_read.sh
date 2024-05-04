@@ -70,6 +70,61 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_clone_basic_git() {
+	local testroot=`test_init clone_basic_git 1`
+
+	cp -r ${GOTD_TEST_REPO} $testroot/repo-copy
+
+	git clone -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "git clone failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# Verify that the clone operation worked fine.
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got tree -R -r "$testroot/repo-clone" > $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+alpha
+beta
+epsilon/
+epsilon/zeta
+gamma/
+gamma/delta
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cloning a repository should not result in modifications
+	diff -urN ${GOTD_TEST_REPO} $testroot/repo-copy \
+		> $testroot/stdout
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+
 test_send_to_read_only_repo() {
 	local testroot=`test_init send_to_read_only_repo 1`
 
@@ -119,4 +174,5 @@ test_send_to_read_only_repo() {
 
 test_parseargs "$@"
 run_test test_clone_basic
+run_test test_clone_basic_git
 run_test test_send_to_read_only_repo
