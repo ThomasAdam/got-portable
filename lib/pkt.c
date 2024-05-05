@@ -26,16 +26,15 @@
 #include "got_lib_pkt.h"
 #include "got_lib_poll.h"
 
-#define GOT_PKT_TIMEOUT	30
-
 const struct got_error *
-got_pkt_readn(ssize_t *off, int fd, void *buf, size_t n)
+got_pkt_readn(ssize_t *off, int fd, void *buf, size_t n,
+    int timeout)
 {
 	const struct got_error *err;
 	size_t len;
 
 	err = got_poll_read_full_timeout(fd, &len, buf, n, n,
-	    GOT_PKT_TIMEOUT);
+	    timeout);
 	if (err)
 		return err;
 
@@ -91,7 +90,7 @@ got_pkt_readlen(int *len, const char *str, int chattygot)
  * of data which follows.
  */
 const struct got_error *
-got_pkt_readhdr(int *datalen, int fd, int chattygot)
+got_pkt_readhdr(int *datalen, int fd, int chattygot, int timeout)
 {
 	static const struct got_error *err;
 	char lenstr[4];
@@ -100,7 +99,7 @@ got_pkt_readhdr(int *datalen, int fd, int chattygot)
 
 	*datalen = 0;
 
-	err = got_pkt_readn(&r, fd, lenstr, 4);
+	err = got_pkt_readn(&r, fd, lenstr, 4, timeout);
 	if (err)
 		return err;
 	if (r == 0) {
@@ -125,20 +124,21 @@ got_pkt_readhdr(int *datalen, int fd, int chattygot)
 }
 
 const struct got_error *
-got_pkt_readpkt(int *outlen, int fd, char *buf, int buflen, int chattygot)
+got_pkt_readpkt(int *outlen, int fd, char *buf, int buflen, int chattygot,
+    int timeout)
 {
 	const struct got_error *err = NULL;
 	int datalen, i;
 	ssize_t n;
 
-	err = got_pkt_readhdr(&datalen, fd, chattygot);
+	err = got_pkt_readhdr(&datalen, fd, chattygot, timeout);
 	if (err)
 		return err;
 
 	if (datalen > buflen)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	err = got_pkt_readn(&n, fd, buf, datalen);
+	err = got_pkt_readn(&n, fd, buf, datalen, timeout);
 	if (err)
 		return err;
 	if (n != datalen)
