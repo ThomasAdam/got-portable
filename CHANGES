@@ -1,3 +1,26 @@
+* got 0.99; 2024-05-05
+  see git repository history for per-change authorship information
+- make 'got fetch' work with URLs which refer to $HOME via a tilde: ~user
+- replace strftime %G-%m-%d with %F to prevent 2024-12-30 -> 2025-12-30
+- fix spurious errors from got-fetch-http when server has no more data to send
+- prevent gotd notification process from exiting due to EPIPE
+- fix I/O hangs with TLS in got-notify-http
+- document http and https protocol support in got.conf(5), too
+- fix an fd leak in gotd's notify process causing endless CPU spin
+- back out got stage -R option addition; deemed too inconvenient in practice
+- fix got-fetch-http GET request URL; add leading slash and avoid double slashes
+- allow custom GOT_TEST_HTTP_PORT when running regression tests
+- gotwebd: add magic ".git" handling; try foo.git if repository foo is not found
+- expose authenticated gotd user account in HTTP notifications
+- gotd.conf(5) HTTP/JSON documentation fixes
+- fix endless loop upon Ctrl-D (EOF) input during got stage/unstage/revert -p
+- make gotd notifications work when 'git push' is used instead of 'got send'
+- make got stage -p behave the same way in interactive and -F modes for 'q'
+- fix lingering gotd processes from clients closing connections early
+- regress: prevent spurious failure of gotd test_clone_basic_access_denied
+- fix an issue where 'git fetch' would error or hang against gotd
+- use polling read in got_pkt_readn() to avoid endless hangs in gotsh
+
 * got 0.98; 2024-04-23
   see git repository history for per-change authorship information
 - speed up got tag -l by caching timestamps in got_ref_cmp_tags() 
