@@ -56,8 +56,7 @@ enum gotd_session_read_state {
 	GOTD_STATE_EXPECT_LIST_REFS,
 	GOTD_STATE_EXPECT_CAPABILITIES,
 	GOTD_STATE_EXPECT_WANT,
-	GOTD_STATE_EXPECT_HAVE,
-	GOTD_STATE_EXPECT_DONE,
+	GOTD_STATE_EXPECT_HAVE_OR_DONE,
 	GOTD_STATE_DONE,
 };
 
@@ -544,7 +543,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			err = forward_want(client, &imsg);
 			break;
 		case GOTD_IMSG_HAVE:
-			if (gotd_session.state != GOTD_STATE_EXPECT_HAVE) {
+			if (gotd_session.state !=
+			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected have-line received");
 				break;
@@ -558,8 +558,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			break;
 		case GOTD_IMSG_FLUSH:
 			if (gotd_session.state != GOTD_STATE_EXPECT_WANT && 
-			    gotd_session.state != GOTD_STATE_EXPECT_HAVE &&
-			    gotd_session.state != GOTD_STATE_EXPECT_DONE) {
+			    gotd_session.state !=
+			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected flush-pkt received");
 				break;
@@ -580,15 +580,17 @@ session_dispatch_client(int fd, short events, void *arg)
 			log_debug("received flush-pkt from uid %d",
 			    client->euid);
 			if (gotd_session.state == GOTD_STATE_EXPECT_WANT) {
-				gotd_session.state = GOTD_STATE_EXPECT_HAVE;
-				log_debug("uid %d: expecting have-lines",
-				    client->euid);
-			} else if (gotd_session.state == GOTD_STATE_EXPECT_HAVE) {
-				gotd_session.state = GOTD_STATE_EXPECT_DONE;
+				gotd_session.state =
+				    GOTD_STATE_EXPECT_HAVE_OR_DONE;
+				log_debug("uid %d: expecting have-lines "
+				    "or 'done'", client->euid);
+			} else if (gotd_session.state ==
+			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				client->accept_flush_pkt = 1;
-				log_debug("uid %d: expecting 'done'",
-				    client->euid);
-			} else if (gotd_session.state != GOTD_STATE_EXPECT_DONE) {
+				log_debug("uid %d: expecting more have-lines "
+				    "or 'done'", client->euid);
+			} else if (gotd_session.state !=
+			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				/* should not happen, see above */
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected client state");
@@ -596,8 +598,8 @@ session_dispatch_client(int fd, short events, void *arg)
 			}
 			break;
 		case GOTD_IMSG_DONE:
-			if (gotd_session.state != GOTD_STATE_EXPECT_HAVE &&
-			    gotd_session.state != GOTD_STATE_EXPECT_DONE) {
+			if (gotd_session.state !=
+			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,
 				    "unexpected flush-pkt received");
 				break;
