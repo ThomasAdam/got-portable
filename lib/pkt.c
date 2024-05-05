@@ -24,21 +24,25 @@
 
 #include "got_error.h"
 #include "got_lib_pkt.h"
+#include "got_lib_poll.h"
+
+#define GOT_PKT_TIMEOUT	30
 
 const struct got_error *
 got_pkt_readn(ssize_t *off, int fd, void *buf, size_t n)
 {
-	ssize_t r;
+	const struct got_error *err;
+	size_t len;
 
-	*off = 0;
-	while (*off != n) {
-		r = read(fd, buf + *off, n - *off);
-		if (r == -1)
-			return got_error_from_errno("read");
-		if (r == 0)
-			return got_error(GOT_ERR_EOF);
-		*off += r;
-	}
+	err = got_poll_read_full_timeout(fd, &len, buf, n, n,
+	    GOT_PKT_TIMEOUT);
+	if (err)
+		return err;
+
+	/* XXX size_t -> ssize_t */
+	if (len > SSIZE_MAX)
+		return got_error(GOT_ERR_RANGE);
+	*off = len;
 	return NULL;
 }
 
