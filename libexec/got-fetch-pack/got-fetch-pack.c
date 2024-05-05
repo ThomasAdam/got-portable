@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -367,7 +368,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		goto done;
 	}
 	while (1) {
-		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot,
+		    INFTIM);
 		if (err)
 			goto done;
 		if (n == 0)
@@ -595,7 +597,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		struct got_object_id common_id;
 
 		/* The server should ACK the object IDs we need. */
-		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot,
+		    INFTIM);
 		if (err)
 			goto done;
 		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
@@ -626,7 +629,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	}
 
 	if (nhave == 0) {
-		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot,
+		    INFTIM);
 		if (err)
 			goto done;
 		if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
@@ -648,7 +652,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		int datalen = -1;
 
 		if (have_sidebands) {
-			err = got_pkt_readhdr(&datalen, fd, chattygot);
+			err = got_pkt_readhdr(&datalen, fd, chattygot, INFTIM);
 			if (err)
 				goto done;
 			if (datalen <= 0)
@@ -673,7 +677,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			datalen--; /* sideband ID has been read */
 			if (buf[0] == GOT_SIDEBAND_PACKFILE_DATA) {
 				/* Read packfile data. */
-				err = got_pkt_readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen,
+				    INFTIM);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -682,7 +687,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					goto done;
 				}
 			} else if (buf[0] == GOT_SIDEBAND_PROGRESS_INFO) {
-				err = got_pkt_readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen,
+				    INFTIM);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -695,7 +701,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					goto done;
 				continue;
 			} else if (buf[0] == GOT_SIDEBAND_ERROR_INFO) {
-				err = got_pkt_readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen,
+				    INFTIM);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -706,7 +713,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				err = fetch_error(buf, r);
 				goto done;
 			} else if (buf[0] == 'A') {
-				err = got_pkt_readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen,
+				    INFTIM);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -731,7 +739,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 		} else {
 			/* No sideband channel. Every byte is packfile data. */
-			err = got_pkt_readn(&r, fd, buf, sizeof buf);
+			err = got_pkt_readn(&r, fd, buf, sizeof buf, INFTIM);
 			if (err)
 				goto done;
 			if (r <= 0)

@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -360,7 +361,8 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		return got_error(GOT_ERR_SEND_EMPTY);
 
 	while (1) {
-		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot,
+		    INFTIM);
 		if (err)
 			goto done;
 		if (n == 0)
@@ -547,7 +549,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			goto done;
 	}
 
-	err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+	err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot, INFTIM);
 	if (err)
 		goto done;
 	if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
@@ -560,7 +562,8 @@ send_pack(int fd, struct got_pathlist_head *refs,
 	}
 
 	while (nsent > 0) {
-		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot,
+		    INFTIM);
 		if (err)
 			goto done;
 		if (n < 3) {
