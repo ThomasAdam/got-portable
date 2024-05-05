@@ -5,7 +5,8 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_read_bad_user test_repo_read_bad_group \
 	test_repo_write test_repo_write_empty test_request_bad \
 	test_repo_write_protected test_repo_write_readonly \
-	test_email_notification test_http_notification
+	test_email_notification test_http_notification \
+	test_git_interop
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
@@ -276,5 +277,11 @@ test_http_notification: prepare_test_repo start_gotd_http_notification
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./http_notification.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
+
+test_git_interop: prepare_test_repo start_gotd_rw
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./test_git_interop.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
 
 .include <bsd.regress.mk>
