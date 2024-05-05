@@ -370,6 +370,7 @@
 /regress/gotd/repo_write_protected.sh
 /regress/gotd/repo_write_readonly.sh
 /regress/gotd/request_bad.sh
+/regress/gotd/test_git_interop.sh
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
