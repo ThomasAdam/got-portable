@@ -78,6 +78,32 @@ is listening on.
 This path can be configured in
 .Xr gotd.conf 5 .
 .El
+.Sh EXAMPLES
+Create an empty repository to be served by
+.Nm ,
+ensuring that it can only be accessed by the _gotd user:
+.Pp
+.Dl # mkdir -p /git/myrepo.git
+.Dl # chmod 700 /git/myrepo.git
+.Dl # chown _gotd /git/myrepo.git
+.Dl # su -m _gotd -c 'gotadmin init /git/myrepo.git'
+.Pp
+Add the new repository to
+.Xr gotd.conf 5
+granting read-write access to the flan_hacker user account, and
+restart
+.Nm :
+.Pp
+.Dl # cat >> /etc/gotd.conf <<EOF
+.Dl repository 'myrepo' {
+.Dl path '/git/myrepo.git'
+.Dl permit rw flan_hacker
+.Dl }
+.Dl EOF
+.Dl # rcctl restart gotd
+.Pp
+The flan_hacker user can now populate the empty repository with
+.Cm got send .
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr gotsh 1 ,
