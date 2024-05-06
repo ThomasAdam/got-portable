@@ -54,7 +54,7 @@ test_request_bad_commit() {
 
 # Zero pkt-len (as flush packet with payload)
 test_request_bad_length_zero() {
-	local testroot=`test_init test_request_bad_length_zero`
+	local testroot=`test_init request_bad_length_zero`
 
 	echo "0000want $dummy_commit multi_ack side-band-64k ofs-delta" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
@@ -87,7 +87,7 @@ test_request_bad_length_zero() {
 
 # 0004 (empty)
 test_request_bad_length_empty() {
-	local testroot=`test_init test_request_bad_length_empty`
+	local testroot=`test_init request_bad_length_empty`
 
 	echo "0004want $dummy_commit multi_ack side-band-64k ofs-delta" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
@@ -123,7 +123,7 @@ test_request_bad_length_empty() {
 
 # Pkt-len too small
 test_request_bad_length_small() {
-	local testroot=`test_init test_request_bad_length_small`
+	local testroot=`test_init request_bad_length_small`
 
 	echo "0002want $dummy_commit multi_ack side-band-64k ofs-delta" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
@@ -159,7 +159,7 @@ test_request_bad_length_small() {
 
 # Pkt-len too large
 test_request_bad_length_large() {
-	local testroot=`test_init test_request_bad_length_large`
+	local testroot=`test_init request_bad_length_large`
 
 	echo "ffffwant $dummy_commit multi_ack side-band-64k ofs-delta" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
@@ -196,7 +196,7 @@ test_request_bad_length_large() {
 
 # Unknown feature
 test_request_bad_capabilities() {
-	local testroot=`test_init test_request_bad_capabilities`
+	local testroot=`test_init request_bad_capabilities`
 
 	echo "0054want $dummy_commit aaaaaaaaa bbbbbbbbbbbbb ccccccccc" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
@@ -228,7 +228,7 @@ test_request_bad_capabilities() {
 
 # Unknown repository
 test_request_bad_repository() {
-	local testroot=`test_init test_request_bad_repository`
+	local testroot=`test_init request_bad_repository`
 
 	echo "0054want $dummy_commit aaaaaaaaa bbbbbbbbbbbbb ccccccccc" \
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/XXXX-XXXX' \
@@ -260,7 +260,7 @@ test_request_bad_repository() {
 
 # Repository with name of 255 symbols
 test_request_bad_large_repo_name() {
-	local testroot=`test_init test_request_bad_large_repo_name`
+	local testroot=`test_init request_bad_large_repo_name`
 
 	# build a string of 255 "A": 63 "A" four times plus tree more "A"
 	local a=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -294,7 +294,7 @@ test_request_bad_large_repo_name() {
 }
 
 test_request_bad_no_repo() {
-	local testroot=`test_init test_request_bad_no_repo`
+	local testroot=`test_init request_bad_no_repo`
 
 	for i in `seq 10`; do
 		ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack \
