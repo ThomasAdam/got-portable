@@ -47,6 +47,19 @@ test_rebase_basic() {
 		return 1
 	fi
 
+	(cd $testroot/wt && got rebase master > $testroot/stdout \
+		2> $testroot/stderr)
+	echo -n "got: cannot rebase refs/heads/master onto itself: " \
+		> $testroot/stderr.expected
+	echo "update -b required" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
 
 	git -C $testroot/repo checkout -q newbranch
