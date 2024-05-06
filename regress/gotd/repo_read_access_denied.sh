@@ -33,8 +33,15 @@ test_clone_basic_access_denied() {
 	grep ^got-fetch-pack: $testroot/stderr.raw > $testroot/stderr
 
 	# Verify that the clone operation failed.
-	echo 'got-fetch-pack: test-repo: Permission denied' \
-		> $testroot/stderr.expected
+	# The error returned will differ depending on whether read access
+	# is denied explicitly for GOTD_DEVUSER.
+	if grep -q "permit.*${GOTD_DEVUSER}$" $GOTD_CONF; then
+		echo 'got-fetch-pack: test-repo: Permission denied' \
+			> $testroot/stderr.expected
+	else
+		echo 'got-fetch-pack: no git repository found' \
+			> $testroot/stderr.expected
+	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then

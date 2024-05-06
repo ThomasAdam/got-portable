@@ -58,8 +58,16 @@ EOF
 		return 1
 	fi
 
-	echo "got-send-pack: test-repo: Permission denied" \
-		> $testroot/stderr.expected
+	# Verify that the send operation failed.
+	# The error returned will differ depending on whether read access
+	# is denied explicitly for GOTD_DEVUSER.
+	if grep -q "permit.*${GOTD_DEVUSER}$" $GOTD_CONF; then
+		echo "got-send-pack: test-repo: Permission denied" \
+			> $testroot/stderr.expected
+	else
+		echo 'got-send-pack: no git repository found' \
+			> $testroot/stderr.expected
+	fi
 	grep '^got-send-pack:' $testroot/stderr > $testroot/stderr.filtered
 	cmp -s $testroot/stderr.expected $testroot/stderr.filtered
 	ret=$?

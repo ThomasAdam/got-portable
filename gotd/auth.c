@@ -136,6 +136,7 @@ auth_check(char **username, struct gotd_access_rule_list *rules,
 	struct passwd *pw;
 	gid_t groups[NGROUPS_MAX];
 	int ngroups = NGROUPS_MAX;
+	int matched_user = 0;
 
 	*username = NULL;
 
@@ -159,14 +160,23 @@ auth_check(char **username, struct gotd_access_rule_list *rules,
 		    euid, egid))
 			continue;
 
+		matched_user = 1;
 		access = rule->access;
 		if (rule->access == GOTD_ACCESS_PERMITTED &&
 		    (rule->authorization & required_auth) != required_auth)
 			access = GOTD_ACCESS_DENIED;
 	}
 
-	if (access == GOTD_ACCESS_DENIED)
-		return got_error_set_errno(EACCES, repo_name);
+	if (access == GOTD_ACCESS_DENIED) {
+		/*
+		 * If a user has no explicit read or write access then
+		 * do not leak the existence of a repository to them.
+		 */
+		if (!matched_user)
+			return got_error(GOT_ERR_NOT_GIT_REPO);
+		else
+			return got_error_set_errno(EACCES, repo_name);
+	}
 
 	if (access == GOTD_ACCESS_PERMITTED)
 		return NULL;
