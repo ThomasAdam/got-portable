@@ -36,7 +36,7 @@ GOTD_SOCK=${GOTD_DEVUSER_HOME}/gotd.sock
 
 .if "${GOT_RELEASE}" == "Yes"
 PREFIX ?= /usr/local
-BINDIR ?= ${PREFIX}/bin
+BINDIR ?= ${PREFIX}/sbin
 .else
 PREFIX ?= ${GOTD_TEST_USER_HOME}
 BINDIR ?= ${PREFIX}/bin
