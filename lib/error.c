@@ -139,6 +139,7 @@ static const struct got_error got_errors[] = {
 	    "changes must be committed or reverted first" },
 	{ GOT_ERR_NOT_REBASING,	"rebase operation not in progress" },
 	{ GOT_ERR_REBASE_COMMITID,"rebase commit ID mismatch" },
+	{ GOT_ERR_WRONG_BRANCH, "update -b required" },
 	{ GOT_ERR_REBASING,	"a rebase operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_REBASE_PATH,	"cannot rebase branch which contains "

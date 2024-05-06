@@ -11653,9 +11653,19 @@ cmd_rebase(int argc, char *argv[])
 
 		if (got_object_id_cmp(base_commit_id, yca_id) == 0) {
 			struct got_pathlist_head paths;
-			printf("%s is already based on %s\n",
-			    got_ref_get_name(branch),
-			    got_worktree_get_head_ref_name(worktree));
+			const char *branch_name = got_ref_get_name(branch);
+			const char *base =
+			    got_worktree_get_head_ref_name(worktree);
+
+			if (strcmp(branch_name, base) == 0) {
+				error = got_error_fmt(GOT_ERR_WRONG_BRANCH,
+				    "cannot rebase %s onto itself",
+				    branch_name);
+				goto done;
+			} else {
+				printf("%s is already based on %s\n",
+				    branch_name, base);
+			}
 			error = switch_head_ref(branch, branch_head_commit_id,
 			    worktree, repo);
 			if (error)
