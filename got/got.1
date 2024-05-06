@@ -3937,6 +3937,18 @@ Add new files and remove obsolete files in a work tree directory:
 .Dl $ got add sys/uvm/uvm_ubc.c
 .Dl $ got remove sys/uvm/uvm_vnode.c
 .Pp
+A file can be renamed or moved by removing it from its old location
+and adding it at the new location:
+.Pp
+.Dl $ cp oldfile.c newfile.c
+.Dl $ got remove oldfile.c
+.Dl $ got add newfile.c
+.Pp
+.Nm
+does not yet follow file history across renames, but
+.Xr git 1
+will be able to do so regardless.
+.Pp
 Create a new commit from local changes in a work tree directory
 with a pre-defined log message.
 .Pp
