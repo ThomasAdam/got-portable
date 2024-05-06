@@ -27,13 +27,19 @@ test_request_bad_commit() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "0041ERR object $dummy_commit not found" \
+	# Replace embedded NUL from Git protocol with \n and then strip
+	# off the initial capabilities advertisement header.
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
+	echo -n "0041ERR object $dummy_commit not found" \
+		>> $testroot/stdout.expected
 
 	echo "gotsh: object $dummy_commit not found" \
 		> $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 112
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -60,13 +66,17 @@ test_request_bad_length_zero() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "00000028ERR unexpected flush packet received" \
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
+	echo -n "0028ERR unexpected flush packet received" \
+		>> $testroot/stdout.expected
 
 	echo "gotsh: unexpected flush packet received" \
 		> $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -93,16 +103,15 @@ test_request_bad_length_empty() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n '006c0000000000000000000000000000000000000000 ' \
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
-	printf "capabilities^{}\0" >> $testroot/stdout.expected
-	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
-		>> $testroot/stdout.expected
-	echo -n '00000018ERR packet too short' >> $testroot/stdout.expected
+	echo -n '0018ERR packet too short' >> $testroot/stdout.expected
 
 	echo "gotsh: packet too short" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -129,16 +138,15 @@ test_request_bad_length_small() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n '006c0000000000000000000000000000000000000000 ' \
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
-	printf "capabilities^{}\0" >> $testroot/stdout.expected
-	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
-		>> $testroot/stdout.expected
-	echo -n '00000018ERR packet too short' >> $testroot/stdout.expected
+	echo -n '0018ERR packet too short' >> $testroot/stdout.expected
 
 	echo "gotsh: packet too short" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -165,17 +173,16 @@ test_request_bad_length_large() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n '006c0000000000000000000000000000000000000000 ' \
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
-	printf "capabilities^{}\0" >> $testroot/stdout.expected
-	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k" \
-		>> $testroot/stdout.expected
-	echo -n '0000001eERR unexpected end of file' \
+	echo -n '001eERR unexpected end of file' \
 		>> $testroot/stdout.expected
 
 	echo "gotsh: unexpected end of file" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
@@ -202,12 +209,16 @@ test_request_bad_capabilities() {
 		| ssh ${GOTD_DEVUSER}@127.0.0.1 git-upload-pack '/test-repo' \
 		> $testroot/stdout 2>$testroot/stderr
 
-	echo -n "00000025ERR unexpected want-line received" \
+	tr '\0' '\n' < $testroot/stdout | tail -n 1 > $testroot/stdout.filtered
+
+	echo -n " agent=got/${GOT_VERSION_STR} ofs-delta side-band-64k0000" \
 		> $testroot/stdout.expected
+	echo -n "0025ERR unexpected want-line received" \
+		>> $testroot/stdout.expected
 
 	echo "gotsh: unexpected want-line received" > $testroot/stderr.expected
 
-	cmp -s $testroot/stdout.expected $testroot/stdout 0 108
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "unexpected stdout" >&2
