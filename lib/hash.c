@@ -205,7 +205,10 @@ void
 got_hash_final_object_id(struct got_hash *hash, struct got_object_id *id)
 {
 	memset(id, 0, sizeof(*id));
-	got_hash_final(hash, id->sha1);
+	if (hash->algo == GOT_HASH_SHA1)
+		SHA1Final(id->sha1, &hash->sha1_ctx);
+	else
+		abort();
 }
 
 int
