@@ -922,28 +922,32 @@ diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **,
     struct got_pathlist_head *, int, const char *, const char *,
     struct got_repository *, struct got_fileindex_diff_dir_cb *, void *);
 
+static struct dirent *
+copy_dirent(const struct dirent *de)
+{
+	size_t amt = de->d_reclen;
+	struct dirent *copy;
+
+	copy = malloc(amt);
+	if (copy != NULL) {
+		memcpy(copy, de, amt);
+	}
+	return copy;
+}
+
 static const struct got_error *
 read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *new = NULL;
-	struct dirent *dep = NULL;
 	struct dirent *de = NULL;
 
 	for (;;) {
-		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
-		if (de == NULL) {
-			err = got_error_from_errno("malloc");
-			break;
-		}
-
-		if (readdir_r(dir, de, &dep) != 0) {
-			err = got_error_from_errno("readdir_r");
-			free(de);
-			break;
-		}
-		if (dep == NULL) {
-			free(de);
+		errno = 0;
+		if ((de = readdir(dir)) == NULL) {
+			if (errno != 0) {
+				err = got_error_from_errno("readdir");
+			}
 			break;
 		}
 
@@ -953,10 +957,14 @@ read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0) ||
 		    (path[0] == '\0' &&
 		    strcmp(de->d_name, GOT_WORKTREE_CVG_DIR) == 0)) {
-			free(de);
 			continue;
 		}
 
+		de = copy_dirent(de);
+		if (de == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
 		err = got_pathlist_insert(&new, dirlist, de->d_name, de);
 		if (err) {
 			free(de);
