@@ -319,13 +319,11 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (username == NULL)
 		return got_error_from_errno("strndup");
 
-	if (lseek(fd, 0, SEEK_SET) == -1) {
-		err = got_error_from_errno("lseek");
-		goto done;
-	}
-
-
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		if (lseek(fd, 0, SEEK_SET) == -1) {
+			err = got_error_from_errno("lseek");
+			goto done;
+		}
 		switch (target->type) {
 		case GOTD_NOTIFICATION_VIA_EMAIL:
 			notify_email(target, inotify.subject_line, fd);
