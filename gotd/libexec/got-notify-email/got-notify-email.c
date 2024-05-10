@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2024 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2008, 2012 Gilles Chehade <gilles@poolp.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -198,24 +199,6 @@ send_smtp_msg(int s, const char *fmt, ...)
 	return 0;
 }
 
-static char *
-get_datestr(time_t *time, char *datebuf)
-{
-	struct tm mytm, *tm;
-	char *p, *s;
-
-	tm = gmtime_r(time, &mytm);
-	if (tm == NULL)
-		return NULL;
-	s = asctime_r(tm, datebuf);
-	if (s == NULL)
-		return NULL;
-	p = strchr(s, '\n');
-	if (p)
-		*p = '\0';
-	return s;
-}
-
 static const struct got_error *
 print_date(int s, char *date, int shortfmt)
 {
@@ -249,6 +232,55 @@ print_date(int s, char *date, int shortfmt)
 	return got_poll_write_full(s, datebuf, strlen(datebuf));
 }
 
+/* from usr.sbin/smtpd/util.c */
+static int
+bsnprintf(char *str, size_t size, const char *format, ...)
+{
+	int ret;
+	va_list ap;
+
+	va_start(ap, format);
+	ret = vsnprintf(str, size, format, ap);
+	va_end(ap);
+	if (ret < 0 || (size_t)ret >= size)
+		return 0;
+
+	return 1;
+}
+
+/* based on usr.sbin/smtpd/to.c */
+static const char *
+time_to_text(time_t when, char *buf, size_t buf_size)
+{
+	struct tm *lt;
+	const char *day[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+	const char *month[] = {"Jan","Feb","Mar","Apr","May","Jun",
+			 "Jul","Aug","Sep","Oct","Nov","Dec"};
+	const char *tz;
+	long offset;
+
+	lt = gmtime(&when);
+	if (lt == NULL || when == 0)
+		fatalx("time_to_text: localtime");
+
+	offset = lt->tm_gmtoff;
+	tz = lt->tm_zone;
+
+	/* We do not use strftime because it is subject to locale substitution*/
+	if (!bsnprintf(buf, buf_size,
+	    "%s, %d %s %d %02d:%02d:%02d %c%02d%02d (%s)",
+	    day[lt->tm_wday], lt->tm_mday, month[lt->tm_mon],
+	    lt->tm_year + 1900,
+	    lt->tm_hour, lt->tm_min, lt->tm_sec,
+	    offset >= 0 ? '+' : '-',
+	    abs((int)offset / 3600),
+	    abs((int)offset % 3600) / 60,
+	    tz))
+		fatalx("time_to_text: bsnprintf");
+
+	return buf;
+}
+
 static void
 send_email(int s, const char *myfromaddr, const char *fromaddr,
     const char *recipient, const char *replytoaddr,
@@ -258,13 +290,11 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	time_t now;
 	int firstline = 1, shortfmt = 0;
-	char datebuf[26];
-	char *datestr;
+	char datebuf[40];
+	const char *datestr;
 
-	now = time(NULL);
-	datestr = get_datestr(&now, datebuf);
+	datestr = time_to_text(time(NULL), datebuf, sizeof(datebuf));
 
 	if (read_smtp_code(s, "220"))
 		fatalx("unexpected SMTP greeting received");
@@ -297,7 +327,7 @@ send_email(int s, const char *myfromaddr, const char *fromaddr,
 		if (send_smtp_msg(s, "Reply-To: %s\r\n", replytoaddr))
 			fatalx("could not send Reply-To header");
 	}
-	if (send_smtp_msg(s, "Date: %s +0000 (UTC)\r\n", datestr))
+	if (send_smtp_msg(s, "Date: %s\r\n", datestr))
 		fatalx("could not send Date header");
 
 	if (send_smtp_msg(s, "Subject: %s\r\n", subject))
