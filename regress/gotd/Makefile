@@ -6,7 +6,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_write test_repo_write_empty test_request_bad \
 	test_repo_write_protected test_repo_write_readonly \
 	test_email_notification test_http_notification \
-	test_git_interop
+	test_git_interop test_email_and_http_notification
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
