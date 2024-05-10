@@ -196,6 +196,21 @@ start_gotd_http_notification: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_email_and_http_notification: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo '    notify {' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password" insecure' >> $(PWD)/gotd.conf
+	@echo -n '      email to ${GOTD_DEVUSER}' >> $(PWD)/gotd.conf
+	@echo ' relay 127.0.0.1 port ${GOTD_TEST_SMTP_PORT}' >> $(PWD)/gotd.conf
+	@echo "    }" >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
@@ -277,6 +292,13 @@ test_email_notification: prepare_test_repo start_gotd_email_notification
 test_http_notification: prepare_test_repo start_gotd_http_notification
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./http_notification.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+
+test_email_and_http_notification: prepare_test_repo start_gotd_email_and_http_notification
+	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./http_notification.sh test_file_changed'
+	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./email_notification.sh test_file_changed'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 
 test_git_interop: prepare_test_repo start_gotd_rw
