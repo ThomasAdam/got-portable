@@ -54,6 +54,7 @@ test_file_changed() {
 
 	wait %1 # wait for nc -l
 
+	short_commit_id=`trim_obj_id 28 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -63,7 +64,7 @@ test_file_changed() {
 	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} changed refs/heads/main\r\n" \
+	printf "${GOTD_DEVUSER} changed refs/heads/main: $short_commit_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	printf "commit $commit_id\n" >> $testroot/stdout.expected
@@ -133,6 +134,7 @@ test_many_commits_not_summarized() {
 
 	wait %1 # wait for nc -l
 
+	short_commit_id=`trim_obj_id 28 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -143,7 +145,7 @@ test_many_commits_not_summarized() {
 		>> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} changed refs/heads/main\r\n" \
+	printf "${GOTD_DEVUSER} changed refs/heads/main: $short_commit_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	for i in `seq 1 24`; do
@@ -219,6 +221,7 @@ test_many_commits_summarized() {
 
 	wait %1 # wait for nc -l
 
+	short_commit_id=`trim_obj_id 28 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -229,7 +232,7 @@ test_many_commits_summarized() {
 		>> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} changed refs/heads/main\r\n" \
+	printf "${GOTD_DEVUSER} changed refs/heads/main: $short_commit_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	for i in `seq 1 51`; do
@@ -294,6 +297,7 @@ test_branch_created() {
 
 	wait %1 # wait for nc -l
 
+	short_commit_id=`trim_obj_id 28 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -303,7 +307,7 @@ test_branch_created() {
 	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} created refs/heads/newbranch\r\n" \
+	printf "${GOTD_DEVUSER} created refs/heads/newbranch: $short_commit_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	printf "commit $commit_id\n" >> $testroot/stdout.expected
@@ -347,6 +351,7 @@ test_branch_removed() {
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
 
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
+	local short_commit_id=`trim_obj_id 28 $commit_id`
 
 	got send -d newbranch -q -r $testroot/repo-clone
 	ret=$?
@@ -367,7 +372,7 @@ test_branch_removed() {
 	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} removed refs/heads/newbranch\r\n" \
+	printf "${GOTD_DEVUSER} removed refs/heads/newbranch: $short_commit_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	printf "Removed refs/heads/newbranch: $commit_id\n" \
@@ -402,6 +407,9 @@ test_tag_created() {
 	got tag -r $testroot/repo-clone -m "new tag" 1.0 > /dev/null
 	local commit_id=`git_show_head $testroot/repo-clone`
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
+	local tag_id=`got ref -r $testroot/repo-clone -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+	local short_tag_id=`trim_obj_id 28 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
@@ -425,7 +433,7 @@ test_tag_created() {
 	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} created refs/tags/1.0\r\n" \
+	printf "${GOTD_DEVUSER} created refs/tags/1.0: $short_tag_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	printf "tag refs/tags/1.0\n" >> $testroot/stdout.expected
@@ -478,6 +486,9 @@ test_tag_changed() {
 	got ref -r $testroot/repo-clone -d refs/tags/1.0 >/dev/null
 	got tag -r $testroot/repo-clone -m "new tag" 1.0 > /dev/null
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
+	local tag_id=`got ref -r $testroot/repo-clone -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+	local short_tag_id=`trim_obj_id 28 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
@@ -501,7 +512,7 @@ test_tag_changed() {
 	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
 	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
 	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
-	printf "${GOTD_DEVUSER} changed refs/tags/1.0\r\n" \
+	printf "${GOTD_DEVUSER} changed refs/tags/1.0: $short_tag_id\r\n" \
 		>> $testroot/stdout.expected
 	printf "\r\n" >> $testroot/stdout.expected
 	printf "tag refs/tags/1.0\n" >> $testroot/stdout.expected

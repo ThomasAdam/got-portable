@@ -493,7 +493,7 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	struct gotd_imsgev *iev = &gotd_session.notifier_iev;
 	struct gotd_session_notif *notif;
 	struct gotd_imsg_notification_content icontent;
-	char *refname = NULL;
+	char *refname = NULL, *id_str = NULL;
 	size_t datalen;
 	struct gotd_imsg_notify inotify;
 	const char *action;
@@ -548,12 +548,21 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	switch (notif->action) {
 	case GOTD_NOTIF_ACTION_CREATED:
 		action = "created";
+		err = got_object_id_str(&id_str, &notif->new_id);
+		if (err)
+			goto done;
 		break;
 	case GOTD_NOTIF_ACTION_REMOVED:
 		action = "removed";
+		err = got_object_id_str(&id_str, &notif->old_id);
+		if (err)
+			goto done;
 		break;
 	case GOTD_NOTIF_ACTION_CHANGED:
 		action = "changed";
+		err = got_object_id_str(&id_str, &notif->new_id);
+		if (err)
+			goto done;
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -564,8 +573,8 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	    sizeof(inotify.repo_name));
 
 	snprintf(inotify.subject_line, sizeof(inotify.subject_line),
-	    "%s: %s %s %s", gotd_session.repo_cfg->name,
-	    client->username, action, notif->refname);
+	    "%s: %s %s %s: %.12s", gotd_session.repo_cfg->name,
+	    client->username, action, notif->refname, id_str);
 
 	inotify.username_len = strlen(client->username);
 	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY,
@@ -594,6 +603,7 @@ done:
 		close(notif->fd);
 	free(notif);
 	free(refname);
+	free(id_str);
 	return err;
 }
 
