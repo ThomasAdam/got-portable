@@ -91,7 +91,7 @@ dial(const char *host, const char *port)
 
 	freeaddrinfo(res0);
 	if (s == -1)
-		fatal("%s", cause);
+		fatal("%s %s:%s", cause, host, port);
 	return s;
 }
 
