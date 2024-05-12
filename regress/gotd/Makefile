@@ -14,7 +14,7 @@ CLEANFILES=gotd.conf
 
 GOTD_TEST_ROOT=/tmp
 GOTD_DEVUSER?=gotdev
-GOTD_DEVUSER_HOME!=userinfo $(GOTD_DEVUSER) | awk '/^dir/ {print $$2}'
+GOTD_DEVUSER_HOME!=getent passwd $(GOTD_DEVUSER) | cut -d: -f6
 GOTD_TEST_REPO!?=mktemp -d "$(GOTD_TEST_ROOT)/gotd-test-repo-XXXXXXXXXX"
 GOTD_TEST_REPO_NAME=test-repo
 GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/$(GOTD_TEST_REPO_NAME)
@@ -28,7 +28,7 @@ GOTD_TEST_USER=${SUDO_USER}
 .if empty(GOTD_TEST_USER)
 GOTD_TEST_USER=${USER}
 .endif
-GOTD_TEST_USER_HOME!=userinfo $(GOTD_TEST_USER) | awk '/^dir/ {print $$2}'
+GOTD_TEST_USER_HOME!=getent passwd $(GOTD_TEST_USER) | cut -d: -f6
 
 # gotd.conf parameters
 GOTD_USER?=got
