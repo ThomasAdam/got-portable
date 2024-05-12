@@ -47,6 +47,8 @@ test_file_changed() {
 	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
 	    > $testroot/stdout &
 
+	sleep 1 # server starts up
+
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -115,6 +117,8 @@ test_file_changed() {
 
 	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
 	    > $testroot/stdout &
+
+	sleep 1 # server starts up
 
 	git -C $testroot/repo-clone push -q origin main
 	ret=$?
@@ -204,6 +208,8 @@ test_bad_utf8() {
 
 	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
 	    > $testroot/stdout &
+
+	sleep 1 # server starts up
 
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
@@ -297,6 +303,8 @@ test_many_commits_not_summarized() {
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
+
+	sleep 1 # server starts up
 
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
@@ -403,6 +411,8 @@ test_many_commits_summarized() {
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
+	sleep 1 # server starts up
+
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -483,6 +493,8 @@ test_branch_created() {
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
+
+	sleep 1 # server starts up
 
 	got send -b newbranch -q -r $testroot/repo-clone
 	ret=$?
@@ -570,6 +582,8 @@ test_branch_removed() {
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
 
+	sleep 1 # server starts up
+
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
 
 	got send -d newbranch -q -r $testroot/repo-clone
@@ -625,6 +639,8 @@ test_tag_created() {
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    >$testroot/stdout &
+
+	sleep 1 # server starts up
 
 	got send -t 1.0 -q -r $testroot/repo-clone
 	ret=$?
@@ -702,6 +718,8 @@ test_tag_changed() {
 
 	timeout 5 ./http-server -a $AUTH -p "$GOTD_TEST_HTTP_PORT" \
 	    > $testroot/stdout &
+
+	sleep 1 # server starts up
 
 	got send -f -t 1.0 -q -r $testroot/repo-clone
 	ret=$?
