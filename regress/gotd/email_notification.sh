@@ -44,6 +44,8 @@ test_file_changed() {
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
 
+	sleep 1 # server starts up
+
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -123,6 +125,8 @@ test_many_commits_not_summarized() {
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
+
+	sleep 1 # server starts up
 
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
@@ -211,6 +215,8 @@ test_many_commits_summarized() {
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
 
+	sleep 1 # server starts up
+
 	got send -b main -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -287,6 +293,8 @@ test_branch_created() {
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
 
+	sleep 1 # server starts up
+
 	got send -b newbranch -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -349,6 +357,8 @@ test_branch_removed() {
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
+
+	sleep 1 # server starts up
 
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
 	local short_commit_id=`trim_obj_id 28 $commit_id`
@@ -413,6 +423,8 @@ test_tag_created() {
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
+
+	sleep 1 # server starts up
 
 	got send -t 1.0 -q -r $testroot/repo-clone
 	ret=$?
@@ -492,6 +504,8 @@ test_tag_changed() {
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
+
+	sleep 1 # server starts up
 
 	got send -f -t 1.0 -q -r $testroot/repo-clone
 	ret=$?
