@@ -325,9 +325,9 @@ http_chunk(struct bufio *bio, const void *buf, size_t len)
 {
 	int r;
 
-	if (bufio_compose_fmt(bio, "%zx\r\n", len) ||
-	    bufio_compose(bio, buf, len) ||
-	    bufio_compose(bio, "\r\n", 2))
+	if (bufio_compose_fmt(bio, "%zx\r\n", len) == -1 ||
+	    bufio_compose(bio, buf, len) == -1 ||
+	    bufio_compose(bio, "\r\n", 2) == -1)
 		return 1;
 
 	do {
