@@ -197,7 +197,7 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 	do {
 		r = bufio_write(bio);
 		if (r == -1 && errno != EAGAIN)
-			errx(1, "bufio_read: %s", bufio_io_err(bio));
+			errx(1, "bufio_write: %s", bufio_io_err(bio));
 	} while (bio->wbuf.len != 0);
 
 	return 0;
