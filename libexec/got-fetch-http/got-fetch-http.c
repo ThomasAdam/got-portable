@@ -85,7 +85,7 @@ bufio_close_sync(struct bufio *bio)
 
 	do {
 		r = bufio_close(bio);
-		if (r == -1 && errno == EAGAIN)
+		if (r == -1 && errno != EAGAIN)
 			errx(1, "bufio_read: %s", bufio_io_err(bio));
 	} while (r == -1 && errno == EAGAIN);
 }
