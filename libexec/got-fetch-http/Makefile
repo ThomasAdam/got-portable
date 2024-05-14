@@ -9,7 +9,7 @@ SRCS=		got-fetch-http.c bufio.c hash.c error.c inflate.c pkt.c \
 CPPFLAGS= -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 
 .if defined(PROFILE)
-LDADD=	-lutil_p -lz_p -ltls_p
+LDADD=	-lutil_p -lz_p -ltls_p -lcrypto_p -lssl_p
 .else
 LDADD=	-lutil -lz -ltls
 .endif
