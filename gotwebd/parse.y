@@ -26,6 +26,7 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -94,8 +95,8 @@ int				 getservice(const char *);
 int				 n;
 
 int		 get_addrs(const char *, const char *, struct server *);
-int		 addr_dup_check(struct addresslist *, struct address *,
-		    const char *, const char *);
+int		 get_unix_addr(const char *, struct server *);
+int		 addr_dup_check(struct addresslist *, struct address *);
 int		 add_addr(struct server *, struct address *);
 
 typedef struct {
@@ -112,7 +113,7 @@ typedef struct {
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
-%token	UNIX_SOCKET UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
+%token	UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
 %token	SUMMARY_COMMITS_DISPLAY SUMMARY_TAGS_DISPLAY
 
 %token	<v.string>	STRING
@@ -200,9 +201,6 @@ main		: PREFORK NUMBER {
 				YYERROR;
 			}
 			free($2);
-		}
-		| UNIX_SOCKET boolean {
-			gotwebd->unix_socket = $2;
 		}
 		| UNIX_SOCKET_NAME STRING {
 			n = snprintf(gotwebd->unix_socket_name,
@@ -328,7 +326,6 @@ serveropts1	: REPOS_PATH STRING {
 			}
 			free($3);
 			free($5);
-			new_srv->fcgi_socket = 1;
 		}
 		| LISTEN ON listen_addr PORT NUMBER {
 			char portno[32];
@@ -345,24 +342,10 @@ serveropts1	: REPOS_PATH STRING {
 				YYERROR;
 			}
 			free($3);
-			new_srv->fcgi_socket = 1;
 		}
 		| LISTEN ON SOCKET STRING {
-			if (strcasecmp($4, "off") == 0) {
-				new_srv->unix_socket = 0;
-				free($4);
-				YYACCEPT;
-			}
-
-			new_srv->unix_socket = 1;
-
-			n = snprintf(new_srv->unix_socket_name,
-			    sizeof(new_srv->unix_socket_name), "%s%s",
-			    gotwebd->httpd_chroot, $4);
-			if (n < 0 ||
-			    (size_t)n >= sizeof(new_srv->unix_socket_name)) {
-				yyerror("%s: unix_socket_name truncated",
-				    __func__);
+			if (get_unix_addr($4, new_srv) == -1) {
+				yyerror("can't listen on %s", $4);
 				free($4);
 				YYERROR;
 			}
@@ -489,7 +472,6 @@ lookup(char *s)
 		{ "socket",			SOCKET },
 		{ "summary_commits_display",	SUMMARY_COMMITS_DISPLAY },
 		{ "summary_tags_display",	SUMMARY_TAGS_DISPLAY },
-		{ "unix_socket",		UNIX_SOCKET },
 		{ "unix_socket_name",		UNIX_SOCKET_NAME },
 	};
 	const struct keywords *p;
@@ -823,11 +805,18 @@ int
 parse_config(const char *filename, struct gotwebd *env)
 {
 	struct sym *sym, *next;
+	struct server *srv;
+	int n;
 
 	if (config_init(env) == -1)
 		fatalx("failed to initialize configuration");
 
 	gotwebd = env;
+
+	n = snprintf(env->unix_socket_name, sizeof(env->unix_socket_name),
+	    "%s%s", D_HTTPD_CHROOT, D_UNIX_SOCKET);
+	if (n < 0 || (size_t)n >= sizeof(env->unix_socket_name))
+		fatalx("%s: snprintf", __func__);
 
 	file = newfile(filename, 0);
 	if (file == NULL) {
@@ -854,12 +843,20 @@ parse_config(const char *filename, struct gotwebd *env)
 		}
 	}
 
-	if (errors)
-		return (-1);
-
 	/* just add default server if no config specified */
 	if (gotwebd->server_cnt == 0)
 		add_default_server();
+
+	/* add the implicit listen on socket where missing */
+	TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
+		if (!TAILQ_EMPTY(&srv->al))
+			continue;
+		if (get_unix_addr(env->unix_socket_name, srv) == -1)
+			yyerror("can't listen on %s", env->unix_socket_name);
+	}
+
+	if (errors)
+		return (-1);
 
 	/* setup our listening sockets */
 	sockets_parse_sockets(env);
@@ -879,11 +876,6 @@ conf_new_server(const char *name)
 	n = strlcpy(srv->name, name, sizeof(srv->name));
 	if (n >= sizeof(srv->name))
 		fatalx("%s: strlcpy", __func__);
-	n = snprintf(srv->unix_socket_name,
-	    sizeof(srv->unix_socket_name), "%s%s", D_HTTPD_CHROOT,
-	    D_UNIX_SOCKET);
-	if (n < 0 || (size_t)n >= sizeof(srv->unix_socket_name))
-		fatalx("%s: snprintf", __func__);
 	n = strlcpy(srv->repos_path, D_GOTPATH,
 	    sizeof(srv->repos_path));
 	if (n >= sizeof(srv->repos_path))
@@ -922,9 +914,6 @@ conf_new_server(const char *name)
 	srv->max_commits_display = D_MAXCOMMITDISP;
 	srv->summary_commits_display = D_MAXSLCOMMDISP;
 	srv->summary_tags_display = D_MAXSLTAGDISP;
-
-	srv->unix_socket = 1;
-	srv->fcgi_socket = 0;
 
 	TAILQ_INIT(&srv->al);
 	TAILQ_INSERT_TAIL(&gotwebd->servers, srv, entry);
@@ -1074,13 +1063,34 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 }
 
 int
-addr_dup_check(struct addresslist *al, struct address *h, const char *new_srv,
-    const char *other_srv)
+get_unix_addr(const char *path, struct server *new_srv)
+{
+	struct address *h;
+	struct sockaddr_un *sun;
+
+	if ((h = calloc(1, sizeof(*h))) == NULL)
+		fatal("%s: calloc", __func__);
+
+	h->ai_family = AF_UNIX;
+	h->ai_socktype = SOCK_STREAM;
+	h->ai_protocol = PF_UNSPEC;
+	h->slen = sizeof(*sun);
+
+	sun = (struct sockaddr_un *)&h->ss;
+	sun->sun_family = AF_UNIX;
+	if (strlcpy(sun->sun_path, path, sizeof(sun->sun_path)) >=
+	    sizeof(sun->sun_path)) {
+		log_warnx("socket path too long: %s", sun->sun_path);
+		return (-1);
+	}
+
+	return add_addr(new_srv, h);
+}
+
+int
+addr_dup_check(struct addresslist *al, struct address *h)
 {
 	struct address *a;
-	void *ia;
-	char buf[INET6_ADDRSTRLEN];
-	const char *addrstr;
 
 	TAILQ_FOREACH(a, al, entry) {
 		if (a->ai_family != h->ai_family ||
@@ -1089,39 +1099,6 @@ addr_dup_check(struct addresslist *al, struct address *h, const char *new_srv,
 		    a->slen != h->slen ||
 		    memcmp(&a->ss, &h->ss, a->slen) != 0)
 			continue;
-
-		switch (h->ss.ss_family) {
-		case AF_INET:
-			ia = &((struct sockaddr_in *)(&h->ss))->sin_addr;
-			break;
-		case AF_INET6:
-			ia = &((struct sockaddr_in6 *)(&h->ss))->sin6_addr;
-			break;
-		default:
-			yyerror("unknown address family: %d", h->ss.ss_family);
-			return -1;
-		}
-		addrstr = inet_ntop(h->ss.ss_family, ia, buf, sizeof(buf));
-		if (addrstr) {
-			if (other_srv) {
-				yyerror("server %s: duplicate fcgi listen "
-				    "address %s:%d, already used by server %s",
-				    new_srv, addrstr, h->port, other_srv);
-			} else {
-				log_warnx("server: %s: duplicate fcgi listen "
-				    "address %s:%d", new_srv, addrstr, h->port);
-			}
-		} else {
-			if (other_srv) {
-				yyerror("server: %s: duplicate fcgi listen "
-				    "address, already used by server %s",
-				    new_srv, other_srv);
-			} else {
-				log_warnx("server %s: duplicate fcgi listen "
-				    "address", new_srv);
-			}
-		}
-
 		return -1;
 	}
 
@@ -1132,20 +1109,22 @@ int
 add_addr(struct server *new_srv, struct address *h)
 {
 	struct server *srv;
+	struct address *dup;
 
-	/* Address cannot be shared between different servers. */
 	TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
-		if (srv == new_srv)
-			continue;
-		if (addr_dup_check(&srv->al, h, new_srv->name, srv->name))
-			return -1;
+		if (addr_dup_check(&srv->al, h) == -1) {
+			free(h);
+			return 0;
+		}
 	}
 
-	/* Tolerate duplicate address lines within the scope of a server. */
-	if (addr_dup_check(&new_srv->al, h, NULL, NULL) == 0)
-		TAILQ_INSERT_TAIL(&new_srv->al, h, entry);
-	else
-		free(h);
+	if (addr_dup_check(&gotwebd->addresses, h) == 0) {
+		if ((dup = calloc(1, sizeof(*dup))) == NULL)
+			fatal("%s: calloc", __func__);
+		memcpy(dup, h, sizeof(*dup));
+		TAILQ_INSERT_TAIL(&gotwebd->addresses, dup, entry);
+	}
 
-	return 0;
+	TAILQ_INSERT_TAIL(&new_srv->al, h, entry);
+	return (0);
 }

@@ -308,11 +308,6 @@ struct server {
 	int		 show_repo_description;
 	int		 show_repo_cloneurl;
 	int		 respect_exportok;
-
-	int		 unix_socket;
-	char		 unix_socket_name[PATH_MAX];
-
-	int		 fcgi_socket;
 };
 TAILQ_HEAD(serverlist, server);
 
@@ -323,9 +318,6 @@ enum client_action {
 
 struct socket_conf {
 	struct address	 addr;
-
-	char		 name[GOTWEBD_MAXTEXT];
-	char		 srv_name[GOTWEBD_MAXTEXT];
 
 	int		 id;
 	int		 af_type;
@@ -353,6 +345,7 @@ struct passwd;
 struct gotwebd {
 	struct serverlist	servers;
 	struct socketlist	sockets;
+	struct addresslist	addresses;
 
 	const char	*gotwebd_conffile;
 
@@ -372,7 +365,6 @@ struct gotwebd {
 
 	char		 httpd_chroot[PATH_MAX];
 
-	int		 unix_socket;
 	char		 unix_socket_name[PATH_MAX];
 };
 
