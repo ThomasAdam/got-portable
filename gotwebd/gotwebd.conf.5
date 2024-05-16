@@ -62,9 +62,6 @@ will be used.
 Run the specified number of server processes.
 .Xr gotwebd 8
 runs 3 server processes by default.
-.It Ic unix_socket Ar on | off
-Controls whether the servers will listen on unix sockets by default.
-Listening on unix sockets is the default.
 .It Ic unix_socket_name Ar path
 Set the path to the default unix socket.
 Defaults to
@@ -108,8 +105,6 @@ argument may be number or a service name defined in
 May be specified multiple times to build up a list of listening sockets.
 However, a given combination of address and port may only be used by
 one server.
-.It Ic listen on socket off
-Disable use of unix socket.
 .It Ic listen on socket Ar path
 Set the path to the unix socket used by the server.
 .It Ic logo Ar path
@@ -211,7 +206,6 @@ implicit
 socket.
 .Bd -literal -offset indent
 server "localhost" {
-	listen on socket off
 	listen on 127.0.0.1 port 9000
 	listen on ::1 port 9000
 }
