@@ -1064,8 +1064,10 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 			fatalx("unknown address family %d", res->ai_family);
 		}
 
-		if (add_addr(new_srv, h))
+		if (add_addr(new_srv, h) == -1) {
+			freeaddrinfo(res0);
 			return -1;
+		}
 	}
 	freeaddrinfo(res0);
 	return (0);
