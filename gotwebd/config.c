@@ -50,6 +50,7 @@ config_init(struct gotwebd *env)
 	env->server_cnt = 0;
 	TAILQ_INIT(&env->servers);
 	TAILQ_INIT(&env->sockets);
+	TAILQ_INIT(&env->addresses);
 
 	return 0;
 }
@@ -88,9 +89,7 @@ config_getserver(struct gotwebd *env, struct imsg *imsg)
 	memcpy(srv, p, sizeof(*srv));
 
 	/* log server info */
-	log_debug("%s: server=%s fcgi_socket=%s unix_socket=%s", __func__,
-	    srv->name, srv->fcgi_socket ? "yes" : "no", srv->unix_socket ?
-	    "yes" : "no");
+	log_debug("%s: server=%s", __func__, srv->name);
 
 	TAILQ_INSERT_TAIL(&env->servers, srv, entry);
 
@@ -147,8 +146,8 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 		sock->pack_fds[i] = -1;
 
 	/* log new socket info */
-	log_debug("%s: name=%s id=%d server=%s af_type=%s socket_path=%s",
-	    __func__, sock->conf.name, sock->conf.id, sock->conf.srv_name,
+	log_debug("%s: id=%d af_type=%s socket_path=%s",
+	    __func__, sock->conf.id,
 	    sock->conf.af_type == AF_UNIX ? "unix" :
 	    (sock->conf.af_type == AF_INET ? "inet" :
 	    (sock->conf.af_type == AF_INET6 ? "inet6" : "unknown")),

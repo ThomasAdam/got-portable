@@ -78,10 +78,8 @@ static int	 sockets_create_socket(struct address *);
 static int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *,
 		    int, volatile int *);
 
-static struct socket *sockets_conf_new_socket_unix(struct gotwebd *,
-		    struct server *, int);
-static struct socket *sockets_conf_new_socket_fcgi(struct gotwebd *,
-		    struct server *, int, struct address *);
+static struct socket *sockets_conf_new_socket(struct gotwebd *,
+		    int, struct address *);
 
 int cgi_inflight = 0;
 
@@ -132,88 +130,25 @@ sockets(struct gotwebd *env, int fd)
 void
 sockets_parse_sockets(struct gotwebd *env)
 {
-	struct server *srv;
 	struct address *a;
 	struct socket *new_sock = NULL;
 	int sock_id = 1;
 
-	TAILQ_FOREACH(srv, &env->servers, entry) {
-		if (srv->unix_socket) {
-			new_sock = sockets_conf_new_socket_unix(env, srv,
-			    sock_id);
-			if (new_sock) {
-				sock_id++;
-				TAILQ_INSERT_TAIL(&env->sockets, new_sock,
-				    entry);
-			}
-		}
-
-		if (srv->fcgi_socket) {
-			if (TAILQ_EMPTY(&srv->al)) {
-				fatalx("%s: server %s has no IP addresses to "
-				    "listen for FCGI connections", __func__,
-				    srv->name);
-			}
-			TAILQ_FOREACH(a, &srv->al, entry) {
-				if (a->ss.ss_family != AF_INET &&
-				    a->ss.ss_family != AF_INET6)
-					continue;
-				new_sock = sockets_conf_new_socket_fcgi(env,
-				    srv, sock_id, a);
-				if (new_sock) {
-					sock_id++;
-					TAILQ_INSERT_TAIL(&env->sockets,
-					    new_sock, entry);
-				}
-			}
+	TAILQ_FOREACH(a, &env->addresses, entry) {
+		new_sock = sockets_conf_new_socket(env, sock_id, a);
+		if (new_sock) {
+			sock_id++;
+			TAILQ_INSERT_TAIL(&env->sockets,
+			    new_sock, entry);
 		}
 	}
 }
 
 static struct socket *
-sockets_conf_new_socket_unix(struct gotwebd *env, struct server *srv, int id)
-{
-	struct socket *sock;
-	int n;
-
-	if ((sock = calloc(1, sizeof(*sock))) == NULL)
-		fatalx("%s: calloc", __func__);
-
-	sock->conf.id = id;
-	sock->fd = -1;
-	sock->conf.af_type = AF_UNIX;
-
-	if (strlcpy(sock->conf.unix_socket_name,
-	    srv->unix_socket_name,
-	    sizeof(sock->conf.unix_socket_name)) >=
-	    sizeof(sock->conf.unix_socket_name)) {
-		free(sock);
-		fatalx("%s: strlcpy", __func__);
-	}
-
-	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
-	    srv->name);
-	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
-		free(sock);
-		fatalx("%s: snprintf", __func__);
-	}
-
-	if (strlcpy(sock->conf.srv_name, srv->name,
-	    sizeof(sock->conf.srv_name)) >= sizeof(sock->conf.srv_name)) {
-		free(sock);
-		fatalx("%s: strlcpy", __func__);
-	}
-
-	return sock;
-}
-
-static struct socket *
-sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
-    struct address *a)
+sockets_conf_new_socket(struct gotwebd *env, int id, struct address *a)
 {
 	struct socket *sock;
 	struct address *acp;
-	int n;
 
 	if ((sock = calloc(1, sizeof(*sock))) == NULL)
 		fatalx("%s: calloc", __func__);
@@ -222,20 +157,17 @@ sockets_conf_new_socket_fcgi(struct gotwebd *env, struct server *srv, int id,
 	sock->fd = -1;
 	sock->conf.af_type = a->ss.ss_family;
 
+	if (a->ss.ss_family == AF_UNIX) {
+		struct sockaddr_un *sun;
+
+		sun = (struct sockaddr_un *)&a->ss;
+		if (strlcpy(sock->conf.unix_socket_name, sun->sun_path,
+		    sizeof(sock->conf.unix_socket_name)) >=
+		    sizeof(sock->conf.unix_socket_name))
+			fatalx("unix socket path too long: %s", sun->sun_path);
+	}
+
 	sock->conf.fcgi_socket_port = a->port;
-
-	n = snprintf(sock->conf.name, GOTWEBD_MAXTEXT, "%s_parent",
-	    srv->name);
-	if (n < 0 || (size_t)n >= GOTWEBD_MAXTEXT) {
-		free(sock);
-		fatalx("%s: snprintf", __func__);
-	}
-
-	if (strlcpy(sock->conf.srv_name, srv->name,
-	    sizeof(sock->conf.srv_name)) >= sizeof(sock->conf.srv_name)) {
-		free(sock);
-		fatalx("%s: strlcpy", __func__);
-	}
 
 	acp = &sock->conf.addr;
 
@@ -438,9 +370,9 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 	}
 
 	if (sock->conf.af_type == AF_INET || sock->conf.af_type == AF_INET6) {
-		log_debug("%s: initializing %s FCGI socket on port %d for %s",
+		log_debug("%s: initializing %s FCGI socket on port %d",
 		    __func__, sock->conf.af_type == AF_INET ? "inet" : "inet6",
-		    sock->conf.fcgi_socket_port, sock->conf.name);
+		    sock->conf.fcgi_socket_port);
 		sock->fd = sockets_create_socket(&sock->conf.addr);
 		if (sock->fd == -1) {
 			log_warnx("%s: create FCGI socket failed", __func__);
@@ -454,35 +386,12 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 static int
 sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
 {
-	struct sockaddr_un sun;
-	struct socket *tsock;
 	int u_fd = -1;
 	mode_t old_umask, mode;
 
-	TAILQ_FOREACH(tsock, &env->sockets, entry) {
-		if (strcmp(tsock->conf.unix_socket_name,
-		    sock->conf.unix_socket_name) == 0 &&
-		    tsock->fd != -1)
-			return (tsock->fd);
-	}
-
-	/* TA: FIXME:  this needs upstreaming. */
-	int socket_flags = SOCK_STREAM | SOCK_NONBLOCK;
-#ifdef SOCK_CLOEXEC
-	socket_flags |= SOCK_CLOEXEC;
-#endif
-	u_fd = socket(AF_UNIX, socket_flags, 0);
+	u_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK| SOCK_CLOEXEC, 0);
 	if (u_fd == -1) {
 		log_warn("%s: socket", __func__);
-		return -1;
-	}
-
-	sun.sun_family = AF_UNIX;
-	if (strlcpy(sun.sun_path, sock->conf.unix_socket_name,
-	    sizeof(sun.sun_path)) >= sizeof(sun.sun_path)) {
-		log_warn("%s: %s name too long", __func__,
-		    sock->conf.unix_socket_name);
-		close(u_fd);
 		return -1;
 	}
 
@@ -498,7 +407,8 @@ sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
 	old_umask = umask(S_IXUSR|S_IXGRP|S_IWOTH|S_IROTH|S_IXOTH);
 	mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP;
 
-	if (bind(u_fd, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
+	if (bind(u_fd, (struct sockaddr *)&sock->conf.addr.ss,
+	    sock->conf.addr.slen) == -1) {
 		log_warn("%s: bind: %s", __func__, sock->conf.unix_socket_name);
 		close(u_fd);
 		(void)umask(old_umask);
