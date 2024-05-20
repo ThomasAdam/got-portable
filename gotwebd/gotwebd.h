@@ -285,7 +285,6 @@ TAILQ_HEAD(addresslist, address);
 
 struct server {
 	TAILQ_ENTRY(server)	 entry;
-	struct addresslist	al;
 
 	char		 name[GOTWEBD_MAXTEXT];
 

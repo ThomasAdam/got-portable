@@ -94,10 +94,10 @@ static struct server		*conf_new_server(const char *);
 int				 getservice(const char *);
 int				 n;
 
-int		 get_addrs(const char *, const char *, struct server *);
-int		 get_unix_addr(const char *, struct server *);
+int		 get_addrs(const char *, const char *);
+int		 get_unix_addr(const char *);
 int		 addr_dup_check(struct addresslist *, struct address *);
-int		 add_addr(struct server *, struct address *);
+int		 add_addr(struct address *);
 
 typedef struct {
 	union {
@@ -215,6 +215,38 @@ main		: PREFORK NUMBER {
 			}
 			free($2);
 		}
+		| LISTEN ON listen_addr PORT STRING {
+			if (get_addrs($3, $5) == -1) {
+				yyerror("could not get addrs");
+				YYERROR;
+			}
+			free($3);
+			free($5);
+		}
+		| LISTEN ON listen_addr PORT NUMBER {
+			char portno[32];
+			int n;
+
+			n = snprintf(portno, sizeof(portno), "%lld",
+			    (long long)$5);
+			if (n < 0 || (size_t)n >= sizeof(portno))
+				fatalx("port number too long: %lld",
+				    (long long)$5);
+
+			if (get_addrs($3, portno) == -1) {
+				yyerror("could not get addrs");
+				YYERROR;
+			}
+			free($3);
+		}
+		| LISTEN ON SOCKET STRING {
+			if (get_unix_addr($4) == -1) {
+				yyerror("can't listen on %s", $4);
+				free($4);
+				YYERROR;
+			}
+			free($4);
+		}
 		;
 
 server		: SERVER STRING {
@@ -318,38 +350,6 @@ serveropts1	: REPOS_PATH STRING {
 				YYERROR;
 			}
 			free($2);
-		}
-		| LISTEN ON listen_addr PORT STRING {
-			if (get_addrs($3, $5, new_srv) == -1) {
-				yyerror("could not get addrs");
-				YYERROR;
-			}
-			free($3);
-			free($5);
-		}
-		| LISTEN ON listen_addr PORT NUMBER {
-			char portno[32];
-			int n;
-
-			n = snprintf(portno, sizeof(portno), "%lld",
-			    (long long)$5);
-			if (n < 0 || (size_t)n >= sizeof(portno))
-				fatalx("port number too long: %lld",
-				    (long long)$5);
-
-			if (get_addrs($3, portno, new_srv) == -1) {
-				yyerror("could not get addrs");
-				YYERROR;
-			}
-			free($3);
-		}
-		| LISTEN ON SOCKET STRING {
-			if (get_unix_addr($4, new_srv) == -1) {
-				yyerror("can't listen on %s", $4);
-				free($4);
-				YYERROR;
-			}
-			free($4);
 		}
 		| SHOW_SITE_OWNER boolean {
 			new_srv->show_site_owner = $2;
@@ -805,7 +805,6 @@ int
 parse_config(const char *filename, struct gotwebd *env)
 {
 	struct sym *sym, *next;
-	struct server *srv;
 	int n;
 
 	if (config_init(env) == -1)
@@ -847,12 +846,11 @@ parse_config(const char *filename, struct gotwebd *env)
 	if (gotwebd->server_cnt == 0)
 		add_default_server();
 
-	/* add the implicit listen on socket where missing */
-	TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
-		if (!TAILQ_EMPTY(&srv->al))
-			continue;
-		if (get_unix_addr(env->unix_socket_name, srv) == -1)
-			yyerror("can't listen on %s", env->unix_socket_name);
+	/* add the implicit listen on socket */
+	if (TAILQ_EMPTY(&gotwebd->addresses)) {
+		const char *path = D_HTTPD_CHROOT D_UNIX_SOCKET;
+		if (get_unix_addr(path) == -1)
+			yyerror("can't listen on %s", path);
 	}
 
 	if (errors)
@@ -915,7 +913,6 @@ conf_new_server(const char *name)
 	srv->summary_commits_display = D_MAXSLCOMMDISP;
 	srv->summary_tags_display = D_MAXSLTAGDISP;
 
-	TAILQ_INIT(&srv->al);
 	TAILQ_INSERT_TAIL(&gotwebd->servers, srv, entry);
 	gotwebd->server_cnt++;
 
@@ -998,7 +995,7 @@ symget(const char *nam)
 }
 
 int
-get_addrs(const char *hostname, const char *servname, struct server *new_srv)
+get_addrs(const char *hostname, const char *servname)
 {
 	struct addrinfo hints, *res0, *res;
 	int error;
@@ -1053,7 +1050,7 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 			fatalx("unknown address family %d", res->ai_family);
 		}
 
-		if (add_addr(new_srv, h) == -1) {
+		if (add_addr(h) == -1) {
 			freeaddrinfo(res0);
 			return -1;
 		}
@@ -1063,7 +1060,7 @@ get_addrs(const char *hostname, const char *servname, struct server *new_srv)
 }
 
 int
-get_unix_addr(const char *path, struct server *new_srv)
+get_unix_addr(const char *path)
 {
 	struct address *h;
 	struct sockaddr_un *sun;
@@ -1084,7 +1081,7 @@ get_unix_addr(const char *path, struct server *new_srv)
 		return (-1);
 	}
 
-	return add_addr(new_srv, h);
+	return add_addr(h);
 }
 
 int
@@ -1106,25 +1103,13 @@ addr_dup_check(struct addresslist *al, struct address *h)
 }
 
 int
-add_addr(struct server *new_srv, struct address *h)
+add_addr(struct address *h)
 {
-	struct server *srv;
-	struct address *dup;
-
-	TAILQ_FOREACH(srv, &gotwebd->servers, entry) {
-		if (addr_dup_check(&srv->al, h) == -1) {
-			free(h);
-			return 0;
-		}
-	}
-
 	if (addr_dup_check(&gotwebd->addresses, h) == 0) {
-		if ((dup = calloc(1, sizeof(*dup))) == NULL)
-			fatal("%s: calloc", __func__);
-		memcpy(dup, h, sizeof(*dup));
-		TAILQ_INSERT_TAIL(&gotwebd->addresses, dup, entry);
+		TAILQ_INSERT_TAIL(&gotwebd->addresses, h, entry);
+		return (0);
 	}
 
-	TAILQ_INSERT_TAIL(&new_srv->al, h, entry);
+	free(h);
 	return (0);
 }

@@ -58,6 +58,21 @@ environment of
 If not specified then
 .Pa /var/www
 will be used.
+.It Ic listen on Ar address Ic port Ar number
+Configure an address and port for incoming FastCGI connections.
+Valid
+.Ar address
+arguments are hostnames, IPv4 and IPv6 addresses.
+The
+.Ar port
+argument may be number or a service name defined in
+.Xr services 5 .
+May be specified multiple times to build up a list of listening sockets.
+.It Ic listen on socket Ar path
+Configure a
+.Ux Ns -domain
+socket for incoming FastCGI connections.
+May be specified multiple times to build up a list of listening sockets.
 .It Ic prefork Ar number
 Run the specified number of server processes.
 .Xr gotwebd 8
@@ -67,14 +82,22 @@ Set the path to the default unix socket.
 Defaults to
 .Pa /var/www/run/gotweb.sock .
 .El
+.Pp
+If no
+.Ic listen
+directive is used,
+.Xr gotwebd 8
+will listen on the
+.Ux Ns -domain
+socket at
+.Pa /var/www/run/gotweb.sock .
 .Sh SERVER CONFIGURATION
 At least one server context must exist for
 .Xr gotwebd 8
 to function.
 In case no server context is defined in the configuration file, a default
-server context will be used, which listens on a unix socket at
-.Pa /var/www/run/gotweb.sock
-and uses default parameters for all applicable settings.
+server context will be used which uses default parameters for all
+applicable settings.
 .Pp
 A server context is declared with a unique
 .Ar name ,
@@ -92,19 +115,6 @@ Set the path to a custom Cascading Style Sheet (CSS) to be used.
 If this option is not specified then the default style sheet
 .Sq gotweb.css
 will be used.
-.It Ic listen on Ar address Ic port Ar number
-Configure an address and port for incoming FastCGI connections.
-Valid
-.Ar address
-arguments are hostnames, IPv4 and IPv6 addresses.
-The
-.Ar port
-argument may be number or a service name defined in
-.Xr services 5 .
-.Pp
-May be specified multiple times to build up a list of listening sockets.
-.It Ic listen on socket Ar path
-Set the path to the unix socket used by the server.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
 Defaults to
@@ -203,9 +213,11 @@ implicit
 .Ux
 socket.
 .Bd -literal -offset indent
+listen on 127.0.0.1 port 9000
+listen on ::1 port 9000
+
 server "localhost" {
-	listen on 127.0.0.1 port 9000
-	listen on ::1 port 9000
+	site_name "my public repos"
 }
 .Ed
 .Sh SEE ALSO
