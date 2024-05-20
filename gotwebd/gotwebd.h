@@ -363,8 +363,6 @@ struct gotwebd {
 	int		 server_cnt;
 
 	char		 httpd_chroot[PATH_MAX];
-
-	char		 unix_socket_name[PATH_MAX];
 };
 
 /*
