@@ -114,7 +114,7 @@ typedef struct {
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
-%token	UNIX_SOCKET_NAME SERVER CHROOT CUSTOM_CSS SOCKET
+%token	SERVER CHROOT CUSTOM_CSS SOCKET
 %token	SUMMARY_COMMITS_DISPLAY SUMMARY_TAGS_DISPLAY
 
 %token	<v.string>	STRING
@@ -198,19 +198,6 @@ main		: PREFORK NUMBER {
 			    sizeof(gotwebd->httpd_chroot));
 			if (n >= sizeof(gotwebd->httpd_chroot)) {
 				yyerror("%s: httpd_chroot truncated", __func__);
-				free($2);
-				YYERROR;
-			}
-			free($2);
-		}
-		| UNIX_SOCKET_NAME STRING {
-			n = snprintf(gotwebd->unix_socket_name,
-			    sizeof(gotwebd->unix_socket_name), "%s%s",
-			    gotwebd->httpd_chroot, $2);
-			if (n < 0 ||
-			    (size_t)n >= sizeof(gotwebd->unix_socket_name)) {
-				yyerror("%s: unix_socket_name truncated",
-				    __func__);
 				free($2);
 				YYERROR;
 			}
@@ -473,7 +460,6 @@ lookup(char *s)
 		{ "socket",			SOCKET },
 		{ "summary_commits_display",	SUMMARY_COMMITS_DISPLAY },
 		{ "summary_tags_display",	SUMMARY_TAGS_DISPLAY },
-		{ "unix_socket_name",		UNIX_SOCKET_NAME },
 	};
 	const struct keywords *p;
 
@@ -806,17 +792,11 @@ int
 parse_config(const char *filename, struct gotwebd *env)
 {
 	struct sym *sym, *next;
-	int n;
 
 	if (config_init(env) == -1)
 		fatalx("failed to initialize configuration");
 
 	gotwebd = env;
-
-	n = snprintf(env->unix_socket_name, sizeof(env->unix_socket_name),
-	    "%s%s", D_HTTPD_CHROOT, D_UNIX_SOCKET);
-	if (n < 0 || (size_t)n >= sizeof(env->unix_socket_name))
-		fatalx("%s: snprintf", __func__);
 
 	file = newfile(filename, 0);
 	if (file == NULL) {
