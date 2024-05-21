@@ -24,12 +24,6 @@
 #include <limits.h>
 #include <stdio.h>
 
-#ifdef DEBUG
-#define dprintf(x...)   do { log_debug(x); } while(0)
-#else
-#define dprintf(x...)
-#endif /* DEBUG */
-
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
@@ -521,25 +515,3 @@ int config_setfd(struct gotwebd *, struct socket *);
 int config_getfd(struct gotwebd *, struct imsg *);
 int config_getcfg(struct gotwebd *, struct imsg *);
 int config_init(struct gotwebd *);
-
-/* log.c */
-void	log_init(int, int);
-void	log_procinit(const char *);
-void	log_setverbose(int);
-int	log_getverbose(void);
-void	log_warn(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));
-void	log_warnx(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));
-void	log_info(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));
-void	log_debug(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));
-void	logit(int, const char *, ...)
-	    __attribute__((__format__ (printf, 2, 3)));
-void	vlog(int, const char *, va_list)
-	    __attribute__((__format__ (printf, 2, 0)));
-__dead void fatal(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));
-__dead void fatalx(const char *, ...)
-	    __attribute__((__format__ (printf, 1, 2)));

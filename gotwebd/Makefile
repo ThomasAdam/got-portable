@@ -7,7 +7,7 @@ SUBDIR = libexec
 .include "Makefile.inc"
 
 PROG =		gotwebd
-SRCS =		config.c sockets.c log.c gotwebd.c parse.y \
+SRCS =		config.c sockets.c gotwebd.c parse.y \
 		fcgi.c gotweb.c got_operations.c tmpl.c pages.c
 SRCS +=		blame.c commit_graph.c delta.c diff.c \
 		diffreg.c error.c object.c object_cache.c \
@@ -21,7 +21,7 @@ SRCS +=		blame.c commit_graph.c delta.c diff.c \
 		sigs.c date.c \
 		object_open_privsep.c read_gitconfig_privsep.c \
 		read_gotconfig_privsep.c pollfd.c reference_parse.c \
-		object_qid.c
+		object_qid.c log.c
 
 .if exists(${.CURDIR}/../template/obj/template)
 TEMPLATE = ${.CURDIR}/../template/obj/template

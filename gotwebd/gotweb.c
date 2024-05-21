@@ -50,6 +50,7 @@
 #include "got_privsep.h"
 
 #include "gotwebd.h"
+#include "log.h"
 #include "tmpl.h"
 
 static const struct querystring_keys querystring_keys[] = {

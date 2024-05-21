@@ -40,6 +40,7 @@
 #include "got_reference.h"
 
 #include "gotwebd.h"
+#include "log.h"
 
 int
 config_init(struct gotwebd *env)

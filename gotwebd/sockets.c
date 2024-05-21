@@ -56,6 +56,7 @@
 #include "got_privsep.h"
 
 #include "gotwebd.h"
+#include "log.h"
 #include "tmpl.h"
 
 #define SOCKS_BACKLOG 5
