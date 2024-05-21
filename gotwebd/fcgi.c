@@ -38,6 +38,7 @@
 #include "got_reference.h"
 
 #include "gotwebd.h"
+#include "log.h"
 #include "tmpl.h"
 
 size_t	 fcgi_parse_record(uint8_t *, size_t, struct request *);

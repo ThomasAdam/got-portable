@@ -43,6 +43,7 @@
 #include "got_reference.h"
 
 #include "gotwebd.h"
+#include "log.h"
 
 __dead void usage(void);
 

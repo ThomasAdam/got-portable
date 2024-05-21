@@ -52,6 +52,7 @@
 #include "got_reference.h"
 
 #include "gotwebd.h"
+#include "log.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {

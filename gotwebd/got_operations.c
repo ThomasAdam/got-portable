@@ -40,6 +40,7 @@
 #include "got_privsep.h"
 
 #include "gotwebd.h"
+#include "log.h"
 
 static const struct got_error *got_init_repo_commit(struct repo_commit **);
 static const struct got_error *got_init_repo_tag(struct repo_tag **);
