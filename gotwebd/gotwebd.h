@@ -31,7 +31,9 @@
 /* GOTWEBD DEFAULTS */
 #define GOTWEBD_CONF		 "/etc/gotwebd.conf"
 
-#define GOTWEBD_USER		 "www"
+#ifndef GOTWEBD_DEFAULT_USER
+#define GOTWEBD_DEFAULT_USER	 "www"
+#endif
 
 #define GOTWEBD_MAXDESCRSZ	 1024
 #define GOTWEBD_MAXCLONEURLSZ	 1024
@@ -340,6 +342,7 @@ struct gotwebd {
 	struct socketlist	sockets;
 	struct addresslist	addresses;
 
+	char		*user;
 	const char	*gotwebd_conffile;
 
 	int		 gotwebd_debug;

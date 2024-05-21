@@ -116,7 +116,7 @@ typedef struct {
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
 %token	SERVER CHROOT CUSTOM_CSS SOCKET
-%token	SUMMARY_COMMITS_DISPLAY SUMMARY_TAGS_DISPLAY
+%token	SUMMARY_COMMITS_DISPLAY SUMMARY_TAGS_DISPLAY USER
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -235,6 +235,12 @@ main		: PREFORK NUMBER {
 				YYERROR;
 			}
 			free($4);
+		}
+		| USER STRING {
+			if (gotwebd->user != NULL)
+				yyerror("user already specified");
+			free(gotwebd->user);
+			gotwebd->user = $2;
 		}
 		;
 
@@ -461,6 +467,7 @@ lookup(char *s)
 		{ "socket",			SOCKET },
 		{ "summary_commits_display",	SUMMARY_COMMITS_DISPLAY },
 		{ "summary_tags_display",	SUMMARY_TAGS_DISPLAY },
+		{ "user",			USER },
 	};
 	const struct keywords *p;
 

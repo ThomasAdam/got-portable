@@ -273,6 +273,7 @@ main(int argc, char **argv)
 	int			 no_action = 0;
 	int			 server_proc = 0;
 	const char		*conffile = GOTWEBD_CONF;
+	const char		*username = GOTWEBD_DEFAULT_USER;
 	const char		*argv0;
 
 	if ((argv0 = argv[0]) == NULL)
@@ -332,9 +333,11 @@ main(int argc, char **argv)
 	if (geteuid())
 		fatalx("need root privileges");
 
-	pw = getpwnam(GOTWEBD_USER);
+	if (env->user)
+		username = env->user;
+	pw = getpwnam(username);
 	if (pw == NULL)
-		fatalx("unknown user %s", GOTWEBD_USER);
+		fatalx("unknown user %s", username);
 	env->pw = pw;
 
 	log_init(env->gotwebd_debug, LOG_DAEMON);
