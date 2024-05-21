@@ -55,9 +55,9 @@ Set the path to the
 .Xr chroot 2
 environment of
 .Xr httpd 8 .
-If not specified then
-.Pa /var/www
-will be used.
+If not specified, it defaults to
+.Pa /var/www ,
+the home directory of the www user.
 .It Ic listen on Ar address Ic port Ar number
 Configure an address and port for incoming FastCGI connections.
 Valid
@@ -77,6 +77,12 @@ May be specified multiple times to build up a list of listening sockets.
 Run the specified number of server processes.
 .Xr gotwebd 8
 runs 3 server processes by default.
+.It Ic user Ar user
+Set the
+.Ar user
+which will run
+.Xr gotwebd 8 .
+If not specified, the user www will be used.
 .El
 .Pp
 If no
