@@ -305,6 +305,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				    "mapoff %lld would overflow size_t",
 				    (long long)mapoff
 				    + obj->delta.ofs.base_offsetlen);
+				break;
 			}
 
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
