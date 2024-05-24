@@ -27,14 +27,6 @@ got:
 - enforce that log messages are encoded in either ASCII or UTF-8; this
   mostly matters for -portable since OpenBSD doesn't provide other locales
 
-network protocol:
-- add http(s) transport with libtls, speaking the two Git HTTP protocols
-  (both "dumb" and "smart" need to work) via got-fetch-pack, or a new helper
-  like got-fetch-http; it is fine if HTTP remains a fetch-only protocol, and
-  works only against servers which don't require authentication for fetches;
-  anything beyond this would require a full-featured HTTP client (Git uses
-  libcurl, which we cannot use as it is not in the OpenBSD base system)
-
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
   can be slow for paths in a deep history if the path has not been changed
