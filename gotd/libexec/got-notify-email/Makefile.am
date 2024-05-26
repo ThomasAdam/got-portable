@@ -3,9 +3,9 @@ libexec_PROGRAMS = got-notify-email
 include $(top_builddir)/Makefile.common
 
 got_notify_email_SOURCES = got-notify-email.c \
-	$(top_srcdir)/gotd/log.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/hash.c \
+	$(top_srcdir)/lib/log.c \
 	$(top_srcdir)/lib/pollfd.c
 
 got_notify_email_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a

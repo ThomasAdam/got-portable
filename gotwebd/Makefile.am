@@ -37,6 +37,7 @@ gotwebd_SOURCES = config.c \
 		  $(top_srcdir)/lib/hash.c \
 		  $(top_srcdir)/lib/inflate.c \
 		  $(top_srcdir)/lib/lockfile.c \
+		  $(top_srcdir)/lib/log.c \
 		  $(top_srcdir)/lib/murmurhash2.c \
 		  $(top_srcdir)/lib/object.c \
 		  $(top_srcdir)/lib/object_cache.c \
@@ -66,7 +67,6 @@ gotwebd_SOURCES = config.c \
 		  got_operations.c \
 		  gotweb.c \
 		  gotwebd.c \
-		  log.c \
 		  pages.c \
 		  parse.y \
 		  sockets.c

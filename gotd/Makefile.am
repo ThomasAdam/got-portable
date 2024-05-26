@@ -30,6 +30,7 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/lockfile.c \
+	$(top_srcdir)/lib/log.c \
 	$(top_srcdir)/lib/murmurhash2.c \
 	$(top_srcdir)/lib/object.c \
 	$(top_srcdir)/lib/object_cache.c \
@@ -55,7 +56,6 @@ gotd_SOURCES = gotd.c \
 	auth.c \
 	imsg.c \
 	listen.c \
-	log.c \
 	notify.c \
 	parse.y \
 	privsep_stub.c \

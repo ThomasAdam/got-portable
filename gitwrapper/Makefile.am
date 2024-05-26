@@ -8,11 +8,11 @@ AM_CPPFLAGS += -DGITWRAPPER_GIT_LIBEXEC_DIR='"@GITWRAPPER_LIBEXEC_PATHC@"'
 CLEANFILES = parse.h
 
 gitwrapper_SOURCES = gitwrapper.c \
-		  $(top_srcdir)/gotd/log.c \
 		  $(top_srcdir)/gotd/parse.y \
 		  $(top_srcdir)/lib/dial.c \
 		  $(top_srcdir)/lib/error.c \
 		  $(top_srcdir)/lib/hash.c \
+		  $(top_srcdir)/lib/log.c \
 		  $(top_srcdir)/lib/object_qid.c \
 		  $(top_srcdir)/lib/path.c \
 		  $(top_srcdir)/lib/reference_parse.c
