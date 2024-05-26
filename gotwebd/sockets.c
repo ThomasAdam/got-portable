@@ -389,8 +389,13 @@ sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
 {
 	int u_fd = -1;
 	mode_t old_umask, mode;
+	int flags = SOCK_STREAM | SOCK_NONBLOCK;
 
-	u_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK| SOCK_CLOEXEC, 0);
+#ifdef SOCK_CLOEXEC
+	flags |= SOCK_CLOEXEC;
+#endif
+
+	u_fd = socket(AF_UNIX, flags, 0);
 	if (u_fd == -1) {
 		log_warn("%s: socket", __func__);
 		return -1;
