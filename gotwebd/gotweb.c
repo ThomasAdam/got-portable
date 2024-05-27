@@ -1069,7 +1069,6 @@ gotweb_load_got_path(struct repo_dir **rp, const char *dir,
     struct request *c)
 {
 	const struct got_error *error = NULL;
-	struct socket *sock = c->sock;
 	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct repo_dir *repo_dir;
@@ -1120,7 +1119,8 @@ gotweb_load_got_path(struct repo_dir **rp, const char *dir,
 		goto err;
 	}
 
-	error = got_repo_open(&t->repo, repo_dir->path, NULL, sock->pack_fds);
+	error = got_repo_open(&t->repo, repo_dir->path, NULL,
+	    gotwebd_env->pack_fds);
 	if (error)
 		goto err;
 	error = gotweb_get_repo_description(&repo_dir->description, srv,

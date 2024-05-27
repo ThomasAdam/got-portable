@@ -325,9 +325,6 @@ struct socket {
 	struct socket_conf	 conf;
 
 	int		 fd;
-	int		 pack_fds[GOTWEB_PACK_NUM_TEMPFILES];
-	int		 priv_fd[PRIV_FDS__MAX];
-
 	struct event	 evt;
 	struct event	 ev;
 	struct event	 pause;
@@ -341,6 +338,9 @@ struct gotwebd {
 	struct serverlist	servers;
 	struct socketlist	sockets;
 	struct addresslist	addresses;
+
+	int		 pack_fds[GOTWEB_PACK_NUM_TEMPFILES];
+	int		 priv_fd[PRIV_FDS__MAX];
 
 	char		*user;
 	const char	*gotwebd_conffile;
@@ -514,7 +514,7 @@ int config_setserver(struct gotwebd *, struct server *);
 int config_getserver(struct gotwebd *, struct imsg *);
 int config_setsock(struct gotwebd *, struct socket *);
 int config_getsock(struct gotwebd *, struct imsg *);
-int config_setfd(struct gotwebd *, struct socket *);
+int config_setfd(struct gotwebd *);
 int config_getfd(struct gotwebd *, struct imsg *);
 int config_getcfg(struct gotwebd *, struct imsg *);
 int config_init(struct gotwebd *);

@@ -584,7 +584,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 
 	c->fd = s;
 	c->sock = sock;
-	memcpy(c->priv_fd, sock->priv_fd, sizeof(c->priv_fd));
+	memcpy(c->priv_fd, gotwebd_env->priv_fd, sizeof(c->priv_fd));
 	c->buf_pos = 0;
 	c->buf_len = 0;
 	c->request_started = 0;
