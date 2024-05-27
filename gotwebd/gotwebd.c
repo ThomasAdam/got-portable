@@ -442,9 +442,11 @@ gotwebd_configure(struct gotwebd *env)
 	TAILQ_FOREACH(sock, &env->sockets, entry) {
 		if (config_setsock(env, sock) == -1)
 			fatalx("%s: send socket error", __func__);
-		if (config_setfd(env, sock) == -1)
-			fatalx("%s: send priv_fd error", __func__);
 	}
+
+	/* send the temp files */
+	if (config_setfd(env) == -1)
+		fatalx("%s: send priv_fd error", __func__);
 
 	if (main_compose_sockets(env, IMSG_CFG_DONE, -1, NULL, 0) == -1)
 		fatal("main_compose_sockets IMSG_CFG_DONE");

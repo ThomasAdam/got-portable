@@ -45,6 +45,8 @@
 int
 config_init(struct gotwebd *env)
 {
+	int i;
+
 	strlcpy(env->httpd_chroot, D_HTTPD_CHROOT, sizeof(env->httpd_chroot));
 
 	env->prefork_gotwebd = GOTWEBD_NUMPROC;
@@ -52,6 +54,12 @@ config_init(struct gotwebd *env)
 	TAILQ_INIT(&env->servers);
 	TAILQ_INIT(&env->sockets);
 	TAILQ_INIT(&env->addresses);
+
+	for (i = 0; i < PRIV_FDS__MAX; i++)
+		env->priv_fd[i] = -1;
+
+	for (i = 0; i < GOTWEB_PACK_NUM_TEMPFILES; i++)
+		env->pack_fds[i] = -1;
 
 	return 0;
 }
@@ -118,7 +126,6 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	struct socket *sock = NULL;
 	struct socket_conf sock_conf;
 	uint8_t *p = imsg->data;
-	int i;
 
 	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_conf))
 		fatalx("%s: wrong size", __func__);
@@ -140,12 +147,6 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 
 	TAILQ_INSERT_TAIL(&env->sockets, sock, entry);
 
-	for (i = 0; i < PRIV_FDS__MAX; i++)
-		sock->priv_fd[i] = -1;
-
-	for (i = 0; i < GOTWEB_PACK_NUM_TEMPFILES; i++)
-		sock->pack_fds[i] = -1;
-
 	/* log new socket info */
 	log_debug("%s: id=%d af_type=%s socket_path=%s",
 	    __func__, sock->conf.id,
@@ -159,7 +160,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 }
 
 int
-config_setfd(struct gotwebd *env, struct socket *sock)
+config_setfd(struct gotwebd *env)
 {
 	int i, j, ret, fd;
 
@@ -172,8 +173,7 @@ config_setfd(struct gotwebd *env, struct socket *sock)
 			if (fd == -1)
 				fatal("got_opentemp");
 			if (imsg_compose_event(&env->iev_server[j],
-			    IMSG_CFG_FD, 0, -1, fd, &sock->conf.id,
-			    sizeof(sock->conf.id)) == -1)
+			    IMSG_CFG_FD, 0, -1, fd, NULL, 0) == -1)
 				fatal("imsg_compose_event IMSG_CFG_FD");
 
 			do {
@@ -191,34 +191,28 @@ config_setfd(struct gotwebd *env, struct socket *sock)
 int
 config_getfd(struct gotwebd *env, struct imsg *imsg)
 {
-	struct socket *sock;
-	uint8_t *p = imsg->data;
-	int sock_id, match = 0, i, j;
+	int match = 0, i, j;
+	const int nfds = GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX;
 
-	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_id))
+	if (imsg_get_len(imsg) != 0)
 		fatalx("%s: wrong size", __func__);
 
-	memcpy(&sock_id, p, sizeof(sock_id));
+	for (i = 0; i < nfds; i++) {
+		if (i < PRIV_FDS__MAX && env->priv_fd[i] == -1) {
+			env->priv_fd[i] = imsg_get_fd(imsg);
+			log_debug("%s: assigning priv_fd %d",
+			    __func__, env->priv_fd[i]);
+			match = 1;
+			break;
+		}
 
-	TAILQ_FOREACH(sock, &env->sockets, entry) {
-		const int nfds = (GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX);
-		for (i = 0; i < nfds; i++) {
-			if (i < PRIV_FDS__MAX && sock->priv_fd[i] == -1) {
-				sock->priv_fd[i] = imsg_get_fd(imsg);
-				log_debug("%s: assigning socket %d priv_fd %d",
-				    __func__, sock_id, sock->priv_fd[i]);
-				match = 1;
-				break;
-			}
-
-			j = i - PRIV_FDS__MAX;
-			if (sock->pack_fds[j] == -1) {
-				sock->pack_fds[j] = imsg_get_fd(imsg);
-				log_debug("%s: assigning socket %d pack_fd %d",
-				    __func__, sock_id, sock->pack_fds[j]);
-				match = 1;
-				break;
-			}
+		j = i - PRIV_FDS__MAX;
+		if (env->pack_fds[j] == -1) {
+			env->pack_fds[j] = imsg_get_fd(imsg);
+			log_debug("%s: assigning pack_fd %d",
+			    __func__, env->pack_fds[j]);
+			match = 1;
+			break;
 		}
 	}
 
