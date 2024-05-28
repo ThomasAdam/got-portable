@@ -579,12 +579,8 @@ gotweb_assign_querystring(struct querystring *qs, char *key, char *value)
 			for (a_cnt = 0; a_cnt < nitems(action_keys); a_cnt++) {
 				if (strcmp(value, action_keys[a_cnt].name) != 0)
 					continue;
-				else if (strcmp(value,
-				    action_keys[a_cnt].name) == 0){
-					qs->action =
-					    action_keys[a_cnt].action;
-					goto qa_found;
-				}
+				qs->action = action_keys[a_cnt].action;
+				goto qa_found;
 			}
 			qs->action = ERR;
 qa_found:
