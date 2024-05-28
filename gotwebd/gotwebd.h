@@ -370,8 +370,6 @@ struct gotweb_url {
 	int		 action;
 	int		 index_page;
 	const char	*commit;
-	const char	*previd;
-	const char	*prevset;
 	const char	*file;
 	const char	*folder;
 	const char	*headref;
@@ -381,8 +379,6 @@ struct gotweb_url {
 struct querystring {
 	uint8_t		 action;
 	char		*commit;
-	char		*previd;
-	char		*prevset;
 	char		*file;
 	char		*folder;
 	char		*headref;
