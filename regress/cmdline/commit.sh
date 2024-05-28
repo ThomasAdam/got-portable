@@ -638,7 +638,8 @@ test_commit_selected_paths() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "got: nonexistent: bad path" > $testroot/stderr.expected
+	echo "got: nonexistent: no changes to commit" \
+		> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?

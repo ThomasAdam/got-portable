@@ -6532,7 +6532,7 @@ check_path_is_commitable(const char *path,
 	}
 
 	if (cpe == NULL)
-		return got_error_path(path, GOT_ERR_BAD_PATH);
+		return got_error_path(path, GOT_ERR_COMMIT_NO_CHANGES);
 
 	return NULL;
 }
