@@ -980,18 +980,6 @@ gotweb_render_url(struct request *c, struct gotweb_url *url)
 		sep = "&";
 	}
 
-	if (url->previd) {
-		if (tp_writef(c->tp, "%sprevid=%s", sep, url->previd) == -1)
-			return -1;
-		sep = "&";
-	}
-
-	if (url->prevset) {
-		if (tp_writef(c->tp, "%sprevset=%s", sep, url->prevset) == -1)
-			return -1;
-		sep = "&";
-	}
-
 	if (url->file) {
 		tmp = gotweb_urlencode(url->file);
 		if (tmp == NULL)
