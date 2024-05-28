@@ -80,9 +80,9 @@ static const struct action_keys action_keys[] = {
 };
 
 static const struct got_error *gotweb_init_querystring(struct querystring **);
-static const struct got_error *gotweb_parse_querystring(struct querystring **,
+static const struct got_error *gotweb_parse_querystring(struct querystring *,
     char *);
-static const struct got_error *gotweb_assign_querystring(struct querystring **,
+static const struct got_error *gotweb_assign_querystring(struct querystring *,
     char *, char *);
 static int gotweb_render_index(struct template *);
 static const struct got_error *gotweb_load_got_path(struct repo_dir **,
@@ -169,7 +169,7 @@ gotweb_process_request(struct request *c)
 		goto err;
 	}
 	c->t->qs = qs;
-	error = gotweb_parse_querystring(&qs, c->querystring);
+	error = gotweb_parse_querystring(qs, c->querystring);
 	if (error) {
 		log_warnx("%s: %s", __func__, error->msg);
 		goto err;
@@ -464,7 +464,7 @@ gotweb_init_querystring(struct querystring **qs)
 }
 
 static const struct got_error *
-gotweb_parse_querystring(struct querystring **qs, char *qst)
+gotweb_parse_querystring(struct querystring *qs, char *qst)
 {
 	const struct got_error *error = NULL;
 	char *tok1 = NULL, *tok1_pair = NULL, *tok1_end = NULL;
@@ -559,7 +559,7 @@ gotweb_urldecode(char *url)
 }
 
 static const struct got_error *
-gotweb_assign_querystring(struct querystring **qs, char *key, char *value)
+gotweb_assign_querystring(struct querystring *qs, char *key, char *value)
 {
 	const struct got_error *error = NULL;
 	const char *errstr;
@@ -580,42 +580,42 @@ gotweb_assign_querystring(struct querystring **qs, char *key, char *value)
 					continue;
 				else if (strcmp(value,
 				    action_keys[a_cnt].name) == 0){
-					(*qs)->action =
+					qs->action =
 					    action_keys[a_cnt].action;
 					goto qa_found;
 				}
 			}
-			(*qs)->action = ERR;
+			qs->action = ERR;
 qa_found:
 			break;
 		case COMMIT:
-			(*qs)->commit = strdup(value);
-			if ((*qs)->commit == NULL) {
+			qs->commit = strdup(value);
+			if (qs->commit == NULL) {
 				error = got_error_from_errno2(__func__,
 				    "strdup");
 				goto done;
 			}
 			break;
 		case RFILE:
-			(*qs)->file = strdup(value);
-			if ((*qs)->file == NULL) {
+			qs->file = strdup(value);
+			if (qs->file == NULL) {
 				error = got_error_from_errno2(__func__,
 				    "strdup");
 				goto done;
 			}
 			break;
 		case FOLDER:
-			(*qs)->folder = strdup(value);
-			if ((*qs)->folder == NULL) {
+			qs->folder = strdup(value);
+			if (qs->folder == NULL) {
 				error = got_error_from_errno2(__func__,
 				    "strdup");
 				goto done;
 			}
 			break;
 		case HEADREF:
-			free((*qs)->headref);
-			(*qs)->headref = strdup(value);
-			if ((*qs)->headref == NULL) {
+			free(qs->headref);
+			qs->headref = strdup(value);
+			if (qs->headref == NULL) {
 				error = got_error_from_errno2(__func__,
 				    "strdup");
 				goto done;
@@ -624,19 +624,19 @@ qa_found:
 		case INDEX_PAGE:
 			if (*value == '\0')
 				break;
-			(*qs)->index_page = strtonum(value, INT64_MIN,
+			qs->index_page = strtonum(value, INT64_MIN,
 			    INT64_MAX, &errstr);
 			if (errstr) {
 				error = got_error_from_errno3(__func__,
 				    "strtonum", errstr);
 				goto done;
 			}
-			if ((*qs)->index_page < 0)
-				(*qs)->index_page = 0;
+			if (qs->index_page < 0)
+				qs->index_page = 0;
 			break;
 		case PATH:
-			(*qs)->path = strdup(value);
-			if ((*qs)->path == NULL) {
+			qs->path = strdup(value);
+			if (qs->path == NULL) {
 				error = got_error_from_errno2(__func__,
 				    "strdup");
 				goto done;
