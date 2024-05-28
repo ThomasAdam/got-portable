@@ -155,9 +155,6 @@ gotweb_process_request(struct request *c)
 		log_warnx("%s: %s", __func__, error->msg);
 		return;
 	}
-	/* don't process any further if client disconnected */
-	if (c->sock->client_status == CLIENT_DISCONNECT)
-		return;
 	/* get the gotwebd server */
 	srv = gotweb_get_server(c->server_name);
 	if (srv == NULL) {
