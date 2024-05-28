@@ -232,24 +232,21 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 
 		val = buf + name_len;
 
-		if (c->querystring[0] == '\0' &&
-		    val_len < MAX_QUERYSTRING &&
+		if (val_len < MAX_QUERYSTRING &&
 		    name_len == 12 &&
 		    strncmp(buf, "QUERY_STRING", 12) == 0) {
 			memcpy(c->querystring, val, val_len);
 			c->querystring[val_len] = '\0';
 		}
 
-		if (c->document_uri[0] == '\0' &&
-		    val_len < MAX_DOCUMENT_URI &&
+		if (val_len < MAX_DOCUMENT_URI &&
 		    name_len == 12 &&
 		    strncmp(buf, "DOCUMENT_URI", 12) == 0) {
 			memcpy(c->document_uri, val, val_len);
 			c->document_uri[val_len] = '\0';
 		}
 
-		if (c->server_name[0] == '\0' &&
-		    val_len < MAX_SERVER_NAME &&
+		if (val_len < MAX_SERVER_NAME &&
 		    name_len == 11 &&
 		    strncmp(buf, "SERVER_NAME", 11) == 0) {
 			memcpy(c->server_name, val, val_len);
