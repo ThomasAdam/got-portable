@@ -5628,6 +5628,7 @@ cmd_diff(int argc, char *argv[])
 	error = printfile(outfile);
 
 done:
+	free(cwd);
 	free(labels[0]);
 	free(labels[1]);
 	free(ids[0]);
@@ -13793,6 +13794,7 @@ cmd_merge(int argc, char *argv[])
 
 	}
 done:
+	free(cwd);
 	free(gitconfig_path);
 	free(id_str);
 	free(merge_commit_id);
@@ -14446,6 +14448,7 @@ cmd_cat(int argc, char *argv[])
 		id = NULL;
 	}
 done:
+	free(cwd);
 	free(label);
 	free(id);
 	free(commit_id);
