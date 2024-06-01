@@ -146,12 +146,15 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 	off_t outoff = 0;
 	int n;
 
-	if (lines && *lines && *nlines > 0)
-		outoff = (*lines)[*nlines - 1].offset;
-	else if (lines) {
-		err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
-		if (err)
-			goto done;
+	if (lines && *lines) {
+		if (*nlines > 0)
+			outoff = (*lines)[*nlines - 1].offset;
+		else {
+			err = add_line_metadata(lines, nlines,
+			    0, GOT_DIFF_LINE_NONE);
+			if (err != NULL)
+				goto done;
+		}
 	}
 
 	if (resultp)
@@ -218,7 +221,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		if (n < 0)
 			goto done;
 		outoff += n;
-		if (lines) {
+		if (lines && *lines) {
 			err = add_line_metadata(lines, nlines, outoff,
 			    GOT_DIFF_LINE_BLOB_MIN);
 			if (err)
@@ -230,7 +233,7 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		if (n < 0)
 			goto done;
 		outoff += n;
-		if (lines) {
+		if (lines && *lines) {
 			err = add_line_metadata(lines, nlines, outoff,
 			    GOT_DIFF_LINE_BLOB_PLUS);
 			if (err)
