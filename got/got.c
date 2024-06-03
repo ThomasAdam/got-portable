@@ -96,6 +96,7 @@ struct got_cmd {
 };
 
 __dead static void	usage(int, int);
+__dead static void	usage_init(void);
 __dead static void	usage_import(void);
 __dead static void	usage_clone(void);
 __dead static void	usage_fetch(void);
@@ -126,6 +127,7 @@ __dead static void	usage_unstage(void);
 __dead static void	usage_cat(void);
 __dead static void	usage_info(void);
 
+static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
 static const struct got_error*		cmd_clone(int, char *[]);
 static const struct got_error*		cmd_fetch(int, char *[]);
@@ -157,6 +159,7 @@ static const struct got_error*		cmd_cat(int, char *[]);
 static const struct got_error*		cmd_info(int, char *[]);
 
 static const struct got_cmd got_commands[] = {
+	{ "init",	cmd_init,	usage_init,	"" },
 	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "clone",	cmd_clone,	usage_clone,	"cl" },
 	{ "fetch",	cmd_fetch,	usage_fetch,	"fe" },
@@ -349,6 +352,64 @@ apply_unveil(const char *repo_path, int repo_read_only,
 		return got_error_from_errno("unveil");
 
 	return NULL;
+}
+
+__dead static void
+usage_init(void)
+{
+	fprintf(stderr, "usage: %s init [-b branch] repository-path\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_init(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	const char *head_name = NULL;
+	char *repo_path = NULL;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "b:")) != -1) {
+		switch (ch) {
+		case 'b':
+			head_name = optarg;
+			break;
+		default:
+			usage_init();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	if (argc != 1)
+		usage_init();
+
+	repo_path = strdup(argv[0]);
+	if (repo_path == NULL)
+		return got_error_from_errno("strdup");
+
+	got_path_strip_trailing_slashes(repo_path);
+
+	error = got_path_mkdir(repo_path);
+	if (error &&
+	    !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
+		goto done;
+
+	error = apply_unveil(repo_path, 0, NULL);
+	if (error)
+		goto done;
+
+	error = got_repo_init(repo_path, head_name);
+done:
+	free(repo_path);
+	return error;
 }
 
 __dead static void

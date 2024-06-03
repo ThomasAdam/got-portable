@@ -21,7 +21,7 @@ test_import_basic() {
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	gotadmin init $testroot/repo
+	got init $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -372,7 +372,7 @@ test_import_ignores() {
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	gotadmin init $testroot/repo
+	got init $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree

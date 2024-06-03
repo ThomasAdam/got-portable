@@ -670,7 +670,7 @@ test_log_in_worktree_different_repo() {
 	git_commit $testroot/repo -m "adding the test tree"
 	local head_commit=`git_show_head $testroot/repo`
 
-	gotadmin init $testroot/other-repo
+	got init $testroot/other-repo
 	mkdir -p $testroot/tree
 	make_test_tree $testroot/tree
 	got import -mm -b foo -r $testroot/other-repo $testroot/tree >/dev/null
