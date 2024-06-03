@@ -48,8 +48,9 @@ which can be placed at an arbitrary directory in the filesystem hierarchy.
 The on-disk format of this work tree is described in
 .Xr got-worktree 5 .
 .Pp
+The
 .Nm
-provides global and command-specific options.
+utility provides global and command-specific options.
 Global options must precede the command name, and are as follows:
 .Bl -tag -width tenletters
 .It Fl h
@@ -57,6 +58,18 @@ Display usage information and exit immediately.
 .It Fl V , -version
 Display program version and exit immediately.
 .El
+.Pp
+The
+.Nm
+utility only provides commands needed to perform version control tasks.
+Commands needed for repository maintenance tasks are provided by
+.Xr gotadmin 8 .
+Git repository server functionality is provided by
+.Xr gotd 8 .
+A repository interface for web browsers is provided by
+.Xr gotwebd 8 .
+An interactive repository interface for the terminal is provided by
+.Xr tog 1 .
 .Pp
 The commands for
 .Nm
