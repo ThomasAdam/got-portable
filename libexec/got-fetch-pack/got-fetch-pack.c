@@ -51,6 +51,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 #include "got_lib_pkt.h"
+#include "got_lib_poll.h"
 #include "got_lib_gitproto.h"
 #include "got_lib_ratelimit.h"
 
@@ -341,7 +342,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;
-	int i, n, nwant = 0, nhave = 0, acked = 0;
+	int i, n, nwant = 0, nhave = 0, acked = 0, eof = 0;
 	off_t packsz = 0, last_reported_packsz = 0;
 	char *id_str = NULL, *default_id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
@@ -648,7 +649,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	    strstr(my_capabilities, GOT_CAPA_SIDE_BAND_64K) != NULL)
 		have_sidebands = 1;
 
-	while (1) {
+	while (!eof) {
 		ssize_t r = 0;
 		int datalen = -1;
 
@@ -740,11 +741,16 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 		} else {
 			/* No sideband channel. Every byte is packfile data. */
-			err = got_pkt_readn(&r, fd, buf, sizeof buf, INFTIM);
-			if (err)
-				goto done;
-			if (r <= 0)
-				break;
+			size_t n = 0;
+			err = got_poll_read_full_timeout(fd, &n,
+			    buf, sizeof buf, 1, INFTIM);
+			if (err) {
+				if (err->code != GOT_ERR_EOF)
+					goto done;
+				r = 0;
+				eof = 1;
+			} else
+				r = n;
 		}
 
 		/*
@@ -753,8 +759,6 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		 * keep SHA1_DIGEST_LENGTH bytes buffered and avoid mixing
 		 * those bytes into our SHA1 checksum computation until we
 		 * know for sure that additional pack file data bytes follow.
-		 *
-		 * We can assume r > 0 since otherwise the loop would exit.
 		 */
 		if (r < SHA1_DIGEST_LENGTH) {
 			if (sha1_buf_len < SHA1_DIGEST_LENGTH) {
@@ -778,7 +782,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				/* Buffer potential checksum bytes. */
 				memcpy(sha1_buf + sha1_buf_len, buf, r);
 				sha1_buf_len += r;
-			} else {
+			} else if (r > 0) {
 				/*
 				 * Mix in previously buffered bytes which
 				 * are not part of the checksum after all.
