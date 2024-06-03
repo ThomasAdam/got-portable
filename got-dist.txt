@@ -50,8 +50,6 @@
 /gotd/libexec/got-notify-http/utf8d.h
 /gotd/listen.c
 /gotd/listen.h
-/gotd/log.c
-/gotd/log.h
 /gotd/notify.c
 /gotd/notify.h
 /gotd/parse.y
@@ -115,7 +113,6 @@
 /gotwebd/libexec/got-read-tag/Makefile
 /gotwebd/libexec/got-read-tree
 /gotwebd/libexec/got-read-tree/Makefile
-/gotwebd/log.c
 /gotwebd/pages.tmpl
 /gotwebd/parse.y
 /gotwebd/sockets.c
@@ -221,6 +218,8 @@
 /lib/keyword.c
 /lib/load.c
 /lib/lockfile.c
+/lib/log.c
+/lib/log.h
 /lib/murmurhash2.c
 /lib/murmurhash2.h
 /lib/object.c
