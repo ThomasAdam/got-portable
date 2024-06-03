@@ -62,6 +62,50 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width checkout
+.It Cm init Oo Fl b Ar branch Oc Ar repository-path
+Create a new empty repository at the specified
+.Ar repository-path .
+.Pp
+After
+.Cm got init ,
+the new repository must be populated before
+.Cm got checkout
+can be used.
+The
+.Cm got import
+command can be used to populate the new repository with data from
+a local directory.
+Alternatively, on a server running
+.Xr gotd 8 ,
+the new repository can be made available to
+.Xr got 1
+or
+.Xr git 1
+clients by adding the repository to
+.Xr gotd.conf 5
+and restarting
+.Xr gotd 8 .
+Clients may then clone the new repository from the server, populate the cloned
+repository, and then populate the new repository on the server via
+.Cm got send
+or
+.Cm git push .
+.Pp
+The options for
+.Cm got init
+are as follows:
+.Bl -tag -width Ds
+.It Fl b Ar branch
+Make the repository's HEAD reference point to the specified
+.Ar branch
+instead of the default branch
+.Dq main .
+.El
+.Pp
+The
+.Cm got init
+command is equivalent to
+.Cm gotadmin init .
 .Tg im
 .It Xo
 .Cm import
@@ -3855,7 +3899,7 @@ a new Git repository could be created and populated with files,
 e.g. from a temporary CVS checkout located at
 .Pa /tmp/src :
 .Pp
-.Dl $ gotadmin init /var/git/src.git
+.Dl $ got init /var/git/src.git
 .Dl $ got import -r /var/git/src.git -I CVS -I obj /tmp/src
 .Pp
 Check out a work tree from the Git repository to /usr/src:
