@@ -937,7 +937,7 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 		if (pack->map) {
 			size_t mapoff;
 
-			if (delta_offset + *len > SIZE_MAX) {
+			if (delta_offset > SIZE_MAX - *len) {
 				return got_error_fmt(GOT_ERR_PACK_OFFSET,
 				    "mapoff %lld would overflow size_t",
 				    (long long)delta_offset + *len);
@@ -1095,7 +1095,7 @@ got_pack_parse_ref_delta(struct got_object_id *id,
 	if (pack->map) {
 		size_t mapoff;
 
-		if (delta_offset + tslen > SIZE_MAX) {
+		if (delta_offset > SIZE_MAX - tslen) {
 			return got_error_fmt(GOT_ERR_PACK_OFFSET,
 			    "mapoff %lld would overflow size_t",
 			    (long long)delta_offset + tslen);
