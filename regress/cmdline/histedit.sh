@@ -2611,6 +2611,153 @@ test_histedit_drop_only() {
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_conflict_revert() {
+	local testroot=`test_init histedit_conflict_revert`
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "first change of alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+
+	echo "second change of alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit2=`git_show_head $testroot/repo`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+
+	echo "third change of alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit3=`git_show_head $testroot/repo`
+	local short_old_commit3=`trim_obj_id 28 $old_commit3`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edit $old_commit1" > $testroot/histedit-script
+	echo "edit $old_commit2" >> $testroot/histedit-script
+	echo "pick $old_commit3" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "Stopping histedit for amending commit $old_commit1" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "tweaked first change of alpha" > $testroot/wt/alpha
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/committing changes/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -c > $testroot/stdout 2> $testroot/stderr)
+
+	local new_commit1=$(cd $testroot/wt && got info | \
+		grep 'work tree base commit:' | cut -d ' ' -f5)
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "$short_old_commit1 -> $short_new_commit1: committing changes" \
+		> $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+	echo "$short_old_commit2 -> merge conflict: committing changes" \
+		>> $testroot/stdout.expected
+
+	echo "got: conflicts must be resolved before histedit can continue" \
+		> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert alpha > /dev/null)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -c > $testroot/stdout 2> $testroot/stderr)
+
+	echo "$short_old_commit2 -> no-op change: committing changes" \
+		> $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+	echo "$short_old_commit3 -> merge conflict: committing changes" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert alpha > /dev/null)
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -c > $testroot/stdout 2> $testroot/stderr)
+
+	echo "$short_old_commit3 -> no-op change: committing changes" \
+		> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2638,3 +2785,4 @@ run_test test_histedit_resets_committer
 run_test test_histedit_umask
 run_test test_histedit_mesg_filemode_change
 run_test test_histedit_drop_only
+run_test test_histedit_conflict_revert

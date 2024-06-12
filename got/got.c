@@ -13222,14 +13222,8 @@ cmd_histedit(int argc, char *argv[])
 					if (error)
 						goto done;
 				} else {
-					error = got_object_open_as_commit(
-					    &commit, repo, hle->commit_id);
-					if (error)
-						goto done;
-					error = show_histedit_progress(commit,
-					    hle, NULL);
-					got_object_commit_close(commit);
-					commit = NULL;
+					error = histedit_skip_commit(hle,
+					    worktree, repo);
 					if (error)
 						goto done;
 				}
