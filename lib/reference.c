@@ -1206,6 +1206,12 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 	err = got_opentemp_named(&tmppath, &f, path, "");
 	if (err) {
 		char *parent;
+		if (err->code == GOT_ERR_ERRNO && errno == ENOTDIR) {
+			err = got_error_fmt(GOT_ERR_BAD_REF_NAME,
+			    "collision with an existing reference: %s",
+			    got_ref_get_name(ref));
+			goto done;
+		}
 		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
 			goto done;
 		err = got_path_dirname(&parent, path);

@@ -170,12 +170,45 @@ test_ref_create() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	# Create a ref with a / in its name
+	got ref -r $testroot/repo -c $commit_id refs/heads/commit/ref
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a ref with a name that collides with a file
+	got ref -r $testroot/repo -c $commit_id refs/heads/commitref/new \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got ref command succeeded unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: collision with an existing reference: " \
+		> $testroot/stderr.expected
+	echo "refs/heads/commitref/new: bad reference name" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
 	got ref -r $testroot/repo -l > $testroot/stdout
 	echo "HEAD: refs/heads/newref" > $testroot/stdout.expected
 	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
 	cat $testroot/wt/.got/uuid | tr -d '\n' >> $testroot/stdout.expected
 	echo ": $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/anotherref: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/commit/ref: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/commitref: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/newref: $commit_id" >> $testroot/stdout.expected
