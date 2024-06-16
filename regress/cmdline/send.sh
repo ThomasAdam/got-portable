@@ -193,7 +193,9 @@ EOF
 	echo -n "got: refs/heads/master: " > $testroot/stderr.expected
 	echo -n "branch on server has a different ancestry; " \
 		>> $testroot/stderr.expected
-	echo -n "either rebase or merge local branch before sending, or " \
+	echo -n "either fetch changes from server and then " \
+		>> $testroot/stderr.expected
+	echo -n "rebase or merge local branch before sending, or " \
 		>> $testroot/stderr.expected
 	echo "ignore ancestry with send -f (can lead to data loss on server)" \
 		>> $testroot/stderr.expected
