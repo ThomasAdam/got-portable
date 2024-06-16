@@ -200,7 +200,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_SEND_BAD_REF, "reference cannot be sent" },
 	{ GOT_ERR_SEND_FAILED, "could not send pack file" },
 	{ GOT_ERR_SEND_EMPTY, "no references to send" },
-	{ GOT_ERR_SEND_ANCESTRY, "fetch and rebase required" },
+	{ GOT_ERR_SEND_ANCESTRY, "branch on server has a different ancestry; either rebase or merge local branch before sending, or ignore ancestry with send -f (can lead to data loss on server)" },
 	{ GOT_ERR_CAPA_DELETE_REFS, "server cannot delete references" },
 	{ GOT_ERR_SEND_DELETE_REF, "reference cannot be deleted" },
 	{ GOT_ERR_SEND_TAG_EXISTS, "tag already exists on server" },
