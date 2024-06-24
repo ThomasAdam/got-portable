@@ -63,9 +63,6 @@
 
 #ifndef __GNUC__
 #define __attribute__(a)
-#ifndef __bounded__
-#define __bounded__(a, b, c)
-#endif
 #endif
 
 
@@ -108,6 +105,10 @@
 
 #ifndef __unused
 #define __unused __attribute__ ((__unused__))
+#endif
+
+#ifndef __bounded__
+#define __bounded__(a, b, c)
 #endif
 
 #ifndef __OpenBSD__
