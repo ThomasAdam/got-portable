@@ -759,7 +759,7 @@ AC_CHECK_DECL(
 	[#include <sys/tree.h>]
 )
 
-#FIXME: May need OS-wrapping.
+if test "x$PLATFORM" != "xopenbsd"; then
 PKG_CHECK_MODULES(
 	LIBTLS,
 	[libtls],
@@ -771,6 +771,7 @@ PKG_CHECK_MODULES(
 	],
 	AC_MSG_ERROR(["*** Couldn't find libtls ***"])
 )
+fi
 
 # Look for __progname.
 AC_MSG_CHECKING(for __progname)

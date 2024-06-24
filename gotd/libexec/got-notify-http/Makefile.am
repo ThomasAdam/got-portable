@@ -20,4 +20,8 @@ if HOST_FREEBSD
 LDADD += -lmd
 endif
 
+if HOST_OPENBSD
+LDADD += -ltls
+endif
+
 AM_CPPFLAGS += $(zlib_CFLAGS) $(libbsd_CFLAGS) $(libmd_CFLAGS) $(libtls_CFLAGS)
