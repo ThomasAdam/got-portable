@@ -131,9 +131,9 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-test_diff_J_keymap_on_last_loaded_commit()
+test_diff_J_keymap()
 {
-	test_init diff_J_keymap_on_last_loaded_commit 94 24
+	test_init diff_J_keymap 94 24
 
 	local i=0
 
@@ -142,18 +142,31 @@ test_diff_J_keymap_on_last_loaded_commit()
 	while [ "$i" -lt 32 ]; do
 		echo $i > alpha
 		git commit -aqm $i
+		# Get timestamp, and blob and commit IDs
+		# of the diff views to be screendumped.
 		if [ $i -eq 6 ]; then
 			local id6=$(git_show_head .)
 			local blobid6=$(get_blob_id . "" alpha)
 		elif [ $i -eq 7 ]; then
 			local id7=$(git_show_head .)
 			local blobid7=$(get_blob_id . "" alpha)
-			local author_time=$(git_show_author_time .)
+			local author_time7=$(git_show_author_time .)
+		elif [ $i -eq 25 ]; then
+			local id25=$(git_show_head .)
+			local blobid25=$(get_blob_id . "" alpha)
+		elif [ $i -eq 26 ]; then
+			local id26=$(git_show_head .)
+			local blobid26=$(get_blob_id . "" alpha)
+			local author_time26=$(git_show_author_time .)
 		fi
 		i=$(( i + 1 ))
 	done
 
-	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	local date7=`date -u -r $author_time7 +"%a %b %e %X %Y UTC"`
+	local date26=`date -u -r $author_time26 +"%a %b %e %X %Y UTC"`
+
+	# Test that J loads the diff view of the next commit when
+	# currently viewing the last commit loaded in the log view.
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 KEY_ENTER	open diff view of selected commit
@@ -170,7 +183,103 @@ EOF
 [1/20] diff $id6 $id7
 commit $id7
 from: Flan Hacker <flan_hacker@openbsd.org>
-date: $date
+date: $date7
+
+7
+
+M  alpha  |  1+  1-
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit - $id6
+commit + $id7
+blob - $blobid6
+blob + $blobid7
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-6
++7
+
+
+
+(END)
+EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Test that J loads the diff view of the next commit when currently
+	# viewing the last visible commit in the horizontally split log view.
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+S		toggle horizontal split
+4j		move to last visible commit when in horizontal split
+KEY_ENTER	open diff view of selected commit
+F		toggle fullscreen
+J		move down to next commit in the log
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+[1/20] diff $id25 $id26
+commit $id26
+from: Flan Hacker <flan_hacker@openbsd.org>
+date: $date26
+
+26
+
+M  alpha  |  1+  1-
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit - $id25
+commit + $id26
+blob - $blobid25
+blob + $blobid26
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-25
++26
+
+
+
+(END)
+EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Test J correctly requests the log to load more commits when
+	# scrolling beyond the last loaded commit from the diff view.
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+S		toggle horizontal split
+4j		move to the 5th commit
+KEY_ENTER	open diff view of selected commit
+F		toggle fullscreen
+20J		scroll down and load diff of the 25th commit
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+[1/20] diff $id6 $id7
+commit $id7
+from: Flan Hacker <flan_hacker@openbsd.org>
+date: $date7
 
 7
 
@@ -377,5 +486,5 @@ test_diff_commit_keywords()
 test_parseargs "$@"
 run_test test_diff_contiguous_commits
 run_test test_diff_arbitrary_commits
-run_test test_diff_J_keymap_on_last_loaded_commit
+run_test test_diff_J_keymap
 run_test test_diff_commit_keywords
