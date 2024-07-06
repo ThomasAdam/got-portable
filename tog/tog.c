@@ -2304,8 +2304,6 @@ format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
 	if (err)
 		return err;
 
-	scrollx = span_wline(&cols, 0, wline, nscroll, col_tab_align);
-
 	if (wlen > 0 && wline[wlen - 1] == L'\n') {
 		wline[wlen - 1] = L'\0';
 		wlen--;
@@ -2314,6 +2312,8 @@ format_line(wchar_t **wlinep, int *widthp, int *scrollxp,
 		wline[wlen - 1] = L'\0';
 		wlen--;
 	}
+
+	scrollx = span_wline(&cols, 0, wline, nscroll, col_tab_align);
 
 	i = span_wline(&cols, scrollx, wline, wlimit, col_tab_align);
 	wline[i] = L'\0';
