@@ -483,8 +483,72 @@ test_diff_commit_keywords()
 	test_done "$testroot" "$ret"
 }
 
+test_diff_horizontal_scroll()
+{
+	test_init diff_horizontal_scroll
+
+	local commit_id1=`git_show_head $testroot/repo`
+	local alpha_id_old=`get_blob_id $testroot/repo "" alpha`
+
+	{
+		echo -n "01234567890123456789012345678901234567890123456789"
+		echo "0123456789012345678901234567890123"
+	} >> $testroot/repo/alpha
+
+	git_commit $testroot/repo -m "scroll"
+	local author_time=`git_show_author_time $testroot/repo`
+	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	local head_id=`git_show_head $testroot/repo`
+	local head_id_truncated=`trim_obj_id 13 $head_id`
+	local alpha_id=`get_blob_id $testroot/repo "" alpha`
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+3l
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+[1/20] diff $commit_id1 $head_id_truncated
+ $head_id (master)
+Flan Hacker <flan_hacker@openbsd.org>
+$date
+
+
+
+ha  |  1+  0-
+
+ changed, 1 insertion(+), 0 deletions(-)
+
+ - $commit_id1
+ + $head_id
+ $alpha_id_old
+ $alpha_id
+pha
+pha
++1,2 @@
+
+5678901234567890123456789012345678901234567890123456789012345678901234567890123
+
+
+
+(END)
+EOF
+
+	cd $testroot/repo && tog diff $commit_id1 $head_id
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_contiguous_commits
 run_test test_diff_arbitrary_commits
 run_test test_diff_J_keymap
 run_test test_diff_commit_keywords
+run_test test_diff_horizontal_scroll
