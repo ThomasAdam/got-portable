@@ -3099,7 +3099,7 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 	if (s->last_displayed_entry == NULL)
 		return NULL;
 
-	ncommits_needed = s->last_displayed_entry->idx + 1 + maxscroll;
+	ncommits_needed = s->last_displayed_entry->idx + 2 + maxscroll;
 	if (s->commits->ncommits < ncommits_needed &&
 	    !s->thread_args.log_complete) {
 		/*
@@ -4013,7 +4013,8 @@ log_move_cursor_down(struct tog_view *view, int page)
 	 * We might necessarily overshoot in horizontal
 	 * splits; if so, select the last displayed commit.
 	 */
-	if (s->first_displayed_entry && s->last_displayed_entry) {
+	if (view_is_hsplit_top(view) && s->first_displayed_entry &&
+	    s->last_displayed_entry) {
 		s->selected = MIN(s->selected,
 		    s->last_displayed_entry->idx -
 		    s->first_displayed_entry->idx);
