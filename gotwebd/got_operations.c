@@ -1153,15 +1153,15 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 
 	error = got_gotweb_openfile(&f1, &c->priv_fd[DIFF_FD_1]);
 	if (error)
-		return error;
+		goto done;
 
 	error = got_gotweb_openfile(&f2, &c->priv_fd[DIFF_FD_2]);
 	if (error)
-		return error;
+		goto done;
 
 	error = got_gotweb_openfile(&f3, &c->priv_fd[DIFF_FD_3]);
 	if (error)
-		return error;
+		goto done;
 
 	rc = TAILQ_FIRST(&t->repo_commits);
 
