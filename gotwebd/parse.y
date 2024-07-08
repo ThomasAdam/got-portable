@@ -806,16 +806,12 @@ parse_config(const char *filename, struct gotwebd *env)
 	gotwebd = env;
 
 	file = newfile(filename, 0);
-	if (file == NULL) {
-		add_default_server();
-		sockets_parse_sockets(env);
-		/* just return, as we don't require a conf file */
-		return (0);
+	if (file != NULL) {
+		/* we don't require a config file */
+		yyparse();
+		errors = file->errors;
+		closefile(file);
 	}
-
-	yyparse();
-	errors = file->errors;
-	closefile(file);
 
 	/* Free macros and check which have not been used. */
 	TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
