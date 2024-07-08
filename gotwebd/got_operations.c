@@ -60,7 +60,7 @@ got_gotweb_closefile(FILE *f)
 	if (fseek(f, 0, SEEK_SET) == -1)
 		err = got_error_from_errno("fseek");
 
-	if (err == NULL && ftruncate(fileno(f), 0) == -1)
+	if (ftruncate(fileno(f), 0) == -1 && err == NULL)
 		err = got_error_from_errno("ftruncate");
 
 	if (fclose(f) == EOF && err == NULL)
