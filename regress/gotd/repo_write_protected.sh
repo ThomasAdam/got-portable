@@ -253,9 +253,19 @@ test_modify_protected_branch() {
 		test_done "$testroot" 1
 		return 1
 	fi
+ 
+	echo -n 'got: refs/heads/main: branch on server has' \
+	    > $testroot/stderr.expected
+	echo -n ' a different ancestry; either fetch changes' \
+	    >> $testroot/stderr.expected
+	echo -n ' from server and then rebase or merge local' \
+	    >> $testroot/stderr.expected
+	echo -n ' branch before sending, or ignore ancestry' \
+	    >> $testroot/stderr.expected
+	echo -n ' with send -f (can lead to data loss on' \
+	    >> $testroot/stderr.expected
+	echo ' server)' >> $testroot/stderr.expected
 
-	echo 'got: refs/heads/main: fetch and rebase required' \
-		>> $testroot/stderr.expected
 	if ! cmp -s $testroot/stderr.expected $testroot/stderr; then
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" 1
