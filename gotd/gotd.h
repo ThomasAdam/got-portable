@@ -471,8 +471,8 @@ enum gotd_notification_action {
 /* IMSG_NOTIFY session <-> repo_write */
 struct gotd_imsg_notification_content {
 	enum gotd_notification_action action;
-	uint8_t old_id[SHA1_DIGEST_LENGTH];
-	uint8_t new_id[SHA1_DIGEST_LENGTH];
+	struct got_object_id old_id;
+	struct got_object_id new_id;
 	size_t refname_len;
 	/* Followed by refname_len data bytes. */
 };

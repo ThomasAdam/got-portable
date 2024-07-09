@@ -523,23 +523,23 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 		goto done;
 	}
 	if (notif->action == GOTD_NOTIF_ACTION_CREATED) {
-		if (memcmp(notif->new_id.sha1, icontent.new_id,
-		    SHA1_DIGEST_LENGTH) != 0) {
+		if (memcmp(&notif->new_id, &icontent.new_id,
+		    sizeof(notif->new_id)) != 0) {
 			err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
 			    "received notification content for unknown event");
 			goto done;
 		}
 	} else if (notif->action == GOTD_NOTIF_ACTION_REMOVED) {
-		if (memcmp(notif->old_id.sha1, icontent.old_id,
-		    SHA1_DIGEST_LENGTH) != 0) {
+		if (memcmp(&notif->old_id, &icontent.old_id,
+		    sizeof(notif->old_id)) != 0) {
 			err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
 			    "received notification content for unknown event");
 			goto done;
 		}
-	} else if (memcmp(notif->old_id.sha1, icontent.old_id,
-	    SHA1_DIGEST_LENGTH) != 0 ||
-	    memcmp(notif->new_id.sha1, icontent.new_id,
-	    SHA1_DIGEST_LENGTH) != 0) {
+	} else if (memcmp(&notif->old_id, &icontent.old_id,
+	    sizeof(notif->old_id)) != 0 ||
+	    memcmp(&notif->new_id, &icontent.new_id,
+	    sizeof(notif->old_id)) != 0) {
 		err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
 		    "received notification content for unknown event");
 		goto done;
