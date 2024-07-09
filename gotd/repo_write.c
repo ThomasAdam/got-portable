@@ -1630,17 +1630,13 @@ receive_pack_idx(struct imsg *imsg, struct gotd_imsgev *iev)
 }
 
 static const struct got_error *
-notify_removed_ref(const char *refname, uint8_t *sha1,
+notify_removed_ref(const char *refname, struct got_object_id *id,
     struct gotd_imsgev *iev, int fd)
 {
 	const struct got_error *err;
-	struct got_object_id id;
 	char *id_str;
 
-	memset(&id, 0, sizeof(id));
-	memcpy(id.sha1, sha1, sizeof(id.sha1));
-
-	err = got_object_id_str(&id_str, &id);
+	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
@@ -2027,42 +2023,36 @@ done:
 }
 
 static const struct got_error *
-notify_changed_ref(const char *refname, uint8_t *old_sha1,
-    uint8_t *new_sha1, struct gotd_imsgev *iev, int fd)
+notify_changed_ref(const char *refname, struct got_object_id *old_id,
+    struct got_object_id *new_id, struct gotd_imsgev *iev, int fd)
 {
 	const struct got_error *err;
-	struct got_object_id old_id, new_id;
 	int old_obj_type, new_obj_type;
 	const char *label;
 	char *new_id_str = NULL;
 
-	memset(&old_id, 0, sizeof(old_id));
-	memcpy(old_id.sha1, old_sha1, sizeof(old_id.sha1));
-	memset(&new_id, 0, sizeof(new_id));
-	memcpy(new_id.sha1, new_sha1, sizeof(new_id.sha1));
-
-	err = got_object_get_type(&old_obj_type, repo_write.repo, &old_id);
+	err = got_object_get_type(&old_obj_type, repo_write.repo, old_id);
 	if (err)
 		return err;
 
-	err = got_object_get_type(&new_obj_type, repo_write.repo, &new_id);
+	err = got_object_get_type(&new_obj_type, repo_write.repo, new_id);
 	if (err)
 		return err;
 
 	switch (new_obj_type) {
 	case GOT_OBJ_TYPE_COMMIT:
-		err = print_commits(&new_id,
-		    old_obj_type == GOT_OBJ_TYPE_COMMIT ? &old_id : NULL,
+		err = print_commits(new_id,
+		    old_obj_type == GOT_OBJ_TYPE_COMMIT ? old_id : NULL,
 		    repo_write.repo, fd);
 		break;
 	case GOT_OBJ_TYPE_TAG:
-		err = print_tag(&new_id, refname, repo_write.repo, fd);
+		err = print_tag(new_id, refname, repo_write.repo, fd);
 		break;
 	default:
 		err = got_object_type_label(&label, new_obj_type);
 		if (err)
 			goto done;
-		err = got_object_id_str(&new_id_str, &new_id);
+		err = got_object_id_str(&new_id_str, new_id);
 		if (err)
 			goto done;
 		dprintf(fd, "%s: %s object %s\n", refname, label, new_id_str);
@@ -2074,24 +2064,20 @@ done:
 }
 
 static const struct got_error *
-notify_created_ref(const char *refname, uint8_t *sha1,
+notify_created_ref(const char *refname, struct got_object_id *id,
     struct gotd_imsgev *iev, int fd)
 {
 	const struct got_error *err;
-	struct got_object_id id;
 	int obj_type;
 
-	memset(&id, 0, sizeof(id));
-	memcpy(id.sha1, sha1, sizeof(id.sha1));
-
-	err = got_object_get_type(&obj_type, repo_write.repo, &id);
+	err = got_object_get_type(&obj_type, repo_write.repo, id);
 	if (err)
 		return err;
 
 	if (obj_type == GOT_OBJ_TYPE_TAG)
-		return print_tag(&id, refname, repo_write.repo, fd);
+		return print_tag(id, refname, repo_write.repo, fd);
 
-	return print_commits(&id, NULL, repo_write.repo, fd);
+	return print_commits(id, NULL, repo_write.repo, fd);
 }
 
 static const struct got_error *
@@ -2129,13 +2115,13 @@ render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 
 	switch (ireq.action) {
 	case GOTD_NOTIF_ACTION_CREATED:
-		err = notify_created_ref(refname, ireq.new_id, iev, fd);
+		err = notify_created_ref(refname, &ireq.new_id, iev, fd);
 		break;
 	case GOTD_NOTIF_ACTION_REMOVED:
-		err = notify_removed_ref(refname, ireq.old_id, iev, fd);
+		err = notify_removed_ref(refname, &ireq.old_id, iev, fd);
 		break;
 	case GOTD_NOTIF_ACTION_CHANGED:
-		err = notify_changed_ref(refname, ireq.old_id, ireq.new_id,
+		err = notify_changed_ref(refname, &ireq.old_id, &ireq.new_id,
 		    iev, fd);
 		break;
 	}

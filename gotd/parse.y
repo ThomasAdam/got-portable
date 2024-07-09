@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_object.h"
 #include "got_path.h"
 #include "got_reference.h"
 
