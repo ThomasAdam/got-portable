@@ -354,7 +354,7 @@ struct got_imsg_commit_painting_request {
 
 /* Structure for GOT_IMSG_PAINTED_COMMITS. */
 struct got_imsg_painted_commit {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	intptr_t color;
 } __attribute__((__packed__));
 

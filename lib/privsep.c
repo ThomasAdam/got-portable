@@ -3427,7 +3427,7 @@ send_painted_commits(struct got_object_id_queue *ids, int *nids,
 		color = (intptr_t)qid->data;
 
 		/* Keep in sync with struct got_imsg_painted_commit! */
-		if (imsg_add(wbuf, qid->id.sha1, SHA1_DIGEST_LENGTH) == -1)
+		if (imsg_add(wbuf, &qid->id, sizeof(qid->id)) == -1)
 			return got_error_from_errno("imsg_add PAINTED_COMMITS");
 		if (imsg_add(wbuf, &color, sizeof(color)) == -1)
 			return got_error_from_errno("imsg_add PAINTED_COMMITS");
@@ -3521,7 +3521,7 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 
 			if (icommits.present_in_pack) {
 				struct got_object_id id;
-				memcpy(id.sha1, icommit.id, SHA1_DIGEST_LENGTH);
+				memcpy(&id, &icommit.id, sizeof(id));
 				err = cb(cb_arg, &id, icommit.color);
 				if (err)
 					break;
@@ -3530,8 +3530,8 @@ got_privsep_recv_painted_commits(struct got_object_id_queue *new_ids,
 				err = got_object_qid_alloc_partial(&qid);
 				if (err)
 					break;
-				memcpy(qid->id.sha1, icommit.id,
-				    SHA1_DIGEST_LENGTH);
+				memcpy(&qid->id, &icommit.id,
+				    sizeof(qid->id));
 				qid->data = (void *)icommit.color;
 				STAILQ_INSERT_TAIL(new_ids, qid, entry);
 			}
