@@ -145,7 +145,7 @@ read_file_digest(struct got_hash *ctx, FILE *f, size_t len)
 
 static const struct got_error *
 read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
-    FILE *tmpfile, struct got_hash *pack_sha1_ctx)
+    FILE *tmpfile, struct got_hash *pack_hash_ctx)
 {
 	const struct got_error *err = NULL;
 	struct got_hash ctx;
@@ -159,7 +159,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	struct got_inflate_checksum csum;
 
 	memset(&csum, 0, sizeof(csum));
-	csum.input_ctx = pack_sha1_ctx;
+	csum.input_ctx = pack_hash_ctx;
 	csum.input_crc = &obj->crc;
 
 	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size,
@@ -169,13 +169,13 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 
 	if (pack->map) {
 		obj->crc = crc32(obj->crc, pack->map + mapoff, obj->tslen);
-		got_hash_update(pack_sha1_ctx, pack->map + mapoff, obj->tslen);
+		got_hash_update(pack_hash_ctx, pack->map + mapoff, obj->tslen);
 		mapoff += obj->tslen;
 	} else {
 		/* XXX Seek back and get the CRC of on-disk type+size bytes. */
 		if (lseek(pack->fd, obj->off, SEEK_SET) == -1)
 			return got_error_from_errno("lseek");
-		err = read_checksum(&obj->crc, pack_sha1_ctx,
+		err = read_checksum(&obj->crc, pack_hash_ctx,
 		    pack->fd, obj->tslen);
 		if (err)
 			return err;
@@ -249,7 +249,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			    SHA1_DIGEST_LENGTH);
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    SHA1_DIGEST_LENGTH);
-			got_hash_update(pack_sha1_ctx, pack->map + mapoff,
+			got_hash_update(pack_hash_ctx, pack->map + mapoff,
 			    SHA1_DIGEST_LENGTH);
 			mapoff += SHA1_DIGEST_LENGTH;
 			err = got_inflate_to_mem_mmap(NULL, &datalen,
@@ -270,7 +270,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			}
 			obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.sha1,
 			    SHA1_DIGEST_LENGTH);
-			got_hash_update(pack_sha1_ctx,
+			got_hash_update(pack_hash_ctx,
 			    obj->delta.ref.ref_id.sha1, SHA1_DIGEST_LENGTH);
 			err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
 			    &csum, obj->size, pack->fd);
@@ -305,7 +305,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    obj->delta.ofs.base_offsetlen);
-			got_hash_update(pack_sha1_ctx, pack->map + mapoff,
+			got_hash_update(pack_hash_ctx, pack->map + mapoff,
 			    obj->delta.ofs.base_offsetlen);
 			mapoff += obj->delta.ofs.base_offsetlen;
 			err = got_inflate_to_mem_mmap(NULL, &datalen,
@@ -323,7 +323,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				err = got_error_from_errno("lseek");
 				break;
 			}
-			err = read_checksum(&obj->crc, pack_sha1_ctx,
+			err = read_checksum(&obj->crc, pack_hash_ctx,
 			    pack->fd, obj->delta.ofs.base_offsetlen);
 			if (err)
 				break;
