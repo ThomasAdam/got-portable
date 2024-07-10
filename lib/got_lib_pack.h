@@ -154,44 +154,8 @@ struct got_packfile_obj_hdr {
 #define GOT_PACK_OBJ_SIZE_VAL_MASK	0x7f
 };
 
-/* If object is not a DELTA type. */
-struct got_packfile_object_data {
-	uint8_t *data;	/* compressed */
-};
-
-/* If object is of type	GOT_OBJ_TYPE_REF_DELTA. */
-struct got_packfile_object_data_ref_delta {
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
-	uint8_t *delta_data;		/* compressed */
-};
-
-/* If object is of type GOT_OBJ_TYPE_OFFSET_DELTA. */
-struct got_packfile_object_data_offset_delta {
-	/*
-	 * This offset is interpreted as a negative offset from
-	 * the got_packfile_obj_hdr corresponding to this object.
-	 * The size provided in the header specifies the amount
-	 * of compressed delta data that follows.
-	 *
-	 * This field uses a variable length encoding of N bytes,
-	 * where the MSB is always set except for the last byte.
-	 * The value is encoded as a series of N 7 bit integers,
-	 * which are concatenated, and if N > 1 the value 2^7 +
-	 * 2^14 + ... + 2^(7 * (n-1)) is added to the result.
-	 */
-	uint8_t *offset;	/* variable length */
 #define GOT_PACK_OBJ_DELTA_OFF_MORE		0x80
 #define GOT_PACK_OBJ_DELTA_OFF_VAL_MASK		0x7f
-	uint8_t *delta_data;		/* compressed */
-};
-
-struct got_packfile_obj_data {
-	union {
-		struct got_packfile_object_data data;
-		struct got_packfile_object_data_ref_delta ref_delta;
-		struct got_packfile_object_data_offset_delta offset_delta;
-	} __attribute__((__packed__));
-} __attribute__((__packed__));
 
 const struct got_error *got_packidx_init_hdr(struct got_packidx *, int, off_t);
 const struct got_error *got_packidx_open(struct got_packidx **,
