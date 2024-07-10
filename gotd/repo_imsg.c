@@ -46,7 +46,7 @@ gotd_imsg_send_ack(struct got_object_id *id, struct imsgbuf *ibuf,
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	if (log_getverbose() > 0 &&
-	    got_sha1_digest_to_str(id->sha1, hex, sizeof(hex)))
+	    got_object_id_hex(id, hex, sizeof(hex)))
 		log_debug("sending ACK for %s", hex);
 
 	memset(&iack, 0, sizeof(iack));
@@ -73,7 +73,7 @@ gotd_imsg_send_nak(struct got_object_id *id, struct imsgbuf *ibuf,
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	if (log_getverbose() > 0 &&
-	    got_sha1_digest_to_str(id->sha1, hex, sizeof(hex)))
+	    got_object_id_hex(id, hex, sizeof(hex)))
 		log_debug("sending NAK for %s", hex);
 
 	memset(&inak, 0, sizeof(inak));
