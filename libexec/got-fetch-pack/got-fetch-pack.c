@@ -554,7 +554,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
 			continue;
-		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
+		got_object_id_hex(&want[i], hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
 		    sent_my_capabilites || my_capabilities == NULL ?
 		    "" : my_capabilities);
@@ -577,7 +577,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		struct got_object_id *id = pe->data;
-		got_sha1_digest_to_str(id->sha1, hashstr, sizeof(hashstr));
+		got_object_id_hex(id, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
 		if (n < 0 || (size_t)n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);

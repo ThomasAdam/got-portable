@@ -365,7 +365,7 @@ verify_object_type(struct got_object_id *id, int expected_obj_type,
 
 	idx = got_packidx_get_object_idx(packidx, id);
 	if (idx == -1) {
-		got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
+		got_object_id_hex(id, hex, sizeof(hex));
 		return got_error_fmt(GOT_ERR_BAD_PACKFILE,
 		    "object %s is missing from pack file", hex);
 	}
@@ -376,7 +376,7 @@ verify_object_type(struct got_object_id *id, int expected_obj_type,
 		return err;
 
 	if (obj->type != expected_obj_type) {
-		got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
+		got_object_id_hex(id, hex, sizeof(hex));
 		got_object_type_label(&typestr, expected_obj_type);
 		err = got_error_fmt(GOT_ERR_OBJ_TYPE,
 		    "%s is not pointing at a %s object", hex, typestr);
@@ -435,7 +435,7 @@ protect_require_yca(struct got_object_id *tip_id,
 		goto done;
 
 	if (obj_type != GOT_OBJ_TYPE_COMMIT) {
-		got_sha1_digest_to_str(expected_yca_id->sha1, hex, sizeof(hex));
+		got_object_id_hex(expected_yca_id, hex, sizeof(hex));
 		err = got_error_fmt(GOT_ERR_OBJ_TYPE,
 		    "%s is not pointing at a commit object", hex);
 		goto done;
@@ -490,8 +490,7 @@ protect_require_yca(struct got_object_id *tip_id,
 
 			idx = got_packidx_get_object_idx(packidx, &qid->id);
 			if (idx == -1) {
-				got_sha1_digest_to_str(qid->id.sha1,
-				    hex, sizeof(hex));
+				got_object_id_hex(&qid->id, hex, sizeof(hex));
 				err = got_error_fmt(GOT_ERR_BAD_PACKFILE,
 				    "object %s is missing from pack file", hex);
 				goto done;
@@ -503,8 +502,7 @@ protect_require_yca(struct got_object_id *tip_id,
 				goto done;
 
 			if (obj->type != GOT_OBJ_TYPE_COMMIT) {
-				got_sha1_digest_to_str(qid->id.sha1,
-				    hex, sizeof(hex));
+				got_object_id_hex(&qid->id, hex, sizeof(hex));
 				err = got_error_fmt(GOT_ERR_OBJ_TYPE,
 				    "%s is not pointing at a commit object",
 				    hex);
@@ -1422,7 +1420,7 @@ verify_packfile(void)
 			int idx = got_packidx_get_object_idx(packidx,
 			    &ref_update->new_id);
 			if (idx == -1) {
-				got_sha1_digest_to_str(ref_update->new_id.sha1,
+				got_object_id_hex(&ref_update->new_id,
 				    hex, sizeof(hex));
 				err = got_error_fmt(GOT_ERR_BAD_PACKFILE,
 				    "object %s is missing from pack file",

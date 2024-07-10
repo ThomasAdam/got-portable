@@ -461,7 +461,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			goto done;
 		}
 
-		got_sha1_digest_to_str(their_id->sha1, old_hashstr,
+		got_object_id_hex(their_id, old_hashstr,
 		    sizeof(old_hashstr));
 		got_sha1_digest_to_str(zero_id, new_hashstr,
 		    sizeof(new_hashstr));
@@ -503,14 +503,13 @@ send_pack(int fd, struct got_pathlist_head *refs,
 				}
 				continue;
 			}
-			got_sha1_digest_to_str(their_id->sha1, old_hashstr,
+			got_object_id_hex(their_id, old_hashstr,
 			    sizeof(old_hashstr));
 		} else {
 			got_sha1_digest_to_str(zero_id, old_hashstr,
 			    sizeof(old_hashstr));
 		}
-		got_sha1_digest_to_str(id->sha1, new_hashstr,
-		    sizeof(new_hashstr));
+		got_object_id_hex(id, new_hashstr, sizeof(new_hashstr));
 		err = describe_refchange(&n, &sent_my_capabilites,
 		    my_capabilities, buf, sizeof(buf), refname,
 		    old_hashstr, new_hashstr);

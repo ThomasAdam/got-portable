@@ -417,7 +417,7 @@ recv_want(struct imsg *imsg)
 	memcpy(id.sha1, iwant.object_id, SHA1_DIGEST_LENGTH);
 
 	if (log_getverbose() > 0 &&
-	    got_sha1_digest_to_str(id.sha1, hex, sizeof(hex)))
+	    got_object_id_hex(&id, hex, sizeof(hex)))
 		log_debug("client wants %s", hex);
 
 	imsg_init(&ibuf, client->fd);
@@ -462,7 +462,7 @@ recv_have(struct imsg *imsg)
 	memcpy(id.sha1, ihave.object_id, SHA1_DIGEST_LENGTH);
 
 	if (log_getverbose() > 0 &&
-	    got_sha1_digest_to_str(id.sha1, hex, sizeof(hex)))
+	    got_object_id_hex(&id, hex, sizeof(hex)))
 		log_debug("client has %s", hex);
 
 	imsg_init(&ibuf, client->fd);

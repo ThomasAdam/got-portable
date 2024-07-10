@@ -795,8 +795,8 @@ prepare_merge(int *do_merge, char **apath, FILE **afile,
 		err = got_object_tree_find_path(&id, NULL, repo, tree, path);
 		if (err)
 			return err;
-		got_sha1_digest_to_str(id->sha1, p->blob, sizeof(p->blob));
-		got_sha1_digest_to_str(commit_id->sha1, p->cid, sizeof(p->cid));
+		got_object_id_hex(id, p->blob, sizeof(p->blob));
+		got_object_id_hex(commit_id, p->cid, sizeof(p->cid));
 		free(id);
 		err = open_blob(apath, afile, p->blob, repo);
 		*do_merge = err == NULL;
