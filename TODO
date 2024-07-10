@@ -26,6 +26,7 @@ got:
   file visible to readers of the repository
 - enforce that log messages are encoded in either ASCII or UTF-8; this
   mostly matters for -portable since OpenBSD doesn't provide other locales
+- by default, deny rebasing of commits that exist in refs/remotes or refs/tags
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
