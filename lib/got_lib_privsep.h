@@ -598,7 +598,7 @@ struct got_imsg_enumerated_commit {
 
 /* Structure for GOT_IMSG_ENUMERATED_TREE */
 struct got_imsg_enumerated_tree {
-	uint8_t id[SHA1_DIGEST_LENGTH]; /* tree ID */
+	struct got_object_id id;	/* tree ID */
 	int nentries;			/* number of tree entries */
 
 	/* Followed by tree's path in remaining data of imsg buffer. */
