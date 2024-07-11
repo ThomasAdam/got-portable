@@ -1,3 +1,16 @@
+* got 0.101; 2024-07-11
+  see git repository history for per-change authorship information
+- improve gotwebd.8 one-line description
+- adjust some SIZE_MAX bounds checks
+- fix histedit -e bug where reverting all the changes caused histedit -c cycles
+- show a more useful error when a reference name collides with another
+- improve error message shown by 'got send' when ancestry has diverged
+- fix wrong gotwebd default repository path in the manpage
+- tog: fix jumping to the next commit from the diff view with the J key
+- tog: fix horizontal scroll bug that draws a trailing '.'
+- gotwebd: plug file descriptor leak in error path
+- fix bug that prevented gotwebd from working without a config file
+
 * got 0.100; 2024-06-03
   see git repository history for per-change authorship information
 - abort if we see a sha2 hash to quiet a potential compiler warning
