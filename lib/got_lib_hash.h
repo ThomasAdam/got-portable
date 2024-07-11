@@ -36,6 +36,32 @@ char *got_object_id_hex(struct got_object_id *, char *, size_t);
 int got_parse_object_id(struct got_object_id *, const char *,
     enum got_hash_algorithm);
 
+static inline int
+got_hash_digest_length(enum got_hash_algorithm algo)
+{
+	switch (algo) {
+	case GOT_HASH_SHA1:
+		return SHA1_DIGEST_LENGTH;
+	case GOT_HASH_SHA256:
+		return SHA256_DIGEST_LENGTH;
+	default:
+		return 0;
+	}
+}
+
+static inline int
+got_hash_digest_string_length(enum got_hash_algorithm algo)
+{
+	switch (algo) {
+	case GOT_HASH_SHA1:
+		return SHA1_DIGEST_STRING_LENGTH;
+	case GOT_HASH_SHA256:
+		return SHA256_DIGEST_STRING_LENGTH;
+	default:
+		return 0;
+	}
+}
+
 struct got_hash {
 	SHA1_CTX		 sha1_ctx;
 	SHA2_CTX		 sha256_ctx;
