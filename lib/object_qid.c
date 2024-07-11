@@ -31,7 +31,7 @@
 const struct got_error *
 got_object_qid_alloc_partial(struct got_object_qid **qid)
 {
-	*qid = malloc(sizeof(**qid));
+	*qid = calloc(1, sizeof(**qid));
 	if (*qid == NULL)
 		return got_error_from_errno("malloc");
 

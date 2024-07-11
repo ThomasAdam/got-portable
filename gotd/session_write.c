@@ -696,7 +696,9 @@ update_ref(int *shut, struct gotd_session_client *client,
 
 	log_debug("updating ref %s for uid %d", refname, client->euid);
 
+	memset(&old_id, 0, sizeof(old_id));
 	memcpy(old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
+	memset(&new_id, 0, sizeof(new_id));
 	memcpy(new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
 	err = got_repo_find_object_id(iref.delete_ref ? &old_id : &new_id,
 	    repo);
