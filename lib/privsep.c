@@ -2824,12 +2824,12 @@ got_privsep_send_enumerated_commit(struct imsgbuf *ibuf,
 	struct ibuf *wbuf;
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_ENUMERATED_COMMIT, 0, 0,
-	    sizeof(struct got_imsg_enumerated_commit) + SHA1_DIGEST_LENGTH);
+	    sizeof(struct got_imsg_enumerated_commit));
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create ENUMERATED_COMMIT");
 
 	/* Keep in sync with struct got_imsg_enumerated_commit! */
-	if (imsg_add(wbuf, id, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_COMMIT");
 	if (imsg_add(wbuf, &mtime, sizeof(mtime)) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_COMMIT");
@@ -2880,7 +2880,7 @@ got_privsep_recv_enumerated_objects(int *found_all_objects,
 				break;
 			}
 			icommit = (struct got_imsg_enumerated_commit *)imsg.data;
-			memcpy(commit_id.sha1, icommit->id, SHA1_DIGEST_LENGTH);
+			memcpy(&commit_id, &icommit->id, sizeof(commit_id));
 			mtime = icommit->mtime;
 			have_commit = 1;
 			break;

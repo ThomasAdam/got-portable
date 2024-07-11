@@ -592,7 +592,7 @@ struct got_imsg_traversed_commits {
 
 /* Structure for GOT_IMSG_ENUMERATED_COMMIT  */
 struct got_imsg_enumerated_commit {
-	uint8_t id[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 	time_t mtime;
 } __attribute__((__packed__));
 
