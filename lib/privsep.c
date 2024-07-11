@@ -2766,7 +2766,7 @@ got_privsep_send_enumerated_tree(size_t *totlen, struct imsgbuf *ibuf,
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create ENUMERATED_TREE");
 
-	if (imsg_add(wbuf, tree_id->sha1, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, tree_id, sizeof(*tree_id)) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_TREE");
 	if (imsg_add(wbuf, &nentries, sizeof(nentries)) == -1)
 		return got_error_from_errno("imsg_add ENUMERATED_TREE");
@@ -2900,7 +2900,7 @@ got_privsep_recv_enumerated_objects(int *found_all_objects,
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
-			memcpy(tree_id.sha1, itree->id, sizeof(tree_id.sha1));
+			memcpy(&tree_id, &itree->id, sizeof(tree_id));
 			free(path);
 			path = strndup(imsg.data + sizeof(*itree), path_len);
 			if (path == NULL) {
