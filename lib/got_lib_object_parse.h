@@ -22,7 +22,7 @@ struct got_commit_object *got_object_commit_alloc_partial(void);
 struct got_tree_entry *got_alloc_tree_entry_partial(void);
 
 const struct got_error *got_object_parse_commit(struct got_commit_object **,
-    char *, size_t);
+    char *, size_t, enum got_hash_algorithm);
 const struct got_error *got_object_read_commit(struct got_commit_object **, int,
     struct got_object_id *, size_t);
 
@@ -35,12 +35,12 @@ struct got_parsed_tree_entry {
 const struct got_error *got_object_parse_tree_entry(
     struct got_parsed_tree_entry *, size_t *, char *, size_t, size_t);
 const struct got_error *got_object_parse_tree(struct got_parsed_tree_entry **,
-    size_t *, size_t *, uint8_t *, size_t);
+    size_t *, size_t *, uint8_t *, size_t, enum got_hash_algorithm);
 const struct got_error *got_object_read_tree(struct got_parsed_tree_entry **,
     size_t *, size_t *, uint8_t **, int, struct got_object_id *);
 
 const struct got_error *got_object_parse_tag(struct got_tag_object **,
-    uint8_t *, size_t);
+    uint8_t *, size_t, enum got_hash_algorithm);
 const struct got_error *got_object_read_tag(struct got_tag_object **, int,
     struct got_object_id *, size_t);
 

@@ -366,7 +366,7 @@ const char *got_object_tag_get_tagger(struct got_tag_object *);
 const char *got_object_tag_get_message(struct got_tag_object *);
 
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
-    const char *);
+    const char *, enum got_hash_algorithm);
 
 /* Create a new tag object in the repository. */
 const struct got_error *got_object_tag_create(struct got_object_id **,
