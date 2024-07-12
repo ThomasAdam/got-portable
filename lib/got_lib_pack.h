@@ -57,9 +57,9 @@ const struct got_error *got_pack_parse_object_type_and_size(uint8_t *,
 #define GOT_PACKFILE_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
 				SHA1_DIGEST_STRING_LENGTH - 1 + \
 				strlen(GOT_PACKFILE_SUFFIX))
-#define GOT_PACKIDX_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
-				SHA1_DIGEST_STRING_LENGTH - 1 + \
-				strlen(GOT_PACKIDX_SUFFIX))
+#define GOT_PACKIDX_NAMELEN(digest_len) \
+				(strlen(GOT_PACK_PREFIX) + \
+				digest_len - 1 + strlen(GOT_PACKIDX_SUFFIX))
 
 /* See Documentation/technical/pack-format.txt in Git. */
 

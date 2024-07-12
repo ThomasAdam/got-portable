@@ -1182,16 +1182,21 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 }
 
 int
-got_repo_is_packidx_filename(const char *name, size_t len)
+got_repo_is_packidx_filename(const char *name, size_t len,
+    enum got_hash_algorithm algo)
 {
-	if (len != GOT_PACKIDX_NAMELEN)
+	size_t idlen;
+
+	idlen = got_hash_digest_string_length(algo);
+
+	if (len != GOT_PACKIDX_NAMELEN(idlen))
 		return 0;
 
 	if (strncmp(name, GOT_PACK_PREFIX, strlen(GOT_PACK_PREFIX)) != 0)
 		return 0;
 
-	if (strcmp(name + strlen(GOT_PACK_PREFIX) +
-	    SHA1_DIGEST_STRING_LENGTH - 1, GOT_PACKIDX_SUFFIX) != 0)
+	if (strcmp(name + strlen(GOT_PACK_PREFIX) + idlen - 1,
+	    GOT_PACKIDX_SUFFIX) != 0)
 		return 0;
 
 	return 1;
@@ -1442,7 +1447,8 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 	repo->pack_path_mtime.tv_nsec = sb.st_mtim.tv_nsec;
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen,
+		    repo->algo))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
@@ -2553,7 +2559,8 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen,
+		    repo->algo))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
