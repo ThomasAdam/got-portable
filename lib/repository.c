@@ -1380,7 +1380,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			continue; /* already searched */
 
 		err = got_packidx_open(packidx, got_repo_get_fd(repo),
-		    path_packidx, 0);
+		    path_packidx, 0, repo->algo);
 		if (err)
 			goto done;
 
@@ -1483,7 +1483,7 @@ got_repo_get_packidx(struct got_packidx **packidx, const char *path_packidx,
 	/* No luck. Search the filesystem. */
 
 	err = got_packidx_open(packidx, got_repo_get_fd(repo),
-	    path_packidx, 0);
+	    path_packidx, 0, repo->algo);
 	if (err)
 		return err;
 
@@ -1814,7 +1814,7 @@ retry:
 		path_packidx = pe->path;
 
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
-		    path_packidx, 0);
+		    path_packidx, 0, repo->algo);
 		if (err)
 			break;
 
@@ -2561,7 +2561,7 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 		}
 
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
-		    path_packidx, 0);
+		    path_packidx, 0, repo->algo);
 		free(path_packidx);
 		if (err)
 			goto done;

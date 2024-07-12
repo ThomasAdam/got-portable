@@ -545,7 +545,8 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 		goto done;
 	}
 
-	err = got_packidx_open(&packidx, got_repo_get_fd(repo), idxpath, 1);
+	err = got_packidx_open(&packidx, got_repo_get_fd(repo), idxpath, 1,
+	    repo->algo);
 	if (err)
 		goto done;
 

@@ -122,6 +122,7 @@ struct got_pack_large_offset_index {
 struct got_packidx {
 	char *path_packidx; /* actual on-disk path */
 	int fd;
+	enum got_hash_algorithm algo;
 	uint8_t *map;
 	size_t len;
 	size_t nlargeobj;
@@ -160,7 +161,7 @@ struct got_packfile_obj_hdr {
 
 const struct got_error *got_packidx_init_hdr(struct got_packidx *, int, off_t);
 const struct got_error *got_packidx_open(struct got_packidx **,
-    int, const char *, int);
+    int, const char *, int, enum got_hash_algorithm);
 const struct got_error *got_packidx_close(struct got_packidx *);
 const struct got_error *got_packidx_get_packfile_path(char **, const char *);
 off_t got_packidx_get_object_offset(struct got_packidx *, int idx);
