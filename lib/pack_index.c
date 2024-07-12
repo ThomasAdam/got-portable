@@ -211,7 +211,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		}
 		if (err)
 			break;
-		got_hash_init(&ctx, GOT_HASH_SHA1);
+		got_hash_init(&ctx, pack->algo);
 		err = got_object_type_label(&obj_label, obj->type);
 		if (err) {
 			free(data);
@@ -414,7 +414,7 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, pack->algo);
 	got_hash_update(&ctx, header, headerlen);
 	if (max_size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 		err = read_file_digest(&ctx, tmpfile, len);
@@ -644,7 +644,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		    "bad packfile with zero objects");
 
 	/* We compute the SHA1 of pack file contents and verify later on. */
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, pack->algo);
 	got_hash_update(&ctx, &hdr, sizeof(hdr));
 
 	/*

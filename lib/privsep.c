@@ -1960,6 +1960,7 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 
 	ipackidx.len = packidx->len;
 	ipackidx.packfile_size = pack->filesize;
+	ipackidx.algo = packidx->algo;
 	fd = dup(packidx->fd);
 	if (fd == -1)
 		return got_error_from_errno("dup");

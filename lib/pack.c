@@ -75,7 +75,6 @@ const struct got_error *
 got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 {
 	const struct got_error *err = NULL;
-	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	struct got_packidx_v2_hdr *h;
 	struct got_hash ctx;
 	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
@@ -83,7 +82,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	ssize_t n;
 	int i;
 
-	got_hash_init(&ctx, algo);
+	got_hash_init(&ctx, p->algo);
 
 	h = &p->hdr;
 	offset = 0;
@@ -183,7 +182,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	remain -= len_fanout;
 
 	nobj = be32toh(h->fanout_table[0xff]);
-	len_ids = nobj * sizeof(*h->sorted_ids);
+	len_ids = nobj * got_hash_digest_length(p->algo);
 	if (len_ids <= nobj || len_ids > remain) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
@@ -327,7 +326,7 @@ checksum:
 	}
 	if (verify) {
 		got_hash_update(&ctx, h->trailer->packfile_sha1,
-		    SHA1_DIGEST_LENGTH);
+		    got_hash_digest_length(p->algo));
 		got_hash_final(&ctx, hash);
 		if (got_hash_cmp(ctx.algo, hash, h->trailer->packidx_sha1) != 0)
 			err = got_error(GOT_ERR_PACKIDX_CSUM);
@@ -338,7 +337,8 @@ done:
 
 const struct got_error *
 got_packidx_open(struct got_packidx **packidx,
-    int dir_fd, const char *relpath, int verify)
+    int dir_fd, const char *relpath, int verify,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *p = NULL;
@@ -370,6 +370,8 @@ got_packidx_open(struct got_packidx **packidx,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
+
+	p->algo = algo;
 
 	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (p->fd == -1) {

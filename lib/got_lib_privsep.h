@@ -513,6 +513,7 @@ struct got_imsg_index_pack_progress {
 struct got_imsg_packidx {
 	size_t len;
 	off_t packfile_size;
+	int algo;
 	/* Additionally, a file desciptor is passed via imsg. */
 };
 

@@ -1146,6 +1146,7 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	}
 	memcpy(&ipackidx, imsg.data, sizeof(ipackidx));
 
+	p->algo = ipackidx.algo;
 	p->fd = imsg_get_fd(&imsg);
 	p->len = ipackidx.len;
 	if (p->fd == -1) {
