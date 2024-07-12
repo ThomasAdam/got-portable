@@ -157,10 +157,13 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	const char *obj_label;
 	size_t mapoff = obj->off;
 	struct got_inflate_checksum csum;
+	size_t digest_len;
 
 	memset(&csum, 0, sizeof(csum));
 	csum.input_ctx = pack_hash_ctx;
 	csum.input_crc = &obj->crc;
+
+	digest_len = got_hash_digest_length(pack->algo);
 
 	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size,
 	    &obj->tslen, pack, obj->off);
@@ -239,19 +242,19 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		free(data);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
-		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
+		memset(obj->id.sha1, 0xff, digest_len);
 		if (pack->map) {
-			if (mapoff + SHA1_DIGEST_LENGTH >= pack->filesize) {
+			if (mapoff + digest_len >= pack->filesize) {
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
 			}
 			memcpy(obj->delta.ref.ref_id.sha1, pack->map + mapoff,
-			    SHA1_DIGEST_LENGTH);
+			    digest_len);
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
-			    SHA1_DIGEST_LENGTH);
+			    digest_len);
 			got_hash_update(pack_hash_ctx, pack->map + mapoff,
-			    SHA1_DIGEST_LENGTH);
-			mapoff += SHA1_DIGEST_LENGTH;
+			    digest_len);
+			mapoff += digest_len;
 			err = got_inflate_to_mem_mmap(NULL, &datalen,
 			    &obj->len, &csum, pack->map, mapoff,
 			    pack->filesize - mapoff);
@@ -259,7 +262,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				break;
 		} else {
 			n = read(pack->fd, obj->delta.ref.ref_id.sha1,
-			    SHA1_DIGEST_LENGTH);
+			    digest_len);
 			if (n == -1) {
 				err = got_error_from_errno("read");
 				break;
@@ -269,18 +272,18 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				break;
 			}
 			obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.sha1,
-			    SHA1_DIGEST_LENGTH);
+			    digest_len);
 			got_hash_update(pack_hash_ctx,
-			    obj->delta.ref.ref_id.sha1, SHA1_DIGEST_LENGTH);
+			    obj->delta.ref.ref_id.sha1, digest_len);
 			err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
 			    &csum, obj->size, pack->fd);
 			if (err)
 				break;
 		}
-		obj->len += SHA1_DIGEST_LENGTH;
+		obj->len += digest_len;
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
+		memset(obj->id.sha1, 0xff, digest_len);
 		err = got_pack_parse_offset_delta(&obj->delta.ofs.base_offset,
 		    &obj->delta.ofs.base_offsetlen, pack, obj->off,
 		    obj->tslen);

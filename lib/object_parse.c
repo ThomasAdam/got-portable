@@ -576,8 +576,10 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 {
 	const struct got_error *err = NULL;
 	char *s = buf;
-	size_t label_len;
+	size_t label_len, digest_string_len;
 	ssize_t remain = (ssize_t)len;
+
+	digest_string_len = got_hash_digest_string_length(algo);
 
 	if (remain == 0)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -589,7 +591,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 	label_len = strlen(GOT_COMMIT_LABEL_TREE);
 	if (strncmp(s, GOT_COMMIT_LABEL_TREE, label_len) == 0) {
 		remain -= label_len;
-		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+		if (remain < digest_string_len) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
@@ -598,8 +600,8 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		remain -= SHA1_DIGEST_STRING_LENGTH;
-		s += SHA1_DIGEST_STRING_LENGTH;
+		remain -= digest_string_len;
+		s += digest_string_len;
 	} else {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
@@ -608,7 +610,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 	label_len = strlen(GOT_COMMIT_LABEL_PARENT);
 	while (strncmp(s, GOT_COMMIT_LABEL_PARENT, label_len) == 0) {
 		remain -= label_len;
-		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+		if (remain < digest_string_len) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
@@ -617,8 +619,8 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 		if (err)
 			goto done;
 
-		remain -= SHA1_DIGEST_STRING_LENGTH;
-		s += SHA1_DIGEST_STRING_LENGTH;
+		remain -= digest_string_len;
+		s += digest_string_len;
 	}
 
 	label_len = strlen(GOT_COMMIT_LABEL_AUTHOR);
@@ -811,12 +813,12 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
     enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
-	size_t idlen, remain = len;
+	size_t digest_len, remain = len;
 	const size_t nalloc = 16;
 	struct got_parsed_tree_entry *pte;
 	int i;
 
-	idlen = got_hash_digest_length(algo);
+	digest_len = got_hash_digest_length(algo);
 
 	*nentries = 0;
 	if (remain == 0)
@@ -838,7 +840,7 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 
 		pte = &(*entries)[*nentries];
 		err = got_object_parse_tree_entry(pte, &elen, buf, remain,
-			idlen);
+			digest_len);
 		if (err)
 			goto done;
 		buf += elen;
@@ -937,7 +939,9 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len,
 	const struct got_error *err = NULL;
 	size_t remain = len;
 	char *s = buf;
-	size_t label_len;
+	size_t label_len, digest_string_len;
+
+	digest_string_len = got_hash_digest_string_length(algo);
 
 	if (remain == 0)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -949,7 +953,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len,
 	label_len = strlen(GOT_TAG_LABEL_OBJECT);
 	if (strncmp(s, GOT_TAG_LABEL_OBJECT, label_len) == 0) {
 		remain -= label_len;
-		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+		if (remain < digest_string_len) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
@@ -958,8 +962,8 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len,
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		remain -= SHA1_DIGEST_STRING_LENGTH;
-		s += SHA1_DIGEST_STRING_LENGTH;
+		remain -= digest_string_len;
+		s += digest_string_len;
 	} else {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
