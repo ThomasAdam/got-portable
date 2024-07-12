@@ -762,7 +762,7 @@ got_object_tree_close(struct got_tree_object *tree)
 
 const struct got_error *
 got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
-    char *buf, size_t maxlen)
+    char *buf, size_t maxlen, size_t idlen)
 {
 	char *p, *space;
 
@@ -786,14 +786,14 @@ got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
 		p++;
 	}
 
-	if (*elen > maxlen || maxlen - *elen < SHA1_DIGEST_LENGTH)
+	if (*elen > maxlen || maxlen - *elen < idlen)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
 	pte->name = space + 1;
 	pte->namelen = strlen(pte->name);
 	buf += *elen;
 	pte->id = buf;
-	*elen += SHA1_DIGEST_LENGTH;
+	*elen += idlen;
 	return NULL;
 }
 
@@ -810,10 +810,12 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
     size_t *nentries_alloc, uint8_t *buf, size_t len)
 {
 	const struct got_error *err = NULL;
-	size_t remain = len;
+	size_t idlen, remain = len;
 	const size_t nalloc = 16;
 	struct got_parsed_tree_entry *pte;
 	int i;
+
+	idlen = got_hash_digest_length(GOT_HASH_SHA1);
 
 	*nentries = 0;
 	if (remain == 0)
@@ -834,7 +836,8 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 		}
 
 		pte = &(*entries)[*nentries];
-		err = got_object_parse_tree_entry(pte, &elen, buf, remain);
+		err = got_object_parse_tree_entry(pte, &elen, buf, remain,
+			idlen);
 		if (err)
 			goto done;
 		buf += elen;
