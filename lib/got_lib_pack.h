@@ -24,6 +24,7 @@ struct got_pack_privsep_child {
 struct got_pack {
 	char *path_packfile;
 	int fd;
+	enum got_hash_algorithm algo;
 	uint8_t *map;
 	off_t filesize;
 	struct got_pack_privsep_child *privsep_child;

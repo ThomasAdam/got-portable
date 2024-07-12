@@ -1878,6 +1878,7 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 	}
 	memcpy(&ipack, imsg.data, sizeof(ipack));
 
+	pack->algo = ipack.algo;
 	pack->filesize = ipack.filesize;
 	pack->fd = imsg_get_fd(&imsg);
 	if (pack->fd == -1) {
