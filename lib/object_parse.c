@@ -331,7 +331,7 @@ got_object_commit_alloc_partial(void)
 
 const struct got_error *
 got_object_commit_add_parent(struct got_commit_object *commit,
-    const char *id_str)
+    const char *id_str, enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
@@ -340,7 +340,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	if (err)
 		return err;
 
-	if (!got_parse_object_id(&qid->id, id_str, GOT_HASH_SHA1)) {
+	if (!got_parse_object_id(&qid->id, id_str, algo)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		got_object_qid_free(qid);
 		return err;
@@ -570,10 +570,9 @@ got_object_commit_get_logmsg_raw(struct got_commit_object *commit)
 
 const struct got_error *
 got_object_parse_commit(struct got_commit_object **commit, char *buf,
-    size_t len)
+    size_t len, enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
-	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	char *s = buf;
 	size_t label_len;
 	ssize_t remain = (ssize_t)len;
@@ -612,7 +611,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		}
 		s += label_len;
-		err = got_object_commit_add_parent(*commit, s);
+		err = got_object_commit_add_parent(*commit, s, algo);
 		if (err)
 			goto done;
 
@@ -737,7 +736,8 @@ got_object_read_commit(struct got_commit_object **commit, int fd,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = got_object_parse_commit(commit, p + obj->hdrlen, len);
+	err = got_object_parse_commit(commit, p + obj->hdrlen, len,
+	    GOT_HASH_SHA1);
 done:
 	free(p);
 	if (obj)
@@ -805,7 +805,8 @@ pte_cmp(const void *pa, const void *pb)
 
 const struct got_error *
 got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
-    size_t *nentries_alloc, uint8_t *buf, size_t len)
+    size_t *nentries_alloc, uint8_t *buf, size_t len,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	size_t idlen, remain = len;
@@ -813,7 +814,7 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 	struct got_parsed_tree_entry *pte;
 	int i;
 
-	idlen = got_hash_digest_length(GOT_HASH_SHA1);
+	idlen = got_hash_digest_length(algo);
 
 	*nentries = 0;
 	if (remain == 0)
@@ -905,7 +906,7 @@ got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 	/* Skip object header. */
 	len -= obj->hdrlen;
 	err = got_object_parse_tree(entries, nentries, nentries_alloc,
-	    *p + obj->hdrlen, len);
+	    *p + obj->hdrlen, len, GOT_HASH_SHA1);
 done:
 	if (obj)
 		got_object_close(obj);
@@ -928,10 +929,10 @@ got_object_tag_close(struct got_tag_object *tag)
 }
 
 const struct got_error *
-got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
+got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
-	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	size_t remain = len;
 	char *s = buf;
 	size_t label_len;
@@ -1145,7 +1146,8 @@ got_object_read_tag(struct got_tag_object **tag, int fd,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = got_object_parse_tag(tag, p + obj->hdrlen, len);
+	err = got_object_parse_tag(tag, p + obj->hdrlen, len,
+	    GOT_HASH_SHA1);
 done:
 	free(p);
 	if (obj)

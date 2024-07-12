@@ -142,7 +142,7 @@ open_commit(struct got_commit_object **commit, struct got_pack *pack,
 
 	obj->size = len;
 
-	err = got_object_parse_commit(commit, buf, len);
+	err = got_object_parse_commit(commit, buf, len, pack->algo);
 done:
 	got_object_close(obj);
 	free(buf);
@@ -245,7 +245,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		return err;
 
 	err = got_object_parse_tree(entries, nentries, nentries_alloc,
-	    buf, len);
+	    buf, len, GOT_HASH_SHA1);
 	if (err)
 		goto done;
 
@@ -422,7 +422,7 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		goto done;
 
 	obj->size = len;
-	err = got_object_parse_tag(&tag, buf, len);
+	err = got_object_parse_tag(&tag, buf, len, GOT_HASH_SHA1);
 	if (err)
 		goto done;
 
@@ -1255,7 +1255,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 		}
 
 		err = got_object_parse_tree(&entries, &nentries,
-		    &nentries_alloc, buf, len);
+		    &nentries_alloc, buf, len, GOT_HASH_SHA1);
 		if (err)
 			goto done;
 
@@ -1466,7 +1466,8 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			if (err)
 				goto done;
 			obj->size = len;
-			err = got_object_parse_tag(&tag, buf, len);
+			err = got_object_parse_tag(&tag, buf, len,
+			    GOT_HASH_SHA1);
 			if (err) {
 				free(buf);
 				goto done;

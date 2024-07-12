@@ -514,7 +514,8 @@ protect_require_yca(struct got_object_id *tip_id,
 			if (err)
 				goto done;
 
-			err = got_object_parse_commit(&commit, buf, len);
+			err = got_object_parse_commit(&commit, buf, len,
+			    GOT_HASH_SHA1);
 			if (err)
 				goto done;
 
