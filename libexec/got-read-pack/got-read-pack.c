@@ -38,6 +38,7 @@
 
 #include "got_lib_delta.h"
 #include "got_lib_delta_cache.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_qid.h"
 #include "got_lib_object_cache.h"
@@ -450,7 +451,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 	const struct got_error *err = NULL;
 	struct got_parsed_tree_entry pte1, pte2;
 	const char *seg, *s;
-	size_t seglen;
+	size_t seglen, idlen;
 	size_t remain1 = *len1, remain2 = *len2, elen;
 	uint8_t *next_entry1 = *buf1;
 	uint8_t *next_entry2 = *buf2;
@@ -459,6 +460,8 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 	memset(&pte2, 0, sizeof(pte2));
 
 	*changed = 0;
+
+	idlen = got_hash_digest_length(GOT_HASH_SHA1);
 
 	/* We not do support comparing the root path. */
 	if (got_path_is_root_dir(path))
@@ -490,7 +493,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 		 */
 		while (remain1 > 0) {
 			err = got_object_parse_tree_entry(&pte1, &elen,
-			    next_entry1, remain1);
+			    next_entry1, remain1, idlen);
 			if (err)
 				return err;
 			next_entry1 += elen;
@@ -514,7 +517,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 
 		while (remain2 > 0) {
 			err = got_object_parse_tree_entry(&pte2, &elen,
-			    next_entry2, remain2);
+			    next_entry2, remain2, idlen);
 			if (err)
 				return err;
 			next_entry2 += elen;
