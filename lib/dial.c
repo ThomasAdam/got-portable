@@ -23,7 +23,6 @@
 
 #include <assert.h>
 #include <err.h>
-#include <limits.h>
 #include <sha1.h>
 #include <sha2.h>
 #include <stdint.h>
