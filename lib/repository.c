@@ -1960,15 +1960,16 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 {
 	const struct got_error *err = NULL;
 	char *path_objects = NULL, *object_dir = NULL;
-	size_t len;
+	size_t len, digest_string_len;
 	int i;
 
 	*id = NULL;
 
 	path_objects = got_repo_get_path_objects(repo);
+	digest_string_len = got_hash_digest_string_length(repo->algo);
 
 	len = strlen(id_str_prefix);
-	if (len > SHA1_DIGEST_STRING_LENGTH - 1) {
+	if (len > digest_string_len - 1) {
 		err = got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}
