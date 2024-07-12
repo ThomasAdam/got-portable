@@ -1609,6 +1609,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 		goto done;
 	}
 	pack->filesize = sb.st_size;
+	pack->algo = repo->algo;
 
 	pack->privsep_child = NULL;
 

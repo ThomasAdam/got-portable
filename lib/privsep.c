@@ -1975,6 +1975,7 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 	    sizeof(ipack.path_packfile)) >= sizeof(ipack.path_packfile))
 		return got_error(GOT_ERR_NO_SPACE);
 	ipack.filesize = pack->filesize;
+	ipack.algo = pack->algo;
 
 	fd = dup(pack->fd);
 	if (fd == -1)

@@ -520,6 +520,7 @@ struct got_imsg_packidx {
 struct got_imsg_pack {
 	char path_packfile[PATH_MAX];
 	off_t filesize;
+	int algo;
 	/* Additionally, a file desciptor is passed via imsg. */
 } __attribute__((__packed__));
 
