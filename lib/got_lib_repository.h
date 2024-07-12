@@ -159,7 +159,7 @@ const struct got_error*got_repo_cache_raw_object(struct got_repository *,
     struct got_object_id *, struct got_raw_object *);
 struct got_raw_object *got_repo_get_cached_raw_object(struct got_repository *,
     struct got_object_id *);
-int got_repo_is_packidx_filename(const char *, size_t);
+int got_repo_is_packidx_filename(const char *, size_t, enum got_hash_algorithm);
 int got_repo_check_packidx_bloom_filter(struct got_repository *,
     const char *, struct got_object_id *);
 const struct got_error *got_repo_search_packidx(struct got_packidx **, int *,

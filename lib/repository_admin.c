@@ -1534,8 +1534,8 @@ got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
 				goto done;
 		}
 
-		if (!got_repo_is_packidx_filename(dent->d_name,
-		    strlen(dent->d_name)))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen,
+		    got_repo_get_object_format(repo)))
 			continue;
 
 		err = got_packidx_get_packfile_path(&pack_relpath,
