@@ -532,6 +532,7 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 	struct got_packidx *packidx = NULL;
 	struct got_pack *pack = NULL;
 	uint32_t nobj, i;
+	size_t digest_len = got_hash_digest_length(repo->algo);
 
 	err = got_object_id_str(&id_str, pack_hash);
 	if (err)
@@ -559,7 +560,7 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 
 	nobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	for (i = 0; i < nobj; i++) {
-		struct got_packidx_object_id *oid;
+		uint8_t *oid;
 		struct got_object_id id, base_id;
 		off_t offset, base_offset = 0;
 		uint8_t type;
@@ -571,8 +572,8 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 			if (err)
 				break;
 		}
-		oid = &packidx->hdr.sorted_ids[i];
-		memcpy(id.sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		oid = packidx->hdr.sorted_ids + i * digest_len;
+		memcpy(id.sha1, oid, digest_len);
 
 		offset = got_packidx_get_object_offset(packidx, i);
 		if (offset == -1) {
@@ -1270,9 +1271,10 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 {
 	const struct got_error *err;
 	struct got_packidx *packidx;
-	struct got_packidx_object_id *pid;
+	uint8_t *pid;
 	struct got_object_id id;
 	size_t i, nobjects;
+	size_t digest_len = got_hash_digest_length(repo->algo);
 
 	*redundant = 1;
 
@@ -1282,10 +1284,10 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 
 	nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
 	for (i = 0; i < nobjects; ++i) {
-		pid = &packidx->hdr.sorted_ids[i];
+		pid = packidx->hdr.sorted_ids + i * digest_len;
 
 		memset(&id, 0, sizeof(id));
-		memcpy(&id.sha1, pid->sha1, sizeof(id.sha1));
+		memcpy(&id.sha1, pid, digest_len);
 
 		if (got_object_idset_contains(idset, &id))
 			continue;

@@ -1236,7 +1236,9 @@ add_packidx_bloom_filter(struct got_repository *repo,
 {
 	int i, nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
 	struct got_packidx_bloom_filter *bf;
-	size_t len;
+	size_t len, digest_len;
+
+	digest_len = got_hash_digest_length(repo->algo);
 
 	/*
 	 * Don't use bloom filters for very large pack index files.
@@ -1274,9 +1276,8 @@ add_packidx_bloom_filter(struct got_repository *repo,
 	/* Minimum size supported by our bloom filter is 1000 entries. */
 	bloom_init(bf->bloom, nobjects < 1000 ? 1000 : nobjects, 0.1);
 	for (i = 0; i < nobjects; i++) {
-		struct got_packidx_object_id *id;
-		id = &packidx->hdr.sorted_ids[i];
-		bloom_add(bf->bloom, id->sha1, sizeof(id->sha1));
+		uint8_t *id = packidx->hdr.sorted_ids + i * digest_len;
+		bloom_add(bf->bloom, id, digest_len);
 	}
 
 	RB_INSERT(got_packidx_bloom_filter_tree,

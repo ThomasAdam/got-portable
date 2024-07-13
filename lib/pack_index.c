@@ -445,17 +445,18 @@ find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = nindexed - 1;
 	int cmp = 0, i = 0;
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 
 	if (id0 > 0)
 		left = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 
 	while (left <= right) {
-		struct got_packidx_object_id *oid;
+		uint8_t *oid;
 
 		i = ((left + right) / 2);
-		oid = &packidx->hdr.sorted_ids[i];
+		oid = packidx->hdr.sorted_ids + i * digest_len;
 
-		cmp = memcmp(sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		cmp = memcmp(sha1, oid, digest_len);
 		if (cmp == 0)
 			return -1; /* object already indexed */
 		else if (cmp > 0)
@@ -472,12 +473,13 @@ static void
 print_packidx(struct got_packidx *packidx)
 {
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 	int i;
 
 	fprintf(stderr, "object IDs:\n");
 	for (i = 0; i < nindexed; i++) {
 		char hex[SHA1_DIGEST_STRING_LENGTH];
-		got_sha1_digest_to_str(packidx->hdr.sorted_ids[i].sha1,
+		got_sha1_digest_to_str(packidx->hdr.sorted_ids + i * digest_len,
 		    hex, sizeof(hex));
 		fprintf(stderr, "%s\n", hex);
 	}
@@ -507,9 +509,11 @@ add_indexed_object(struct got_packidx *packidx, uint32_t idx,
     struct got_indexed_object *obj)
 {
 	int i;
+	uint8_t *oid;
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 
-	memcpy(packidx->hdr.sorted_ids[idx].sha1, obj->id.sha1,
-	    SHA1_DIGEST_LENGTH);
+	oid = packidx->hdr.sorted_ids + idx * digest_len;
+	memcpy(oid, obj->id.sha1, digest_len);
 	packidx->hdr.crc32[idx] = htobe32(obj->crc);
 	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 		packidx->hdr.offsets[idx] = htobe32(obj->off);
@@ -565,14 +569,16 @@ update_packidx(struct got_packidx *packidx, uint32_t nobj,
 {
 	int idx;
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
+	size_t digest_len = got_hash_digest_length(packidx->algo);
+	uint8_t *from, *to;
 
 	idx = find_object_idx(packidx, obj->id.sha1);
 	if (idx == -1)
 		return; /* object already indexed */
 
-	memmove(&packidx->hdr.sorted_ids[idx + 1],
-	    &packidx->hdr.sorted_ids[idx],
-	    sizeof(struct got_packidx_object_id) * (nindexed - idx));
+	from = packidx->hdr.sorted_ids + idx * digest_len;
+	to = from + digest_len;
+	memmove(to, from, digest_len * (nindexed - idx));
 	memmove(&packidx->hdr.offsets[idx + 1], &packidx->hdr.offsets[idx],
 	    sizeof(uint32_t) * (nindexed - idx));
 
@@ -674,7 +680,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		goto done;
 	}
 	packidx.hdr.sorted_ids = calloc(nobj,
-	    sizeof(struct got_packidx_object_id));
+	    got_hash_digest_length(pack->algo));
 	if (packidx.hdr.sorted_ids == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
