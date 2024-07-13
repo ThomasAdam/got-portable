@@ -675,9 +675,9 @@ test_branch_list_worktree_state() {
 test_parseargs "$@"
 run_test test_branch_create
 run_test test_branch_list
-run_test test_branch_delete
+run_test test_branch_delete			sha256-ok
 run_test test_branch_delete_current_branch
-run_test test_branch_delete_packed
+run_test test_branch_delete_packed		sha256-ok
 run_test test_branch_show
 run_test test_branch_packed_ref_collision
 run_test test_branch_commit_keywords
