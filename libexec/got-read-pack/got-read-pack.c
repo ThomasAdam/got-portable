@@ -557,7 +557,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			struct got_object_id id1, id2;
 			int idx;
 
-			memcpy(id1.sha1, pte1.id, SHA1_DIGEST_LENGTH);
+			memcpy(id1.hash, pte1.id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx(packidx, &id1);
 			if (idx == -1) {
 				err = got_error_no_obj(&id1);
@@ -573,7 +573,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			next_entry1 = *buf1;
 			remain1 = *len1;
 
-			memcpy(id2.sha1, pte2.id, SHA1_DIGEST_LENGTH);
+			memcpy(id2.hash, pte2.id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx(packidx, &id2);
 			if (idx == -1) {
 				err = got_error_no_obj(&id2);
@@ -1274,7 +1274,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 			err = got_object_qid_alloc_partial(&eqid);
 			if (err)
 				goto done;
-			memcpy(eqid->id.sha1, pte->id, sizeof(eqid->id.sha1));
+			memcpy(eqid->id.hash, pte->id, sizeof(eqid->id.hash));
 
 			if (got_object_idset_contains(idset, &eqid->id)) {
 				got_object_qid_free(eqid);

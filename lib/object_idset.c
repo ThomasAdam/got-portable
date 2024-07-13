@@ -94,7 +94,7 @@ got_object_idset_free(struct got_object_idset *set)
 static uint64_t
 idset_hash(struct got_object_idset *set, struct got_object_id *id)
 {
-	return SipHash24(&set->key, id->sha1, sizeof(id->sha1));
+	return SipHash24(&set->key, id->hash, sizeof(id->hash));
 }
 
 static const struct got_error *

@@ -114,7 +114,7 @@ send_symref(struct got_reference *symref, struct got_object_id *target_id,
 	memset(&isymref, 0, sizeof(isymref));
 	isymref.name_len = strlen(refname);
 	isymref.target_len = strlen(target);
-	memcpy(isymref.target_id, target_id->sha1, sizeof(isymref.target_id));
+	memcpy(isymref.target_id, target_id->hash, sizeof(isymref.target_id));
 
 	len = sizeof(isymref) + isymref.name_len + isymref.target_len;
 	if (len > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
@@ -184,7 +184,7 @@ send_peeled_tag_ref(struct got_reference *ref, struct got_object *obj,
 	}
 
 	/* Keep in sync with struct gotd_imsg_ref definition. */
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+	if (imsg_add(wbuf, id->hash, SHA1_DIGEST_LENGTH) == -1) {
 		err = got_error_from_errno("imsg_add REF");
 		goto done;
 	}
@@ -232,7 +232,7 @@ send_ref(struct got_reference *ref, struct imsgbuf *ibuf)
 	}
 
 	/* Keep in sync with struct gotd_imsg_ref definition. */
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, id->hash, SHA1_DIGEST_LENGTH) == -1)
 		return got_error_from_errno("imsg_add REF");
 	if (imsg_add(wbuf, &namelen, sizeof(namelen)) == -1)
 		return got_error_from_errno("imsg_add REF");
@@ -414,7 +414,7 @@ recv_want(struct imsg *imsg)
 	memcpy(&iwant, imsg->data, sizeof(iwant));
 
 	memset(&id, 0, sizeof(id));
-	memcpy(id.sha1, iwant.object_id, SHA1_DIGEST_LENGTH);
+	memcpy(id.hash, iwant.object_id, SHA1_DIGEST_LENGTH);
 
 	if (log_getverbose() > 0 &&
 	    got_object_id_hex(&id, hex, sizeof(hex)))
@@ -459,7 +459,7 @@ recv_have(struct imsg *imsg)
 	memcpy(&ihave, imsg->data, sizeof(ihave));
 
 	memset(&id, 0, sizeof(id));
-	memcpy(id.sha1, ihave.object_id, SHA1_DIGEST_LENGTH);
+	memcpy(id.hash, ihave.object_id, SHA1_DIGEST_LENGTH);
 
 	if (log_getverbose() > 0 &&
 	    got_object_id_hex(&id, hex, sizeof(hex)))

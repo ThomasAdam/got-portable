@@ -1114,7 +1114,7 @@ create_fileindex_entry(struct got_fileindex_entry **new_iep,
 		return err;
 
 	err = got_fileindex_entry_update(new_ie, wt_fd, path,
-	    blob_id->sha1, base_commit_id->sha1, update_timestamps);
+	    blob_id->hash, base_commit_id->hash, update_timestamps);
 	if (err)
 		goto done;
 
@@ -2000,7 +2000,7 @@ update_blob(struct got_worktree *worktree,
 		 * updating contents of this file.
 		 */
 		if (got_fileindex_entry_has_commit(ie) &&
-		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
+		    memcmp(ie->commit_sha1, worktree->base_commit_id->hash,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			/* Same commit. */
 			err = sync_timestamps(worktree->root_fd,
@@ -2012,13 +2012,13 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 		}
 		if (got_fileindex_entry_has_blob(ie) &&
-		    memcmp(ie->blob_sha1, te->id.sha1,
+		    memcmp(ie->blob_sha1, te->id.hash,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			/* Different commit but the same blob. */
 			if (got_fileindex_entry_has_commit(ie)) {
 				/* Update the base commit ID of this file. */
 				memcpy(ie->commit_sha1,
-				    worktree->base_commit_id->sha1,
+				    worktree->base_commit_id->hash,
 				    sizeof(ie->commit_sha1));
 			}
 			err = sync_timestamps(worktree->root_fd,
@@ -2100,17 +2100,17 @@ update_blob(struct got_worktree *worktree,
 		 * unmodified files again.
 		 */
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.sha1, worktree->base_commit_id->sha1,
+		    blob->id.hash, worktree->base_commit_id->hash,
 		    update_timestamps);
 	} else if (status == GOT_STATUS_MODE_CHANGE) {
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
+		    blob->id.hash, worktree->base_commit_id->hash, 0);
 	} else if (status == GOT_STATUS_DELETE) {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		if (err)
 			goto done;
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
+		    blob->id.hash, worktree->base_commit_id->hash, 0);
 		if (err)
 			goto done;
 	} else {
@@ -2134,8 +2134,8 @@ update_blob(struct got_worktree *worktree,
 
 		if (ie) {
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, path, blob->id.sha1,
-			    worktree->base_commit_id->sha1, 1);
+			    worktree->root_fd, path, blob->id.hash,
+			    worktree->base_commit_id->hash, 1);
 		} else {
 			err = create_fileindex_entry(&ie, fileindex,
 			    worktree->base_commit_id, worktree->root_fd, path,
@@ -2568,7 +2568,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	if (got_fileindex_entry_was_skipped(ie))
 		return NULL;
 
-	if (memcmp(ie->commit_sha1, a->base_commit_id->sha1,
+	if (memcmp(ie->commit_sha1, a->base_commit_id->hash,
 	    SHA1_DIGEST_LENGTH) == 0)
 		return NULL;
 
@@ -2578,7 +2578,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 		if (err)
 			return err;
 	}
-	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(ie->commit_sha1, a->base_commit_id->hash, SHA1_DIGEST_LENGTH);
 	return NULL;
 }
 
@@ -2966,7 +2966,7 @@ add_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		/* Re-adding a locally deleted file. */
 		err = got_fileindex_entry_update(ie,
 		    worktree->root_fd, path2, ie->blob_sha1,
-		    worktree->base_commit_id->sha1, 0);
+		    worktree->base_commit_id->hash, 0);
 		if (err)
 			return err;
 	}
@@ -3319,7 +3319,7 @@ check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 
 	/* Reject merges into a work tree with mixed base commits. */
 	if (got_fileindex_entry_has_commit(ie) &&
-	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
+	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->hash,
 	    SHA1_DIGEST_LENGTH) != 0)
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
@@ -5308,8 +5308,8 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			    status == GOT_STATUS_MODE_CHANGE) {
 				err = got_fileindex_entry_update(ie,
 				    a->worktree->root_fd, relpath,
-				    blob->id.sha1,
-				    a->worktree->base_commit_id->sha1, 1);
+				    blob->id.hash,
+				    a->worktree->base_commit_id->hash, 1);
 				if (err)
 					goto done;
 			}
@@ -6281,22 +6281,22 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->staged_blob_id->sha1,
-				    new_base_commit_id->sha1,
+				    ct->staged_blob_id->hash,
+				    new_base_commit_id->hash,
 				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->blob_id->sha1,
-				    new_base_commit_id->sha1,
+				    ct->blob_id->hash,
+				    new_base_commit_id->hash,
 				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
 				goto done;
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, relpath, ct->blob_id->sha1,
-			    new_base_commit_id->sha1, 1);
+			    worktree->root_fd, relpath, ct->blob_id->hash,
+			    new_base_commit_id->hash, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
@@ -6747,7 +6747,7 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 	char *ondisk_path;
 
 	/* Reject rebase of a work tree with mixed base commits. */
-	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
+	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->hash,
 	    SHA1_DIGEST_LENGTH))
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
@@ -9234,7 +9234,7 @@ stage_path(void *arg, unsigned char status,
 		    path_content ? path_content : ondisk_path, a->repo);
 		if (err)
 			break;
-		memcpy(ie->staged_blob_sha1, new_staged_blob_id->sha1,
+		memcpy(ie->staged_blob_sha1, new_staged_blob_id->hash,
 		    SHA1_DIGEST_LENGTH);
 		if (status == GOT_STATUS_ADD || staged_status == GOT_STATUS_ADD)
 			stage = GOT_FILEIDX_STAGE_ADD;
@@ -9705,7 +9705,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		goto done;
 
 	if (new_staged_blob_id) {
-		memcpy(ie->staged_blob_sha1, new_staged_blob_id->sha1,
+		memcpy(ie->staged_blob_sha1, new_staged_blob_id->hash,
 		    SHA1_DIGEST_LENGTH);
 	} else {
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);

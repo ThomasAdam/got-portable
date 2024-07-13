@@ -1241,7 +1241,7 @@ got_fileindex_entry_get_staged_blob_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
 	memset(id, 0, sizeof(*id));
-	memcpy(id->sha1, ie->staged_blob_sha1, sizeof(ie->staged_blob_sha1));
+	memcpy(id->hash, ie->staged_blob_sha1, sizeof(ie->staged_blob_sha1));
 	return id;
 }
 
@@ -1250,7 +1250,7 @@ got_fileindex_entry_get_blob_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
 	memset(id, 0, sizeof(*id));
-	memcpy(id->sha1, ie->blob_sha1, sizeof(ie->blob_sha1));
+	memcpy(id->hash, ie->blob_sha1, sizeof(ie->blob_sha1));
 	return id;
 }
 
@@ -1259,7 +1259,7 @@ got_fileindex_entry_get_commit_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
 	memset(id, 0, sizeof(*id));
-	memcpy(id->sha1, ie->commit_sha1, sizeof(ie->commit_sha1));
+	memcpy(id->hash, ie->commit_sha1, sizeof(ie->commit_sha1));
 	return id;
 }
 

@@ -115,7 +115,7 @@ got_object_get_path(char **path, struct got_object_id *id,
 		goto done;
 
 	if (asprintf(path, "%s/%.2x/%s", path_objects,
-	    id->sha1[0], hex + 2) == -1)
+	    id->hash[0], hex + 2) == -1)
 		err = got_error_from_errno("asprintf");
 
 done:

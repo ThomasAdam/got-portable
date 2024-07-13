@@ -241,13 +241,13 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		free(data);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
-		memset(obj->id.sha1, 0xff, digest_len);
+		memset(obj->id.hash, 0xff, digest_len);
 		if (pack->map) {
 			if (mapoff + digest_len >= pack->filesize) {
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
 			}
-			memcpy(obj->delta.ref.ref_id.sha1, pack->map + mapoff,
+			memcpy(obj->delta.ref.ref_id.hash, pack->map + mapoff,
 			    digest_len);
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    digest_len);
@@ -260,7 +260,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			if (err)
 				break;
 		} else {
-			n = read(pack->fd, obj->delta.ref.ref_id.sha1,
+			n = read(pack->fd, obj->delta.ref.ref_id.hash,
 			    digest_len);
 			if (n == -1) {
 				err = got_error_from_errno("read");
@@ -270,10 +270,10 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
 			}
-			obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.sha1,
+			obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.hash,
 			    digest_len);
 			got_hash_update(pack_hash_ctx,
-			    obj->delta.ref.ref_id.sha1, digest_len);
+			    obj->delta.ref.ref_id.hash, digest_len);
 			err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
 			    &csum, obj->size, pack->fd);
 			if (err)
@@ -282,7 +282,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		obj->len += digest_len;
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		memset(obj->id.sha1, 0xff, digest_len);
+		memset(obj->id.hash, 0xff, digest_len);
 		err = got_pack_parse_offset_delta(&obj->delta.ofs.base_offset,
 		    &obj->delta.ofs.base_offsetlen, pack, obj->off,
 		    obj->tslen);
@@ -512,7 +512,7 @@ add_indexed_object(struct got_packidx *packidx, uint32_t idx,
 	size_t digest_len = got_hash_digest_length(packidx->algo);
 
 	oid = packidx->hdr.sorted_ids + idx * digest_len;
-	memcpy(oid, obj->id.sha1, digest_len);
+	memcpy(oid, obj->id.hash, digest_len);
 	packidx->hdr.crc32[idx] = htobe32(obj->crc);
 	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 		packidx->hdr.offsets[idx] = htobe32(obj->off);
@@ -524,7 +524,7 @@ add_indexed_object(struct got_packidx *packidx, uint32_t idx,
 		packidx->nlargeobj++;
 	}
 
-	for (i = obj->id.sha1[0]; i <= 0xff; i++) {
+	for (i = obj->id.hash[0]; i <= 0xff; i++) {
 		uint32_t n = be32toh(packidx->hdr.fanout_table[i]);
 		packidx->hdr.fanout_table[i] = htobe32(n + 1);
 	}
@@ -571,7 +571,7 @@ update_packidx(struct got_packidx *packidx, uint32_t nobj,
 	size_t digest_len = got_hash_digest_length(packidx->algo);
 	uint8_t *from, *to;
 
-	idx = find_object_idx(packidx, obj->id.sha1);
+	idx = find_object_idx(packidx, obj->id.hash);
 	if (idx == -1)
 		return; /* object already indexed */
 

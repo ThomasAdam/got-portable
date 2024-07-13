@@ -1232,7 +1232,7 @@ got_repo_check_packidx_bloom_filter(struct got_repository *repo,
 
 	bf = get_packidx_bloom_filter(repo, path_packidx, strlen(path_packidx));
 	if (bf)
-		return bloom_check(bf->bloom, id->sha1, sizeof(id->sha1));
+		return bloom_check(bf->bloom, id->hash, sizeof(id->hash));
 
 	/* No bloom filter means this pack index must be searched. */
 	return 1;

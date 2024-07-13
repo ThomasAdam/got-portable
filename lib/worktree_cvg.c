@@ -2142,22 +2142,22 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->staged_blob_id->sha1,
-				    new_base_commit_id->sha1,
+				    ct->staged_blob_id->hash,
+				    new_base_commit_id->hash,
 				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->blob_id->sha1,
-				    new_base_commit_id->sha1,
+				    ct->blob_id->hash,
+				    new_base_commit_id->hash,
 				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
 				goto done;
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, relpath, ct->blob_id->sha1,
-			    new_base_commit_id->sha1, 1);
+			    worktree->root_fd, relpath, ct->blob_id->hash,
+			    new_base_commit_id->hash, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
