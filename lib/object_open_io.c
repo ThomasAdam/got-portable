@@ -33,13 +33,13 @@
 #include "got_path.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"
 #include "got_lib_inflate.h"
-#include "got_lib_hash.h"
 
 const struct got_error *
 got_object_open_packed(struct got_object **obj, struct got_object_id *id,
