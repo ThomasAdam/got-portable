@@ -513,6 +513,7 @@ add_indexed_object(struct got_packidx *packidx, uint32_t idx,
 
 	oid = packidx->hdr.sorted_ids + idx * digest_len;
 	memcpy(oid, obj->id.hash, digest_len);
+	obj->id.algo = packidx->algo;
 	packidx->hdr.crc32[idx] = htobe32(obj->crc);
 	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 		packidx->hdr.offsets[idx] = htobe32(obj->off);

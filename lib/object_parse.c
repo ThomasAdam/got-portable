@@ -253,7 +253,7 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	*size = 0;
 	*hdrlen = 0;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, expected_id->algo);
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
@@ -708,7 +708,7 @@ got_object_read_commit(struct got_commit_object **commit, int fd,
 	struct got_hash ctx;
 	struct got_object_id id;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, expected_id->algo);
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
@@ -739,7 +739,7 @@ got_object_read_commit(struct got_commit_object **commit, int fd,
 	/* Skip object header. */
 	len -= obj->hdrlen;
 	err = got_object_parse_commit(commit, p + obj->hdrlen, len,
-	    GOT_HASH_SHA1);
+	    expected_id->algo);
 done:
 	free(p);
 	if (obj)
@@ -884,7 +884,7 @@ got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 	struct got_hash ctx;
 	struct got_object_id id;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, expected_id->algo);
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
@@ -910,7 +910,7 @@ got_object_read_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 	/* Skip object header. */
 	len -= obj->hdrlen;
 	err = got_object_parse_tree(entries, nentries, nentries_alloc,
-	    *p + obj->hdrlen, len, GOT_HASH_SHA1);
+	    *p + obj->hdrlen, len, expected_id->algo);
 done:
 	if (obj)
 		got_object_close(obj);
@@ -1126,7 +1126,7 @@ got_object_read_tag(struct got_tag_object **tag, int fd,
 	struct got_hash ctx;
 	struct got_object_id id;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, expected_id->algo);
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
@@ -1153,7 +1153,7 @@ got_object_read_tag(struct got_tag_object **tag, int fd,
 	/* Skip object header. */
 	len -= obj->hdrlen;
 	err = got_object_parse_tag(tag, p + obj->hdrlen, len,
-	    GOT_HASH_SHA1);
+	    expected_id->algo);
 done:
 	free(p);
 	if (obj)

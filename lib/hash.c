@@ -46,7 +46,9 @@ int
 got_object_id_cmp(const struct got_object_id *id1,
     const struct got_object_id *id2)
 {
-	return memcmp(id1->hash, id2->hash, SHA1_DIGEST_LENGTH);
+	if (id1->algo != id2->algo)
+		abort();
+	return memcmp(id1->hash, id2->hash, got_hash_digest_length(id1->algo));
 }
 
 const struct got_error *
@@ -170,7 +172,11 @@ got_parse_hash_digest(uint8_t *digest, const char *line,
 char *
 got_object_id_hex(struct got_object_id *id, char *buf, size_t len)
 {
-	return got_sha1_digest_to_str(id->hash, buf, len);
+	if (id->algo == GOT_HASH_SHA1)
+		return got_sha1_digest_to_str(id->hash, buf, len);
+	if (id->algo == GOT_HASH_SHA256)
+		return got_sha256_digest_to_str(id->hash, buf, len);
+	abort();
 }
 
 int
@@ -178,11 +184,7 @@ got_parse_object_id(struct got_object_id *id, const char *line,
     enum got_hash_algorithm algo)
 {
 	memset(id, 0, sizeof(*id));
-
-	/* XXX: temporary until we grow got_object_id */
-	if (algo != GOT_HASH_SHA1)
-		return 0;
-
+	id->algo = algo;
 	return got_parse_hash_digest(id->hash, line, algo);
 }
 
@@ -220,10 +222,11 @@ void
 got_hash_final_object_id(struct got_hash *hash, struct got_object_id *id)
 {
 	memset(id, 0, sizeof(*id));
+	id->algo = hash->algo;
 	if (hash->algo == GOT_HASH_SHA1)
 		SHA1Final(id->hash, &hash->sha1_ctx);
 	else
-		abort();
+		SHA256Final(id->hash, &hash->sha256_ctx);
 }
 
 int

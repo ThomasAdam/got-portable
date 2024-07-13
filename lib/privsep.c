@@ -1585,7 +1585,9 @@ recv_tree_entries(void *data, size_t datalen, struct got_tree_object *tree,
 		te_name = buf + sizeof(ite);
 		memcpy(te->name, te_name, ite.namelen);
 		te->name[ite.namelen] = '\0';
-		memcpy(te->id.hash, ite.id, sizeof(te->id.sha1));
+		memcpy(te->id.hash, ite.id, sizeof(te->id.hash));
+		memcpy(te->id.hash, ite.id, got_hash_digest_length(ite.algo));
+		te->id.algo = ite.algo;
 		te->mode = ite.mode;
 		te->idx = *nentries;
 		(*nentries)++;

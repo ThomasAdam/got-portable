@@ -570,6 +570,7 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 				break;
 		}
 		oid = packidx->hdr.sorted_ids + i * digest_len;
+		id.algo = repo->algo;
 		memcpy(id.hash, oid, digest_len);
 
 		offset = got_packidx_get_object_offset(packidx, i);
@@ -1285,6 +1286,7 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 
 		memset(&id, 0, sizeof(id));
 		memcpy(&id.hash, pid, digest_len);
+		id.algo = repo->algo;
 
 		if (got_object_idset_contains(idset, &id))
 			continue;

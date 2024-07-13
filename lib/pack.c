@@ -661,6 +661,7 @@ got_packidx_get_object_id(struct got_object_id *id,
 
 	oid = packidx->hdr.sorted_ids + idx * digest_len;
 	memcpy(id->hash, oid, digest_len);
+	id->algo = packidx->algo;
 	return NULL;
 }
 
@@ -709,6 +710,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		if (err)
 			return err;
 		memcpy(qid->id.hash, oid, digest_len);
+		qid->id.algo = packidx->algo;
 		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = packidx->hdr.sorted_ids + (++i) * digest_len;
