@@ -260,7 +260,8 @@ struct got_imsg_commit_object {
 } __attribute__((__packed__));
 
 struct got_imsg_tree_entry {
-	char id[SHA1_DIGEST_LENGTH];
+	char id[GOT_HASH_DIGEST_MAXLEN];
+	int algo;
 	mode_t mode;
 	size_t namelen;
 	/* Followed by namelen bytes of entry's name, not NUL-terminated. */

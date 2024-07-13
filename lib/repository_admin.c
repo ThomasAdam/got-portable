@@ -46,6 +46,7 @@
 #include "got_path.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_object_cache.h"
@@ -54,7 +55,6 @@
 #include "got_lib_repository.h"
 #include "got_lib_ratelimit.h"
 #include "got_lib_pack_create.h"
-#include "got_lib_hash.h"
 #include "got_lib_lockfile.h"
 
 #ifndef nitems

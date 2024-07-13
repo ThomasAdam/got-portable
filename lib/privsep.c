@@ -1452,10 +1452,16 @@ send_tree_entries_batch(struct imsgbuf *ibuf,
 		return got_error_from_errno("imsg_add TREE_ENTRY");
 
 	for (i = idx0; i <= idxN; i++) {
+		static const char gap[12]; /* for sha1 inside sha256 align */
 		struct got_parsed_tree_entry *pte = &entries[i];
 
 		/* Keep in sync with struct got_imsg_tree_entry definition! */
-		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1)
+		if (imsg_add(wbuf, pte->id, pte->idlen) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
+		if (pte->algo == GOT_HASH_SHA1 &&
+		    imsg_add(wbuf, gap, sizeof(gap)) == -1)
+			return got_error_from_errno("imsg_add TREE_ENTRY");
+		if (imsg_add(wbuf, &pte->algo, sizeof(pte->algo)) == -1)
 			return got_error_from_errno("imsg_add TREE_ENTRY");
 		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1)
 			return got_error_from_errno("imsg_add TREE_ENTRY");
@@ -1579,7 +1585,7 @@ recv_tree_entries(void *data, size_t datalen, struct got_tree_object *tree,
 		te_name = buf + sizeof(ite);
 		memcpy(te->name, te_name, ite.namelen);
 		te->name[ite.namelen] = '\0';
-		memcpy(te->id.sha1, ite.id, SHA1_DIGEST_LENGTH);
+		memcpy(te->id.sha1, ite.id, sizeof(te->id.sha1));
 		te->mode = ite.mode;
 		te->idx = *nentries;
 		(*nentries)++;

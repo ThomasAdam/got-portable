@@ -31,9 +31,11 @@ struct got_parsed_tree_entry {
 	size_t namelen; /* strlen(name) */
 	mode_t mode; /* Mode parsed from tree buffer. */
 	uint8_t *id; /* Points to ID in parsed tree buffer. */
+	size_t idlen;
+	int algo;
 };
 const struct got_error *got_object_parse_tree_entry(
-    struct got_parsed_tree_entry *, size_t *, char *, size_t, size_t);
+    struct got_parsed_tree_entry *, size_t *, char *, size_t, size_t, enum got_hash_algorithm);
 const struct got_error *got_object_parse_tree(struct got_parsed_tree_entry **,
     size_t *, size_t *, uint8_t *, size_t, enum got_hash_algorithm);
 const struct got_error *got_object_read_tree(struct got_parsed_tree_entry **,
