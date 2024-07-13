@@ -1146,7 +1146,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	if (err)
 		return err;
 	if (pack->map) {
-		delta_data_offset = delta_offset + tslen + SHA1_DIGEST_LENGTH;
+		delta_data_offset = delta_offset + tslen +
+		    got_hash_digest_length(packidx->algo);
 	} else {
 		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 		if (delta_data_offset == -1)
@@ -2089,7 +2090,7 @@ got_packfile_extract_raw_delta(uint8_t **delta_buf, size_t *delta_size,
 		err = got_pack_parse_ref_delta(base_id, pack, offset, tslen);
 		if (err)
 			return err;
-		delta_hdrlen = SHA1_DIGEST_LENGTH;
+		delta_hdrlen = got_hash_digest_length(pack->algo);
 		break;
 	default:
 		return got_error_fmt(GOT_ERR_OBJ_TYPE,
