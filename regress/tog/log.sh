@@ -135,7 +135,7 @@ test_log_show_author()
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local ymd=`date -u -r $author_time +"%F"`
-	local head_id_len8=`trim_obj_id 32 $head_id`
+	local head_id_len8=`trim_obj_id 8 $head_id`
 
 	echo "mod alpha" > $testroot/repo/alpha
 	cd $testroot/repo && git add .
@@ -144,7 +144,7 @@ test_log_show_author()
 	    /dev/null
 
 	local commit1=`git_show_head $testroot/repo`
-	local id1_len8=`trim_obj_id 32 $commit1`
+	local id1_len8=`trim_obj_id 8 $commit1`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 @		toggle show author
@@ -399,11 +399,11 @@ test_log_commit_keywords()
 
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 5 $@) [1/5]
-	$ymd $(trim_obj_id 32 $(pop_idx 5 $@)) flan_hacker  commit 4
-	$ymd $(trim_obj_id 32 $(pop_idx 4 $@)) flan_hacker  commit 3
-	$ymd $(trim_obj_id 32 $(pop_idx 3 $@)) flan_hacker  commit 2
-	$ymd $(trim_obj_id 32 $(pop_idx 2 $@)) flan_hacker  commit 1
-	$ymd $(trim_obj_id 32 $(pop_idx 1 $@)) flan_hacker  adding the test tree
+	$ymd $(trim_obj_id 8 $(pop_idx 5 $@)) flan_hacker  commit 4
+	$ymd $(trim_obj_id 8 $(pop_idx 4 $@)) flan_hacker  commit 3
+	$ymd $(trim_obj_id 8 $(pop_idx 3 $@)) flan_hacker  commit 2
+	$ymd $(trim_obj_id 8 $(pop_idx 2 $@)) flan_hacker  commit 1
+	$ymd $(trim_obj_id 8 $(pop_idx 1 $@)) flan_hacker  adding the test tree
 
 
 
@@ -421,13 +421,13 @@ test_log_commit_keywords()
 
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 7 $@) [1/7]
-	$ymd $(trim_obj_id 32 $(pop_idx 7 $@)) flan_hacker  commit 6
-	$ymd $(trim_obj_id 32 $(pop_idx 6 $@)) flan_hacker  commit 5
-	$ymd $(trim_obj_id 32 $(pop_idx 5 $@)) flan_hacker  commit 4
-	$ymd $(trim_obj_id 32 $(pop_idx 4 $@)) flan_hacker  commit 3
-	$ymd $(trim_obj_id 32 $(pop_idx 3 $@)) flan_hacker  commit 2
-	$ymd $(trim_obj_id 32 $(pop_idx 2 $@)) flan_hacker  commit 1
-	$ymd $(trim_obj_id 32 $(pop_idx 1 $@)) flan_hacker  adding the test tree
+	$ymd $(trim_obj_id 8 $(pop_idx 7 $@)) flan_hacker  commit 6
+	$ymd $(trim_obj_id 8 $(pop_idx 6 $@)) flan_hacker  commit 5
+	$ymd $(trim_obj_id 8 $(pop_idx 5 $@)) flan_hacker  commit 4
+	$ymd $(trim_obj_id 8 $(pop_idx 4 $@)) flan_hacker  commit 3
+	$ymd $(trim_obj_id 8 $(pop_idx 3 $@)) flan_hacker  commit 2
+	$ymd $(trim_obj_id 8 $(pop_idx 2 $@)) flan_hacker  commit 1
+	$ymd $(trim_obj_id 8 $(pop_idx 1 $@)) flan_hacker  adding the test tree
 
 
 	EOF
@@ -443,11 +443,11 @@ test_log_commit_keywords()
 
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 5 $@) [1/5]
-	$ymd $(trim_obj_id 32 $(pop_idx 5 $@)) flan_hacker  commit 4
-	$ymd $(trim_obj_id 32 $(pop_idx 4 $@)) flan_hacker  commit 3
-	$ymd $(trim_obj_id 32 $(pop_idx 3 $@)) flan_hacker ~commit 2
-	$ymd $(trim_obj_id 32 $(pop_idx 2 $@)) flan_hacker  commit 1
-	$ymd $(trim_obj_id 32 $(pop_idx 1 $@)) flan_hacker  adding the test tree
+	$ymd $(trim_obj_id 8 $(pop_idx 5 $@)) flan_hacker  commit 4
+	$ymd $(trim_obj_id 8 $(pop_idx 4 $@)) flan_hacker  commit 3
+	$ymd $(trim_obj_id 8 $(pop_idx 3 $@)) flan_hacker ~commit 2
+	$ymd $(trim_obj_id 8 $(pop_idx 2 $@)) flan_hacker  commit 1
+	$ymd $(trim_obj_id 8 $(pop_idx 1 $@)) flan_hacker  adding the test tree
 
 
 
@@ -473,7 +473,7 @@ test_log_commit_keywords()
 
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 1 $@) [1/1]
-	$ymd $(trim_obj_id 32 $(pop_idx 1 $@)) flan_hacker  adding the test tree
+	$ymd $(trim_obj_id 8 $(pop_idx 1 $@)) flan_hacker  adding the test tree
 
 
 

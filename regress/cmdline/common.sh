@@ -160,13 +160,7 @@ trim_obj_id()
 	local trimcount=$1
 	local id=$2
 
-	local pat=""
-	while [ "$trimcount" -gt 0 ]; do
-		pat="[0-9a-f]$pat"
-		trimcount=$((trimcount - 1))
-	done
-
-	echo ${id%$pat}
+	echo "$id" | sed -E "s/^([0-9a-f]{$trimcount}).*/\1/"
 }
 
 pop_idx()
@@ -229,7 +223,7 @@ get_loose_object_path()
 {
 	local repo="$1"
 	local id="$2"
-	local id0=`trim_obj_id 38 $id`
+	local id0=`trim_obj_id 2 $id`
 	local idrest=`echo ${id#[0-9a-f][0-9a-f]}`
 	echo "$repo/.git/objects/$id0/$idrest"
 }

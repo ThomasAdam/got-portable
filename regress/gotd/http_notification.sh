@@ -403,7 +403,7 @@ test_many_commits_summarized() {
 		echo "alpha $i" > $testroot/wt/alpha
 		(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
 		local commit_id=`git_show_head $testroot/repo-clone`
-		local short_commit_id=`trim_obj_id 33 $commit_id`
+		local short_commit_id=`trim_obj_id 7 $commit_id`
 		local author_time=`git_show_author_time $testroot/repo-clone`
 		set -- "$@" "$short_commit_id $author_time"
 	done

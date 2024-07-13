@@ -61,9 +61,9 @@ test_blame_basic() {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	local short_commit1=`trim_obj_id 32 $commit1`
-	local short_commit2=`trim_obj_id 32 $commit2`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit1=`trim_obj_id 8 $commit1`
+	local short_commit2=`trim_obj_id 8 $commit2`
+	local short_commit3=`trim_obj_id 8 $commit3`
 
 	d=`date -u -r $author_time +"%F"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
@@ -110,8 +110,8 @@ test_blame_tag() {
 
 	(cd $testroot/wt && got blame -c $tag alpha > $testroot/stdout)
 
-	local short_commit1=`trim_obj_id 32 $commit1`
-	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit1=`trim_obj_id 8 $commit1`
+	local short_commit2=`trim_obj_id 8 $commit2`
 
 	d=`date -u -r $author_time +"%F"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
@@ -147,7 +147,7 @@ test_blame_file_single_line() {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 
 	d=`date -u -r $author_time +"%F"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
@@ -182,7 +182,7 @@ test_blame_file_single_line_no_newline() {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 
 	d=`date -u -r $author_time +"%F"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
@@ -208,7 +208,7 @@ test_blame_all_lines_replaced() {
 	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
@@ -245,7 +245,7 @@ test_blame_lines_shifted_up() {
 	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	ed -s $testroot/wt/alpha <<-\EOF
@@ -254,7 +254,7 @@ test_blame_lines_shifted_up() {
 	EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
-	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit2=`trim_obj_id 8 $commit2`
 
 	seq 2 > $testroot/wt/alpha
 	echo foo >> $testroot/wt/alpha
@@ -263,7 +263,7 @@ test_blame_lines_shifted_up() {
 	seq 6 8 >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit3=`trim_obj_id 8 $commit3`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
@@ -304,7 +304,7 @@ test_blame_lines_shifted_down() {
 	seq 8 > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	ed -s $testroot/wt/alpha <<-\EOF
@@ -313,7 +313,7 @@ test_blame_lines_shifted_down() {
 	EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
-	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit2=`trim_obj_id 8 $commit2`
 
 	seq 2 > $testroot/wt/alpha
 	echo foo >> $testroot/wt/alpha
@@ -322,7 +322,7 @@ test_blame_lines_shifted_down() {
 	seq 3 8 >> $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit3=`trim_obj_id 8 $commit3`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
@@ -398,7 +398,7 @@ dvi: # do nothing to build dvi
 EOF
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 	local author_time1=`git_show_author_time $testroot/repo`
 	local d1=`date -u -r $author_time1 +"%F"`
 
@@ -425,7 +425,7 @@ EOF
 	# all changes in this commit will be subsumed by later commits
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
-	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit2=`trim_obj_id 8 $commit2`
 	local author_time2=`git_show_author_time $testroot/repo`
 	local d2=`date -u -r $author_time2 +"%F"`
 
@@ -449,7 +449,7 @@ dvi: # do nothing to build dvi
 EOF
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit3=`trim_obj_id 8 $commit3`
 	local author_time3=`git_show_author_time $testroot/repo`
 	local d3=`date -u -r $author_time3 +"%F"`
 
@@ -473,7 +473,7 @@ dvi: # do nothing to build dvi
 EOF
 	(cd $testroot/wt && got commit -m "change 4" > /dev/null)
 	local commit4=`git_show_head $testroot/repo`
-	local short_commit4=`trim_obj_id 32 $commit4`
+	local short_commit4=`trim_obj_id 8 $commit4`
 	local author_time4=`git_show_author_time $testroot/repo`
 	local d4=`date -u -r $author_time4 +"%F"`
 
@@ -720,9 +720,9 @@ test_blame_added_on_branch() {
 
 	(cd $testroot/wt && got blame new > $testroot/stdout)
 
-	local short_commit1=`trim_obj_id 32 $commit1`
-	local short_commit2=`trim_obj_id 32 $commit2`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit1=`trim_obj_id 8 $commit1`
+	local short_commit2=`trim_obj_id 8 $commit2`
+	local short_commit3=`trim_obj_id 8 $commit3`
 
 	d=`date -u -r $author_time +"%F"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
@@ -772,7 +772,7 @@ test_blame_submodule() {
 test_blame_symlink() {
 	local testroot=`test_init blame_symlink`
 	local commit_id0=`git_show_head $testroot/repo`
-	local short_commit0=`trim_obj_id 32 $commit_id0`
+	local short_commit0=`trim_obj_id 8 $commit_id0`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
 	(cd $testroot/repo && ln -s epsilon epsilon.link)
@@ -783,7 +783,7 @@ test_blame_symlink() {
 	git_commit $testroot/repo -m "add symlinks"
 
 	local commit_id1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit_id1`
+	local short_commit1=`trim_obj_id 8 $commit_id1`
 	local author_time=`git_show_author_time $testroot/repo`
 
 	# got blame dereferences symlink to a regular file
@@ -907,7 +907,7 @@ D
 EOF
 	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
 	local commit1=`git_show_head $testroot/repo`
-	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit1=`trim_obj_id 8 $commit1`
 	local author_time1=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
@@ -920,7 +920,7 @@ Q
 EOF
 	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
 	local commit2=`git_show_head $testroot/repo`
-	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit2=`trim_obj_id 8 $commit2`
 	local author_time2=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
@@ -934,7 +934,7 @@ Q
 EOF
 	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
 	local commit3=`git_show_head $testroot/repo`
-	local short_commit3=`trim_obj_id 32 $commit3`
+	local short_commit3=`trim_obj_id 8 $commit3`
 	local author_time3=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
@@ -947,7 +947,7 @@ Q
 EOF
 	(cd $testroot/wt && got commit -m "change 4" > /dev/null)
 	local commit4=`git_show_head $testroot/repo`
-	local short_commit4=`trim_obj_id 32 $commit4`
+	local short_commit4=`trim_obj_id 8 $commit4`
 	local author_time4=`git_show_author_time $testroot/repo`
 
 	cat > $testroot/wt/alpha <<EOF
@@ -961,7 +961,7 @@ Q
 EOF
 	(cd $testroot/wt && got commit -m "change 5" > /dev/null)
 	local commit5=`git_show_head $testroot/repo`
-	local short_commit5=`trim_obj_id 32 $commit5`
+	local short_commit5=`trim_obj_id 8 $commit5`
 	local author_time5=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
@@ -997,7 +997,7 @@ test_blame_commit_keywords() {
 	local wt="$testroot/wt"
 	local id=$(git_show_head "$repo")
 
-	set -- "$(trim_obj_id 32 $id)"
+	set -- "$(trim_obj_id 8 $id)"
 
 	# :base requires work tree
 	echo "got: '-c :base' requires work tree" > "$testroot/stderr.expected"
@@ -1038,7 +1038,7 @@ test_blame_commit_keywords() {
 		fi
 
 		id=$(git_show_head "$repo")
-		set -- "$@" "$(trim_obj_id 32 $id)"
+		set -- "$@" "$(trim_obj_id 8 $id)"
 	done
 
 	local author_time=$(git_show_author_time "$repo")

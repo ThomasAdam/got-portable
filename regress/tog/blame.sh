@@ -48,10 +48,10 @@ WAIT_FOR_UI	wait for blame to finish
 SCREENDUMP
 EOF
 
-	local commit_id1_short=`trim_obj_id 32 $commit_id1`
-	local commit_id2_short=`trim_obj_id 32 $commit_id2`
-	local commit_id3_short=`trim_obj_id 32 $commit_id3`
-	local commit_id4_short=`trim_obj_id 32 $commit_id4`
+	local commit_id1_short=`trim_obj_id 8 $commit_id1`
+	local commit_id2_short=`trim_obj_id 8 $commit_id2`
+	local commit_id3_short=`trim_obj_id 8 $commit_id3`
+	local commit_id4_short=`trim_obj_id 8 $commit_id4`
 
 	cat <<EOF >$testroot/view.expected
 commit $commit_id4
@@ -114,7 +114,7 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $id
 	[1/1] /alpha
-	$(trim_obj_id 32 $(pop_idx 1 $@)) alpha
+	$(trim_obj_id 8 $(pop_idx 1 $@)) alpha
 
 
 
@@ -174,13 +174,13 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 8 $@)
 	[1/7] /alpha
-	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
-	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
-	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
-	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
-	$(trim_obj_id 32 $(pop_idx 6 $@)) alpha 5
-	$(trim_obj_id 32 $(pop_idx 7 $@)) alpha 6
-	$(trim_obj_id 32 $(pop_idx 8 $@)) alpha 7
+	$(trim_obj_id 8 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 8 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 8 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 8 $(pop_idx 5 $@)) alpha 4
+	$(trim_obj_id 8 $(pop_idx 6 $@)) alpha 5
+	$(trim_obj_id 8 $(pop_idx 7 $@)) alpha 6
+	$(trim_obj_id 8 $(pop_idx 8 $@)) alpha 7
 
 	EOF
 
@@ -204,10 +204,10 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 5 $@)
 	[1/4] /alpha
-	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
-	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
-	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
-	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
+	$(trim_obj_id 8 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 8 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 8 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 8 $(pop_idx 5 $@)) alpha 4
 
 
 
@@ -234,10 +234,10 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 5 $@)
 	[1/4] /alpha
-	$(trim_obj_id 32 $(pop_idx 2 $@)) alpha 1
-	$(trim_obj_id 32 $(pop_idx 3 $@)) alpha 2
-	$(trim_obj_id 32 $(pop_idx 4 $@)) alpha 3
-	$(trim_obj_id 32 $(pop_idx 5 $@)) alpha 4
+	$(trim_obj_id 8 $(pop_idx 2 $@)) alpha 1
+	$(trim_obj_id 8 $(pop_idx 3 $@)) alpha 2
+	$(trim_obj_id 8 $(pop_idx 4 $@)) alpha 3
+	$(trim_obj_id 8 $(pop_idx 5 $@)) alpha 4
 
 
 
@@ -271,7 +271,7 @@ test_blame_commit_keywords()
 	cat <<-EOF >$testroot/view.expected
 	commit $(pop_idx 1 $@)
 	[1/1] /alpha
-	$(trim_obj_id 32 $(pop_idx 1 $@)) alpha
+	$(trim_obj_id 8 $(pop_idx 1 $@)) alpha
 
 
 

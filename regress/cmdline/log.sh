@@ -1275,10 +1275,10 @@ test_log_toposort() {
 	local merge_commit=`git_show_head $testroot/repo`
 	local merge_time=`git_show_author_time $testroot/repo`
 
-	local short_commit0=`trim_obj_id 33 $commit0`
-	local short_commit1=`trim_obj_id 33 $commit1`
-	local short_commit2=`trim_obj_id 33 $commit2`
-	local short_commit3=`trim_obj_id 33 $commit3`
+	local short_commit0=`trim_obj_id 7 $commit0`
+	local short_commit1=`trim_obj_id 7 $commit1`
+	local short_commit2=`trim_obj_id 7 $commit2`
+	local short_commit3=`trim_obj_id 7 $commit3`
 
 	d_0=`date -u -r $author_time0 +"%F"`
 	d_1=`date -u -r $author_time1 +"%F"`

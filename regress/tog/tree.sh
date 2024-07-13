@@ -54,8 +54,8 @@ test_tree_vsplit_blame()
 	test_init tree_vsplit_blame 120 8
 
 	local head_id=`git_show_head $testroot/repo`
-	local head_id_truncated=`trim_obj_id 8 $head_id`
-	local head_id_short=`trim_obj_id 32 $head_id`
+	local head_id_truncated=`trim_obj_id 32 $head_id`
+	local head_id_short=`trim_obj_id 8 $head_id`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 KEY_ENTER
@@ -91,8 +91,8 @@ test_tree_hsplit_blame()
 	test_init tree_hsplit_blame 48 24
 
 	local head_id=`git_show_head $testroot/repo`
-	local head_id_truncated=`trim_obj_id 8 $head_id`
-	local head_id_short=`trim_obj_id 32 $head_id`
+	local head_id_truncated=`trim_obj_id 32 $head_id`
+	local head_id_short=`trim_obj_id 8 $head_id`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
 j

@@ -67,10 +67,10 @@ test_rebase_basic() {
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -293,7 +293,7 @@ test_rebase_continue() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
 
 	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -395,7 +395,7 @@ EOF
 
 	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_head $testroot/repo`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
 		> $testroot/stdout.expected
@@ -432,7 +432,7 @@ test_rebase_abort() {
 	echo "modified beta on branch" > $testroot/repo/beta
 	git_commit $testroot/repo -m "committing to beta on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
 
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	echo "new file on branch" > $testroot/repo/epsilon/new
@@ -440,7 +440,7 @@ test_rebase_abort() {
 	git_commit $testroot/repo \
 		-m "changing alpha and adding new on newbranch"
 	local orig_commit2=`git_show_head $testroot/repo`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
 
 	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -462,7 +462,7 @@ test_rebase_abort() {
 
 	new_commit1=$(cd $testroot/wt && got info beta | \
 		grep '^based on commit:' | cut -d' ' -f4)
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 	
 	echo "G  beta" > $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -628,7 +628,7 @@ test_rebase_no_op_change() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
 
 	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -743,7 +743,7 @@ test_rebase_in_progress() {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
 
 	git -C $testroot/repo checkout -q master
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -904,8 +904,8 @@ test_rebase_path_prefix() {
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  gamma/delta" > $testroot/stdout.expected
 	echo -n "$short_orig_commit2 -> $short_new_commit2" \
@@ -1364,10 +1364,10 @@ test_rebase_trims_empty_dir() {
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -1463,8 +1463,8 @@ test_rebase_delete_missing_file() {
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
 
 	(cd $testroot/wt && got update -b master > /dev/null)
 	(cd $testroot/wt && got rm beta d/f/g/new > /dev/null)
@@ -1487,8 +1487,8 @@ test_rebase_delete_missing_file() {
 	local new_commit1=$(cd $testroot/wt && got info | \
 		grep '^work tree base commit: ' | cut -d: -f2 | tr -d ' ')
 
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -1572,7 +1572,7 @@ test_rebase_delete_missing_file() {
 
 	git -C $testroot/repo checkout -q newbranch
 	local new_commit1=`git_show_head $testroot/repo`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
 	echo "commit $new_commit1 (newbranch)" > $testroot/stdout.expected
@@ -1633,12 +1633,12 @@ test_rebase_rm_add_rm_file() {
 
 	git -C $testroot/repo checkout -q newbranch
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_orig_commit3=`trim_obj_id 28 $orig_commit3`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
-	local short_new_commit3=`trim_obj_id 28 $new_commit3`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_orig_commit3=`trim_obj_id 12 $orig_commit3`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
+	local short_new_commit3=`trim_obj_id 12 $new_commit3`
 
 	echo "D  beta" > $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -1730,10 +1730,10 @@ test_rebase_resets_committer() {
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -1819,10 +1819,10 @@ test_rebase_no_author_info() {
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_orig_commit1=`trim_obj_id 12 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 12 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -2096,16 +2096,16 @@ test_rebase_merge_commit() {
 	(cd $testroot/wt && got rebase newbranch2) > $testroot/stdout
 
 	local new_commit5=`git_show_parent_commit $testroot/repo newbranch2`
-	local short_orig_commit5=`trim_obj_id 28 $commit5`
-	local short_new_commit5=`trim_obj_id 28 $new_commit5`
+	local short_orig_commit5=`trim_obj_id 12 $commit5`
+	local short_new_commit5=`trim_obj_id 12 $new_commit5`
 
 	local new_commit4=`git_show_parent_commit $testroot/repo $new_commit5`
-	local short_orig_commit4=`trim_obj_id 28 $commit4`
-	local short_new_commit4=`trim_obj_id 28 $new_commit4`
+	local short_orig_commit4=`trim_obj_id 12 $commit4`
+	local short_new_commit4=`trim_obj_id 12 $new_commit4`
 
 	local new_merge_commit=`git_show_branch_head $testroot/repo newbranch2`
-	local short_orig_merge_commit=`trim_obj_id 28 $merge_commit`
-	local short_new_merge_commit=`trim_obj_id 28 $new_merge_commit`
+	local short_orig_merge_commit=`trim_obj_id 12 $merge_commit`
+	local short_new_merge_commit=`trim_obj_id 12 $new_merge_commit`
 
 	echo "G  beta"> $testroot/stdout.expected
 	echo "$short_orig_commit4 -> $short_new_commit4: edit beta" \
@@ -2193,8 +2193,8 @@ test_rebase_across_merge_commit() {
 	(cd $testroot/wt && got rebase master) > $testroot/stdout
 
 	local new_commit1=`git_show_head $testroot/repo`
-	local short_orig_commit1=`trim_obj_id 28 $commit1`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_orig_commit1=`trim_obj_id 12 $commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "G  gamma/delta"> $testroot/stdout.expected
 	echo "$short_orig_commit1 -> $short_new_commit1: edit delta" \
