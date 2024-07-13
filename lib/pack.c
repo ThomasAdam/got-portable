@@ -492,7 +492,7 @@ int
 got_packidx_get_object_idx(struct got_packidx *packidx,
     struct got_object_id *id)
 {
-	u_int8_t id0 = id->sha1[0];
+	u_int8_t id0 = id->hash[0];
 	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = totobj - 1;
 	size_t digest_len = got_hash_digest_length(packidx->algo);
@@ -506,7 +506,7 @@ got_packidx_get_object_idx(struct got_packidx *packidx,
 
 		i = ((left + right) / 2);
 		oid = packidx->hdr.sorted_ids + i * digest_len;
-		cmp = memcmp(id->sha1, oid, digest_len);
+		cmp = memcmp(id->hash, oid, digest_len);
 		if (cmp == 0)
 			return i;
 		else if (cmp > 0)
@@ -663,7 +663,7 @@ got_packidx_get_object_id(struct got_object_id *id,
 		return got_error(GOT_ERR_NO_OBJ);
 
 	oid = packidx->hdr.sorted_ids + idx * digest_len;
-	memcpy(id->sha1, oid, digest_len);
+	memcpy(id->hash, oid, digest_len);
 	return NULL;
 }
 
@@ -711,7 +711,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		err = got_object_qid_alloc_partial(&qid);
 		if (err)
 			return err;
-		memcpy(qid->id.sha1, oid, digest_len);
+		memcpy(qid->id.hash, oid, digest_len);
 		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = packidx->hdr.sorted_ids + (++i) * digest_len;

@@ -186,7 +186,7 @@ copypack(FILE *in, int outfd, off_t *tot,
 
 	/* XXX SHA256 */
 	memset(&expected_id, 0, sizeof(expected_id));
-	memcpy(&expected_id.sha1, sha1buf, sizeof(expected_id.sha1));
+	memcpy(&expected_id.hash, sha1buf, sizeof(expected_id.hash));
 
 	if (got_object_id_cmp(id, &expected_id) != 0)
 		return got_error(GOT_ERR_PACKIDX_CSUM);
@@ -425,7 +425,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	imsg_idxfds[1] = -1;
 	imsg_init(&idxibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&idxibuf, id.sha1, packfd);
+	err = got_privsep_send_index_pack_req(&idxibuf, id.hash, packfd);
 	if (err)
 		goto done;
 	packfd = -1;

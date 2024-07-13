@@ -50,7 +50,7 @@ gotd_imsg_send_ack(struct got_object_id *id, struct imsgbuf *ibuf,
 		log_debug("sending ACK for %s", hex);
 
 	memset(&iack, 0, sizeof(iack));
-	memcpy(iack.object_id, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(iack.object_id, id->hash, SHA1_DIGEST_LENGTH);
 
 	if (imsg_compose(ibuf, GOTD_IMSG_ACK, peerid, pid, -1,
 	    &iack, sizeof(iack)) == -1) {
@@ -77,7 +77,7 @@ gotd_imsg_send_nak(struct got_object_id *id, struct imsgbuf *ibuf,
 		log_debug("sending NAK for %s", hex);
 
 	memset(&inak, 0, sizeof(inak));
-	memcpy(inak.object_id, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy(inak.object_id, id->hash, SHA1_DIGEST_LENGTH);
 
 	if (imsg_compose(ibuf, GOTD_IMSG_NAK, peerid, pid, -1,
 	    &inak, sizeof(inak)) == -1) {

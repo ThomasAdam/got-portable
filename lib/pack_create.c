@@ -1578,11 +1578,11 @@ deltahdr(off_t *packfile_size, struct got_hash *ctx, int packfd,
 		if (err)
 			return err;
 		*packfile_size += nh;
-		err = hwrite(packfd, m->prev->id.sha1,
-		    sizeof(m->prev->id.sha1), ctx);
+		err = hwrite(packfd, m->prev->id.hash,
+		    sizeof(m->prev->id.hash), ctx);
 		if (err)
 			return err;
-		*packfile_size += sizeof(m->prev->id.sha1);
+		*packfile_size += sizeof(m->prev->id.hash);
 	}
 
 	return NULL;

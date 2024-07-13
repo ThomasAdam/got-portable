@@ -22,7 +22,7 @@ enum got_hash_algorithm {
 };
 
 struct got_object_id {
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
+	u_int8_t hash[SHA1_DIGEST_LENGTH];
 };
 
 struct got_blob_object;

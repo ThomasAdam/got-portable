@@ -302,7 +302,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 
 		err = got_privsep_recv_fetch_progress(&done,
 		    &id, &refname, symrefs, &server_progress,
-		    &packfile_size_cur, (*pack_hash)->sha1, &fetchibuf);
+		    &packfile_size_cur, (*pack_hash)->hash, &fetchibuf);
 		if (err != NULL)
 			goto done;
 		/* Don't report size progress for an empty pack file. */
@@ -455,7 +455,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_index_pack_req(&idxibuf, (*pack_hash)->sha1,
+	err = got_privsep_send_index_pack_req(&idxibuf, (*pack_hash)->hash,
 	    npackfd);
 	if (err != NULL)
 		goto done;

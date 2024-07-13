@@ -209,7 +209,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		goto done;
 	}
 
-	err = got_pack_create((*pack_hash)->sha1, packfd, delta_cache,
+	err = got_pack_create((*pack_hash)->hash, packfd, delta_cache,
 	    theirs, ntheirs, ours, nours, repo, loose_obj_only,
 	    0, force_refdelta, progress_cb, progress_arg, &rl,
 	    cancel_cb, cancel_arg);
@@ -365,7 +365,7 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_index_pack_req(&idxibuf, pack_hash->sha1,
+	err = got_privsep_send_index_pack_req(&idxibuf, pack_hash->hash,
 	    npackfd);
 	if (err != NULL)
 		goto done;
@@ -573,7 +573,7 @@ got_repo_list_pack(FILE *packfile, struct got_object_id *pack_hash,
 				break;
 		}
 		oid = packidx->hdr.sorted_ids + i * digest_len;
-		memcpy(id.sha1, oid, digest_len);
+		memcpy(id.hash, oid, digest_len);
 
 		offset = got_packidx_get_object_offset(packidx, i);
 		if (offset == -1) {
@@ -1287,7 +1287,7 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 		pid = packidx->hdr.sorted_ids + i * digest_len;
 
 		memset(&id, 0, sizeof(id));
-		memcpy(&id.sha1, pid, digest_len);
+		memcpy(&id.hash, pid, digest_len);
 
 		if (got_object_idset_contains(idset, &id))
 			continue;

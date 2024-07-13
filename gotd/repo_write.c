@@ -173,7 +173,7 @@ send_peeled_tag_ref(struct got_reference *ref, struct got_object *obj,
 	}
 
 	/* Keep in sync with struct gotd_imsg_ref definition. */
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+	if (imsg_add(wbuf, id->hash, SHA1_DIGEST_LENGTH) == -1) {
 		err = got_error_from_errno("imsg_add REF");
 		goto done;
 	}
@@ -221,7 +221,7 @@ send_ref(struct got_reference *ref, struct imsgbuf *ibuf)
 	}
 
 	/* Keep in sync with struct gotd_imsg_ref definition. */
-	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1)
+	if (imsg_add(wbuf, id->hash, SHA1_DIGEST_LENGTH) == -1)
 		return got_error_from_errno("imsg_add REF");
 	if (imsg_add(wbuf, &namelen, sizeof(namelen)) == -1)
 		return got_error_from_errno("imsg_add REF");
@@ -643,14 +643,14 @@ recv_ref_update(struct imsg *imsg)
 		goto done;
 	}
 
-	memcpy(ref_update->old_id.sha1, iref.old_id, SHA1_DIGEST_LENGTH);
-	memcpy(ref_update->new_id.sha1, iref.new_id, SHA1_DIGEST_LENGTH);
+	memcpy(ref_update->old_id.hash, iref.old_id, SHA1_DIGEST_LENGTH);
+	memcpy(ref_update->new_id.hash, iref.new_id, SHA1_DIGEST_LENGTH);
 
 	err = got_ref_open(&ref, repo_write.repo, refname, 0);
 	if (err) {
 		if (err->code != GOT_ERR_NOT_REF)
 			goto done;
-		if (memcmp(ref_update->new_id.sha1,
+		if (memcmp(ref_update->new_id.hash,
 		    zero_id, sizeof(zero_id)) == 0) {
 			err = got_error_fmt(GOT_ERR_BAD_OBJ_ID,
 			    "%s", refname);
@@ -706,7 +706,7 @@ recv_ref_update(struct imsg *imsg)
 	    repo_write.pid);
 
 	ref_update->ref = ref;
-	if (memcmp(ref_update->new_id.sha1, zero_id, sizeof(zero_id)) == 0) {
+	if (memcmp(ref_update->new_id.hash, zero_id, sizeof(zero_id)) == 0) {
 		ref_update->delete_ref = 1;
 		client->nref_del++;
 	}
@@ -1541,8 +1541,8 @@ send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 	size_t len;
 
 	memset(&iref, 0, sizeof(iref));
-	memcpy(iref.old_id, ref_update->old_id.sha1, SHA1_DIGEST_LENGTH);
-	memcpy(iref.new_id, ref_update->new_id.sha1, SHA1_DIGEST_LENGTH);
+	memcpy(iref.old_id, ref_update->old_id.hash, SHA1_DIGEST_LENGTH);
+	memcpy(iref.new_id, ref_update->new_id.hash, SHA1_DIGEST_LENGTH);
 	iref.ref_is_new = ref_update->ref_is_new;
 	iref.delete_ref = ref_update->delete_ref;
 	iref.name_len = strlen(refname);

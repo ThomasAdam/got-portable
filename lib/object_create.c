@@ -384,12 +384,12 @@ got_object_tree_create(struct got_object_id **id,
 		treesize += n;
 
 		len = SHA1_DIGEST_LENGTH;
-		n = fwrite(te->id.sha1, 1, len, treefile);
+		n = fwrite(te->id.hash, 1, len, treefile);
 		if (n != len) {
 			err = got_ferror(treefile, GOT_ERR_IO);
 			goto done;
 		}
-		got_hash_update(&ctx, te->id.sha1, len);
+		got_hash_update(&ctx, te->id.hash, len);
 		treesize += n;
 	}
 

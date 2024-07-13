@@ -46,7 +46,7 @@ int
 got_object_id_cmp(const struct got_object_id *id1,
     const struct got_object_id *id2)
 {
-	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
+	return memcmp(id1->hash, id2->hash, SHA1_DIGEST_LENGTH);
 }
 
 const struct got_error *
@@ -170,7 +170,7 @@ got_parse_hash_digest(uint8_t *digest, const char *line,
 char *
 got_object_id_hex(struct got_object_id *id, char *buf, size_t len)
 {
-	return got_sha1_digest_to_str(id->sha1, buf, len);
+	return got_sha1_digest_to_str(id->hash, buf, len);
 }
 
 int
@@ -183,7 +183,7 @@ got_parse_object_id(struct got_object_id *id, const char *line,
 	if (algo != GOT_HASH_SHA1)
 		return 0;
 
-	return got_parse_hash_digest(id->sha1, line, algo);
+	return got_parse_hash_digest(id->hash, line, algo);
 }
 
 void
@@ -221,7 +221,7 @@ got_hash_final_object_id(struct got_hash *hash, struct got_object_id *id)
 {
 	memset(id, 0, sizeof(*id));
 	if (hash->algo == GOT_HASH_SHA1)
-		SHA1Final(id->sha1, &hash->sha1_ctx);
+		SHA1Final(id->hash, &hash->sha1_ctx);
 	else
 		abort();
 }
