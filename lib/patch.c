@@ -732,7 +732,8 @@ open_blob(char **path, FILE **fp, const char *blobid,
 			return err;
 		idptr = matched_id;
 	} else {
-		if (!got_parse_object_id(&id, blobid, GOT_HASH_SHA1))
+		if (!got_parse_object_id(&id, blobid,
+		    got_repo_get_object_format(repo)))
 			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		idptr = &id;
 	}
