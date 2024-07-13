@@ -68,10 +68,6 @@ struct got_packidx_trailer {
 	u_int8_t	packidx_sha1[SHA1_DIGEST_LENGTH];
 } __attribute__((__packed__));
 
-struct got_packidx_object_id {
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
-} __attribute__((__packed__));
-
 /* Ignore pack index version 1 which is no longer written by Git. */
 #define GOT_PACKIDX_VERSION 2
 
@@ -91,8 +87,8 @@ struct got_packidx_v2_hdr {
 	uint32_t	*fanout_table;	/* values are big endian */
 #define GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS (0xff + 1)
 
-	/* Sorted SHA1 checksums for each object in the pack file. */
-	struct got_packidx_object_id *sorted_ids;
+	/* Sorted checksums for each object in the pack file. */
+	uint8_t *sorted_ids;
 
 	/* CRC32 of the packed representation of each object. */
 	uint32_t	*crc32;

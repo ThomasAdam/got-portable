@@ -185,8 +185,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 		goto done;
 	}
 	if (p->map)
-		h->sorted_ids =
-		    (struct got_packidx_object_id *)((uint8_t*)(p->map + offset));
+		h->sorted_ids = p->map + offset;
 	else {
 		h->sorted_ids = malloc(len_ids);
 		if (h->sorted_ids == NULL) {
@@ -492,17 +491,18 @@ got_packidx_get_object_idx(struct got_packidx *packidx,
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = totobj - 1;
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 
 	if (id0 > 0)
 		left = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 
 	while (left <= right) {
-		struct got_packidx_object_id *oid;
+		uint8_t *oid;
 		int i, cmp;
 
 		i = ((left + right) / 2);
-		oid = &packidx->hdr.sorted_ids[i];
-		cmp = memcmp(id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		oid = packidx->hdr.sorted_ids + i * digest_len;
+		cmp = memcmp(id->sha1, oid, digest_len);
 		if (cmp == 0)
 			return i;
 		else if (cmp > 0)
@@ -652,13 +652,14 @@ got_packidx_get_object_id(struct got_object_id *id,
     struct got_packidx *packidx, int idx)
 {
 	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
-	struct got_packidx_object_id *oid;
+	uint8_t *oid;
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 
 	if (idx < 0 || idx >= totobj)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	oid = &packidx->hdr.sorted_ids[idx];
-	memcpy(id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+	oid = packidx->hdr.sorted_ids + idx * digest_len;
+	memcpy(id->sha1, oid, digest_len);
 	return NULL;
 }
 
@@ -671,8 +672,9 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	char hex[3];
 	size_t prefix_len = strlen(id_str_prefix);
-	struct got_packidx_object_id *oid;
+	uint8_t *oid;
 	uint32_t i = 0;
+	size_t digest_len = got_hash_digest_length(packidx->algo);
 
 	if (prefix_len < 2)
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
@@ -685,18 +687,18 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 
 	if (id0 > 0)
 		i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
-	oid = &packidx->hdr.sorted_ids[i];
-	while (i < totobj && oid->sha1[0] == id0) {
+	oid = packidx->hdr.sorted_ids + i * digest_len;
+	while (i < totobj && oid[0] == id0) {
 		char id_str[SHA1_DIGEST_STRING_LENGTH];
 		struct got_object_qid *qid;
 		int cmp;
 
-		if (!got_sha1_digest_to_str(oid->sha1, id_str, sizeof(id_str)))
+		if (!got_sha1_digest_to_str(oid, id_str, sizeof(id_str)))
 			return got_error(GOT_ERR_NO_SPACE);
 
 		cmp = strncmp(id_str, id_str_prefix, prefix_len);
 		if (cmp < 0) {
-			oid = &packidx->hdr.sorted_ids[++i];
+			oid = packidx->hdr.sorted_ids + (++i) * digest_len;
 			continue;
 		} else if (cmp > 0)
 			break;
@@ -704,10 +706,10 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		err = got_object_qid_alloc_partial(&qid);
 		if (err)
 			return err;
-		memcpy(qid->id.sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		memcpy(qid->id.sha1, oid, digest_len);
 		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
-		oid = &packidx->hdr.sorted_ids[++i];
+		oid = packidx->hdr.sorted_ids + (++i) * digest_len;
 	}
 
 	return NULL;
