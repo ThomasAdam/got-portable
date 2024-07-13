@@ -28,6 +28,7 @@ export GOT_TEST_ROOT="/tmp"
 export GOT_IGNORE_GITCONFIG=1
 export GOT_VERSION_STR=`got --version | cut -d ' ' -f2`
 export GOT_TEST_HTTP_PORT=${GOT_TEST_HTTP_PORT:-8080}
+export GOT_TEST_ALGO="${GOT_TEST_ALGO:-sha1}"
 
 export LC_ALL=C
 
@@ -63,7 +64,12 @@ fi
 
 git_init()
 {
-	git init -q "$1"
+	args=
+	if [ "${GOT_TEST_ALGO}" = sha256 ]; then
+		args="--object-format=sha256"
+	fi
+
+	git init -q $args "$1"
 
 	# Switch the default branch to match our test expectations if needed.
 	# Only need to change HEAD since 'git init' did not create any refs.
@@ -294,12 +300,17 @@ test_parseargs()
 run_test()
 {
 	testfunc="$1"
+	limits="$2"
 
 	if [ -n "$regress_run_only" ]; then
 		case "$regress_run_only" in
 		*$testfunc*) ;;
 		*) return ;;
 		esac
+	fi
+
+	if [ "${GOT_TEST_ALGO}" = sha256 -a -z "$limits" ]; then
+		return
 	fi
 
 	if [ -z "$GOT_TEST_QUIET" ]; then

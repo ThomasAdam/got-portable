@@ -1304,21 +1304,21 @@ EOF
 
 
 test_parseargs "$@"
-run_test test_log_in_repo
-run_test test_log_in_bare_repo
+run_test test_log_in_repo			sha256-ok
+run_test test_log_in_bare_repo			sha256-ok
 run_test test_log_in_worktree
 run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
 run_test test_log_oneline
 run_test test_log_patch_added_file
-run_test test_log_nonexistent_path
+run_test test_log_nonexistent_path		sha256-ok
 run_test test_log_end_at_commit
 run_test test_log_reverse_display
-run_test test_log_in_worktree_different_repo
+run_test test_log_in_worktree_different_repo	sha256-ok
 run_test test_log_changed_paths
-run_test test_log_merge_commit_nonexistent_path
-run_test test_log_submodule
+run_test test_log_merge_commit_nonexistent_path	sha256-ok
+run_test test_log_submodule			sha256-ok
 run_test test_log_diffstat
 run_test test_log_commit_keywords
 run_test test_log_toposort
