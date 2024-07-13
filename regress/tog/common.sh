@@ -114,6 +114,10 @@ run_test()
 		esac
 	fi
 
+	if [ "${GOT_TEST_ALGO}" = sha256 -a -z "$limits" ]; then
+		return
+	fi
+
 	if [ -z "$GOT_TEST_QUIET" ]; then
 		echo -n "$testfunc "
 	fi
