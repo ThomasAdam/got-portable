@@ -247,7 +247,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		return err;
 
 	err = got_object_parse_tree(entries, nentries, nentries_alloc,
-	    buf, len, GOT_HASH_SHA1);
+	    buf, len, id.algo);
 	if (err)
 		goto done;
 
@@ -424,7 +424,7 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		goto done;
 
 	obj->size = len;
-	err = got_object_parse_tag(&tag, buf, len, GOT_HASH_SHA1);
+	err = got_object_parse_tag(&tag, buf, len, id.algo);
 	if (err)
 		goto done;
 
@@ -559,7 +559,8 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			struct got_object_id id1, id2;
 			int idx;
 
-			memcpy(id1.hash, pte1.id, SHA1_DIGEST_LENGTH);
+			memcpy(id1.hash, pte1.id, pte1.idlen);
+			id1.algo = pack->algo;
 			idx = got_packidx_get_object_idx(packidx, &id1);
 			if (idx == -1) {
 				err = got_error_no_obj(&id1);
@@ -576,6 +577,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			remain1 = *len1;
 
 			memcpy(id2.hash, pte2.id, SHA1_DIGEST_LENGTH);
+			id2.algo = pack->algo;
 			idx = got_packidx_get_object_idx(packidx, &id2);
 			if (idx == -1) {
 				err = got_error_no_obj(&id2);
@@ -1276,6 +1278,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 			err = got_object_qid_alloc_partial(&eqid);
 			if (err)
 				goto done;
+			eqid->id.algo = pte->algo;
 			memcpy(eqid->id.hash, pte->id, sizeof(eqid->id.hash));
 
 			if (got_object_idset_contains(idset, &eqid->id)) {
@@ -1469,7 +1472,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 				goto done;
 			obj->size = len;
 			err = got_object_parse_tag(&tag, buf, len,
-			    GOT_HASH_SHA1);
+			    qid->id.algo);
 			if (err) {
 				free(buf);
 				goto done;

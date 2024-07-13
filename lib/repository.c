@@ -1236,7 +1236,8 @@ got_repo_check_packidx_bloom_filter(struct got_repository *repo,
 
 	bf = get_packidx_bloom_filter(repo, path_packidx, strlen(path_packidx));
 	if (bf)
-		return bloom_check(bf->bloom, id->hash, sizeof(id->hash));
+		return bloom_check(bf->bloom, id->hash,
+		    got_hash_digest_length(id->algo));
 
 	/* No bloom filter means this pack index must be searched. */
 	return 1;

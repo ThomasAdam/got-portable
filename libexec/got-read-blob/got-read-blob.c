@@ -81,10 +81,6 @@ main(int argc, char *argv[])
 		struct got_inflate_checksum csum;
 		struct got_hash ctx;
 
-		got_hash_init(&ctx, GOT_HASH_SHA1);
-		memset(&csum, 0, sizeof(csum));
-		csum.output_ctx = &ctx;
-
 		memset(&imsg, 0, sizeof(imsg));
 		memset(&imsg_outfd, 0, sizeof(imsg_outfd));
 
@@ -162,6 +158,10 @@ main(int argc, char *argv[])
 			goto done;
 		}
 		fd = -1;
+
+		got_hash_init(&ctx, expected_id.algo);
+		memset(&csum, 0, sizeof(csum));
+		csum.output_ctx = &ctx;
 
 		if (obj->size + obj->hdrlen <=
 		    GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {

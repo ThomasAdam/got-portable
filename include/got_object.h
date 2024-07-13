@@ -14,7 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define GOT_OBJECT_ID_HEX_MAXLEN SHA1_DIGEST_STRING_LENGTH
+#define GOT_OBJECT_ID_MAXLEN SHA256_DIGEST_LENGTH
+#define GOT_OBJECT_ID_HEX_MAXLEN SHA256_DIGEST_STRING_LENGTH
 
 enum got_hash_algorithm {
 	GOT_HASH_SHA1,
@@ -22,7 +23,8 @@ enum got_hash_algorithm {
 };
 
 struct got_object_id {
-	u_int8_t hash[SHA1_DIGEST_LENGTH];
+	uint8_t hash[GOT_OBJECT_ID_MAXLEN];
+	enum got_hash_algorithm algo;
 };
 
 struct got_blob_object;
