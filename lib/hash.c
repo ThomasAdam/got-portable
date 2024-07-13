@@ -138,6 +138,21 @@ got_sha256_digest_to_str(const uint8_t *digest, char *buf, size_t size)
 	return digest_to_str(digest, SHA256_DIGEST_LENGTH, buf);
 }
 
+char *
+got_hash_digest_to_str(const uint8_t *digest, char *buf, size_t size,
+    enum got_hash_algorithm algo)
+{
+	switch (algo) {
+	case GOT_HASH_SHA1:
+		return got_sha1_digest_to_str(digest, buf, size);
+	case GOT_HASH_SHA256:
+		return got_sha256_digest_to_str(digest, buf, size);
+	default:
+		abort();
+		return NULL;
+	}
+}
+
 int
 got_parse_hash_digest(uint8_t *digest, const char *line,
     enum got_hash_algorithm algo)
