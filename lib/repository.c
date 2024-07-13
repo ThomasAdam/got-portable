@@ -791,7 +791,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 	err = read_gitconfig(repo, global_gitconfig_path);
 	if (err)
 		goto done;
-	if (repo->gitconfig_repository_format_version != 0) {
+	if (repo->gitconfig_repository_format_version > 1) {
 		err = got_error_path(path, GOT_ERR_GIT_REPO_FORMAT);
 		goto done;
 	}
@@ -799,6 +799,18 @@ got_repo_open(struct got_repository **repop, const char *path,
 		char *ext = repo->extnames[i];
 		char *val = repo->extvals[i];
 		int j, supported = 0;
+
+		if (repo->gitconfig_repository_format_version == 1 &&
+		    strcasecmp(ext, "objectformat") == 0) {
+			if (strcmp(val, "sha1") == 0)
+				continue;
+			if (strcmp(val, "sha256") == 0) {
+				repo->algo = GOT_HASH_SHA256;
+				continue;
+			}
+			err = got_error_path(val, GOT_ERR_OBJECT_FORMAT);
+			goto done;
+		}
 
 		if (!is_boolean_val(val)) {
 			err = got_error_path(ext, GOT_ERR_GIT_REPO_EXT);
