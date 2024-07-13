@@ -64,8 +64,8 @@ const struct got_error *got_pack_parse_object_type_and_size(uint8_t *,
 /* See Documentation/technical/pack-format.txt in Git. */
 
 struct got_packidx_trailer {
-	u_int8_t	packfile_sha1[SHA1_DIGEST_LENGTH];
-	u_int8_t	packidx_sha1[SHA1_DIGEST_LENGTH];
+	u_int8_t	packfile_hash[GOT_HASH_DIGEST_MAXLEN];
+	u_int8_t	packidx_hash[GOT_HASH_DIGEST_MAXLEN];
 } __attribute__((__packed__));
 
 /* Ignore pack index version 1 which is no longer written by Git. */
@@ -101,7 +101,7 @@ struct got_packidx_v2_hdr {
 	/* Large offsets table is empty for pack files < 2 GB. */
 	uint64_t	*large_offsets;		/* values are big endian */
 
-	struct got_packidx_trailer *trailer;
+	struct got_packidx_trailer trailer;
 };
 
 struct got_pack_offset_index {

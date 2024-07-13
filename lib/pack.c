@@ -78,11 +78,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	struct got_packidx_v2_hdr *h;
 	struct got_hash ctx;
 	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
-	size_t nobj, len_fanout, len_ids, offset, remain;
+	size_t nobj, len_fanout, len_ids, offset, remain, idlen;
 	ssize_t n;
 	int i;
 
 	got_hash_init(&ctx, p->algo);
+	idlen = got_hash_digest_length(p->algo);
 
 	h = &p->hdr;
 	offset = 0;
@@ -302,32 +303,33 @@ got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 	offset += p->nlargeobj * sizeof(*h->large_offsets);
 
 checksum:
-	if (remain < sizeof(*h->trailer)) {
+	if (remain < idlen * 2) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	if (p->map)
-		h->trailer =
-		    (struct got_packidx_trailer *)((uint8_t*)(p->map + offset));
-	else {
-		h->trailer = malloc(sizeof(*h->trailer));
-		if (h->trailer == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-		n = read(p->fd, h->trailer, sizeof(*h->trailer));
+	if (p->map) {
+		memcpy(h->trailer.packfile_hash, p->map + offset, idlen);
+		memcpy(h->trailer.packidx_hash, p->map + offset + idlen, idlen);
+	} else {
+		n = read(p->fd, h->trailer.packfile_hash, idlen);
 		if (n < 0)
 			err = got_error_from_errno("read");
-		else if (n != sizeof(*h->trailer)) {
+		else if (n != idlen) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+		n = read(p->fd, h->trailer.packidx_hash, idlen);
+		if (n < 0)
+			err = got_error_from_errno("read");
+		else if (n != idlen) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
 	}
 	if (verify) {
-		got_hash_update(&ctx, h->trailer->packfile_sha1,
-		    got_hash_digest_length(p->algo));
+		got_hash_update(&ctx, h->trailer.packfile_hash, idlen);
 		got_hash_final(&ctx, hash);
-		if (got_hash_cmp(ctx.algo, hash, h->trailer->packidx_sha1) != 0)
+		if (got_hash_cmp(ctx.algo, hash, h->trailer.packidx_hash) != 0)
 			err = got_error(GOT_ERR_PACKIDX_CSUM);
 	}
 done:
@@ -435,7 +437,6 @@ got_packidx_close(struct got_packidx *packidx)
 		free(packidx->hdr.crc32);
 		free(packidx->hdr.offsets);
 		free(packidx->hdr.large_offsets);
-		free(packidx->hdr.trailer);
 	}
 	if (close(packidx->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
