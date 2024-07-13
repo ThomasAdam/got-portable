@@ -695,7 +695,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		}
 
 		if (sizeof(struct got_imsg_traversed_commits) +
-		    ncommits * sizeof(commit_ids[0]) >= max_datalen) {
+		    (ncommits + 1) * sizeof(commit_ids[0]) >= max_datalen) {
 			err = send_traversed_commits(commit_ids, ncommits,
 			    ibuf);
 			if (err)
