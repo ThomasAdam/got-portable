@@ -689,11 +689,12 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 	oid = packidx->hdr.sorted_ids + i * digest_len;
 	while (i < totobj && oid[0] == id0) {
-		char id_str[SHA1_DIGEST_STRING_LENGTH];
+		char id_str[GOT_HASH_DIGEST_STRING_MAXLEN];
 		struct got_object_qid *qid;
 		int cmp;
 
-		if (!got_sha1_digest_to_str(oid, id_str, sizeof(id_str)))
+		if (!got_hash_digest_to_str(oid, id_str, sizeof(id_str),
+		    packidx->algo))
 			return got_error(GOT_ERR_NO_SPACE);
 
 		cmp = strncmp(id_str, id_str_prefix, prefix_len);

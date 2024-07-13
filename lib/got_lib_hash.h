@@ -18,11 +18,14 @@
 #define GOT_SHA256_STRING_ZERO "0000000000000000000000000000000000000000000000000000000000000000"
 
 #define GOT_HASH_DIGEST_MAXLEN SHA256_DIGEST_LENGTH
+#define GOT_HASH_DIGEST_STRING_MAXLEN SHA256_DIGEST_STRING_LENGTH
 
 int got_parse_xdigit(uint8_t *, const char *);
 
 char *got_sha1_digest_to_str(const uint8_t *, char *, size_t);
 char *got_sha256_digest_to_str(const uint8_t *, char *, size_t);
+char *got_hash_digest_to_str(const uint8_t *, char *, size_t,
+    enum got_hash_algorithm);
 
 int got_parse_hash_digest(uint8_t *, const char *, enum got_hash_algorithm);
 
