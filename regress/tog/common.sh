@@ -106,6 +106,7 @@ test_init()
 run_test()
 {
 	testfunc="$1"
+	limits="$2"
 
 	if [ -n "$regress_run_only" ]; then
 		case "$regress_run_only" in
