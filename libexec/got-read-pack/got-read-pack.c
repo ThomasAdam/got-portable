@@ -493,7 +493,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 		 */
 		while (remain1 > 0) {
 			err = got_object_parse_tree_entry(&pte1, &elen,
-			    next_entry1, remain1, idlen);
+			    next_entry1, remain1, idlen, pack->algo);
 			if (err)
 				return err;
 			next_entry1 += elen;
@@ -517,7 +517,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 
 		while (remain2 > 0) {
 			err = got_object_parse_tree_entry(&pte2, &elen,
-			    next_entry2, remain2, idlen);
+			    next_entry2, remain2, idlen, pack->algo);
 			if (err)
 				return err;
 			next_entry2 += elen;

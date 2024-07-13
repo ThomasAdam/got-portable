@@ -41,6 +41,7 @@
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
+#include "got_lib_hash.h"
 #include "got_lib_privsep.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_pack.h"

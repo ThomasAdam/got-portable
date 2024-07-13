@@ -762,7 +762,7 @@ got_object_tree_close(struct got_tree_object *tree)
 
 const struct got_error *
 got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
-    char *buf, size_t maxlen, size_t idlen)
+    char *buf, size_t maxlen, size_t idlen, enum got_hash_algorithm algo)
 {
 	char *p, *space;
 
@@ -793,6 +793,8 @@ got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
 	pte->namelen = strlen(pte->name);
 	buf += *elen;
 	pte->id = buf;
+	pte->idlen = idlen;
+	pte->algo = algo;
 	*elen += idlen;
 	return NULL;
 }
@@ -838,7 +840,7 @@ got_object_parse_tree(struct got_parsed_tree_entry **entries, size_t *nentries,
 
 		pte = &(*entries)[*nentries];
 		err = got_object_parse_tree_entry(pte, &elen, buf, remain,
-			digest_len);
+		    digest_len, algo);
 		if (err)
 			goto done;
 		buf += elen;
