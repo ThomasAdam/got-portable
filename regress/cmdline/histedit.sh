@@ -55,10 +55,10 @@ test_histedit_no_op() {
 	local new_commit2=`git_show_head $testroot/repo`
 	local new_author_time2=`git_show_author_time $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -267,10 +267,10 @@ test_histedit_swap() {
 	local new_commit2=`git_show_parent_commit $testroot/repo`
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  epsilon/zeta" > $testroot/stdout.expected
 	echo -n "$short_old_commit2 -> $short_new_commit2: " \
@@ -388,9 +388,9 @@ test_histedit_drop() {
 
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "$short_old_commit1 ->  drop commit: committing changes" \
 		> $testroot/stdout.expected
@@ -511,11 +511,11 @@ EOF
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_old_commit3=`trim_obj_id 28 $old_commit3`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_old_commit3=`trim_obj_id 12 $old_commit3`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -617,8 +617,8 @@ test_histedit_edit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -675,8 +675,8 @@ EOF
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "$short_old_commit1 -> $short_new_commit1: committing changes" \
 		> $testroot/stdout.expected
@@ -926,8 +926,8 @@ test_histedit_abort() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -1058,8 +1058,8 @@ test_histedit_path_prefix_drop() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	echo "$short_old_commit1 ->  drop commit: changing zeta" \
 		> $testroot/stdout.expected
@@ -1161,7 +1161,7 @@ test_histedit_path_prefix_edit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
 
 	echo "G  zeta" > $testroot/stdout.expected
 	echo "Stopping histedit for amending commit $old_commit1" \
@@ -1212,7 +1212,7 @@ EOF
 		got histedit -c > $testroot/stdout)
 
 	local new_commit1=`git_show_head $testroot/repo`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo -n "$short_old_commit1 -> $short_new_commit1: " \
 		> $testroot/stdout.expected
@@ -1359,9 +1359,9 @@ EOF
 
 	local new_commit=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit=`trim_obj_id 28 $new_commit`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit=`trim_obj_id 12 $new_commit`
 
 	echo "G  epsilon/zeta" >> $testroot/stdout.expected
 	echo -n "$short_old_commit2 ->  fold commit: committing to zeta " \
@@ -1395,12 +1395,12 @@ test_histedit_split_commit() {
 	git -C $testroot/repo add epsilon/new
 	git_commit $testroot/repo -m "committing changes 1"
 	local old_commit1=`git_show_head $testroot/repo`
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
 
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing changes 2"
 	local old_commit2=`git_show_head $testroot/repo`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -1471,7 +1471,7 @@ test_histedit_split_commit() {
 		return 1
 	fi
 	local new_commit2=`git_show_head $testroot/repo`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "$short_old_commit1 -> no-op change: committing changes 1" \
 		> $testroot/stdout.expected
@@ -1587,10 +1587,10 @@ EOF
 
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_old_commit3=`trim_obj_id 28 $old_commit3`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_old_commit3=`trim_obj_id 12 $old_commit3`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "A  epsilon/psi" >> $testroot/stdout.expected
 	echo "$short_old_commit1 ->  fold commit: committing changes" \
@@ -1690,9 +1690,9 @@ EOF
 
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "G  alpha" >> $testroot/stdout.expected
 	echo "$short_old_commit1 ->  fold commit: modified alpha" \
@@ -1779,9 +1779,9 @@ EOF
 
 	local new_commit1=`git_show_head $testroot/repo`
 	
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "D  alpha" > $testroot/stdout.expected
 	echo "$short_old_commit1 ->  fold commit: removing alpha" \
@@ -1859,11 +1859,11 @@ EOF
 
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_old_commit3=`trim_obj_id 28 $old_commit3`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_old_commit3=`trim_obj_id 12 $old_commit3`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -1978,12 +1978,12 @@ EOF
 
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local very_short_old_commit1=`trim_obj_id 29 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_old_commit3=`trim_obj_id 28 $old_commit3`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local very_short_old_commit1=`trim_obj_id 11 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+	local short_old_commit3=`trim_obj_id 12 $old_commit3`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -2083,8 +2083,8 @@ test_histedit_edit_only() {
 
 	(cd $testroot/wt && got histedit -e > $testroot/stdout)
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
@@ -2115,7 +2115,7 @@ EOF
 
 	local new_commit1=$(cd $testroot/wt && got info | \
 		grep '^work tree base commit: ' | cut -d: -f2 | tr -d ' ')
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo -n "$short_old_commit1 -> $short_new_commit1: " \
 		> $testroot/stdout.expected
@@ -2146,7 +2146,7 @@ EOF
 		VISUAL="$testroot/editor.sh" got histedit -c > $testroot/stdout)
 
 	local new_commit2=`git_show_head $testroot/repo`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_new_commit2=`trim_obj_id 12 $new_commit2`
 
 	echo -n "$short_old_commit2 -> $short_new_commit2: " \
 		> $testroot/stdout.expected
@@ -2437,8 +2437,8 @@ EOF
 	local new_commit1=`git_show_head $testroot/repo`
 	local new_author_time1=`git_show_author_time $testroot/repo`
 
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "$short_old_commit1 -> $short_new_commit1: set executable bit on alpha" \
@@ -2530,9 +2530,9 @@ test_histedit_drop_only() {
 	(cd $testroot/wt && got histedit -d > $testroot/stdout)
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_commit1=`trim_obj_id 28 $drop_commit1`
-	local short_commit2=`trim_obj_id 28 $drop_commit2`
-	local short_commit3=`trim_obj_id 28 $drop_commit3`
+	local short_commit1=`trim_obj_id 12 $drop_commit1`
+	local short_commit2=`trim_obj_id 12 $drop_commit2`
+	local short_commit3=`trim_obj_id 12 $drop_commit3`
 
 	echo "$short_commit1 $drop $dropmsg 1" > $testroot/stdout.expected
 	echo "$short_commit2 $drop $dropmsg 2" >> $testroot/stdout.expected
@@ -2618,17 +2618,17 @@ test_histedit_conflict_revert() {
 	echo "first change of alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
-	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
 
 	echo "second change of alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit2=`git_show_head $testroot/repo`
-	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
 
 	echo "third change of alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit3=`git_show_head $testroot/repo`
-	local short_old_commit3=`trim_obj_id 28 $old_commit3`
+	local short_old_commit3=`trim_obj_id 12 $old_commit3`
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret=$?
@@ -2672,7 +2672,7 @@ EOF
 
 	local new_commit1=$(cd $testroot/wt && got info | \
 		grep 'work tree base commit:' | cut -d ' ' -f5)
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit1=`trim_obj_id 12 $new_commit1`
 
 	echo "$short_old_commit1 -> $short_new_commit1: committing changes" \
 		> $testroot/stdout.expected

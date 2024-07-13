@@ -56,7 +56,7 @@ test_file_changed() {
 
 	wait %1 # wait for nc -l
 
-	short_commit_id=`trim_obj_id 28 $commit_id`
+	short_commit_id=`trim_obj_id 12 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -138,7 +138,7 @@ test_many_commits_not_summarized() {
 
 	wait %1 # wait for nc -l
 
-	short_commit_id=`trim_obj_id 28 $commit_id`
+	short_commit_id=`trim_obj_id 12 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -206,7 +206,7 @@ test_many_commits_summarized() {
 		echo "alpha $i" > $testroot/wt/alpha
 		(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
 		local commit_id=`git_show_head $testroot/repo-clone`
-		local short_commit_id=`trim_obj_id 33 $commit_id`
+		local short_commit_id=`trim_obj_id 7 $commit_id`
 		local author_time=`git_show_author_time $testroot/repo-clone`
 		d=`date -u -r $author_time +"%F"`
 		set -- "$@" "$short_commit_id $d"
@@ -227,7 +227,7 @@ test_many_commits_summarized() {
 
 	wait %1 # wait for nc -l
 
-	short_commit_id=`trim_obj_id 28 $commit_id`
+	short_commit_id=`trim_obj_id 12 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -305,7 +305,7 @@ test_branch_created() {
 
 	wait %1 # wait for nc -l
 
-	short_commit_id=`trim_obj_id 28 $commit_id`
+	short_commit_id=`trim_obj_id 12 $commit_id`
 	HOSTNAME=`hostname`
 	printf "HELO localhost\r\n" > $testroot/stdout.expected
 	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
@@ -361,7 +361,7 @@ test_branch_removed() {
 	sleep 1 # server starts up
 
 	local commit_id=`git_show_branch_head $testroot/repo-clone newbranch`
-	local short_commit_id=`trim_obj_id 28 $commit_id`
+	local short_commit_id=`trim_obj_id 12 $commit_id`
 
 	got send -d newbranch -q -r $testroot/repo-clone
 	ret=$?
@@ -419,7 +419,7 @@ test_tag_created() {
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 	local tag_id=`got ref -r $testroot/repo-clone -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
-	local short_tag_id=`trim_obj_id 28 $tag_id`
+	local short_tag_id=`trim_obj_id 12 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
@@ -500,7 +500,7 @@ test_tag_changed() {
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 	local tag_id=`got ref -r $testroot/repo-clone -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
-	local short_tag_id=`trim_obj_id 28 $tag_id`
+	local short_tag_id=`trim_obj_id 12 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
 		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &

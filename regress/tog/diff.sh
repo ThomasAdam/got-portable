@@ -28,7 +28,7 @@ test_diff_contiguous_commits()
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local head_id=`git_show_head $testroot/repo`
-	local head_id_truncated=`trim_obj_id 13 $head_id`
+	local head_id_truncated=`trim_obj_id 27 $head_id`
 	local alpha_id=`get_blob_id $testroot/repo "" alpha`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
@@ -90,7 +90,7 @@ test_diff_arbitrary_commits()
 	(cd $testroot/repo && git add new)
 	git_commit $testroot/repo -m "new file"
 	local head_id=`git_show_head $testroot/repo`
-	local head_id_truncated=`trim_obj_id 13 $head_id`
+	local head_id_truncated=`trim_obj_id 27 $head_id`
 	local alpha_id=`get_blob_id $testroot/repo "" alpha`
 	local new_id=`get_blob_id $testroot/repo "" new`
 
@@ -499,7 +499,7 @@ test_diff_horizontal_scroll()
 	local author_time=`git_show_author_time $testroot/repo`
 	local date=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
 	local head_id=`git_show_head $testroot/repo`
-	local head_id_truncated=`trim_obj_id 13 $head_id`
+	local head_id_truncated=`trim_obj_id 27 $head_id`
 	local alpha_id=`get_blob_id $testroot/repo "" alpha`
 
 	cat <<EOF >$TOG_TEST_SCRIPT
