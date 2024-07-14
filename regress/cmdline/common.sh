@@ -92,8 +92,8 @@ maybe_pack_repo()
 			arg="-D"
 		fi
 
-		(cd $repo && gotadmin pack -a $arg > /dev/null)
-		(cd $repo && gotadmin cleanup -a -q)
+		gotadmin pack -r "$repo" -a $arg > /dev/null
+		gotadmin cleanup -r "$repo" -a -q
 	fi
 }
 
