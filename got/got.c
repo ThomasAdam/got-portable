@@ -12289,7 +12289,7 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 	struct got_histedit_list_entry *hle;
-	static char msg[92];
+	static char msg[128];
 	char *id_str;
 
 	if (TAILQ_EMPTY(histedit_cmds))
