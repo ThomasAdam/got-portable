@@ -132,7 +132,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		ie->flags |= GOT_FILEIDX_F_NO_BLOB;
 
 	if (commit_sha1) {
-		memcpy(ie->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+		memmove(ie->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
 		ie->flags &= ~GOT_FILEIDX_F_NO_COMMIT;
 	} else
 		ie->flags |= GOT_FILEIDX_F_NO_COMMIT;
