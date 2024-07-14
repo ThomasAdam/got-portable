@@ -266,7 +266,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				err = got_error_from_errno("read");
 				break;
 			}
-			if (n < sizeof(obj->id)) {
+			if (n < digest_len) {
 				err = got_error(GOT_ERR_BAD_PACKFILE);
 				break;
 			}

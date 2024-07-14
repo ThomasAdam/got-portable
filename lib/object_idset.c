@@ -30,6 +30,7 @@
 #include "got_error.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_qid.h"
@@ -94,7 +95,7 @@ got_object_idset_free(struct got_object_idset *set)
 static uint64_t
 idset_hash(struct got_object_idset *set, struct got_object_id *id)
 {
-	return SipHash24(&set->key, id->hash, sizeof(id->hash));
+	return SipHash24(&set->key, id->hash, got_hash_digest_length(id->algo));
 }
 
 static const struct got_error *
