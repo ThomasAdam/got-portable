@@ -1100,6 +1100,11 @@ const struct got_error *
 got_pack_parse_ref_delta(struct got_object_id *id,
     struct got_pack *pack, off_t delta_offset, int tslen)
 {
+	size_t digest_len = got_hash_digest_length(pack->algo);
+
+	memset(id, 0, sizeof(*id));
+	id->algo = pack->algo;
+
 	if (pack->map) {
 		size_t mapoff;
 
@@ -1112,13 +1117,13 @@ got_pack_parse_ref_delta(struct got_object_id *id,
 		mapoff = delta_offset + tslen;
 		if (mapoff + sizeof(*id) >= pack->filesize)
 			return got_error(GOT_ERR_PACK_OFFSET);
-		memcpy(id, pack->map + mapoff, sizeof(*id));
+		memcpy(id->hash, pack->map + mapoff, digest_len);
 	} else {
 		ssize_t n;
-		n = read(pack->fd, id, sizeof(*id));
+		n = read(pack->fd, id->hash, digest_len);
 		if (n < 0)
 			return got_error_from_errno("read");
-		if (n != sizeof(*id))
+		if (n != digest_len)
 			return got_error(GOT_ERR_BAD_PACKFILE);
 	}
 
