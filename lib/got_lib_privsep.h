@@ -655,8 +655,8 @@ struct got_imsg_patch {
 	int	xbit;
 	char	old[PATH_MAX];
 	char	new[PATH_MAX];
-	char	cid[41];
-	char	blob[41];
+	char	cid[GOT_HASH_DIGEST_STRING_MAXLEN];
+	char	blob[GOT_HASH_DIGEST_STRING_MAXLEN];
 };
 
 /*
