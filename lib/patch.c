@@ -84,8 +84,8 @@ struct got_patch {
 	int	 xbit;
 	char	*old;
 	char	*new;
-	char	 cid[41];
-	char	 blob[41];
+	char	 cid[GOT_HASH_DIGEST_STRING_MAXLEN];
+	char	 blob[GOT_HASH_DIGEST_STRING_MAXLEN];
 	struct got_patch_hunk_head head;
 };
 
@@ -717,12 +717,14 @@ open_blob(char **path, FILE **fp, const char *blobid,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_object_id id, *idptr, *matched_id = NULL;
+	enum got_hash_algorithm algo;
 	int fd = -1;
 
 	*fp = NULL;
 	*path = NULL;
+	algo = got_repo_get_object_format(repo);
 
-	if (strlen(blobid) != SHA1_DIGEST_STRING_LENGTH - 1) {
+	if (strlen(blobid) != got_hash_digest_string_length(algo) - 1) {
 		err = got_repo_match_object_id(&matched_id, NULL, blobid,
 		    GOT_OBJ_TYPE_BLOB, NULL /* do not resolve tags */,
 		    repo);
@@ -730,8 +732,7 @@ open_blob(char **path, FILE **fp, const char *blobid,
 			return err;
 		idptr = matched_id;
 	} else {
-		if (!got_parse_object_id(&id, blobid,
-		    got_repo_get_object_format(repo)))
+		if (!got_parse_object_id(&id, blobid, algo))
 			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
 		idptr = &id;
 	}
