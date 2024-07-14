@@ -242,6 +242,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 		memset(obj->id.hash, 0xff, digest_len);
+		obj->id.algo = pack->algo;
 		if (pack->map) {
 			if (mapoff + digest_len >= pack->filesize) {
 				err = got_error(GOT_ERR_BAD_PACKFILE);
@@ -283,6 +284,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		memset(obj->id.hash, 0xff, digest_len);
+		obj->id.algo = pack->algo;
 		err = got_pack_parse_offset_delta(&obj->delta.ofs.base_offset,
 		    &obj->delta.ofs.base_offsetlen, pack, obj->off,
 		    obj->tslen);
