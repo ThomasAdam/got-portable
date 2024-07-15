@@ -135,10 +135,7 @@ git_show_tree()
 
 trim_obj_id()
 {
-	local trimcount=$1
-	local id=$2
-
-	echo "$id" | sed -E "s/^([0-9a-f]{$trimcount}).*/\1/"
+	expr "$2" : "\([0-9a-f]\{$1\}\)"
 }
 
 pop_idx()
