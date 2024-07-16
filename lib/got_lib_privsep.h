@@ -492,7 +492,7 @@ struct got_imsg_send_ref_status {
 
 /* Structure for GOT_IMSG_IDXPACK_REQUEST data. */
 struct got_imsg_index_pack_request {
-	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
+	struct got_object_id id;
 } __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_IDXPACK_PROGRESS data. */
@@ -701,7 +701,7 @@ const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
 const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *,
-    uint8_t *, int);
+    struct got_object_id *, int);
 const struct got_error *got_privsep_send_index_pack_outfd(struct imsgbuf *,
     int);
 const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,

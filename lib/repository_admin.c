@@ -154,7 +154,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	struct got_object_id **ours = NULL, **theirs = NULL;
 	int nours = 0, ntheirs = 0, packfd = -1, i;
 	char *tmpfile_path = NULL, *path = NULL, *packfile_path = NULL;
-	char *sha1_str = NULL;
+	char *hash_str = NULL;
 	FILE *delta_cache = NULL;
 	struct got_ratelimit rl;
 
@@ -208,20 +208,19 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-
-	err = got_pack_create((*pack_hash)->hash, packfd, delta_cache,
+	err = got_pack_create(*pack_hash, packfd, delta_cache,
 	    theirs, ntheirs, ours, nours, repo, loose_obj_only,
 	    0, force_refdelta, progress_cb, progress_arg, &rl,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
-	err = got_object_id_str(&sha1_str, *pack_hash);
+	err = got_object_id_str(&hash_str, *pack_hash);
 	if (err)
 		goto done;
 	if (asprintf(&packfile_path, "%s/%s/pack-%s.pack",
 	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR,
-	    sha1_str) == -1) {
+	    hash_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -259,7 +258,7 @@ done:
 		err = got_error_from_errno2("unlink", tmpfile_path);
 	free(tmpfile_path);
 	free(packfile_path);
-	free(sha1_str);
+	free(hash_str);
 	free(path);
 	if (err) {
 		free(*pack_hash);
@@ -365,8 +364,7 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_index_pack_req(&idxibuf, pack_hash->hash,
-	    npackfd);
+	err = got_privsep_send_index_pack_req(&idxibuf, pack_hash, npackfd);
 	if (err != NULL)
 		goto done;
 	npackfd = -1;

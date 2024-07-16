@@ -36,6 +36,7 @@
 #include "got_repository_dump.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_hash.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_ratelimit.h"
@@ -86,7 +87,7 @@ got_repo_dump(FILE *out, struct got_reflist_head *include_refs,
 {
 	const struct got_error *err = NULL;
 	struct got_ratelimit rl;
-	uint8_t packsha[SHA1_DIGEST_LENGTH];
+	struct got_object_id packhash;
 	FILE *delta_cache = NULL;
 	struct got_reflist_entry *e;
 	struct got_object_id *id = NULL;
@@ -171,7 +172,7 @@ got_repo_dump(FILE *out, struct got_reflist_head *include_refs,
 		goto done;
 	}
 
-	err = got_pack_create(&packsha[0], fileno(out), delta_cache,
+	err = got_pack_create(&packhash, fileno(out), delta_cache,
 	    theirs.ids, theirs.len, ours.ids, ours.len,
 	    repo, 0, 0, 0, progress_cb, progress_arg, &rl,
 	    cancel_cb, cancel_arg);

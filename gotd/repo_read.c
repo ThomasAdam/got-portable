@@ -601,8 +601,8 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 {
 	const struct got_error *err = NULL;
 	struct repo_read_client *client = &repo_read_client;
-	uint8_t packsha1[SHA1_DIGEST_LENGTH];
-	char hex[SHA1_DIGEST_STRING_LENGTH];
+	struct got_object_id packhash;
+	char hex[GOT_HASH_DIGEST_STRING_MAXLEN];
 	FILE *delta_cache = NULL;
 	struct imsgbuf ibuf;
 	struct repo_read_pack_progress_arg pa;
@@ -642,7 +642,7 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (err)
 		goto done;
 
-	err = got_pack_create(packsha1, client->pack_pipe, delta_cache,
+	err = got_pack_create(&packhash, client->pack_pipe, delta_cache,
 	    have_ids.ids, have_ids.nids, want_ids.ids, want_ids.nids,
 	    repo_read.repo, 0, 1, 0, pack_progress, &pa, &rl,
 	    check_cancelled, NULL);
@@ -650,7 +650,8 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 		goto done;
 
 	if (log_getverbose() > 0 &&
-	    got_sha1_digest_to_str(packsha1, hex, sizeof(hex)))
+	    got_hash_digest_to_str(packhash.hash, hex, sizeof(hex),
+	    packhash.algo))
 		log_debug("sent pack-%s.pack", hex);
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_DONE,

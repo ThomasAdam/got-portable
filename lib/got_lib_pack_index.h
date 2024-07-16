@@ -23,6 +23,6 @@ const struct got_error *got_pack_hwrite(int, void *, int, struct got_hash *);
 const struct got_error *
 got_pack_index(struct got_pack *pack, int idxfd,
     FILE *tmpfile, FILE *delta_base_file, FILE *delta_accum_file,
-    uint8_t *pack_sha1_expected,
+    struct got_object_id *pack_hash_expected,
     got_pack_index_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl);

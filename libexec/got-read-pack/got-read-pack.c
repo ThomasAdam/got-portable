@@ -463,7 +463,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 
 	*changed = 0;
 
-	idlen = got_hash_digest_length(GOT_HASH_SHA1);
+	idlen = got_hash_digest_length(pack->algo);
 
 	/* We not do support comparing the root path. */
 	if (got_path_is_root_dir(path))
@@ -542,7 +542,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			break;
 		}
 
-		if (memcmp(pte1.id, pte2.id, SHA1_DIGEST_LENGTH) == 0) {
+		if (memcmp(pte1.id, pte2.id, pte1.idlen) == 0) {
 			*changed = 0;
 			break;
 		}
@@ -576,7 +576,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			next_entry1 = *buf1;
 			remain1 = *len1;
 
-			memcpy(id2.hash, pte2.id, SHA1_DIGEST_LENGTH);
+			memcpy(id2.hash, pte2.id, pte2.idlen);
 			id2.algo = pack->algo;
 			idx = got_packidx_get_object_idx(packidx, &id2);
 			if (idx == -1) {
@@ -1259,7 +1259,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 		}
 
 		err = got_object_parse_tree(&entries, &nentries,
-		    &nentries_alloc, buf, len, GOT_HASH_SHA1);
+		    &nentries_alloc, buf, len, pack->algo);
 		if (err)
 			goto done;
 
@@ -1279,7 +1279,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 			if (err)
 				goto done;
 			eqid->id.algo = pte->algo;
-			memcpy(eqid->id.hash, pte->id, sizeof(eqid->id.hash));
+			memcpy(eqid->id.hash, pte->id, pte->idlen);
 
 			if (got_object_idset_contains(idset, &eqid->id)) {
 				got_object_qid_free(eqid);

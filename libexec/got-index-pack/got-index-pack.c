@@ -82,11 +82,11 @@ main(int argc, char **argv)
 	const struct got_error *err = NULL, *close_err;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
+	struct got_object_id pack_hash;
 	size_t i;
 	int idxfd = -1, tmpfd = -1;
 	FILE *tmpfiles[3];
 	struct got_pack pack;
-	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
 	off_t packfile_size;
 	struct got_ratelimit rl;
 #if 0
@@ -128,8 +128,9 @@ main(int argc, char **argv)
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	memcpy(pack_hash, imsg.data, sizeof(pack_hash));
+	memcpy(&pack_hash, imsg.data, sizeof(pack_hash));
 	pack.fd = imsg_get_fd(&imsg);
+	pack.algo = pack_hash.algo;
 
 	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 	if (err)
@@ -194,7 +195,7 @@ main(int argc, char **argv)
 	}
 #endif
 	err = got_pack_index(&pack, idxfd, tmpfiles[0], tmpfiles[1],
-	    tmpfiles[2], pack_hash, send_index_pack_progress, &ibuf, &rl);
+	    tmpfiles[2], &pack_hash, send_index_pack_progress, &ibuf, &rl);
 done:
 	close_err = got_pack_close(&pack);
 	if (close_err && err == NULL)
