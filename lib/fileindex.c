@@ -746,9 +746,16 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile,
 			return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		}
 		algo = be32toh(hdr.algo);
-		if (algo != repo_algo)
-			return got_error_fmt(GOT_ERR_OBJECT_FORMAT,
-			    "unknown object format");
+		if (algo != repo_algo) {
+			const char *fmt = "unknown";
+
+			if (repo_algo == GOT_HASH_SHA1)
+				fmt = "sha1";
+			else if (repo_algo == GOT_HASH_SHA256)
+				fmt = "sha256";
+
+			return got_error_path(fmt, GOT_ERR_OBJECT_FORMAT);
+		}
 	}
 
 	digest_len = got_hash_digest_length(algo);
