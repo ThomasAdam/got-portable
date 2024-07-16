@@ -15,7 +15,7 @@
  */
 
 const struct got_error *got_object_blob_file_create(struct got_object_id **,
-    FILE **, off_t *, const char *);
+    FILE **, off_t *, const char *, struct got_repository *);
 const struct got_error *got_object_blob_create(struct got_object_id **,
     const char *, struct got_repository *);
 

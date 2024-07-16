@@ -120,7 +120,7 @@ done:
 
 const struct got_error *
 got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
-    off_t *blobsize, const char *ondisk_path)
+    off_t *blobsize, const char *ondisk_path, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *header = NULL;
@@ -133,7 +133,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 	*blobfile = NULL;
 	*blobsize = 0;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, got_repo_get_object_format(repo));
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (fd == -1) {
@@ -235,7 +235,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	off_t blobsize;
 
 	err = got_object_blob_file_create(id, &blobfile, &blobsize,
-	    ondisk_path);
+	    ondisk_path, repo);
 	if (err)
 		return err;
 
@@ -309,17 +309,20 @@ got_object_tree_create(struct got_object_id **id,
 	char modebuf[sizeof("100644 ")];
 	struct got_hash ctx;
 	char *header = NULL;
-	size_t headerlen, len = 0, n;
+	size_t headerlen, len = 0, n, digest_len;
 	FILE *treefile = NULL;
 	off_t treesize = 0;
 	struct got_pathlist_entry *pe;
 	struct got_tree_entry **sorted_entries;
 	struct got_tree_entry *te;
+	enum got_hash_algorithm algo;
 	int i;
 
 	*id = NULL;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	algo = got_repo_get_object_format(repo);
+	digest_len = got_hash_digest_length(algo);
+	got_hash_init(&ctx, algo);
 
 	sorted_entries = calloc(nentries, sizeof(struct got_tree_entry *));
 	if (sorted_entries == NULL)
@@ -336,8 +339,7 @@ got_object_tree_create(struct got_object_id **id,
 		err = te_mode2str(modebuf, sizeof(modebuf), te);
 		if (err)
 			goto done;
-		len += strlen(modebuf) + strlen(te->name) + 1 +
-		    SHA1_DIGEST_LENGTH;
+		len += strlen(modebuf) + strlen(te->name) + 1 + digest_len;
 	}
 
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_TREE, len) == -1) {
@@ -383,7 +385,7 @@ got_object_tree_create(struct got_object_id **id,
 		got_hash_update(&ctx, te->name, len);
 		treesize += n;
 
-		len = SHA1_DIGEST_LENGTH;
+		len = digest_len;
 		n = fwrite(te->id.hash, 1, len, treefile);
 		if (n != len) {
 			err = got_ferror(treefile, GOT_ERR_IO);
@@ -431,15 +433,18 @@ got_object_commit_create(struct got_object_id **id,
 	char *header = NULL, *tree_str = NULL;
 	char *author_str = NULL, *committer_str = NULL;
 	char *id_str = NULL;
-	size_t headerlen, len = 0, n;
+	size_t headerlen, len = 0, n, digest_string_len;
 	FILE *commitfile = NULL;
 	off_t commitsize = 0;
 	struct got_object_qid *qid;
+	enum got_hash_algorithm algo;
 	char *msg0, *msg;
 
 	*id = NULL;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	algo = got_repo_get_object_format(repo);
+	digest_string_len = got_hash_digest_string_length(algo);
+	got_hash_init(&ctx, algo);
 
 	msg0 = strdup(logmsg);
 	if (msg0 == NULL)
@@ -468,9 +473,9 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	}
 
-	len = strlen(GOT_COMMIT_LABEL_TREE) + SHA1_DIGEST_STRING_LENGTH +
+	len = strlen(GOT_COMMIT_LABEL_TREE) + digest_string_len +
 	    nparents *
-	    (strlen(GOT_COMMIT_LABEL_PARENT) + SHA1_DIGEST_STRING_LENGTH) +
+	    (strlen(GOT_COMMIT_LABEL_PARENT) + digest_string_len) +
 	    + strlen(author_str) + strlen(committer_str) + 2 + strlen(msg);
 
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_COMMIT, len) == -1) {
@@ -633,7 +638,7 @@ got_object_tag_create(struct got_object_id **id,
 
 	*id = NULL;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, got_repo_get_object_format(repo));
 
 	err = got_object_id_str(&id_str, object_id);
 	if (err)
