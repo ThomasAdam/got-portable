@@ -53,6 +53,7 @@
 #include "got_lib_privsep.h"
 
 #define GIT_BUNDLE_SIGNATURE_V2 "# v2 git bundle\n"
+#define GIT_BUNDLE_SIGNATURE_V3 "# v3 git bundle\n"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -231,12 +232,15 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	int imsg_idxfds[2] = {-1, -1};
 	int ch, done, nobj, idxstatus;
 	pid_t idxpid;
-	enum got_hash_algorithm algo;
+	enum got_hash_algorithm repo_algo, bundle_algo;
 
 	got_ratelimit_init(&rl, 0, 500);
-	algo = got_repo_get_object_format(repo);
-	digest_len = got_hash_digest_length(algo);
+	repo_algo = got_repo_get_object_format(repo);
+	digest_len = got_hash_digest_length(repo_algo);
 	repo_path = got_repo_get_path_git_dir(repo);
+
+	/* bundles will use v3 and a capability to advertise sha256 */
+	bundle_algo = GOT_HASH_SHA1;
 
 	linelen = getline(&line, &linesize, in);
 	if (linelen == -1) {
@@ -244,8 +248,56 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 		goto done;
 	}
 
-	if (strcmp(line, GIT_BUNDLE_SIGNATURE_V2) != 0) {
+	if (strcmp(line, GIT_BUNDLE_SIGNATURE_V2) != 0 &&
+	    strcmp(line, GIT_BUNDLE_SIGNATURE_V3) != 0) {
 		err = got_error(GOT_ERR_BUNDLE_FORMAT);
+		goto done;
+	}
+
+	/* Parse the capabilities */
+	for (;;) {
+		char *key, *val;
+
+		ch = fgetc(in);
+		if (ch != '@') {
+			if (ch != EOF)
+				ungetc(ch, in);
+			break;
+		}
+
+		linelen = getline(&line, &linesize, in);
+		if (linelen == -1) {
+			err = got_ferror(in, GOT_ERR_IO);
+			goto done;
+		}
+
+		if (line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
+
+		key = line;
+		val = strchr(key, '=');
+		if (val == NULL) {
+			err = got_error_path(key, GOT_ERR_UNKNOWN_CAPA);
+			goto done;
+		}
+		*val++ = '\0';
+		if (!strcmp(key, "object-format")) {
+			if (!strcmp(val, "sha1")) {
+				bundle_algo = GOT_HASH_SHA1;
+				continue;
+			}
+			if (!strcmp(val, "sha256")) {
+				bundle_algo = GOT_HASH_SHA256;
+				continue;
+			}
+		}
+		err = got_error_path(key, GOT_ERR_UNKNOWN_CAPA);
+		goto done;
+	}
+
+	if (bundle_algo != repo_algo) {
+		fprintf(stderr, "%d vs %d\n", bundle_algo, repo_algo);
+		err = got_error(GOT_ERR_OBJECT_FORMAT);
 		goto done;
 	}
 
@@ -267,7 +319,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 		if (line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
 
-		if (!got_parse_object_id(&id, line, algo)) {
+		if (!got_parse_object_id(&id, line, repo_algo)) {
 			err = got_error_path(line, GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
 		}
@@ -312,7 +364,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 			goto done;
 		}
 
-		if (!got_parse_object_id(id, line, algo)) {
+		if (!got_parse_object_id(id, line, repo_algo)) {
 			free(id);
 			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
@@ -344,7 +396,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	if (err)
 		goto done;
 
-	err = copypack(in, packfd, &packsiz, &id, algo, &rl,
+	err = copypack(in, packfd, &packsiz, &id, repo_algo, &rl,
 	    progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
