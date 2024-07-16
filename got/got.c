@@ -14608,10 +14608,12 @@ static const struct got_error *
 cmd_info(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *id_str = NULL;
 	struct got_pathlist_head paths;
 	char *uuidstr = NULL;
+	int *pack_fds = NULL;
 	int ch, show_files = 0;
 
 	TAILQ_INIT(&paths);
@@ -14645,6 +14647,15 @@ cmd_info(int argc, char *argv[])
 			error = wrap_not_worktree_error(error, "info", cwd);
 		goto done;
 	}
+
+	error = got_repo_pack_fds_open(&pack_fds);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree), NULL,
+	    pack_fds);
+	if (error)
+		goto done;
 
 #ifndef PROFILE
 	/* Remove "wpath cpath proc exec sendfd" promises. */
@@ -14692,7 +14703,7 @@ cmd_info(int argc, char *argv[])
 			 */
 			pe->data = (void *)got_error(GOT_ERR_BAD_PATH);
 		}
-		error = got_worktree_path_info(worktree, &paths,
+		error = got_worktree_path_info(worktree, repo, &paths,
 		    print_path_info, &paths, check_cancelled, NULL);
 		if (error)
 			goto done;
@@ -14710,6 +14721,17 @@ cmd_info(int argc, char *argv[])
 done:
 	if (worktree)
 		got_worktree_close(worktree);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (pack_fds) {
+		const struct got_error *pack_err =
+		    got_repo_pack_fds_close(pack_fds);
+		if (error == NULL)
+			error = pack_err;
+	}
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
 	free(id_str);

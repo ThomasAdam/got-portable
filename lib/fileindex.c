@@ -52,6 +52,7 @@ struct got_fileindex {
 	struct got_fileindex_tree entries;
 	int nentries; /* Does not include entries marked for removal. */
 #define GOT_FILEIDX_MAX_ENTRIES INT32_MAX
+	enum got_hash_algorithm algo;
 };
 
 mode_t
@@ -87,8 +88,8 @@ got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *ie,
-    int wt_fd, const char *ondisk_path, uint8_t *blob_sha1,
-    uint8_t *commit_sha1, int update_timestamps)
+    int wt_fd, const char *ondisk_path, struct got_object_id *blob,
+    struct got_object_id *commit, int update_timestamps)
 {
 	struct stat sb;
 
@@ -125,14 +126,14 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		}
 	}
 
-	if (blob_sha1) {
-		memmove(ie->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+	if (blob) {
+		memmove(&ie->blob, blob, sizeof(ie->blob));
 		ie->flags &= ~GOT_FILEIDX_F_NO_BLOB;
 	} else
 		ie->flags |= GOT_FILEIDX_F_NO_BLOB;
 
-	if (commit_sha1) {
-		memmove(ie->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+	if (commit) {
+		memmove(&ie->commit, commit, sizeof(ie->commit));
 		ie->flags &= ~GOT_FILEIDX_F_NO_COMMIT;
 	} else
 		ie->flags |= GOT_FILEIDX_F_NO_COMMIT;
@@ -329,7 +330,7 @@ got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
 }
 
 struct got_fileindex *
-got_fileindex_alloc(void)
+got_fileindex_alloc(enum got_hash_algorithm algo)
 {
 	struct got_fileindex *fileindex;
 
@@ -337,6 +338,7 @@ got_fileindex_alloc(void)
 	if (fileindex == NULL)
 		return NULL;
 
+	fileindex->algo = algo;
 	RB_INIT(&fileindex->entries);
 	return fileindex;
 }
@@ -422,6 +424,7 @@ write_fileindex_entry(struct got_hash *ctx, struct got_fileindex_entry *ie,
 	const struct got_error *err;
 	size_t n;
 	uint32_t stage;
+	size_t digest_len = got_hash_digest_length(ctx->algo);
 
 	err = write_fileindex_val64(ctx, ie->ctime_sec, outfile);
 	if (err)
@@ -450,14 +453,14 @@ write_fileindex_entry(struct got_hash *ctx, struct got_fileindex_entry *ie,
 	if (err)
 		return err;
 
-	got_hash_update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-	n = fwrite(ie->blob_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
-	if (n != SHA1_DIGEST_LENGTH)
+	got_hash_update(ctx, ie->blob.hash, digest_len);
+	n = fwrite(ie->blob.hash, 1, digest_len, outfile);
+	if (n != digest_len)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	got_hash_update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-	n = fwrite(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
-	if (n != SHA1_DIGEST_LENGTH)
+	got_hash_update(ctx, ie->commit.hash, digest_len);
+	n = fwrite(ie->commit.hash, 1, digest_len, outfile);
+	if (n != digest_len)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	err = write_fileindex_val32(ctx, ie->flags, outfile);
@@ -471,10 +474,10 @@ write_fileindex_entry(struct got_hash *ctx, struct got_fileindex_entry *ie,
 	stage = got_fileindex_entry_stage_get(ie);
 	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 	    stage == GOT_FILEIDX_STAGE_ADD) {
-		got_hash_update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
-		n = fwrite(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,
+		got_hash_update(ctx, ie->staged_blob.hash, digest_len);
+		n = fwrite(ie->staged_blob.hash, 1, digest_len,
 		    outfile);
-		if (n != SHA1_DIGEST_LENGTH)
+		if (n != digest_len)
 			return got_ferror(outfile, GOT_ERR_IO);
 	}
 
@@ -488,18 +491,22 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	struct got_fileindex_hdr hdr;
 	struct got_hash ctx;
 	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
-	size_t n;
+	size_t n, digest_len = got_hash_digest_length(fileindex->algo);
 	struct got_fileindex_entry *ie, *tmp;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	memset(hash, 0, sizeof(hash));
+
+	got_hash_init(&ctx, fileindex->algo);
 
 	hdr.signature = htobe32(GOT_FILE_INDEX_SIGNATURE);
 	hdr.version = htobe32(GOT_FILE_INDEX_VERSION);
 	hdr.nentries = htobe32(fileindex->nentries);
+	hdr.algo = htobe32(fileindex->algo);
 
 	got_hash_update(&ctx, &hdr.signature, sizeof(hdr.signature));
 	got_hash_update(&ctx, &hdr.version, sizeof(hdr.version));
 	got_hash_update(&ctx, &hdr.nentries, sizeof(hdr.nentries));
+	got_hash_update(&ctx, &hdr.algo, sizeof(hdr.algo));
 	n = fwrite(&hdr.signature, 1, sizeof(hdr.signature), outfile);
 	if (n != sizeof(hdr.signature))
 		return got_ferror(outfile, GOT_ERR_IO);
@@ -507,6 +514,9 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != sizeof(hdr.version))
 		return got_ferror(outfile, GOT_ERR_IO);
 	n = fwrite(&hdr.nentries, 1, sizeof(hdr.nentries), outfile);
+	if (n != sizeof(hdr.nentries))
+		return got_ferror(outfile, GOT_ERR_IO);
+	n = fwrite(&hdr.algo, 1, sizeof(hdr.algo), outfile);
 	if (n != sizeof(hdr.nentries))
 		return got_ferror(outfile, GOT_ERR_IO);
 
@@ -524,8 +534,8 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	}
 
 	got_hash_final(&ctx, hash);
-	n = fwrite(hash, 1, SHA1_DIGEST_LENGTH, outfile);
-	if (n != SHA1_DIGEST_LENGTH)
+	n = fwrite(hash, 1, digest_len, outfile);
+	if (n != digest_len)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	if (fflush(outfile) != 0)
@@ -600,11 +610,11 @@ read_fileindex_path(char **path, struct got_hash *ctx, FILE *infile)
 
 static const struct got_error *
 read_fileindex_entry(struct got_fileindex_entry **iep, struct got_hash *ctx,
-    FILE *infile, uint32_t version)
+    FILE *infile, uint32_t version, enum got_hash_algorithm algo)
 {
 	const struct got_error *err;
 	struct got_fileindex_entry *ie;
-	size_t n;
+	size_t n, digest_len = got_hash_digest_length(algo);
 
 	*iep = NULL;
 
@@ -639,19 +649,21 @@ read_fileindex_entry(struct got_fileindex_entry **iep, struct got_hash *ctx,
 	if (err)
 		goto done;
 
-	n = fread(ie->blob_sha1, 1, SHA1_DIGEST_LENGTH, infile);
-	if (n != SHA1_DIGEST_LENGTH) {
+	ie->blob.algo = algo;
+	n = fread(ie->blob.hash, 1, digest_len, infile);
+	if (n != digest_len) {
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	got_hash_update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->blob.hash, digest_len);
 
-	n = fread(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
-	if (n != SHA1_DIGEST_LENGTH) {
+	ie->commit.algo = algo;
+	n = fread(ie->commit.hash, 1, digest_len, infile);
+	if (n != digest_len) {
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	got_hash_update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_update(ctx, ie->commit.hash, digest_len);
 
 	err = read_fileindex_val32(&ie->flags, ctx, infile);
 	if (err)
@@ -665,14 +677,15 @@ read_fileindex_entry(struct got_fileindex_entry **iep, struct got_hash *ctx,
 		uint32_t stage = got_fileindex_entry_stage_get(ie);
 		if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 		    stage == GOT_FILEIDX_STAGE_ADD) {
-			n = fread(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,
+			ie->staged_blob.algo = algo;
+			n = fread(ie->staged_blob.hash, 1, digest_len,
 			    infile);
-			if (n != SHA1_DIGEST_LENGTH) {
+			if (n != digest_len) {
 				err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 				goto done;
 			}
-			got_hash_update(ctx, ie->staged_blob_sha1,
-			    SHA1_DIGEST_LENGTH);
+			got_hash_update(ctx, ie->staged_blob.hash,
+			    digest_len);
 		}
 	} else {
 		/* GOT_FILE_INDEX_VERSION 1 does not support staging. */
@@ -688,18 +701,19 @@ done:
 }
 
 const struct got_error *
-got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
+got_fileindex_read(struct got_fileindex *fileindex, FILE *infile,
+    enum got_hash_algorithm repo_algo)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_hdr hdr;
 	struct got_hash ctx;
 	struct got_fileindex_entry *ie;
-	uint8_t sha1_expected[SHA1_DIGEST_LENGTH];
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
-	size_t n;
+	enum got_hash_algorithm algo = repo_algo;
+	uint8_t hash_expected[GOT_HASH_DIGEST_MAXLEN];
+	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
+	size_t n, digest_len;
+	uint32_t version;
 	int i;
-
-	got_hash_init(&ctx, GOT_HASH_SHA1);
 
 	n = fread(&hdr.signature, 1, sizeof(hdr.signature), infile);
 	if (n != sizeof(hdr.signature)) {
@@ -719,10 +733,29 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 			return NULL;
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	}
+	version = be32toh(hdr.version);
 
+	if (version >= 3) {
+		n = fread(&hdr.algo, 1, sizeof(hdr.algo), infile);
+		if (n != sizeof(hdr.algo)) {
+			if (n == 0) /* EOF */
+				return NULL;
+			return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+		}
+		algo = be32toh(hdr.algo);
+		if (algo != repo_algo)
+			return got_error_fmt(GOT_ERR_OBJECT_FORMAT,
+			    "unknown object format");
+	}
+
+	digest_len = got_hash_digest_length(algo);
+
+	got_hash_init(&ctx, algo);
 	got_hash_update(&ctx, &hdr.signature, sizeof(hdr.signature));
 	got_hash_update(&ctx, &hdr.version, sizeof(hdr.version));
 	got_hash_update(&ctx, &hdr.nentries, sizeof(hdr.nentries));
+	if (version >= 3)
+		got_hash_update(&ctx, &hdr.algo, sizeof(hdr.algo));
 
 	hdr.signature = be32toh(hdr.signature);
 	hdr.version = be32toh(hdr.version);
@@ -733,8 +766,10 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	if (hdr.version > GOT_FILE_INDEX_VERSION)
 		return got_error(GOT_ERR_FILEIDX_VER);
 
+	fileindex->algo = algo;
 	for (i = 0; i < hdr.nentries; i++) {
-		err = read_fileindex_entry(&ie, &ctx, infile, hdr.version);
+		err = read_fileindex_entry(&ie, &ctx, infile,
+		    hdr.version, algo);
 		if (err)
 			return err;
 		err = add_entry(fileindex, ie);
@@ -744,11 +779,11 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		}
 	}
 
-	n = fread(sha1_expected, 1, sizeof(sha1_expected), infile);
-	if (n != sizeof(sha1_expected))
+	n = fread(hash_expected, 1, digest_len, infile);
+	if (n != digest_len)
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-	got_hash_final(&ctx, sha1);
-	if (memcmp(sha1, sha1_expected, SHA1_DIGEST_LENGTH) != 0)
+	got_hash_final(&ctx, hash);
+	if (got_hash_cmp(algo, hash, hash_expected) != 0)
 		return got_error(GOT_ERR_FILEIDX_CSUM);
 
 	return NULL;
@@ -1240,27 +1275,21 @@ struct got_object_id *
 got_fileindex_entry_get_staged_blob_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
-	memset(id, 0, sizeof(*id));
-	memcpy(id->hash, ie->staged_blob_sha1, sizeof(ie->staged_blob_sha1));
-	return id;
+	return memcpy(id, &ie->staged_blob, sizeof(*id));
 }
 
 struct got_object_id *
 got_fileindex_entry_get_blob_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
-	memset(id, 0, sizeof(*id));
-	memcpy(id->hash, ie->blob_sha1, sizeof(ie->blob_sha1));
-	return id;
+	return memcpy(id, &ie->blob, sizeof(*id));
 }
 
 struct got_object_id *
 got_fileindex_entry_get_commit_id(struct got_object_id *id,
     struct got_fileindex_entry *ie)
 {
-	memset(id, 0, sizeof(*id));
-	memcpy(id->hash, ie->commit_sha1, sizeof(ie->commit_sha1));
-	return id;
+	return memcpy(id, &ie->commit, sizeof(*id));
 }
 
 RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

@@ -46,11 +46,17 @@ struct got_fileindex_entry {
 #define GOT_FILEIDX_MODE_PERMS		0xfff0
 #define GOT_FILEIDX_MODE_PERMS_SHIFT	4
 
-	/* SHA1 of corresponding blob in repository. */
-	uint8_t blob_sha1[SHA1_DIGEST_LENGTH];
+	/*
+	 * id of corresponding blob in repository.  only the actual
+	 * hash is written to the disk.
+	 */
+	struct got_object_id blob;
 
-	/* SHA1 of corresponding base commit in repository. */
-	uint8_t commit_sha1[SHA1_DIGEST_LENGTH];
+	/*
+	 * id of corresponding base commit in repository.  only the
+	 * actual hash is written to the disk.
+	 */
+	struct got_object_id commit;
 
 	uint32_t flags;
 
@@ -62,11 +68,12 @@ struct got_fileindex_entry {
 
 	/*
 	 * (since GOT_FILE_INDEX_VERSION 2)
-	 * SHA1 of staged blob in repository if stage equals either
+	 * Hash of staged blob in repository if stage equals either
 	 * GOT_FILEIDX_STAGE_MODIFY or GOT_FILEIDX_STAGE_ADD.
 	 * Otherwise, this field is not written to disk.
+	 * Only the actual hash is written to the disk.
 	 */
-	uint8_t staged_blob_sha1[SHA1_DIGEST_LENGTH];
+	struct got_object_id staged_blob;
 };
 
 /* Modifications explicitly staged for commit. */
@@ -97,10 +104,15 @@ struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian */
 #define GOT_FILE_INDEX_SIGNATURE	0x676f7449 /* 'g', 'o', 't', 'I' */
 	uint32_t version;	/* big-endian */
-#define GOT_FILE_INDEX_VERSION	2
+#define GOT_FILE_INDEX_VERSION	3
 	uint32_t nentries;	/* big-endian */
+	uint32_t algo;		/* big-endian -- since v3 */
 	/* list of concatenated fileindex entries */
-	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
+	/*
+	 * checksum of above on-disk data, the actual length of the
+	 * hash depends on the algorithm.
+	 */
+	uint8_t hash[GOT_HASH_DIGEST_MAXLEN];
 };
 
 mode_t got_fileindex_entry_perms_get(struct got_fileindex_entry *);
@@ -108,13 +120,13 @@ uint16_t got_fileindex_perms_from_st(struct stat *);
 mode_t got_fileindex_perms_to_st(struct got_fileindex_entry *);
 
 const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
-    int, const char *, uint8_t *, uint8_t *, int);
+    int, const char *, struct got_object_id *, struct got_object_id *, int);
 void got_fileindex_entry_mark_skipped(struct got_fileindex_entry *);
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);
 
-struct got_fileindex *got_fileindex_alloc(void);
+struct got_fileindex *got_fileindex_alloc(enum got_hash_algorithm);
 void got_fileindex_free(struct got_fileindex *);
 const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
 const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
@@ -123,7 +135,8 @@ void got_fileindex_entry_remove(struct got_fileindex *,
     struct got_fileindex_entry *);
 struct got_fileindex_entry *got_fileindex_entry_get(struct got_fileindex *,
     const char *, size_t);
-const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *);
+const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *,
+	enum got_hash_algorithm);
 typedef const struct got_error *(*got_fileindex_cb)(void *,
     struct got_fileindex_entry *);
 const struct got_error *got_fileindex_for_each_entry_safe(
