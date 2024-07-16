@@ -30,6 +30,7 @@
 #include "got_error.h"
 #include "got_cancel.h"
 #include "got_reference.h"
+#include "got_repository.h"
 #include "got_repository_admin.h" /* XXX for pack_progress */
 #include "got_object.h"
 #include "got_opentemp.h"
@@ -43,6 +44,7 @@
 #include "got_lib_pack_create.h"
 
 #define GIT_BUNDLE_SIGNATURE_V2 "# v2 git bundle"
+#define GIT_BUNDLE_SIGNATURE_V3 "# v3 git bundle"
 
 struct idvec {
 	struct got_object_id	**ids;
@@ -94,17 +96,33 @@ got_repo_dump(FILE *out, struct got_reflist_head *include_refs,
 	struct got_commit_object *commit = NULL;
 	struct idvec ours, theirs;
 	char *nl, *s, *hex, *logmsg = NULL;
-	const char *refname;
+	const char *refname, *signature;
+	enum got_hash_algorithm algo;
 	int r;
+
+	algo = got_repo_get_object_format(repo);
+	switch (algo) {
+	case GOT_HASH_SHA1:
+		signature = GIT_BUNDLE_SIGNATURE_V2;
+		break;
+	case GOT_HASH_SHA256:
+		signature = GIT_BUNDLE_SIGNATURE_V3;
+		break;
+	default:
+		return got_error(GOT_ERR_OBJECT_FORMAT);
+	}
 
 	got_ratelimit_init(&rl, 0, 500);
 
 	memset(&ours, 0, sizeof(ours));
 	memset(&theirs, 0, sizeof(theirs));
 
-	r = fprintf(out, "%s\n", GIT_BUNDLE_SIGNATURE_V2);
+	r = fprintf(out, "%s\n", signature);
 	if (r != strlen(GIT_BUNDLE_SIGNATURE_V2) + 1)
 		return got_ferror(out, GOT_ERR_IO);
+
+	if (algo == GOT_HASH_SHA256)
+		fprintf(out, "@object-format=sha256\n");
 
 	TAILQ_FOREACH(e, exclude_refs, entry) {
 		err = got_ref_resolve(&id, repo, e->ref);
