@@ -1117,7 +1117,7 @@ create_fileindex_entry(struct got_fileindex_entry **new_iep,
 		return err;
 
 	err = got_fileindex_entry_update(new_ie, wt_fd, path,
-	    blob_id->hash, base_commit_id->hash, update_timestamps);
+	    blob_id, base_commit_id, update_timestamps);
 	if (err)
 		goto done;
 
@@ -1900,7 +1900,7 @@ sync_timestamps(int wt_fd, const char *path, unsigned char status,
 {
 	if (status == GOT_STATUS_NO_CHANGE && stat_info_differs(ie, sb))
 		return got_fileindex_entry_update(ie, wt_fd, path,
-		    ie->blob_sha1, ie->commit_sha1, 1);
+		    &ie->blob, &ie->commit, 1);
 
 	return NULL;
 }
@@ -2003,8 +2003,8 @@ update_blob(struct got_worktree *worktree,
 		 * updating contents of this file.
 		 */
 		if (got_fileindex_entry_has_commit(ie) &&
-		    memcmp(ie->commit_sha1, worktree->base_commit_id->hash,
-		    SHA1_DIGEST_LENGTH) == 0) {
+		    got_object_id_cmp(&ie->commit,
+		    worktree->base_commit_id) == 0) {
 			/* Same commit. */
 			err = sync_timestamps(worktree->root_fd,
 			    path, status, ie, &sb);
@@ -2015,14 +2015,12 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 		}
 		if (got_fileindex_entry_has_blob(ie) &&
-		    memcmp(ie->blob_sha1, te->id.hash,
-		    SHA1_DIGEST_LENGTH) == 0) {
+		    got_object_id_cmp(&ie->blob, &te->id) == 0) {
 			/* Different commit but the same blob. */
 			if (got_fileindex_entry_has_commit(ie)) {
 				/* Update the base commit ID of this file. */
-				memcpy(ie->commit_sha1,
-				    worktree->base_commit_id->hash,
-				    sizeof(ie->commit_sha1));
+				memcpy(&ie->commit, worktree->base_commit_id,
+				    sizeof(ie->commit));
 			}
 			err = sync_timestamps(worktree->root_fd,
 			    path, status, ie, &sb);
@@ -2060,9 +2058,10 @@ update_blob(struct got_worktree *worktree,
 				goto done;
 		}
 		if (got_fileindex_entry_has_commit(ie)) {
-			char id_str[SHA1_DIGEST_STRING_LENGTH];
-			if (got_sha1_digest_to_str(ie->commit_sha1, id_str,
-			    sizeof(id_str)) == NULL) {
+			char id_str[GOT_HASH_DIGEST_STRING_MAXLEN];
+
+			if (got_hash_digest_to_str(ie->commit.hash, id_str,
+			    sizeof(id_str), ie->commit.algo) == NULL) {
 				err = got_error_path(id_str,
 				    GOT_ERR_BAD_OBJ_ID_STR);
 				goto done;
@@ -2103,17 +2102,16 @@ update_blob(struct got_worktree *worktree,
 		 * unmodified files again.
 		 */
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.hash, worktree->base_commit_id->hash,
-		    update_timestamps);
+		    &blob->id, worktree->base_commit_id, update_timestamps);
 	} else if (status == GOT_STATUS_MODE_CHANGE) {
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.hash, worktree->base_commit_id->hash, 0);
+		    &blob->id, worktree->base_commit_id, 0);
 	} else if (status == GOT_STATUS_DELETE) {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		if (err)
 			goto done;
 		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
-		    blob->id.hash, worktree->base_commit_id->hash, 0);
+		    &blob->id, worktree->base_commit_id, 0);
 		if (err)
 			goto done;
 	} else {
@@ -2137,8 +2135,8 @@ update_blob(struct got_worktree *worktree,
 
 		if (ie) {
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, path, blob->id.hash,
-			    worktree->base_commit_id->hash, 1);
+			    worktree->root_fd, path, &blob->id,
+			    worktree->base_commit_id, 1);
 		} else {
 			err = create_fileindex_entry(&ie, fileindex,
 			    worktree->base_commit_id, worktree->root_fd, path,
@@ -2514,13 +2512,13 @@ get_fileindex_path(char **fileindex_path, struct got_worktree *worktree)
 
 static const struct got_error *
 open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
-    struct got_worktree *worktree)
+    struct got_worktree *worktree, enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	FILE *index = NULL;
 
+	*fileindex = got_fileindex_alloc(algo);
 	*fileindex_path = NULL;
-	*fileindex = got_fileindex_alloc();
 	if (*fileindex == NULL)
 		return got_error_from_errno("got_fileindex_alloc");
 
@@ -2533,7 +2531,7 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 		if (errno != ENOENT)
 			err = got_error_from_errno2("fopen", *fileindex_path);
 	} else {
-		err = got_fileindex_read(*fileindex, index);
+		err = got_fileindex_read(*fileindex, index, algo);
 		if (fclose(index) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
@@ -2571,8 +2569,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	if (got_fileindex_entry_was_skipped(ie))
 		return NULL;
 
-	if (memcmp(ie->commit_sha1, a->base_commit_id->hash,
-	    SHA1_DIGEST_LENGTH) == 0)
+	if (got_object_id_cmp(&ie->commit, a->base_commit_id) == 0)
 		return NULL;
 
 	if (a->progress_cb) {
@@ -2581,7 +2578,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 		if (err)
 			return err;
 	}
-	memcpy(ie->commit_sha1, a->base_commit_id->hash, SHA1_DIGEST_LENGTH);
+	memcpy(&ie->commit, a->base_commit_id, sizeof(ie->commit));
 	return NULL;
 }
 
@@ -2870,7 +2867,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	 * Checking out files is supposed to be an idempotent operation.
 	 * If the on-disk file index is incomplete we will try to complete it.
 	 */
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -2968,8 +2966,8 @@ add_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	} else {
 		/* Re-adding a locally deleted file. */
 		err = got_fileindex_entry_update(ie,
-		    worktree->root_fd, path2, ie->blob_sha1,
-		    worktree->base_commit_id->hash, 0);
+		    worktree->root_fd, path2, &ie->blob,
+		    worktree->base_commit_id, 0);
 		if (err)
 			return err;
 	}
@@ -3322,8 +3320,7 @@ check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 
 	/* Reject merges into a work tree with mixed base commits. */
 	if (got_fileindex_entry_has_commit(ie) &&
-	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->hash,
-	    SHA1_DIGEST_LENGTH) != 0)
+	    got_object_id_cmp(&ie->commit, a->worktree->base_commit_id) != 0)
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
 	return NULL;
@@ -3361,7 +3358,8 @@ got_worktree_get_state(char *state, struct got_repository *repo,
 	cma.cancel_arg = cancel_arg;
 
 	if (got_object_id_cmp(base_id, head_id) == 0) {
-		err = open_fileindex(&fileindex, &fileindex_path, worktree);
+		err = open_fileindex(&fileindex, &fileindex_path, worktree,
+		    got_repo_get_object_format(repo));
 		if (err)
 			goto done;
 
@@ -3570,7 +3568,8 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -4229,7 +4228,8 @@ got_worktree_status(struct got_worktree *worktree,
 	struct got_fileindex *fileindex = NULL;
 	struct got_pathlist_entry *pe;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		return err;
 
@@ -4447,7 +4447,8 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -4637,7 +4638,8 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -5311,8 +5313,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			    status == GOT_STATUS_MODE_CHANGE) {
 				err = got_fileindex_entry_update(ie,
 				    a->worktree->root_fd, relpath,
-				    blob->id.hash,
-				    a->worktree->base_commit_id->hash, 1);
+				    &blob->id, a->worktree->base_commit_id, 1);
 				if (err)
 					goto done;
 			}
@@ -5361,7 +5362,8 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -6284,22 +6286,20 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->staged_blob_id->hash,
-				    new_base_commit_id->hash,
+				    ct->staged_blob_id, new_base_commit_id,
 				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->blob_id->hash,
-				    new_base_commit_id->hash,
+				    ct->blob_id, new_base_commit_id,
 				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
 				goto done;
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, relpath, ct->blob_id->hash,
-			    new_base_commit_id->hash, 1);
+			    worktree->root_fd, relpath, ct->blob_id,
+			    new_base_commit_id, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
@@ -6611,7 +6611,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -6750,8 +6751,7 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 	char *ondisk_path;
 
 	/* Reject rebase of a work tree with mixed base commits. */
-	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->hash,
-	    SHA1_DIGEST_LENGTH))
+	if (got_object_id_cmp(&ie->commit, a->worktree->base_commit_id))
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
 	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, ie->path)
@@ -6794,7 +6794,8 @@ got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -6910,7 +6911,8 @@ got_worktree_rebase_continue(struct got_object_id **commit_id,
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -7884,7 +7886,8 @@ got_worktree_histedit_prepare(struct got_reference **tmp_branch,
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -8020,7 +8023,8 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -8407,7 +8411,8 @@ got_worktree_integrate_prepare(struct got_fileindex **fileindex,
 		goto done;
 	}
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -8791,7 +8796,8 @@ const struct got_error *got_worktree_merge_prepare(
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -8897,7 +8903,8 @@ got_worktree_merge_continue(char **branch_name,
 	if (err)
 		return err;
 
-	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -9237,8 +9244,8 @@ stage_path(void *arg, unsigned char status,
 		    path_content ? path_content : ondisk_path, a->repo);
 		if (err)
 			break;
-		memcpy(ie->staged_blob_sha1, new_staged_blob_id->hash,
-		    SHA1_DIGEST_LENGTH);
+		memcpy(&ie->staged_blob, new_staged_blob_id,
+		    sizeof(ie->staged_blob));
 		if (status == GOT_STATUS_ADD || staged_status == GOT_STATUS_ADD)
 			stage = GOT_FILEIDX_STAGE_ADD;
 		else
@@ -9290,8 +9297,7 @@ stage_path(void *arg, unsigned char status,
 		 * When staging the reverse of the staged diff,
 		 * implicitly unstage the file.
 		 */
-		if (memcmp(ie->staged_blob_sha1, ie->blob_sha1,
-		    sizeof(ie->blob_sha1)) == 0) {
+		if (got_object_id_cmp(&ie->staged_blob, &ie->blob) == 0) {
 			got_fileindex_entry_stage_set(ie,
 			    GOT_FILEIDX_STAGE_NONE);
 		}
@@ -9369,7 +9375,8 @@ got_worktree_stage(struct got_worktree *worktree,
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
 	if (err)
 		goto done;
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -9708,8 +9715,8 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		goto done;
 
 	if (new_staged_blob_id) {
-		memcpy(ie->staged_blob_sha1, new_staged_blob_id->hash,
-		    SHA1_DIGEST_LENGTH);
+		memcpy(&ie->staged_blob, new_staged_blob_id,
+		    sizeof(ie->staged_blob));
 	} else {
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
 		got_fileindex_entry_staged_filetype_set(ie, 0);
@@ -9916,7 +9923,8 @@ got_worktree_unstage(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -9999,6 +10007,7 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_worktree_path_info(struct got_worktree *worktree,
+    struct got_repository *repo,
     struct got_pathlist_head *paths,
     got_worktree_path_info_cb info_cb, void *info_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
@@ -10013,7 +10022,8 @@ got_worktree_path_info(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 
@@ -10119,9 +10129,11 @@ patch_can_edit(const char *path, unsigned char status,
 
 const struct got_error *
 got_worktree_patch_prepare(struct got_fileindex **fileindex,
-    char **fileindex_path, struct got_worktree *worktree)
+    char **fileindex_path, struct got_worktree *worktree,
+    struct got_repository *repo)
 {
-	return open_fileindex(fileindex, fileindex_path, worktree);
+	return open_fileindex(fileindex, fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 }
 
 const struct got_error *

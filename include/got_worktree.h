@@ -590,8 +590,9 @@ typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
  * a path, and meta-data arguments (see got_worktree_path_info_cb).
  */
 const struct got_error *
-got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
-    got_worktree_path_info_cb, void *, got_cancel_cb , void *);
+got_worktree_path_info(struct got_worktree *, struct got_repository *,
+    struct got_pathlist_head *, got_worktree_path_info_cb, void *,
+    got_cancel_cb , void *);
 
 /* References pointing at pre-rebase commit backups. */
 #define GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX "refs/got/backup/rebase"
@@ -604,7 +605,7 @@ got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
  */
 const struct got_error *
 got_worktree_patch_prepare(struct got_fileindex **, char **,
-    struct got_worktree *);
+    struct got_worktree *, struct got_repository *);
 
 /*
  * Lookup paths for the "old" and "new" file before patching and check their

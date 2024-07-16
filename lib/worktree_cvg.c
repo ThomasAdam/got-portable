@@ -563,13 +563,13 @@ get_fileindex_path(char **fileindex_path, struct got_worktree *worktree)
 
 static const struct got_error *
 open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
-    struct got_worktree *worktree)
+    struct got_worktree *worktree, enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	FILE *index = NULL;
 
 	*fileindex_path = NULL;
-	*fileindex = got_fileindex_alloc();
+	*fileindex = got_fileindex_alloc(algo);
 	if (*fileindex == NULL)
 		return got_error_from_errno("got_fileindex_alloc");
 
@@ -582,7 +582,7 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 		if (errno != ENOENT)
 			err = got_error_from_errno2("fopen", *fileindex_path);
 	} else {
-		err = got_fileindex_read(*fileindex, index);
+		err = got_fileindex_read(*fileindex, index, algo);
 		if (fclose(index) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
@@ -2145,22 +2145,20 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->staged_blob_id->hash,
-				    new_base_commit_id->hash,
+				    ct->staged_blob_id, new_base_commit_id,
 				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    worktree->root_fd, relpath,
-				    ct->blob_id->hash,
-				    new_base_commit_id->hash,
+				    ct->blob_id, new_base_commit_id,
 				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
 				goto done;
 			err = got_fileindex_entry_update(ie,
-			    worktree->root_fd, relpath, ct->blob_id->hash,
-			    new_base_commit_id->hash, 1);
+			    worktree->root_fd, relpath, ct->blob_id,
+			    new_base_commit_id, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
@@ -2969,7 +2967,8 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	    got_repo_get_object_format(repo));
 	if (err)
 		goto done;
 

@@ -1083,7 +1083,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 
 	err = got_worktree_patch_prepare(&fileindex, &fileindex_path,
-	    worktree);
+	    worktree, repo);
 	if (err)
 		goto done;
 
