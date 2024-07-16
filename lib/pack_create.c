@@ -41,6 +41,7 @@
 #include "got_object.h"
 #include "got_path.h"
 #include "got_reference.h"
+#include "got_repository.h"
 #include "got_repository_admin.h"
 
 #include "got_lib_deltify.h"
@@ -1555,6 +1556,7 @@ deltahdr(off_t *packfile_size, struct got_hash *ctx, int packfd,
 	const struct got_error *err;
 	char buf[32];
 	int nh;
+	size_t digest_len = got_hash_digest_length(m->prev->id.algo);
 
 	if (m->prev->off != 0 && !force_refdelta) {
 		err = packhdr(&nh, buf, sizeof(buf),
@@ -1575,11 +1577,10 @@ deltahdr(off_t *packfile_size, struct got_hash *ctx, int packfd,
 		if (err)
 			return err;
 		*packfile_size += nh;
-		err = hwrite(packfd, m->prev->id.hash,
-		    sizeof(m->prev->id.hash), ctx);
+		err = hwrite(packfd, m->prev->id.hash, digest_len, ctx);
 		if (err)
 			return err;
-		*packfile_size += sizeof(m->prev->id.hash);
+		*packfile_size += digest_len;
 	}
 
 	return NULL;
@@ -1681,8 +1682,9 @@ done:
 }
 
 static const struct got_error *
-genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
-    FILE *delta_cache, struct got_pack_meta **deltify, int ndeltify,
+genpack(struct got_object_id *pack_hash, int packfd,
+    struct got_pack *reuse_pack, FILE *delta_cache,
+    struct got_pack_meta **deltify, int ndeltify,
     struct got_pack_meta **reuse, int nreuse,
     int ncolored, int nfound, int ntrees, int nours,
     struct got_repository *repo, int force_refdelta,
@@ -1701,8 +1703,15 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 	uint8_t *delta_cache_map = NULL;
 	size_t delta_cache_size = 0;
 	FILE *packfile = NULL;
+	enum got_hash_algorithm algo;
+	size_t digest_len;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	algo = got_repo_get_object_format(repo);
+	digest_len = got_hash_digest_length(algo);
+	got_hash_init(&ctx, algo);
+
+	memset(pack_hash, 0, sizeof(*pack_hash));
+	pack_hash->algo = algo;
 
 #ifndef GOT_PACK_NO_MMAP
 	delta_cache_fd = dup(fileno(delta_cache));
@@ -1783,11 +1792,11 @@ genpack(uint8_t *pack_sha1, int packfd, struct got_pack *reuse_pack,
 			goto done;
 	}
 
-	got_hash_final(&ctx, pack_sha1);
-	err = got_poll_write_full(packfd, pack_sha1, SHA1_DIGEST_LENGTH);
+	got_hash_final_object_id(&ctx, pack_hash);
+	err = got_poll_write_full(packfd, pack_hash->hash, digest_len);
 	if (err)
 		goto done;
-	packfile_size += SHA1_DIGEST_LENGTH;
+	packfile_size += digest_len;
 	packfile_size += sizeof(struct got_packfile_hdr);
 	if (progress_cb) {
 		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
@@ -1821,7 +1830,7 @@ add_meta_idset_cb(struct got_object_id *id, void *data, void *arg)
 }
 
 const struct got_error *
-got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
+got_pack_create(struct got_object_id *packhash, int packfd, FILE *delta_cache,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
     struct got_repository *repo, int loose_obj_only, int allow_empty,
@@ -1933,7 +1942,7 @@ got_pack_create(uint8_t *packsha1, int packfd, FILE *delta_cache,
 	/* Pinned pack may have moved to different cache slot. */
 	reuse_pack = got_repo_get_pinned_pack(repo);
 
-	err = genpack(packsha1, packfd, reuse_pack, delta_cache, deltify.meta,
+	err = genpack(packhash, packfd, reuse_pack, delta_cache, deltify.meta,
 	    deltify.nmeta, reuse.meta, reuse.nmeta, ncolored, nfound, ntrees,
 	    nours, repo, force_refdelta, progress_cb, progress_arg, rl,
 	    cancel_cb, cancel_arg);

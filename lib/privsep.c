@@ -1077,14 +1077,14 @@ got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
 }
 
 const struct got_error *
-got_privsep_send_index_pack_req(struct imsgbuf *ibuf, uint8_t *pack_sha1,
+got_privsep_send_index_pack_req(struct imsgbuf *ibuf, struct got_object_id *id,
     int fd)
 {
 	const struct got_error *err = NULL;
 
 	/* Keep in sync with struct got_imsg_index_pack_request */
 	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_REQUEST, 0, 0, fd,
-	    pack_sha1, SHA1_DIGEST_LENGTH) == -1) {
+	    id, sizeof(*id)) == -1) {
 		err = got_error_from_errno("imsg_compose INDEX_REQUEST");
 		close(fd);
 		return err;

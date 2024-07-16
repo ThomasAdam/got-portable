@@ -104,19 +104,20 @@ load_report_progress(got_load_progress_cb progress_cb, void *progress_arg,
 }
 
 static const struct got_error *
-copypack(FILE *in, int outfd, off_t *tot,
-    struct got_object_id *id, struct got_ratelimit *rl,
+copypack(FILE *in, int outfd, off_t *tot, struct got_object_id *id,
+    enum got_hash_algorithm algo, struct got_ratelimit *rl,
     got_load_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_hash hash;
 	struct got_object_id expected_id;
-	char buf[BUFSIZ], sha1buf[SHA1_DIGEST_LENGTH];
-	size_t r, sha1buflen = 0;
+	char buf[BUFSIZ], hashbuf[GOT_HASH_DIGEST_MAXLEN];
+	size_t r, digest_len, hashlen = 0;
 
 	*tot = 0;
-	got_hash_init(&hash, GOT_HASH_SHA1);
+	digest_len = got_hash_digest_length(algo);
+	got_hash_init(&hash, algo);
 
 	for (;;) {
 		err = cancel_cb(cancel_arg);
@@ -128,27 +129,27 @@ copypack(FILE *in, int outfd, off_t *tot,
 			break;
 
 		/*
-		 * An expected SHA1 checksum sits at the end of the
-		 * pack file.  Since we don't know the file size ahead
-		 * of time we have to keep SHA1_DIGEST_LENGTH bytes
-		 * buffered and avoid mixing those bytes int our hash
-		 * computation until we know for sure that additional
-		 * pack file data bytes follow.
+		 * An expected a checksum sits at the end of the pack
+		 * file.  Since we don't know the file size ahead of
+		 * time we have to keep digest_len bytes buffered and
+		 * avoid mixing those bytes int our hash computation
+		 * until we know for sure that additional pack file
+		 * data bytes follow.
 		 *
 		 * We can assume that BUFSIZE is greater than
-		 * SHA1_DIGEST_LENGTH and that a short read means that
-		 * we've reached EOF.
+		 * digest_len and that a short read means that we've
+		 * reached EOF.
 		 */
 
-		if (r >= sizeof(sha1buf)) {
-			*tot += sha1buflen;
-			got_hash_update(&hash, sha1buf, sha1buflen);
-			if (write(outfd, sha1buf, sha1buflen) == -1)
+		if (r >= digest_len) {
+			*tot += hashlen;
+			got_hash_update(&hash, hashbuf, hashlen);
+			if (write(outfd, hashbuf, hashlen) == -1)
 				return got_error_from_errno("write");
 
-			r -= sizeof(sha1buf);
-			memcpy(sha1buf, &buf[r], sizeof(sha1buf));
-			sha1buflen = sizeof(sha1buf);
+			r -= digest_len;
+			memcpy(hashbuf, &buf[r], digest_len);
+			hashlen = digest_len;
 
 			*tot += r;
 			got_hash_update(&hash, buf, r);
@@ -163,37 +164,37 @@ copypack(FILE *in, int outfd, off_t *tot,
 			continue;
 		}
 
-		if (sha1buflen == 0)
+		if (hashlen == 0)
 			return got_error(GOT_ERR_BAD_PACKFILE);
 
 		/* short read, we've reached EOF */
 		*tot += r;
-		got_hash_update(&hash, sha1buf, r);
-		if (write(outfd, sha1buf, r) == -1)
+		got_hash_update(&hash, hashbuf, r);
+		if (write(outfd, hashbuf, r) == -1)
 			return got_error_from_errno("write");
 
-		memmove(&sha1buf[0], &sha1buf[r], sizeof(sha1buf) - r);
-		memcpy(&sha1buf[sizeof(sha1buf) - r], buf, r);
+		memmove(&hashbuf[0], &hashbuf[r], digest_len - r);
+		memcpy(&hashbuf[digest_len - r], buf, r);
 		break;
 	}
 
-	if (sha1buflen == 0)
+	if (hashlen == 0)
 		return got_error(GOT_ERR_BAD_PACKFILE);
 
 	got_hash_final_object_id(&hash, id);
 
-	/* XXX SHA256 */
 	memset(&expected_id, 0, sizeof(expected_id));
-	memcpy(&expected_id.hash, sha1buf, sizeof(expected_id.hash));
+	expected_id.algo = algo;
+	memcpy(&expected_id.hash, hashbuf, digest_len);
 
 	if (got_object_id_cmp(id, &expected_id) != 0)
 		return got_error(GOT_ERR_PACKIDX_CSUM);
 
 	/* re-add the expected hash at the end of the pack */
-	if (write(outfd, sha1buf, sizeof(sha1buf)) == -1)
+	if (write(outfd, hashbuf, digest_len) == -1)
 		return got_error_from_errno("write");
 
-	*tot += sizeof(sha1buf);
+	*tot += digest_len;
 	err = progress_cb(progress_arg, *tot, 0, 0, 0, 0);
 	if (err)
 		return err;
@@ -221,16 +222,18 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-	size_t i;
+	size_t i, digest_len;
 	ssize_t n;
 	off_t packsiz;
 	int tmpfds[3] = {-1, -1, -1};
 	int imsg_idxfds[2] = {-1, -1};
 	int ch, done, nobj, idxstatus;
 	pid_t idxpid;
+	enum got_hash_algorithm algo;
 
 	got_ratelimit_init(&rl, 0, 500);
-
+	algo = got_repo_get_object_format(repo);
+	digest_len = got_hash_digest_length(algo);
 	repo_path = got_repo_get_path_git_dir(repo);
 
 	linelen = getline(&line, &linesize, in);
@@ -262,7 +265,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 		if (line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
 
-		if (!got_parse_object_id(&id, line, GOT_HASH_SHA1)) {
+		if (!got_parse_object_id(&id, line, algo)) {
 			err = got_error_path(line, GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
 		}
@@ -307,7 +310,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 			goto done;
 		}
 
-		if (!got_parse_object_id(id, line, GOT_HASH_SHA1)) {
+		if (!got_parse_object_id(id, line, algo)) {
 			free(id);
 			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
@@ -339,7 +342,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	if (err)
 		goto done;
 
-	err = copypack(in, packfd, &packsiz, &id, &rl,
+	err = copypack(in, packfd, &packsiz, &id, algo, &rl,
 	    progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
@@ -350,7 +353,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	}
 
 	/* Safety checks on the pack' content. */
-	if (packsiz <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+	if (packsiz <= ssizeof(pack_hdr) + digest_len) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE, "short pack file");
 		goto done;
 	}
@@ -376,13 +379,13 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	}
 	nobj = be32toh(pack_hdr.nobjects);
 	if (nobj == 0 &&
-	    packsiz > ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+	    packsiz > ssizeof(pack_hdr) + digest_len) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad pack file with zero objects");
 		goto done;
 	}
 	if (nobj != 0 &&
-	    packsiz <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+	    packsiz <= ssizeof(pack_hdr) + digest_len) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "empty pack file with non-zero object count");
 		goto done;
@@ -423,7 +426,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	imsg_idxfds[1] = -1;
 	imsg_init(&idxibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&idxibuf, id.hash, packfd);
+	err = got_privsep_send_index_pack_req(&idxibuf, &id, packfd);
 	if (err)
 		goto done;
 	packfd = -1;

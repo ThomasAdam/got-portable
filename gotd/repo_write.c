@@ -1203,6 +1203,7 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	const struct got_error *err = NULL, *unpack_err;
 	struct repo_write_client *client = &repo_write_client;
 	struct gotd_imsg_recv_packfile ireq;
+	struct got_object_id id;
 	FILE *tempfiles[3] = { NULL, NULL, NULL };
 	struct repo_tempfile {
 		int fd;
@@ -1320,10 +1321,14 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	pack->filesize = pack_filesize;
 	*have_packfile = 1;
 
+	memset(&id, 0, sizeof(id));
+	memcpy(&id.hash, client->pack_sha1, SHA1_DIGEST_LENGTH);
+	id.algo = GOT_HASH_SHA1;
+
 	log_debug("begin indexing pack (%lld bytes in size)",
 	    (long long)pack->filesize);
 	err = got_pack_index(pack, client->packidx_fd,
-	    tempfiles[0], tempfiles[1], tempfiles[2], client->pack_sha1,
+	    tempfiles[0], tempfiles[1], tempfiles[2], &id,
 	    pack_index_progress, NULL, &rl);
 	if (err)
 		goto done;

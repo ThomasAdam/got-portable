@@ -319,8 +319,8 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				break;
 		} else {
 			/*
-			 * XXX Seek back and get CRC and SHA1 of on-disk
-			 * offset bytes.
+			 * XXX Seek back and get CRC and hash digest
+			 * of on-disk offset bytes.
 			 */
 			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET)
 			    == -1) {
@@ -440,9 +440,9 @@ done:
 
 /* Determine the slot in the pack index a given object ID should use. */
 static int
-find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
+find_object_idx(struct got_packidx *packidx, uint8_t *hash)
 {
-	u_int8_t id0 = sha1[0];
+	u_int8_t id0 = hash[0];
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = nindexed - 1;
 	int cmp = 0, i = 0;
@@ -457,7 +457,7 @@ find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
 		i = ((left + right) / 2);
 		oid = packidx->hdr.sorted_ids + i * digest_len;
 
-		cmp = memcmp(sha1, oid, digest_len);
+		cmp = memcmp(hash, oid, digest_len);
 		if (cmp == 0)
 			return -1; /* object already indexed */
 		else if (cmp > 0)
@@ -479,9 +479,9 @@ print_packidx(struct got_packidx *packidx)
 
 	fprintf(stderr, "object IDs:\n");
 	for (i = 0; i < nindexed; i++) {
-		char hex[SHA1_DIGEST_STRING_LENGTH];
-		got_sha1_digest_to_str(packidx->hdr.sorted_ids + i * digest_len,
-		    hex, sizeof(hex));
+		char hex[GOT_HASH_DIGEST_STRING_MAXLEN];
+		got_hash_digest_to_str(packidx->hdr.sorted_ids + i * digest_len,
+		    hex, sizeof(hex), packidx->algo);
 		fprintf(stderr, "%s\n", hex);
 	}
 	fprintf(stderr, "\n");
@@ -607,7 +607,8 @@ report_progress(uint32_t nobj_total, uint32_t nobj_indexed, uint32_t nobj_loose,
 
 const struct got_error *
 got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
-    FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_sha1_expected,
+    FILE *delta_base_file, FILE *delta_accum_file,
+    struct got_object_id *pack_hash_expected,
     got_pack_index_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl)
 {
@@ -615,19 +616,20 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	struct got_packfile_hdr hdr;
 	struct got_packidx packidx;
 	char buf[8];
-	char pack_sha1[SHA1_DIGEST_LENGTH];
+	struct got_object_id pack_hash;
 	uint32_t nobj, nvalid, nloose, nresolved = 0, i;
 	struct got_indexed_object *objects = NULL, *obj;
 	struct got_hash ctx;
-	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
+	uint8_t packidx_hash[GOT_HASH_DIGEST_MAXLEN];
 	ssize_t r, w;
 	int pass, have_ref_deltas = 0, first_delta_idx = -1;
 	size_t mapoff = 0;
 	int p_indexed = 0, last_p_indexed = -1;
 	int p_resolved = 0, last_p_resolved = -1;
+	size_t digest_len = got_hash_digest_length(pack->algo);
 
-	/* Require that pack file header and SHA1 trailer are present. */
-	if (pack->filesize < sizeof(hdr) + SHA1_DIGEST_LENGTH)
+	/* Require that pack file header and hash trailer are present. */
+	if (pack->filesize < sizeof(hdr) + digest_len)
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "short pack file");
 
@@ -654,7 +656,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile with zero objects");
 
-	/* We compute the SHA1 of pack file contents and verify later on. */
+	/* We compute the hash of pack file contents and verify later on. */
 	got_hash_init(&ctx, pack->algo);
 	got_hash_update(&ctx, &hdr, sizeof(hdr));
 
@@ -681,8 +683,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
-	packidx.hdr.sorted_ids = calloc(nobj,
-	    got_hash_digest_length(pack->algo));
+	packidx.hdr.sorted_ids = calloc(nobj, digest_len);
 	if (packidx.hdr.sorted_ids == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
@@ -697,6 +698,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
+	packidx.algo = pack->algo;
 	/* Large offsets table is empty for pack files < 2 GB. */
 	if (pack->filesize >= GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
 		packidx.hdr.large_offsets = calloc(nobj, sizeof(uint64_t));
@@ -779,14 +781,14 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	 * Having done a full pass over the pack file and can now
 	 * verify its checksum.
 	 */
-	got_hash_final(&ctx, pack_sha1);
+	got_hash_final_object_id(&ctx, &pack_hash);
 
-	if (memcmp(pack_sha1_expected, pack_sha1, SHA1_DIGEST_LENGTH) != 0) {
+	if (got_object_id_cmp(pack_hash_expected, &pack_hash) != 0) {
 		err = got_error(GOT_ERR_PACKFILE_CSUM);
 		goto done;
 	}
 
-	/* Verify the SHA1 checksum stored at the end of the pack file. */
+	/* Verify the hash checksum stored at the end of the pack file. */
 	if (pack->map) {
 		if (pack->filesize > SIZE_MAX) {
 			err = got_error_fmt(GOT_ERR_RANGE,
@@ -795,26 +797,26 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			goto done;
 		}
 
-		memcpy(pack_sha1_expected, pack->map +
-		    pack->filesize - SHA1_DIGEST_LENGTH,
-		    SHA1_DIGEST_LENGTH);
+		memcpy(pack_hash_expected, pack->map +
+		    pack->filesize - digest_len,
+		    digest_len);
 	} else {
 		ssize_t n;
-		if (lseek(pack->fd, -SHA1_DIGEST_LENGTH, SEEK_END) == -1) {
+		if (lseek(pack->fd, -digest_len, SEEK_END) == -1) {
 			err = got_error_from_errno("lseek");
 			goto done;
 		}
-		n = read(pack->fd, pack_sha1_expected, SHA1_DIGEST_LENGTH);
+		n = read(pack->fd, pack_hash_expected, digest_len);
 		if (n == -1) {
 			err = got_error_from_errno("read");
 			goto done;
 		}
-		if (n != SHA1_DIGEST_LENGTH) {
+		if (n != digest_len) {
 			err = got_error(GOT_ERR_IO);
 			goto done;
 		}
 	}
-	if (memcmp(pack_sha1, pack_sha1_expected, SHA1_DIGEST_LENGTH) != 0) {
+	if (got_object_id_cmp(pack_hash_expected, &pack_hash) != 0) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad checksum in pack file trailer");
 		goto done;
@@ -914,7 +916,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	free(objects);
 	objects = NULL;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, pack->algo);
 	putbe32(buf, GOT_PACKIDX_V2_MAGIC);
 	putbe32(buf + 4, GOT_PACKIDX_VERSION);
 	err = got_pack_hwrite(idxfd, buf, 8, &ctx);
@@ -925,7 +927,7 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	if (err)
 		goto done;
 	err = got_pack_hwrite(idxfd, packidx.hdr.sorted_ids,
-	    nobj * SHA1_DIGEST_LENGTH, &ctx);
+	    nobj * digest_len, &ctx);
 	if (err)
 		goto done;
 	err = got_pack_hwrite(idxfd, packidx.hdr.crc32,
@@ -942,17 +944,17 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		if (err)
 			goto done;
 	}
-	err = got_pack_hwrite(idxfd, pack_sha1, SHA1_DIGEST_LENGTH, &ctx);
+	err = got_pack_hwrite(idxfd, &pack_hash.hash, digest_len, &ctx);
 	if (err)
 		goto done;
 
 	got_hash_final(&ctx, packidx_hash);
-	w = write(idxfd, packidx_hash, sizeof(packidx_hash));
+	w = write(idxfd, packidx_hash, digest_len);
 	if (w == -1) {
 		err = got_error_from_errno("write");
 		goto done;
 	}
-	if (w != sizeof(packidx_hash)) {
+	if (w != digest_len) {
 		err = got_error(GOT_ERR_IO);
 		goto done;
 	}
