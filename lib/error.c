@@ -245,7 +245,8 @@ static const struct got_error got_errors[] = {
 	    "the work tree is no longer up-to-date; merge must be aborted "
 	    "and retried" },
 	{ GOT_ERR_BUNDLE_FORMAT, "unknown git bundle version" },
-	{ GOT_ERR_BAD_KEYWORD, "invalid commit keyword" }
+	{ GOT_ERR_BAD_KEYWORD, "invalid commit keyword" },
+	{ GOT_ERR_UNKNOWN_CAPA, "unknown capability" },
 };
 
 static struct got_custom_error {
