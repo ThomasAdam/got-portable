@@ -435,9 +435,9 @@ test_cat_commit_keywords() {
 }
 
 test_parseargs "$@"
-run_test test_cat_basic				sha256-ok
+run_test test_cat_basic
 run_test test_cat_path
-run_test test_cat_submodule			sha256-ok
-run_test test_cat_submodule_of_same_repo	sha256-ok
-run_test test_cat_symlink			sha256-ok
+run_test test_cat_submodule
+run_test test_cat_submodule_of_same_repo
+run_test test_cat_symlink
 run_test test_cat_commit_keywords

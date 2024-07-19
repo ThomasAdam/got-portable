@@ -306,7 +306,7 @@ run_test()
 		esac
 	fi
 
-	if [ "${GOT_TEST_ALGO}" = sha256 -a -z "$limits" ]; then
+	if [ "${GOT_TEST_ALGO}" = sha256 -a "$limits" = no-sha256 ]; then
 		return
 	fi
 
