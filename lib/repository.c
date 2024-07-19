@@ -1719,7 +1719,8 @@ got_repo_unpin_pack(struct got_repository *repo)
 }
 
 const struct got_error *
-got_repo_init(const char *repo_path, const char *head_name)
+got_repo_init(const char *repo_path, const char *head_name,
+    enum got_hash_algorithm algo)
 {
 	const struct got_error *err = NULL;
 	const char *dirnames[] = {
@@ -1730,12 +1731,22 @@ got_repo_init(const char *repo_path, const char *head_name)
 	const char *description_str = "Unnamed repository; "
 	    "edit this file 'description' to name the repository.";
 	const char *headref = "ref: refs/heads/";
-	const char *gitconfig_str = "[core]\n"
+	const char *gitconfig_sha1 = "[core]\n"
 	    "\trepositoryformatversion = 0\n"
 	    "\tfilemode = true\n"
 	    "\tbare = true\n";
+	const char *gitconfig_sha256 = "[core]\n"
+	    "\trepositoryformatversion = 1\n"
+	    "\tfilemode = true\n"
+	    "\tbare = true\n"
+	    "[extensions]\n"
+	    "\tobjectformat = sha256\n";
+	const char *gitconfig = gitconfig_sha1;
 	char *headref_str, *path;
 	size_t i;
+
+	if (algo == GOT_HASH_SHA256)
+		gitconfig = gitconfig_sha256;
 
 	if (!got_path_dir_is_empty(repo_path))
 		return got_error(GOT_ERR_DIR_NOT_EMPTY);
@@ -1772,7 +1783,7 @@ got_repo_init(const char *repo_path, const char *head_name)
 
 	if (asprintf(&path, "%s/%s", repo_path, "config") == -1)
 		return got_error_from_errno("asprintf");
-	err = got_path_create_file(path, gitconfig_str);
+	err = got_path_create_file(path, gitconfig);
 	free(path);
 	if (err)
 		return err;
