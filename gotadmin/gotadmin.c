@@ -393,6 +393,9 @@ cmd_info(int argc, char *argv[])
 		goto done;
 
 	printf("repository: %s\n", got_repo_get_path_git_dir(repo));
+	printf("hashing algorithm: %s\n",
+	    got_repo_get_object_format(repo) == GOT_HASH_SHA1 ? "sha1"
+	    : "sha256");
 
 	gotconfig = got_repo_get_gotconfig(repo);
 	if (gotconfig) {
