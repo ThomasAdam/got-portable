@@ -16,6 +16,11 @@
 
 . ./common.sh
 
+format_arg=
+if [ "${GOT_TEST_ALGO}" = sha256 ]; then
+	format_arg="-A sha256"
+fi
+
 test_load_bundle() {
 	local testroot=`test_init test_load_bundle`
 
@@ -23,7 +28,7 @@ test_load_bundle() {
 	git -C "$testroot/repo" bundle create -q "$testroot/bundle" master
 
 	# then load it in an empty repository
-	(cd "$testroot/" && gotadmin init -b master repo2) >/dev/null
+	(cd "$testroot/" && gotadmin init $format_arg -b master repo2) >/dev/null
 	(cd "$testroot/repo2" && gotadmin load < "$testroot/bundle") \
 		>/dev/null
 	if [ $? -ne 0 ]; then
@@ -85,7 +90,7 @@ test_load_branch_from_bundle() {
 
 	(cd "$testroot/repo" && gotadmin dump -q >$testroot/bundle)
 
-	(cd "$testroot/" && gotadmin init -b newbranch repo2) >/dev/null
+	(cd "$testroot/" && gotadmin init $format_arg -b newbranch repo2) >/dev/null
 
 	# check that the reference in the bundle are what we expect
 	(cd "$testroot/repo2" && gotadmin load -l "$testroot/bundle") \

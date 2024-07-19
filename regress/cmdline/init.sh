@@ -16,13 +16,18 @@
 
 . ./common.sh
 
+format_arg=
+if [ "${GOT_TEST_ALGO}" = sha256 ]; then
+	format_arg="-A sha256"
+fi
+
 test_init_basic() {
 	local testname=init_basic
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=main
 
-	gotadmin init $testroot/repo
+	gotadmin init $format_arg $testroot/repo
 
 	local git_head=`git -C $testroot/repo symbolic-ref HEAD`
 	echo $git_head > $testroot/content
@@ -42,7 +47,7 @@ test_init_specified_head() {
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=trunk
 
-	gotadmin init -b $headref $testroot/repo
+	gotadmin init $format_arg -b $headref $testroot/repo
 
 	local git_head=`git -C $testroot/repo symbolic-ref HEAD`
 	echo refs/heads/$headref > $testroot/content.expected

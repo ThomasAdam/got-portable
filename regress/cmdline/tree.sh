@@ -271,6 +271,6 @@ test_tree_commit_keywords() {
 test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_branch
-run_test test_tree_submodule			sha256-ok
-run_test test_tree_submodule_of_same_repo	sha256-ok
+run_test test_tree_submodule
+run_test test_tree_submodule_of_same_repo
 run_test test_tree_commit_keywords

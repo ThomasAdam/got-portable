@@ -994,16 +994,16 @@ EOF
 }
 
 test_parseargs "$@"
-run_test test_clone_basic
-run_test test_clone_quoting
-run_test test_clone_list
-run_test test_clone_branch
-run_test test_clone_all
-run_test test_clone_mirror
-run_test test_clone_mirror_all
-run_test test_clone_reference
-run_test test_clone_branch_and_reference
-run_test test_clone_reference_mirror
-run_test test_clone_multiple_branches
-run_test test_clone_dangling_headref
-run_test test_clone_basic_http
+run_test test_clone_basic			no-sha256
+run_test test_clone_quoting			no-sha256
+run_test test_clone_list			no-sha256
+run_test test_clone_branch			no-sha256
+run_test test_clone_all				no-sha256
+run_test test_clone_mirror			no-sha256
+run_test test_clone_mirror_all			no-sha256
+run_test test_clone_reference			no-sha256
+run_test test_clone_branch_and_reference	no-sha256
+run_test test_clone_reference_mirror		no-sha256
+run_test test_clone_multiple_branches		no-sha256
+run_test test_clone_dangling_headref		no-sha256
+run_test test_clone_basic_http			no-sha256

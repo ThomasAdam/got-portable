@@ -635,7 +635,7 @@ test_ref_commit_keywords() {
 
 test_parseargs "$@"
 run_test test_ref_create
-run_test test_ref_delete		sha256-ok
+run_test test_ref_delete
 run_test test_ref_list
 run_test test_ref_list_packed_refs
 run_test test_ref_commit_keywords

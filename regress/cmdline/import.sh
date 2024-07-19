@@ -16,12 +16,17 @@
 
 . ./common.sh
 
+format_arg=
+if [ "${GOT_TEST_ALGO}" = sha256 ]; then
+	format_arg="-A sha256"
+fi
+
 test_import_basic() {
 	local testname=import_basic
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	got init $testroot/repo
+	got init $format_arg $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -147,7 +152,7 @@ test_import_specified_head() {
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 	local headref=trunk
 
-	gotadmin init -b $headref $testroot/repo
+	gotadmin init $format_arg -b $headref $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -372,7 +377,7 @@ test_import_ignores() {
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	got init $testroot/repo
+	got init $format_arg $testroot/repo
 
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
@@ -406,7 +411,7 @@ test_import_empty_dir() {
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	gotadmin init $testroot/repo
+	gotadmin init $format_arg $testroot/repo
 
 	mkdir $testroot/tree
 	mkdir -p $testroot/tree/empty $testroot/tree/notempty
@@ -450,7 +455,7 @@ test_import_symlink() {
 	local testroot=`mktemp -d \
 	    "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXXXX"`
 
-	gotadmin init $testroot/repo
+	gotadmin init $format_arg $testroot/repo
 
 	mkdir $testroot/tree
 	echo 'this is file alpha' > $testroot/tree/alpha

@@ -1130,7 +1130,7 @@ run_test test_blame_lines_shifted_down
 run_test test_blame_commit_subsumed
 run_test test_blame_blame_h
 run_test test_blame_added_on_branch
-run_test test_blame_submodule			sha256-ok
-run_test test_blame_symlink			sha256-ok
+run_test test_blame_submodule
+run_test test_blame_symlink
 run_test test_blame_lines_shifted_skip
 run_test test_blame_commit_keywords

@@ -2270,12 +2270,12 @@ test_diff_commit_keywords() {
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
-run_test test_diff_tag				sha256-ok
-run_test test_diff_lightweight_tag		sha256-ok
+run_test test_diff_tag
+run_test test_diff_lightweight_tag
 run_test test_diff_ignore_whitespace
-run_test test_diff_submodule_of_same_repo	sha256-ok
+run_test test_diff_submodule_of_same_repo
 run_test test_diff_symlinks_in_work_tree
-run_test test_diff_symlinks_in_repo		sha256-ok
+run_test test_diff_symlinks_in_repo
 run_test test_diff_binary_files
 run_test test_diff_commits
 run_test test_diff_ignored_file
