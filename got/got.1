@@ -75,7 +75,7 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width checkout
-.It Cm init Oo Fl b Ar branch Oc Ar repository-path
+.It Cm init Oo Fl A Ar hashing-algorithm Oc Oo Fl b Ar branch Oc Ar repository-path
 Create a new empty repository at the specified
 .Ar repository-path .
 .Pp
@@ -108,6 +108,15 @@ The options for
 .Cm got init
 are as follows:
 .Bl -tag -width Ds
+.It Fl A Ar hashing-algorithm
+Configure the repository's
+.Ar hashing-algorithm
+used for the computation of Git object IDs.
+Possible values are
+.Cm sha1
+.Pq the default
+or
+.Cm sha256 .
 .It Fl b Ar branch
 Make the repository's HEAD reference point to the specified
 .Ar branch

@@ -144,7 +144,8 @@ const struct got_error *got_repo_map_path(char **, struct got_repository *,
  * Create a new repository with optional specified
  * HEAD ref in an empty directory at a specified path.
  */
-const struct got_error *got_repo_init(const char *, const char *);
+const struct got_error *got_repo_init(const char *, const char *,
+    enum got_hash_algorithm);
 
 /* Attempt to find a unique object ID for a given ID string prefix. */
 const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,

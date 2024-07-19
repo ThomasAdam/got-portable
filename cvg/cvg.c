@@ -1675,7 +1675,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	if (!list_refs_only) {
-		error = got_repo_init(repo_path, NULL);
+		error = got_repo_init(repo_path, NULL, GOT_HASH_SHA1);
 		if (error)
 			goto done;
 		error = got_repo_pack_fds_open(&pack_fds);

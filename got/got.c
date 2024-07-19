@@ -357,7 +357,8 @@ apply_unveil(const char *repo_path, int repo_read_only,
 __dead static void
 usage_init(void)
 {
-	fprintf(stderr, "usage: %s init [-b branch] repository-path\n",
+	fprintf(stderr, "usage: %s init [-A hashing-algorithm] [-b branch]"
+	    " repository-path\n",
 	    getprogname());
 	exit(1);
 }
@@ -368,10 +369,20 @@ cmd_init(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	const char *head_name = NULL;
 	char *repo_path = NULL;
+	enum got_hash_algorithm algo = GOT_HASH_SHA1;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "b:")) != -1) {
+	while ((ch = getopt(argc, argv, "A:b:")) != -1) {
 		switch (ch) {
+		case 'A':
+			if (!strcmp(optarg, "sha1"))
+				algo = GOT_HASH_SHA1;
+			else if (!strcmp(optarg, "sha256"))
+				algo = GOT_HASH_SHA256;
+			else
+				return got_error_path(optarg,
+				    GOT_ERR_OBJECT_FORMAT);
+			break;
 		case 'b':
 			head_name = optarg;
 			break;
@@ -406,7 +417,7 @@ cmd_init(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_init(repo_path, head_name);
+	error = got_repo_init(repo_path, head_name, algo);
 done:
 	free(repo_path);
 	return error;
@@ -1765,7 +1776,7 @@ cmd_clone(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 	if (!list_refs_only) {
-		error = got_repo_init(repo_path, NULL);
+		error = got_repo_init(repo_path, NULL, GOT_HASH_SHA1);
 		if (error)
 			goto done;
 		error = got_repo_pack_fds_open(&pack_fds);
