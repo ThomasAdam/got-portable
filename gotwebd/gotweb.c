@@ -1130,30 +1130,24 @@ err:
 }
 
 static const struct got_error *
-gotweb_get_repo_description(char **description, struct server *srv,
-    const char *dirpath, int dir)
+gotweb_load_file(char **str, const char *dir, const char *file, int dirfd)
 {
 	const struct got_error *error = NULL;
 	struct stat sb;
-	int fd = -1;
 	off_t len;
+	int fd;
 
-	*description = NULL;
-	if (srv->show_repo_description == 0)
-		return NULL;
+	*str = NULL;
 
-	fd = openat(dir, "description", O_RDONLY);
+	fd = openat(dirfd, file, O_RDONLY);
 	if (fd == -1) {
-		if (errno != ENOENT && errno != EACCES) {
-			error = got_error_from_errno_fmt("openat %s/%s",
-			    dirpath, "description");
-		}
-		goto done;
+		if (errno == ENOENT || errno == EACCES)
+			return NULL;
+		return got_error_from_errno_fmt("openat %s/%s", dir, file);
 	}
 
 	if (fstat(fd, &sb) == -1) {
-		error = got_error_from_errno_fmt("fstat %s/%s",
-		    dirpath, "description");
+		error = got_error_from_errno_fmt("fstat %s/%s", dir, file);
 		goto done;
 	}
 
@@ -1161,64 +1155,40 @@ gotweb_get_repo_description(char **description, struct server *srv,
 	if (len > GOTWEBD_MAXDESCRSZ - 1)
 		len = GOTWEBD_MAXDESCRSZ - 1;
 
-	*description = calloc(len + 1, sizeof(**description));
-	if (*description == NULL) {
+	*str = calloc(len + 1, 1);
+	if (*str == NULL) {
 		error = got_error_from_errno("calloc");
 		goto done;
 	}
 
-	if (read(fd, *description, len) == -1)
+	if (read(fd, *str, len) == -1)
 		error = got_error_from_errno("read");
-done:
+ done:
 	if (fd != -1 && close(fd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	return error;
 }
 
 static const struct got_error *
+gotweb_get_repo_description(char **description, struct server *srv,
+    const char *dirpath, int dir)
+{
+	*description = NULL;
+	if (srv->show_repo_description == 0)
+		return NULL;
+
+	return gotweb_load_file(description, dirpath, "description", dir);
+}
+
+static const struct got_error *
 gotweb_get_clone_url(char **url, struct server *srv, const char *dirpath,
     int dir)
 {
-	const struct got_error *error = NULL;
-	struct stat sb;
-	int fd = -1;
-	off_t len;
-
 	*url = NULL;
 	if (srv->show_repo_cloneurl == 0)
 		return NULL;
 
-	fd = openat(dir, "cloneurl", O_RDONLY);
-	if (fd == -1) {
-		if (errno != ENOENT && errno != EACCES) {
-			error = got_error_from_errno_fmt("openat %s/%s",
-			    dirpath, "cloneurl");
-		}
-		goto done;
-	}
-
-	if (fstat(fd, &sb) == -1) {
-		error = got_error_from_errno_fmt("fstat %s/%s",
-		    dirpath, "cloneurl");
-		goto done;
-	}
-
-	len = sb.st_size;
-	if (len > GOTWEBD_MAXCLONEURLSZ - 1)
-		len = GOTWEBD_MAXCLONEURLSZ - 1;
-
-	*url = calloc(len + 1, sizeof(**url));
-	if (*url == NULL) {
-		error = got_error_from_errno("calloc");
-		goto done;
-	}
-
-	if (read(fd, *url, len) == -1)
-		error = got_error_from_errno("read");
-done:
-	if (fd != -1 && close(fd) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	return error;
+	return gotweb_load_file(url, dirpath, "cloneurl", dir);
 }
 
 int
