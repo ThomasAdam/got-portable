@@ -116,11 +116,8 @@ got_get_repo_owner(char **owner, struct request *c)
 		*owner = strdup(gitconfig_owner);
 		if (*owner == NULL)
 			return got_error_from_errno("strdup");
-	} else {
-		*owner = strdup("");
-		if (*owner == NULL)
-			return got_error_from_errno("strdup");
 	}
+
 	return NULL;
 }
 
