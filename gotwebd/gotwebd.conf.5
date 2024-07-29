@@ -161,16 +161,24 @@ file in the repository should be updated with an appropriate description.
 .It Ic show_repo_owner Ar on | off
 Set whether to display the repository owner.
 Enabled by default.
-Displaying the owner requires owner information to be added to the
+This requires the creation of an
+.Pa owner
+file in the repository or adding an
+.Sq owner
+field under the [gotweb] or [gitweb] section in the
 .Pa config
-file in the repository.
-.Xr gotwebd 8
-will parse owner information from either a [gotweb] or a [gitweb] section.
+file inside the repository.
 For example:
 .Bd -literal -offset indent
 [gotweb]
 owner = "Your Name"
 .Ed
+.Pp
+The
+.Pa owner
+file has priority over the
+.Pa config
+if present.
 .It Ic site_link Ar string
 Set the displayed site link name for the index page.
 Defaults to
