@@ -54,11 +54,13 @@ When versioned files are checked out into the work tree, the current
 .Xr umask 2
 is heeded.
 .It Blob object ID
-The SHA1 hash of the blob object which corresponds to the contents
+The hash of the blob object which corresponds to the contents
 of this file in the repository.
 The hash is stored as binary data.
+The size of the hash depends on the hashing algorithm used in the
+repository.
 .It Commit object ID
-The SHA1 hash of the commit object the file was checked out from.
+The hash of the commit object the file was checked out from.
 The hash is stored as binary data.
 This data is used to detect past incomplete update operations.
 Entries which do not match the work tree's base commit may still need
@@ -117,7 +119,7 @@ This happens when files are removed with
 The path of the entry, relative to the work tree root.
 Path data is of variable length and NUL-padded to a multiple of 8 bytes.
 .It Staged blob object ID
-The SHA1 hash of a blob object containing file content which has been
+The hash of a blob object containing file content which has been
 staged for commit.
 The hash is stored as binary data.
 Only present if a file addition or modification has been staged with
@@ -183,6 +185,6 @@ A universal unique identifier for the work tree.
 .Xr rename 2 ,
 .Xr stat 2 ,
 .Xr umask 2 ,
-.Xr lockf 3 ,
+.Xr flock 3 ,
 .Xr git-repository 5 ,
 .Xr got.conf 5
