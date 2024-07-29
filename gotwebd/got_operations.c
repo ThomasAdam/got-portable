@@ -101,16 +101,11 @@ got_gotweb_dupfd(int *priv_fd, int *fd)
 const struct got_error *
 got_get_repo_owner(char **owner, struct request *c)
 {
-	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct got_repository *repo = t->repo;
 	const char *gitconfig_owner;
 
 	*owner = NULL;
-
-	if (srv->show_repo_owner == 0)
-		return NULL;
-
 	gitconfig_owner = got_repo_get_gitconfig_owner(repo);
 	if (gitconfig_owner) {
 		*owner = strdup(gitconfig_owner);

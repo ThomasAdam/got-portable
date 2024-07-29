@@ -87,6 +87,8 @@ static const struct got_error *gotweb_assign_querystring(struct querystring *,
 static int gotweb_render_index(struct template *);
 static const struct got_error *gotweb_load_got_path(struct repo_dir **,
     const char *, struct request *);
+static const struct got_error *gotweb_load_file(char **, const char *,
+    const char *, int);
 static const struct got_error *gotweb_get_repo_description(char **,
     struct server *, const char *, int);
 static const struct got_error *gotweb_get_clone_url(char **, struct server *,
@@ -1108,9 +1110,17 @@ gotweb_load_got_path(struct repo_dir **rp, const char *dir,
 	    repo_dir->path, dirfd(dt));
 	if (error)
 		goto err;
-	error = got_get_repo_owner(&repo_dir->owner, c);
-	if (error)
-		goto err;
+	if (srv->show_repo_owner) {
+		error = gotweb_load_file(&repo_dir->owner, repo_dir->path,
+		    "owner", dirfd(dt));
+		if (error)
+			goto err;
+		if (repo_dir->owner == NULL) {
+			error = got_get_repo_owner(&repo_dir->owner, c);
+			if (error)
+				goto err;
+		}
+	}
 	if (srv->show_repo_age) {
 		error = got_get_repo_age(&repo_dir->age, c, NULL);
 		if (error)
