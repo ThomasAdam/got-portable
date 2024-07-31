@@ -1457,7 +1457,8 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 	repo->pack_path_mtime.tv_nsec = sb.st_mtim.tv_nsec;
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen,
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name),
 		    repo->algo))
 			continue;
 
@@ -2581,7 +2582,8 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen,
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name),
 		    repo->algo))
 			continue;
 
