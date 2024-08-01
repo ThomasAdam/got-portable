@@ -32,7 +32,7 @@ int got_parse_hash_digest(uint8_t *, const char *, enum got_hash_algorithm);
 /*
  * Write the string representation fo an object ID in the given buffer.
  * This buffer must be at least GOT_OBJECT_ID_HEX_MAXLEN bytes in size.
- * The output depneds on the hash function used by the repository format.
+ * The output depends on the hash function used by the repository format.
  */
 char *got_object_id_hex(struct got_object_id *, char *, size_t);
 
