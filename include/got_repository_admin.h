@@ -27,7 +27,7 @@ typedef const struct got_error *(*got_pack_progress_cb)(void *arg,
  * already packed in another packfile. Otherwise, add only loose
  * objects to the new pack file.
  * Return an open file handle for the generated pack file.
- * Return the SHA1 digest of the resulting pack file in pack_hash which
+ * Return the hash digest of the resulting pack file in pack_hash which
  * must freed by the caller when done.
  */
 const struct got_error *

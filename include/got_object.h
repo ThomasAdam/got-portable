@@ -86,7 +86,7 @@ struct got_repository;
 
 /*
  * Obtain a string representation of an object ID. The output depends on
- * the hash function used by the repository format (currently SHA1).
+ * the hash function used by the repository format.
  */
 const struct got_error *got_object_id_str(char **, struct got_object_id *);
 
