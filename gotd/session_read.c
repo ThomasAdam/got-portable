@@ -853,6 +853,11 @@ session_read_main(const char *title, const char *repo_path,
 		    "bare git repository required");
 		goto done;
 	}
+	if (got_repo_get_object_format(gotd_session.repo) != GOT_HASH_SHA1) {
+		err = got_error_msg(GOT_ERR_NOT_IMPL,
+		    "sha256 object IDs unsupported in network protocol");
+		goto done;
+	}
 
 	got_repo_temp_fds_set(gotd_session.repo, temp_fds);
 
