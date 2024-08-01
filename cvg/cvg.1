@@ -362,9 +362,9 @@ reference will be used.
 Check out files from the specified
 .Ar commit
 on the selected branch.
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the selected
 branch will be used.
@@ -491,9 +491,9 @@ or could be discarded with
 .It Fl c Ar commit
 Update the work tree to the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
@@ -650,9 +650,9 @@ By default, 3 lines of context are shown.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
@@ -701,7 +701,7 @@ If this directory is a
 work tree, use the repository path associated with this work tree.
 .It Fl S Ar search-pattern
 If specified, show only commits with a log message, author name,
-committer name, or ID SHA1 hash matched by the extended regular
+committer name, or commit ID matched by the extended regular
 expression
 .Ar search-pattern .
 Lines in committed patches will be matched if
@@ -745,10 +745,10 @@ If one or more
 arguments are specified, only show changes within the specified paths.
 .Pp
 If two arguments are provided, treat each argument as a reference, a tag
-name, or an object ID SHA1 hash, and display differences between the
+name, or an object ID, and display differences between the
 corresponding objects.
 Both objects must be of the same type (blobs, trees, or commits).
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 If none of these interpretations produce a valid result or if the
 .Fl P
@@ -774,9 +774,9 @@ When used only once, show differences between the specified
 and its first parent commit.
 When used twice, show differences between the two specified commits.
 .Pp
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .Pp
 If the
@@ -834,9 +834,9 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
@@ -881,9 +881,9 @@ are as follows:
 .It Fl c Ar commit
 List files and directories as they appear in the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .It Fl i
 Show object IDs of files (blob objects) and directories (tree objects).
@@ -934,9 +934,9 @@ Make the newly created tag reference point at the specified
 .Ar commit .
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash or an existing reference or tag name which
+argument is a commit ID or an existing reference or tag name which
 will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .It Fl l
 List all existing tags in the repository instead of creating a new tag.
@@ -1449,8 +1449,8 @@ into the work tree.
 The specified
 .Ar commit
 should be on a different branch than the work tree's base commit.
-The expected argument is a reference or a commit ID SHA1 hash.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+The expected argument is a reference or a commit ID.
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .Pp
 Show the status of each affected file, using the following status codes:
@@ -1557,8 +1557,8 @@ into the work tree.
 The specified
 .Ar commit
 should be on the same branch as the work tree's base commit.
-The expected argument is a reference or a commit ID SHA1 hash.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+The expected argument is a reference or a commit ID.
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .Pp
 Show the status of each affected file, using the following status codes:
@@ -1665,10 +1665,10 @@ to the actual content stored in such objects.
 Blob object contents are printed as they would appear in files on disk.
 .Pp
 Attempt to interpret each argument as a reference, a tag name, or
-an object ID SHA1 hash.
+an object ID.
 References will be resolved to an object ID.
 Tag names will resolved to a tag object.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .Pp
 If none of the above interpretations produce a valid result, or if the
@@ -1685,9 +1685,9 @@ Look up paths in the specified
 .Ar commit .
 If this option is not used, paths are looked up in the commit resolved
 via the repository's HEAD reference.
-The expected argument is a commit ID SHA1 hash or an existing reference
+The expected argument is a commit ID or an existing reference
 or tag name which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 .It Fl P
 Interpret all arguments as paths only.

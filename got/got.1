@@ -666,9 +666,9 @@ branch will be used.
 .Pp
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -831,9 +831,9 @@ branch will be used.
 .Pp
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1033,9 +1033,9 @@ if invoked in a work tree, or to the repository's HEAD reference.
 .Pp
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1121,7 +1121,7 @@ If this directory is a
 work tree, use the repository path associated with this work tree.
 .It Fl S Ar search-pattern
 If specified, show only commits with a log message, author name,
-committer name, or ID SHA1 hash matched by the extended regular
+committer name, or commit ID matched by the extended regular
 expression
 .Ar search-pattern .
 Lines in committed patches will be matched if
@@ -1155,7 +1155,7 @@ Like
 .Fl c ,
 the expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
 This option has no effect if the specified
 .Ar commit
@@ -1178,10 +1178,10 @@ If one or more
 arguments are specified, only show changes within the specified paths.
 .Pp
 If two arguments are provided, treat each argument as a reference, a tag
-name, or an object ID SHA1 hash, and display differences between the
+name, or an object ID, and display differences between the
 corresponding objects.
 Both objects must be of the same type (blobs, trees, or commits).
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 If none of these interpretations produce a valid result or if the
 .Fl P
@@ -1216,9 +1216,9 @@ arguments are provided, only show differences for the specified paths.
 .Pp
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1305,9 +1305,9 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash, or a reference name
+The expected argument is a commit ID, or a reference name
 or a keyword which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1389,9 +1389,9 @@ are as follows:
 List files and directories as they appear in the specified
 .Ar commit .
 .Pp
-The expected argument is a commit ID SHA1 hash, or a reference name
+The expected argument is a commit ID, or a reference name
 or a keyword which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1470,10 +1470,10 @@ will point at the specified
 .Pp
 The expected
 .Ar object
-argument is an ID SHA1 hash or an existing reference or tag name
+argument is an object ID or an existing reference or tag name
 or a keyword which will be resolved to the ID of a corresponding commit,
 tree, tag, or blob object.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1621,9 +1621,9 @@ are as follows:
 .It Fl c Ar commit
 Make a newly created branch reference point at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+The expected argument is a commit ID, or a reference name or keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -1746,9 +1746,9 @@ Make the newly created tag reference point at the specified
 .Ar commit .
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference or keyword
+argument is a commit ID, or a reference or keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -2054,9 +2054,9 @@ than producing merge conflicts in the patched target file.
 .Pp
 The expected
 .Ar commit
-argument is a commit ID SHA1 hash, or a reference name or a keyword
+argument is a commit ID, or a reference name or a keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -2538,9 +2538,9 @@ The specified
 .Ar commit
 should be on a different branch than the work tree's base commit.
 .Pp
-The expected argument is a commit ID SHA1 hash, or a reference name or
+The expected argument is a commit ID, or a reference name or
 keyword which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -2681,9 +2681,9 @@ The specified
 .Ar commit
 should be on the same branch as the work tree's base commit.
 .Pp
-The expected argument is a commit ID SHA1 hash, or a reference name
+The expected argument is a commit ID, or a reference name
 or keyword which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -3092,7 +3092,7 @@ Quitting the editor without saving the file will abort the histedit operation.
 The format of the histedit script is line-based.
 Each line in the script begins with a command name, followed by
 whitespace and an argument.
-For most commands, the expected argument is a commit ID SHA1 hash.
+For most commands, the expected argument is a commit ID.
 Any remaining text on the line is ignored.
 Lines which begin with the
 .Sq #
@@ -3712,10 +3712,10 @@ to the actual content stored in such objects.
 Blob object contents are printed as they would appear in files on disk.
 .Pp
 Attempt to interpret each argument as a reference, a tag name, or
-an object ID SHA1 hash.
+an object ID.
 References will be resolved to an object ID.
 Tag names will resolved to a tag object.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 .Pp
 If none of the above interpretations produce a valid result, or if the
@@ -3733,9 +3733,9 @@ Look up paths in the specified
 If this option is not used, paths are looked up in the commit resolved
 via the repository's HEAD reference.
 .Pp
-The expected argument is a commit ID SHA1 hash, or a reference name
+The expected argument is a commit ID, or a reference name
 or keyword which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
