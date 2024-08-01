@@ -959,7 +959,7 @@ test_clone_basic_http() {
 remote "origin" {
 	server 127.0.0.1
 	protocol http
-	port 8080
+	port $GOT_TEST_HTTP_PORT
 	repository "/repo"
 	branch { "master" }
 }
