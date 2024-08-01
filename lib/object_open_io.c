@@ -559,7 +559,7 @@ open_tree(struct got_tree_object **tree,
 	for (i = 0; i < nentries; i++) {
 		struct got_parsed_tree_entry *pe = &entries[i];
 		struct got_tree_entry *te = &(*tree)->entries[i];
-	
+
 		if (strlcpy(te->name, pe->name,
 		    sizeof(te->name)) >= sizeof(te->name)) {
 			err = got_error(GOT_ERR_NO_SPACE);
@@ -639,7 +639,7 @@ read_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 	if (blob_size <= GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 		err = got_packfile_extract_object_to_mem(outbuf, size,
-		    obj, pack); 
+		    obj, pack);
 	} else {
 		/*
 		 * XXX This uses 3 file extra descriptors for no good reason.
