@@ -427,7 +427,8 @@ open_commit(struct got_commit_object **commit,
 		got_object_close(obj);
 		if (err)
 			goto done;
-		err = got_object_parse_commit(commit, buf, len, GOT_HASH_SHA1);
+		err = got_object_parse_commit(commit, buf, len,
+		    got_repo_get_object_format(repo));
 		free(buf);
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
@@ -524,7 +525,8 @@ open_tree(struct got_tree_object **tree,
 		if (err)
 			goto done;
 		err = got_object_parse_tree(&entries, &nentries,
-		    &nentries_alloc, buf, len, GOT_HASH_SHA1);
+		    &nentries_alloc, buf, len,
+		    got_repo_get_object_format(repo));
 		if (err)
 			goto done;
 	} else if (err->code == GOT_ERR_NO_OBJ) {
@@ -683,7 +685,7 @@ read_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd, int infd,
 	struct got_inflate_checksum csum;
 	struct got_hash ctx;
 
-	got_hash_init(&ctx, GOT_HASH_SHA1);
+	got_hash_init(&ctx, got_repo_get_object_format(repo));
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
@@ -921,7 +923,8 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		got_object_close(obj);
 		if (err)
 			goto done;
-		err = got_object_parse_tag(tag, buf, len, GOT_HASH_SHA1);
+		err = got_object_parse_tag(tag, buf, len,
+		    got_repo_get_object_format(repo));
 		free(buf);
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
