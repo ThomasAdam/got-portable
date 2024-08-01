@@ -23,7 +23,7 @@
 A Git repository stores a series of versioned snapshots of a file hierarchy.
 Conceptually, the repository's data model is a directed acyclic graph which
 contains four types of objects as nodes:
-.Bl -tag -width Ds
+.Bl -tag -width commits
 .It Blobs
 The content of tracked files is stored in objects of type
 .Em blob .
@@ -57,8 +57,11 @@ Tag objects also contain a tag message, as well as author and
 timestamp information.
 .El
 .Pp
-Each object is identified by a SHA1 hash calculated over both the object's
+Each object is identified by an hash calculated over both the object's
 header and the data stored in the object.
+The hashing algorithm used is specified in the repository
+.Pa config
+file for newer repositories while older ones use SHA1 implicitly.
 .Sh OBJECT STORAGE
 Loose objects are stored as individual files beneath the directory
 .Pa objects ,
@@ -88,7 +91,7 @@ This other object is referred to by its offset in the pack file.
 .It Reference Delta Objects
 This object is represented as a delta against another object in the
 same pack file.
-The other object is referred to by its SHA1 object identifier.
+The other object is referred to by its object identifier.
 .El
 .Pp
 Pack files are self-contained and may not refer to loose objects or

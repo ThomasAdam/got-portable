@@ -207,7 +207,7 @@ aborts the running operation.
 Prompt for a search pattern and start searching for matching commits.
 The search pattern is an extended regular expression which is matched
 against a commit's author name, committer name, log message, and
-commit ID SHA1 hash.
+commit ID.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm &
@@ -224,7 +224,7 @@ For example, a search started with
 will search the limited list of commits, rather than searching all commits.
 The pattern is an extended regular expression which is matched
 against a commit's author name, committer name, log message, and
-commit ID SHA1 hash.
+commit ID.
 Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
@@ -282,9 +282,9 @@ key binding can be used to toggle display of merged commits at run-time.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+The expected argument is a commit ID, or a reference name or keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -340,10 +340,10 @@ work tree, use the repository path associated with this work tree.
 .Xc
 Display the differences between two objects in the repository.
 Treat each of the two arguments as a reference, a tag name, an object
-ID SHA1 hash, or a keyword and display differences between the corresponding
+ID, or a keyword and display differences between the corresponding
 objects.
 Both objects must be of the same type (blobs, trees, or commits).
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -564,9 +564,9 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+The expected argument is a commit ID, or a reference name or keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
@@ -701,9 +701,9 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is a commit ID SHA1 hash, or a reference name or keyword
+The expected argument is a commit ID, or a reference name or keyword
 which will be resolved to a commit ID.
-An abbreviated hash argument will be expanded to a full SHA1 hash
+An abbreviated hash argument will be expanded to a full commit ID
 automatically, provided the abbreviation is unique.
 The keywords
 .Qq :base
