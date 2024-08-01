@@ -55,7 +55,7 @@ struct got_diffstat_cb_arg;
  * blob object arguments should be set to NULL.
  * Two const char * diff header labels may be provided which will be used
  * to identify each blob in the diff output.
- * If a label is NULL, use the blob's SHA1 checksum instead.
+ * If a label is NULL, use the blob's hash instead.
  * The number of context lines to show in the diff must be specified as well.
  * Whitespace differences may optionally be ignored.
  * If not NULL, the two initial output arguments will be populated with an
@@ -194,7 +194,7 @@ const struct got_error *got_diff_tree_compute_diffstat(void *,
 /*
  * Diff two objects, assuming both objects are blobs. Two const char * diff
  * header labels may be provided which will be used to identify each blob in
- * the diff output. If a label is NULL, use the blob's SHA1 checksum instead.
+ * the diff output. If a label is NULL, use the blob's hash instead.
  * Two open temporary files and two temporary file descriptors must be
  * provided for internal use; these files can be obtained from
  * got_opentemp() and got_opentempfd(), and must be closed by the caller.
@@ -216,7 +216,7 @@ struct got_pathlist_head;
 /*
  * Diff two objects, assuming both objects are trees. Two const char * diff
  * header labels may be provided which will be used to identify each blob in
- * the trees. If a label is NULL, use the blob's SHA1 checksum instead.
+ * the trees. If a label is NULL, use the blob's hash instead.
  * The number of context lines to show in diffs must be specified.
  * Two open temporary files and two temporary file descriptors must be
  * provided for internal use; these files can be obtained from

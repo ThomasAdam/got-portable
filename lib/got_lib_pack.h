@@ -78,9 +78,9 @@ struct got_packidx_v2_hdr {
 
 	/*
 	 * Each entry N in the fanout table contains the number of objects in
-	 * the packfile whose SHA1 begins with a byte less than or equal to N.
+	 * the packfile whose hash begins with a byte less than or equal to N.
 	 * The last entry (index 255) contains the number of objects in the
-	 * pack file whose first SHA1 byte is <= 0xff, and thus records the
+	 * pack file whose first hash byte is <= 0xff, and thus records the
 	 * total number of objects in the pack file. All pointer variables
 	 * below point to tables with a corresponding number of entries.
 	 */
