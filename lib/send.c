@@ -360,6 +360,10 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	TAILQ_INIT(&have_refs);
 	TAILQ_INIT(&their_refs);
 
+	if (got_repo_get_object_format(repo) != GOT_HASH_SHA1)
+		return got_error_fmt(GOT_ERR_NOT_IMPL,
+		    "sha256 object IDs unsupported in network protocol");
+
 	TAILQ_FOREACH(pe, branch_names, entry) {
 		const char *branchname = pe->path;
 		const char *targetname = pe->data;
