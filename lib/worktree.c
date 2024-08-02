@@ -3739,6 +3739,10 @@ read_ignores(struct got_pathlist_head *ignores, const char *path, FILE *f)
 		if (linelen > 0 && line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
 
+		/* Skip blank lines. */
+		if (line[0] == '\0')
+			continue;
+
 		/* Git's ignores may contain comments. */
 		if (line[0] == '#')
 			continue;

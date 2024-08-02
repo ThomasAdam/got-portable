@@ -745,6 +745,42 @@ test_status_gitignore_trailing_slashes() {
 	test_done "$testroot" "$ret"
 }
 
+test_status_gitignore_comments() {
+	local testroot=`test_init status_gitignore_comments`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	echo "unversioned file" > $testroot/wt/epsilon/bar
+	echo "unversioned file" > $testroot/wt/epsilon/boo
+	echo "unversioned file" > $testroot/wt/upsilon
+
+	echo "# comment" > $testroot/wt/.gitignore
+	echo "" >> $testroot/wt/.gitignore
+	echo "foo" >> $testroot/wt/.gitignore
+	echo "# comment" > $testroot/wt/epsilon/.gitignore
+	echo "" >> $testroot/wt/epsilon/.gitignore
+	echo "bar" >> $testroot/wt/epsilon/.gitignore
+
+	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  epsilon/.gitignore' >> $testroot/stdout.expected
+	echo '?  epsilon/boo' >> $testroot/stdout.expected
+	echo '?  upsilon' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_status_status_code() {
 	local testroot=`test_init status_status_code`
 
@@ -1114,6 +1150,7 @@ run_test test_status_many_paths
 run_test test_status_cvsignore
 run_test test_status_gitignore
 run_test test_status_gitignore_trailing_slashes
+run_test test_status_gitignore_comments
 run_test test_status_status_code
 run_test test_status_suppress
 run_test test_status_empty_file
