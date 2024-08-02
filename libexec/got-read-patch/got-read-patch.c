@@ -184,7 +184,6 @@ filexbit(const char *line)
 static const struct got_error *
 blobid(const char *line, char **blob, int git)
 {
-	uint8_t digest[SHA1_DIGEST_LENGTH];
 	size_t len;
 
 	*blob = NULL;
@@ -193,7 +192,11 @@ blobid(const char *line, char **blob, int git)
 	if ((*blob = strndup(line, len)) == NULL)
 		return got_error_from_errno("strndup");
 
-	if (!git && !got_parse_hash_digest(digest, *blob, GOT_HASH_SHA1)) {
+	if (git)
+		return NULL;
+
+	if (len != got_hash_digest_string_length(GOT_HASH_SHA1) - 1 &&
+	    len != got_hash_digest_string_length(GOT_HASH_SHA256) - 1) {
 		/* silently ignore invalid blob ids */
 		free(*blob);
 		*blob = NULL;
