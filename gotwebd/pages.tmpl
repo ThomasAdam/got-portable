@@ -672,7 +672,7 @@ nextsep(char *s, char **t)
 	url.action = BLOB;
 	url.path = t->qs->path;
 	url.file = readme;
-	url.folder = t->qs->folder;
+	url.folder = t->qs->folder ? t->qs->folder : "";
 	url.commit = t->qs->commit;
     !}
     {{ if !binary }}
