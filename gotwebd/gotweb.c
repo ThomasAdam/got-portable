@@ -147,6 +147,7 @@ gotweb_process_request(struct request *c)
 	struct server *srv = NULL;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
+	struct repo_commit *commit;
 	const char *rss_ctype = "application/rss+xml;charset=utf-8";
 	const uint8_t *buf;
 	size_t len;
@@ -353,6 +354,15 @@ gotweb_process_request(struct request *c)
 		error = got_get_repo_commits(c, srv->summary_commits_display);
 		if (error)
 			goto err;
+		commit = TAILQ_FIRST(&c->t->repo_commits);
+		if (commit && qs->commit == NULL) {
+			qs->commit = strdup(commit->commit_id);
+			if (qs->commit == NULL) {
+				error = got_error_from_errno("strdup");
+				log_warn("%s: strdup", __func__);
+				goto err;
+			}
+		}
 		qs->action = TAGS;
 		error = got_get_repo_tags(c, srv->summary_tags_display);
 		if (error) {
