@@ -2058,6 +2058,7 @@ main(int argc, char **argv)
 	char *argv0 = argv[0];
 	char title[2048];
 	struct passwd *pw = NULL;
+	uid_t uid;
 	char *repo_path = NULL;
 	enum gotd_procid proc_id = PROC_GOTD;
 	struct event evsigint, evsigterm, evsighup, evsigusr1, evsigchld;
@@ -2067,6 +2068,7 @@ main(int argc, char **argv)
 	char hostname[_POSIX_HOST_NAME_MAX + 1];
 	FILE *diff_f1 = NULL, *diff_f2 = NULL;
 	int diff_fd1 = -1, diff_fd2 = -1;
+	const char *errstr;
 
 	TAILQ_INIT(&procs);
 
@@ -2131,6 +2133,11 @@ main(int argc, char **argv)
 		return 1;
 
 	pw = getpwnam(gotd.user_name);
+	if (pw == NULL) {
+		uid = strtonum(gotd.user_name, 0, UID_MAX - 1, &errstr);
+		if (errstr == NULL)
+			pw = getpwuid(uid);
+	}
 	if (pw == NULL)
 		fatalx("user %s not found", gotd.user_name);
 

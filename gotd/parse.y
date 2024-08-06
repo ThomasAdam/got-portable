@@ -242,7 +242,7 @@ main		: LISTEN ON STRING {
 			}
 			free($3);
 		}
-		| USER STRING {
+		| USER numberstring {
 			if (strlcpy(gotd->user_name, $2,
 			    sizeof(gotd->user_name)) >=
 			    sizeof(gotd->user_name)) {
