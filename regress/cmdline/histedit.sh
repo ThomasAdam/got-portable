@@ -2229,7 +2229,7 @@ EOF
 	(cd $testroot/wt/ && got commit -m 'modified alpha on master' \
 		alpha > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2240,7 +2240,7 @@ EOF
 
 	(cd $testroot/wt/ && got update -c $orig_commit > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2249,7 +2249,7 @@ EOF
 	(cd $testroot/wt && got histedit -F "$testroot/histedit-script" \
 		> /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got histedit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2279,7 +2279,7 @@ test_histedit_resets_committer() {
 	(cd $testroot/wt/ && got commit -m 'modified alpha on master' \
 		alpha > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2290,7 +2290,7 @@ test_histedit_resets_committer() {
 
 	(cd $testroot/wt/ && got update -c $orig_commit > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got update failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2299,7 +2299,7 @@ test_histedit_resets_committer() {
 	(cd $testroot/wt && env GOT_AUTHOR="$committer" \
 		got histedit -F "$testroot/histedit-script" > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got histedit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2768,7 +2768,7 @@ test_histedit_no_eof_newline() {
 
 	(cd "$testroot/wt" && got commit -m 'no eof newline' > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2826,7 +2826,7 @@ EOF
 
 	(cd "$testroot/wt" && got commit -m 'padding beta' > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2863,7 +2863,7 @@ EOF
 
 	(cd "$testroot/wt" && got commit -m 'beta no eof newline' > /dev/null)
 	ret=$?
-	if [ "$?" != 0 ]; then
+	if [ $ret -ne 0 ]; then
 		echo "got commit failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
