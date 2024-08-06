@@ -25,9 +25,15 @@ is the run-time configuration file for
 .Xr gotwebd 8 .
 .Pp
 The file format is line-based, with one configuration directive per line.
-Any lines beginning with a
-.Sq #
-are treated as comments and ignored.
+Comments can be put anywhere in the file using a hash mark
+.Pq Sq # ,
+and extend to the end of the current line.
+Arguments names not beginning with a letter, digit or underscore,
+as well as reserved words
+.Pq such as Ic listen , Ic server No or Ic user ,
+must be quoted.
+Arguments containing whitespace should be surrounded by double quotes
+.Pq \&" .
 .Pp
 Macros can be defined that are later expanded in context.
 Macro names must start with a letter, digit, or underscore, and may
