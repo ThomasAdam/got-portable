@@ -155,6 +155,8 @@ struct diff3_state {
 
 	char *buf;
 
+	int no_eofnl;		/* set if the merged file has no eof newline */
+
 	BUF *diffbuf;
 };
 
@@ -417,6 +419,10 @@ out:
 			err = got_error_from_errno("fclose");
 	}
 	if (err == NULL && diffb) {
+		dlen = buf_len(diffb);
+		if (d3s->no_eofnl && dlen > 0 &&
+		    buf_getc(diffb, dlen - 1) == '\n')
+			--diffb->cb_len;
 		if (buf_write_fd(diffb, outfd) < 0)
 			err = got_error_from_errno("buf_write_fd");
 		*overlapcnt = d3s->overlapcnt;
@@ -1063,6 +1069,17 @@ edscript(int n, struct diff3_state *d3s)
 		}
 
 		if (!d3s->overlap[n]) {
+			size_t len;
+
+			len = buf_len(d3s->diffbuf);
+			if (len > 0) {
+				if (buf_getc(d3s->diffbuf, len - 1) != '\n') {
+					err = buf_putc(d3s->diffbuf, '\n');
+					if (err != NULL)
+						goto done;
+					d3s->no_eofnl = 1;
+				}
+			}
 			err = diff_output(d3s->diffbuf, ".\n");
 			if (err)
 				goto done;
