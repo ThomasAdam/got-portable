@@ -50,8 +50,13 @@ test_load_bundle() {
 	echo "modified alpha in master" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "edit alpha in master"
 
-	git -C "$testroot/repo" bundle create -q \
-		"$testroot/bundle" "$base..master"
+	# XXX git outputs a "thin pack" when making bundles using an
+	# exclude base and doesn't provide a way to generate "thick"
+	# packs; use gotadmin since we don't support them.
+	#git -C "$testroot/repo" bundle create -q \
+	#	"$testroot/bundle" "$base..master"
+	gotadmin dump -q -r "$testroot/repo" -x "$base" master \
+		> "$testroot/bundle"
 
 	(cd "$testroot/repo2" && gotadmin load < "$testroot/bundle") >/dev/null
 	if [ $? -ne 0 ]; then
