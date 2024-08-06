@@ -2758,6 +2758,150 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_no_eof_newline() {
+	local testroot=$(test_init histedit_no_eof_newline)
+	local id_root=$(git_show_head "$testroot/repo")
+
+	got checkout "$testroot/repo" "$testroot/wt" > /dev/null
+
+	echo -n "fubar" >> $testroot/wt/alpha
+
+	(cd "$testroot/wt" && got commit -m 'no eof newline' > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp $testroot/wt/alpha $testroot/content.expected
+
+	(cd $testroot/wt && got update -c :base:- > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update to $id_root failed" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/ eof / terminating /
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+	    VISUAL="$testroot/editor.sh" got histedit -m > /dev/null)
+
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "histedit -m failed" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	cp $testroot/wt/alpha $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/wt/beta <<-EOF
+	beta
+	2
+	3
+	4
+
+	6
+	7
+	8
+	EOF
+
+	(cd "$testroot/wt" && got commit -m 'padding beta' > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local id=$(git_show_head "$testroot/repo")
+
+	cat > $testroot/wt/beta <<-EOF
+	betazoid
+	3
+	4
+
+	7
+	8
+	a
+	b
+	c
+	d
+	e
+	f
+	0
+	1
+	2
+	3
+	4
+	5
+	6
+	7
+	8
+	9
+	EOF
+
+	echo -n "fubar" >> $testroot/wt/beta
+
+	(cd "$testroot/wt" && got commit -m 'beta no eof newline' > /dev/null)
+	ret=$?
+	if [ "$?" != 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp $testroot/wt/beta $testroot/content.expected
+
+	(cd $testroot/wt && got update -c :base:- > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "update to $id failed" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+	    VISUAL="$testroot/editor.sh" got histedit -m > /dev/null)
+
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "histedit -m failed" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	cp $testroot/wt/beta $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2786,3 +2930,4 @@ run_test test_histedit_umask
 run_test test_histedit_mesg_filemode_change
 run_test test_histedit_drop_only
 run_test test_histedit_conflict_revert
+run_test test_histedit_no_eof_newline
