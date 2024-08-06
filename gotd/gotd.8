@@ -111,3 +111,10 @@ The flan_hacker user can now populate the empty repository with
 .Xr gotd.conf 5
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
+.Sh CAVEATS
+At present,
+.Nm
+cannot serve repositories that use the sha256 object ID hashing algorithm
+because
+.Nm
+does not yet support version 2 of the Git network protocol.
