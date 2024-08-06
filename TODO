@@ -76,3 +76,5 @@ gotadmin:
 - add support for generating git-fast-export streams from a repository
 - add support for importing git-fast-export streams into a repository
 - speed up 'gotadmin pack -a' is too slow on repositories with many pack files
+- support "thin" bundles; git will hardcode --thin when using an
+  exclude base.
