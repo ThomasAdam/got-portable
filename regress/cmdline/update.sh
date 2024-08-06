@@ -244,7 +244,7 @@ test_update_deletes_dir_recursively() {
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
-	if [ "$?" != "0" ]; then
+	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
