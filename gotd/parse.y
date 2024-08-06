@@ -133,6 +133,7 @@ typedef struct {
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.tv>		timeout
+%type	<v.string>	numberstring
 
 %%
 
@@ -158,6 +159,15 @@ varset		: STRING '=' STRING	{
 				fatal("cannot store variable");
 			free($1);
 			free($3);
+		}
+		;
+
+numberstring	: STRING
+		| NUMBER {
+			if (asprintf(&$$, "%lld", (long long)$1) == -1) {
+				yyerror("asprintf: %s", strerror(errno));
+				YYERROR;
+			}
 		}
 		;
 
@@ -707,14 +717,14 @@ repoopts1	: PATH STRING {
 			}
 			free($2);
 		}
-		| PERMIT RO STRING {
+		| PERMIT RO numberstring {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
 			} else
 				free($3);
 		}
-		| PERMIT RW STRING {
+		| PERMIT RW numberstring {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED,
@@ -722,7 +732,7 @@ repoopts1	: PATH STRING {
 			} else
 				free($3);
 		}
-		| DENY STRING {
+		| DENY numberstring {
 			if (gotd_proc_id == PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_DENIED, 0, $2);
