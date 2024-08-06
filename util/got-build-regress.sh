@@ -166,6 +166,19 @@ if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
 	exit 0
 fi
 
+printf "\n\n\tRunning tests with sha256 and pack files\n\n" >> build.log
+log_cmd regress.log env PATH=$HOME/bin:$PATH make regress GOT_TEST_ROOT="$testroot" GOT_TEST_ALGO=sha256 GOT_TEST_PACK=1
+regress_status="$?"
+cat regress.log >> build.log
+egrep "test.*failed" regress.log > failures.log
+regress_failure_grep="$?"
+if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
+	printf "\n\n\t Test failures:\n\n" >> build.log
+	cat failures.log >> build.log
+	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
+	exit 0
+fi
+
 if [ $gotd -ne 0 ]; then
 	printf "\n\n\tRunning gotd tests\n\n" >> build.log
 	log_cmd regress.log doas env PATH=$HOME/bin:$PATH make server-regress
