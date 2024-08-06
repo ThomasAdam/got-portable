@@ -294,7 +294,6 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	}
 
 	if (bundle_algo != repo_algo) {
-		fprintf(stderr, "%d vs %d\n", bundle_algo, repo_algo);
 		err = got_error(GOT_ERR_OBJECT_FORMAT);
 		goto done;
 	}
