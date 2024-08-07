@@ -2093,6 +2093,30 @@ main(int argc, char **argv)
 	if (pw->pw_uid == 0)
 		fatalx("cannot run %s as the superuser", getprogname());
 
+	/*
+	 * SHA2 repositories cannot be used with gotd until Git protocol v2
+	 * support is added. Reject them at startup for now.
+	 */
+	TAILQ_FOREACH(repo, &gotd.repos, entry) {
+		struct got_repository *r;
+
+		error = got_repo_open(&r, repo->path, NULL, NULL);
+		if (error) {
+			if (error->code == GOT_ERR_ERRNO && errno == ENOENT)
+				continue;
+			fatalx("%s: %s", repo->path, error->msg);
+		}
+
+		if (got_repo_get_object_format(r) != GOT_HASH_SHA1) {
+			error = got_error_msg(GOT_ERR_NOT_IMPL,
+			    "sha256 object IDs unsupported in network "
+			    "protocol");
+			fatalx("%s: %s", repo->path, error->msg);
+		}
+
+		got_repo_close(r);
+	}
+
 	if (noaction) {
 		fprintf(stderr, "configuration OK\n");
 		return 0;

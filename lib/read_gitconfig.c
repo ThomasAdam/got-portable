@@ -111,13 +111,8 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	tags = got_gitconfig_get_tag_list(gitconfig, "extensions");
 	if (extnames && extvals && nextensions && tags) {
 		size_t numext = 0;
-		TAILQ_FOREACH(node, &tags->fields, link) {
-			char *ext = node->field;
-			char *val = got_gitconfig_get_str(gitconfig,
-			    "extensions", ext);
-			if (get_boolean_val(val))
-				numext++;
-		}
+		TAILQ_FOREACH(node, &tags->fields, link)
+			numext++;
 		*extnames = calloc(numext, sizeof(char *));
 		if (*extnames == NULL) {
 			err = got_error_from_errno("calloc");
@@ -132,23 +127,21 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			char *ext = node->field;
 			char *val = got_gitconfig_get_str(gitconfig,
 			    "extensions", ext);
-			if (get_boolean_val(val)) {
-				char *extstr = NULL, *valstr = NULL;
+			char *extstr = NULL, *valstr = NULL;
 
-				extstr = strdup(ext);
-				if (extstr == NULL) {
-					err = got_error_from_errno("strdup");
-					goto done;
-				}
-				valstr = strdup(val);
-				if (valstr == NULL) {
-					err = got_error_from_errno("strdup");
-					goto done;
-				}
-				(*extnames)[(*nextensions)] = extstr;
-				(*extvals)[(*nextensions)] = valstr;
-				(*nextensions)++;
+			extstr = strdup(ext);
+			if (extstr == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
 			}
+			valstr = strdup(val);
+			if (valstr == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+			(*extnames)[(*nextensions)] = extstr;
+			(*extvals)[(*nextensions)] = valstr;
+			(*nextensions)++;
 		}
 	}
 
