@@ -699,8 +699,7 @@ repoopts1	: PATH STRING {
 					 * gotd regardless.
 					 */
 					if (errno == ENOENT) {
-						yyerror("realpath %s: %s", $2,
-						    strerror(errno));
+						log_warn("%s", $2);
 					} else if (errno != EACCES ||
 					    gotd_proc_id != PROC_GITWRAPPER) {
 						yyerror("realpath %s: %s", $2,
