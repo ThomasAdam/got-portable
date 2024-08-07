@@ -21,7 +21,7 @@ make_repo()
 	local repo_path="$1"
 	local no_tree="$2"
 
-	gotadmin init "${repo_path}"
+	gotadmin init -A "$GOT_TEST_ALGO" "${repo_path}"
 
 	if [ -n "$no_tree" ]; then
 		return
