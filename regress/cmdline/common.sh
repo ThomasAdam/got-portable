@@ -36,12 +36,7 @@ export MALLOC_OPTIONS=S
 
 git_init()
 {
-	args=
-	if [ "${GOT_TEST_ALGO}" = sha256 ]; then
-		args="--object-format=sha256"
-	fi
-
-	git init -q $args "$1"
+	git init -q --object-format=${GOT_TEST_ALGO} "$1"
 
 	# Switch the default branch to match our test expectations if needed.
 	# Only need to change HEAD since 'git init' did not create any refs.
