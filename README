@@ -50,6 +50,13 @@ deltified objects, run:
 
  $ make regress GOT_TEST_PACK=ref-delta
 
+To test with sha256 object IDs instead of sha1, run:
+
+ $ make regress GOT_TEST_ALGO=sha256
+
+The GOT_TEST_PACK and GOT_TEST_ALGO flags can be combined to test packed
+repositories with sha256 object IDs.
+
 Because got unveils the /tmp directory by default using the /tmp directory
 for test data can hide bugs. However, /tmp remains the default because
 there is no better alternative that works out of the box. In order to
