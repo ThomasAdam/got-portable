@@ -193,6 +193,19 @@ but defaults to the oldest commit.
 Open a
 .Cm diff
 view showing file changes made in the currently selected commit.
+If a commit is marked with the
+.Cm m
+key map, open a diff view showing file changes made between the marked commit
+and the currently selected commit.
+.It Cm m
+Mark or unmark the selected commit.
+When a commit is marked,
+pressing the
+.Cm enter
+key on another selected commit opens a
+.Cm diff
+view showing the changes between the marked commit and the
+currently selected commit.
 .It Cm T
 Open a
 .Cm tree
