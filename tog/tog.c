@@ -394,6 +394,7 @@ struct tog_log_view_state {
 	struct commit_queue_entry *first_displayed_entry;
 	struct commit_queue_entry *last_displayed_entry;
 	struct commit_queue_entry *selected_entry;
+	struct commit_queue_entry *marked_entry;
 	struct commit_queue real_commits;
 	int selected;
 	char *in_repo_path;
@@ -575,6 +576,8 @@ struct tog_help_view_state {
 	KEY_("R", "Open ref view of all repository references"), \
 	KEY_("T", "Display tree view of the repository from the selected" \
 	    " commit"), \
+	KEY_("m", "Mark or unmark the selected entry for diffing with the " \
+	    "next selected commit"), \
 	KEY_("@", "Toggle between displaying author and committer name"), \
 	KEY_("&", "Open prompt to enter term to limit commits displayed"), \
 	KEY_("C-g Backspace", "Cancel current search or log operation"), \
@@ -1700,6 +1703,12 @@ done:
 	return err;
 }
 
+static void
+log_mark_clear(struct tog_log_view_state *s)
+{
+	s->marked_entry = NULL;
+}
+
 static const struct got_error *
 view_input(struct tog_view **new, int *done, struct tog_view *view,
     struct tog_view_list_head *views, int fast_refresh)
@@ -1828,14 +1837,23 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		}
 		break;
 	case 'q':
-		if (view->parent && view->mode == TOG_VIEW_SPLIT_HRZN) {
-			if (view->parent->resize) {
-				/* might need more commits to fill fullscreen */
-				err = view->parent->resize(view->parent, 0);
-				if (err)
-					break;
+		if (view->parent != NULL) {
+			if (view->parent->type == TOG_VIEW_LOG)
+				log_mark_clear(&view->parent->state.log);
+
+			if (view->mode == TOG_VIEW_SPLIT_HRZN) {
+				if (view->parent->resize) {
+					/*
+					 * Might need more commits
+					 * to fill fullscreen.
+					 */
+					err = view->parent->resize(
+					    view->parent, 0);
+					if (err)
+						break;
+				}
+				offset_selection_up(view->parent);
 			}
-			offset_selection_up(view->parent);
 		}
 		err = view->input(new, view, ch);
 		view->dying = 1;
@@ -2428,6 +2446,25 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 }
 
 static const struct got_error *
+draw_commit_marker(struct tog_view *view, char c)
+{
+	struct tog_color *tc;
+
+	if (view->type != TOG_VIEW_LOG)
+		return got_error_msg(GOT_ERR_NOT_IMPL, "view not supported");
+
+	tc = get_color(&view->state.log.colors, TOG_COLOR_COMMIT);
+	if (tc != NULL)
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	if (waddch(view->window, c) == ERR)
+		return got_error_msg(GOT_ERR_IO, "waddch");
+	if (tc != NULL)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+
+	return NULL;
+}
+
+static const struct got_error *
 draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
     const size_t date_display_cols, int author_display_cols)
 {
@@ -2519,17 +2556,16 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	waddwstr(view->window, wauthor);
 	col += author_width;
 	while (col < avail && author_width < author_display_cols + 2) {
-		if (tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN &&
-		    author_width == marker_column &&
+		if (s->marked_entry == entry && author_width == marker_column) {
+			err = draw_commit_marker(view, '>');
+			if (err != NULL)
+				goto done;
+		} else if (tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN
+		    && author_width == marker_column &&
 		    entry->idx == tog_base_commit.idx && !s->limit_view) {
-			tc = get_color(&s->colors, TOG_COLOR_COMMIT);
-			if (tc)
-				wattr_on(view->window,
-				    COLOR_PAIR(tc->colorpair), NULL);
-			waddch(view->window, tog_base_commit.marker);
-			if (tc)
-				wattr_off(view->window,
-				    COLOR_PAIR(tc->colorpair), NULL);
+			err = draw_commit_marker(view, tog_base_commit.marker);
+			if (err != NULL)
+				goto done;
 		} else
 			waddch(view->window, ' ');
 		col++;
@@ -3154,16 +3190,28 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_y, int begin_x,
     struct tog_view *log_view, struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct got_object_qid *parent_id;
+	struct got_object_qid *p;
+	struct got_object_id *parent_id;
 	struct tog_view *diff_view;
+	struct tog_log_view_state *ls = NULL;
 
 	diff_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_DIFF);
 	if (diff_view == NULL)
 		return got_error_from_errno("view_open");
 
-	parent_id = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
-	err = open_diff_view(diff_view, parent_id ? &parent_id->id : NULL,
-	    commit_id, NULL, NULL, 3, 0, 0, log_view, repo);
+	if (log_view != NULL)
+		ls = &log_view->state.log;
+
+	if (ls != NULL && ls->marked_entry != NULL &&
+	    ls->marked_entry != ls->selected_entry)
+		parent_id = log_view->state.log.marked_entry->id;
+	else if ((p = STAILQ_FIRST(got_object_commit_get_parent_ids(commit))))
+		parent_id = &p->id;
+	else
+		parent_id = NULL;
+
+	err = open_diff_view(diff_view, parent_id, commit_id,
+	    NULL, NULL, 3, 0, 0, log_view, repo);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
@@ -3526,6 +3574,8 @@ close_log_view(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 	int errcode;
+
+	log_mark_clear(s);
 
 	err = stop_log_thread(s);
 
@@ -4152,6 +4202,15 @@ horizontal_scroll_input(struct tog_view *view, int ch)
 	}
 }
 
+static void
+log_mark_commit(struct tog_log_view_state *s)
+{
+	if (s->selected_entry == s->marked_entry)
+		s->marked_entry = NULL;
+	else
+		s->marked_entry = s->selected_entry;
+}
+
 static const struct got_error *
 input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
@@ -4351,6 +4410,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->matched_entry = NULL;
 		s->search_entry = NULL;
 		view->offset = 0;
+		break;
+	case 'm':
+		log_mark_commit(s);
 		break;
 	case 'R':
 		view->count = 0;
@@ -6003,6 +6065,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 			if (old_selected_entry == ls->selected_entry)
 				break;
+
+			log_mark_clear(ls);
 
 			err = set_selected_commit(s, ls->selected_entry);
 			if (err)
