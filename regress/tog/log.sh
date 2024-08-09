@@ -726,6 +726,164 @@ test_log_search()
 	test_done "$testroot" "$ret"
 }
 
+test_log_mark_keymap()
+{
+	test_init log_mark_keymap 141 10
+
+	local repo="$testroot/repo"
+	local wt="$testroot/wt"
+	local id_root=$(git_show_head $repo)
+	local prefix_root=$(trim_obj_id 8 $id_root)
+	local author_time=$(git_show_author_time $repo)
+	local ymd_root=$(date -u -r $author_time +"%F")
+	local alpha_root=$(get_blob_id $testroot/repo "" alpha)
+
+	got checkout "$repo" "$wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cd "$wt"
+
+	echo "new alpha" > alpha
+	got commit -m "new alpha" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	author_time=$(git_show_author_time $repo)
+	local ymd_head=$(date -u -r $author_time +"%F")
+	local id_head=$(git_show_head $repo)
+	local prefix_head=$(trim_obj_id 8 $id_head)
+	local alpha_head=$(get_blob_id $testroot/repo "" alpha)
+
+	# test marker is correctly applied to arbitrary commit
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	j
+	m		mark commit
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id_root [2/2]
+	$ymd_head $prefix_head flan_hacker ~[master] new alpha
+	$ymd_root $prefix_root flan_hacker >adding the test tree
+
+
+
+
+
+
+
+	EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# test commit is correctly unmarked
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	j
+	m		mark commit
+	m		unmark commit
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id_root [2/2]
+	$ymd_head $prefix_head flan_hacker ~[master] new alpha
+	$ymd_root $prefix_root flan_hacker  adding the test tree
+
+
+
+
+
+
+
+	EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# test marker correctly overwrites base commit marker
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	m		mark commit
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id_head [1/2] master
+	$ymd_head $prefix_head flan_hacker >[master] new alpha
+	$ymd_root $prefix_root flan_hacker  adding the test tree
+
+
+
+
+
+
+
+	EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	# test diff of marked and selected commit is correctly rendered
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	m		mark commit
+	j
+	KEY_ENTER	show diff of marked and root commit
+	F		toggle fullscreen
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	[1/10] diff $id_head $id_root
+	commit - $id_head
+	commit + $id_root
+	blob - $alpha_head
+	blob + $alpha_root
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-new alpha
+	+alpha
+	EOF
+
+	tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -738,3 +896,4 @@ run_test test_log_commit_keywords
 run_test test_log_show_base_commit
 run_test test_log_limit_view
 run_test test_log_search
+run_test test_log_mark_keymap
