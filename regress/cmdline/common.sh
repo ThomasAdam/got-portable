@@ -158,7 +158,7 @@ git_show_tree()
 
 trim_obj_id()
 {
-	expr "$2" : "\([0-9a-f]\{$1\}\)"
+	expr "$2" : "\([0-9a-f]\{1,$1\}\)"
 }
 
 pop_idx()
