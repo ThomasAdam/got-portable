@@ -32,14 +32,14 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id [1/1] master
+$(trim 80 "commit $head_id [1/1] master")
 $ymd flan_hacker  [master] adding the test tree
 
 
 
 
 --------------------------------------------------------------------------------
-[1/40] diff /dev/null $head_id
+$(trim 80 "[1/40] diff /dev/null $head_id")
 commit $head_id (master)
 from: Flan Hacker <flan_hacker@openbsd.org>
 date: $date
@@ -88,7 +88,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id [1/1] master |[1/40] diff /dev/null $head_id
+$(trim 61 "commit $head_id [1/1] master ")|$(trim 80 "[1/40] diff /dev/null $head_id")
 $ymd flan_hacker  [master] adding the test tree        |commit $head_id (master)
                                                              |from: Flan Hacker <flan_hacker@openbsd.org>
                                                              |date: $date
@@ -105,13 +105,13 @@ $ymd flan_hacker  [master] adding the test tree        |commit $head_id (master)
                                                              |commit - /dev/null
                                                              |commit + $head_id
                                                              |blob - /dev/null
-                                                             |blob + $blobid_alpha (mode 644)
+                                                             |$(trim 80 "blob + $blobid_alpha (mode 644)")
                                                              |--- /dev/null
                                                              |+++ alpha
                                                              |@@ -0,0 +1 @@
                                                              |+alpha
                                                              |blob - /dev/null
-                                                             |blob + $blobid_beta (mode 644)
+                                                             |$(trim 80 "blob + $blobid_beta (mode 644)")
 EOF
 
 	cd $testroot/repo && tog log
@@ -193,7 +193,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $commit1 [1/2] master
+$(trim 80 "commit $commit1 [1/2] master")
 $ymd flan_hacker  $scrolled_msg
 $ymd flan_hacker  ng the test tree
 EOF
@@ -227,7 +227,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id [1/1] master
+$(trim 80 "commit $head_id [1/1] master")
 $ymd flan_hacker  [master] adding the test tree
 
 --------------------------------------------------------------------------------
@@ -269,7 +269,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id [1/1] master
+$(trim 80 "commit $head_id [1/1] master")
 $ymd flan_hacker  [master] adding the test tree
 
 --------------------------------------------------------------------------------
@@ -528,7 +528,7 @@ test_log_show_base_commit()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $head_id [1/2] master
+	$(trim 80 "commit $head_id [1/2] master")
 	$ymd flan_hacker *[master] base commit
 	$ymd flan_hacker  adding the test tree
 	EOF
@@ -544,7 +544,7 @@ test_log_show_base_commit()
 
 	# check marker is not drawn when not in a work tree
 	cat <<-EOF >$testroot/view.expected
-	commit $head_id [1/2] master
+	$(trim 80 "commit $head_id [1/2] master")
 	$ymd flan_hacker  [master] base commit
 	$ymd flan_hacker  adding the test tree
 	EOF
@@ -569,7 +569,7 @@ test_log_show_base_commit()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $head_id [1/3] master
+	$(trim 80 "commit $head_id [1/3] master")
 	$ymd flan_hacker ~[master] new base mixed-commit
 	$ymd flan_hacker  base commit
 	EOF
@@ -648,7 +648,7 @@ test_log_limit_view()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $id [1/2] master
+	$(trim 80 "commit $id [1/2] master")
 	$ymd flan_hacker  [master] beta1
 	$ymd flan_hacker  beta0
 
@@ -707,7 +707,7 @@ test_log_search()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 9 $@) [9/17] no more matches
+	$(trim 80 "commit $(pop_idx 9 $@) [9/17] no more matches")
 	$ymd flan_hacker  alpha commit 14
 	$ymd flan_hacker  alpha commit 13
 	$ymd flan_hacker  alpha commit 12

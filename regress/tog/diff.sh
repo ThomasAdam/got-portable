@@ -36,7 +36,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/20] diff $commit_id1 $head_id_truncated
+$(trim 80 "[1/20] diff $commit_id1 $head_id_truncated")
 commit $head_id (master)
 from: Flan Hacker <flan_hacker@openbsd.org>
 date: $date
@@ -99,7 +99,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/16] diff $commit_id1 $head_id_truncated
+$(trim 80 "[1/16] diff $commit_id1 $head_id_truncated")
 commit - $commit_id1
 commit + $head_id
 blob - $alpha_id_old
@@ -110,7 +110,7 @@ blob + $alpha_id
 -alpha
 +modified alpha again
 blob - /dev/null
-blob + $new_id (mode 644)
+$(trim 80 "blob + $new_id (mode 644)")
 --- /dev/null
 +++ new
 @@ -0,0 +1 @@
@@ -180,7 +180,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/20] diff $id6 $id7
+$(trim 94 "[1/20] diff $id6 $id7")
 commit $id7
 from: Flan Hacker <flan_hacker@openbsd.org>
 date: $date7
@@ -228,7 +228,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/20] diff $id25 $id26
+$(trim 94 "[1/20] diff $id25 $id26")
 commit $id26
 from: Flan Hacker <flan_hacker@openbsd.org>
 date: $date26
@@ -276,7 +276,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/20] diff $id6 $id7
+$(trim 94 "[1/20] diff $id6 $id7")
 commit $id7
 from: Flan Hacker <flan_hacker@openbsd.org>
 date: $date7
@@ -364,7 +364,7 @@ test_diff_commit_keywords()
 	local date=$(date -u -r $(pop_idx 2 $@) +"%a %b %e %X %Y UTC")
 
 	cat <<-EOF >$testroot/view.expected
-	[1/20] diff $lhs_id $rhs_id
+	$(trim 120 "[1/20] diff $lhs_id $rhs_id")
 	commit $rhs_id
 	from: Flan Hacker <flan_hacker@openbsd.org>
 	date: $date
@@ -404,7 +404,7 @@ test_diff_commit_keywords()
 	rhs_id=$(pop_idx 8 $ids)
 
 	cat <<-EOF >$testroot/view.expected
-	[1/10] diff $lhs_id $rhs_id
+	$(trim 120 "[1/10] diff $lhs_id $rhs_id")
 	commit - $lhs_id
 	commit + $rhs_id
 	blob - $(pop_idx 5 $alpha_ids)
@@ -508,7 +508,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-[1/20] diff $commit_id1 $head_id_truncated
+$(trim 80 "[1/20] diff $commit_id1 $head_id_truncated")
  $head_id (master)
 Flan Hacker <flan_hacker@openbsd.org>
 $date
