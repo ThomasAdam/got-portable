@@ -77,6 +77,11 @@ set_test_env()
 	fi
 }
 
+trim()
+{
+	expr "$2" : "\(.\{1,$1\}\)"
+}
+
 test_init()
 {
 	local testname="$1"
@@ -106,17 +111,12 @@ test_init()
 run_test()
 {
 	testfunc="$1"
-	limits="$2"
 
 	if [ -n "$regress_run_only" ]; then
 		case "$regress_run_only" in
 		*$testfunc*) ;;
 		*) return ;;
 		esac
-	fi
-
-	if [ "${GOT_TEST_ALGO}" = sha256 -a -z "$limits" ]; then
-		return
 	fi
 
 	if [ -z "$GOT_TEST_QUIET" ]; then

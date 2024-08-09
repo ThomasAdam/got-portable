@@ -27,7 +27,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id
+$(trim 48 "commit $head_id")
 [1/4] /
 
   alpha
@@ -104,7 +104,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id
+$(trim 48 "commit $head_id")
 [2/4] /
 
   alpha
@@ -115,7 +115,7 @@ commit $head_id
 
 
 ------------------------------------------------
-commit $head_id
+$(trim 48 "commit $head_id")
 [1/1] /beta
 $head_id_short beta
 
@@ -156,7 +156,7 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-commit $head_id
+$(trim 48 "commit $head_id")
 [1/5] /
 
   alpha
@@ -224,7 +224,7 @@ test_tree_commit_keywords()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 8 $@)
+	$(trim 48 "commit $(pop_idx 8 $@)")
 	[1/7] /
 
 	  alpha
@@ -247,7 +247,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 6 $@)
+	$(trim 48 "commit $(pop_idx 6 $@)")
 	[1/6] /
 
 	  alpha
@@ -270,7 +270,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 9 $@)
+	$(trim 48 "commit $(pop_idx 9 $@)")
 	[1/8] /
 
 	  alpha
@@ -294,7 +294,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 4 $@)
+	$(trim 48 "commit $(pop_idx 4 $@)")
 	[1/5] /
 
 	  alpha
@@ -317,7 +317,7 @@ test_tree_commit_keywords()
 	fi
 
 	cat <<-EOF >$testroot/view.expected
-	commit $(pop_idx 1 $@)
+	$(trim 48 "commit $(pop_idx 1 $@)")
 	[1/4] /
 
 	  alpha
