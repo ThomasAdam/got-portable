@@ -31,16 +31,9 @@
 const struct got_error *
 got_object_qid_alloc_partial(struct got_object_qid **qid)
 {
-	/*
-	 * XXX(op) this should really be malloc(), but there are
-	 * strange interactions in the fileindex and worktree code
-	 * that are creating issues with some of the changes needed
-	 * for sha256 support.  This will have to be revisited once
-	 * that code is fixed.
-	 */
-	*qid = calloc(1, sizeof(**qid));
+	*qid = malloc(sizeof(**qid));
 	if (*qid == NULL)
-		return got_error_from_errno("calloc");
+		return got_error_from_errno("malloc");
 
 	(*qid)->data = NULL;
 	return NULL;
