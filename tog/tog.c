@@ -3200,7 +3200,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_y, int begin_x,
 
 	if (ls != NULL && ls->marked_entry != NULL &&
 	    ls->marked_entry != ls->selected_entry)
-		parent_id = log_view->state.log.marked_entry->id;
+		parent_id = ls->marked_entry->id;
 	else if ((p = STAILQ_FIRST(got_object_commit_get_parent_ids(commit))))
 		parent_id = &p->id;
 	else
