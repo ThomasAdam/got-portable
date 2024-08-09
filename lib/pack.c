@@ -358,10 +358,9 @@ got_packidx_open(struct got_packidx **packidx,
 	 * the existence of lonely pack index files but we do not.
 	 */
 	if (fstatat(dir_fd, pack_relpath, &pack_sb, 0) == -1) {
-		if (errno == ENOENT) {
-			err = got_error_fmt(GOT_ERR_LONELY_PACKIDX,
-			    "%s", relpath);
-		} else
+		if (errno == ENOENT)
+			err = got_error_path(relpath, GOT_ERR_LONELY_PACKIDX);
+		else
 			err = got_error_from_errno2("fstatat", pack_relpath);
 		goto done;
 	}
