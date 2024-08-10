@@ -627,7 +627,10 @@ got_pack_index(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	size_t mapoff = 0;
 	int p_indexed = 0, last_p_indexed = -1;
 	int p_resolved = 0, last_p_resolved = -1;
-	size_t digest_len = got_hash_digest_length(pack->algo);
+	ssize_t digest_len;
+
+	/* This has to be signed for lseek(2) later */
+	digest_len = got_hash_digest_length(pack->algo);
 
 	/* Require that pack file header and hash trailer are present. */
 	if (pack->filesize < sizeof(hdr) + digest_len)
