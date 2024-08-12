@@ -762,7 +762,7 @@ got_object_tree_close(struct got_tree_object *tree)
 
 const struct got_error *
 got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
-    char *buf, size_t maxlen, size_t idlen, enum got_hash_algorithm algo)
+    char *buf, size_t maxlen, size_t digest_len, enum got_hash_algorithm algo)
 {
 	char *p, *space;
 
@@ -786,16 +786,16 @@ got_object_parse_tree_entry(struct got_parsed_tree_entry *pte, size_t *elen,
 		p++;
 	}
 
-	if (*elen > maxlen || maxlen - *elen < idlen)
+	if (*elen > maxlen || maxlen - *elen < digest_len)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
 	pte->name = space + 1;
 	pte->namelen = strlen(pte->name);
 	buf += *elen;
 	pte->id = buf;
-	pte->idlen = idlen;
+	pte->digest_len = digest_len;
 	pte->algo = algo;
-	*elen += idlen;
+	*elen += digest_len;
 	return NULL;
 }
 

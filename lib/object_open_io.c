@@ -566,7 +566,7 @@ open_tree(struct got_tree_object **tree,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		memcpy(te->id.hash, pe->id, pe->idlen);
+		memcpy(te->id.hash, pe->id, pe->digest_len);
 		te->id.algo = pe->algo;
 		te->mode = pe->mode;
 		te->idx = i;

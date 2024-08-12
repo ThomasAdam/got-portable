@@ -297,10 +297,10 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 {
 	struct got_object_id id;
 	const char *name;
-	size_t idlen;
+	size_t digest_string_len;
 
 	*ref = NULL;
-	idlen = got_hash_digest_string_length(algo);
+	digest_string_len = got_hash_digest_string_length(algo);
 
 	if (line[0] == '#' || line[0] == '^')
 		return NULL;
@@ -309,11 +309,11 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	if (abs_refname) {
-		if (strcmp(line + idlen, abs_refname) != 0)
+		if (strcmp(line + digest_string_len, abs_refname) != 0)
 			return NULL;
 		name = abs_refname;
 	} else
-		name = line + idlen;
+		name = line + digest_string_len;
 
 	return alloc_ref(ref, name, &id, GOT_REF_IS_PACKED, mtime);
 }
