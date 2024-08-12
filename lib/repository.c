@@ -1404,8 +1404,13 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 		err = got_packidx_open(packidx, got_repo_get_fd(repo),
 		    path_packidx, 0, repo->algo);
-		if (err)
+		if (err) {
+			if (err->code == GOT_ERR_LONELY_PACKIDX) {
+				err = NULL;
+				continue;
+			}
 			goto done;
+		}
 
 		err = add_packidx_bloom_filter(repo, *packidx, path_packidx);
 		if (err)
@@ -1849,8 +1854,13 @@ retry:
 
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
 		    path_packidx, 0, repo->algo);
-		if (err)
+		if (err) {
+			if (err->code == GOT_ERR_LONELY_PACKIDX) {
+				err = NULL;
+				continue;
+			}
 			break;
+		}
 
 		got_object_id_queue_free(&matched_ids);
 
@@ -2598,8 +2608,13 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
 		    path_packidx, 0, repo->algo);
 		free(path_packidx);
-		if (err)
+		if (err) {
+			if (err->code == GOT_ERR_LONELY_PACKIDX) {
+				err = NULL;
+				continue;
+			}
 			goto done;
+		}
 
 		if (fstat(packidx->fd, &sb) == -1)
 			goto done;

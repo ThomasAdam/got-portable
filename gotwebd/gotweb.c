@@ -197,7 +197,7 @@ gotweb_process_request(struct request *c)
 	if (qs->action != INDEX) {
 		error = gotweb_load_got_path(&repo_dir, qs->path, c);
 		c->t->repo_dir = repo_dir;
-		if (error && error->code != GOT_ERR_LONELY_PACKIDX)
+		if (error)
 			goto err;
 	}
 
@@ -825,7 +825,7 @@ gotweb_render_index(struct template *tp)
 
 		error = gotweb_load_got_path(&repo_dir, sd_dent[d_i]->d_name,
 		    c);
-		if (error && error->code != GOT_ERR_LONELY_PACKIDX) {
+		if (error) {
 			if (error->code != GOT_ERR_NOT_GIT_REPO)
 				log_warnx("%s: %s: %s", __func__,
 				    sd_dent[d_i]->d_name, error->msg);
