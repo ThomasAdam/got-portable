@@ -453,7 +453,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 	const struct got_error *err = NULL;
 	struct got_parsed_tree_entry pte1, pte2;
 	const char *seg, *s;
-	size_t seglen, idlen;
+	size_t seglen, digest_len;
 	size_t remain1 = *len1, remain2 = *len2, elen;
 	uint8_t *next_entry1 = *buf1;
 	uint8_t *next_entry2 = *buf2;
@@ -463,7 +463,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 
 	*changed = 0;
 
-	idlen = got_hash_digest_length(pack->algo);
+	digest_len = got_hash_digest_length(pack->algo);
 
 	/* We not do support comparing the root path. */
 	if (got_path_is_root_dir(path))
@@ -495,7 +495,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 		 */
 		while (remain1 > 0) {
 			err = got_object_parse_tree_entry(&pte1, &elen,
-			    next_entry1, remain1, idlen, pack->algo);
+			    next_entry1, remain1, digest_len, pack->algo);
 			if (err)
 				return err;
 			next_entry1 += elen;
@@ -519,7 +519,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 
 		while (remain2 > 0) {
 			err = got_object_parse_tree_entry(&pte2, &elen,
-			    next_entry2, remain2, idlen, pack->algo);
+			    next_entry2, remain2, digest_len, pack->algo);
 			if (err)
 				return err;
 			next_entry2 += elen;
@@ -542,7 +542,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			break;
 		}
 
-		if (memcmp(pte1.id, pte2.id, pte1.idlen) == 0) {
+		if (memcmp(pte1.id, pte2.id, pte1.digest_len) == 0) {
 			*changed = 0;
 			break;
 		}
@@ -559,7 +559,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			struct got_object_id id1, id2;
 			int idx;
 
-			memcpy(id1.hash, pte1.id, pte1.idlen);
+			memcpy(id1.hash, pte1.id, pte1.digest_len);
 			id1.algo = pack->algo;
 			idx = got_packidx_get_object_idx(packidx, &id1);
 			if (idx == -1) {
@@ -576,7 +576,7 @@ tree_path_changed(int *changed, uint8_t **buf1, size_t *len1,
 			next_entry1 = *buf1;
 			remain1 = *len1;
 
-			memcpy(id2.hash, pte2.id, pte2.idlen);
+			memcpy(id2.hash, pte2.id, pte2.digest_len);
 			id2.algo = pack->algo;
 			idx = got_packidx_get_object_idx(packidx, &id2);
 			if (idx == -1) {
@@ -1279,7 +1279,7 @@ enumerate_tree(int *have_all_entries, struct imsgbuf *ibuf, size_t *totlen,
 			if (err)
 				goto done;
 			eqid->id.algo = pte->algo;
-			memcpy(eqid->id.hash, pte->id, pte->idlen);
+			memcpy(eqid->id.hash, pte->id, pte->digest_len);
 
 			if (got_object_idset_contains(idset, &eqid->id)) {
 				got_object_qid_free(eqid);

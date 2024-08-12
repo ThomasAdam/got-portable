@@ -31,7 +31,7 @@ struct got_parsed_tree_entry {
 	size_t namelen; /* strlen(name) */
 	mode_t mode; /* Mode parsed from tree buffer. */
 	uint8_t *id; /* Points to ID in parsed tree buffer. */
-	size_t idlen;
+	size_t digest_len;
 	int algo;
 };
 const struct got_error *got_object_parse_tree_entry(

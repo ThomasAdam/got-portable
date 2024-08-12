@@ -1197,17 +1197,17 @@ int
 got_repo_is_packidx_filename(const char *name, size_t len,
     enum got_hash_algorithm algo)
 {
-	size_t idlen;
+	size_t digest_string_len;
 
-	idlen = got_hash_digest_string_length(algo);
+	digest_string_len = got_hash_digest_string_length(algo);
 
-	if (len != GOT_PACKIDX_NAMELEN(idlen))
+	if (len != GOT_PACKIDX_NAMELEN(digest_string_len))
 		return 0;
 
 	if (strncmp(name, GOT_PACK_PREFIX, strlen(GOT_PACK_PREFIX)) != 0)
 		return 0;
 
-	if (strcmp(name + strlen(GOT_PACK_PREFIX) + idlen - 1,
+	if (strcmp(name + strlen(GOT_PACK_PREFIX) + digest_string_len - 1,
 	    GOT_PACKIDX_SUFFIX) != 0)
 		return 0;
 
