@@ -6915,10 +6915,8 @@ cmd_patch(int argc, char *argv[])
 			return error;
 	} else if (argc == 1) {
 		patchfd = open(argv[0], O_RDONLY);
-		if (patchfd == -1) {
-			error = got_error_from_errno2("open", argv[0]);
-			return error;
-		}
+		if (patchfd == -1)
+			return got_error_from_errno2("open", argv[0]);
 		if (fstat(patchfd, &sb) == -1) {
 			error = got_error_from_errno2("fstat", argv[0]);
 			goto done;
