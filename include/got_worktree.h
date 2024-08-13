@@ -578,6 +578,21 @@ const struct got_error *got_worktree_unstage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_checkout_cb, void *,
     got_worktree_patch_cb, void *, struct got_repository *);
 
+/*
+ * Prepare for getting meta data for paths in the work tree.  This
+ * function also returns a poniter to a fileindex wihch must be passed
+ * back to other path_info-related functions and *_version() functions.
+ */
+const struct got_error *
+got_worktree_prepare_path_info(struct got_fileindex **,
+    struct got_worktree *, struct got_repository *);
+
+/*
+ * Get the file-index version.
+ */
+uint32_t
+got_worktree_fileindex_version(struct got_fileindex *);
+
 /* A callback function which is invoked with per-path info. */
 typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
     const char *path, mode_t mode, time_t mtime,
@@ -590,9 +605,15 @@ typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
  * a path, and meta-data arguments (see got_worktree_path_info_cb).
  */
 const struct got_error *
-got_worktree_path_info(struct got_worktree *, struct got_repository *,
+got_worktree_path_info(struct got_worktree *, struct got_fileindex *,
     struct got_pathlist_head *, got_worktree_path_info_cb, void *,
     got_cancel_cb , void *);
+
+/*
+ * Complete the current path_info operation.
+ */
+const struct got_error *
+got_worktree_path_info_complete(struct got_fileindex *, struct got_worktree *);
 
 /* References pointing at pre-rebase commit backups. */
 #define GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX "refs/got/backup/rebase"

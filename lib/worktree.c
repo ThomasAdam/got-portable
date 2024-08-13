@@ -10007,26 +10007,37 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 }
 
 const struct got_error *
-got_worktree_path_info(struct got_worktree *worktree,
-    struct got_repository *repo,
-    struct got_pathlist_head *paths,
-    got_worktree_path_info_cb info_cb, void *info_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
-
+got_worktree_prepare_path_info(struct got_fileindex **fileindex,
+    struct got_worktree *worktree, struct got_repository *repo)
 {
-	const struct got_error *err = NULL, *unlockerr;
-	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL;
-	struct report_file_info_arg arg;
+	const struct got_error *err;
+	char *fileindex_path;
 
 	err = lock_worktree(worktree, LOCK_SH);
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree,
+	err = open_fileindex(fileindex, &fileindex_path, worktree,
 	    got_repo_get_object_format(repo));
-	if (err)
-		goto done;
+	free(fileindex_path);
+	return err;
+}
+
+uint32_t
+got_worktree_fileindex_version(struct got_fileindex *fileindex)
+{
+	return got_fileindex_version(fileindex);
+}
+
+const struct got_error *
+got_worktree_path_info(struct got_worktree *worktree,
+    struct got_fileindex *fileindex,
+    struct got_pathlist_head *paths,
+    got_worktree_path_info_cb info_cb, void *info_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+
+{
+	struct report_file_info_arg arg;
 
 	arg.worktree = worktree;
 	arg.info_cb = info_cb;
@@ -10034,16 +10045,17 @@ got_worktree_path_info(struct got_worktree *worktree,
 	arg.paths = paths;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
-	err = got_fileindex_for_each_entry_safe(fileindex, report_file_info,
+	return got_fileindex_for_each_entry_safe(fileindex, report_file_info,
 	    &arg);
-done:
-	free(fileindex_path);
+}
+
+const struct got_error *
+got_worktree_path_info_complete(struct got_fileindex *fileindex,
+    struct got_worktree *worktree)
+{
 	if (fileindex)
 		got_fileindex_free(fileindex);
-	unlockerr = lock_worktree(worktree, LOCK_UN);
-	if (unlockerr && err == NULL)
-		err = unlockerr;
-	return err;
+	return lock_worktree(worktree, LOCK_UN);
 }
 
 static const struct got_error *
