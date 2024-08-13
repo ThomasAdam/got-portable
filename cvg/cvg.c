@@ -9123,8 +9123,7 @@ cmd_info(int argc, char *argv[])
 				const struct got_error *perr;
 
 				perr = pe->data;
-				error = got_error_fmt(perr->code, "%s",
-				    pe->path);
+				error = got_error_path(pe->path, perr->code);
 				break;
 			}
 		}
