@@ -53,6 +53,7 @@
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
+	uint32_t version;
 	int nentries; /* Does not include entries marked for removal. */
 #define GOT_FILEIDX_MAX_ENTRIES INT32_MAX
 	enum got_hash_algorithm algo;
@@ -341,6 +342,7 @@ got_fileindex_alloc(enum got_hash_algorithm algo)
 	if (fileindex == NULL)
 		return NULL;
 
+	fileindex->version = GOT_FILE_INDEX_VERSION;
 	fileindex->algo = algo;
 	RB_INIT(&fileindex->entries);
 	return fileindex;
@@ -776,6 +778,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile,
 	if (hdr.version > GOT_FILE_INDEX_VERSION)
 		return got_error(GOT_ERR_FILEIDX_VER);
 
+	fileindex->version = version;
 	fileindex->algo = algo;
 	for (i = 0; i < hdr.nentries; i++) {
 		err = read_fileindex_entry(&ie, &ctx, infile,
@@ -797,6 +800,12 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile,
 		return got_error(GOT_ERR_FILEIDX_CSUM);
 
 	return NULL;
+}
+
+uint32_t
+got_fileindex_version(struct got_fileindex *fileindex)
+{
+	return fileindex->version;
 }
 
 static struct got_fileindex_entry *

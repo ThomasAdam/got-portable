@@ -9023,6 +9023,7 @@ cmd_info(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
+	struct got_fileindex *fileindex = NULL;
 	char *cwd = NULL, *id_str = NULL;
 	struct got_pathlist_head paths;
 	char *uuidstr = NULL;
@@ -9087,6 +9088,10 @@ cmd_info(int argc, char *argv[])
 		show_files = 1;
 	}
 
+	error = got_worktree_prepare_path_info(&fileindex, worktree, repo);
+	if (error)
+		goto done;
+
 	error = got_object_id_str(&id_str,
 	    got_worktree_get_base_commit_id(worktree));
 	if (error)
@@ -9103,6 +9108,8 @@ cmd_info(int argc, char *argv[])
 	printf("work tree branch reference: %s\n",
 	    got_worktree_get_head_ref_name(worktree));
 	printf("work tree UUID: %s\n", uuidstr);
+	printf("file index version: %u\n",
+	    got_worktree_fileindex_version(fileindex));
 	printf("repository: %s\n", got_worktree_get_repo_path(worktree));
 
 	if (show_files) {
@@ -9116,7 +9123,7 @@ cmd_info(int argc, char *argv[])
 			 */
 			pe->data = (void *)got_error(GOT_ERR_BAD_PATH);
 		}
-		error = got_worktree_path_info(worktree, repo, &paths,
+		error = got_worktree_path_info(worktree, fileindex, &paths,
 		    print_path_info, &paths, check_cancelled, NULL);
 		if (error)
 			goto done;
@@ -9131,8 +9138,14 @@ cmd_info(int argc, char *argv[])
 		}
 	}
 done:
-	if (worktree)
+	if (worktree) {
+		const struct got_error *cerr;
+
+		cerr = got_worktree_path_info_complete(fileindex, worktree);
+		if (error == NULL)
+			error = cerr;
 		got_worktree_close(worktree);
+	}
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
