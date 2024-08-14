@@ -1,3 +1,16 @@
+* got 0.102; 2024-08-14
+  see git repository history for per-change authorship information
+- support for sha256 repositories; the network protocol requires git(1) for now
+- gotwebd: add support for the "owner" file
+- gotwebd: fix the README link in the summary view
+- fix handling of .gitignore files containing empty lines
+- fix handling of files without trailing newline in histedit, rebase and merge
+- gotd: allow numeric UIDs in permit/deny rules, as intended
+- gotd: support numeric UIDs in the `user' directive
+- fix comment handling and explain quoting in the *.conf.5 man pages
+- tog: add ability to mark arbitrary commits to diff them
+- print file index and work tree version in got info
+
 * got 0.101; 2024-07-11
   see git repository history for per-change authorship information
 - improve gotwebd.8 one-line description
