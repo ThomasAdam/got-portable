@@ -10007,7 +10007,7 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 }
 
 const struct got_error *
-got_worktree_prepare_path_info(struct got_fileindex **fileindex,
+got_worktree_path_info_prepare(struct got_fileindex **fileindex,
     struct got_worktree *worktree, struct got_repository *repo)
 {
 	const struct got_error *err;
