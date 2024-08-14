@@ -91,6 +91,11 @@ const char *got_worktree_get_path_prefix(struct got_worktree *);
 const struct got_error *got_worktree_get_uuid(char **, struct got_worktree *);
 
 /*
+ * Get the work tree's format version number.
+ */
+int got_worktree_get_format_version(struct got_worktree *);
+
+/*
  * Check if a user-provided path prefix matches that of the worktree.
  */
 const struct got_error *got_worktree_match_path_prefix(int *,
