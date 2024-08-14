@@ -800,7 +800,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile,
 }
 
 uint32_t
-got_fileindex_version(struct got_fileindex *fileindex)
+got_fileindex_get_version(struct got_fileindex *fileindex)
 {
 	return fileindex->version;
 }
