@@ -9108,6 +9108,8 @@ cmd_info(int argc, char *argv[])
 	printf("work tree branch reference: %s\n",
 	    got_worktree_get_head_ref_name(worktree));
 	printf("work tree UUID: %s\n", uuidstr);
+	printf("work tree format version: %d\n",
+	    got_worktree_get_format_version(worktree));
 	printf("file index version: %u\n",
 	    got_worktree_fileindex_version(fileindex));
 	printf("repository: %s\n", got_worktree_get_repo_path(worktree));

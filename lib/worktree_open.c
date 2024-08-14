@@ -171,6 +171,7 @@ open_worktree(struct got_worktree **worktree, const char *path,
 		goto done;
 	}
 	(*worktree)->lockfd = -1;
+	(*worktree)->format_version = version;
 
 	(*worktree)->root_path = realpath(path, NULL);
 	if ((*worktree)->root_path == NULL) {
@@ -362,4 +363,10 @@ const char *
 got_worktree_get_path_prefix(struct got_worktree *worktree)
 {
 	return worktree->path_prefix;
+}
+
+int
+got_worktree_get_format_version(struct got_worktree *worktree)
+{
+	return worktree->format_version;
 }
