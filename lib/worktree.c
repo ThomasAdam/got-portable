@@ -10029,7 +10029,7 @@ got_worktree_prepare_path_info(struct got_fileindex **fileindex,
 uint32_t
 got_worktree_get_fileindex_version(struct got_fileindex *fileindex)
 {
-	return got_fileindex_version(fileindex);
+	return got_fileindex_get_version(fileindex);
 }
 
 const struct got_error *

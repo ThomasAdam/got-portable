@@ -137,7 +137,7 @@ struct got_fileindex_entry *got_fileindex_entry_get(struct got_fileindex *,
     const char *, size_t);
 const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *,
 	enum got_hash_algorithm);
-uint32_t got_fileindex_version(struct got_fileindex *);
+uint32_t got_fileindex_get_version(struct got_fileindex *);
 typedef const struct got_error *(*got_fileindex_cb)(void *,
     struct got_fileindex_entry *);
 const struct got_error *got_fileindex_for_each_entry_safe(
