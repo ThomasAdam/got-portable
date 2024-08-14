@@ -596,7 +596,7 @@ got_worktree_prepare_path_info(struct got_fileindex **,
  * Get the file-index version.
  */
 uint32_t
-got_worktree_fileindex_version(struct got_fileindex *);
+got_worktree_get_fileindex_version(struct got_fileindex *);
 
 /* A callback function which is invoked with per-path info. */
 typedef const struct got_error *(*got_worktree_path_info_cb)(void *,

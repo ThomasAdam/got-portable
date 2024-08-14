@@ -9109,7 +9109,7 @@ cmd_info(int argc, char *argv[])
 	printf("work tree format version: %d\n",
 	    got_worktree_get_format_version(worktree));
 	printf("file index version: %u\n",
-	    got_worktree_fileindex_version(fileindex));
+	    got_worktree_get_fileindex_version(fileindex));
 	printf("repository: %s\n", got_worktree_get_repo_path(worktree));
 
 	if (show_files) {
