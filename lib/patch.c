@@ -1136,9 +1136,8 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	}
 
 done:
-	if (fileindex != NULL)
-		complete_err = got_worktree_patch_complete(fileindex,
-		    fileindex_path);
+	complete_err = got_worktree_patch_complete(worktree, fileindex,
+	    fileindex_path);
 	if (complete_err && err == NULL)
 		err = complete_err;
 	free(fileindex_path);

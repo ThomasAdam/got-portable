@@ -10145,6 +10145,12 @@ got_worktree_patch_prepare(struct got_fileindex **fileindex,
     char **fileindex_path, struct got_worktree *worktree,
     struct got_repository *repo)
 {
+	const struct got_error *err;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
 	return open_fileindex(fileindex, fileindex_path, worktree,
 	    got_repo_get_object_format(repo));
 }
@@ -10246,13 +10252,20 @@ got_worktree_patch_schedule_rm(const char *path, struct got_repository *repo,
 }
 
 const struct got_error *
-got_worktree_patch_complete(struct got_fileindex *fileindex,
+got_worktree_patch_complete(struct got_worktree *worktree,
+    struct got_fileindex *fileindex,
     const char *fileindex_path)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *unlock_err;
 
-	err = sync_fileindex(fileindex, fileindex_path);
-	got_fileindex_free(fileindex);
+	if (fileindex) {
+		err = sync_fileindex(fileindex, fileindex_path);
+		got_fileindex_free(fileindex);
+	}
+
+	unlock_err = lock_worktree(worktree, LOCK_UN);
+	if (unlock_err && err == NULL)
+		err = unlock_err;
 
 	return err;
 }
