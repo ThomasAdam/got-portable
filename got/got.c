@@ -14685,7 +14685,7 @@ cmd_info(int argc, char *argv[])
 		show_files = 1;
 	}
 
-	error = got_worktree_prepare_path_info(&fileindex, worktree, repo);
+	error = got_worktree_path_info_prepare(&fileindex, worktree, repo);
 	if (error)
 		goto done;
 

@@ -589,7 +589,7 @@ const struct got_error *got_worktree_unstage(struct got_worktree *,
  * back to other path_info-related functions and *_version() functions.
  */
 const struct got_error *
-got_worktree_prepare_path_info(struct got_fileindex **,
+got_worktree_path_info_prepare(struct got_fileindex **,
     struct got_worktree *, struct got_repository *);
 
 /*
