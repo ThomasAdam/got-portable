@@ -5355,11 +5355,6 @@ done:
 	free(logmsg);
 	free(refs_str);
 	got_object_commit_close(commit);
-	if (err) {
-		free(*lines);
-		*lines = NULL;
-		*nlines = 0;
-	}
 	return err;
 }
 
