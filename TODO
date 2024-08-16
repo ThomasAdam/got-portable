@@ -27,6 +27,11 @@ got:
 - enforce that log messages are encoded in either ASCII or UTF-8; this
   mostly matters for -portable since OpenBSD doesn't provide other locales
 - by default, deny rebasing of commits that exist in refs/remotes or refs/tags
+- allow rebase to detect changes already present in the new base branch by
+  comparing the IDs of base-blobs of changed files on either side, and then
+  removing detected no-op changes from the list of commits to rebase before
+  merging any changes (rather than letting diff3 figure this out). RCS IDs
+  in commits exported from CVS will need to be elided to avoid false positives.
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
