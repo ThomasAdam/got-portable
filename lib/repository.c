@@ -1576,6 +1576,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	struct got_pack *pack = NULL;
+	struct got_pack tmp;
 	struct stat sb;
 	size_t i;
 
@@ -1591,7 +1592,6 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	}
 
 	if (i == repo->pack_cache_size) {
-		struct got_pack tmp;
 		do {
 			i--;
 		} while (i > 0 && repo->pinned_pack >= 0 &&
@@ -1603,6 +1603,9 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return got_error_from_errno("ftruncate");
 		if (ftruncate(repo->packs[i].accumfd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
+	}
+
+	if (i != 0) {
 		memcpy(&tmp, &repo->packs[i], sizeof(tmp));
 		memcpy(&repo->packs[i], &repo->packs[0],
 		    sizeof(repo->packs[i]));
