@@ -340,6 +340,7 @@ get_color_value(const char *envvar)
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	const char *label1, *label2;
+	char *action;
 	FILE *f, *f1, *f2;
 	int fd1, fd2;
 	int lineno;
@@ -589,6 +590,7 @@ struct tog_help_view_state {
 	KEY_("A", "Toggle between Myers and Patience diff algorithm"), \
 	KEY_("a", "Toggle treatment of file as ASCII irrespective of binary" \
 	    " data"), \
+	KEY_("p", "Write diff to a patch file in /tmp"), \
 	KEY_("(", "Go to the previous file in the diff"), \
 	KEY_(")", "Go to the next file in the diff"), \
 	KEY_("{", "Go to the previous hunk in the diff"), \
@@ -1624,10 +1626,13 @@ action_report(struct tog_view *view)
 	/*
 	 * Clear action status report. Only clear in blame view
 	 * once annotating is complete, otherwise it's too fast.
+	 * In diff view, let its state control view->action lifetime.
 	 */
 	if (view->type == TOG_VIEW_BLAME) {
 		if (view->state.blame.blame_complete)
 			view->action = NULL;
+	} else if (view->type == TOG_VIEW_DIFF) {
+		view->action = view->state.diff.action;
 	} else
 		view->action = NULL;
 }
@@ -5615,6 +5620,8 @@ close_diff_view(struct tog_view *view)
 	s->id1 = NULL;
 	free(s->id2);
 	s->id2 = NULL;
+	free(s->action);
+	s->action = NULL;
 	if (s->f && fclose(s->f) == EOF)
 		err = got_error_from_errno("fclose");
 	s->f = NULL;
@@ -5810,6 +5817,67 @@ show_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
+diff_write_patch(struct tog_view *view)
+{
+	const struct got_error		*err;
+	struct tog_diff_view_state	*s = &view->state.diff;
+	FILE				*f;
+	char				 buf[BUFSIZ];
+	char				*path;
+	size_t				 r;
+	off_t				 pos;
+
+	if (s->action != NULL) {
+		free(s->action);
+		s->action = NULL;
+	}
+
+	pos = ftello(s->f);
+	if (pos == -1)
+		return got_error_from_errno("ftello");
+	if (fseeko(s->f, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	err = got_opentemp_named(&path, &f, GOT_TMPDIR_STR "/tog", ".diff");
+	if (err != NULL)
+		return err;
+
+	while ((r = fread(buf, 1, sizeof(buf), s->f)) > 0) {
+		if (fwrite(buf, 1, r, f) != r) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+	}
+
+	if (ferror(s->f)) {
+		err = got_error_from_errno("fread");
+		goto done;
+	}
+	if (fseeko(s->f, pos, SEEK_SET) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
+
+	if (fflush(f) == EOF) {
+		err = got_error_from_errno2("fflush", path);
+		goto done;
+	}
+
+	if (asprintf(&s->action, "patch file written to %s", path) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	view->action = s->action;
+
+done:
+	if (f != NULL && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path);
+	free(path);
+	return err;
+}
+
+static const struct got_error *
 set_selected_commit(struct tog_diff_view_state *s,
     struct commit_queue_entry *entry)
 {
@@ -5844,6 +5912,10 @@ reset_diff_view(struct tog_view *view)
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
 	s->matched_line = 0;
+	if (s->action != NULL) {
+		free(s->action);
+		s->action = NULL;
+	}
 	diff_view_indicate_progress(view);
 	return create_diff(s);
 }
@@ -5902,6 +5974,12 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int i, nscroll = view->nlines - 1, up = 0;
 
 	s->lineno = s->first_displayed_line - 1 + s->selected_line;
+
+	if (s->action != NULL && ch != ERR) {
+		free(s->action);
+		s->action = NULL;
+		view->action = NULL;
+	}
 
 	switch (ch) {
 	case '0':
@@ -6102,6 +6180,9 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
+		break;
+	case 'p':
+		err = diff_write_patch(view);
 		break;
 	default:
 		view->count = 0;
