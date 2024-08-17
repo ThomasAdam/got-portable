@@ -5817,11 +5817,12 @@ diff_write_patch(struct tog_view *view)
 {
 	const struct got_error		*err;
 	struct tog_diff_view_state	*s = &view->state.diff;
-	FILE				*f;
-	char				 buf[BUFSIZ];
-	char				*path;
+	FILE				*f = NULL;
+	char				 buf[BUFSIZ], pathbase[PATH_MAX];
+	char				*idstr2, *idstr1 = NULL, *path = NULL;
 	size_t				 r;
 	off_t				 pos;
+	int				 rc;
 
 	if (s->action != NULL) {
 		free(s->action);
@@ -5834,9 +5835,25 @@ diff_write_patch(struct tog_view *view)
 	if (fseeko(s->f, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
-	err = got_opentemp_named(&path, &f, GOT_TMPDIR_STR "/tog", ".diff");
+	if (s->id1 != NULL) {
+		err = got_object_id_str(&idstr1, s->id1);
+		if (err != NULL)
+			return err;
+	}
+	err = got_object_id_str(&idstr2, s->id2);
 	if (err != NULL)
-		return err;
+		goto done;
+
+	rc = snprintf(pathbase, sizeof(pathbase), "%s/tog-%.8s-%.8s",
+	    GOT_TMPDIR_STR, idstr1 != NULL ? idstr1 : "empty", idstr2);
+	if (rc < 0 || (size_t)rc >= sizeof(pathbase)) {
+		err = got_error(rc < 0 ? GOT_ERR_IO : GOT_ERR_NO_SPACE);
+		goto done;
+	}
+
+	err = got_opentemp_named(&path, &f, pathbase, ".diff");
+	if (err != NULL)
+		goto done;
 
 	while ((r = fread(buf, 1, sizeof(buf), s->f)) > 0) {
 		if (fwrite(buf, 1, r, f) != r) {
@@ -5870,6 +5887,8 @@ done:
 	if (f != NULL && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path);
 	free(path);
+	free(idstr1);
+	free(idstr2);
 	return err;
 }
 
