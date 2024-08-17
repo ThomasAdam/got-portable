@@ -546,9 +546,132 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_p_keymap()
+{
+	test_init diff_p_keymap
+
+	local id_root=$(git_show_head $testroot/repo)
+	local alpha_root=$(get_blob_id $testroot/repo "" alpha)
+	local beta_root=$(get_blob_id $testroot/repo "" beta)
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local id_mid=$(git_show_head $testroot/repo)
+	local alpha_mid=$(get_blob_id $testroot/repo "" alpha)
+	local beta_mid=$(get_blob_id $testroot/repo "" beta)
+
+	echo "modified beta" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified beta"
+	local id_head=$(git_show_head $testroot/repo)
+	local beta_head=$(get_blob_id $testroot/repo "" beta)
+	local author_time=$(git_show_author_time $testroot/repo)
+	local date_head=$(date -u -r $author_time +"%a %b %e %X %Y UTC")
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	p
+	SCREENDUMP
+	EOF
+
+	cat <<EOF >$testroot/content.expected
+commit $id_head (master)
+from: Flan Hacker <flan_hacker@openbsd.org>
+date: $date_head
+
+modified beta
+
+M  beta  |  1+  1-
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit - $id_mid
+commit + $id_head
+blob - $beta_mid
+blob + $beta_head
+--- beta
++++ beta
+@@ -1 +1 @@
+-beta
++modified beta
+EOF
+
+	# test diff of parent:child commit has commit info in patch file
+	cd $testroot/repo && tog diff :head:- :head
+	local patchpath=$(tail -1 $testroot/view | cut -d' ' -f 5)
+
+	if [ ! -e "$patchpath" ]; then
+		echo "tog diff 'p' keymap failed to write patch file" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	mv $patchpath $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "renaming patch file failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	cat <<EOF >$testroot/content.expected
+commit - $id_root
+commit + $id_head
+blob - $alpha_root
+blob + $alpha_mid
+--- alpha
++++ alpha
+@@ -1 +1 @@
+-alpha
++modified alpha
+blob - $beta_root
+blob + $beta_head
+--- beta
++++ beta
+@@ -1 +1 @@
+-beta
++modified beta
+EOF
+
+	# test diff of arbitrary commits
+	cd $testroot/repo && tog diff :head:-2 :head
+	patchpath=$(tail -1 $testroot/view | cut -d' ' -f 5)
+
+	if [ ! -e "$patchpath" ]; then
+		echo "tog diff 'p' keymap failed to write patch file" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	mv -f $patchpath $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "renaming patch file failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_diff_contiguous_commits
 run_test test_diff_arbitrary_commits
 run_test test_diff_J_keymap
 run_test test_diff_commit_keywords
 run_test test_diff_horizontal_scroll
+run_test test_diff_p_keymap
