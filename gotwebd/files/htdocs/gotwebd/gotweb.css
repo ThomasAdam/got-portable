@@ -173,7 +173,7 @@ header.subtitle h2 {
 	flex-grow: 0;
 	flex-shrink: 0;
 }
-.briefs_age, .briefs_author {
+.briefs_age, .briefs_author, .briefs_id {
 	display: inline-block;
 	vertical-align: middle;
 }
@@ -188,6 +188,13 @@ header.subtitle h2 {
 	padding-bottom: 5px;
 	width: 8.5em;
 	font-style: italic;
+}
+.briefs_id {
+	padding-top: 5px;
+	padding-bottom: 5px;
+	width: 8.5em;
+	font-family: monospace;
+	font-size: 14px;
 }
 .briefs_log {
 	padding-left: 10px;

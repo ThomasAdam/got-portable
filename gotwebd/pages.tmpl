@@ -396,6 +396,10 @@ nextsep(char *s, char **t)
           {{ render datetime(tp, rc->committer_time, TM_DIFF) }}
         </span>
         {{" "}}
+        <span class='briefs_id'>
+          {{ printf "%.10s", rc->commit_id }}
+        </span>
+        {{" "}}
         <span class="briefs_author">
           {{ rc->committer }}
         </span>
