@@ -5190,6 +5190,67 @@ cat_diff(FILE *dst, FILE *src, struct got_diff_line **d_lines, size_t *d_nlines,
 }
 
 static const struct got_error *
+write_diffstat(FILE *outfile, struct got_diff_line **lines, size_t *nlines,
+    struct got_diffstat_cb_arg *dsa)
+{
+	const struct got_error		*err;
+	struct got_pathlist_entry	*pe;
+	off_t				 offset;
+	int				 n;
+
+	if (*nlines == 0) {
+		err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
+		if (err != NULL)
+			return err;
+		offset = 0;
+	} else
+		offset = (*lines)[*nlines - 1].offset;
+
+	TAILQ_FOREACH(pe, dsa->paths, entry) {
+		struct got_diff_changed_path *cp = pe->data;
+		int pad = dsa->max_path_len - pe->path_len + 1;
+
+		n = fprintf(outfile, "%c  %s%*c | %*d+ %*d-\n", cp->status,
+		    pe->path, pad, ' ', dsa->add_cols + 1, cp->add,
+		    dsa->rm_cols + 1, cp->rm);
+		if (n < 0)
+			return got_error_from_errno("fprintf");
+
+		offset += n;
+		err = add_line_metadata(lines, nlines, offset,
+		    GOT_DIFF_LINE_CHANGES);
+		if (err != NULL)
+			return err;
+	}
+
+	if (fputc('\n', outfile) == EOF)
+		return got_error_from_errno("fputc");
+
+	offset++;
+	err = add_line_metadata(lines, nlines, offset, GOT_DIFF_LINE_NONE);
+	if (err != NULL)
+		return err;
+
+	n = fprintf(outfile,
+	    "%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n",
+	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins,
+	    dsa->ins != 1 ? "s" : "", dsa->del, dsa->del != 1 ? "s" : "");
+	if (n < 0)
+		return got_error_from_errno("fprintf");
+
+	offset += n;
+	err = add_line_metadata(lines, nlines, offset, GOT_DIFF_LINE_NONE);
+	if (err != NULL)
+		return err;
+
+	if (fputc('\n', outfile) == EOF)
+		return got_error_from_errno("fputc");
+
+	offset++;
+	return add_line_metadata(lines, nlines, offset, GOT_DIFF_LINE_NONE);
+}
+
+static const struct got_error *
 write_commit_info(struct got_diff_line **lines, size_t *nlines,
     struct got_object_id *commit_id, struct got_reflist_head *refs,
     struct got_repository *repo, int ignore_ws, int force_text_diff,
@@ -5202,7 +5263,6 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 	time_t committer_time;
 	const char *author, *committer;
 	char *refs_str = NULL;
-	struct got_pathlist_entry *pe;
 	off_t outoff = 0;
 	int n;
 
@@ -5315,46 +5375,6 @@ write_commit_info(struct got_diff_line **lines, size_t *nlines,
 			goto done;
 	}
 
-	TAILQ_FOREACH(pe, dsa->paths, entry) {
-		struct got_diff_changed_path *cp = pe->data;
-		int pad = dsa->max_path_len - pe->path_len + 1;
-
-		n = fprintf(outfile, "%c  %s%*c | %*d+ %*d-\n", cp->status,
-		    pe->path, pad, ' ', dsa->add_cols + 1, cp->add,
-		    dsa->rm_cols + 1, cp->rm);
-		if (n < 0) {
-			err = got_error_from_errno("fprintf");
-			goto done;
-		}
-		outoff += n;
-		err = add_line_metadata(lines, nlines, outoff,
-		    GOT_DIFF_LINE_CHANGES);
-		if (err)
-			goto done;
-	}
-
-	fputc('\n', outfile);
-	outoff++;
-	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
-	if (err)
-		goto done;
-
-	n = fprintf(outfile,
-	    "%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n",
-	    dsa->nfiles, dsa->nfiles > 1 ? "s" : "", dsa->ins,
-	    dsa->ins != 1 ? "s" : "", dsa->del, dsa->del != 1 ? "s" : "");
-	if (n < 0) {
-		err = got_error_from_errno("fprintf");
-		goto done;
-	}
-	outoff += n;
-	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
-	if (err)
-		goto done;
-
-	fputc('\n', outfile);
-	outoff++;
-	err = add_line_metadata(lines, nlines, outoff, GOT_DIFF_LINE_NONE);
 done:
 	free(id_str);
 	free(logmsg);
@@ -5372,8 +5392,15 @@ create_diff(struct tog_diff_view_state *s)
 	struct got_diff_line *lines = NULL;
 	struct got_pathlist_head changed_paths;
 	struct got_commit_object *commit2 = NULL;
+	struct got_diffstat_cb_arg dsa;
+	size_t nlines = 0;
 
 	TAILQ_INIT(&changed_paths);
+	memset(&dsa, 0, sizeof(dsa));
+	dsa.paths = &changed_paths;
+	dsa.diff_algo = tog_diff_algo;
+	dsa.force_text = s->force_text_diff;
+	dsa.ignore_ws = s->ignore_whitespace;
 
 	free(s->lines);
 	s->lines = malloc(sizeof(*s->lines));
@@ -5390,9 +5417,22 @@ create_diff(struct tog_diff_view_state *s)
 	if (s->f == NULL)
 		return got_error_from_errno("got_opentemp");
 
+	/*
+	 * The diffstat requires the diff to be built first, but we want the
+	 * diffstat to prepend the diff when displayed. Build the diff first
+	 * in the temporary file and write the diffstat and/or commit info to
+	 * the persistent file (s->f) from which views are drawn, then append
+	 * the diff from the temp file to the diffstat/commit info in s->f.
+	 */
 	tmp_diff_file = got_opentemp();
 	if (tmp_diff_file == NULL)
 		return got_error_from_errno("got_opentemp");
+
+	lines = malloc(sizeof(*lines));
+	if (lines == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
 
 	if (s->id1)
 		err = got_object_get_type(&obj_type, s->repo, s->id1);
@@ -5403,44 +5443,33 @@ create_diff(struct tog_diff_view_state *s)
 
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(&s->lines, &s->nlines,
+		err = got_diff_objects_as_blobs(&lines, &nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
 		    s->label1, s->label2, tog_diff_algo, s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, NULL, s->repo,
-		    s->f);
+		    s->ignore_whitespace, s->force_text_diff, &dsa, s->repo,
+		    tmp_diff_file);
+		if (err != NULL)
+			goto done;
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(&s->lines, &s->nlines,
+		err = got_diff_objects_as_trees(&lines, &nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
 		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, NULL, s->repo, s->f);
+		    s->force_text_diff, &dsa, s->repo, tmp_diff_file);
+		if (err != NULL)
+			goto done;
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *pid;
 		struct got_reflist_head *refs;
-		size_t nlines = 0;
-		struct got_diffstat_cb_arg dsa = {
-			0, 0, 0, 0, 0, 0,
-			&changed_paths,
-			s->ignore_whitespace,
-			s->force_text_diff,
-			tog_diff_algo
-		};
 
-		lines = malloc(sizeof(*lines));
-		if (lines == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-
-		/* build diff first in tmp file then append to commit info */
 		err = got_diff_objects_as_commits(&lines, &nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
 		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
 		    s->force_text_diff, &dsa, s->repo, tmp_diff_file);
 		if (err)
-			break;
+			goto done;
 
 		refs = got_reflist_object_id_map_lookup(tog_refs_idmap, s->id2);
 		/* Show commit info if we're diffing to a parent/root commit. */
@@ -5469,15 +5498,20 @@ create_diff(struct tog_diff_view_state *s)
 				}
 			}
 		}
-
-		err = cat_diff(s->f, tmp_diff_file, &s->lines, &s->nlines,
-		    lines, nlines);
 		break;
 	}
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);
-		break;
+		goto done;
 	}
+
+	err = write_diffstat(s->f, &s->lines, &s->nlines, &dsa);
+	if (err != NULL)
+		goto done;
+
+	err = cat_diff(s->f, tmp_diff_file, &s->lines, &s->nlines,
+	    lines, nlines);
+
 done:
 	free(lines);
 	if (commit2 != NULL)

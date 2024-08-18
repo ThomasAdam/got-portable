@@ -728,7 +728,7 @@ test_log_search()
 
 test_log_mark_keymap()
 {
-	test_init log_mark_keymap 141 10
+	test_init log_mark_keymap 141 14
 
 	local repo="$testroot/repo"
 	local wt="$testroot/wt"
@@ -781,6 +781,10 @@ test_log_mark_keymap()
 
 
 
+
+
+
+
 	EOF
 
 	tog log
@@ -804,6 +808,10 @@ test_log_mark_keymap()
 	commit $id_root [2/2]
 	$ymd_head $prefix_head flan_hacker ~[master] new alpha
 	$ymd_root $prefix_root flan_hacker  adding the test tree
+
+
+
+
 
 
 
@@ -839,6 +847,10 @@ test_log_mark_keymap()
 
 
 
+
+
+
+
 	EOF
 
 	tog log
@@ -860,7 +872,11 @@ test_log_mark_keymap()
 	EOF
 
 	cat <<-EOF >$testroot/view.expected
-	[1/10] diff $id_head $id_root
+	[1/14] diff $id_head $id_root
+	M  alpha  |  1+  1-
+
+	1 file changed, 1 insertion(+), 1 deletion(-)
+
 	commit - $id_head
 	commit + $id_root
 	blob - $alpha_head
