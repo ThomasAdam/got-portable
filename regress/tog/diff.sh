@@ -690,13 +690,16 @@ test_diff_blobs()
 
 	local blob_alpha_head=$(get_blob_id $testroot/repo "" alpha)
 
+	local short_alpha_root=$(printf '%.10s' $blob_alpha_root)
+	local short_alpha_head=$(printf '%.10s' $blob_alpha_head)
+
 	cat <<EOF >$TOG_TEST_SCRIPT
 SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
 [1/12] diff $blob_alpha_root $blob_alpha_head
-M  $blob_alpha_head  |  1+  1-
+M  $short_alpha_root -> $short_alpha_head  |  1+  1-
 
 1 file changed, 1 insertion(+), 1 deletion(-)
 
