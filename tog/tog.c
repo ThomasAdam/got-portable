@@ -5423,7 +5423,7 @@ create_diff(struct tog_diff_view_state *s)
 
 	/*
 	 * The diffstat requires the diff to be built first, but we want the
-	 * diffstat to prepend the diff when displayed. Build the diff first
+	 * diffstat to precede the diff when displayed. Build the diff first
 	 * in the temporary file and write the diffstat and/or commit info to
 	 * the persistent file (s->f) from which views are drawn, then append
 	 * the diff from the temp file to the diffstat/commit info in s->f.
@@ -5449,7 +5449,7 @@ create_diff(struct tog_diff_view_state *s)
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&lines, &nlines,
 		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
-		    s->label1, s->label2, tog_diff_algo, s->diff_context,
+		    NULL, NULL, tog_diff_algo, s->diff_context,
 		    s->ignore_whitespace, s->force_text_diff, &dsa, s->repo,
 		    tmp_diff_file);
 		if (err != NULL)
