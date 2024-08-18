@@ -76,7 +76,7 @@ EOF
 
 test_diff_arbitrary_commits()
 {
-	test_init diff_arbitrary_commits 80 18
+	test_init diff_arbitrary_commits
 
 	local commit_id1=`git_show_head $testroot/repo`
 	local alpha_id_old=`get_blob_id $testroot/repo "" alpha`
@@ -99,7 +99,12 @@ SCREENDUMP
 EOF
 
 	cat <<EOF >$testroot/view.expected
-$(trim 80 "[1/16] diff $commit_id1 $head_id_truncated")
+$(trim 80 "[1/21] diff $commit_id1 $head_id_truncated")
+M  alpha  |  1+  1-
+A  new    |  1+  0-
+
+2 files changed, 2 insertions(+), 1 deletion(-)
+
 commit - $commit_id1
 commit + $head_id
 blob - $alpha_id_old
@@ -115,6 +120,7 @@ $(trim 80 "blob + $new_id (mode 644)")
 +++ new
 @@ -0,0 +1 @@
 +new file
+
 
 (END)
 EOF
@@ -404,7 +410,11 @@ test_diff_commit_keywords()
 	rhs_id=$(pop_idx 8 $ids)
 
 	cat <<-EOF >$testroot/view.expected
-	$(trim 120 "[1/10] diff $lhs_id $rhs_id")
+	$(trim 120 "[1/14] diff $lhs_id $rhs_id")
+	M  alpha  |  1+  1-
+
+	1 file changed, 1 insertion(+), 1 deletion(-)
+
 	commit - $lhs_id
 	commit + $rhs_id
 	blob - $(pop_idx 5 $alpha_ids)
@@ -414,10 +424,6 @@ test_diff_commit_keywords()
 	@@ -1 +1 @@
 	-alpha 4
 	+alpha 7
-
-
-
-
 
 
 
@@ -621,6 +627,11 @@ EOF
 	fi
 
 	cat <<EOF >$testroot/content.expected
+M  alpha  |  1+  1-
+M  beta   |  1+  1-
+
+2 files changed, 2 insertions(+), 2 deletions(-)
+
 commit - $id_root
 commit + $id_head
 blob - $alpha_root
@@ -639,7 +650,7 @@ blob + $beta_head
 +modified beta
 EOF
 
-	# test diff of arbitrary commits
+	# test diff of arbitrary commits displays diffstat in patch file
 	cd $testroot/repo && tog diff :head:-2 :head
 	patchpath=$(tail -1 $testroot/view | cut -d' ' -f 5)
 
@@ -668,6 +679,98 @@ EOF
 	test_done "$testroot" $ret
 }
 
+test_diff_blobs()
+{
+	test_init diff_blobs 148 14
+
+	local blob_alpha_root=$(get_blob_id $testroot/repo "" alpha)
+
+	echo "new alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "new alpha"
+
+	local blob_alpha_head=$(get_blob_id $testroot/repo "" alpha)
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+[1/12] diff $blob_alpha_root $blob_alpha_head
+M  $blob_alpha_head  |  1+  1-
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+blob - $blob_alpha_root
+blob + $blob_alpha_head
+--- $blob_alpha_root
++++ $blob_alpha_head
+@@ -1 +1 @@
+-alpha
++new alpha
+
+(END)
+EOF
+
+	cd $testroot/repo && tog diff $blob_alpha_root $blob_alpha_head
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" $ret
+}
+
+test_diff_trees()
+{
+	test_init diff_trees 148 16
+
+	local tree_gamma_root=$(get_blob_id $testroot/repo "" gamma/)
+	local blob_delta_root=$(get_blob_id $testroot/repo gamma delta)
+
+	echo "new delta" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "new delta"
+
+	local tree_gamma_head=$(get_blob_id $testroot/repo "" gamma/)
+	local blob_delta_head=$(get_blob_id $testroot/repo gamma delta)
+
+	cat <<EOF >$TOG_TEST_SCRIPT
+SCREENDUMP
+EOF
+
+	cat <<EOF >$testroot/view.expected
+[1/14] diff $tree_gamma_root $tree_gamma_head
+M  delta  |  1+  1-
+
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+tree - $tree_gamma_root
+tree + $tree_gamma_head
+blob - $blob_delta_root
+blob + $blob_delta_head
+--- delta
++++ delta
+@@ -1 +1 @@
+-delta
++new delta
+
+(END)
+EOF
+
+	cd $testroot/repo && tog diff $tree_gamma_root $tree_gamma_head
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_diff_contiguous_commits
 run_test test_diff_arbitrary_commits
@@ -675,3 +778,5 @@ run_test test_diff_J_keymap
 run_test test_diff_commit_keywords
 run_test test_diff_horizontal_scroll
 run_test test_diff_p_keymap
+run_test test_diff_blobs
+run_test test_diff_trees
