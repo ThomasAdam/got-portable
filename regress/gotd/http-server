@@ -111,7 +111,8 @@ say "";
 if (defined $hmac) {
 	my $digest = $hmac->hexdigest;
 	if ($digest ne $hmac_signature) {
-		die "bad hmac signature: expected: $hmac_signature, actual: $digest";
+		print "bad hmac signature: expected: $hmac_signature, actual: $digest";
+		die
 	}
 }
 
