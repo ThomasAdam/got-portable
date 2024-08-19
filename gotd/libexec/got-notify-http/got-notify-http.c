@@ -1059,7 +1059,7 @@ main(int argc, char **argv)
 	    path, host,
 	    nonstd ? ":" : "", nonstd ? port : "",
 	    (long long)paylen, USERAGENT,
-	    hmac_sig ? "HTTP_X_GOTD_SIGNATURE_256: " : "",
+	    hmac_sig ? "X-Gotd-Signature: " : "",
 	    hmac_sig ? "sha256=" : "",
 	    hmac_sig ? hex : "",
 	    hmac_sig ? "\r\n" : "");
