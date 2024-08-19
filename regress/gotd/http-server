@@ -17,12 +17,17 @@
 use v5.36;
 use IPC::Open2;
 use Getopt::Long qw(:config bundling);
+use Digest;
+use Digest::HMAC;
 
 my $auth;
 my $port = 8000;
+my $hmac_secret;
+my $hmac_signature;
+my $hmac;
 
-GetOptions("a:s" => \$auth, "p:i" => \$port)
-    or die("usage: $0 [-a auth] [-p port]\n");
+GetOptions("a:s" => \$auth, "p:i" => \$port, "s:s" => \$hmac_secret)
+    or die("usage: $0 [-a auth] [-p port] [-s hmac_secret]\n");
 
 my $pid = open2(my $out, my $in, 'nc', '-l', 'localhost', $port);
 
@@ -71,9 +76,22 @@ while (<$out>) {
 		    if not defined($auth) or $auth ne $t;
 		next;
 	}
+
+	if (m/HTTP_X_GOTD_SIGNATURE_256/) {
+		die "bad hmac signature header"
+		    unless m/HTTP_X_GOTD_SIGNATURE_256: sha256=(.*)$/;
+		$hmac_signature = $1;
+		next;
+	}
 }
 
 die "no Content-Length header" unless defined $clen;
+
+if (defined $hmac_signature) {
+	die "no HMAC secret provided" if not (defined $hmac_secret);
+	my $sha256 = Digest->new("SHA-256");
+	$hmac = Digest::HMAC->new($hmac_secret, $sha256);
+}
 
 while ($clen != 0) {
 	my $len = $clen;
@@ -82,9 +100,20 @@ while ($clen != 0) {
 	my $r = read($out, my $buf, $len);
 	$clen -= $r;
 
+	if (defined $hmac) {
+		$hmac->add($buf);
+	}
+
 	print $buf;
 }
 say "";
+
+if (defined $hmac) {
+	my $digest = $hmac->hexdigest;
+	if ($digest ne $hmac_signature) {
+		die "bad hmac signature: expected: $hmac_signature, actual: $digest";
+	}
+}
 
 print $in "HTTP/1.1 200 OK\r\n";
 print $in "Content-Length: 0\r\n";

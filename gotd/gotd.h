@@ -115,6 +115,7 @@ struct gotd_notification_target {
 			char *path;
 			char *user;
 			char *password;
+			char *hmac_secret;
 		} http;
 	} conf;
 };
