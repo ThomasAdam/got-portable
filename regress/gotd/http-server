@@ -77,9 +77,9 @@ while (<$out>) {
 		next;
 	}
 
-	if (m/HTTP_X_GOTD_SIGNATURE_256/) {
+	if (m/X-Gotd-Signature/) {
 		die "bad hmac signature header"
-		    unless m/HTTP_X_GOTD_SIGNATURE_256: sha256=(.*)$/;
+		    unless m/X-Gotd-Signature: sha256=(.*)$/;
 		$hmac_signature = $1;
 		next;
 	}

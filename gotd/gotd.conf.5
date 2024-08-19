@@ -374,7 +374,7 @@ If a
 is provided, the request body will be signed using HMAC, allowing the
 receiver to verify the notification message's authenticity and integrity.
 The signature uses HMAC-SHA256 and will be sent in the HTTP header
-.Dq HTTP_X_GOTD_SIGNATURE_256 .
+.Dq X-Gotd-Signature .
 Suitable secrets can be generated with
 .Xr openssl 1
 as follows:
