@@ -861,12 +861,12 @@ compute_hmac_sha256(FILE *payload, off_t paylen, const char *hmac_secret,
 
 	ctx = HMAC_CTX_new();
 	if (ctx == NULL) {
-		log_warn("HMAC_CTX_new");
+		log_warnx("HMAC_CTX_new failed");
 		return NULL;
 	}
 
 	if (!HMAC_Init_ex(ctx, hmac_secret, secret_len, EVP_sha256(), NULL)) {
-		log_warn("HMAC_Init_ex");
+		log_warnx("HMAC_Init_ex failed");
 		goto fail;
 	}
 
@@ -878,8 +878,7 @@ compute_hmac_sha256(FILE *payload, off_t paylen, const char *hmac_secret,
 				log_warnx("HMAC payload truncated");
 				goto fail;
 			}
-			log_warnx("reading HMAC payload: %s",
-			    strerror(ferror(payload)));
+			log_warn("failed to read HMAC payload");
 			goto fail;
 		}
 		if (!HMAC_Update(ctx, buf, r)) {
@@ -890,7 +889,7 @@ compute_hmac_sha256(FILE *payload, off_t paylen, const char *hmac_secret,
 	}
 
 	if (!HMAC_Final(ctx, hmac_sig_buf, hmac_siglen)) {
-		log_warn("HMAC_Final");
+		log_warnx("HMAC_Final failed");
 		goto fail;
 	}
 
