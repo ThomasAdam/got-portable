@@ -46,7 +46,7 @@ test_file_changed() {
 	local author_time=`git_show_author_time $testroot/repo-clone`
 
 	timeout 5 ./http-server -a $AUTH -p $GOTD_TEST_HTTP_PORT \
-		-s $GOTD_TEST_HMAC_SECRET > $testroot/stdout &
+		-s "$GOTD_TEST_HMAC_SECRET" > $testroot/stdout &
 
 	sleep 1 # server starts up
 
