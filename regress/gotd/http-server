@@ -88,7 +88,7 @@ while (<$out>) {
 die "no Content-Length header" unless defined $clen;
 
 if (defined $hmac_signature) {
-	die "no HMAC secret provided" if not (defined $hmac_secret);
+	die "no Hmac secret provided" unless defined $hmac_secret;
 	my $sha256 = Digest->new("SHA-256");
 	$hmac = Digest::HMAC->new($hmac_secret, $sha256);
 }
