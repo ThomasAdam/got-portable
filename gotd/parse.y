@@ -111,7 +111,7 @@ static int			 conf_notify_ref_namespace(struct gotd_repo *,
 static int			 conf_notify_email(struct gotd_repo *,
 				    char *, char *, char *, char *, char *);
 static int			 conf_notify_http(struct gotd_repo *,
-				    char *, char *, char *, int);
+				    char *, char *, char *, int, char *);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
@@ -128,7 +128,7 @@ typedef struct {
 %token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 %token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT
-%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD INSECURE
+%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD INSECURE HMAC
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -611,7 +611,7 @@ notifyflags	: BRANCH STRING {
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, NULL,
-				    NULL, 0)) {
+				    NULL, 0, NULL)) {
 					free($2);
 					YYERROR;
 				}
@@ -622,7 +622,8 @@ notifyflags	: BRANCH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 0)) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 0,
+				    NULL)) {
 					free($2);
 					free($4);
 					free($6);
@@ -637,7 +638,8 @@ notifyflags	: BRANCH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 1)) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 1,
+				    NULL)) {
 					free($2);
 					free($4);
 					free($6);
@@ -647,6 +649,56 @@ notifyflags	: BRANCH STRING {
 			free($2);
 			free($4);
 			free($6);
+		}
+		| URL STRING HMAC STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, NULL,
+				    NULL, 0, $4)) {
+					free($2);
+					free($4);
+					YYERROR;
+				}
+			}
+			free($2);
+			free($4);
+		}
+		| URL STRING USER STRING PASSWORD STRING HMAC STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 0,
+				    $8)) {
+					free($2);
+					free($4);
+					free($6);
+					free($8);
+					YYERROR;
+				}
+			}
+			free($2);
+			free($4);
+			free($6);
+			free($8);
+		}
+		| URL STRING USER STRING PASSWORD STRING INSECURE HMAC STRING {
+			if (gotd_proc_id == PROC_GOTD ||
+			    gotd_proc_id == PROC_SESSION_WRITE ||
+			    gotd_proc_id == PROC_NOTIFY) {
+				if (conf_notify_http(new_repo, $2, $4, $6, 1,
+				    $9)) {
+					free($2);
+					free($4);
+					free($6);
+					free($9);
+					YYERROR;
+				}
+			}
+			free($2);
+			free($4);
+			free($6);
+			free($9);
 		}
 		;
 	
@@ -792,6 +844,7 @@ lookup(char *s)
 		{ "deny",			DENY },
 		{ "email",			EMAIL },
 		{ "from",			FROM },
+		{ "hmac",			HMAC },
 		{ "insecure",			INSECURE },
 		{ "limit",			LIMIT },
 		{ "listen",			LISTEN },
@@ -1562,7 +1615,7 @@ conf_notify_email(struct gotd_repo *repo, char *sender, char *recipient,
 
 static int
 conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
-    int insecure)
+    int insecure, char *hmac_secret)
 {
 	const struct got_error *error;
 	struct gotd_notification_target *target;
@@ -1645,6 +1698,11 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
 		if (target->conf.http.password == NULL)
 			fatal("strdup");
 	}	
+	if (hmac_secret) {
+		target->conf.http.hmac_secret = strdup(hmac_secret);
+		if (target->conf.http.hmac_secret == NULL)
+			fatal("strdup");
+	}
 
 	STAILQ_INSERT_TAIL(&repo->notification_targets, target, entry);
 done:

@@ -6,7 +6,8 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_write test_repo_write_empty test_request_bad \
 	test_repo_write_protected test_repo_write_readonly \
 	test_email_notification test_http_notification \
-	test_git_interop test_email_and_http_notification
+	test_git_interop test_email_and_http_notification \
+	test_http_notification_hmac
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
@@ -20,6 +21,7 @@ GOTD_TEST_REPO_NAME=test-repo
 GOTD_TEST_REPO_URL=ssh://${GOTD_DEVUSER}@127.0.0.1/$(GOTD_TEST_REPO_NAME)
 GOTD_TEST_SMTP_PORT=2525
 GOTD_TEST_HTTP_PORT=8000
+GOTD_TEST_HMAC_SECRET=test1234
 
 GOTD_TEST_USER?=${DOAS_USER}
 .if empty(GOTD_TEST_USER)
@@ -58,6 +60,7 @@ GOTD_TEST_ENV=GOTD_TEST_ROOT=$(GOTD_TEST_ROOT) \
 	GOTD_CONF=$(PWD)/gotd.conf \
 	GOTD_TEST_SMTP_PORT=$(GOTD_TEST_SMTP_PORT) \
 	GOTD_TEST_HTTP_PORT=$(GOTD_TEST_HTTP_PORT) \
+	GOTD_TEST_HMAC_SECRET=$(GOTD_TEST_HMAC_SECRET) \
 	HOME=$(GOTD_TEST_USER_HOME) \
 	PATH=$(GOTD_TEST_USER_HOME)/bin:$(PATH)
 
@@ -211,6 +214,18 @@ start_gotd_email_and_http_notification: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_http_notification_hmac: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo '    notify {' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password" insecure hmac "${GOTD_TEST_HMAC_SECRET}"' >> $(PWD)/gotd.conf
+	@echo "    }" >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
@@ -292,6 +307,11 @@ test_email_notification: prepare_test_repo start_gotd_email_notification
 test_http_notification: prepare_test_repo start_gotd_http_notification
 	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./http_notification.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+
+test_http_notification_hmac: prepare_test_repo start_gotd_http_notification_hmac
+	@-$(GOTD_TRAP); su -m ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./http_notification_hmac.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 
 test_email_and_http_notification: prepare_test_repo start_gotd_email_and_http_notification

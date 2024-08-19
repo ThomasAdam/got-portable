@@ -333,7 +333,7 @@ The
 and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
-.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc
+.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc Oo Ic hmac Ar secret Oc 
 Send notifications via HTTP.
 This directive may be specified multiple times to build a list of
 HTTP servers to send notifications to.
@@ -367,6 +367,19 @@ option is specified the notification target
 must be a
 .Dq https://
 URL to avoid leaking of authentication credentials.
+.Pp
+If a
+.Ic hmac
+.Ar secret
+is provided, the request body will be signed using HMAC, allowing the
+receiver to verify the notification message's authenticity and integrity.
+The signature uses HMAC-SHA256 and will be sent in the HTTP header
+.Dq HTTP_X_GOTD_SIGNATURE_256 .
+Suitable secrets can be generated with
+.Xr openssl 1
+as follows:
+.Pp
+.Dl $ openssl rand -base64 32
 .Pp
 The request body contains a JSON object with a
 .Dq notifications

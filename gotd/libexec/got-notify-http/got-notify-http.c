@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 
 #include <err.h>
 #include <errno.h>
@@ -24,6 +25,8 @@
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +35,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+
 #include "got_opentemp.h"
 #include "got_version.h"
+#include "got_object.h"
+
+#include "got_lib_hash.h"
 
 #include "bufio.h"
 #include "log.h"
@@ -837,6 +846,61 @@ bufio2poll(struct bufio *bio)
 	return ret;
 }
 
+static unsigned char *
+compute_hmac_sha256(FILE *payload, off_t paylen, const char *hmac_secret,
+    size_t secret_len, unsigned char *hmac_sig_buf, unsigned int *hmac_siglen)
+{
+	HMAC_CTX *ctx;
+	char buf[4096];
+	off_t n;
+	ssize_t r;
+
+	*hmac_siglen = 0;
+
+	ctx = HMAC_CTX_new();
+	if (ctx == NULL) {
+		log_warn("HMAC_CTX_new");
+		return NULL;
+	}
+
+	if (!HMAC_Init_ex(ctx, hmac_secret, secret_len, EVP_sha256(), NULL)) {
+		log_warn("HMAC_Init_ex");
+		goto fail;
+	}
+
+	n = paylen;
+	while (n > 0) {
+		r = fread(buf, 1, n > sizeof(buf) ? sizeof(buf) : n, payload);
+		if (r == 0) {
+			if (feof(payload)) {
+				log_warnx("HMAC payload truncated");
+				goto fail;
+			}
+			log_warnx("reading HMAC payload: %s",
+			    strerror(ferror(payload)));
+			goto fail;
+		}
+		if (!HMAC_Update(ctx, buf, r)) {
+			log_warn("HMAC_Update");
+			goto fail;
+		}
+		n -= r;
+	}
+
+	if (!HMAC_Final(ctx, hmac_sig_buf, hmac_siglen)) {
+		log_warn("HMAC_Final");
+		goto fail;
+	}
+
+	*hmac_siglen = HMAC_size(ctx);
+
+	HMAC_CTX_free(ctx);
+	return hmac_sig_buf;
+fail:
+	HMAC_CTX_free(ctx);
+	return NULL;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -847,11 +911,16 @@ main(int argc, char **argv)
 	const char	*username;
 	const char	*password;
 	const char	*timeoutstr;
+	const char	*hmac_secret;
 	const char	*errstr;
 	const char	*repo = NULL;
 	const char	*host = NULL, *port = NULL, *path = NULL;
 	const char	*gotd_auth_user = NULL;
 	char		*auth, *line, *spc;
+	unsigned char	*hmac_sig = NULL;
+	unsigned char	 hmac_sig_buf[EVP_MAX_MD_SIZE];
+	unsigned int	 hmac_siglen;
+	char		 hex[SHA256_DIGEST_STRING_LENGTH];
 	size_t		 len;
 	ssize_t		 r;
 	off_t		 paylen;
@@ -933,6 +1002,19 @@ main(int argc, char **argv)
 	if (pledge("stdio rpath dns inet", NULL) == -1)
 		err(1, "pledge");
 #endif
+	hmac_secret = getenv("GOT_NOTIFY_HTTP_HMAC_SECRET");
+	if (hmac_secret) {
+		hmac_sig = compute_hmac_sha256(tmpfp, paylen, hmac_secret,
+		    strlen(hmac_secret), hmac_sig_buf, &hmac_siglen);
+		if (hmac_sig == NULL || hmac_siglen != SHA256_DIGEST_LENGTH)
+			fatalx("HMAC computation failed");
+		if (got_sha256_digest_to_str(hmac_sig, hex, sizeof(hex))
+		    == NULL)
+			fatalx("HMAC conversion to hex string failed");
+
+		if (fseeko(tmpfp, 0, SEEK_SET) == -1)
+			fatal("fseeko");
+	}
 
 	memset(&pfd, 0, sizeof(pfd));
 	pfd.fd = dial(host, port);
@@ -964,10 +1046,15 @@ main(int argc, char **argv)
 	    "Content-Type: application/json\r\n"
 	    "Content-Length: %lld\r\n"
 	    "User-Agent: %s\r\n"
-	    "Connection: close\r\n",
+	    "Connection: close\r\n"
+	    "%s%s%s%s",
 	    path, host,
 	    nonstd ? ":" : "", nonstd ? port : "",
-	    (long long)paylen, USERAGENT);
+	    (long long)paylen, USERAGENT,
+	    hmac_sig ? "HTTP_X_GOTD_SIGNATURE_256: " : "",
+	    hmac_sig ? "sha256=" : "",
+	    hmac_sig ? hex : "",
+	    hmac_sig ? "\r\n" : "");
 	if (ret == -1)
 		fatal("bufio_compose_fmt");
 

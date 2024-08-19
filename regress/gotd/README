@@ -51,7 +51,7 @@ sshd must be restarted for configuration changes to take effect:
 
 The server test suite can now be run from the top-level directory:
 
- $ doas pkg_add git p5-http-daemon
+ $ doas pkg_add git p5-http-daemon p5-digest-hmac
  $ doas make server-regress
 
 The suite must be started as root in order to be able to start and stop gotd.
