@@ -767,6 +767,7 @@ test_log_mark_keymap()
 	cat <<-EOF >$TOG_TEST_SCRIPT
 	j
 	m		mark commit
+	WAIT_FOR_UI
 	SCREENDUMP
 	EOF
 
@@ -801,6 +802,7 @@ test_log_mark_keymap()
 	j
 	m		mark commit
 	m		unmark commit
+	WAIT_FOR_UI
 	SCREENDUMP
 	EOF
 
