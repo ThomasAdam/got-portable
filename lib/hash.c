@@ -198,6 +198,8 @@ got_hash_init(struct got_hash *hash, enum got_hash_algorithm algo)
 		SHA1Init(&hash->sha1_ctx);
 	else if (algo == GOT_HASH_SHA256)
 		SHA256Init(&hash->sha256_ctx);
+	else
+		abort();
 }
 
 void
@@ -207,6 +209,8 @@ got_hash_update(struct got_hash *hash, const void *data, size_t len)
 		SHA1Update(&hash->sha1_ctx, data, len);
 	else if (hash->algo == GOT_HASH_SHA256)
 		SHA256Update(&hash->sha256_ctx, data, len);
+	else
+		abort();
 }
 
 void
@@ -216,6 +220,8 @@ got_hash_final(struct got_hash *hash, uint8_t *out)
 		SHA1Final(out, &hash->sha1_ctx);
 	else if (hash->algo == GOT_HASH_SHA256)
 		SHA256Final(out, &hash->sha256_ctx);
+	else
+		abort();
 }
 
 void
@@ -225,8 +231,10 @@ got_hash_final_object_id(struct got_hash *hash, struct got_object_id *id)
 	id->algo = hash->algo;
 	if (hash->algo == GOT_HASH_SHA1)
 		SHA1Final(id->hash, &hash->sha1_ctx);
-	else
+	else if (hash->algo == GOT_HASH_SHA256)
 		SHA256Final(id->hash, &hash->sha256_ctx);
+	else
+		abort();
 }
 
 int
@@ -236,5 +244,7 @@ got_hash_cmp(enum got_hash_algorithm algo, uint8_t *b1, uint8_t *b2)
 		return memcmp(b1, b2, SHA1_DIGEST_LENGTH);
 	else if (algo == GOT_HASH_SHA256)
 		return memcmp(b1, b2, SHA256_DIGEST_LENGTH);
+	else
+		abort();
 	return -1;
 }
