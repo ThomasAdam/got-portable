@@ -1634,9 +1634,9 @@ static pid_t
 start_child(enum gotd_procid proc_id, const char *repo_path,
     char *argv0, const char *confpath, int fd, int daemonize, int verbosity)
 {
-	char	*argv[11];
-	int	 argc = 0;
-	pid_t	 pid;
+	const char	*argv[11];
+	int		 argc = 0;
+	pid_t		 pid;
 
 	switch (pid = fork()) {
 	case -1:
@@ -1657,47 +1657,47 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 	argv[argc++] = argv0;
 	switch (proc_id) {
 	case PROC_LISTEN:
-		argv[argc++] = (char *)"-TL";
+		argv[argc++] = "-TL";
 		break;
 	case PROC_AUTH:
-		argv[argc++] = (char *)"-TA";
+		argv[argc++] = "-TA";
 		break;
 	case PROC_SESSION_READ:
-		argv[argc++] = (char *)"-Ts";
+		argv[argc++] = "-Ts";
 		break;
 	case PROC_SESSION_WRITE:
-		argv[argc++] = (char *)"-TS";
+		argv[argc++] = "-TS";
 		break;
 	case PROC_REPO_READ:
-		argv[argc++] = (char *)"-TR";
+		argv[argc++] = "-TR";
 		break;
 	case PROC_REPO_WRITE:
-		argv[argc++] = (char *)"-TW";
+		argv[argc++] = "-TW";
 		break;
 	case PROC_NOTIFY:
-		argv[argc++] = (char *)"-TN";
+		argv[argc++] = "-TN";
 		break;
 	default:
 		fatalx("invalid process id %d", proc_id);
 	}
 
-	argv[argc++] = (char *)"-f";
-	argv[argc++] = (char *)confpath;
+	argv[argc++] = "-f";
+	argv[argc++] = confpath;
 
 	if (repo_path) {
-		argv[argc++] = (char *)"-P";
-		argv[argc++] = (char *)repo_path;
+		argv[argc++] = "-P";
+		argv[argc++] = repo_path;
 	}
 
 	if (!daemonize)
-		argv[argc++] = (char *)"-d";
+		argv[argc++] = "-d";
 	if (verbosity > 0)
-		argv[argc++] = (char *)"-v";
+		argv[argc++] = "-v";
 	if (verbosity > 1)
-		argv[argc++] = (char *)"-v";
+		argv[argc++] = "-v";
 	argv[argc++] = NULL;
 
-	execvp(argv0, argv);
+	execvp(argv0, (char * const *)argv);
 	fatal("execvp");
 }
 
