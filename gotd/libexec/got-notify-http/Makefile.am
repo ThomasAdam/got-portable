@@ -15,7 +15,8 @@ got_notify_http_SOURCES = got-notify-http.c \
 got_notify_http_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
-LDADD += $(zlib_LIBS) $(libbsd_LIBS) $(libutil_LIBS) $(libmd_LIBS) $(libtls_LIBS)
+LDADD += $(zlib_LIBS) $(libbsd_LIBS) $(libutil_LIBS) $(libmd_LIBS) \
+	 $(libtls_LIBS) $(libcrypto_LIBS)
 if HOST_FREEBSD
 LDADD += -lmd
 endif
@@ -24,4 +25,5 @@ if HOST_OPENBSD
 LDADD += -ltls
 endif
 
-AM_CPPFLAGS += $(zlib_CFLAGS) $(libbsd_CFLAGS) $(libmd_CFLAGS) $(libtls_CFLAGS)
+AM_CPPFLAGS += $(zlib_CFLAGS) $(libbsd_CFLAGS) $(libmd_CFLAGS) \
+	       $(libtls_CFLAGS) $(libcrypto_CFLAGS)

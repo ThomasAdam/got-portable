@@ -27,8 +27,6 @@
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

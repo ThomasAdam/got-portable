@@ -771,6 +771,19 @@ PKG_CHECK_MODULES(
 	],
 	AC_MSG_ERROR(["*** Couldn't find libtls ***"])
 )
+
+# Look for crypto (part of openssl)
+PKG_CHECK_MODULES(
+	LIBCRYPTO,
+	[libcrypto],
+	[
+		libcrypto_CFLAGS="$LIBCRYPTO_CFLAGS"
+		libcrypto_LIBS="$LIBCRYPTO_LIBS"
+		AC_SUBST(libcrypto_CFLAGS)
+		AC_SUBST(libcrypto_LIBS)
+	],
+	AC_MSG_ERROR(["*** Couldn't find libcrypto ***"])
+)
 fi
 
 # Look for __progname.
