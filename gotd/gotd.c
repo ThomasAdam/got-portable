@@ -1657,25 +1657,25 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 	argv[argc++] = argv0;
 	switch (proc_id) {
 	case PROC_LISTEN:
-		argv[argc++] = (char *)"-L";
+		argv[argc++] = (char *)"-TL";
 		break;
 	case PROC_AUTH:
-		argv[argc++] = (char *)"-A";
+		argv[argc++] = (char *)"-TA";
 		break;
 	case PROC_SESSION_READ:
-		argv[argc++] = (char *)"-s";
+		argv[argc++] = (char *)"-Ts";
 		break;
 	case PROC_SESSION_WRITE:
-		argv[argc++] = (char *)"-S";
+		argv[argc++] = (char *)"-TS";
 		break;
 	case PROC_REPO_READ:
-		argv[argc++] = (char *)"-R";
+		argv[argc++] = (char *)"-TR";
 		break;
 	case PROC_REPO_WRITE:
-		argv[argc++] = (char *)"-W";
+		argv[argc++] = (char *)"-TW";
 		break;
 	case PROC_NOTIFY:
-		argv[argc++] = (char *)"-N";
+		argv[argc++] = (char *)"-TN";
 		break;
 	default:
 		fatalx("invalid process id %d", proc_id);
@@ -2023,46 +2023,52 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "Adf:LnNP:RsSvW")) != -1) {
+	while ((ch = getopt(argc, argv, "df:nP:T:v")) != -1) {
 		switch (ch) {
-		case 'A':
-			proc_id = PROC_AUTH;
-			break;
 		case 'd':
 			daemonize = 0;
 			break;
 		case 'f':
 			confpath = optarg;
 			break;
-		case 'L':
-			proc_id = PROC_LISTEN;
-			break;
 		case 'n':
 			noaction = 1;
-			break;
-		case 'N':
-			proc_id = PROC_NOTIFY;
 			break;
 		case 'P':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				fatal("realpath '%s'", optarg);
 			break;
-		case 'R':
-			proc_id = PROC_REPO_READ;
-			break;
-		case 's':
-			proc_id = PROC_SESSION_READ;
-			break;
-		case 'S':
-			proc_id = PROC_SESSION_WRITE;
+		case 'T':
+			switch (*optarg) {
+			case 'A':
+				proc_id = PROC_AUTH;
+				break;
+			case 'L':
+				proc_id = PROC_LISTEN;
+				break;
+			case 'N':
+				proc_id = PROC_NOTIFY;
+				break;
+			case 'R':
+				proc_id = PROC_REPO_READ;
+				break;
+			case 's':
+				proc_id = PROC_SESSION_READ;
+				break;
+			case 'S':
+				proc_id = PROC_SESSION_WRITE;
+				break;
+			case 'W':
+				proc_id = PROC_REPO_WRITE;
+				break;
+			default:
+				errx(1, "unknown proc type %s", optarg);
+			}
 			break;
 		case 'v':
 			if (verbosity < 3)
 				verbosity++;
-			break;
-		case 'W':
-			proc_id = PROC_REPO_WRITE;
 			break;
 		default:
 			usage();
