@@ -759,6 +759,22 @@ AC_CHECK_DECL(
 	[#include <sys/tree.h>]
 )
 
+
+# Look for crypto (part of openssl)
+# Note:  libcrypto (via openssl) has a .pc file in pretty-much all distros and
+# BSDs which we support.
+PKG_CHECK_MODULES(
+	LIBCRYPTO,
+	[libcrypto],
+	[
+		libcrypto_CFLAGS="$LIBCRYPTO_CFLAGS"
+		libcrypto_LIBS="$LIBCRYPTO_LIBS"
+		AC_SUBST(libcrypto_CFLAGS)
+		AC_SUBST(libcrypto_LIBS)
+	],
+	AC_MSG_ERROR(["*** Couldn't find libcrypto ***"])
+)
+
 if test "x$PLATFORM" != "xopenbsd"; then
 PKG_CHECK_MODULES(
 	LIBTLS,
@@ -770,19 +786,6 @@ PKG_CHECK_MODULES(
 		AC_SUBST(libtls_LIBS)
 	],
 	AC_MSG_ERROR(["*** Couldn't find libtls ***"])
-)
-
-# Look for crypto (part of openssl)
-PKG_CHECK_MODULES(
-	LIBCRYPTO,
-	[libcrypto],
-	[
-		libcrypto_CFLAGS="$LIBCRYPTO_CFLAGS"
-		libcrypto_LIBS="$LIBCRYPTO_LIBS"
-		AC_SUBST(libcrypto_CFLAGS)
-		AC_SUBST(libcrypto_LIBS)
-	],
-	AC_MSG_ERROR(["*** Couldn't find libcrypto ***"])
 )
 fi
 
