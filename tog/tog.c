@@ -846,10 +846,14 @@ view_close(struct tog_view *view)
 	}
 	if (view->close)
 		err = view->close(view);
-	if (view->panel)
+	if (view->panel) {
 		del_panel(view->panel);
-	if (view->window)
+		view->panel = NULL;
+	}
+	if (view->window) {
 		delwin(view->window);
+		view->window = NULL;
+	}
 	free(view);
 	return err ? err : child_err;
 }
