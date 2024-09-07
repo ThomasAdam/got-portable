@@ -189,6 +189,9 @@ run_notification_helper(const char *prog, const char **argv, int fd,
 		if (user != NULL && pass != NULL) {
 			setenv("GOT_NOTIFY_HTTP_USER", user, 1);
 			setenv("GOT_NOTIFY_HTTP_PASS", pass, 1);
+		} else {
+			unsetenv("GOTD_NOTIFY_HTTP_USER");
+			unsetenv("GOTD_NOTIFY_HTTP_PASS");
 		}
 
 		if (hmac_secret)
