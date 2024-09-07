@@ -815,26 +815,19 @@ nextsep(char *s, char **t)
 {!
 	struct request		*c = tp->tp_arg;
 	struct transport	*t = c->t;
-	struct querystring	*qs = t->qs;
 	struct repo_tag		*rt;
-	int			 commit_found;
-
-	commit_found = qs->commit == NULL;
 !}
 <header class='subtitle'>
   <h2>Tags</h2>
 </header>
 <div id="tags_content">
-  {{ if t->tag_count == 0 }}
+  {{ if TAILQ_EMPTY(&t->repo_tags) }}
     <div id="err_content">
       This repository contains no tags
     </div>
   {{ else }}
     {{ tailq-foreach rt &t->repo_tags entry }}
-      {{ if commit_found || !strcmp(qs->commit, rt->commit_id) }}
-        {! commit_found = 1; !}
-        {{ render tag_item(tp, rt) }}
-      {{ end }}
+      {{ render tag_item(tp, rt) }}
     {{ end }}
     {{ render gotweb_render_more(tp, TAGS) }}
   {{ end }}
