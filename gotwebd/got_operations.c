@@ -510,10 +510,6 @@ got_get_repo_tags(struct request *c, size_t limit)
 	if (limit == 1)
 		chk_multi = 0;
 
-	/*
-	 * XXX: again, see previous message about caching
-	 */
-
 	TAILQ_FOREACH(re, &refs, entry) {
 		struct repo_tag *new_repo_tag = NULL;
 		error = got_init_repo_tag(&new_repo_tag);
@@ -579,12 +575,12 @@ got_get_repo_tags(struct request *c, size_t limit)
 			goto done;
 
 		if (commit_found == 0 && qs->commit != NULL &&
-		    strncmp(id_str, qs->commit, strlen(id_str)) != 0)
+		    strncmp(id_str, qs->commit, strlen(id_str)) != 0) {
+			TAILQ_REMOVE(&t->repo_tags, new_repo_tag, entry);
+			gotweb_free_repo_tag(new_repo_tag);
 			continue;
-		else
+		} else
 			commit_found = 1;
-
-		t->tag_count++;
 
 		/*
 		 * check for one more commit before breaking,

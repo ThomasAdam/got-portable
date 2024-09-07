@@ -202,7 +202,6 @@ struct transport {
 	unsigned int		 repos_total;
 	unsigned int		 next_disp;
 	unsigned int		 prev_disp;
-	unsigned int		 tag_count;
 	const struct got_error	*error;
 	struct got_blob_object	*blob;
 	int			 fd;

@@ -380,7 +380,7 @@ gotweb_process_request(struct request *c)
 			log_warnx("%s: %s", __func__, error->msg);
 			goto err;
 		}
-		if (c->t->tag_count == 0) {
+		if (TAILQ_EMPTY(&c->t->repo_tags)) {
 			error = got_error_msg(GOT_ERR_BAD_OBJ_ID,
 			    "bad commit id");
 			goto err;
