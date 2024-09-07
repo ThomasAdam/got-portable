@@ -226,6 +226,7 @@ start_gotd_http_notification_hmac: ensure_root
 	@echo "}" >> $(PWD)/gotd.conf
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
+
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
