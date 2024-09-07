@@ -701,7 +701,7 @@ notifyflags	: BRANCH STRING {
 			free($9);
 		}
 		;
-	
+
 repository	: REPOSITORY STRING {
 			struct gotd_repo *repo;
 
@@ -1697,7 +1697,7 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
 		target->conf.http.password = strdup(password);
 		if (target->conf.http.password == NULL)
 			fatal("strdup");
-	}	
+	}
 	if (hmac_secret) {
 		target->conf.http.hmac_secret = strdup(hmac_secret);
 		if (target->conf.http.hmac_secret == NULL)
