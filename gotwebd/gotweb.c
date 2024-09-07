@@ -354,6 +354,14 @@ gotweb_process_request(struct request *c)
 		error = got_get_repo_commits(c, srv->summary_commits_display);
 		if (error)
 			goto err;
+		qs->action = TAGS;
+		error = got_get_repo_tags(c, srv->summary_tags_display);
+		if (error) {
+			log_warnx("%s: got_get_repo_tags: %s", __func__,
+			    error->msg);
+			goto err;
+		}
+		qs->action = SUMMARY;
 		commit = TAILQ_FIRST(&c->t->repo_commits);
 		if (commit && qs->commit == NULL) {
 			qs->commit = strdup(commit->commit_id);
@@ -363,14 +371,6 @@ gotweb_process_request(struct request *c)
 				goto err;
 			}
 		}
-		qs->action = TAGS;
-		error = got_get_repo_tags(c, srv->summary_tags_display);
-		if (error) {
-			log_warnx("%s: got_get_repo_tags: %s", __func__,
-			    error->msg);
-			goto err;
-		}
-		qs->action = SUMMARY;
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
 			return;
 		gotweb_render_page(c->tp, gotweb_render_summary);
