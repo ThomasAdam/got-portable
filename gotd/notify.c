@@ -456,13 +456,13 @@ static void
 notify_dispatch(int fd, short event, void *arg)
 {
 	struct gotd_imsgev *iev = arg;
-	struct imsgbuf *ibuf = &iev->ibuf;
+	struct imsgbuf *imsgbuf = &iev->ibuf;
 	ssize_t n;
 	int shut = 0;
 	struct imsg imsg;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsg_read(imsgbuf)) == -1 && errno != EAGAIN)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -472,7 +472,7 @@ notify_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
+		n = msgbuf_write(&imsgbuf->w);
 		if (n == -1 && errno != EAGAIN)
 			fatal("msgbuf_write");
 		if (n == 0) {
@@ -485,7 +485,7 @@ notify_dispatch(int fd, short event, void *arg)
 	for (;;) {
 		const struct got_error *err = NULL;
 
-		if ((n = imsg_get(ibuf, &imsg)) == -1)
+		if ((n = imsg_get(imsgbuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
 		if (n == 0)	/* No more messages. */
 			break;
