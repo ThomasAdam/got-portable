@@ -11,7 +11,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 NOOBJ=Yes
 CLEANFILES=gotd.conf
 
-.PHONY: ensure_root prepare_test_repo check_test_repo start_gotd
+.PHONY: ensure_root ensure_secrets prepare_test_repo check_test_repo start_gotd
 
 GOTD_TEST_ROOT=/tmp
 GOTD_DEVUSER?=gotdev
@@ -73,6 +73,12 @@ ensure_root:
 		echo GOTD_TEST_USER must be a non-root user >&2; \
 		false; \
 	fi
+
+ensure_secrets:
+	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
+	@echo 'hmac flan ${GOTD_TEST_HMAC_SECRET}' >> $(PWD)/gotd-secrets.conf
+	@chown root:0 $(PWD)/gotd-secrets.conf
+	@chmod 600 $(PWD)/gotd-secrets.conf
 
 start_gotd_ro: ensure_root
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
@@ -186,8 +192,7 @@ start_gotd_email_notification: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
 
-start_gotd_http_notification: ensure_root
-	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
+start_gotd_http_notification: ensure_root ensure_secrets
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
@@ -200,8 +205,7 @@ start_gotd_http_notification: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
-start_gotd_email_and_http_notification: ensure_root
-	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
+start_gotd_email_and_http_notification: ensure_root ensure_secrets
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
@@ -216,9 +220,7 @@ start_gotd_email_and_http_notification: ensure_root
 	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
-start_gotd_http_notification_hmac: ensure_root
-	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
-	@echo 'hmac flan ${GOTD_TEST_HMAC_SECRET}' >> $(PWD)/gotd-secrets.conf
+start_gotd_http_notification_hmac: ensure_root ensure_secrets
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf

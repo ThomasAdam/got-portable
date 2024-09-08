@@ -2051,6 +2051,26 @@ unveil_notification_helpers(void)
 		fatal("unveil");
 }
 
+static void
+check_file_secrecy(int fd, const char *fname)
+{
+	struct stat st;
+
+	if (fstat(fd, &st))
+		fatal("cannot stat %s", fname);
+
+	if (st.st_uid != 0)
+		fatalx("secrets file %s must be owned by root", fname);
+
+	if (st.st_gid != 0)
+		fatalx("secrets file %s must be owned by group wheel/root",
+		    fname);
+
+	if (st.st_mode & (S_IWGRP | S_IXGRP | S_IRWXO))
+		fatalx("secrets file %s must not be group writable or world "
+		    "readable/writable", fname);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2150,9 +2170,10 @@ main(int argc, char **argv)
 
 		fp = fopen(p, "r");
 		if (fp == NULL && (secretspath != NULL || errno != ENOENT))
-			fatal("can't open secret file %s", p);
+			fatal("can't open secrets file %s", p);
 
 		if (fp != NULL) {
+			check_file_secrecy(fileno(fp), p);
 			error = gotd_secrets_parse(p, fp, &secrets);
 			fclose(fp);
 			if (error)
