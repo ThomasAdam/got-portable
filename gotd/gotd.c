@@ -2058,7 +2058,7 @@ main(int argc, char **argv)
 	struct gotd_secrets *secrets = NULL;
 	int ch, fd = -1, daemonize = 1, verbosity = 0, noaction = 0;
 	const char *confpath = GOTD_CONF_PATH;
-	const char *secretspath = NULL;
+	char *secretspath = NULL;
 	char *argv0 = argv[0];
 	char title[2048];
 	struct passwd *pw = NULL;
@@ -2096,7 +2096,9 @@ main(int argc, char **argv)
 				fatal("realpath '%s'", optarg);
 			break;
 		case 's':
-			secretspath = optarg;
+			secretspath = realpath(optarg, NULL);
+			if (secretspath == NULL)
+				fatal("realpath '%s'", optarg);
 			break;
 		case 'T':
 			switch (*optarg) {
@@ -2508,6 +2510,7 @@ main(int argc, char **argv)
 	event_dispatch();
 
 	free(repo_path);
+	free(secretspath);
 	free(default_sender);
 	gotd_shutdown();
 
