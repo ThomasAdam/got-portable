@@ -23,6 +23,7 @@
 .Nm
 .Op Fl dnv
 .Op Fl f Ar config-file
+.Op Fl s Ar secrets
 .Sh DESCRIPTION
 .Nm
 is a Git repository server which listens on a
@@ -63,6 +64,11 @@ will be used.
 .It Fl n
 Configtest mode.
 Only check the configuration file for validity.
+.It Fl s Ar secrets
+Set the path to the secrets file.
+If not specified, the file
+.Pa /etc/gotd-secrets.conf
+will be used if it exists.
 .It Fl v
 Verbose mode.
 Verbosity increases if this option is used multiple times.
@@ -109,6 +115,7 @@ The flan_hacker user can now populate the empty repository with
 .Xr gotsh 1 ,
 .Xr git-repository 5 ,
 .Xr gotd.conf 5
+.Xr gotd-secrets.conf 5
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .Sh CAVEATS

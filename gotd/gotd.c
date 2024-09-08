@@ -67,6 +67,7 @@
 #include "repo_read.h"
 #include "repo_write.h"
 #include "notify.h"
+#include "secrets.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -127,7 +128,8 @@ static void disconnect(struct gotd_client *);
 __dead static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-dnv] [-f config-file]\n", getprogname());
+	fprintf(stderr, "usage: %s [-dnv] [-f config-file] [-s secrets]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -2002,8 +2004,10 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *error = NULL;
+	struct gotd_secrets *secrets = NULL;
 	int ch, fd = -1, daemonize = 1, verbosity = 0, noaction = 0;
 	const char *confpath = GOTD_CONF_PATH;
+	const char *secretspath = NULL;
 	char *argv0 = argv[0];
 	char title[2048];
 	struct passwd *pw = NULL;
@@ -2015,6 +2019,7 @@ main(int argc, char **argv)
 	struct gotd_repo *repo = NULL;
 	char *default_sender = NULL;
 	char hostname[HOST_NAME_MAX + 1];
+	FILE *fp;
 	FILE *diff_f1 = NULL, *diff_f2 = NULL;
 	int diff_fd1 = -1, diff_fd2 = -1;
 	const char *errstr;
@@ -2023,7 +2028,7 @@ main(int argc, char **argv)
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
 
-	while ((ch = getopt(argc, argv, "df:nP:T:v")) != -1) {
+	while ((ch = getopt(argc, argv, "df:nP:s:T:v")) != -1) {
 		switch (ch) {
 		case 'd':
 			daemonize = 0;
@@ -2038,6 +2043,9 @@ main(int argc, char **argv)
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				fatal("realpath '%s'", optarg);
+			break;
+		case 's':
+			secretspath = optarg;
 			break;
 		case 'T':
 			switch (*optarg) {
@@ -2084,7 +2092,23 @@ main(int argc, char **argv)
 	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
 		fatalx("need root privileges");
 
-	if (parse_config(confpath, proc_id, &gotd) != 0)
+	if (proc_id == PROC_GOTD) {
+		const char *p = secretspath ? secretspath : GOTD_SECRETS_PATH;
+
+		fp = fopen(p, "r");
+		if (fp == NULL && (secretspath != NULL || errno != ENOENT))
+			fatal("can't open secret file %s", p);
+
+		if (fp != NULL) {
+			error = gotd_secrets_parse(p, fp, &secrets);
+			fclose(fp);
+			if (error)
+				fatalx("failed to parse secrets file %s: %s",
+				    p, error->msg);
+		}
+	}
+
+	if (parse_config(confpath, proc_id, secrets, &gotd) != 0)
 		return 1;
 
 	pw = getpwnam(gotd.user_name);
@@ -2346,8 +2370,56 @@ main(int argc, char **argv)
 	signal_add(&evsigchld, NULL);
 
 	gotd_imsg_event_add(&gotd.listen_proc->iev);
-	if (gotd.notify_proc)
+	if (gotd.notify_proc) {
+		struct imsgbuf *imsgbuf = &gotd.notify_proc->iev.ibuf;
+		struct gotd_secret *s;
+		size_t i, n = 0;
+
 		gotd_imsg_event_add(&gotd.notify_proc->iev);
+
+		if (gotd.secrets)
+			n = gotd.secrets->len;
+
+		if (imsg_compose(imsgbuf, GOTD_IMSG_SECRETS, 0, 0, -1,
+		    &n, sizeof(n)) == -1)
+			fatal("imsg_compose GOTD_IMSG_SECRETS");
+		if (imsg_flush(imsgbuf))
+			fatal("imsg_flush");
+
+		for (i = 0; i < n; ++i) {
+			struct iovec iov[5];
+			int keylen, vallen;
+
+			s = &gotd.secrets->secrets[i];
+
+			keylen = strlen(s->key) + 1;
+			vallen = strlen(s->val) + 1;
+
+			iov[0].iov_base = &s->type;
+			iov[0].iov_len = sizeof(s->type);
+
+			iov[1].iov_base = &keylen;
+			iov[1].iov_len = sizeof(keylen);
+
+			iov[2].iov_base = &vallen;
+			iov[2].iov_len = sizeof(vallen);
+
+			iov[3].iov_base = s->key;
+			iov[3].iov_len = keylen;
+
+			iov[4].iov_base = s->val;
+			iov[4].iov_len = vallen;
+
+			if (imsg_composev(imsgbuf, GOTD_IMSG_SECRET,
+			    0, 0, -1, iov, 5) == -1)
+				fatal("imsg_composev GOTD_IMSG_SECRET");
+			if (imsg_flush(imsgbuf))
+				fatal("imsg_flush");
+		}
+
+		gotd_secrets_free(gotd.secrets);
+		gotd.secrets = NULL;
+	}
 
 	event_dispatch();
 

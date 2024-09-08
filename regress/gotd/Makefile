@@ -187,44 +187,48 @@ start_gotd_email_notification: ensure_root
 	@$(GOTD_TRAP); sleep .5
 
 start_gotd_http_notification: ensure_root
+	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
 	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
 	@echo '    notify {' >> $(PWD)/gotd.conf
-	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password" insecure' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" auth flan insecure' >> $(PWD)/gotd.conf
 	@echo "    }" >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
-	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
 start_gotd_email_and_http_notification: ensure_root
+	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
 	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
 	@echo '    notify {' >> $(PWD)/gotd.conf
-	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password" insecure' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" auth flan insecure' >> $(PWD)/gotd.conf
 	@echo -n '      email to ${GOTD_DEVUSER}' >> $(PWD)/gotd.conf
 	@echo ' relay 127.0.0.1 port ${GOTD_TEST_SMTP_PORT}' >> $(PWD)/gotd.conf
 	@echo "    }" >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
-	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
 start_gotd_http_notification_hmac: ensure_root
+	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
+	@echo 'hmac flan ${GOTD_TEST_HMAC_SECRET}' >> $(PWD)/gotd-secrets.conf
 	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
 	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
 	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
 	@echo '    notify {' >> $(PWD)/gotd.conf
-	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" user flan password "password" insecure hmac "${GOTD_TEST_HMAC_SECRET}"' >> $(PWD)/gotd.conf
+	@echo '         url "http://localhost:${GOTD_TEST_HTTP_PORT}/" auth flan insecure hmac flan' >> $(PWD)/gotd.conf
 	@echo "    }" >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
-	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
 prepare_test_repo: ensure_root

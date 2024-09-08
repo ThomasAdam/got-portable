@@ -19,6 +19,7 @@
 #define GOTD_UNIX_SOCKET_BACKLOG 10
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
+#define GOTD_SECRETS_PATH "/etc/gotd-secrets.conf"
 #define GOTD_EMPTY_PATH	"/var/empty"
 
 #ifndef GOT_LIBEXECDIR
@@ -110,9 +111,8 @@ struct gotd_notification_target {
 			char *hostname;
 			char *port;
 			char *path;
-			char *user;
-			char *password;
-			char *hmac_secret;
+			char *auth;
+			char *hmac;
 		} http;
 	} conf;
 };
@@ -153,6 +153,7 @@ struct gotd_uid_connection_limit {
 
 struct gotd_child_proc;
 
+struct gotd_secrets;
 struct gotd {
 	pid_t pid;
 	char unix_socket_path[PATH_MAX];
@@ -166,6 +167,7 @@ struct gotd {
 	struct timeval auth_timeout;
 	struct gotd_uid_connection_limit *connection_limits;
 	size_t nconnection_limits;
+	struct gotd_secrets *secrets;
 
 	char *argv0;
 	const char *confpath;
@@ -240,7 +242,11 @@ enum gotd_imsg_type {
 	GOTD_IMSG_CONNECT_NOTIFIER,
 	GOTD_IMSG_CONNECT_SESSION,
 	GOTD_IMSG_NOTIFY,
-	GOTD_IMSG_NOTIFICATION_SENT
+	GOTD_IMSG_NOTIFICATION_SENT,
+
+	/* Secrets. */
+	GOTD_IMSG_SECRETS,	/* number of secrets */
+	GOTD_IMSG_SECRET,
 };
 
 /* Structure for GOTD_IMSG_ERROR. */
@@ -482,7 +488,8 @@ struct gotd_imsg_notify {
 	/* Followed by username_len data bytes. */
 };
 
-int parse_config(const char *, enum gotd_procid, struct gotd *);
+int parse_config(const char *, enum gotd_procid, struct gotd_secrets *,
+    struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(

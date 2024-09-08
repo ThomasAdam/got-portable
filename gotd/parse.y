@@ -52,6 +52,7 @@
 #include "gotd.h"
 #include "auth.h"
 #include "listen.h"
+#include "secrets.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
@@ -111,7 +112,7 @@ static int			 conf_notify_ref_namespace(struct gotd_repo *,
 static int			 conf_notify_email(struct gotd_repo *,
 				    char *, char *, char *, char *, char *);
 static int			 conf_notify_http(struct gotd_repo *,
-				    char *, char *, char *, int, char *);
+				    char *, char *, char *, int);
 static enum gotd_procid		 gotd_proc_id;
 
 typedef struct {
@@ -128,7 +129,7 @@ typedef struct {
 %token	PATH ERROR LISTEN ON USER REPOSITORY PERMIT DENY
 %token	RO RW CONNECTION LIMIT REQUEST TIMEOUT
 %token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT
-%token	NOTIFY EMAIL FROM REPLY TO URL PASSWORD INSECURE HMAC
+%token	NOTIFY EMAIL FROM REPLY TO URL INSECURE HMAC AUTH
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -611,51 +612,47 @@ notifyflags	: BRANCH STRING {
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, NULL,
-				    NULL, 0, NULL)) {
+				    NULL, 0)) {
 					free($2);
 					YYERROR;
 				}
 			}
 			free($2);
 		}
-		| URL STRING USER STRING PASSWORD STRING {
+		| URL STRING AUTH STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 0,
-				    NULL)) {
+				if (conf_notify_http(new_repo, $2, $4, NULL,
+				    0)) {
 					free($2);
 					free($4);
-					free($6);
 					YYERROR;
 				}
 			}
 			free($2);
 			free($4);
-			free($6);
 		}
-		| URL STRING USER STRING PASSWORD STRING INSECURE {
+		| URL STRING AUTH STRING INSECURE {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 1,
-				    NULL)) {
+				if (conf_notify_http(new_repo, $2, $4, NULL,
+				    1)) {
 					free($2);
 					free($4);
-					free($6);
 					YYERROR;
 				}
 			}
 			free($2);
 			free($4);
-			free($6);
 		}
 		| URL STRING HMAC STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, NULL,
-				    NULL, 0, $4)) {
+				if (conf_notify_http(new_repo, $2, NULL, $4,
+				    0)) {
 					free($2);
 					free($4);
 					YYERROR;
@@ -664,41 +661,37 @@ notifyflags	: BRANCH STRING {
 			free($2);
 			free($4);
 		}
-		| URL STRING USER STRING PASSWORD STRING HMAC STRING {
+		| URL STRING AUTH STRING HMAC STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 0,
-				    $8)) {
+				if (conf_notify_http(new_repo, $2, $4, $6,
+				    0)) {
 					free($2);
 					free($4);
 					free($6);
-					free($8);
 					YYERROR;
 				}
 			}
 			free($2);
 			free($4);
 			free($6);
-			free($8);
 		}
-		| URL STRING USER STRING PASSWORD STRING INSECURE HMAC STRING {
+		| URL STRING AUTH STRING INSECURE HMAC STRING {
 			if (gotd_proc_id == PROC_GOTD ||
 			    gotd_proc_id == PROC_SESSION_WRITE ||
 			    gotd_proc_id == PROC_NOTIFY) {
-				if (conf_notify_http(new_repo, $2, $4, $6, 1,
-				    $9)) {
+				if (conf_notify_http(new_repo, $2, $4, $7,
+				    1)) {
 					free($2);
 					free($4);
-					free($6);
-					free($9);
+					free($7);
 					YYERROR;
 				}
 			}
 			free($2);
 			free($4);
-			free($6);
-			free($9);
+			free($7);
 		}
 		;
 
@@ -839,6 +832,7 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{ "auth",			AUTH },
 		{ "branch",			BRANCH },
 		{ "connection",			CONNECTION },
 		{ "deny",			DENY },
@@ -851,7 +845,6 @@ lookup(char *s)
 		{ "namespace",			NAMESPACE },
 		{ "notify",			NOTIFY },
 		{ "on",				ON },
-		{ "password",			PASSWORD },
 		{ "path",			PATH },
 		{ "permit",			PERMIT },
 		{ "port",			PORT },
@@ -1192,7 +1185,7 @@ closefile(struct file *xfile)
 
 int
 parse_config(const char *filename, enum gotd_procid proc_id,
-    struct gotd *env)
+    struct gotd_secrets *secrets, struct gotd *env)
 {
 	struct sym *sym, *next;
 	struct gotd_repo *repo;
@@ -1202,6 +1195,7 @@ parse_config(const char *filename, enum gotd_procid proc_id,
 
 	gotd = env;
 	gotd_proc_id = proc_id;
+	gotd->secrets = secrets;
 	TAILQ_INIT(&gotd->repos);
 
 	/* Apply default values. */
@@ -1614,8 +1608,8 @@ conf_notify_email(struct gotd_repo *repo, char *sender, char *recipient,
 }
 
 static int
-conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
-    int insecure, char *hmac_secret)
+conf_notify_http(struct gotd_repo *repo, char *url, char *auth, char *hmac,
+    int insecure)
 {
 	const struct got_error *error;
 	struct gotd_notification_target *target;
@@ -1650,15 +1644,23 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
 		}
 	}
 
-	if ((user != NULL && password == NULL) ||
-	    (user == NULL && password != NULL)) {
-		yyerror("missing username or password");
+	if (auth != NULL && gotd_proc_id == PROC_GOTD &&
+	    (gotd->secrets == NULL || gotd_secrets_get(gotd->secrets,
+	    GOTD_SECRET_AUTH, auth) == NULL)) {
+		yyerror("no auth secret `%s' defined", auth);
 		ret = -1;
 		goto done;
 	}
 
-	if (!insecure && strcmp(proto, "http") == 0 &&
-	    (user != NULL || password != NULL)) {
+	if (hmac != NULL && gotd_proc_id == PROC_GOTD &&
+	    (gotd->secrets == NULL && gotd_secrets_get(gotd->secrets,
+	    GOTD_SECRET_HMAC, hmac) == NULL)) {
+		yyerror("no hmac secret `%s' defined", hmac);
+		ret = -1;
+		goto done;
+	}
+
+	if (!insecure && strcmp(proto, "http") == 0 && auth) {
 		yyerror("%s: HTTP notifications with basic authentication "
 		    "over plaintext HTTP will leak credentials; add the "
 		    "'insecure' config keyword if this is intentional", url);
@@ -1690,17 +1692,14 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *user, char *password,
 	target->conf.http.path = path;
 	hostname = port = path = NULL;
 
-	if (user) {
-		target->conf.http.user = strdup(user);
-		if (target->conf.http.user == NULL)
-			fatal("strdup");
-		target->conf.http.password = strdup(password);
-		if (target->conf.http.password == NULL)
+	if (auth) {
+		target->conf.http.auth = strdup(auth);
+		if (target->conf.http.auth == NULL)
 			fatal("strdup");
 	}
-	if (hmac_secret) {
-		target->conf.http.hmac_secret = strdup(hmac_secret);
-		if (target->conf.http.hmac_secret == NULL)
+	if (hmac) {
+		target->conf.http.hmac = strdup(hmac);
+		if (target->conf.http.hmac == NULL)
 			fatal("strdup");
 	}
 
