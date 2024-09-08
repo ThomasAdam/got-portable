@@ -42,6 +42,7 @@
 
 #include "gotd.h"
 #include "log.h"
+#include "secrets.h"
 
 #ifndef GITWRAPPER_GIT_LIBEXEC_DIR
 #define GITWRAPPER_GIT_LIBEXEC_DIR "/usr/local/libexec/git"
@@ -51,6 +52,13 @@
 #define GITWRAPPER_MY_SERVER_PROG "gotsh"
 #endif
 
+/* only needed to satisfy the linker */
+const char *
+gotd_secrets_get(struct gotd_secrets *secrets, enum gotd_secret_type t,
+    const char *key)
+{
+	return NULL;
+}
 
 __dead static void
 usage(void)
