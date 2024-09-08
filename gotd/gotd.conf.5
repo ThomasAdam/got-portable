@@ -333,7 +333,7 @@ The
 and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
-.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc Oo Ic hmac Ar secret Oc 
+.It Ic url Ar URL Oo Ic auth Ar auth Oo Ic insecure Oc Oc Oo Ic hmac Ar label Oc 
 Send notifications via HTTP.
 This directive may be specified multiple times to build a list of
 HTTP servers to send notifications to.
@@ -348,18 +348,8 @@ If HTTPS is used, sending of notifications will only succeed if
 no TLS errors occur.
 .Pp
 The optional
-.Ic user
-and
-.Ic password
-directives enable HTTP Basic authentication.
-If used, both a
-.Ar user
-and a
-.Ar password
-must be specified.
-The
-.Ar password
-must not be an empty string.
+.Ic auth
+directive enables HTTP Basic authentication.
 Unless the
 .Ic insecure
 option is specified the notification target
@@ -370,16 +360,20 @@ URL to avoid leaking of authentication credentials.
 .Pp
 If a
 .Ic hmac
-.Ar secret
+.Ar label
 is provided, the request body will be signed using HMAC, allowing the
 receiver to verify the notification message's authenticity and integrity.
 The signature uses HMAC-SHA256 and will be sent in the HTTP header
 .Dq X-Gotd-Signature .
-Suitable secrets can be generated with
-.Xr openssl 1
-as follows:
 .Pp
-.Dl $ openssl rand -base64 32
+If provided,
+the authentication data
+.Ar auth
+and the HMAC secret
+.Ar label
+are resolved using the
+.Xr gotd-secrets.conf 5
+file.
 .Pp
 The request body contains a JSON object with a
 .Dq notifications
@@ -563,4 +557,5 @@ connection {
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr gotsh 1 ,
+.Xr gotd-secrets.conf 5 ,
 .Xr gotd 8
