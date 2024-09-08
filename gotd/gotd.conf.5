@@ -350,6 +350,9 @@ no TLS errors occur.
 The optional
 .Ic auth
 directive enables HTTP Basic authentication.
+Authentication credentials must be specified in the separate
+.Xr gotd-secrets.conf 5
+file.
 Unless the
 .Ic insecure
 option is specified the notification target
@@ -360,20 +363,15 @@ URL to avoid leaking of authentication credentials.
 .Pp
 If a
 .Ic hmac
-.Ar label
-is provided, the request body will be signed using HMAC, allowing the
+secret is provided, the request body will be signed using HMAC, allowing the
 receiver to verify the notification message's authenticity and integrity.
+The HMAC secret to use must be specified in the separate
+.Xr gotd-secrets.conf 5
+file, using the
+.Ar label
+as identifier.
 The signature uses HMAC-SHA256 and will be sent in the HTTP header
 .Dq X-Gotd-Signature .
-.Pp
-If provided,
-the authentication data
-.Ar auth
-and the HMAC secret
-.Ar label
-are resolved using the
-.Xr gotd-secrets.conf 5
-file.
 .Pp
 The request body contains a JSON object with a
 .Dq notifications
