@@ -148,6 +148,9 @@ gotd_secrets_free(struct gotd_secrets *s)
 {
 	size_t		 i;
 
+	if (s == NULL)
+		return;
+
 	for (i = 0; i < s->len; ++i) {
 		free(s->secrets[i].key);
 		free(s->secrets[i].val);
