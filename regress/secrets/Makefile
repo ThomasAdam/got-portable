@@ -4,6 +4,9 @@
 PROG =		secrets
 SRCS =		secrets-parser.c error.c hash.c log.c secrets.c 
 
+CLEANFILES = ${.CURDIR}/stderr ${.CURDIR}/stderr.expected \
+	${.CURDIR}/gotd-secrets.conf
+
 CPPFLAGS +=	-I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 CPPFLAGS +=	-I${.CURDIR}/../../gotd
 
