@@ -1310,7 +1310,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	struct got_reflist_head refs;
 	int found_delref = 0;
 
-	/* The packed-refs file does not cotain symbolic references. */
+	/* The packed-refs file does not contain symbolic references. */
 	if (delref->flags & GOT_REF_IS_SYMBOLIC)
 		return got_error(GOT_ERR_BAD_REF_DATA);
 

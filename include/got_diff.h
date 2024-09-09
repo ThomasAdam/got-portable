@@ -120,7 +120,7 @@ struct got_diff_blob_output_unidiff_arg {
 	 * offsets and types, with nlines > 0 indicating the length of the
 	 * pre-populated array.  This is useful if the output file already
 	 * contains some lines of text.  The array will be grown as needed to
-	 * accomodate additional offsets and types, and the last offset found
+	 * accommodate additional offsets and types, and the last offset found
 	 * in a pre-populated array will be added to all subsequent offsets.
 	 */
 	size_t nlines;

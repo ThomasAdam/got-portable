@@ -59,6 +59,6 @@ The test suite switches to non-root users as appropriate.
 
 The test suite uses netcat on port 2525 to test SMTP notifications.
 If this port is already in use then affected tests might fail.
-If needed the port can be overriden on the make command line:
+If needed the port can be overridden on the make command line:
 
  $ doas make server-regress GOTD_TEST_SMTP_PORT=12345

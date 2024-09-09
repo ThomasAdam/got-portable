@@ -8253,7 +8253,7 @@ logmsg_ref(struct got_object_id *id, const char *prefix,
 	int			 rebase_in_progress, merge_in_progress;
 
 	/*
-	 * Silenty refuse to create merge reference if any histedit, merge,
+	 * Silently refuse to create merge reference if any histedit, merge,
 	 * or rebase operation is in progress.
 	 */
 	err = got_worktree_histedit_in_progress(&histedit_in_progress,

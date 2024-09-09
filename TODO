@@ -1,7 +1,7 @@
 got:
 - Teach 'got merge' to merge changes into an arbitrary subdirectory
   of the work tree. This would be nice for merging vendor branches.
-  Say you have a branch 'llvm-12' which intially contains a 12.0
+  Say you have a branch 'llvm-12' which initially contains a 12.0
   release tree as published by the LLVM project, added to the repository
   with a command such as 'got import -b llvm-12'. On the main branch we
   would want to merge files from the llvm-12 branch into /usr/src/gnu/llvm

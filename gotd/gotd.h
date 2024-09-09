@@ -178,7 +178,7 @@ struct gotd {
 };
 
 enum gotd_imsg_type {
-	/* An error occured while processing a request. */
+	/* An error occurred while processing a request. */
 	GOTD_IMSG_ERROR,
 
 	/* Commands used by gotctl(8). */
@@ -225,7 +225,7 @@ enum gotd_imsg_type {
 	GOTD_IMSG_REF_UPDATES_START, /* Ref updates starting. */
 	GOTD_IMSG_REF_UPDATE_OK, /* Update went OK. */
 	GOTD_IMSG_REF_UPDATE_NG, /* Update was not good. */
-	GOTD_IMSG_REFS_UPDATED, /* The server proccessed all ref updates. */
+	GOTD_IMSG_REFS_UPDATED, /* The server processed all ref updates. */
 
 	/* Client connections. */
 	GOTD_IMSG_DISCONNECT,

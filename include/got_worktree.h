@@ -49,7 +49,7 @@ struct got_fileindex;
  * will be created. The path itself must not yet exist, but the dirname(3)
  * of the path must already exist.
  * The reference provided will be used to determine the new worktree's
- * base commit. The third argument speficies the work tree's path prefix.
+ * base commit. The third argument specifies the work tree's path prefix.
  * The fourth argument specifies the meta data directory to use, which
  * should be either GOT_WORKTREE_GOT_DIR or GOT_WORKTREE_CVG_DIR.
  */
@@ -289,10 +289,10 @@ const struct got_error *got_worktree_commit(struct got_object_id **,
     const char *, int, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
-/* Get the path of a commitable worktree item. */
+/* Get the path of a committable worktree item. */
 const char *got_commitable_get_path(struct got_commitable *);
 
-/* Get the status of a commitable worktree item. */
+/* Get the status of a committable worktree item. */
 unsigned int got_commitable_get_status(struct got_commitable *);
 
 /*
@@ -585,7 +585,7 @@ const struct got_error *got_worktree_unstage(struct got_worktree *,
 
 /*
  * Prepare for getting meta data for paths in the work tree.  This
- * function also returns a poniter to a fileindex wihch must be passed
+ * function also returns a pointer to a fileindex which must be passed
  * back to other path_info-related functions and *_version() functions.
  */
 const struct got_error *

@@ -543,7 +543,7 @@
 - tog: add 'L' key to blame view; opens log view for the annotated line (jamsek)
 - don't chug along if repo format version is unsupported (florian)
 - fix dead stores to variables, found with LLVM's scan-build (florian)
-- fix unitialized error return (florian)
+- fix uninitialized error return (florian)
 - make sure got_repo_pack_fds_close() frees a malloc'ed pointer (florian)
 - prevent memory leak when asprintf fails (florian)
 - prevent use-after-free of packed_refs_path in error path (florian)
@@ -655,7 +655,7 @@
 - fix bug in findwixt() which caused pack files with missing parent commits
 - avoid looping over deltas twice in dump_delta_chain_to_{file,mem}()
 - open tempfiles needed for delta application upfront, for future gotwebd
-- reduce GOT_PACK_CACHE_SIZE to 32 to accomodate for previous tempfile change
+- reduce GOT_PACK_CACHE_SIZE to 32 to accommodate for previous tempfile change
 - tog: override SIGTERM and SIGINT handlers to avoid ncurses cleanup() handler
 - move creation of tempfiles outside of lib/diff.c
 - tests: don't pass $ret to test_done on failure when it's known to be zero (op)
@@ -902,7 +902,7 @@
 
 * got 0.55; 2021-07-26
 - display recovery steps in the lonely pack index error message
-- fix double-free that ocurred upon exit from 'tog tree'; found by naddy
+- fix double-free that occurred upon exit from 'tog tree'; found by naddy
 - don't scan pack index offsets for large values if pack file is < 2GB
 - new -X option for removing backups created by got rebase and got histedit
 - add 'got fetch -X' option for deleting references created by 'got fetch'
@@ -949,7 +949,7 @@
 - fix error checking in dial_ssh()
 - increase pack index cache size from 16 to 64 to improve performance
 - fix off-by-one in got_repo_cache_pack() causing the wrong pack to be evicted
-- cap pack file cache size at 1/8 of the current open file desciptor limit
+- cap pack file cache size at 1/8 of the current open file descriptor limit
 - when reading a pack index byte-swap fields at compile-time where possible
 - diff: reduce duplicate code (kn)
 - fix "mandoc -T lint" WARNINGS and ERRORS, add missing word (kn)

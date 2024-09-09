@@ -189,7 +189,7 @@ got_path_cmp(const char *path1, const char *path2, size_t len1, size_t len2)
 	if (len1 == len2 && i >= min_len)
 		return 0;
 
-	/* Skip over redundant trailing path seperators. */
+	/* Skip over redundant trailing path separators. */
 	while (path1[i] == '/' && path1[i + 1] == '/')
 		path1++;
 	while (path2[i] == '/' && path2[i + 1] == '/')

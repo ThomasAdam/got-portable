@@ -214,7 +214,7 @@ make_single_file_repo()
 	git_init $repo
 	echo "this is file $file" > $repo/$file
 	git -C $repo add .
-	git_commit $repo -m "intialize $repo with file $file"
+	git_commit $repo -m "initialize $repo with file $file"
 }
 
 get_loose_object_path()

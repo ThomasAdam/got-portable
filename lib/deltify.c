@@ -38,7 +38,7 @@
 #endif
 
 /*
- * The algorihm used here is FastCDC (Fast Content-Defined Chunking)
+ * The algorithm used here is FastCDC (Fast Content-Defined Chunking)
  * https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
  */
 

@@ -433,7 +433,7 @@ blame_atomize_file(void *arg, struct diff_data *d)
 			    blame->nlines1, blame->line_offsets1);
 	} else if (d->f == blame->f2) {
 		if (d->atoms.len > 0) {
-			/* Re-use data from previous commit. */
+			/* Reuse data from previous commit. */
 			return DIFF_RC_OK;
 		}
 		if (blame->map2)

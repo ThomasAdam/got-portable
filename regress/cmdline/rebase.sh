@@ -2012,7 +2012,7 @@ test_rebase_one_commit() {
 		2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "rebase comand failed unexpectedly" >&2
+		echo "rebase command failed unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
@@ -2073,7 +2073,7 @@ test_rebase_merge_commit() {
 		2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "merge comand failed unexpectedly" >&2
+		echo "merge command failed unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1
@@ -2171,7 +2171,7 @@ test_rebase_across_merge_commit() {
 		2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "merge comand failed unexpectedly" >&2
+		echo "merge command failed unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"
 		return 1

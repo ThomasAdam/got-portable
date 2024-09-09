@@ -82,7 +82,7 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_FETCH_HTTP)
 
 enum got_imsg_type {
-	/* An error occured while processing a request. */
+	/* An error occurred while processing a request. */
 	GOT_IMSG_ERROR,
 
 	/* Stop the child process. */
@@ -190,7 +190,7 @@ enum got_imsg_type {
 	GOT_IMSG_RAW_DELTA_REQUEST,
 	GOT_IMSG_RAW_DELTA,
 
-	/* Re-use deltas found in a pack file. */
+	/* Reuse deltas found in a pack file. */
 	GOT_IMSG_DELTA_REUSE_REQUEST,
 	GOT_IMSG_REUSED_DELTAS,
 	GOT_IMSG_DELTA_REUSE_DONE,
@@ -515,7 +515,7 @@ struct got_imsg_packidx {
 	size_t len;
 	off_t packfile_size;
 	int algo;
-	/* Additionally, a file desciptor is passed via imsg. */
+	/* Additionally, a file descriptor is passed via imsg. */
 };
 
 /* Structure for GOT_IMSG_PACK. */
@@ -523,7 +523,7 @@ struct got_imsg_pack {
 	char path_packfile[PATH_MAX];
 	off_t filesize;
 	int algo;
-	/* Additionally, a file desciptor is passed via imsg. */
+	/* Additionally, a file descriptor is passed via imsg. */
 } __attribute__((__packed__));
 
 /*
