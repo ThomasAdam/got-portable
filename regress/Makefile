@@ -1,4 +1,4 @@
-SUBDIR = cmdline delta deltify idset path fetch tog
+SUBDIR = cmdline delta deltify idset path fetch tog secrets
 
 .if make(clean)
 SUBDIR += gotd 
