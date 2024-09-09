@@ -33,6 +33,7 @@
 /gotd/Makefile
 /gotd/auth.c
 /gotd/auth.h
+/gotd/gotd-secrets.conf.5
 /gotd/gotd.8
 /gotd/gotd.c
 /gotd/gotd.conf.5
@@ -59,6 +60,8 @@
 /gotd/repo_read.h
 /gotd/repo_write.c
 /gotd/repo_write.h
+/gotd/secrets.c
+/gotd/secrets.h
 /gotd/session_read.c
 /gotd/session_read.h
 /gotd/session_write.c
@@ -361,6 +364,7 @@
 /regress/gotd/email_notification.sh
 /regress/gotd/http-server
 /regress/gotd/http_notification.sh
+/regress/gotd/http_notification_hmac.sh
 /regress/gotd/prepare_test_repo.sh
 /regress/gotd/repo_read.sh
 /regress/gotd/repo_read_access_denied.sh
@@ -376,6 +380,17 @@
 /regress/path
 /regress/path/Makefile
 /regress/path/path_test.c
+/regress/secrets
+/regress/secrets/.gitignore
+/regress/secrets/01.conf
+/regress/secrets/01.exp
+/regress/secrets/02.conf
+/regress/secrets/02.exp
+/regress/secrets/03.conf
+/regress/secrets/04.conf
+/regress/secrets/05.conf
+/regress/secrets/Makefile
+/regress/secrets/secrets-parser.c
 /regress/template
 /regress/template/00-empty.tmpl
 /regress/template/01-noise-only.tmpl
