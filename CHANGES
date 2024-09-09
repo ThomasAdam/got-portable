@@ -1,3 +1,16 @@
+* got 0.103; 2024-09-24
+  see git repository history for per-change authorship information
+- fix bug causing performance to degrade as more and more pack files appear
+- tog: add diff view 'p' keymap to write the diff to file
+- tog: display diffstat in diff view when diffing blobs or trees directly
+- gotwebd: show commit id prefix on briefs page
+- add support for HMAC digests to gotd HTTP notifications
+- move authentication credentials from gotd.conf(5) to gotd-secrets.conf(5)
+- fix spurious tog regression test failures on slower machines
+- restore abort() calls in lib/hash.c to quiet potential compiler warnings
+- gotwebd: unbreak listing of tags on the summary page (regression from 0.102)
+- gotwebd: minor tweaks to the HTML for ease of styling
+
 * got 0.102; 2024-08-14
   see git repository history for per-change authorship information
 - support for sha256 repositories; the network protocol requires git(1) for now
