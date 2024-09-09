@@ -333,7 +333,7 @@ The
 and
 .Ic port
 directives can be used to specify a different SMTP server address and port.
-.It Ic url Ar URL Oo Ic auth Ar auth Oo Ic insecure Oc Oc Oo Ic hmac Ar label Oc 
+.It Ic url Ar URL Oo Ic auth Ar label Oo Ic insecure Oc Oc Oo Ic hmac Ar label Oc 
 Send notifications via HTTP.
 This directive may be specified multiple times to build a list of
 HTTP servers to send notifications to.
@@ -352,7 +352,9 @@ The optional
 directive enables HTTP Basic authentication.
 Authentication credentials must be specified in the separate
 .Xr gotd-secrets.conf 5
-file.
+file, using the
+.Ar label
+as identifier.
 Unless the
 .Ic insecure
 option is specified the notification target
