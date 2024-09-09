@@ -75,7 +75,7 @@ ensure_root:
 	fi
 
 ensure_secrets:
-	@echo 'auth flan password' > $(PWD)/gotd-secrets.conf
+	@echo 'auth flan user flan password password' > $(PWD)/gotd-secrets.conf
 	@echo 'hmac flan ${GOTD_TEST_HMAC_SECRET}' >> $(PWD)/gotd-secrets.conf
 	@chown root:0 $(PWD)/gotd-secrets.conf
 	@chmod 600 $(PWD)/gotd-secrets.conf

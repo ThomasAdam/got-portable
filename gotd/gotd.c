@@ -2411,27 +2411,23 @@ main(int argc, char **argv)
 
 		for (i = 0; i < n; ++i) {
 			struct iovec iov[5];
-			int keylen, vallen;
 
 			s = &gotd.secrets->secrets[i];
-
-			keylen = strlen(s->key) + 1;
-			vallen = strlen(s->val) + 1;
 
 			iov[0].iov_base = &s->type;
 			iov[0].iov_len = sizeof(s->type);
 
-			iov[1].iov_base = &keylen;
-			iov[1].iov_len = sizeof(keylen);
+			iov[1].iov_base = s->label;
+			iov[1].iov_len = strlen(s->label) + 1;
 
-			iov[2].iov_base = &vallen;
-			iov[2].iov_len = sizeof(vallen);
+			iov[2].iov_base = s->user;
+			iov[2].iov_len = s->user ? strlen(s->user) + 1 : 0 ;
 
-			iov[3].iov_base = s->key;
-			iov[3].iov_len = keylen;
+			iov[3].iov_base = s->pass;
+			iov[3].iov_len = s->pass ? strlen(s->pass) + 1 : 0 ;
 
-			iov[4].iov_base = s->val;
-			iov[4].iov_len = vallen;
+			iov[4].iov_base = s->hmac;
+			iov[4].iov_len = s->hmac ? strlen(s->hmac) + 1 : 0 ;
 
 			if (imsg_composev(imsgbuf, GOTD_IMSG_SECRET,
 			    0, 0, -1, iov, 5) == -1)

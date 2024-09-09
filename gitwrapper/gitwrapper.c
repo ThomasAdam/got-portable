@@ -55,9 +55,9 @@
 #endif
 
 /* only needed to satisfy the linker */
-const char *
+struct gotd_secret *
 gotd_secrets_get(struct gotd_secrets *secrets, enum gotd_secret_type t,
-    const char *key)
+    const char *label)
 {
 	return NULL;
 }
