@@ -9,7 +9,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_git_interop test_email_and_http_notification \
 	test_http_notification_hmac
 NOOBJ=Yes
-CLEANFILES=gotd.conf
+CLEANFILES=gotd.conf gotd-secrets.conf
 
 .PHONY: ensure_root ensure_secrets prepare_test_repo check_test_repo start_gotd
 
