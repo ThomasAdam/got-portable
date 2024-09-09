@@ -217,7 +217,7 @@ nextsep(char *s, char **t)
         {{ end }}
       </div>
     </nav>
-    <main>
+    <main class="action-{{ gotweb_action_name(qs->action) }}">
       {{ render body(tp) }}
     </main>
     <footer id="site_owner_wrapper">
@@ -1108,14 +1108,22 @@ nextsep(char *s, char **t)
     <dd><pre class="clone-url">{{ t->repo_dir->url }}</pre></dd>
   {{ end }}
 </dl>
-{{ render gotweb_render_briefs(tp) }}
-{{ render gotweb_render_branches(tp, refs) }}
-{{ render gotweb_render_tags(tp) }}
-<header class='subtitle'>
-  <h2>Tree</h2>
-</header>
-<div id="tree_content">
-  {{ render tree_listing(tp) }}
+<div class="summary-briefs">
+  {{ render gotweb_render_briefs(tp) }}
+</div>
+<div class="summary-branches">
+  {{ render gotweb_render_branches(tp, refs) }}
+</div>
+<div class="summary-tags">
+  {{ render gotweb_render_tags(tp) }}
+</div>
+<div class="summary-tree">
+  <header class='subtitle'>
+    <h2>Tree</h2>
+  </header>
+  <div id="tree_content">
+    {{ render tree_listing(tp) }}
+  </div>
 </div>
 {{ end }}
 
