@@ -105,7 +105,7 @@ diff_atoms_mark_unique_in_both(struct diff_data *left, struct diff_data *right,
 			       unsigned int *unique_in_both_count)
 {
 	/* Derive the final unique_in_both count without needing an explicit
-	 * iteration. So this is just some optimiziation to save one iteration
+	 * iteration. So this is just some optimization to save one iteration
 	 * in the end. */
 	unsigned int unique_in_both;
 	int r;
