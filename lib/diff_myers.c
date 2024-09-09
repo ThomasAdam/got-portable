@@ -1370,7 +1370,7 @@ diff_algo_myers(const struct diff_algo_config *algo_config,
 			 * is horizontal, meaning first remove one atom from the
 			 * left before sliding down the snake.
 			 * If right_section_len > left_section_len, the lead-in
-			 * is vetical, so add one atom from the right before
+			 * is vertical, so add one atom from the right before
 			 * sliding down the snake. */
 			if (left_section_len == right_section_len + 1) {
 				if (!diff_state_add_chunk(state, true,
