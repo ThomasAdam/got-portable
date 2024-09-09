@@ -394,7 +394,7 @@ test_checkout_read_only() {
 	local testroot=`test_init checkout_read_only`
 	local commit_id=`git_show_head $testroot/repo`
 
-	# Make the repostiory read-only
+	# Make the repository read-only
 	chmod -R a-w $testroot/repo
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected

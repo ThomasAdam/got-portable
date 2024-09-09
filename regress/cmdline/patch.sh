@@ -860,7 +860,7 @@ EOF
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
-		echo "got patch suceeded unexpectedly" >&2
+		echo "got patch succeeded unexpectedly" >&2
 		test_done $testroot $ret
 		return 1
 	fi
@@ -888,7 +888,7 @@ EOF
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
-		echo "got patch suceeded unexpectedly" >&2
+		echo "got patch succeeded unexpectedly" >&2
 		test_done $testroot $ret
 		return 1
 	fi

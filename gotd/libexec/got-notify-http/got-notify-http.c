@@ -356,7 +356,7 @@ jsonify_commit(FILE *fp, const char *repo, const char *user,
 				break;
 			}
 			phase = P_PARENT;
-			/* fallthough */
+			/* fallthrough */
 
 		case P_PARENT:
 			/* optional - more than one */
@@ -625,7 +625,7 @@ jsonify_tag(FILE *fp, const char *repo, const char *user,
 				break;
 			}
 			phase = P_OBJECT;
-			/* fallthough */
+			/* fallthrough */
 
 		case P_OBJECT:
 			/* optional */

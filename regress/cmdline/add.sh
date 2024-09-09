@@ -383,7 +383,7 @@ test_add_clashes_with_submodule() {
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 
-	# Atttempt to add a file clashes with a submodule
+	# Attempt to add a file clashes with a submodule
 	echo "This is a file called repo2" > $testroot/wt/repo2
 	(cd $testroot/wt && got add repo2 > /dev/null)
 

@@ -59,7 +59,7 @@ void got_ref_close(struct got_reference *);
 /* Get the name of the reference. */
 const char *got_ref_get_name(struct got_reference *);
 
-/* Get the name of the reference which a symoblic reference points at. */
+/* Get the name of the reference which a symbolic reference points at. */
 const char *got_ref_get_symref_target(struct got_reference *);
 
 /* Get the last modification timestamp of the reference. */
@@ -130,7 +130,7 @@ void got_ref_list_free(struct got_reflist_head *);
 /*
  * Insert a reference into a reference list.
  * Return a pointer to the newly allocated list entry in *newp.
- * If *newp is NULL and no error occured then the specified reference was
+ * If *newp is NULL and no error occurred then the specified reference was
  * already an element of the list. If *newp is not NULL then the reference
  * was shallow-copied onto the list and should no longer be closed with
  * got_ref_close(). Instead it will be closed along with other list
@@ -147,7 +147,7 @@ got_reflist_sort(struct got_reflist_head *refs, got_ref_cmp_cb cmp_cb,
     void *cmp_arg);
 
 /* Indicate whether the provided reference is symbolic (points at another
- * refernce) or not (points at an object ID). */
+ * reference) or not (points at an object ID). */
 int got_ref_is_symbolic(struct got_reference *);
 
 /* Change the object ID a reference points to. */
