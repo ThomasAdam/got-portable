@@ -274,6 +274,7 @@ static void
 notify_http(struct gotd_notification_target *target, const char *repo,
     const char *username, int fd)
 {
+	struct gotd_secret *secret;
 	const char *http_user = NULL, *http_pass = NULL, *hmac = NULL;
 	const char *argv[12];
 	int argc = 0;
@@ -296,13 +297,15 @@ notify_http(struct gotd_notification_target *target, const char *repo,
 	argv[argc] = NULL;
 
 	if (target->conf.http.auth) {
-		http_user = target->conf.http.auth;
-		http_pass = gotd_secrets_get(&secrets, GOTD_SECRET_AUTH,
-		    http_user);
+		secret = gotd_secrets_get(&secrets, GOTD_SECRET_AUTH,
+		    target->conf.http.auth);
+		http_user = secret->user;
+		http_pass = secret->pass;
 	}
 	if (target->conf.http.hmac) {
-		hmac = gotd_secrets_get(&secrets, GOTD_SECRET_HMAC,
+		secret = gotd_secrets_get(&secrets, GOTD_SECRET_HMAC,
 		    target->conf.http.hmac);
+		hmac = secret->hmac;
 	}
 
 	run_notification_helper(GOTD_PATH_PROG_NOTIFY_HTTP, argv, fd,
@@ -465,6 +468,33 @@ recv_session(struct imsg *imsg)
 	return NULL;
 }
 
+static const struct got_error *
+notify_ibuf_get_str(char **ret, struct ibuf *ibuf)
+{
+	const char	*str, *end;
+	size_t		 len;
+
+	*ret = NULL;
+
+	str = ibuf_data(ibuf);
+	len = ibuf_size(ibuf);
+
+	end = memchr(str, '\0', len);
+	if (end == NULL)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	*ret = strdup(str);
+	if (*ret == NULL)
+		return got_error_from_errno("strdup");
+
+	if (ibuf_skip(ibuf, end - str + 1) == -1) {
+		free(*ret);
+		*ret = NULL;
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	}
+
+	return NULL;
+}
+
 static void
 notify_dispatch(int fd, short event, void *arg)
 {
@@ -475,8 +505,6 @@ notify_dispatch(int fd, short event, void *arg)
 	struct imsg imsg;
 	struct ibuf ibuf;
 	struct gotd_secret *s;
-	int keylen, vallen;
-	char *key, *val;
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(imsgbuf)) == -1 && errno != EAGAIN)
@@ -530,19 +558,26 @@ notify_dispatch(int fd, short event, void *arg)
 			s = &secrets.secrets[secrets.len++];
 			if (imsg_get_ibuf(&imsg, &ibuf) == -1)
 				fatal("imsg_get_ibuf");
-			if (ibuf_get(&ibuf, &s->type, sizeof(s->type)) == -1 ||
-			    ibuf_get(&ibuf, &keylen, sizeof(keylen)) == -1 ||
-			    ibuf_get(&ibuf, &vallen, sizeof(vallen)) == -1 ||
-			    keylen <= 0 || vallen <= 0 ||
-			    ibuf_size(&ibuf) != (keylen + vallen) ||
-			    (key = ibuf_data(&ibuf)) == NULL ||
-			    (val = ibuf_seek(&ibuf, keylen, vallen)) == NULL ||
-			    key[keylen - 1] != '\0' || val[vallen - 1] != '\0')
+			if (ibuf_get(&ibuf, &s->type, sizeof(s->type)) == -1)
 				fatalx("corrupted GOTD_IMSG_SECRET");
-			s->key = strdup(key);
-			s->val = strdup(val);
-			if (s->key == NULL || s->val == NULL)
-				fatal("strdup");
+			err = notify_ibuf_get_str(&s->label, &ibuf);
+			if (err)
+				break;
+			if (s->type == GOTD_SECRET_AUTH) {
+				err = notify_ibuf_get_str(&s->user, &ibuf);
+				if (err)
+					break;
+				err = notify_ibuf_get_str(&s->pass, &ibuf);
+				if (err)
+					break;
+			} else {
+				err = notify_ibuf_get_str(&s->hmac, &ibuf);
+				if (err)
+					break;
+			}
+			if (ibuf_size(&ibuf) != 0)
+				fatalx("unexpected extra data in "
+				    "GOTD_IMSG_SECRET");
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);

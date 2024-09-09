@@ -21,8 +21,10 @@ enum gotd_secret_type {
 
 struct gotd_secret {
 	enum gotd_secret_type	 type;
-	char			*key;	/* label or username		*/
-	char			*val;	/* hmac secret or password	*/
+	char			*label;
+	char			*user;
+	char			*pass;
+	char			*hmac;
 };
 
 struct gotd_secrets {
@@ -33,6 +35,6 @@ struct gotd_secrets {
 
 const struct got_error *gotd_secrets_parse(const char *, FILE *,
     struct gotd_secrets **);
-const char *gotd_secrets_get(struct gotd_secrets *, enum gotd_secret_type,
-    const char *);
+struct gotd_secret *gotd_secrets_get(struct gotd_secrets *,
+    enum gotd_secret_type, const char *);
 void gotd_secrets_free(struct gotd_secrets *);
