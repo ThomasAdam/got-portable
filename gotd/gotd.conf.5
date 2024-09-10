@@ -34,6 +34,16 @@ as well as reserved words
 must be quoted.
 Arguments containing whitespace should be surrounded by double quotes
 .Pq \&" .
+.Pp
+Macros can be defined that are later expanded in context.
+Macro names must start with a letter, digit, or underscore, and may
+contain any of those characters, but may not be reserved words.
+Macros are not expanded inside quotes.
+For example:
+.Bd -literal -offset indent
+path = "/var/run/gotd.sock"
+listen on $path
+.Ed
 .Sh GLOBAL CONFIGURATION
 The available global configuration directives are as follows:
 .Bl -tag -width Ds
