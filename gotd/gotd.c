@@ -2038,7 +2038,7 @@ main(int argc, char **argv)
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
 	char *default_sender = NULL;
-	char hostname[HOST_NAME_MAX + 1];
+	char hostname[_POSIX_HOST_NAME_MAX + 1];
 	FILE *fp;
 	FILE *diff_f1 = NULL, *diff_f2 = NULL;
 	int diff_fd1 = -1, diff_fd2 = -1;
