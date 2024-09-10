@@ -62,6 +62,7 @@ gotd_SOURCES = gotd.c \
 	repo_imsg.c \
 	repo_read.c \
 	repo_write.c \
+	secrets.c \
 	session_read.c \
 	session_write.c
 
@@ -72,9 +73,9 @@ gotd_SOURCES += chroot-openbsd.c
 endif
        
 gotd_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-EXTRA_DIST = gotd.8 gotd.conf.5 *.h
+EXTRA_DIST = gotd.8 gotd.conf.5 gotd-secrets.conf.5 *.h
 
-man5_MANS = gotd.conf.5
+man5_MANS = gotd.conf.5 gotd-secrets.conf.5
 man8_MANS = gotd.8
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm

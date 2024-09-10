@@ -21,6 +21,7 @@
 #define GOTD_USER	"_gotd"
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
 #define GOTD_SECRETS_PATH "/etc/gotd-secrets.conf"
+#ifndef GOTD_EMPTY_PATH
 #define GOTD_EMPTY_PATH	"/var/empty"
 #endif
 
@@ -490,6 +491,7 @@ struct gotd_imsg_notify {
 	/* Followed by username_len data bytes. */
 };
 
+int enter_chroot(const char *);
 int parse_config(const char *, enum gotd_procid, struct gotd_secrets *,
     struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
