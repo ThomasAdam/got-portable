@@ -137,7 +137,10 @@ got_object_open_loose_fd(int *fd, struct got_object_id *id,
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (*fd == -1) {
-		err = got_error_from_errno2("open", path);
+		if (errno == ENOENT)
+			err = got_error_no_obj(id);
+		else
+			err = got_error_from_errno2("open", path);
 		goto done;
 	}
 done:

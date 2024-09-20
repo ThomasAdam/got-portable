@@ -90,9 +90,7 @@ test_tree_submodule() {
 
 	local submodule_id=$(got tree -r $testroot/repo -i | \
 		grep 'repo2\$$' | cut -d ' ' -f1)
-	local objpath=`get_loose_object_path $testroot/repo $submodule_id`
 
-	# Currently fails in open(2)
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -100,8 +98,7 @@ test_tree_submodule() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "got: open: $objpath: No such file or directory" \
-		> $testroot/stderr.expected
+	echo "got: object $submodule_id not found" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?

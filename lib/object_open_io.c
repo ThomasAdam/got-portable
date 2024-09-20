@@ -144,11 +144,8 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return NULL;
 
 	err = got_object_open_loose_fd(&fd, id, repo);
-	if (err) {
-		if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
-			err = got_error_no_obj(id);
+	if (err)
 		return err;
-	}
 
 	err = got_object_read_header(obj, fd);
 	if (err)
