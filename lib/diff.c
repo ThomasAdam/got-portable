@@ -509,7 +509,7 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 	if (obj2->type != GOT_OBJ_TYPE_BLOB) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
