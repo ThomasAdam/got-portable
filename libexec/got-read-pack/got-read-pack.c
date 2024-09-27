@@ -1523,6 +1523,8 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 			if (obj->type != GOT_OBJ_TYPE_COMMIT) {
 				got_object_qid_free(qid);
 				qid = NULL;
+				got_object_close(obj);
+				obj = NULL;
 				continue;
 			}
 			err = open_commit(&commit, pack, packidx, idx,
