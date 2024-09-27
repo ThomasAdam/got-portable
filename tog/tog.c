@@ -8752,12 +8752,8 @@ log_ref_entry(struct tog_view **new_view, int begin_y, int begin_x,
 	*new_view = NULL;
 
 	err = resolve_reflist_entry(&commit_id, re, repo);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			return err;
-		else
-			return NULL;
-	}
+	if (err)
+		return err;
 
 	log_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_LOG);
 	if (log_view == NULL) {
@@ -9079,13 +9075,8 @@ browse_ref_tree(struct tog_view **new_view, int begin_y, int begin_x,
 	*new_view = NULL;
 
 	err = resolve_reflist_entry(&commit_id, re, repo);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			return err;
-		else
-			return NULL;
-	}
-
+	if (err)
+		return err;
 
 	tree_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL) {
