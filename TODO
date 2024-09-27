@@ -32,9 +32,6 @@ got:
   removing detected no-op changes from the list of commits to rebase before
   merging any changes (rather than letting diff3 figure this out). RCS IDs
   in commits exported from CVS will need to be elided to avoid false positives.
-- got_object_enumerate() can result in a tag ID being requested and somehow
-  this tag object gets parsed as a commit object in got-read-pack; then we 
-  see 'got-read-pack: bad object data' during 'got send'; reported by jrick
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
