@@ -1386,6 +1386,53 @@ done:
 	return err;
 }
 
+
+static const struct got_error *
+resolve_tag(struct got_object **obj, struct got_object_id *id,
+    struct got_packidx *packidx, struct got_pack *pack,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err;
+	struct got_object *tagged_obj;
+	struct got_tag_object *tag;
+	uint8_t *buf;
+	size_t len;
+	int idx;
+
+	err = got_packfile_extract_object_to_mem(&buf, &len, *obj, pack);
+	if (err)
+		return err;
+
+	(*obj)->size = len;
+	err = got_object_parse_tag(&tag, buf, len, id->algo);
+	if (err)
+		goto done;
+
+	idx = got_packidx_get_object_idx(packidx, &tag->id);
+	if (idx == -1) {
+		got_object_close(*obj);
+		*obj = NULL;
+		return NULL;
+	}
+
+	tagged_obj = got_object_cache_get(objcache, &tag->id);
+	if (tagged_obj) {
+		tagged_obj->refcnt++;
+	} else {
+		err = open_object(&tagged_obj, pack, packidx,
+		    idx, &tag->id, objcache);
+		if (err)
+			goto done;
+	}
+
+	got_object_close(*obj);
+	*obj = tagged_obj;
+done:
+	got_object_tag_close(tag);
+	free(buf);
+	return err;
+}
+
 static const struct got_error *
 enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_pack *pack, struct got_packidx *packidx,
@@ -1461,29 +1508,25 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		if (err)
 			goto done;
 		if (obj->type == GOT_OBJ_TYPE_TAG) {
-			struct got_tag_object *tag;
-			uint8_t *buf;
-			size_t len;
-			err = got_packfile_extract_object_to_mem(&buf,
-			    &len, obj, pack);
-			if (err)
-				goto done;
-			obj->size = len;
-			err = got_object_parse_tag(&tag, buf, len,
-			    qid->id.algo);
-			if (err) {
-				free(buf);
-				goto done;
+			while (obj->type == GOT_OBJ_TYPE_TAG) {
+				err = resolve_tag(&obj, &qid->id, packidx,
+				    pack, objcache);
+				if (err)
+					goto done;
+				if (obj == NULL)
+					break;
 			}
-			idx = got_packidx_get_object_idx(packidx, &tag->id);
-			if (idx == -1) {
+			if (obj == NULL) {
 				have_all_entries = 0;
 				break;
 			}
+			if (obj->type != GOT_OBJ_TYPE_COMMIT) {
+				got_object_qid_free(qid);
+				qid = NULL;
+				continue;
+			}
 			err = open_commit(&commit, pack, packidx, idx,
-			    &tag->id, objcache);
-			got_object_tag_close(tag);
-			free(buf);
+			    &obj->id, objcache);
 			if (err)
 				goto done;
 		} else if (obj->type == GOT_OBJ_TYPE_COMMIT) {

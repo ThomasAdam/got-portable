@@ -675,6 +675,42 @@ test_pack_bad_ref() {
 	test_done "$testroot" "$ret"
 }
 
+test_pack_tagged_tag() {
+	local testroot=`test_init pack_tagged_tag`
+
+	got tag -r $testroot/repo -m 1.0 1.0 >/dev/null
+
+	git -C $testroot/repo tag -a -m "tagging a tag" 1.0-tag 1.0 \
+		2>$testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo -n "git tag failed unexpectedly:" >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	gotadmin pack -r $testroot/repo -a > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotadmin pack failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# try again, triggering the pack enumeration logic in got-read-pack
+	# such that it runs into a tag of a tag
+	gotadmin pack -a -r $testroot/repo -x 1.0-tag > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotadmin pack failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_pack_all_loose_objects
 run_test test_pack_exclude
@@ -684,3 +720,4 @@ run_test test_pack_ambiguous_arg
 run_test test_pack_loose_only
 run_test test_pack_all_objects
 run_test test_pack_bad_ref
+run_test test_pack_tagged_tag
