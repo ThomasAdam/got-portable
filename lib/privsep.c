@@ -941,13 +941,12 @@ got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	int done = 0;
 	struct got_imsg_send_remote_ref iremote_ref;
 	struct got_object_id *id = NULL;
 	char *refname = NULL;
 	struct got_pathlist_entry *new;
 
-	while (!done) {
+	while (1) {
 		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 		if (err)
 			return err;
@@ -986,6 +985,7 @@ got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
 			}
 			id = NULL;
 			refname = NULL;
+			imsg_free(&imsg);
 			break;
 		case GOT_IMSG_SEND_PACK_REQUEST:
 			if (datalen != 0) {
@@ -993,11 +993,10 @@ got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
 				goto done;
 			}
 			/* got-send-pack is now waiting for a pack file. */
-			done = 1;
-			break;
+			goto done;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
-			break;
+			goto done;
 		}
 	}
 done:
