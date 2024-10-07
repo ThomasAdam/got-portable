@@ -179,7 +179,76 @@ test_unstage_nonexistent() {
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	cat > $testroot/stdout.expected <<EOF
+ M alpha
+ D beta
+ A foo
+EOF
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# removing a staged file from disk and then unstaging
+	# all changes in the work tree would trigger a segfault
+	rm $testroot/wt/alpha
+
+	cat > $testroot/stdout.expected <<EOF
+!M alpha
+ D beta
+ A foo
+EOF
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+!  alpha
+D  beta
+G  foo
+Files which had incoming changes but could not be found in the work tree: 1
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+!M alpha
+D  beta
+A  foo
+EOF
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
