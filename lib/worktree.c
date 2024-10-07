@@ -3685,7 +3685,7 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	const struct got_error *err;
 	struct diff_dir_cb_arg *a = arg;
-	struct got_object_id blob_id, commit_id;
+	struct got_object_id blob_id, commit_id, staged_blob_id;
 	unsigned char status;
 
 	if (a->cancel_cb) {
@@ -3699,12 +3699,13 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 
 	got_fileindex_entry_get_blob_id(&blob_id, ie);
 	got_fileindex_entry_get_commit_id(&commit_id, ie);
+	got_fileindex_entry_get_staged_blob_id(&staged_blob_id, ie);
 	if (got_fileindex_entry_has_file_on_disk(ie))
 		status = GOT_STATUS_MISSING;
 	else
 		status = GOT_STATUS_DELETE;
 	return (*a->status_cb)(a->status_arg, status, get_staged_status(ie),
-	    ie->path, &blob_id, NULL, &commit_id, -1, NULL);
+	    ie->path, &blob_id, &staged_blob_id, &commit_id, -1, NULL);
 }
 
 static void
@@ -9804,6 +9805,12 @@ unstage_path(void *arg, unsigned char status,
 			break;
 		/* fall through */
 	case GOT_STATUS_ADD:
+		if (status == GOT_STATUS_MISSING) {
+			/* Cannot merge changes into missing files. */
+			err = (*a->progress_cb)(a->progress_arg, status,
+			    relpath);
+			goto done;
+		}
 		if (a->patch_cb) {
 			if (staged_status == GOT_STATUS_ADD) {
 				int choice = GOT_PATCH_CHOICE_NONE;
