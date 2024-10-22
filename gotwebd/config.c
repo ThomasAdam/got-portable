@@ -191,33 +191,28 @@ config_setfd(struct gotwebd *env)
 int
 config_getfd(struct gotwebd *env, struct imsg *imsg)
 {
-	int match = 0, i, j;
-	const int nfds = GOTWEB_PACK_NUM_TEMPFILES + PRIV_FDS__MAX;
+	int i;
 
 	if (imsg_get_len(imsg) != 0)
 		fatalx("%s: wrong size", __func__);
 
-	for (i = 0; i < nfds; i++) {
-		if (i < PRIV_FDS__MAX && env->priv_fd[i] == -1) {
+	for (i = 0; i < nitems(env->priv_fd); ++i) {
+		if (env->priv_fd[i] == -1) {
 			env->priv_fd[i] = imsg_get_fd(imsg);
 			log_debug("%s: assigning priv_fd %d",
 			    __func__, env->priv_fd[i]);
-			match = 1;
-			break;
-		}
-
-		j = i - PRIV_FDS__MAX;
-		if (env->pack_fds[j] == -1) {
-			env->pack_fds[j] = imsg_get_fd(imsg);
-			log_debug("%s: assigning pack_fd %d",
-			    __func__, env->pack_fds[j]);
-			match = 1;
-			break;
+			return 0;
 		}
 	}
 
-	if (match)
-		return 0;
-	else
-		return 1;
+	for (i = 0; i < nitems(env->pack_fds); ++i) {
+		if (env->pack_fds[i] == -1) {
+			env->pack_fds[i] = imsg_get_fd(imsg);
+			log_debug("%s: assigning pack_fd %d",
+			    __func__, env->pack_fds[i]);
+			return 0;
+		}
+	}
+
+	return 1;
 }
