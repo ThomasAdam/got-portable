@@ -104,6 +104,8 @@ clear_meta(struct got_pack_meta *meta)
 	free(meta->base_obj_id);
 	meta->base_obj_id = NULL;
 	meta->reused_delta_offset = 0;
+	got_deltify_free(meta->dtab);
+	meta->dtab = NULL;
 }
 
 static void
@@ -111,10 +113,8 @@ free_nmeta(struct got_pack_meta **meta, int nmeta)
 {
 	int i;
 
-	for (i = 0; i < nmeta; i++) {
+	for (i = 0; i < nmeta; i++)
 		clear_meta(meta[i]);
-		got_deltify_free(meta[i]->dtab);
-	}
 
 	free(meta);
 }
