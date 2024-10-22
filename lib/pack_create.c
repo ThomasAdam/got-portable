@@ -111,8 +111,11 @@ free_nmeta(struct got_pack_meta **meta, int nmeta)
 {
 	int i;
 
-	for (i = 0; i < nmeta; i++)
+	for (i = 0; i < nmeta; i++) {
 		clear_meta(meta[i]);
+		got_deltify_free(meta[i]->dtab);
+	}
+
 	free(meta);
 }
 
@@ -688,10 +691,6 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int ncolored,
 		raw = NULL;
 	}
 done:
-	for (i = MAX(0, nmeta - max_base_candidates); i < nmeta; i++) {
-		got_deltify_free(meta[i]->dtab);
-		meta[i]->dtab = NULL;
-	}
 	if (raw)
 		got_object_raw_close(raw);
 	if (base_raw)
