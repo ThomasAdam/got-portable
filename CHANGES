@@ -1,3 +1,12 @@
+* got 0.104; 2024-10-22
+  see git repository history for per-change authorship information
+- gotd.conf: document the macro syntax
+- tog: prevent a segfault upon unexpected object type in ref list view
+- fix pack file creation in the presenc of tagged tag objects
+- plugged some memory leaks
+- fix a crash when unstaging a file which has been removed from disk
+- gotwebd: fix out of bounds access while handling the configuration
+
 * got 0.103; 2024-09-24
   see git repository history for per-change authorship information
 - fix bug causing performance to degrade as more and more pack files appear
