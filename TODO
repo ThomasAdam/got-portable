@@ -32,6 +32,10 @@ got:
   removing detected no-op changes from the list of commits to rebase before
   merging any changes (rather than letting diff3 figure this out). RCS IDs
   in commits exported from CVS will need to be elided to avoid false positives.
+- to support packfile reachability bitmaps, we'll need an ISC or otherwise
+  compatibly-licensed implementation of EWAH bitmaps as used by Git; the
+  EWAH author Daniel Lemire allowed the Git project to relicense code from
+  Apache License 2 to GPLv2; perhaps we can get permission to relicense as ISC
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
