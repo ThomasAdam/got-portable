@@ -32,10 +32,10 @@ got:
   removing detected no-op changes from the list of commits to rebase before
   merging any changes (rather than letting diff3 figure this out). RCS IDs
   in commits exported from CVS will need to be elided to avoid false positives.
-- to support packfile reachability bitmaps, we'll need an ISC or otherwise
-  compatibly-licensed implementation of EWAH bitmaps as used by Git; the
-  EWAH author Daniel Lemire allowed the Git project to relicense code from
-  Apache License 2 to GPLv2; perhaps we can get permission to relicense as ISC
+- to support packfile reachability bitmaps, we'll need to port EWAHBoolArray
+  from C++ to C: https://github.com/lemire/EWAHBoolArray
+  EWAH author Daniel Lemire generously relicensed his code to dual Apache2+MIT
+  to make this possible. The C code we publish should use the MIT license.
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
