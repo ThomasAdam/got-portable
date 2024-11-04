@@ -3041,6 +3041,263 @@ EOF
 	test_done "$testroot" "0"
 }
 
+test_stage_patch_binary() {
+	local testroot=$(test_init stage_patch_binary)
+
+	dd if=/dev/urandom of=$testroot/repo/binary bs=1024 count=16 \
+	    > /dev/null 2>&1
+	git -C $testroot/repo add binary
+	git_commit $testroot/repo -m "add binary file"
+	local id=$(git_show_head $testroot/repo)
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ed -s $testroot/wt/binary <<-EOF
+	2m8
+	7m16
+	5m24
+	22m32
+	w
+	EOF
+
+	# 'n' response to reject stage of binary change
+	printf "n\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p binary \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	stage this change? [y/n/q] n
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# 'q' response to reject stage of binary change
+	printf "q\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p binary \
+	    > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	stage this change? [y/n/q] q
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# 'y' response to stage binary change
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p binary \
+	    > $testroot/stdout 2> $testroot/stderr)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	stage this change? [y/n/q] y
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " M binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "changed binary" > /dev/null)
+
+	seq 16 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers > /dev/null)
+	(cd $testroot/wt && got commit -m "add numbers" > /dev/null)
+
+	ed -s $testroot/wt/numbers <<-EOF
+	,s/^2$/x/
+	,s/^8$/y/
+	,s/^16$/z/
+	w
+	EOF
+
+	ed -s $testroot/wt/binary <<-EOF
+	2m8
+	7m16
+	5m24
+	22m32
+	w
+	EOF
+
+	# stage first numbers hunk and binary file
+	printf "y\ny\nn\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+	    > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	stage this change? [y/n/q] y
+	-----------------------------------------------
+	@@ -1,5 +1,5 @@
+	 1
+	-2
+	+x
+	 3
+	 4
+	 5
+	-----------------------------------------------
+	M  numbers (change 1 of 3)
+	stage this change? [y/n/q] y
+	-----------------------------------------------
+	@@ -5,7 +5,7 @@
+	 5
+	 6
+	 7
+	-8
+	+y
+	 9
+	 10
+	 11
+	-----------------------------------------------
+	M  numbers (change 2 of 3)
+	stage this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -13,4 +13,4 @@
+	 13
+	 14
+	 15
+	-16
+	+z
+	-----------------------------------------------
+	M  numbers (change 3 of 3)
+	stage this change? [y/n/q] n
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " M binary" > $testroot/stdout.expected
+	echo "MM numbers" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s binary | grep '^Binary files' \
+	    > $testroot/stdout)
+	echo "Binary files binary and binary differ" \
+	    > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_stage_basic
 run_test test_stage_no_changes
@@ -3072,3 +3329,4 @@ run_test test_stage_patch_quit
 run_test test_stage_patch_incomplete_script
 run_test test_stage_symlink
 run_test test_stage_patch_symlink
+run_test test_stage_patch_binary

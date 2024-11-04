@@ -4808,6 +4808,43 @@ copy_remaining_content(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
 }
 
 static const struct got_error *
+accept_or_reject_binary_change(int *choice, const char *path,
+    got_worktree_patch_cb patch_cb, void *patch_arg)
+{
+	const struct got_error	*err;
+	FILE			*f;
+
+	*choice = GOT_PATCH_CHOICE_NONE;
+
+	f = got_opentemp();
+	if (f == NULL)
+		return got_error_from_errno("got_opentemp");
+
+	if (fprintf(f, "Binary files %s and %s differ\n", path, path) < 0) {
+		err = got_error_msg(GOT_ERR_IO, "fprintf");
+		goto done;
+	}
+	if (fseeko(f, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
+
+	err = (*patch_cb)(choice, patch_arg, GOT_STATUS_MODIFY, path, f, 1, 1);
+
+done:
+	if (f != NULL && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	return err;
+}
+
+static int
+diff_result_has_binary(struct diff_result *r)
+{
+	return (r->left->atomizer_flags | r->right->atomizer_flags) &
+	    DIFF_ATOMIZER_FOUND_BINARY_DATA;
+}
+
+static const struct got_error *
 apply_or_reject_change(int *choice, int *nchunks_used,
     struct diff_result *diff_result, int n,
     const char *relpath, FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
@@ -4902,8 +4939,8 @@ struct revert_file_args {
 };
 
 static const struct got_error *
-create_patched_content(char **path_outfile, int reverse_patch,
-    struct got_object_id *blob_id, const char *path2,
+create_patched_content(char **path_outfile, int *confirm_binary_change,
+    int reverse_patch, struct got_object_id *blob_id, const char *path2,
     int dirfd2, const char *de_name2,
     const char *relpath, struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
@@ -4917,10 +4954,11 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	char *path1 = NULL, *id_str = NULL;
 	struct stat sb2;
 	struct got_diffreg_result *diffreg_result = NULL;
-	int line_cur1 = 1, line_cur2 = 1, have_content = 0;
+	int choice, line_cur1 = 1, line_cur2 = 1, have_content = 0;
 	int i = 0, n = 0, nchunks_used = 0, nchanges = 0;
 
 	*path_outfile = NULL;
+	*confirm_binary_change = 0;
 
 	err = got_object_id_str(&id_str, blob_id);
 	if (err)
@@ -5012,6 +5050,14 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		goto done;
 
+	if (diff_result_has_binary(diffreg_result->result)) {
+		err = accept_or_reject_binary_change(&choice, relpath,
+		    patch_cb, patch_arg);
+		if (err == NULL && choice == GOT_PATCH_CHOICE_YES)
+			*confirm_binary_change = 1;
+		goto done;
+	}
+
 	err = got_opentemp_named(path_outfile, &outfile, "got-patched-content",
 	    "");
 	if (err)
@@ -5030,7 +5076,6 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		nchanges++;
 	}
 	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
-		int choice;
 		err = apply_or_reject_change(&choice, &nchunks_used,
 		    diffreg_result->result, n, relpath, f1, f2,
 		    &line_cur1, &line_cur2,
@@ -5270,11 +5315,25 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 
 		if (a->patch_cb && (status == GOT_STATUS_MODIFY ||
 		    status == GOT_STATUS_CONFLICT)) {
-			int is_bad_symlink = 0;
-			err = create_patched_content(&path_content, 1, &id,
-			    ondisk_path, dirfd, de_name, ie->path, a->repo,
+			int is_bad_symlink = 0, revert_binary_file = 0;
+
+			err = create_patched_content(&path_content,
+			    &revert_binary_file, 1, &id, ondisk_path, dirfd,
+			    de_name, ie->path, a->repo,
 			    a->patch_cb, a->patch_arg);
-			if (err || path_content == NULL)
+			if (err != NULL)
+				goto done;
+			if (revert_binary_file){
+				err = install_blob(a->worktree, ondisk_path,
+				    ie->path,
+				    te ? te->mode : GOT_DEFAULT_FILE_MODE,
+				    got_fileindex_perms_to_st(ie), blob,
+				    0, 1, 0, 0, NULL, a->repo,
+				    a->progress_cb, a->progress_arg);
+				if (err != NULL)
+					goto done;
+			}
+			if (path_content == NULL)
 				break;
 			if (te && S_ISLNK(te->mode)) {
 				if (unlink(path_content) == -1) {
@@ -9233,11 +9292,15 @@ stage_path(void *arg, unsigned char status,
 				if (choice != GOT_PATCH_CHOICE_YES)
 					break;
 			} else {
-				err = create_patched_content(&path_content, 0,
+				int stage_binary_file = 0;
+
+				err = create_patched_content(&path_content,
+				    &stage_binary_file, 0,
 				    staged_blob_id ? staged_blob_id : blob_id,
 				    ondisk_path, dirfd, de_name, ie->path,
 				    a->repo, a->patch_cb, a->patch_arg);
-				if (err || path_content == NULL)
+				if (!stage_binary_file &&
+				    (err || path_content == NULL))
 					break;
 			}
 		}
@@ -9446,9 +9509,9 @@ struct unstage_path_arg {
 
 static const struct got_error *
 create_unstaged_content(char **path_unstaged_content,
-    char **path_new_staged_content, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, const char *relpath,
-    struct got_repository *repo,
+    char **path_new_staged_content, int *confirm_binary_change,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    const char *relpath, struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
 	const struct got_error *err, *free_err;
@@ -9456,10 +9519,11 @@ create_unstaged_content(char **path_unstaged_content,
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL, *rejectfile = NULL;
 	char *path1 = NULL, *path2 = NULL, *label1 = NULL;
 	struct got_diffreg_result *diffreg_result = NULL;
-	int line_cur1 = 1, line_cur2 = 1, n = 0, nchunks_used = 0;
+	int choice, line_cur1 = 1, line_cur2 = 1, n = 0, nchunks_used = 0;
 	int have_content = 0, have_rejected_content = 0, i = 0, nchanges = 0;
 	int fd1 = -1, fd2 = -1;
 
+	*confirm_binary_change = 0;
 	*path_unstaged_content = NULL;
 	*path_new_staged_content = NULL;
 
@@ -9508,6 +9572,14 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
+	if (diff_result_has_binary(diffreg_result->result)) {
+		err = accept_or_reject_binary_change(&choice, relpath,
+		    patch_cb, patch_arg);
+		if (err == NULL && choice == GOT_PATCH_CHOICE_YES)
+			*confirm_binary_change = 1;
+		goto done;
+	}
+
 	err = got_opentemp_named(path_unstaged_content, &outfile,
 	    "got-unstaged-content", "");
 	if (err)
@@ -9533,7 +9605,6 @@ create_unstaged_content(char **path_unstaged_content,
 		nchanges++;
 	}
 	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
-		int choice;
 		err = apply_or_reject_change(&choice, &nchunks_used,
 		    diffreg_result->result, n, relpath, f1, f2,
 		    &line_cur1, &line_cur2,
@@ -9597,11 +9668,11 @@ done:
 }
 
 static const struct got_error *
-unstage_hunks(struct got_object_id *staged_blob_id,
-    struct got_blob_object *blob_base,
-    struct got_object_id *blob_id, struct got_fileindex_entry *ie,
-    const char *ondisk_path, const char *label_orig,
-    struct got_worktree *worktree, struct got_repository *repo,
+unstage_hunks(int *confirm_binary_change, struct got_object_id *staged_blob_id,
+    struct got_blob_object *blob_base, struct got_object_id *blob_id,
+    struct got_fileindex_entry *ie, const char *ondisk_path,
+    const char *label_orig, struct got_worktree *worktree,
+    struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
@@ -9615,8 +9686,8 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 	struct stat sb;
 
 	err = create_unstaged_content(&path_unstaged_content,
-	    &path_new_staged_content, blob_id, staged_blob_id,
-	    ie->path, repo, patch_cb, patch_arg);
+	    &path_new_staged_content, confirm_binary_change,
+	    blob_id, staged_blob_id, ie->path, repo, patch_cb, patch_arg);
 	if (err)
 		return err;
 
@@ -9820,12 +9891,16 @@ unstage_path(void *arg, unsigned char status,
 				if (choice != GOT_PATCH_CHOICE_YES)
 					break;
 			} else {
-				err = unstage_hunks(staged_blob_id,
-				    blob_base, blob_id, ie, ondisk_path,
-				    label_orig, a->worktree, a->repo,
+				int unstage_binary_file = 0;
+
+				err = unstage_hunks(&unstage_binary_file,
+				    staged_blob_id, blob_base, blob_id,
+				    ie, ondisk_path, label_orig,
+				    a->worktree, a->repo,
 				    a->patch_cb, a->patch_arg,
 				    a->progress_cb, a->progress_arg);
-				break; /* Done with this file. */
+				if (!unstage_binary_file)
+					break; /* Done with this file. */
 			}
 		}
 		err = got_object_open_as_blob(&blob_staged, a->repo,
