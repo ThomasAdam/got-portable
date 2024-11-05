@@ -1507,6 +1507,254 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_unstage_patch_binary() {
+	local testroot=$(test_init unstage_patch_binary)
+
+	dd if=/dev/urandom of=$testroot/repo/binary bs=1024 count=16 \
+	    > /dev/null 2>&1
+	git -C $testroot/repo add binary
+	git_commit $testroot/repo -m "add binary file"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ed -s $testroot/wt/binary <<-EOF
+	2m8
+	7m16
+	15m24
+	23m32
+	w
+	EOF
+
+	(cd $testroot/wt && got stage > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# cancel unstaging with 'n' response
+	printf "n\n" > $testroot/patchscript
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	unstage this change? [y/n/q] n
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " M binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cancel unstaging with 'q' response
+	printf "q\n" > $testroot/patchscript
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	unstage this change? [y/n/q] q
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " M binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# confirm unstage with 'y'
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	unstage this change? [y/n/q] y
+	G  binary
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  binary" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	seq 16 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers > /dev/null)
+	(cd $testroot/wt && got commit -m "add numbers" numbers > /dev/null)
+
+	ed -s $testroot/wt/numbers <<-EOF
+	,s/^2$/x/
+	,s/^8$/y/
+	,s/^16$/z/
+	w
+	EOF
+
+	(cd $testroot/wt && got stage > /dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# unstage last numbers hunk and binary file
+	printf "y\nn\nn\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
+	    > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	unstage this change? [y/n/q] y
+	G  binary
+	-----------------------------------------------
+	@@ -1,5 +1,5 @@
+	 1
+	-2
+	+x
+	 3
+	 4
+	 5
+	-----------------------------------------------
+	M  numbers (change 1 of 3)
+	unstage this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -5,7 +5,7 @@
+	 5
+	 6
+	 7
+	-8
+	+y
+	 9
+	 10
+	 11
+	-----------------------------------------------
+	M  numbers (change 2 of 3)
+	unstage this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -13,4 +13,4 @@
+	 13
+	 14
+	 15
+	-16
+	+z
+	-----------------------------------------------
+	M  numbers (change 3 of 3)
+	unstage this change? [y/n/q] y
+	G  numbers
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  binary" > $testroot/stdout.expected
+	echo "MM numbers" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff binary | grep '^Binary files' \
+	    > $testroot/stdout)
+	echo "Binary files binary and binary differ" \
+	    > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_unstage_basic
 run_test test_unstage_unversioned
@@ -1517,3 +1765,4 @@ run_test test_unstage_patch_removed
 run_test test_unstage_patch_quit
 run_test test_unstage_symlink
 run_test test_unstage_patch_symlink
+run_test test_unstage_patch_binary
