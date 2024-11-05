@@ -1559,6 +1559,312 @@ test_revert_umask() {
 	test_done "$testroot" 0
 }
 
+test_revert_patch_binary() {
+	local testroot=$(test_init revert_patch_binary)
+
+	dd if=/dev/urandom of=$testroot/repo/binary bs=1024 count=16 \
+	    > /dev/null 2>&1
+	git -C $testroot/repo add binary
+	git_commit $testroot/repo -m "add binary file"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ed -s $testroot/wt/binary <<-EOF
+	2m8
+	7m16
+	15m24
+	23m32
+	w
+	EOF
+
+	cp $testroot/wt/binary $testroot/binary.expected
+
+	# cancel reverting changes with 'n' response
+	printf "n\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p binary \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	revert this change? [y/n/q] n
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "M  binary" > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/binary.expected $testroot/wt/binary
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "binary file changes discarded by canceled revert" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cancel reverting changes with 'q' response
+	printf "q\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p binary \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	revert this change? [y/n/q] q
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "M  binary" > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/binary.expected $testroot/wt/binary
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "binary file changes discarded by canceled revert" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# confirm reverting changes with 'y'
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p binary \
+	    > $testroot/stdout)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	revert this change? [y/n/q] y
+	R  binary
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	seq 16 > $testroot/wt/numbers
+	(cd $testroot/wt && got add numbers > /dev/null)
+	(cd $testroot/wt && got commit -m "add numbers" numbers > /dev/null)
+
+	ed -s $testroot/wt/numbers <<-EOF
+	,s/^2$/x/
+	,s/^8$/y/
+	,s/^16$/z/
+	w
+	EOF
+
+	# restore changed binary
+	cp -f $testroot/binary.expected $testroot/wt/binary
+
+	# revert last numbers hunk but cancel reverting binary file changes
+	printf "n\nn\nn\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p -R .\
+	    > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	revert this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -1,5 +1,5 @@
+	 1
+	-2
+	+x
+	 3
+	 4
+	 5
+	-----------------------------------------------
+	M  numbers (change 1 of 3)
+	revert this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -5,7 +5,7 @@
+	 5
+	 6
+	 7
+	-8
+	+y
+	 9
+	 10
+	 11
+	-----------------------------------------------
+	M  numbers (change 2 of 3)
+	revert this change? [y/n/q] n
+	-----------------------------------------------
+	@@ -13,4 +13,4 @@
+	 13
+	 14
+	 15
+	-16
+	+z
+	-----------------------------------------------
+	M  numbers (change 3 of 3)
+	revert this change? [y/n/q] y
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "M  binary" > $testroot/stdout.expected
+	echo "M  numbers" >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/binary.expected $testroot/wt/binary
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "binary file changes discarded by canceled revert" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# revert first numbers hunk and binary file changes
+	printf "y\ny\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p -R . \
+	    > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<-EOF
+	-----------------------------------------------
+	Binary files binary and binary differ
+	-----------------------------------------------
+	M  binary (change 1 of 1)
+	revert this change? [y/n/q] y
+	R  binary
+	-----------------------------------------------
+	@@ -1,5 +1,5 @@
+	 1
+	-2
+	+x
+	 3
+	 4
+	 5
+	-----------------------------------------------
+	M  numbers (change 1 of 2)
+	revert this change? [y/n/q] y
+	-----------------------------------------------
+	@@ -5,7 +5,7 @@
+	 5
+	 6
+	 7
+	-8
+	+y
+	 9
+	 10
+	 11
+	-----------------------------------------------
+	M  numbers (change 2 of 2)
+	revert this change? [y/n/q] n
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "M  numbers" > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_revert_basic
 run_test test_revert_rm
@@ -1578,3 +1884,4 @@ run_test test_revert_deleted_subtree
 run_test test_revert_symlink
 run_test test_revert_patch_symlink
 run_test test_revert_umask
+run_test test_revert_patch_binary
