@@ -454,8 +454,10 @@ recv_session(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	session = calloc(1, sizeof(*session));
-	if (session == NULL)
+	if (session == NULL) {
+		close(fd);
 		return got_error_from_errno("calloc");
+	}
 
 	session->id = get_session_id();
 	imsg_init(&session->iev.ibuf, fd);
