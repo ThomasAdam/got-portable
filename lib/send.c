@@ -149,7 +149,7 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 		}
 		return err;
 	}
-	 
+
 	a->ncolored= ncolored;
 	a->nfound = nfound;
 	a->ntrees = ntrees;

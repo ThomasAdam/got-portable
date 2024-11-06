@@ -813,7 +813,7 @@ done:
  * 2. Walk the reachable commits, but only visit a commit if its in-degree
  * value is zero. When visiting a commit, decrement the in-degree value of
  * each parent.
- * 
+ *
  * This algorithm works because at least one of our starting points will
  * have in-degree zero, and then decrementing the in-degree value is similar
  * to deleting the commit from the graph, always having at least one commit

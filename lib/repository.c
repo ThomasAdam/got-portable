@@ -926,7 +926,7 @@ got_repo_remote_repo_dup(struct got_remote_repo **newp,
 	new = calloc(1, sizeof(*new));
 	if (new == NULL)
 		return got_error_from_errno("calloc");
-	
+
 	if (repo->name) {
 		new->name = strdup(repo->name);
 		if (new->name == NULL) {

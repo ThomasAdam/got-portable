@@ -150,7 +150,7 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 				err = NULL;
 			break;
 		}
-		
+
 		switch (imsg.hdr.type) {
 		case GOTD_IMSG_ERROR:
 			err = gotd_imsg_recv_error(NULL, &imsg);
@@ -203,7 +203,7 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 				err = NULL;
 			break;
 		}
-		
+
 		switch (imsg.hdr.type) {
 		case GOTD_IMSG_ERROR:
 			err = gotd_imsg_recv_error(NULL, &imsg);
