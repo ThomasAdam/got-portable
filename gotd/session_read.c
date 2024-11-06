@@ -558,7 +558,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			client->accept_flush_pkt = 1;
 			break;
 		case GOTD_IMSG_FLUSH:
-			if (gotd_session.state != GOTD_STATE_EXPECT_WANT && 
+			if (gotd_session.state != GOTD_STATE_EXPECT_WANT &&
 			    gotd_session.state !=
 			    GOTD_STATE_EXPECT_HAVE_OR_DONE) {
 				err = got_error_msg(GOT_ERR_BAD_REQUEST,

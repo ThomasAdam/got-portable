@@ -160,7 +160,7 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 	const char	*chdr = NULL, *te = "";
 	char		*p, *req;
 	int		 r;
-	
+
 	if (strcmp(method, "POST") == 0)
 		te = "\r\nTransfer-Encoding: chunked\r\n";
 
@@ -185,7 +185,6 @@ http_open(struct bufio *bio, int https, const char *method, const char *host, co
 
 	if (verbose > 0)
 		fprintf(stderr, "%s: request: %s\n", getprogname(), req);
-	
 
 	r = bufio_compose(bio, req, r);
 	if (r == -1)

@@ -257,7 +257,7 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 	*block = NULL;
 
 	h = hashblk(p, len, seed);
-	
+
 	for (i = h % dt->size; dt->offs[i] != 0; i = (i + 1) % dt->size) {
 		b = &dt->blocks[dt->offs[i] - 1];
 		if (b->hash != h || b->len != len)

@@ -686,7 +686,7 @@ diff_kind_mismatch(struct got_tree_entry *te1, struct got_tree_entry *te2,
 {
 	const struct got_error *err = NULL;
 
-	/* 
+	/*
 	 * Handle files changing into directories and vice-versa.
 	 * Disregard edge cases with FIFOs, device nodes, etc for now.
 	 */
