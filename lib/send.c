@@ -336,7 +336,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
     struct got_repository *repo, got_send_progress_cb progress_cb,
     void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
-	int imsg_sendfds[2];
+	int imsg_sendfds[2] = { -1, -1 };
 	int npackfd = -1, nsendfd = -1;
 	int sendstatus, done = 0;
 	const struct got_error *err;
@@ -450,7 +450,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	if (sendpid == -1) {
 		err = got_error_from_errno("fork");
 		goto done;
-	} else if (sendpid == 0){
+	} else if (sendpid == 0) {
 		got_privsep_exec_child(imsg_sendfds,
 		    GOT_PATH_PROG_SEND_PACK, got_repo_get_path(repo));
 	}
@@ -459,6 +459,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		err = got_error_from_errno("close");
 		goto done;
 	}
+	imsg_sendfds[1] = -1;
 	imsg_init(&sendibuf, imsg_sendfds[0]);
 	nsendfd = dup(sendfd);
 	if (nsendfd == -1) {
@@ -687,6 +688,10 @@ done:
 		if (waitpid(sendpid, &sendstatus, 0) == -1 && err == NULL)
 			err = got_error_from_errno("waitpid");
 	}
+	if (imsg_sendfds[0] != -1 && close(imsg_sendfds[0]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (imsg_sendfds[1] != -1 && close(imsg_sendfds[1]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)

@@ -250,13 +250,8 @@ list_refs(struct imsg *imsg)
 	size_t datalen;
 	struct gotd_imsg_reflist irefs;
 	struct imsgbuf ibuf;
-	int client_fd;
 
 	TAILQ_INIT(&refs);
-
-	client_fd = imsg_get_fd(imsg);
-	if (client_fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != 0)
@@ -268,13 +263,16 @@ list_refs(struct imsg *imsg)
 	}
 	repo_write.refs_listed = 1;
 
-	client->fd = client_fd;
+	client->fd = imsg_get_fd(imsg);
+	if (client->fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
 	client->nref_updates = 0;
 	client->nref_del = 0;
 	client->nref_new = 0;
 	client->nref_move = 0;
 
-	imsg_init(&ibuf, client_fd);
+	imsg_init(&ibuf, client->fd);
 
 	err = got_ref_list(&refs, repo_write.repo, "",
 	    got_ref_cmp_by_name, NULL);
@@ -1240,7 +1238,7 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 
 	err = got_delta_cache_alloc(&pack->delta_cache);
 	if (err)
-		return err;
+		goto done;
 
 	for (i = 0; i < nitems(repo_tempfiles); i++) {
 		struct repo_tempfile *t = &repo_tempfiles[i];
