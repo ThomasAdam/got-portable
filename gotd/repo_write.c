@@ -2330,19 +2330,26 @@ repo_write_dispatch(int fd, short event, void *arg)
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
 			fatal("imsg_read error");
-		if (n == 0)	/* Connection closed. */
+		if (n == 0) {	/* Connection closed. */
 			shut = 1;
+			goto done;
+		}
 	}
 
 	if (event & EV_WRITE) {
 		n = msgbuf_write(&ibuf->w);
 		if (n == -1 && errno != EAGAIN)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed. */
+		if (n == 0) {	/* Connection closed. */
 			shut = 1;
+			goto done;
+		}
 	}
 
-	while (err == NULL && check_cancelled(NULL) == NULL) {
+	while (err == NULL) {
+		err = check_cancelled(NULL);
+		if (err)
+			break;
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get", __func__);
 		if (n == 0)	/* No more messages. */
@@ -2354,19 +2361,18 @@ repo_write_dispatch(int fd, short event, void *arg)
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
 
 		imsg_free(&imsg);
 	}
 
-	if (!shut && check_cancelled(NULL) == NULL) {
-		if (err &&
-		    gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
-		        client->id, err) == -1) {
-			log_warnx("could not send error to parent: %s",
-			    err->msg);
-		}
+	if (err && gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
+	    client->id, err) == -1)
+		log_warnx("could not send error to parent: %s", err->msg);
+done:
+	if (!shut) {
 		gotd_imsg_event_add(iev);
 	} else {
 		/* This pipe is dead. Remove its event handler */
