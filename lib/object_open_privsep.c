@@ -360,6 +360,8 @@ start_child(struct got_repository *repo, int type)
 	pid = fork();
 	if (pid == -1) {
 		err = got_error_from_errno("fork");
+		close(imsg_fds[0]);
+		close(imsg_fds[1]);
 		free(ibuf);
 		return err;
 	}
@@ -370,6 +372,7 @@ start_child(struct got_repository *repo, int type)
 
 	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
+		close(imsg_fds[0]);
 		free(ibuf);
 		return err;
 	}

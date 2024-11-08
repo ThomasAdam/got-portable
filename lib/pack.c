@@ -765,6 +765,8 @@ got_pack_start_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 	pid = fork();
 	if (pid == -1) {
 		err = got_error_from_errno("fork");
+		close(imsg_fds[0]);
+		close(imsg_fds[1]);
 		goto done;
 	} else if (pid == 0) {
 		set_max_datasize();
@@ -773,8 +775,11 @@ got_pack_start_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) == -1)
-		return got_error_from_errno("close");
+	if (close(imsg_fds[1]) == -1) {
+		err = got_error_from_errno("close");
+		close(imsg_fds[0]);
+		goto done;
+	}
 	pack->privsep_child->imsg_fd = imsg_fds[0];
 	pack->privsep_child->pid = pid;
 	imsg_init(ibuf, imsg_fds[0]);
