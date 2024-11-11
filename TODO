@@ -36,6 +36,8 @@ got:
   from C++ to C: https://github.com/lemire/EWAHBoolArray
   EWAH author Daniel Lemire generously relicensed his code to dual Apache2+MIT
   to make this possible. The C code we publish should use the MIT license.
+- 'got send' should support the equivalent to 'got fetch -R', allowing
+  arbitrary references to be sent
 
 tog:
 - make 'tog log' respond to key presses while 'loading...' history; loading
