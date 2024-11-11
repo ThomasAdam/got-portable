@@ -553,6 +553,84 @@ test_tag_changed() {
 	test_done "$testroot" "$ret"
 }
 
+test_file_empty() {
+	local testroot=`test_init file_empty 1`
+
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo -n "" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'empty file' > /dev/null)
+	local commit_id=`git_show_head $testroot/repo-clone`
+	local author_time=`git_show_author_time $testroot/repo-clone`
+
+	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
+		| timeout 5 nc -l "$GOTD_TEST_SMTP_PORT" > $testroot/stdout) &
+
+	sleep 1 # server starts up
+
+	got send -b main -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	wait %1 # wait for nc -l
+
+	short_commit_id=`trim_obj_id 12 $commit_id`
+	HOSTNAME=`hostname`
+	printf "HELO localhost\r\n" > $testroot/stdout.expected
+	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
+		>> $testroot/stdout.expected
+	printf "RCPT TO:<${GOTD_DEVUSER}>\r\n" >> $testroot/stdout.expected
+	printf "DATA\r\n" >> $testroot/stdout.expected
+	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
+	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
+	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
+	printf "${GOTD_DEVUSER} changed refs/heads/main: $short_commit_id\r\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf "commit $commit_id\n" >> $testroot/stdout.expected
+	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
+	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 12\n" >> $testroot/stdout.expected
+	printf " \n" >> $testroot/stdout.expected
+	printf " empty file\n \n" >> $testroot/stdout.expected
+	printf " M  alpha  |  0+  1-\n\n"  >> $testroot/stdout.expected
+	printf "1 file changed, 0 insertions(+), 1 deletion(-)\n\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf ".\r\n" >> $testroot/stdout.expected
+	printf "QUIT\r\n" >> $testroot/stdout.expected
+
+	grep -v ^Date $testroot/stdout > $testroot/stdout.filtered
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_file_changed
 run_test test_many_commits_not_summarized
@@ -561,3 +639,4 @@ run_test test_branch_created
 run_test test_branch_removed
 run_test test_tag_created
 run_test test_tag_changed
+run_test test_file_empty
