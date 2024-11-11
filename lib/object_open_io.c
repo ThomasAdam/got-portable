@@ -802,7 +802,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
-	if (outbuf) {
+	if (outbuf && size > 0) {
 		(*blob)->f = fmemopen(outbuf, size, "rb");
 		if ((*blob)->f == NULL) {
 			err = got_error_from_errno("fmemopen");
