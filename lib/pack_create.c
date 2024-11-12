@@ -1086,6 +1086,18 @@ append_id(struct got_object_id *id, void *data, void *arg)
 }
 
 static const struct got_error *
+free_meta(struct got_object_id *id, void *data, void *arg)
+{
+	struct got_pack_meta *meta = data;
+	if (meta){
+		clear_meta(meta);
+		free(meta);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 queue_commit_or_tag_id(struct got_object_id *id, intptr_t color,
     struct got_object_id_queue *ids, struct got_repository *repo)
 {
@@ -1953,6 +1965,7 @@ got_pack_create(struct got_object_id *packhash, int packfd, FILE *delta_cache,
 done:
 	free_nmeta(deltify.meta, deltify.nmeta);
 	free_nmeta(reuse.meta, reuse.nmeta);
+	got_object_idset_for_each(idset, free_meta, NULL);
 	got_object_idset_free(idset);
 	got_repo_unpin_pack(repo);
 	return err;
