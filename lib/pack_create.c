@@ -1086,11 +1086,9 @@ static const struct got_error *
 free_meta(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_pack_meta *meta = data;
-	if (meta){
-		clear_meta(meta);
-		free(meta);
-	}
 
+	clear_meta(meta);
+	free(meta);
 	return NULL;
 }
 
