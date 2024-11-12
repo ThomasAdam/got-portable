@@ -449,6 +449,50 @@ dd {
 	padding-left: 10px;
 }
 
+/* mobile (<=680px) */
+@media(max-width:680px) {
+    #index_header {
+        display: none;
+    }
+    .index_wrapper {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    .index_wrapper .index_project,
+    .index_wrapper .index_project_description {
+        padding-bottom: 0;
+        width: 100%;
+    }
+    .index_wrapper .index_project {
+        font-weight: bold;
+        text-decoration: underline;
+    }
+    .index_wrapper .index_project_owner,
+    .index_wrapper .index_project_age {
+        opacity: 0.7;
+        width: 50%;
+    }
+    .index_wrapper .index_project_age {
+        text-align: right;
+    }
+
+    #summary_wrapper {
+        padding: 4px 0;
+    }
+    #summary_wrapper dt,
+    #summary_wrapper dd {
+        width: 100%;
+    }
+    #summary_wrapper dt {
+        font-weight: bold;
+        padding-bottom: 0;
+    }
+    #summary_wrapper dd {
+        padding-bottom: 8px;
+    }
+}
+
+
 /* dark theme */
 @media (prefers-color-scheme: dark) {
 	body {
