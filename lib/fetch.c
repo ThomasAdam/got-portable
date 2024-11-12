@@ -308,9 +308,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		if (packfile_size_cur <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
 			packfile_size_cur = 0;
 		if (!done && refname && id) {
-			err = got_pathlist_insert(NULL, refs, refname, id);
+			err = got_pathlist_insert(&pe, refs, refname, id);
 			if (err)
 				goto done;
+			if (pe == NULL)
+				free(id);
 		} else if (!done && server_progress) {
 			char *p;
 			/*
