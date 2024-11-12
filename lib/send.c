@@ -172,6 +172,7 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 	const struct got_error *err;
 	struct got_reference *ref;
 	struct got_object_id *id = NULL;
+	struct got_pathlist_entry *new = NULL;
 	int obj_type;
 
 	err = got_ref_open(&ref, repo, refname, 0);
@@ -200,11 +201,11 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 		goto done;
 	}
 
-	err = got_pathlist_insert(NULL, refs, target_refname, id);
+	err = got_pathlist_insert(&new, refs, target_refname, id);
 done:
 	if (ref)
 		got_ref_close(ref);
-	if (err)
+	if (err || new == NULL /* duplicate */)
 		free(id);
 	return err;
 }
