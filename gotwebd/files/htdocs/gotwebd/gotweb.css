@@ -274,6 +274,8 @@ header.subtitle h2 {
 }
 .index_project {
 	width: 20%;
+	font-weight: bold;
+	text-decoration: underline;
 }
 .index_project_description {
 	width: 30%;
@@ -283,6 +285,7 @@ header.subtitle h2 {
 }
 .index_project_age {
 	width: 25%;
+	opacity: 0.7;
 }
 .index_project a {
 	color: #444444;
@@ -463,13 +466,8 @@ dd {
         padding-bottom: 0;
         width: 100%;
     }
-    .index_wrapper .index_project {
-        font-weight: bold;
-        text-decoration: underline;
-    }
     .index_wrapper .index_project_owner,
     .index_wrapper .index_project_age {
-        opacity: 0.7;
         width: 50%;
     }
     .index_wrapper .index_project_age {
