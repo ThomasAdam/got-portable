@@ -196,7 +196,7 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 	case GOT_OBJ_TYPE_TAG:
 		break;
 	default:
-		err = got_error_fmt(GOT_ERR_OBJ_TYPE," cannot send %s",
+		err = got_error_fmt(GOT_ERR_OBJ_TYPE, "cannot send %s",
 		    refname);
 		goto done;
 	}
