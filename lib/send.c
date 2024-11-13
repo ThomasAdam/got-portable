@@ -202,10 +202,13 @@ insert_sendable_ref(struct got_pathlist_head *refs, const char *refname,
 	}
 
 	err = got_pathlist_insert(&new, refs, target_refname, id);
+	if (new == NULL && err == NULL)
+		err = got_error(GOT_ERR_REF_DUP_ENTRY);
+
 done:
 	if (ref)
 		got_ref_close(ref);
-	if (err || new == NULL /* duplicate */)
+	if (err)
 		free(id);
 	return err;
 }
@@ -388,8 +391,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			}
 		}
 		err = insert_sendable_ref(&have_refs, branchname, s, repo);
-		if (err)
-			goto done;
+		if (err) {
+			if (err->code != GOT_ERR_REF_DUP_ENTRY)
+				goto done;
+			err = NULL;
+			free(s);
+		}
 		s = NULL;
 	}
 
@@ -424,8 +431,12 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			}
 		}
 		err = insert_sendable_ref(&have_refs, s, s, repo);
-		if (err)
-			goto done;
+		if (err) {
+			if (err->code != GOT_ERR_REF_DUP_ENTRY)
+				goto done;
+			err = NULL;
+			free(s);
+		}
 		s = NULL;
 	}
 

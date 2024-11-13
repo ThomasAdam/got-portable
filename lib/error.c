@@ -239,6 +239,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_BUNDLE_FORMAT, "unknown git bundle version" },
 	{ GOT_ERR_BAD_KEYWORD, "invalid commit keyword" },
 	{ GOT_ERR_UNKNOWN_CAPA, "unknown capability" },
+	{ GOT_ERR_REF_DUP_ENTRY, "duplicate reference entry" },
 };
 
 static struct got_custom_error {
