@@ -1,3 +1,10 @@
+* got 0.105; 2024-11-14
+- fix bogus "branch on server has different ancestry" errors from 'got send'
+- do not try to merge binary files during (un)stage -p and revert -p
+- fix gotd notifications about changes involving empty files
+- minor gotwebd.css styling changes
+- plug several memory and file-descriptor leaks
+
 * got 0.104; 2024-10-22
   see git repository history for per-change authorship information
 - gotd.conf: document the macro syntax
