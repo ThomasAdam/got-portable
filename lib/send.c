@@ -593,6 +593,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			if (err) {
 				if (err->code != GOT_ERR_NOT_REF)
 					goto done;
+				err = NULL;
 			} else {
 				err = got_ref_resolve(&their_ids[ntheirs],
 				    repo, ref);

@@ -1732,6 +1732,101 @@ EOF
 
 }
 
+test_send_with_unknown_ref_on_server() {
+	local testroot=`test_init send_with_unknown_ref_on_server`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Add a commit on a new branch in the source repo.
+	# To trigger a known bug in 'got send', this branch reference must
+	# alphabetically sort last.
+	git -C $testroot/repo checkout -q -b zzz 
+	echo "modified alpha" > $testroot/repo/alpha
+	git -C $testroot/repo rm -q beta
+	(cd $testroot/repo && ln -s epsilon/zeta symlink)
+	git -C $testroot/repo add symlink
+	echo "new file alpha" > $testroot/repo/new
+	git -C $testroot/repo add new
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	# This would error "got: reference refs/remotes/origin/zzz not found"
+	got send -r $testroot/repo-clone > $testroot/stdout \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Connecting to \"origin\" ssh://127.0.0.1$testroot/repo" \
+		> $testroot/stdout.expected
+	echo "Already up-to-date" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/zzz" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/zzz: $commit_id2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret=$?
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_send_basic			no-sha256
 run_test test_send_rebase_required		no-sha256
@@ -1749,3 +1844,4 @@ run_test test_send_config			no-sha256
 run_test test_send_gitconfig			no-sha256
 run_test test_send_rejected			no-sha256
 run_test test_send_basic_http			no-sha256
+run_test test_send_with_unknown_ref_on_server	no-sha256
