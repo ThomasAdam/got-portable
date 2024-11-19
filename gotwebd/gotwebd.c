@@ -210,7 +210,7 @@ gotwebd_sighdlr(int sig, short event, void *arg)
 static int
 spawn_socket_process(struct gotwebd *env, const char *argv0, int n)
 {
-	const char	*argv[6];
+	const char	*argv[8];
 	int		 argc = 0;
 	int		 p[2];
 	pid_t		 pid;
@@ -238,6 +238,10 @@ spawn_socket_process(struct gotwebd *env, const char *argv0, int n)
 
 	argv[argc++] = argv0;
 	argv[argc++] = "-S";
+	if (strcmp(env->gotwebd_conffile, GOTWEBD_CONF) != 0) {
+		argv[argc++] = "-f";
+		argv[argc++] = env->gotwebd_conffile;
+	}
 	if (env->gotwebd_debug)
 		argv[argc++] = "-d";
 	if (env->gotwebd_verbose > 0)
