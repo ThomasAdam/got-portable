@@ -1211,7 +1211,6 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	} repo_tempfiles[3] = { { - 1, - 1 }, { - 1, - 1 }, { - 1, - 1 }, };
 	int i;
 	size_t datalen;
-	struct imsgbuf ibuf;
 	struct got_ratelimit rl;
 	struct got_pack *pack = NULL;
 	off_t pack_filesize = 0;
@@ -1229,8 +1228,6 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 
 	if (client->pack_pipe == -1 || client->packidx_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
-
-	imsg_init(&ibuf, client->fd);
 
 	pack = &client->pack;
 	memset(pack, 0, sizeof(*pack));
@@ -1266,10 +1263,6 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 		}
 		tempfiles[i] = f;
 	}
-
-	err = gotd_imsg_flush(&ibuf);
-	if (err)
-		goto done;
 
 	log_debug("receiving pack data");
 	unpack_err = recv_packdata(&pack_filesize, &nobj,
@@ -1355,7 +1348,6 @@ done:
 	}
 	if (err)
 		got_pack_close(pack);
-	imsg_clear(&ibuf);
 	return err;
 }
 
