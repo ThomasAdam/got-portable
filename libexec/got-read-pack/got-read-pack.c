@@ -2156,7 +2156,6 @@ main(int argc, char *argv[])
 	if (pack)
 		got_pack_close(pack);
 	got_object_cache_close(&objcache);
-	imsgbuf_clear(&ibuf);
 	if (basefile && fclose(basefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (accumfile && fclose(accumfile) == EOF && err == NULL)
@@ -2169,6 +2168,7 @@ main(int argc, char *argv[])
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
+	imsgbuf_clear(&ibuf);
 	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;

@@ -218,13 +218,13 @@ done:
 			break;
 	}
 
-	imsgbuf_clear(&ibuf);
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {
 			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
+	imsgbuf_clear(&ibuf);
 	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
