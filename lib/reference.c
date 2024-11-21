@@ -644,6 +644,12 @@ got_ref_get_mtime(struct got_reference *ref)
 	return ref->mtime;
 }
 
+time_t
+got_ref_get_cached_committer_time(struct got_reference *ref)
+{
+	return ref->committer_time;
+}
+
 const struct got_error *
 got_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
     struct got_reference* re2)

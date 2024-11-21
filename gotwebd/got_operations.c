@@ -116,59 +116,82 @@ got_get_repo_owner(char **owner, struct request *c)
 	return NULL;
 }
 
+static const struct got_error *
+get_ref_commit_timestamp(time_t *timestamp,
+    struct got_reference *ref, struct got_repository *repo)
+{
+	const struct got_error *error;
+	struct got_object_id *id = NULL;
+	int obj_type;
+	struct got_commit_object *commit = NULL;
+
+	/* We might have a cached timestamp available. */
+	*timestamp = got_ref_get_cached_committer_time(ref);
+	if (*timestamp != 0)
+		return NULL;
+
+	error = got_ref_resolve(&id, repo, ref);
+	if (error)
+		return error;
+
+	error = got_object_get_type(&obj_type, repo, id);
+	if (error || obj_type != GOT_OBJ_TYPE_COMMIT)
+		goto done;
+
+	error = got_object_open_as_commit(&commit, repo, id);
+	if (error)
+		goto done;
+
+	*timestamp = got_object_commit_get_committer_time(commit);
+done:
+	free(id);
+	if (commit)
+		got_object_commit_close(commit);
+
+	return error;
+}
+
+/*
+ * Find the youngest branch tip in the repository, or the age of
+ * a specific branch tip if a name was provided by the caller.
+ */
 const struct got_error *
 got_get_repo_age(time_t *repo_age, struct request *c, const char *refname)
 {
 	const struct got_error *error = NULL;
 	struct transport *t = c->t;
 	struct got_repository *repo = t->repo;
-	struct got_commit_object *commit = NULL;
-	struct got_reflist_head refs;
-	struct got_reflist_entry *re;
-	time_t committer_time = 0, cmp_time = 0;
-
-	TAILQ_INIT(&refs);
 
 	*repo_age = 0;
 
-	error = got_ref_list(&refs, repo, "refs/heads",
-	    got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
+	if (refname) {
+		struct got_reference *ref;
 
-	/*
-	 * Find the youngest branch tip in the repository, or the age of
-	 * the a specific branch tip if a name was provided by the caller.
-	 */
-	TAILQ_FOREACH(re, &refs, entry) {
-		struct got_object_id *id = NULL;
-
-		if (refname && strcmp(got_ref_get_name(re->ref), refname) != 0)
-			continue;
-
-		error = got_ref_resolve(&id, repo, re->ref);
+		error = got_ref_open(&ref, repo, refname, 0);
 		if (error)
-			goto done;
+			return error;
 
-		error = got_object_open_as_commit(&commit, repo, id);
-		free(id);
+		error = get_ref_commit_timestamp(repo_age, ref, repo);
+		got_ref_close(ref);
+	} else {
+		struct got_reflist_head refs;
+		struct got_reflist_entry *re;
+
+		TAILQ_INIT(&refs);
+
+		error = got_ref_list(&refs, repo, "refs/heads",
+		    got_ref_cmp_by_commit_timestamp_descending, repo);
 		if (error)
-			goto done;
+			return error;
 
-		committer_time =
-		    got_object_commit_get_committer_time(commit);
-		got_object_commit_close(commit);
-		if (cmp_time < committer_time)
-			cmp_time = committer_time;
-
-		if (refname)
-			break;
+		re = TAILQ_FIRST(&refs);
+		if (re) {
+			error = get_ref_commit_timestamp(repo_age,
+			    re->ref, repo);
+		}
+		got_ref_list_free(&refs);
 	}
 
-	if (cmp_time != 0)
-		*repo_age = cmp_time;
- done:
-	got_ref_list_free(&refs);
 	return error;
 }
 
