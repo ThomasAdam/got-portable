@@ -68,7 +68,7 @@ gotd_imsg_flush(struct imsgbuf *ibuf)
 			break;
 
 		if (imsgbuf_write(ibuf) == -1) {
-			err = got_error_from_errno("imsgbuf_flush");
+			err = got_error_from_errno("imsgbuf_write");
 			break;
 		}
 	}
