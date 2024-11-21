@@ -1212,7 +1212,10 @@ session_dispatch_client(int fd, short events, void *arg)
 			 * The client has closed its socket.  This can
 			 * happen when Git clients are done sending
 			 * pack file data.
+			 * Pending notifications should still be sent.
 			 */
+			if (STAILQ_FIRST(&notifications) != NULL)
+				return; 
 			if (errno == EPIPE) {
 				disconnect(client);
 				return;
@@ -1236,6 +1239,14 @@ session_dispatch_client(int fd, short events, void *arg)
 			return;
 		}
 		if (n == 0) {
+			/*
+			 * The client has closed its socket.  This can
+			 * happen when Git clients are done sending
+			 * pack file data.
+			 * Pending notifications should still be sent.
+			 */
+			if (STAILQ_FIRST(&notifications) != NULL)
+				return; 
 			err = got_error(GOT_ERR_EOF);
 			disconnect_on_error(client, err);
 			return;
