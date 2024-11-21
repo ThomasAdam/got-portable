@@ -95,7 +95,7 @@ gotd_imsg_recv(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 		if (n == -1)
 			return got_error_from_errno("imsg_get");
 		if (n == 0)
-			abort();
+			return got_error(GOT_ERR_PRIVSEP_READ);
 	}
 
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
