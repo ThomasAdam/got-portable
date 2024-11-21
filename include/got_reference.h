@@ -66,6 +66,17 @@ const char *got_ref_get_symref_target(struct got_reference *);
 time_t got_ref_get_mtime(struct got_reference *);
 
 /*
+ * Get the modification timestamp of the commit pointed at by the
+ * given reference. Will return zero if the commit timestamp is
+ * unknown or if the reference does not point at a commit.
+ *
+ * The cached timestamp will be known after got_ref_list() was called
+ * with either got_ref_cmp_by_commit_timestamp_descending() or
+ * with got_ref_cmp_tags().
+ */
+time_t got_ref_get_cached_committer_time(struct got_reference *);
+
+/*
  * Create a duplicate copy of a reference.
  * The caller must dispose of this copy with got_ref_close().
  */
