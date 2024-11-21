@@ -434,7 +434,7 @@ main(int argc, char *argv[])
 		usage();
 
 	/* used by the regression test suite */
-	timeoutstr = getenv("GOT_NOTIFY_EMAIL_TIMEOUT");
+	timeoutstr = getenv("GOT_NOTIFY_TIMEOUT");
 	if (timeoutstr) {
 		smtp_timeout = strtonum(timeoutstr, 0, 600, &errstr);
 		if (errstr != NULL)
