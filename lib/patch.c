@@ -1075,7 +1075,11 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 	imsg_fds[1] = -1;
-	imsg_init(ibuf, imsg_fds[0]);
+	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(ibuf);
 
 	err = send_patch(ibuf, fd);
 	fd = -1;
@@ -1150,7 +1154,7 @@ done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (ibuf != NULL)
-		imsg_clear(ibuf);
+		imsgbuf_clear(ibuf);
 	if (imsg_fds[0] != -1 && close(imsg_fds[0]) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)

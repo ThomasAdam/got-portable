@@ -274,7 +274,9 @@ list_refs(struct imsg *imsg)
 	client->nref_new = 0;
 	client->nref_move = 0;
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = got_ref_list(&refs, repo_write.repo, "",
 	    got_ref_cmp_by_name, NULL);
@@ -320,7 +322,7 @@ list_refs(struct imsg *imsg)
 	err = gotd_imsg_flush(&ibuf);
 done:
 	got_ref_list_free(&refs);
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -629,11 +631,15 @@ recv_ref_update(struct imsg *imsg)
 	if (datalen != sizeof(iref) + iref.name_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd))
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	refname = strndup(imsg->data + sizeof(iref), iref.name_len);
-	if (refname == NULL)
-		return got_error_from_errno("strndup");
+	if (refname == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
 
 	ref_update = calloc(1, sizeof(*ref_update));
 	if (ref_update == NULL) {
@@ -1163,7 +1169,9 @@ report_pack_status(const struct got_error *unpack_err)
 	const char *unpack_ok = "unpack ok\n";
 	size_t len;
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd))
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	if (unpack_err)
 		istatus.reason_len = strlen(unpack_err->msg);
@@ -1193,7 +1201,7 @@ report_pack_status(const struct got_error *unpack_err)
 
 	err = gotd_imsg_flush(&ibuf);
 done:
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -1232,8 +1240,10 @@ recv_packfile(int *have_packfile, struct imsg *imsg)
 	pack = &client->pack;
 	memset(pack, 0, sizeof(*pack));
 	pack->fd = imsg_get_fd(imsg);
-	if (pack->fd == -1)
-		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+	if (pack->fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
 
 	err = got_delta_cache_alloc(&pack->delta_cache);
 	if (err)
@@ -2164,18 +2174,15 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	int shut = 0, have_packfile = 0;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed. */
 			shut = 1;
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed. */
-			shut = 1;
 	}
 
 	for (;;) {
@@ -2297,7 +2304,9 @@ recv_connect(struct imsg *imsg)
 	if (repo_write.session_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&iev->ibuf, repo_write.session_fd);
+	if (imsgbuf_init(&iev->ibuf, repo_write.session_fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&iev->ibuf);
 	iev->handler = repo_write_dispatch_session;
 	iev->events = EV_READ;
 	iev->handler_arg = NULL;
@@ -2320,7 +2329,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 	struct repo_write_client *client = &repo_write_client;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {	/* Connection closed. */
 			shut = 1;
@@ -2329,13 +2338,8 @@ repo_write_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {	/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	while (err == NULL) {
@@ -2427,7 +2431,11 @@ repo_write_main(const char *title, const char *repo_path,
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
 
-	imsg_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	if (imsgbuf_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&iev.ibuf);
 	iev.handler = repo_write_dispatch;
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;

@@ -476,7 +476,11 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		goto done;
 	}
 	imsg_sendfds[1] = -1;
-	imsg_init(&sendibuf, imsg_sendfds[0]);
+	if (imsgbuf_init(&sendibuf, imsg_sendfds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&sendibuf);
 	nsendfd = dup(sendfd);
 	if (nsendfd == -1) {
 		err = got_error_from_errno("dup");

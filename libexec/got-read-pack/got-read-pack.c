@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 
+#include <err.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
@@ -1991,7 +1992,11 @@ main(int argc, char *argv[])
 
 	signal(SIGINT, catch_sigint);
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = got_object_cache_init(&objcache, GOT_OBJECT_CACHE_TYPE_OBJ);
 	if (err) {
@@ -2141,7 +2146,7 @@ main(int argc, char *argv[])
 	if (pack)
 		got_pack_close(pack);
 	got_object_cache_close(&objcache);
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	if (basefile && fclose(basefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (accumfile && fclose(accumfile) == EOF && err == NULL)

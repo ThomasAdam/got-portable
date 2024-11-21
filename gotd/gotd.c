@@ -312,7 +312,7 @@ proc_done(struct gotd_child_proc *proc)
 
 	if (proc->iev.ibuf.fd != -1) {
 		event_del(&proc->iev.ev);
-		msgbuf_clear(&proc->iev.ibuf.w);
+		imsgbuf_clear(&proc->iev.ibuf);
 		close(proc->iev.ibuf.fd);
 	}
 
@@ -370,7 +370,7 @@ disconnect(struct gotd_client *client)
 
 	slot = client_hash(client->id) % nitems(gotd_clients);
 	STAILQ_REMOVE(&gotd_clients[slot], client, gotd_client, entry);
-	imsg_clear(&client->iev.ibuf);
+	imsgbuf_clear(&client->iev.ibuf);
 	event_del(&client->iev.ev);
 	evtimer_del(&client->tmo);
 	if (client->fd != -1)
@@ -390,9 +390,12 @@ disconnect_on_error(struct gotd_client *client, const struct got_error *err)
 	if (err->code != GOT_ERR_EOF) {
 		log_warnx("uid %d: %s", client->euid, err->msg);
 		if (client->fd != -1) {
-			imsg_init(&ibuf, client->fd);
-			gotd_imsg_send_error(&ibuf, 0, PROC_GOTD, err);
-			imsg_clear(&ibuf);
+			if (imsgbuf_init(&ibuf, client->fd) != -1) {
+				gotd_imsg_send_error(&ibuf, 0, PROC_GOTD,
+				    err);
+				imsgbuf_clear(&ibuf);
+			} else
+				log_warn("%s: imsgbuf_init failed", __func__);
 		}
 	}
 	disconnect(client);
@@ -506,7 +509,6 @@ send_info(struct gotd_client *client)
 static const struct got_error *
 stop_gotd(struct gotd_client *client)
 {
-
 	if (client->euid != 0)
 		return got_error_set_errno(EPERM, "stop");
 
@@ -579,48 +581,51 @@ gotd_request(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		while (ibuf->w.queued) {
-			n = msgbuf_write(&ibuf->w);
-			if (n == -1 && errno == EPIPE) {
-				/*
-				 * The client has closed its socket.
-				 * This can happen when Git clients are
-				 * done sending pack file data.
-				 */
-				msgbuf_clear(&ibuf->w);
-				continue;
-			} else if (n == -1 && errno != EAGAIN) {
-				err = got_error_from_errno("msgbuf_write");
-				disconnect_on_error(client, err);
+		if (imsgbuf_write(ibuf) == -1) {
+			/*
+			 * The client has closed its socket.  This can
+			 * happen when Git clients are done sending
+			 * pack file data.
+			 */
+			if (errno == EPIPE) {
+				disconnect(client);
 				return;
 			}
-			if (n == 0) {
-				/* Connection closed. */
-				err = got_error(GOT_ERR_EOF);
-				disconnect_on_error(client, err);
-				return;
-			}
+			err = got_error_from_errno("imsgbuf_write");
+			disconnect_on_error(client, err);
+			return;
 		}
 
-		/* Disconnect gotctl(8) now that messages have been sent. */
-		if (!client_is_reading(client) && !client_is_writing(client)) {
+		/* Disconnect gotctl(8) if all messages have been sent. */
+		if (!client_is_reading(client) && !client_is_writing(client) &&
+		    imsgbuf_queuelen(ibuf) == 0) {
 			disconnect(client);
 			return;
 		}
 	}
 
-	if ((events & EV_READ) == 0)
-		return;
-
-	memset(&imsg, 0, sizeof(imsg));
+	if (events & EV_READ) {
+		n = imsgbuf_read(ibuf);
+		if (n == -1) {
+			err = got_error_from_errno("imsgbuf_read");
+			disconnect_on_error(client, err);
+			return;
+		}
+		if (n == 0) {
+			 err = got_error(GOT_ERR_EOF);
+			 disconnect_on_error(client, err);
+			 return;
+		}
+	}
 
 	while (err == NULL) {
-		err = gotd_imsg_recv(&imsg, ibuf, 0);
-		if (err) {
-			if (err->code == GOT_ERR_PRIVSEP_READ)
-				err = NULL;
+		n = imsg_get(ibuf, &imsg);
+		if (n == -1) {
+			err = got_error_from_errno("imsg_get");
 			break;
 		}
+		if (n == 0)
+			break;
 
 		evtimer_del(&client->tmo);
 
@@ -666,7 +671,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	const struct got_error *err = NULL;
 	struct gotd_imsg_connect iconnect;
 	size_t datalen;
-	int s = -1;
 	struct gotd_client *client = NULL;
 
 	*client_id = 0;
@@ -675,12 +679,6 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	if (datalen != sizeof(iconnect))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iconnect, imsg->data, sizeof(iconnect));
-
-	s = imsg_get_fd(imsg);
-	if (s == -1) {
-		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-		goto done;
-	}
 
 	if (find_client(iconnect.client_id)) {
 		err = got_error_msg(GOT_ERR_CLIENT_ID, "duplicate client ID");
@@ -697,13 +695,20 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 
 	client->state = GOTD_CLIENT_STATE_NEW;
 	client->id = iconnect.client_id;
-	client->fd = s;
-	s = -1;
 	/* The auth process will verify UID/GID for us. */
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
 
-	imsg_init(&client->iev.ibuf, client->fd);
+	client->fd = imsg_get_fd(imsg);
+	if (client->fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
+	if (imsgbuf_init(&client->iev.ibuf, client->fd) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&client->iev.ibuf);
 	client->iev.handler = gotd_request;
 	client->iev.events = EV_READ;
 	client->iev.handler_arg = client;
@@ -718,7 +723,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	log_debug("%s: new client uid %d connected on fd %d", __func__,
 	    client->euid, client->fd);
 done:
-	if (err) {
+	if (err && client) {
 		struct gotd_child_proc *listen_proc = gotd.listen_proc;
 		struct gotd_imsg_disconnect idisconnect;
 
@@ -728,8 +733,9 @@ done:
 		    &idisconnect, sizeof(idisconnect)) == -1)
 			log_warn("imsg compose DISCONNECT");
 
-		if (s != -1)
-			close(s);
+		if (client->fd != -1)
+			close(client->fd);
+		free(client);
 	}
 
 	return err;
@@ -756,7 +762,7 @@ kill_proc(struct gotd_child_proc *proc, int fatal)
 
 	if (proc->iev.ibuf.fd != -1) {
 		event_del(&proc->iev.ev);
-		msgbuf_clear(&proc->iev.ibuf.w);
+		imsgbuf_clear(&proc->iev.ibuf);
 		close(proc->iev.ibuf.fd);
 		proc->iev.ibuf.fd = -1;
 	}
@@ -1050,7 +1056,7 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 		fatalx("%s: unexpected fd %d", __func__, fd);
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -1060,14 +1066,8 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	for (;;) {
@@ -1137,7 +1137,7 @@ gotd_dispatch_notifier(int fd, short event, void *arg)
 		fatalx("%s: unexpected fd %d", __func__, fd);
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -1147,14 +1147,8 @@ gotd_dispatch_notifier(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	for (;;) {
@@ -1216,7 +1210,7 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		fatalx("cannot find auth child process for fd %d", fd);
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -1226,13 +1220,8 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-		}
 		goto done;
 	}
 
@@ -1362,8 +1351,8 @@ connect_session(struct gotd_client *client)
 	 * We are no longer interested in messages from this client.
 	 * Further client requests will be handled by the session process.
 	 */
-	msgbuf_clear(&client->iev.ibuf.w);
-	imsg_clear(&client->iev.ibuf);
+	imsgbuf_clear(&client->iev.ibuf);
+	imsgbuf_clear(&client->iev.ibuf);
 	event_del(&client->iev.ev);
 	client->fd = -1; /* will be closed via copy in client->iev.ibuf.fd */
 
@@ -1390,7 +1379,7 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -1400,14 +1389,8 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	proc = client->session;
@@ -1551,7 +1534,7 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -1561,14 +1544,8 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	proc = client->repo;
@@ -1724,7 +1701,9 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	proc->pid = start_child(proc->type, NULL, argv0, confpath,
 	    proc->pipe[1], daemonize, verbosity);
-	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
 	proc->iev.handler = gotd_dispatch_listener;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
@@ -1753,7 +1732,9 @@ start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	proc->pid = start_child(proc->type, NULL, argv0, confpath,
 	    proc->pipe[1], daemonize, verbosity);
-	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
 	proc->iev.handler = gotd_dispatch_notifier;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
@@ -1793,7 +1774,9 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
 	    confpath, proc->pipe[1], daemonize, verbosity);
-	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
 	log_debug("proc %s %s is on fd %d",
 	    gotd_proc_names[proc->type], proc->repo_path,
 	    proc->pipe[0]);
@@ -1839,7 +1822,9 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
 	    confpath, proc->pipe[1], daemonize, verbosity);
-	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
 	log_debug("proc %s %s is on fd %d",
 	    gotd_proc_names[proc->type], proc->repo_path,
 	    proc->pipe[0]);
@@ -1894,7 +1879,9 @@ start_auth_child(struct gotd_client *client, int required_auth,
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
 	    confpath, proc->pipe[1], daemonize, verbosity);
-	imsg_init(&proc->iev.ibuf, proc->pipe[0]);
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
 	log_debug("proc %s %s is on fd %d",
 	    gotd_proc_names[proc->type], proc->repo_path,
 	    proc->pipe[0]);
@@ -2406,7 +2393,7 @@ main(int argc, char **argv)
 		if (imsg_compose(imsgbuf, GOTD_IMSG_SECRETS, 0, 0, -1,
 		    &n, sizeof(n)) == -1)
 			fatal("imsg_compose GOTD_IMSG_SECRETS");
-		if (imsg_flush(imsgbuf))
+		if (imsgbuf_flush(imsgbuf))
 			fatal("imsg_flush");
 
 		for (i = 0; i < n; ++i) {
@@ -2432,7 +2419,7 @@ main(int argc, char **argv)
 			if (imsg_composev(imsgbuf, GOTD_IMSG_SECRET,
 			    0, 0, -1, iov, 5) == -1)
 				fatal("imsg_composev GOTD_IMSG_SECRET");
-			if (imsg_flush(imsgbuf))
+			if (imsgbuf_flush(imsgbuf))
 				fatal("imsg_flush");
 		}
 

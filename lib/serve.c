@@ -788,7 +788,9 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 	int packfd = -1;
 	size_t pack_chunksize;
 
-	imsg_init(&ibuf, gotd_sock);
+	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = announce_refs(outfd, &ibuf, 1, repo_path, chattygot);
 	if (err)
@@ -929,7 +931,7 @@ serve_read(int infd, int outfd, int gotd_sock, const char *repo_path,
 		}
 	}
 done:
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err)
@@ -1258,7 +1260,9 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 	struct imsg imsg;
 	int report_status = 0;
 
-	imsg_init(&ibuf, gotd_sock);
+	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
+		return got_error_from_errno("imsgbuf_init");
+
 	memset(&imsg, 0, sizeof(imsg));
 
 	err = announce_refs(outfd, &ibuf, 0, repo_path, chattygot);
@@ -1376,7 +1380,7 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 		imsg_free(&imsg);
 	}
 done:
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	if (err)
 		echo_error(err, outfd, chattygot);
 	return err;

@@ -19,6 +19,7 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 
+#include <err.h>
 #include <stdint.h>
 #include <imsg.h>
 #include <limits.h>
@@ -58,7 +59,11 @@ main(int argc, char *argv[])
 
 	signal(SIGINT, catch_sigint);
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 
 #ifndef PROFILE
 	/* revoke access to most system calls */
@@ -202,7 +207,7 @@ done:
 			break;
 	}
 
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {
 			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);

@@ -357,7 +357,11 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	imsg_init(&idxibuf, imsg_idxfds[0]);
+	if (imsgbuf_init(&idxibuf, imsg_idxfds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&idxibuf);
 
 	npackfd = dup(fileno(packfile));
 	if (npackfd == -1) {

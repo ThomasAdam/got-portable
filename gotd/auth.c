@@ -252,18 +252,15 @@ auth_dispatch(int fd, short event, void *arg)
 	int shut = 0;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed. */
 			shut = 1;
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed. */
-			shut = 1;
 	}
 
 	for (;;) {
@@ -325,7 +322,9 @@ auth_main(const char *title, struct gotd_repolist *repos,
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	imsg_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	if (imsgbuf_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&iev.ibuf);
 	iev.handler = auth_dispatch;
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;

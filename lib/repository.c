@@ -881,7 +881,7 @@ got_repo_close(struct got_repository *repo)
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		if (repo->privsep_children[i].imsg_fd == -1)
 			continue;
-		imsg_clear(repo->privsep_children[i].ibuf);
+		imsgbuf_clear(repo->privsep_children[i].ibuf);
 		free(repo->privsep_children[i].ibuf);
 		err = got_privsep_send_stop(repo->privsep_children[i].imsg_fd);
 		if (err && err->code == GOT_ERR_EOF)

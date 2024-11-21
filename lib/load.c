@@ -479,7 +479,11 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 		goto done;
 	}
 	imsg_idxfds[1] = -1;
-	imsg_init(&idxibuf, imsg_idxfds[0]);
+	if (imsgbuf_init(&idxibuf, imsg_idxfds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&idxibuf);
 
 	err = got_privsep_send_index_pack_req(&idxibuf, &id, packfd);
 	if (err)

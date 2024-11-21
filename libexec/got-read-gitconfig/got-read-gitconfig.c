@@ -19,6 +19,7 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 
+#include <err.h>
 #include <stdint.h>
 #include <imsg.h>
 #include <limits.h>
@@ -140,7 +141,6 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 		return got_error_from_errno("imsg_compose GITCONFIG_REMOTES");
 
 	err = got_privsep_flush_imsg(ibuf);
-	imsg_clear(ibuf);
 	if (err)
 		return err;
 
@@ -347,7 +347,11 @@ main(int argc, char *argv[])
 #endif
 	signal(SIGINT, catch_sigint);
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 
 #ifndef PROFILE
 	/* revoke access to most system calls */
@@ -432,7 +436,7 @@ main(int argc, char *argv[])
 			break;
 	}
 
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	if (err) {
 		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {
 			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);

@@ -379,7 +379,14 @@ start_child(struct got_repository *repo, int type)
 
 	repo->privsep_children[type].imsg_fd = imsg_fds[0];
 	repo->privsep_children[type].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
+	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		close(imsg_fds[0]);
+		free(ibuf);
+		return err;
+	}
+	imsgbuf_allow_fdpass(ibuf);
+
 	repo->privsep_children[type].ibuf = ibuf;
 
 	return NULL;

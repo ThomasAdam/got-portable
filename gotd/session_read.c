@@ -105,7 +105,7 @@ disconnect(struct gotd_session_client *client)
 	    GOTD_IMSG_DISCONNECT, PROC_SESSION_READ, -1, NULL, 0) == -1)
 		log_warn("imsg compose DISCONNECT");
 
-	imsg_clear(&gotd_session.repo_child_iev.ibuf);
+	imsgbuf_clear(&gotd_session.repo_child_iev.ibuf);
 	event_del(&gotd_session.repo_child_iev.ev);
 	evtimer_del(&client->tmo);
 	close(client->fd);
@@ -134,9 +134,12 @@ disconnect_on_error(struct gotd_session_client *client,
 
 	if (err->code != GOT_ERR_EOF) {
 		log_warnx("uid %d: %s", client->euid, err->msg);
-		imsg_init(&ibuf, client->fd);
-		gotd_imsg_send_error(&ibuf, 0, PROC_SESSION_READ, err);
-		imsg_clear(&ibuf);
+		if (imsgbuf_init(&ibuf, client->fd) == -1) {
+			log_warn("imsgbuf_init");
+		} else {
+			gotd_imsg_send_error(&ibuf, 0, PROC_SESSION_READ, err);
+			imsgbuf_clear(&ibuf);
+		}
 	}
 
 	disconnect(client);
@@ -201,7 +204,7 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	struct imsg imsg;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -211,14 +214,8 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	for (;;) {
@@ -459,51 +456,41 @@ session_dispatch_client(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		while (ibuf->w.queued) {
-			n = msgbuf_write(&ibuf->w);
-			if (n == -1 && errno != EAGAIN) {
-				err = got_error_from_errno("imsg_flush");
-				disconnect_on_error(client, err);
-				return;
-			}
-			if (n == 0) {
-				/* Connection closed. */
-				err = got_error(GOT_ERR_EOF);
-				disconnect_on_error(client, err);
-				return;
-			}
+		if (imsgbuf_write(ibuf) == -1) {
+			err = got_error_from_errno("imsg_flush");
+			disconnect_on_error(client, err);
+			return;
 		}
 
-		if (client->flush_disconnect) {
+		if (imsgbuf_queuelen(ibuf) == 0 &&
+		    client->flush_disconnect) {
 			disconnect(client);
 			return;
 		}
 	}
 
-	if ((events & EV_READ) == 0)
-		return;
-
-	memset(&imsg, 0, sizeof(imsg));
+	if (events & EV_READ) {
+		n = imsgbuf_read(ibuf);
+		if (n == -1) {
+			err = got_error_from_errno("imsgbuf_read");
+			disconnect_on_error(client, err);
+			return;
+		}
+		if (n == 0) {
+			 err = got_error(GOT_ERR_EOF);
+			 disconnect_on_error(client, err);
+			 return;
+		}
+	}
 
 	while (err == NULL) {
-		err = gotd_imsg_recv(&imsg, ibuf, 0);
-		if (err) {
-			if (err->code == GOT_ERR_PRIVSEP_READ)
-				err = NULL;
-			else if (err->code == GOT_ERR_EOF &&
-			    gotd_session.state ==
-			    GOTD_STATE_EXPECT_CAPABILITIES) {
-				/*
-				 * The client has closed its socket before
-				 * sending its capability announcement.
-				 * This can happen when Git clients have
-				 * no ref-updates to send.
-				 */
-				disconnect_on_error(client, err);
-				return;
-			}
+		n = imsg_get(ibuf, &imsg);
+		if (n == -1) {
+			err = got_error_from_errno("imsg_get");
 			break;
 		}
+		if (n == 0)
+			break;
 
 		evtimer_del(&client->tmo);
 
@@ -684,7 +671,9 @@ recv_connect(struct imsg *imsg)
 	if (client->username == NULL)
 		return got_error_from_errno("strndup");
 
-	imsg_init(&client->iev.ibuf, client->fd);
+	if (imsgbuf_init(&client->iev.ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&client->iev.ibuf);
 	client->iev.handler = session_dispatch_client;
 	client->iev.events = EV_READ;
 	client->iev.handler_arg = NULL;
@@ -726,7 +715,11 @@ recv_repo_child(struct imsg *imsg)
 	if (fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&gotd_session.repo_child_iev.ibuf, fd);
+	if (imsgbuf_init(&gotd_session.repo_child_iev.ibuf, fd)) {
+		close(fd);
+		return got_error_from_errno("imsgbuf_init");
+	}
+	imsgbuf_allow_fdpass(&gotd_session.repo_child_iev.ibuf);
 	gotd_session.repo_child_iev.handler = session_dispatch_repo_child;
 	gotd_session.repo_child_iev.events = EV_READ;
 	gotd_session.repo_child_iev.handler_arg = NULL;
@@ -753,7 +746,7 @@ session_dispatch(int fd, short event, void *arg)
 	struct imsg imsg;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -763,8 +756,8 @@ session_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		n = imsgbuf_write(ibuf);
+		if (n == -1)
 			fatal("msgbuf_write");
 		if (n == 0) {
 			/* Connection closed. */
@@ -843,7 +836,11 @@ session_read_main(const char *title, const char *repo_path,
 	    sizeof(gotd_session.request_timeout));
 	gotd_session.repo_cfg = repo_cfg;
 
-	imsg_init(&gotd_session.notifier_iev.ibuf, -1);
+	if (imsgbuf_init(&gotd_session.notifier_iev.ibuf, -1) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&gotd_session.notifier_iev.ibuf);
 
 	err = got_repo_open(&gotd_session.repo, repo_path, NULL, pack_fds);
 	if (err)
@@ -879,7 +876,12 @@ session_read_main(const char *title, const char *repo_path,
 	gotd_session_client.delta_cache_fd = -1;
 	gotd_session_client.accept_flush_pkt = 1;
 
-	imsg_init(&gotd_session.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	if (imsgbuf_init(&gotd_session.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE)
+	    == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&gotd_session.parent_iev.ibuf);
 	gotd_session.parent_iev.handler = session_dispatch;
 	gotd_session.parent_iev.events = EV_READ;
 	gotd_session.parent_iev.handler_arg = NULL;

@@ -268,7 +268,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	imsg_init(&fetchibuf, imsg_fetchfds[0]);
+	if (imsgbuf_init(&fetchibuf, imsg_fetchfds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&fetchibuf);
 	nfetchfd = dup(fetchfd);
 	if (nfetchfd == -1) {
 		err = got_error_from_errno("dup");
@@ -461,7 +465,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	imsg_init(&idxibuf, imsg_idxfds[0]);
+	if (imsgbuf_init(&idxibuf, imsg_idxfds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&idxibuf);
 
 	npackfd = dup(packfd);
 	if (npackfd == -1) {

@@ -500,7 +500,6 @@ const struct got_error *gotd_parse_url(char **, char **, char **,
 
 /* imsg.c */
 const struct got_error *gotd_imsg_flush(struct imsgbuf *);
-const struct got_error *gotd_imsg_recv(struct imsg *, struct imsgbuf *, size_t);
 const struct got_error *gotd_imsg_poll_recv(struct imsg *, struct imsgbuf *,
     size_t);
 const struct got_error *gotd_imsg_recv_error(uint32_t *client_id,

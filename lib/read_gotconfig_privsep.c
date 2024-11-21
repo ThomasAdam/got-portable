@@ -89,7 +89,11 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 		goto done;
 	}
 	imsg_fds[1] = -1;
-	imsg_init(ibuf, imsg_fds[0]);
+	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(ibuf);
 
 	err = got_privsep_send_gotconfig_parse_req(ibuf, fd);
 	if (err)

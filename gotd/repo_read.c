@@ -282,7 +282,9 @@ list_refs(struct imsg *imsg)
 	if (client->fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = got_ref_list(&refs, repo_read.repo, "",
 	    got_ref_cmp_by_name, NULL);
@@ -362,7 +364,7 @@ list_refs(struct imsg *imsg)
 	err = gotd_imsg_flush(&ibuf);
 done:
 	got_ref_list_free(&refs);
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -418,7 +420,9 @@ recv_want(struct imsg *imsg)
 	    got_object_id_hex(&id, hex, sizeof(hex)))
 		log_debug("client wants %s", hex);
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = got_object_get_type(&obj_type, repo_read.repo, &id);
 	if (err)
@@ -435,7 +439,7 @@ recv_want(struct imsg *imsg)
 	}
 
 	gotd_imsg_send_ack(&id, &ibuf, PROC_REPO_READ, repo_read.pid);
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -463,7 +467,9 @@ recv_have(struct imsg *imsg)
 	    got_object_id_hex(&id, hex, sizeof(hex)))
 		log_debug("client has %s", hex);
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	err = got_object_get_type(&obj_type, repo_read.repo, &id);
 	if (err) {
@@ -490,7 +496,7 @@ recv_have(struct imsg *imsg)
 
 	gotd_imsg_send_ack(&id, &ibuf, PROC_REPO_READ, repo_read.pid);
 done:
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -617,7 +623,9 @@ send_packfile(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (client->delta_cache_fd == -1 || client->pack_pipe == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&ibuf, client->fd);
+	if (imsgbuf_init(&ibuf, client->fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	delta_cache = fdopen(client->delta_cache_fd, "w+");
 	if (delta_cache == NULL) {
@@ -661,7 +669,7 @@ done:
 	client->delta_cache_fd = -1;
 	if (delta_cache != NULL && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	free(want_ids.ids);
 	free(have_ids.ids);
 	return err;
@@ -679,18 +687,15 @@ repo_read_dispatch_session(int fd, short event, void *arg)
 	struct repo_read_client *client = &repo_read_client;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed. */
 			shut = 1;
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed. */
-			shut = 1;
 	}
 
 	while (err == NULL && check_cancelled(NULL) == NULL) {
@@ -777,7 +782,9 @@ recv_connect(struct imsg *imsg)
 	if (repo_read.session_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	imsg_init(&iev->ibuf, repo_read.session_fd);
+	if (imsgbuf_init(&iev->ibuf, repo_read.session_fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&iev->ibuf);
 	iev->handler = repo_read_dispatch_session;
 	iev->events = EV_READ;
 	iev->handler_arg = NULL;
@@ -800,18 +807,15 @@ repo_read_dispatch(int fd, short event, void *arg)
 	struct repo_read_client *client = &repo_read_client;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed. */
 			shut = 1;
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed. */
-			shut = 1;
 	}
 
 	while (err == NULL && check_cancelled(NULL) == NULL) {
@@ -897,7 +901,11 @@ repo_read_main(const char *title, const char *repo_path,
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
 
-	imsg_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	if (imsgbuf_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&iev.ibuf);
 	iev.handler = repo_read_dispatch;
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;

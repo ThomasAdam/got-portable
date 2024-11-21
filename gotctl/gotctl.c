@@ -137,10 +137,14 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 
-	imsg_init(&ibuf, gotd_sock);
+	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
-	if (imsg_compose(&ibuf, GOTD_IMSG_INFO, 0, 0, -1, NULL, 0) == -1)
+	if (imsg_compose(&ibuf, GOTD_IMSG_INFO, 0, 0, -1, NULL, 0) == -1) {
+		imsgbuf_clear(&ibuf);
 		return got_error_from_errno("imsg_compose INFO");
+	}
 
 	err = gotd_imsg_flush(&ibuf);
 	while (err == NULL) {
@@ -172,7 +176,7 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 		imsg_free(&imsg);
 	}
 
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
@@ -190,10 +194,14 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 
-	imsg_init(&ibuf, gotd_sock);
+	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
+		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
-	if (imsg_compose(&ibuf, GOTD_IMSG_STOP, 0, 0, -1, NULL, 0) == -1)
+	if (imsg_compose(&ibuf, GOTD_IMSG_STOP, 0, 0, -1, NULL, 0) == -1) {
+		imsgbuf_clear(&ibuf);
 		return got_error_from_errno("imsg_compose STOP");
+	}
 
 	err = gotd_imsg_flush(&ibuf);
 	while (err == NULL) {
@@ -216,7 +224,7 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 		imsg_free(&imsg);
 	}
 
-	imsg_clear(&ibuf);
+	imsgbuf_clear(&ibuf);
 	return err;
 }
 
