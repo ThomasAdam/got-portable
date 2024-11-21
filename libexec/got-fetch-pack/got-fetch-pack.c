@@ -1110,6 +1110,7 @@ done:
 	if (err != NULL) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);
+		exit(1);
 	}
 
 	exit(0);
