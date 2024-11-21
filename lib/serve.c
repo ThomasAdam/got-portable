@@ -1262,6 +1262,7 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 
 	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
 		return got_error_from_errno("imsgbuf_init");
+	imsgbuf_allow_fdpass(&ibuf);
 
 	memset(&imsg, 0, sizeof(imsg));
 
