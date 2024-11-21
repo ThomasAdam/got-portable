@@ -422,9 +422,14 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		if (err)
 			goto done;
 
-		err = got_pathlist_append(&their_refs, refname, id);
-		if (err)
-			goto done;
+		err = got_pathlist_insert(&pe, &their_refs, refname, id);
+		if (err || pe == NULL) {
+			free(refname);
+			free(id);
+			if (err)
+				goto done;
+		}
+
 
 		if (chattygot)
 			fprintf(stderr, "%s: remote has %s %s\n",
@@ -658,6 +663,7 @@ main(int argc, char **argv)
 	for (i = 0; i < send_req.nrefs; i++) {
 		struct got_object_id *id;
 		char *refname;
+		struct got_pathlist_entry *new;
 
 		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 			if (err->code == GOT_ERR_PRIVSEP_PIPE)
@@ -707,13 +713,14 @@ main(int argc, char **argv)
 		}
 		memcpy(id, &href.id, sizeof(*id));
 		if (href.delete)
-			err = got_pathlist_append(&delete_refs, refname, id);
+			err = got_pathlist_insert(&new, &delete_refs, refname, id);
 		else
-			err = got_pathlist_append(&refs, refname, id);
-		if (err) {
+			err = got_pathlist_insert(&new, &refs, refname, id);
+		if (err || new == NULL ) {
 			free(refname);
 			free(id);
-			goto done;
+			if (err)
+				goto done;
 		}
 
 		imsg_free(&imsg);

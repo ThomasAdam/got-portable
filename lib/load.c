@@ -333,6 +333,7 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	for (;;) {
 		struct got_object_id *id;
 		char *dup;
+		struct got_pathlist_entry *new;
 
 		linelen = getline(&line, &linesize, in);
 		if (linelen == -1) {
@@ -376,11 +377,12 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 			goto done;
 		}
 
-		err = got_pathlist_append(refs_found, dup, id);
-		if (err) {
+		err = got_pathlist_insert(&new, refs_found, dup, id);
+		if (err || new == NULL) {
 			free(id);
 			free(dup);
-			goto done;
+			if (err)
+				goto done;
 		}
 	}
 

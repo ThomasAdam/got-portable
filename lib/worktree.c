@@ -4070,7 +4070,7 @@ find_missing_children(void *arg, struct got_fileindex_entry *ie)
 	}
 
 	if (got_path_is_child(ie->path, a->parent_path, a->parent_len))
-		err = got_pathlist_append(a->children, ie->path, NULL);
+		err = got_pathlist_insert(NULL, a->children, ie->path, NULL);
 
 	return err;
 }
@@ -7759,7 +7759,7 @@ get_paths_added_between_commits(struct got_pathlist_head *added_paths,
 			abspath = NULL;
 		}
 
-		err = got_pathlist_append(added_paths, wt_path, NULL);
+		err = got_pathlist_insert(NULL, added_paths, wt_path, NULL);
 		if (err)
 			goto done;
 		wt_path = NULL;

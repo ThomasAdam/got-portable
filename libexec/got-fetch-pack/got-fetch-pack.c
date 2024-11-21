@@ -865,6 +865,7 @@ main(int argc, char **argv)
 	struct got_imsg_fetch_wanted_branch wbranch;
 	struct got_imsg_fetch_wanted_ref wref;
 	size_t datalen, i;
+	struct got_pathlist_entry *new;
 	char *remote_head = NULL, *worktree_branch = NULL;
 #if 0
 	static int attached;
@@ -973,11 +974,12 @@ main(int argc, char **argv)
 			goto done;
 		}
 		memcpy(id, &href.id, sizeof(*id));
-		err = got_pathlist_append(&have_refs, refname, id);
-		if (err) {
+		err = got_pathlist_insert(&new, &have_refs, refname, id);
+		if (err || new == NULL) {
 			free(refname);
 			free(id);
-			goto done;
+			if (err)
+				goto done;
 		}
 
 		imsg_free(&imsg);
@@ -1015,10 +1017,11 @@ main(int argc, char **argv)
 			goto done;
 		}
 
-		err = got_pathlist_append(&wanted_branches, refname, NULL);
-		if (err) {
+		err = got_pathlist_insert(&new, &wanted_branches, refname, NULL);
+		if (err || new == NULL) {
 			free(refname);
-			goto done;
+			if (err)
+				goto done;
 		}
 
 		imsg_free(&imsg);
@@ -1055,7 +1058,7 @@ main(int argc, char **argv)
 			goto done;
 		}
 
-		err = got_pathlist_append(&wanted_refs, refname, NULL);
+		err = got_pathlist_insert(NULL, &wanted_refs, refname, NULL);
 		if (err) {
 			free(refname);
 			goto done;

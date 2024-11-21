@@ -1941,8 +1941,8 @@ date: $d
  
  changed epsilon into file
  
- D  epsilon/zeta
  A  epsilon
+ D  epsilon/zeta
 
 EOF
 

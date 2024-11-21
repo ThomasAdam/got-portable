@@ -1546,7 +1546,7 @@ cmd_clone(int argc, char *argv[])
 			fetch_all_branches = 1;
 			break;
 		case 'b':
-			error = got_pathlist_append(&wanted_branches,
+			error = got_pathlist_insert(NULL, &wanted_branches,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -1562,7 +1562,7 @@ cmd_clone(int argc, char *argv[])
 			verbosity = -1;
 			break;
 		case 'R':
-			error = got_pathlist_append(&wanted_refs,
+			error = got_pathlist_insert(NULL, &wanted_refs,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -2376,7 +2376,7 @@ cmd_checkout(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_pathlist_append(&paths, "", NULL);
+	error = got_pathlist_insert(NULL, &paths, "", NULL);
 	if (error)
 		goto done;
 	cpa.worktree_path = worktree_path;
@@ -2573,7 +2573,7 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 		path = strdup("");
 		if (path == NULL)
 			return got_error_from_errno("strdup");
-		return got_pathlist_append(paths, path, NULL);
+		return got_pathlist_insert(NULL, paths, path, NULL);
 	}
 
 	for (i = 0; i < argc; i++) {
