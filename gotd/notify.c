@@ -374,6 +374,7 @@ done:
 static void
 notify_dispatch_session(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	ssize_t n;
@@ -391,9 +392,10 @@ notify_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1) {
-			if (errno != EPIPE)
-				fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
+			if (err->code != GOT_ERR_ERRNO || errno != EPIPE)
+				fatalx("%s", err->msg);
 			shut = 1;
 			goto done;
 		}
@@ -504,6 +506,7 @@ notify_ibuf_get_str(char **ret, struct ibuf *ibuf)
 static void
 notify_dispatch(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *imsgbuf = &iev->ibuf;
 	ssize_t n;
@@ -523,8 +526,9 @@ notify_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(imsgbuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(imsgbuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {

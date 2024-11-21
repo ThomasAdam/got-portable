@@ -2181,8 +2181,9 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -2338,8 +2339,9 @@ repo_write_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	while (err == NULL) {

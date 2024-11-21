@@ -863,6 +863,7 @@ recv_notification_content(struct imsg *imsg)
 static void
 session_dispatch_repo_child(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_session_client *client = &gotd_session_client;
@@ -881,8 +882,9 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -1207,7 +1209,8 @@ session_dispatch_client(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1) {
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
 			/*
 			 * The client has closed its socket.  This can
 			 * happen when Git clients are done sending
@@ -1216,11 +1219,10 @@ session_dispatch_client(int fd, short events, void *arg)
 			 */
 			if (STAILQ_FIRST(&notifications) != NULL)
 				return; 
-			if (errno == EPIPE) {
+			if (err->code == GOT_ERR_ERRNO && errno == EPIPE) {
 				disconnect(client);
 				return;
 			}
-			err = got_error_from_errno("imsgbuf_flush");
 			disconnect_on_error(client, err);
 			return;
 		}
@@ -1455,8 +1457,9 @@ session_dispatch_notifier(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -1591,6 +1594,7 @@ recv_repo_child(struct imsg *imsg)
 static void
 session_dispatch(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_session_client *client = &gotd_session_client;
@@ -1609,8 +1613,9 @@ session_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
