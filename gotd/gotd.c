@@ -581,7 +581,7 @@ gotd_request(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1) {
+		if (imsgbuf_flush(ibuf) == -1) {
 			/*
 			 * The client has closed its socket.  This can
 			 * happen when Git clients are done sending
@@ -591,7 +591,7 @@ gotd_request(int fd, short events, void *arg)
 				disconnect(client);
 				return;
 			}
-			err = got_error_from_errno("imsgbuf_write");
+			err = got_error_from_errno("imsgbuf_flush");
 			disconnect_on_error(client, err);
 			return;
 		}
@@ -1066,8 +1066,8 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
@@ -1147,8 +1147,8 @@ gotd_dispatch_notifier(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
@@ -1220,8 +1220,8 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 		goto done;
 	}
 
@@ -1389,8 +1389,8 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	proc = client->session;
@@ -1544,8 +1544,8 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	proc = client->repo;
