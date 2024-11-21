@@ -76,7 +76,6 @@ gotd_imsg_flush(struct imsgbuf *ibuf)
 	return err;
 }
 
-#include <stdlib.h>
 static const struct got_error *
 gotd_imsg_recv(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 {
