@@ -1593,9 +1593,11 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 			err = connect_session(client);
 			if (err)
 				break;
-			err = connect_notifier_and_session(client);
-			if (err)
-				break;
+			if (client_is_writing(client)) {
+				err = connect_notifier_and_session(client);
+				if (err)
+					break;
+			}
 			err = connect_repo_child(client, proc);
 			break;
 		default:
