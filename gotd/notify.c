@@ -389,9 +389,9 @@ notify_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1) {
+		if (imsgbuf_flush(ibuf) == -1) {
 			if (errno != EPIPE)
-				fatal("imsgbuf_write");
+				fatal("imsgbuf_flush");
 			shut = 1;
 			goto done;
 		}
@@ -521,8 +521,8 @@ notify_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(imsgbuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(imsgbuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {

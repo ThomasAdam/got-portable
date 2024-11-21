@@ -413,8 +413,8 @@ listen_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {

@@ -881,8 +881,8 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
@@ -1207,7 +1207,7 @@ session_dispatch_client(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1) {
+		if (imsgbuf_flush(ibuf) == -1) {
 			/*
 			 * The client has closed its socket.  This can
 			 * happen when Git clients are done sending
@@ -1222,8 +1222,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			return;
 		}
 
-		if (imsgbuf_queuelen(ibuf) == 0 &&
-		    client->flush_disconnect) {
+		if (client->flush_disconnect) {
 			disconnect(client);
 			return;
 		}
@@ -1445,8 +1444,8 @@ session_dispatch_notifier(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
@@ -1599,8 +1598,8 @@ session_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {

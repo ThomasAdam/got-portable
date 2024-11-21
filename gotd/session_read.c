@@ -213,8 +213,8 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+		if (imsgbuf_flush(ibuf) == -1)
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
@@ -455,14 +455,13 @@ session_dispatch_client(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_write(ibuf) == -1) {
+		if (imsgbuf_flush(ibuf) == -1) {
 			err = got_error_from_errno("imsg_flush");
 			disconnect_on_error(client, err);
 			return;
 		}
 
-		if (imsgbuf_queuelen(ibuf) == 0 &&
-		    client->flush_disconnect) {
+		if (client->flush_disconnect) {
 			disconnect(client);
 			return;
 		}
@@ -755,14 +754,9 @@ session_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = imsgbuf_write(ibuf);
+		n = imsgbuf_flush(ibuf);
 		if (n == -1)
-			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
+			fatal("imsgbuf_flush");
 	}
 
 	for (;;) {
