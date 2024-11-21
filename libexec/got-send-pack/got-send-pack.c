@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
+#include <err.h>
 #include <stdint.h>
 #include <errno.h>
 #include <limits.h>
@@ -626,7 +627,11 @@ main(int argc, char **argv)
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&delete_refs);
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {

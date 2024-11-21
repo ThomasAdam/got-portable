@@ -40,6 +40,7 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 
+#include <err.h>
 #include <ctype.h>
 #include <limits.h>
 #include <paths.h>
@@ -644,7 +645,11 @@ main(int argc, char **argv)
 		sleep(1);
 #endif
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {

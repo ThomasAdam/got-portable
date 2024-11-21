@@ -20,6 +20,9 @@
 #include <sys/mman.h>
 #include <sys/uio.h>
 
+#include <err.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +108,11 @@ main(int argc, char **argv)
 	if (err)
 		goto done;
 
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
+		warn("imsgbuf_init");
+		return 1;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {

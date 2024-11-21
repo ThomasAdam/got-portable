@@ -73,12 +73,9 @@ read_imsg(struct imsgbuf *ibuf)
 		return err;
 	}
 
-	n = imsg_read(ibuf);
-	if (n == -1) {
-		if (errno == EAGAIN) /* Could be a file-descriptor leak. */
-			return got_error(GOT_ERR_PRIVSEP_NO_FD);
+	n = imsgbuf_read(ibuf);
+	if (n == -1)
 		return got_error(GOT_ERR_PRIVSEP_READ);
-	}
 	if (n == 0)
 		return got_error(GOT_ERR_PRIVSEP_PIPE);
 
@@ -184,11 +181,10 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 		return;
 	}
 
-	ret = imsg_flush(ibuf);
+	ret = imsgbuf_flush(ibuf);
 	if (ret == -1) {
 		fprintf(stderr, "%s: error %d \"%s\": imsg_flush: %s\n",
 		    getprogname(), err->code, err->msg, strerror(errno));
-		imsg_clear(ibuf);
 		return;
 	}
 }
@@ -202,10 +198,8 @@ flush_imsg(struct imsgbuf *ibuf)
 	if (err)
 		return err;
 
-	if (imsg_flush(ibuf) == -1) {
-		imsg_clear(ibuf);
+	if (imsgbuf_flush(ibuf) == -1)
 		return got_error_from_errno("imsg_flush");
-	}
 
 	return NULL;
 }
@@ -219,14 +213,21 @@ got_privsep_flush_imsg(struct imsgbuf *ibuf)
 const struct got_error *
 got_privsep_send_stop(int fd)
 {
+	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 
-	imsg_init(&ibuf, fd);
+	if (imsgbuf_init(&ibuf, fd) == -1)
+		return got_error_from_errno("imsgbuf_init");
 
-	if (imsg_compose(&ibuf, GOT_IMSG_STOP, 0, 0, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose STOP");
+	if (imsg_compose(&ibuf, GOT_IMSG_STOP, 0, 0, -1, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg_compose STOP");
+		goto done;
+	}
 
-	return flush_imsg(&ibuf);
+	err = flush_imsg(&ibuf);
+ done:
+	imsgbuf_clear(&ibuf);
+	return err;
 }
 
 const struct got_error *

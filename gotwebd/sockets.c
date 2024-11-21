@@ -98,7 +98,9 @@ sockets(struct gotwebd *env, int fd)
 
 	if ((env->iev_parent = malloc(sizeof(*env->iev_parent))) == NULL)
 		fatal("malloc");
-	imsg_init(&env->iev_parent->ibuf, fd);
+	if (imsgbuf_init(&env->iev_parent->ibuf, fd) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&env->iev_parent->ibuf);
 	env->iev_parent->handler = sockets_dispatch_main;
 	env->iev_parent->data = env->iev_parent;
 	event_set(&env->iev_parent->ev, fd, EV_READ, sockets_dispatch_main,
@@ -257,16 +259,14 @@ sockets_dispatch_main(int fd, short event, void *arg)
 	ibuf = &iev->ibuf;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed */
 			shut = 1;
 	}
 	if (event & EV_WRITE) {
-		if ((n = msgbuf_write(&ibuf->w)) == -1 && errno != EAGAIN)
-			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed */
-			shut = 1;
+		if (imsgbuf_write(ibuf) == -1)
+			fatal("imsgbuf_write");
 	}
 
 	for (;;) {

@@ -105,7 +105,11 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 		goto done;
 	}
 	imsg_fds[1] = -1;
-	imsg_init(ibuf, imsg_fds[0]);
+	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(ibuf);
 
 	err = got_privsep_send_gitconfig_parse_req(ibuf, fd);
 	if (err)

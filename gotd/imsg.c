@@ -62,24 +62,22 @@ gotd_imsg_flush(struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 
-	while (ibuf->w.queued > 0) {
+	while (imsgbuf_queuelen(ibuf) > 0) {
 		err = got_poll_fd(ibuf->fd, POLLOUT, INFTIM);
 		if (err)
 			break;
 
-		if (imsg_flush(ibuf) == -1) {
-			if (errno != EAGAIN) {
-				imsg_clear(ibuf);
-				err = got_error_from_errno("imsg_flush");
-				break;
-			}
+		if (imsgbuf_write(ibuf) == -1) {
+			err = got_error_from_errno("imsgbuf_flush");
+			break;
 		}
 	}
 
 	return err;
 }
 
-const struct got_error *
+#include <stdlib.h>
+static const struct got_error *
 gotd_imsg_recv(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 {
 	ssize_t n;
@@ -89,17 +87,16 @@ gotd_imsg_recv(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 		return got_error_from_errno("imsg_get");
 
 	if (n == 0) {
-		n = imsg_read(ibuf);
-		if (n == -1) {
-			if (errno == EAGAIN)
-				return got_error(GOT_ERR_PRIVSEP_READ);
+		n = imsgbuf_read(ibuf);
+		if (n == -1)
 			return got_error_from_errno("imsg_read");
-		}
 		if (n == 0)
 			return got_error(GOT_ERR_EOF);
 		n = imsg_get(ibuf, imsg);
 		if (n == -1)
 			return got_error_from_errno("imsg_get");
+		if (n == 0)
+			abort();
 	}
 
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
@@ -181,7 +178,7 @@ void
 gotd_imsg_event_add(struct gotd_imsgev *iev)
 {
 	iev->events = EV_READ;
-	if (iev->ibuf.w.queued)
+	if (imsgbuf_queuelen(&iev->ibuf))
 		iev->events |= EV_WRITE;
 
 	event_del(&iev->ev);

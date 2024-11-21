@@ -779,7 +779,13 @@ got_pack_start_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 	}
 	pack->privsep_child->imsg_fd = imsg_fds[0];
 	pack->privsep_child->pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
+	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		close(imsg_fds[0]);
+		goto done;
+	}
+	imsgbuf_allow_fdpass(ibuf);
+
 	pack->privsep_child->ibuf = ibuf;
 
 	err = got_privsep_init_pack_child(ibuf, pack, packidx);
@@ -816,7 +822,7 @@ pack_stop_privsep_child(struct got_pack *pack)
 	err = got_privsep_wait_for_child(pack->privsep_child->pid);
 	if (close_err && err == NULL)
 		err = close_err;
-	imsg_clear(pack->privsep_child->ibuf);
+	imsgbuf_clear(pack->privsep_child->ibuf);
 	free(pack->privsep_child->ibuf);
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;

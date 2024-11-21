@@ -162,7 +162,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 int
 config_setfd(struct gotwebd *env)
 {
-	int i, j, ret, fd;
+	int i, j, fd;
 
 	log_debug("%s: Allocating %d file descriptors",
 	    __func__, PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES);
@@ -176,10 +176,7 @@ config_setfd(struct gotwebd *env)
 			    IMSG_CFG_FD, 0, -1, fd, NULL, 0) == -1)
 				fatal("imsg_compose_event IMSG_CFG_FD");
 
-			do {
-				ret = imsg_flush(&env->iev_server[j].ibuf);
-			} while (ret == -1 && errno == EAGAIN);
-			if (ret == -1)
+			if (imsgbuf_flush(&env->iev_server[j].ibuf) == -1)
 				fatal("imsg_flush");
 			imsg_event_add(&env->iev_server[j]);
 		}

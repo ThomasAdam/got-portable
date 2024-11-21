@@ -379,7 +379,7 @@ notify_dispatch_session(int fd, short event, void *arg)
 	struct imsg imsg;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -389,11 +389,9 @@ notify_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&ibuf->w);
-		if (n == -1 && errno != EAGAIN && errno != EPIPE)
-			fatal("msgbuf_write");
-		if (n == 0 || (n == -1 && errno == EPIPE)) {
-			/* Connection closed. */
+		if (imsgbuf_write(ibuf) == -1) {
+			if (errno != EPIPE)
+				fatal("imsgbuf_write");
 			shut = 1;
 			goto done;
 		}
@@ -428,7 +426,7 @@ done:
 
 		/* This pipe is dead. Remove its event handler */
 		event_del(&iev->ev);
-		imsg_clear(&iev->ibuf);
+		imsgbuf_clear(&iev->ibuf);
 
 		session = find_session_by_fd(fd);
 		if (session)
@@ -458,7 +456,11 @@ recv_session(struct imsg *imsg)
 	}
 
 	session->id = get_session_id();
-	imsg_init(&session->iev.ibuf, fd);
+	if (imsgbuf_init(&session->iev.ibuf, fd) == -1) {
+		close(fd);
+		return got_error_from_errno("imsgbuf_init");
+	}
+	imsgbuf_allow_fdpass(&session->iev.ibuf);
 	session->iev.handler = notify_dispatch_session;
 	session->iev.events = EV_READ;
 	session->iev.handler_arg = NULL;
@@ -509,7 +511,7 @@ notify_dispatch(int fd, short event, void *arg)
 	struct gotd_secret *s;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(imsgbuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(imsgbuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0) {
 			/* Connection closed. */
@@ -519,14 +521,8 @@ notify_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = msgbuf_write(&imsgbuf->w);
-		if (n == -1 && errno != EAGAIN)
+		if (imsgbuf_write(imsgbuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0) {
-			/* Connection closed. */
-			shut = 1;
-			goto done;
-		}
 	}
 
 	for (;;) {
@@ -626,7 +622,10 @@ notify_main(const char *title, struct gotd_repolist *repos,
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	imsg_init(&gotd_notify.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE);
+	if (imsgbuf_init(&gotd_notify.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE)
+	    == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&gotd_notify.parent_iev.ibuf);
 	gotd_notify.parent_iev.handler = notify_dispatch;
 	gotd_notify.parent_iev.events = EV_READ;
 	gotd_notify.parent_iev.handler_arg = NULL;

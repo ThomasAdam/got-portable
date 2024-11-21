@@ -60,12 +60,12 @@ void
 imsg_event_add(struct imsgev *iev)
 {
 	if (iev->handler == NULL) {
-		imsg_flush(&iev->ibuf);
+		imsgbuf_flush(&iev->ibuf);
 		return;
 	}
 
 	iev->events = EV_READ;
-	if (iev->ibuf.w.queued)
+	if (imsgbuf_queuelen(&iev->ibuf))
 		iev->events |= EV_WRITE;
 
 	event_del(&iev->ev);
@@ -105,10 +105,7 @@ main_compose_sockets(struct gotwebd *env, uint32_t type, int fd,
 
 		/* prevent fd exhaustion */
 		if (d != -1) {
-			do {
-				ret = imsg_flush(&env->iev_server[i].ibuf);
-			} while (ret == -1 && errno == EAGAIN);
-			if (ret == -1)
+			if (imsgbuf_flush(&env->iev_server[i].ibuf) == -1)
 				goto err;
 			imsg_event_add(&env->iev_server[i]);
 		}
@@ -144,16 +141,14 @@ gotwebd_dispatch_sockets(int fd, short event, void *arg)
 	ibuf = &iev->ibuf;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
+		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsg_read error");
 		if (n == 0)	/* Connection closed */
 			shut = 1;
 	}
 	if (event & EV_WRITE) {
-		if ((n = msgbuf_write(&ibuf->w)) == -1 && errno != EAGAIN)
+		if (imsgbuf_write(ibuf) == -1)
 			fatal("msgbuf_write");
-		if (n == 0)	/* Connection closed */
-			shut = 1;
 	}
 
 	for (;;) {
@@ -225,7 +220,9 @@ spawn_socket_process(struct gotwebd *env, const char *argv0, int n)
 		break;
 	default:	/* parent */
 		close(p[0]);
-		imsg_init(&env->iev_server[n].ibuf, p[1]);
+		if (imsgbuf_init(&env->iev_server[n].ibuf, p[1]) == -1)
+			fatal("imsgbuf_init");
+		imsgbuf_allow_fdpass(&env->iev_server[n].ibuf);
 		env->iev_server[n].handler = gotwebd_dispatch_sockets;
 		env->iev_server[n].data = &env->iev_server[n];
 		event_set(&env->iev_server[n].ev, p[1], EV_READ,
@@ -484,7 +481,7 @@ gotwebd_shutdown(void)
 
 	for (i = 0; i < env->nserver; ++i) {
 		event_del(&env->iev_server[i].ev);
-		imsg_clear(&env->iev_server[i].ibuf);
+		imsgbuf_clear(&env->iev_server[i].ibuf);
 		close(env->iev_server[i].ibuf.fd);
 		env->iev_server[i].ibuf.fd = -1;
 	}
