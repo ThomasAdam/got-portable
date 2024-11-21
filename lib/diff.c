@@ -114,10 +114,11 @@ get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
 	ds->del += change->rm;
 	++ds->nfiles;
 
-	err = got_pathlist_append(ds->paths, path, change);
-	if (err) {
+	err = got_pathlist_insert(&pe, ds->paths, path, change);
+	if (err || pe == NULL) {
 		free(change);
-		return err;
+		if (err)
+			return err;
 	}
 
 	pe = TAILQ_LAST(ds->paths, got_pathlist_head);
@@ -890,6 +891,7 @@ got_diff_tree_collect_changed_paths(void *arg, struct got_blob_object *blob1,
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_head *paths = arg;
+	struct got_pathlist_entry *new;
 	struct got_diff_changed_path *change = NULL;
 	char *path = NULL;
 
@@ -915,9 +917,9 @@ got_diff_tree_collect_changed_paths(void *arg, struct got_blob_object *blob1,
 			change->status = GOT_STATUS_MODE_CHANGE;
 	}
 
-	err = got_pathlist_append(paths, path, change);
+	err = got_pathlist_insert(&new, paths, path, change);
 done:
-	if (err) {
+	if (err || new == NULL) {
 		free(path);
 		free(change);
 	}

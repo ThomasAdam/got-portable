@@ -757,7 +757,7 @@ cmd_pack(int argc, char *argv[])
 			break;
 		case 'x':
 			got_path_strip_trailing_slashes(optarg);
-			error = got_pathlist_append(&exclude_args,
+			error = got_pathlist_insert(NULL, &exclude_args,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -1457,7 +1457,7 @@ cmd_dump(int argc, char *argv[])
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'x':
-			error = got_pathlist_append(&exclude_args,
+			error = got_pathlist_insert(NULL, &exclude_args,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -1732,7 +1732,7 @@ cmd_load(int argc, char *argv[])
 		got_path_strip_trailing_slashes(refname);
 		if (!got_ref_name_is_valid(refname))
 			errx(1, "invalid reference name %s", refname);
-		error = got_pathlist_append(&include_args, refname, NULL);
+		error = got_pathlist_insert(NULL, &include_args, refname, NULL);
 		if (error)
 			goto done;
 	}

@@ -718,6 +718,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 	size_t datalen;
 	struct got_imsg_fetch_symrefs *isymrefs = NULL;
 	size_t n, remain;
+	struct got_pathlist_entry *new;
 	off_t off;
 	int i;
 
@@ -780,11 +781,12 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 			}
 			off += s->target_len;
 			remain -= s->target_len;
-			err = got_pathlist_append(symrefs, name, target);
-			if (err) {
+			err = got_pathlist_insert(&new, symrefs, name, target);
+			if (err || new == NULL) {
 				free(name);
 				free(target);
-				goto done;
+				if (err->code != GOT_ERR_REF_DUP_ENTRY)
+					goto done;
 			}
 		}
 		break;

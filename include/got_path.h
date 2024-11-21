@@ -85,15 +85,6 @@ TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);
 const struct got_error *got_pathlist_insert(struct got_pathlist_entry **,
     struct got_pathlist_head *, const char *, void *);
 
-/*
- * Append a path to the list of paths.
- * The caller should already have initialized the list head. This list stores
- * the pointer to the path as-is, i.e. the path is not copied internally and
- * must remain available until the list is freed with got_pathlist_free().
- */
-const struct got_error *got_pathlist_append(struct got_pathlist_head *,
-    const char *, void *);
-
 /* Flags passed to got_pathlist_free() to control which pointers are freed. */
 #define GOT_PATHLIST_FREE_NONE	0	  /* pathlist entry only */
 #define GOT_PATHLIST_FREE_PATH	(1 << 0)  /* entry and path pointer */

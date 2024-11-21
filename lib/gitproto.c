@@ -261,6 +261,7 @@ add_symref(struct got_pathlist_head *symrefs, char *capa)
 {
 	const struct got_error *err = NULL;
 	char *colon, *name = NULL, *target = NULL;
+	struct got_pathlist_entry *new;
 
 	/* Need at least "A:B" */
 	if (strlen(capa) < 3)
@@ -282,7 +283,9 @@ add_symref(struct got_pathlist_head *symrefs, char *capa)
 	}
 
 	/* We can't validate the ref itself here. The main process will. */
-	err = got_pathlist_append(symrefs, name, target);
+	err = got_pathlist_insert(&new, symrefs, name, target);
+	if (err == NULL && new == NULL)
+		err = got_error(GOT_ERR_REF_DUP_ENTRY);
 done:
 	if (err) {
 		free(name);
@@ -310,7 +313,7 @@ got_gitproto_match_capabilities(char **common_capabilities,
 		if (equalsign != NULL && symrefs != NULL &&
 		    strncmp(capa, "symref", equalsign - capa) == 0) {
 			err = add_symref(symrefs, equalsign + 1);
-			if (err)
+			if (err && err->code != GOT_ERR_REF_DUP_ENTRY)
 				break;
 			continue;
 		}

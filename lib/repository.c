@@ -1474,7 +1474,7 @@ got_repo_list_packidx(struct got_pathlist_head *packidx_paths,
 			break;
 		}
 
-		err = got_pathlist_append(packidx_paths, path_packidx, NULL);
+		err = got_pathlist_insert(NULL, packidx_paths, path_packidx, NULL);
 		if (err)
 			break;
 	}

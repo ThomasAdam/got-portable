@@ -1101,7 +1101,7 @@ find_missing_children(void *arg, struct got_fileindex_entry *ie)
 	}
 
 	if (got_path_is_child(ie->path, a->parent_path, a->parent_len))
-		err = got_pathlist_append(a->children, ie->path, NULL);
+		err = got_pathlist_insert(NULL, a->children, ie->path, NULL);
 
 	return err;
 }
@@ -3064,7 +3064,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 		goto done;
 	}
 
-	err = got_pathlist_append(&commit_reflist, commit_refname,
+	err = got_pathlist_insert(&pe, &commit_reflist, commit_refname,
 	    head_refname);
 	if (err)
 		goto done;

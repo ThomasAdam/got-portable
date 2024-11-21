@@ -1641,7 +1641,7 @@ cmd_clone(int argc, char *argv[])
 			fetch_all_branches = 1;
 			break;
 		case 'b':
-			error = got_pathlist_append(&wanted_branches,
+			error = got_pathlist_insert(NULL, &wanted_branches,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -1657,7 +1657,7 @@ cmd_clone(int argc, char *argv[])
 			verbosity = -1;
 			break;
 		case 'R':
-			error = got_pathlist_append(&wanted_refs,
+			error = got_pathlist_insert(NULL, &wanted_refs,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -2396,7 +2396,7 @@ cmd_fetch(int argc, char *argv[])
 			fetch_all_branches = 1;
 			break;
 		case 'b':
-			error = got_pathlist_append(&wanted_branches,
+			error = got_pathlist_insert(NULL, &wanted_branches,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -2412,7 +2412,7 @@ cmd_fetch(int argc, char *argv[])
 			verbosity = -1;
 			break;
 		case 'R':
-			error = got_pathlist_append(&wanted_refs,
+			error = got_pathlist_insert(NULL, &wanted_refs,
 			    optarg, NULL);
 			if (error)
 				return error;
@@ -2572,7 +2572,7 @@ cmd_fetch(int argc, char *argv[])
 		if (!fetch_all_branches)
 			fetch_all_branches = remote->fetch_all_branches;
 		for (i = 0; i < remote->nfetch_branches; i++) {
-			error = got_pathlist_append(&wanted_branches,
+			error = got_pathlist_insert(NULL, &wanted_branches,
 			    remote->fetch_branches[i], NULL);
 			if (error)
 				goto done;
@@ -2580,7 +2580,7 @@ cmd_fetch(int argc, char *argv[])
 	}
 	if (TAILQ_EMPTY(&wanted_refs)) {
 		for (i = 0; i < remote->nfetch_refs; i++) {
-			error = got_pathlist_append(&wanted_refs,
+			error = got_pathlist_insert(NULL, &wanted_refs,
 			    remote->fetch_refs[i], NULL);
 			if (error)
 				goto done;
@@ -3296,7 +3296,7 @@ cmd_checkout(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_pathlist_append(&paths, "", NULL);
+	error = got_pathlist_insert(NULL, &paths, "", NULL);
 	if (error)
 		goto done;
 	cpa.worktree_path = worktree_path;
@@ -3538,7 +3538,7 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 		path = strdup("");
 		if (path == NULL)
 			return got_error_from_errno("strdup");
-		return got_pathlist_append(paths, path, NULL);
+		return got_pathlist_insert(NULL, paths, path, NULL);
 	}
 
 	for (i = 0; i < argc; i++) {
@@ -9904,13 +9904,13 @@ cmd_send(int argc, char *argv[])
 			send_all_branches = 1;
 			break;
 		case 'b':
-			error = got_pathlist_append(&branches, optarg, NULL);
+			error = got_pathlist_insert(NULL, &branches, optarg, NULL);
 			if (error)
 				return error;
 			nbranches++;
 			break;
 		case 'd':
-			error = got_pathlist_append(&delete_args, optarg, NULL);
+			error = got_pathlist_insert(NULL, &delete_args, optarg, NULL);
 			if (error)
 				return error;
 			break;
@@ -9931,7 +9931,7 @@ cmd_send(int argc, char *argv[])
 			send_all_tags = 1;
 			break;
 		case 't':
-			error = got_pathlist_append(&tags, optarg, NULL);
+			error = got_pathlist_insert(NULL, &tags, optarg, NULL);
 			if (error)
 				return error;
 			break;
@@ -10089,7 +10089,7 @@ cmd_send(int argc, char *argv[])
 			goto done;
 		TAILQ_FOREACH(re, &all_branches, entry) {
 			const char *branchname = got_ref_get_name(re->ref);
-			error = got_pathlist_append(&branches,
+			error = got_pathlist_insert(NULL, &branches,
 			    branchname, NULL);
 			if (error)
 				goto done;
@@ -10097,7 +10097,7 @@ cmd_send(int argc, char *argv[])
 		}
 	} else if (nbranches == 0) {
 		for (i = 0; i < remote->nsend_branches; i++) {
-			error = got_pathlist_append(&branches,
+			error = got_pathlist_insert(NULL, &branches,
 			    remote->send_branches[i], NULL);
 			if (error)
 				goto done;
@@ -10111,7 +10111,7 @@ cmd_send(int argc, char *argv[])
 			goto done;
 		TAILQ_FOREACH(re, &all_tags, entry) {
 			const char *tagname = got_ref_get_name(re->ref);
-			error = got_pathlist_append(&tags,
+			error = got_pathlist_insert(NULL, &tags,
 			    tagname, NULL);
 			if (error)
 				goto done;
@@ -10163,7 +10163,7 @@ cmd_send(int argc, char *argv[])
 				goto done;
 		} else
 			ref = head_ref;
-		error = got_pathlist_append(&branches, got_ref_get_name(ref),
+		error = got_pathlist_insert(NULL, &branches, got_ref_get_name(ref),
 		    NULL);
 		if (error)
 			goto done;
@@ -11746,7 +11746,7 @@ cmd_rebase(int argc, char *argv[])
 			if (error)
 				goto done;
 			TAILQ_INIT(&paths);
-			error = got_pathlist_append(&paths, "", NULL);
+			error = got_pathlist_insert(NULL, &paths, "", NULL);
 			if (error)
 				goto done;
 			error = got_worktree_checkout_files(worktree,
@@ -13209,7 +13209,7 @@ cmd_histedit(int argc, char *argv[])
 				int have_changes = 0;
 
 				TAILQ_INIT(&paths);
-				error = got_pathlist_append(&paths, "", NULL);
+				error = got_pathlist_insert(NULL, &paths, "", NULL);
 				if (error)
 					goto done;
 				error = got_worktree_status(worktree, &paths,
@@ -13768,7 +13768,7 @@ cmd_merge(int argc, char *argv[])
 			if (error)
 				goto done;
 			TAILQ_INIT(&paths);
-			error = got_pathlist_append(&paths, "", NULL);
+			error = got_pathlist_insert(NULL, &paths, "", NULL);
 			if (error)
 				goto done;
 			error = got_worktree_checkout_files(worktree,

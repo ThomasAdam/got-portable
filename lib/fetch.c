@@ -120,7 +120,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
 	const char *repo_path = NULL;
 	struct got_pathlist_head have_refs;
-	struct got_pathlist_entry *pe;
+	struct got_pathlist_entry *pe, *new;
 	struct got_reflist_head my_refs;
 	struct got_reflist_entry *re;
 	off_t packfile_size = 0;
@@ -179,9 +179,14 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		err = got_pathlist_append(&have_refs, refname, id);
+		err = got_pathlist_insert(&new, &have_refs, refname, id);
 		if (err)
 			goto done;
+		if (new == NULL){
+			free(&refname);
+			free(id);
+		}
+
 	}
 
 	if (list_refs_only) {

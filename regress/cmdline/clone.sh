@@ -727,7 +727,7 @@ test_clone_multiple_branches() {
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
-	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	echo "HEAD: refs/heads/bar" > $testroot/stdout.expected
 	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/bar: $commit_id" \
@@ -748,7 +748,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
-	branch { "foo" "bar" }
+	branch { "bar" "foo" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -768,8 +768,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = refs/heads/foo:refs/remotes/origin/foo
 	fetch = refs/heads/bar:refs/remotes/origin/bar
+	fetch = refs/heads/foo:refs/remotes/origin/foo
 	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
