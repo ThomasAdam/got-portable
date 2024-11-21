@@ -195,6 +195,7 @@ recv_packfile_done(struct imsg *imsg)
 static void
 session_dispatch_repo_child(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_session_client *client = &gotd_session_client;
@@ -213,8 +214,9 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -455,8 +457,8 @@ session_dispatch_client(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1) {
-			err = got_error_from_errno("imsg_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
 			disconnect_on_error(client, err);
 			return;
 		}
@@ -736,6 +738,7 @@ recv_repo_child(struct imsg *imsg)
 static void
 session_dispatch(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_session_client *client = &gotd_session_client;
@@ -754,9 +757,9 @@ session_dispatch(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		n = imsgbuf_flush(ibuf);
-		if (n == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {

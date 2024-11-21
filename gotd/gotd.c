@@ -595,17 +595,17 @@ gotd_request(int fd, short events, void *arg)
 	ssize_t n;
 
 	if (events & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1) {
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
 			/*
 			 * The client has closed its socket.  This can
 			 * happen when Git clients are done sending
 			 * pack file data.
 			 */
-			if (errno == EPIPE) {
+			if (err->code == GOT_ERR_ERRNO && errno == EPIPE) {
 				disconnect(client);
 				return;
 			}
-			err = got_error_from_errno("imsgbuf_flush");
 			disconnect_on_error(client, err);
 			return;
 		}
@@ -1063,6 +1063,7 @@ connect_repo_child(struct gotd_client *client,
 static void
 gotd_dispatch_listener(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_child_proc *proc = gotd.listen_proc;
@@ -1084,8 +1085,9 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -1144,6 +1146,7 @@ done:
 static void
 gotd_dispatch_notifier(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_child_proc *proc = gotd.notify_proc;
@@ -1165,8 +1168,9 @@ gotd_dispatch_notifier(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	for (;;) {
@@ -1238,8 +1242,9 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 		goto done;
 	}
 
@@ -1380,6 +1385,7 @@ connect_session(struct gotd_client *client)
 static void
 gotd_dispatch_client_session(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_child_proc *proc = NULL;
@@ -1407,8 +1413,9 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	proc = client->session;
@@ -1539,6 +1546,7 @@ connect_notifier_and_session(struct gotd_client *client)
 static void
 gotd_dispatch_repo_child(int fd, short event, void *arg)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct gotd_child_proc *proc = NULL;
@@ -1566,8 +1574,9 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		if (imsgbuf_flush(ibuf) == -1)
-			fatal("imsgbuf_flush");
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
 	}
 
 	proc = client->repo;
@@ -1575,7 +1584,6 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 		fatalx("cannot find child process for fd %d", fd);
 
 	for (;;) {
-		const struct got_error *err = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0;
 
@@ -2479,8 +2487,9 @@ main(int argc, char **argv)
 		if (imsg_compose(imsgbuf, GOTD_IMSG_SECRETS, 0, 0, -1,
 		    &n, sizeof(n)) == -1)
 			fatal("imsg_compose GOTD_IMSG_SECRETS");
-		if (imsgbuf_flush(imsgbuf))
-			fatal("imsg_flush");
+		error = gotd_imsg_flush(imsgbuf);
+		if (error)
+			fatalx("%s", error->msg);
 
 		for (i = 0; i < n; ++i) {
 			struct iovec iov[5];
@@ -2505,8 +2514,9 @@ main(int argc, char **argv)
 			if (imsg_composev(imsgbuf, GOTD_IMSG_SECRET,
 			    0, 0, -1, iov, 5) == -1)
 				fatal("imsg_composev GOTD_IMSG_SECRET");
-			if (imsgbuf_flush(imsgbuf))
-				fatal("imsg_flush");
+			error = gotd_imsg_flush(imsgbuf);
+			if (error)
+				fatalx("%s", error->msg);
 		}
 
 		gotd_secrets_free(gotd.secrets);
