@@ -1,5 +1,5 @@
 * got 0.106; 2024-11-21
-- prevent gotd fromexiting with pending notifications if client disconnects
+- prevent gotd from exiting with pending notifications if client disconnects
 - convert got to the new imsg API
 - gotwebd: improve performance of repository age calculations
 - gotwebd: ensure child processes inherit non-default config
