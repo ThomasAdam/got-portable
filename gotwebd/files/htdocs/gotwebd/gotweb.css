@@ -272,9 +272,11 @@ header.subtitle h2 {
 	overflow: hidden;
 	vertical-align: middle;
 }
+.index_wrapper .index_project {
+	font-weight: bold;
+}
 .index_project {
 	width: 20%;
-	font-weight: bold;
 	text-decoration: underline;
 }
 .index_project_description {
@@ -460,6 +462,7 @@ dd {
     .index_wrapper {
         display: flex;
         flex-wrap: wrap;
+        justify-content: flex-end;
     }
     .index_wrapper .index_project,
     .index_wrapper .index_project_description {
