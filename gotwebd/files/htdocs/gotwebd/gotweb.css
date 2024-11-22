@@ -274,10 +274,10 @@ header.subtitle h2 {
 }
 .index_wrapper .index_project {
 	font-weight: bold;
+	text-decoration: underline;
 }
 .index_project {
 	width: 20%;
-	text-decoration: underline;
 }
 .index_project_description {
 	width: 30%;
