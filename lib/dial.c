@@ -284,9 +284,9 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 		argv[i++] = "-p";
 		argv[i++] = (char *)port;
 	}
-	if (verbosity == -1) {
+	if (verbosity <= 0) {
 		argv[i++] = "-q";
-	} else {
+	} else if (verbosity > 1) {
 		/* ssh(1) allows up to 3 "-v" options. */
 		for (j = 0; j < MIN(3, verbosity); j++)
 			argv[i++] = "-v";
