@@ -1116,7 +1116,8 @@ main(int argc, char **argv)
 				fatalx("bad HTTP response from server");
 			*spc++ = '\0';
 			if (strcasecmp(line, "HTTP/1.1") != 0)
-				log_warnx("unexpected protocol: %s", line);
+				log_warnx("warning: unexpected protocol: %s",
+				    line);
 			line = spc;
 
 			spc = strchr(line, ' ');
@@ -1127,7 +1128,7 @@ main(int argc, char **argv)
 			response_code = strtonum(line, 100, 599,
 			    &errstr);
 			if (errstr != NULL)
-				log_warnx("response code is %s: %s",
+				log_warnx("warning: response code is %s: %s",
 				    errstr, line);
 
 			buf_drain(&bio.rbuf, len);
