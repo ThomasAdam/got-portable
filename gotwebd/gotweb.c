@@ -1068,6 +1068,9 @@ gotweb_load_got_path(struct repo_dir **rp, const char *dir,
 	DIR *dt;
 	char *dir_test;
 
+	if (dir == NULL)
+		return got_error(GOT_ERR_NOT_GIT_REPO);
+
 	*rp = calloc(1, sizeof(**rp));
 	if (*rp == NULL)
 		return got_error_from_errno("calloc");
