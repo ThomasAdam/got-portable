@@ -194,6 +194,11 @@ gotweb_process_request(struct request *c)
 	}
 
 	if (qs->action != INDEX) {
+		if (qs->path == NULL) {
+			error = got_error(GOT_ERR_BAD_QUERYSTRING);
+			goto err;
+		}
+
 		error = gotweb_load_got_path(&repo_dir, qs->path, c);
 		c->t->repo_dir = repo_dir;
 		if (error)
@@ -1067,9 +1072,6 @@ gotweb_load_got_path(struct repo_dir **rp, const char *dir,
 	struct repo_dir *repo_dir;
 	DIR *dt;
 	char *dir_test;
-
-	if (dir == NULL)
-		return got_error(GOT_ERR_NOT_GIT_REPO);
 
 	*rp = calloc(1, sizeof(**rp));
 	if (*rp == NULL)
