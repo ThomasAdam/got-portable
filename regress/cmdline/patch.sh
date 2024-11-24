@@ -1577,6 +1577,8 @@ test_patch_merge_conflict() {
 		return 1
 	fi
 
+	local alpha_basecommit_id=`git_show_head $testroot/repo`
+
 	seq 10 > $testroot/wt/numbers
 	(cd $testroot/wt && got add numbers && got commit -m +numbers) \
 		> /dev/null
@@ -1634,7 +1636,7 @@ test_patch_merge_conflict() {
 	cat <<-EOF > $testroot/wt/alpha.expected
 	<<<<<<< --- alpha
 	ALPHA
-	||||||| commit $commit_id
+	||||||| commit $alpha_basecommit_id
 	alpha
 	=======
 	a
