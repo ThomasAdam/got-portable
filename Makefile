@@ -64,4 +64,7 @@ server-install:
 server-regress:
 	${MAKE} -C regress/gotd
 
+webd-regress:
+	${MAKE} -C regress/gotwebd
+
 .include <bsd.subdir.mk>
