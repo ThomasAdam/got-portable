@@ -934,8 +934,8 @@ test_stage_diff() {
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 | tr -d '\n' \
 		>> $testroot/stdout.expected
@@ -946,6 +946,7 @@ test_stage_diff() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-modified file' >> $testroot/stdout.expected
 	echo '+modified file again' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 | tr -d '\n' \
 		>> $testroot/stdout.expected
@@ -968,8 +969,8 @@ test_stage_diff() {
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -981,6 +982,7 @@ test_stage_diff() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -989,6 +991,7 @@ test_stage_diff() {
 	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 \
@@ -1595,8 +1598,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -1702,8 +1705,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -1857,8 +1860,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -1896,8 +1899,8 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
 		tr -d '\n' >> $testroot/stdout.expected
@@ -1963,8 +1966,8 @@ test_stage_patch_added() {
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l epsilon/new) | cut -d' ' -f 1 \
@@ -2088,8 +2091,8 @@ test_stage_patch_removed() {
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l beta) | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -2310,8 +2313,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -2507,8 +2510,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2522,6 +2525,7 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+beta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l dotgotbar.link) | cut -d' ' -f 1 \
@@ -2531,6 +2535,7 @@ EOF
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+.got/bar' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l dotgotfoo.link) | cut -d' ' -f 1 \
@@ -2539,6 +2544,7 @@ EOF
 	echo '+++ dotgotfoo.link' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+this is regular file foo' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i epsilon | grep 'beta.link@ -> ../beta$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2552,6 +2558,7 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+../gamma/delta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'epsilon.link@ -> epsilon$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2565,6 +2572,7 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+gamma' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'nonexistent.link@ -> nonexistent$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2574,6 +2582,7 @@ EOF
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-nonexistent' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l zeta.link) | cut -d' ' -f 1 \
@@ -2832,8 +2841,8 @@ EOF
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff -s $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo "path + $testroot/wt (staged changes)" >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2847,6 +2856,7 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+beta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l dotgotfoo.link) | cut -d' ' -f 1 \
@@ -2855,6 +2865,7 @@ EOF
 	echo '+++ dotgotfoo.link' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+this is regular file foo' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'epsilon.link@ -> epsilon$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2868,6 +2879,7 @@ EOF
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+gamma' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'nonexistent.link@ -> nonexistent$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -2877,6 +2889,7 @@ EOF
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-nonexistent' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $head_commit" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage -l zeta.link) | cut -d' ' -f 1 \

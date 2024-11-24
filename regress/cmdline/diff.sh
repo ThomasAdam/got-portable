@@ -34,8 +34,8 @@ test_diff_basic() {
 	(cd $testroot/wt && got add new >/dev/null)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -45,6 +45,7 @@ test_diff_basic() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -53,6 +54,7 @@ test_diff_basic() {
 	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -119,8 +121,8 @@ test_diff_basic() {
 
 	# diff several paths in a work tree
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -130,6 +132,7 @@ test_diff_basic() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -138,6 +141,7 @@ test_diff_basic() {
 	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -147,6 +151,7 @@ test_diff_basic() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-zeta' >> $testroot/stdout.expected
 	echo '+modified zeta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -266,14 +271,15 @@ test_diff_basic() {
 		return 1
 	fi
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + master (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ master' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+master' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -308,8 +314,8 @@ test_diff_basic() {
 
 	# a single argument which can be resolved to a path is not ambiguous
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -362,8 +368,8 @@ test_diff_basic() {
 	fi
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -475,8 +481,8 @@ test_diff_shows_conflict() {
 	fi
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'numbers$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -665,8 +671,8 @@ test_diff_ignore_whitespace() {
 	(cd $testroot/wt && got diff -w > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id0" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id0" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
 		cut -d' ' -f 1 >> $testroot/stdout.expected
@@ -744,8 +750,8 @@ test_diff_symlinks_in_work_tree() {
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'alpha.link@ -> alpha$' | \
@@ -758,6 +764,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+beta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'dotgotfoo.link@ -> .got/foo$' | \
@@ -770,6 +777,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+.got/bar' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i epsilon | \
 		grep 'beta.link@ -> ../beta$' | \
@@ -782,6 +790,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+../gamma/delta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'epsilon.link@ -> epsilon$' | \
@@ -794,6 +803,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+gamma' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
 		grep 'nonexistent.link@ -> nonexistent$' | \
@@ -804,6 +814,7 @@ test_diff_symlinks_in_work_tree() {
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-nonexistent' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo "commit - $commit_id1" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + zeta.link (mode 120000)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -954,8 +965,8 @@ test_diff_binary_files() {
 	(cd $testroot/wt && got add foo >/dev/null)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo (mode 644)' >> $testroot/stdout.expected
 	echo "Binary files /dev/null and foo differ" \
@@ -971,8 +982,8 @@ test_diff_binary_files() {
 	fi
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -996,8 +1007,8 @@ test_diff_binary_files() {
 	printf '\377\200\0\0\377\200\0\0' > $testroot/wt/foo
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'foo$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1364,8 +1375,8 @@ test_diff_worktree_newfile_xbit() {
 	local commit_id=`git_show_head $testroot/repo`
 	cat <<EOF > $testroot/stdout.expected
 diff $testroot/wt
-commit - $commit_id
 path + $testroot/wt
+commit - $commit_id
 blob - /dev/null
 file + xfile (mode 755)
 --- /dev/null
@@ -1604,8 +1615,8 @@ diffstat $testroot/wt
 EOF
 
 	echo "diff $testroot/wt" >> $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1615,6 +1626,7 @@ EOF
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1623,6 +1635,7 @@ EOF
 	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -1654,8 +1667,8 @@ EOF
 
 	# specify paths to diffstat
 	echo "diff $testroot/wt" >> $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1665,6 +1678,7 @@ EOF
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1673,6 +1687,7 @@ EOF
 	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -1682,6 +1697,7 @@ EOF
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-zeta' >> $testroot/stdout.expected
 	echo '+modified zeta' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -1736,14 +1752,15 @@ diffstat $testroot/wt
 EOF
 
 	echo "diff $testroot/wt" >> $testroot/stdout.expected
-	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + master (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ master' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+master' >> $testroot/stdout.expected
+	echo "commit - $head_rev" >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new (mode 644)' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
@@ -2267,6 +2284,110 @@ test_diff_commit_keywords() {
 	test_done "$testroot" "$ret"
 }
 
+test_diff_mixed_worktree() {
+	local testroot=$(test_init diff_mixed_worktree)
+	local baseid_beta=$(git_show_head $testroot/repo)
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "'alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "'alpha" > /dev/null)
+
+	local baseid_alpha=$(git_show_head $testroot/repo)
+
+	echo "'delta" > $testroot/wt/gamma/delta
+	(cd $testroot/wt && got commit -m "'delta" > /dev/null)
+
+	local baseid_new=$(git_show_head $testroot/repo)
+	local blobid_alpha=$(get_blob_id $testroot/repo "" alpha)
+	local blobid_beta=$(get_blob_id $testroot/repo "" beta)
+
+	echo "alpha" > $testroot/wt/alpha
+	echo "'beta" > $testroot/wt/beta
+	echo "new" > $testroot/wt/new
+
+	(cd $testroot/wt && got add new > /dev/null)
+
+	cat <<-EOF >$testroot/stdout.expected
+	diff $testroot/wt
+	path + $testroot/wt
+	commit - $baseid_alpha
+	blob - $blobid_alpha
+	file + alpha
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-'alpha
+	+alpha
+	commit - $baseid_beta
+	blob - $blobid_beta
+	file + beta
+	--- beta
+	+++ beta
+	@@ -1 +1 @@
+	-beta
+	+'beta
+	commit - $baseid_new
+	blob - /dev/null
+	file + new (mode 644)
+	--- /dev/null
+	+++ new
+	@@ -0,0 +1 @@
+	+new
+	EOF
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage alpha beta > $testroot/stdout)
+
+	stageid_alpha=$(cd $testroot/wt && got stage -l alpha | cut -d' ' -f 1)
+	stageid_beta=$(cd $testroot/wt && got stage -l beta | cut -d' ' -f 1)
+
+	cat <<-EOF >$testroot/stdout.expected
+	diff -s $testroot/wt
+	path + $testroot/wt (staged changes)
+	commit - $baseid_alpha
+	blob - $blobid_alpha
+	blob + $stageid_alpha
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-'alpha
+	+alpha
+	commit - $baseid_beta
+	blob - $blobid_beta
+	blob + $stageid_beta
+	--- beta
+	+++ beta
+	@@ -1 +1 @@
+	-beta
+	+'beta
+	EOF
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -2287,3 +2408,4 @@ run_test test_diff_file_to_dir
 run_test test_diff_dir_to_file
 run_test test_diff_path_in_root_commit
 run_test test_diff_commit_keywords
+run_test test_diff_mixed_worktree

@@ -1178,8 +1178,8 @@ test_update_conflict_wt_rm_vs_repo_edit() {
 	# 'got diff' should show post-update contents of beta being deleted
 	local head_rev=`git_show_head $testroot/repo`
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $head_rev"  >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $head_rev"  >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected

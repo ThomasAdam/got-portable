@@ -5060,6 +5060,34 @@ done:
 }
 
 static const struct got_error *
+emit_base_commit_header(FILE *f, struct got_object_id *commit_id,
+    struct got_worktree *worktree)
+{
+	const struct got_error	*err;
+	struct got_object_id	*base_commit_id;
+	char			*base_commit_idstr;
+
+	if (worktree == NULL)	/* shouldn't happen */
+		return got_error(GOT_ERR_NOT_WORKTREE);
+
+	base_commit_id = got_worktree_get_base_commit_id(worktree);
+
+	if (commit_id != NULL) {
+		if (got_object_id_cmp(commit_id, base_commit_id) != 0)
+			base_commit_id = commit_id;
+	}
+
+	err = got_object_id_str(&base_commit_idstr, base_commit_id);
+	if (err != NULL)
+		return err;
+
+	if (fprintf(f, "commit - %s\n", base_commit_idstr) < 0)
+		err = got_error_from_errno("fprintf");
+	free(base_commit_idstr);
+	return err;
+}
+
+static const struct got_error *
 print_diff(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
     struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
@@ -5108,10 +5136,6 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			err = got_error_from_errno("fprintf");
 			goto done;
 		}
-		if (fprintf(a->outfile, "commit - %s\n", a->id_str) < 0) {
-			err = got_error_from_errno("fprintf");
-			goto done;
-		}
 		if (fprintf(a->outfile, "path + %s%s\n",
 		    got_worktree_get_root_path(a->worktree),
 		    a->diff_staged ? " (staged changes)" : "") < 0) {
@@ -5120,6 +5144,10 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		}
 		a->header_shown = 1;
 	}
+
+	err = emit_base_commit_header(a->outfile, commit_id, a->worktree);
+	if (err != NULL)
+		goto done;
 
 	if (a->diff_staged) {
 		const char *label1 = NULL, *label2 = NULL;

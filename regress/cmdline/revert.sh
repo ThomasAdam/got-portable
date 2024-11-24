@@ -566,8 +566,8 @@ EOF
 	fi
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -669,8 +669,8 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
@@ -739,8 +739,8 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
 	echo "diff $testroot/wt" > $testroot/stdout.expected
-	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo "path + $testroot/wt" >> $testroot/stdout.expected
+	echo "commit - $commit_id" >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id \
 		| grep 'numbers$' | cut -d' ' -f 1 \
