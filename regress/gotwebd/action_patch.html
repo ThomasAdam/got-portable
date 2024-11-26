@@ -1,0 +1,36 @@
+Content-Security-Policy: default-src 'self'; script-src 'none'; object-src 'none';
+Content-Type: text/plain
+
+commit ${COMMIT_ID}
+from: ${COMMITTER} <${COMMITTER_EMAIL}>
+date: ${COMMIT_DATE} UTC
+
+import the test tree
+
+commit - /dev/null
+commit + ${COMMIT_ID}
+blob - /dev/null
+blob + ${BLOB_ALPHA} (mode 644)
+--- /dev/null
++++ alpha
+@@ -0,0 +1 @@
++alpha
+blob - /dev/null
+blob + ${BLOB_BETA} (mode 644)
+--- /dev/null
++++ beta
+@@ -0,0 +1 @@
++beta
+blob - /dev/null
+blob + ${BLOB_ZETA} (mode 644)
+--- /dev/null
++++ epsilon/zeta
+@@ -0,0 +1 @@
++zeta
+blob - /dev/null
+blob + ${BLOB_DELTA} (mode 644)
+--- /dev/null
++++ gamma/delta
+@@ -0,0 +1 @@
++delta
+
