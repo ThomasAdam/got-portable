@@ -41,9 +41,9 @@ test_gotwebd_action_index()
 	test_done "$testroot" "" "$ret"
 }
 
-test_gotwebd_action_commit()
+test_gotwebd_action_diff()
 {
-	local testroot=$(test_init gotwebd_action_commit 1)
+	local testroot=$(test_init gotwebd_action_diff 1)
 	local repo="${GOTWEBD_TEST_CHROOT}/got/public/repo.git"
 	local id=$(git_show_head $repo)
 	local author_time=$(git_show_author_time $repo)
@@ -58,7 +58,7 @@ test_gotwebd_action_commit()
 	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
 	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
-	interpolate action_commit.html > $testroot/content.expected
+	interpolate action_diff.html > $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
@@ -161,7 +161,7 @@ test_gotwebd_action_patch()
 
 test_parseargs "$@"
 run_test test_gotwebd_action_index
-run_test test_gotwebd_action_commit
+run_test test_gotwebd_action_diff
 run_test test_gotwebd_action_blame
 run_test test_gotwebd_action_tree
 run_test test_gotwebd_action_patch
