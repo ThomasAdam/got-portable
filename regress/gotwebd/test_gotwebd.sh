@@ -128,8 +128,40 @@ test_gotwebd_action_tree()
 	test_done "$testroot" "$repo" "$ret"
 }
 
+test_gotwebd_action_patch()
+{
+	local testroot=$(test_init gotwebd_action_patch 1)
+	local repo="${GOTWEBD_TEST_CHROOT}/got/public/repo.git"
+	local id=$(git_show_head $repo)
+	local author_time=$(git_show_author_time $repo)
+	local qs="action=patch&commit=${id}&headref=HEAD&path=repo.git"
+
+	COMMIT_ID=$id \
+	BLOB_ALPHA=$(get_blob_id $repo "" alpha) \
+	BLOB_BETA=$(get_blob_id $repo "" beta) \
+	BLOB_ZETA=$(get_blob_id $repo epsilon zeta) \
+	BLOB_DELTA=$(get_blob_id $repo gamma delta) \
+	COMMITTER="Flan Hacker" \
+	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
+	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
+	interpolate action_patch.html > $testroot/content.expected
+
+	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$repo" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$repo" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_gotwebd_action_index
 run_test test_gotwebd_action_commit
 run_test test_gotwebd_action_blame
 run_test test_gotwebd_action_tree
+run_test test_gotwebd_action_patch
