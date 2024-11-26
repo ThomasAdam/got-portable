@@ -16,9 +16,9 @@
 
 . ./common.sh
 
-test_gotwebd_action_index()
+test_gotwebd_action_summary()
 {
-	local testroot=$(test_init gotwebd_action_index 1)
+	local testroot=$(test_init gotwebd_action_summary 1)
 	local repo="${GOTWEBD_TEST_CHROOT}/got/public/repo.git"
 	local author_time=$(git_show_author_time $repo)
 	local id=$(git_show_head $repo)
@@ -26,7 +26,7 @@ test_gotwebd_action_index()
 	COMMIT_ID=$id \
 	COMMIT_ID10=$(printf '%.10s' $id) \
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
-	interpolate action_index.html > $testroot/content.expected
+	interpolate action_summary.html > $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI > $testroot/content
 
@@ -160,7 +160,7 @@ test_gotwebd_action_patch()
 }
 
 test_parseargs "$@"
-run_test test_gotwebd_action_index
+run_test test_gotwebd_action_summary
 run_test test_gotwebd_action_diff
 run_test test_gotwebd_action_blame
 run_test test_gotwebd_action_tree
