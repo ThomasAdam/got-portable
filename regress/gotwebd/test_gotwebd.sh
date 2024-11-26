@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-. ./common.sh
+. ${GOTWEBD_TEST_DATA_DIR}/common.sh
 
 test_gotwebd_action_summary()
 {
@@ -26,7 +26,8 @@ test_gotwebd_action_summary()
 	COMMIT_ID=$id \
 	COMMIT_ID10=$(printf '%.10s' $id) \
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
-	interpolate action_summary.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_summary.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI > $testroot/content
 
@@ -58,7 +59,8 @@ test_gotwebd_action_diff()
 	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
 	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
-	interpolate action_diff.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_diff.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
@@ -87,7 +89,8 @@ test_gotwebd_action_blame()
 	COMMIT_YMD=$(date -u -r $author_time +"%F") \
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
 	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
-	interpolate action_blame.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_blame.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
@@ -113,7 +116,8 @@ test_gotwebd_action_tree()
 	COMMIT_YMDHMS=$(date -u -r $author_time +"%FT%TZ") \
 	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
 	TREE_ID=$(got cat -r $repo main | head -1 | cut -d ' ' -f2) \
-	interpolate action_tree.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_tree.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
@@ -144,7 +148,8 @@ test_gotwebd_action_patch()
 	COMMITTER="Flan Hacker" \
 	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
 	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
-	interpolate action_patch.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_patch.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
@@ -187,7 +192,8 @@ test_gotwebd_action_commits()
 	COMMIT_YMDHMS_HEAD=$(date -u -r $author_time_head +"%FT%TZ") \
 	COMMIT_DATE_ROOT=$(date -u -r $author_time_root +"%a %b %e %X %Y") \
 	COMMIT_DATE_HEAD=$(date -u -r $author_time_head +"%a %b %e %X %Y") \
-	interpolate action_commits.html > $testroot/content.expected
+	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_commits.html \
+		> $testroot/content.expected
 
 	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
 
