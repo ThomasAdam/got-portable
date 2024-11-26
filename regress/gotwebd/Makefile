@@ -80,7 +80,7 @@ start_gotwebd: prepare_test_repo gotwebd_test
 	@${GOTWEBD_TRAP}; ${GOTWEBD_START_CMD}
 	@${GOTWEBD_TRAP}; sleep .5
 
-test_gotwebd: start_gotwebd
+test_gotwebd: ensure_root start_gotwebd
 	@-$(GOTWEBD_TRAP); su -m ${GOTWEBD_TEST_USER} -c \
 		'env $(GOTWEBD_TEST_ENV) sh ${.CURDIR}/test_gotwebd.sh'
 	@${GOTWEBD_STOP_CMD} 2>/dev/null
