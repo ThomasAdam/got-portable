@@ -21,6 +21,7 @@ worktree=$HOME/got
 fromaddr_arg=
 force=0
 gotd=0
+webd=0
 testroot="/tmp"
 
 while getopts b:fGR:r:w: arg; do
@@ -31,6 +32,8 @@ while getopts b:fGR:r:w: arg; do
 			force=1 ;;
 		G)
 			gotd=1 ;;
+		W)
+			webd=1 ;;
 		w)
 			worktree="$OPTARG" ;;
 		r)
@@ -182,6 +185,21 @@ fi
 if [ $gotd -ne 0 ]; then
 	printf "\n\n\tRunning gotd tests\n\n" >> build.log
 	log_cmd regress.log doas env PATH=$HOME/bin:$PATH make server-regress
+	regress_status=$?
+	cat regress.log >> build.log
+	egrep "test.*failed" regress.log > failures.log
+	regress_failure_grep="$?"
+	if [ "$regress_status" -ne 0 -o "$regress_failure_grep" -eq 0 ]; then
+		printf "\n\n\t Test failures:\n\n" >> build.log
+		cat failures.log >> build.log
+		mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
+		exit 0
+	fi
+fi
+
+if [ $webd -ne 0 ]; then
+	printf "\n\n\tRunning gotwebd tests\n\n" >> build.log
+	log_cmd regress.log doas env PATH=$HOME/bin:$PATH make webd-regress
 	regress_status=$?
 	cat regress.log >> build.log
 	egrep "test.*failed" regress.log > failures.log
