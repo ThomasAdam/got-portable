@@ -59,7 +59,7 @@ gotwebd_libexec:
 	@su -m ${GOTWEBD_TEST_USER} -c \
 	    '${MAKE} -C ${.CURDIR}/../../gotwebd/libexec' >/dev/null 2>&1
 
-prepare_test_env: gotwebd_libexec ensure_root
+prepare_test_env: ensure_root gotwebd_libexec 
 	@mkdir -p "${GOTWEBD_TEST_CHROOT}"
 	@DESTDIR=${GOTWEBD_TEST_ROOT} \
 	    ${MAKE} -C ${.CURDIR}/../../gotwebd/libexec install >/dev/null 2>&1
@@ -80,7 +80,7 @@ start_gotwebd: prepare_test_repo gotwebd_test
 	@${GOTWEBD_TRAP}; ${GOTWEBD_START_CMD}
 	@${GOTWEBD_TRAP}; sleep .5
 
-test_gotwebd: ensure_root start_gotwebd
+test_gotwebd: start_gotwebd
 	@-$(GOTWEBD_TRAP); su -m ${GOTWEBD_TEST_USER} -c \
 		'env $(GOTWEBD_TEST_ENV) sh ${.CURDIR}/test_gotwebd.sh'
 	@${GOTWEBD_STOP_CMD} 2>/dev/null
