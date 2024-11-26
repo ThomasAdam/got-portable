@@ -159,9 +159,53 @@ test_gotwebd_action_patch()
 	test_done "$testroot" "$repo" "$ret"
 }
 
+test_gotwebd_action_commits()
+{
+	local testroot=$(test_init gotwebd_action_commits 1)
+	local repo="${GOTWEBD_TEST_CHROOT}/got/public/repo.git"
+	local author_time_root=$(git_show_author_time $repo)
+	local id_root=$(git_show_head $repo)
+	local qs="action=commits&headref=HEAD&path=repo.git"
+
+	got checkout $repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "'alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
+
+	local author_time_head=$(git_show_author_time $repo)
+
+	COMMITTER="Flan Hacker" \
+	COMMIT_ID_ROOT=$id_root \
+	COMMIT_ID_HEAD=$(git_show_head $repo) \
+	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
+	COMMIT_YMDHMS_ROOT=$(date -u -r $author_time_root +"%FT%TZ") \
+	COMMIT_YMDHMS_HEAD=$(date -u -r $author_time_head +"%FT%TZ") \
+	COMMIT_DATE_ROOT=$(date -u -r $author_time_root +"%a %b %e %X %Y") \
+	COMMIT_DATE_HEAD=$(date -u -r $author_time_head +"%a %b %e %X %Y") \
+	interpolate action_commits.html > $testroot/content.expected
+
+	$GOTWEBD_TEST_FCGI -q "$qs" > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$repo" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$repo" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_gotwebd_action_summary
 run_test test_gotwebd_action_diff
 run_test test_gotwebd_action_blame
 run_test test_gotwebd_action_tree
 run_test test_gotwebd_action_patch
+run_test test_gotwebd_action_commits
