@@ -9,8 +9,6 @@ CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 
 NOMAN = yes
 
-NOOBJ=Yes
-
 .PHONY: ensure_root prepare_test_env prepare_test_repo start_gotwebd
 
 GOTWEBD_TEST_TMPDIR=/tmp
@@ -44,7 +42,8 @@ GOTWEBD_TEST_ENV=GOTWEBD_TEST_SOCK=${GOTWEBD_TEST_SOCK} \
 	GOTWEBD_TEST_USER=${GOTWEBD_TEST_USER} \
 	GOTWEBD_TEST_FCGI=${GOTWEBD_TEST_FCGI} \
 	PATH=$(GOTWEBD_TEST_USER_HOME)/bin:${PATH} \
-	HOME=$(GOTWEBD_TEST_USER_HOME)
+	HOME=$(GOTWEBD_TEST_USER_HOME) \
+	GOTWEBD_TEST_DATA_DIR=${.CURDIR}
 
 ensure_root:
 	@if [[ `id -u` -ne 0 ]]; then \
@@ -69,7 +68,7 @@ prepare_test_env: gotwebd_libexec ensure_root
 
 prepare_test_repo: prepare_test_env
 	@su -m ${GOTWEBD_TEST_USER} -c 'env ${GOTWEBD_TEST_ENV} \
-	    sh ./prepare_test_repo.sh "${GOTWEBD_TEST_CHROOT}"'
+	    sh ${.CURDIR}/prepare_test_repo.sh "${GOTWEBD_TEST_CHROOT}"'
 
 start_gotwebd: prepare_test_repo gotwebd_test
 	@echo 'user "${GOTWEBD_TEST_USER}"' > ${GOTWEBD_TEST_CONF}
@@ -83,7 +82,7 @@ start_gotwebd: prepare_test_repo gotwebd_test
 
 test_gotwebd: start_gotwebd
 	@-$(GOTWEBD_TRAP); su -m ${GOTWEBD_TEST_USER} -c \
-		'env $(GOTWEBD_TEST_ENV) sh ./test_gotwebd.sh'
+		'env $(GOTWEBD_TEST_ENV) sh ${.CURDIR}/test_gotwebd.sh'
 	@${GOTWEBD_STOP_CMD} 2>/dev/null
 
 .include <bsd.regress.mk>
