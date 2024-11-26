@@ -129,7 +129,7 @@ The gotwebd test suite must be started as root in order to start and stop
 the gotwebd daemon. With the gotwebd binary installed, the test suite can
 be run from the top-level directory:
 
-$ doas make webd-regress
+ $ doas make webd-regress
 
 The test suite switches to non-root users as appropriate.
 
