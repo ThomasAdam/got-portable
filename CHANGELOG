@@ -6,6 +6,13 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.106 (2024-11-28)
+
+* Changes from got-0.106
+
+  Plus:
+    - libutil sync changes from OpenBSD so that imsg works on Linux.
+
 # got-portable 0.105 (2024-11-14)
 
 * Changes from got-0.105
