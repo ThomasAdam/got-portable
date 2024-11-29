@@ -171,7 +171,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 
 	TAILQ_FOREACH(re, &my_refs, entry) {
 		struct got_object_id *id;
-		const char *refname;
+		char *refname;
 
 		if (got_ref_is_symbolic(re->ref))
 			continue;
@@ -188,7 +188,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		if (err)
 			goto done;
 		if (new == NULL){
-			free(&refname);
+			free(refname);
 			free(id);
 		}
 
