@@ -433,6 +433,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 			t->more_id = strdup(repo_commit->commit_id);
 			if (t->more_id == NULL)
 				error = got_error_from_errno("strdup");
+			gotweb_free_repo_commit(repo_commit);
 			goto done;
 		}
 
