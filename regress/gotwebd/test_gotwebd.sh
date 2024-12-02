@@ -147,7 +147,7 @@ test_gotwebd_action_patch()
 	BLOB_DELTA=$(get_blob_id $repo gamma delta) \
 	COMMITTER="Flan Hacker" \
 	COMMITTER_EMAIL="flan_hacker@openbsd.org" \
-	COMMIT_DATE=$(date -u -r $author_time +"%a %b %e %X %Y") \
+	COMMIT_DATE=$(date -u -r $author_time +"%a %b %d %X %Y") \
 	interpolate ${GOTWEBD_TEST_DATA_DIR}/action_patch.html \
 		> $testroot/content.expected
 
