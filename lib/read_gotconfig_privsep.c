@@ -86,64 +86,65 @@ got_gotconfig_read(struct got_gotconfig **conf, const char *gotconfig_path)
 
 	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
-		goto done;
+		goto wait;
 	}
 	imsg_fds[1] = -1;
 	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
-		goto done;
+		goto wait;
 	}
 	imsgbuf_allow_fdpass(ibuf);
 
 	err = got_privsep_send_gotconfig_parse_req(ibuf, fd);
 	if (err)
-		goto done;
+		goto wait;
 	fd = -1;
 
 	err = got_privsep_send_gotconfig_author_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gotconfig_str(&(*conf)->author, ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_send_gotconfig_allowed_signers_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gotconfig_str(&(*conf)->allowed_signers_file,
 	    ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_send_gotconfig_revoked_signers_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gotconfig_str(&(*conf)->revoked_signers_file,
 	    ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_send_gotconfig_signer_id_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gotconfig_str(&(*conf)->signer_id, ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_send_gotconfig_remotes_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gotconfig_remotes(&(*conf)->remotes,
 	    &(*conf)->nremotes, ibuf);
 	if (err)
-		goto done;
-
-	err = got_privsep_send_stop(imsg_fds[0]);
+		goto wait;
+wait:
+	if (imsg_fds[0] != -1)
+		got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
 	if (child_err && err == NULL)
 		err = child_err;

@@ -104,55 +104,55 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 
 	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
-		goto done;
+		goto wait;
 	}
 	imsg_fds[1] = -1;
 	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
-		goto done;
+		goto wait;
 	}
 	imsgbuf_allow_fdpass(ibuf);
 
 	err = got_privsep_send_gitconfig_parse_req(ibuf, fd);
 	if (err)
-		goto done;
+		goto wait;
 	fd = -1;
 
 	err = got_privsep_send_gitconfig_repository_format_version_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gitconfig_int(
 	    gitconfig_repository_format_version, ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	if (extnames && extvals && nextensions) {
 		err = got_privsep_send_gitconfig_repository_extensions_req(
 		    ibuf);
 		if (err)
-			goto done;
+			goto wait;
 		err = got_privsep_recv_gitconfig_int(nextensions, ibuf);
 		if (err)
-			goto done;
+			goto wait;
 		if (*nextensions > 0) {
 			int i;
 			*extnames = calloc(*nextensions, sizeof(char *));
 			if (*extnames == NULL) {
 				err = got_error_from_errno("calloc");
-				goto done;
+				goto wait;
 			}
 			*extvals = calloc(*nextensions, sizeof(char *));
 			if (*extvals == NULL) {
 				err = got_error_from_errno("calloc");
-				goto done;
+				goto wait;
 			}
 			for (i = 0; i < *nextensions; i++) {
 				char *ext, *val;
 				err = got_privsep_recv_gitconfig_pair(&ext,
 				    &val, ibuf);
 				if (err)
-					goto done;
+					goto wait;
 				(*extnames)[i] = ext;
 				(*extvals)[i] = val;
 			}
@@ -161,41 +161,42 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 
 	err = got_privsep_send_gitconfig_author_name_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gitconfig_str(gitconfig_author_name, ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_send_gitconfig_author_email_req(ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	err = got_privsep_recv_gitconfig_str(gitconfig_author_email, ibuf);
 	if (err)
-		goto done;
+		goto wait;
 
 	if (remotes && nremotes) {
 		err = got_privsep_send_gitconfig_remotes_req(ibuf);
 		if (err)
-			goto done;
+			goto wait;
 
 		err = got_privsep_recv_gitconfig_remotes(remotes,
 		    nremotes, ibuf);
 		if (err)
-			goto done;
+			goto wait;
 	}
 
 	if (gitconfig_owner) {
 		err = got_privsep_send_gitconfig_owner_req(ibuf);
 		if (err)
-			goto done;
+			goto wait;
 		err = got_privsep_recv_gitconfig_str(gitconfig_owner, ibuf);
 		if (err)
-			goto done;
+			goto wait;
 	}
-
-	err = got_privsep_send_stop(imsg_fds[0]);
+wait:
+	if (imsg_fds[0] != -1)
+		got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
 	if (child_err && err == NULL)
 		err = child_err;
