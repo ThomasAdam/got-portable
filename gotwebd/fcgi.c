@@ -101,7 +101,7 @@ fcgi_request(int fd, short events, void *arg)
 
 		/* drop the parsed record */
 		if (parsed != 0 && c->buf_len > 0) {
-			bcopy(c->buf + c->buf_pos, c->buf, c->buf_len);
+			memmove(c->buf, c->buf + c->buf_pos, c->buf_len);
 			c->buf_pos = 0;
 		}
 	} while (parsed > 0 && c->buf_len > 0);
