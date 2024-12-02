@@ -64,7 +64,7 @@ fcgi_request(int fd, short events, void *arg)
 	size_t parsed = 0;
 
 	n = read(fd, c->buf + c->buf_pos + c->buf_len,
-	    FCGI_RECORD_SIZE - c->buf_pos-c->buf_len);
+	    FCGI_RECORD_SIZE - c->buf_pos - c->buf_len);
 
 	switch (n) {
 	case -1:
@@ -117,7 +117,7 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 	struct fcgi_record_header *h;
 
 	if (n < sizeof(struct fcgi_record_header))
-		 return 0;
+		return 0;
 
 	h = (struct fcgi_record_header*) buf;
 
@@ -125,7 +125,7 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 
 	if (n < sizeof(struct fcgi_record_header) + ntohs(h->content_len)
 	    + h->padding_len)
-		 return 0;
+		return 0;
 
 	if (h->version != 1)
 		log_warn("wrong version");
