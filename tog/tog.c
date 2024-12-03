@@ -3090,6 +3090,7 @@ log_scroll_up(struct tog_log_view_state *s, int maxscroll)
 static const struct got_error *
 trigger_log_thread(struct tog_view *view, int wait)
 {
+	const struct got_error *err;
 	struct tog_log_thread_args *ta = &view->state.log.thread_args;
 	int errcode;
 
@@ -3112,7 +3113,9 @@ trigger_log_thread(struct tog_view *view, int wait)
 			break;
 
 		/* Display progress update in log view. */
-		show_log_view(view);
+		err = show_log_view(view);
+		if (err != NULL)
+			return err;
 		update_panels();
 		doupdate();
 
@@ -3123,7 +3126,9 @@ trigger_log_thread(struct tog_view *view, int wait)
 			    "pthread_cond_wait");
 
 		/* Display progress update in log view. */
-		show_log_view(view);
+		err = show_log_view(view);
+		if (err != NULL)
+			return err;
 		update_panels();
 		doupdate();
 	}
@@ -3753,7 +3758,9 @@ search_next_log_view(struct tog_view *view)
 	struct commit_queue_entry *entry;
 
 	/* Display progress update in log view. */
-	show_log_view(view);
+	err = show_log_view(view);
+	if (err != NULL)
+		return err;
 	update_panels();
 	doupdate();
 
@@ -5797,8 +5804,11 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	}
 
 	if (parent_view && parent_view->type == TOG_VIEW_LOG &&
-	    view_is_splitscreen(view))
-		show_log_view(parent_view); /* draw border */
+	    view_is_splitscreen(view)) {
+		err = show_log_view(parent_view); /* draw border */
+		if (err != NULL)
+			goto done;
+	}
 	diff_view_indicate_progress(view);
 
 	err = create_diff(s);
