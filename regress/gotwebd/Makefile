@@ -59,7 +59,7 @@ gotwebd_libexec:
 	@su -m ${GOTWEBD_TEST_USER} -c \
 	    '${MAKE} -C ${.CURDIR}/../../gotwebd/libexec' >/dev/null 2>&1
 
-prepare_test_env: ensure_root gotwebd_libexec 
+prepare_test_env: ensure_root gotwebd_libexec
 	@mkdir -p "${GOTWEBD_TEST_CHROOT}"
 	@DESTDIR=${GOTWEBD_TEST_ROOT} \
 	    ${MAKE} -C ${.CURDIR}/../../gotwebd/libexec install >/dev/null 2>&1
