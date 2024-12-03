@@ -219,8 +219,10 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 		}
 		n = fprintf(outfile, "blob - %s%s\n", idstr1,
 		    modestr1 ? modestr1 : "");
-		if (n < 0)
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
 			goto done;
+		}
 		outoff += n;
 		if (lines && *lines) {
 			err = add_line_metadata(lines, nlines, outoff,
@@ -231,8 +233,10 @@ diff_blobs(struct got_diff_line **lines, size_t *nlines,
 
 		n = fprintf(outfile, "blob + %s%s\n", idstr2,
 		    modestr2 ? modestr2 : "");
-		if (n < 0)
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
 			goto done;
+		}
 		outoff += n;
 		if (lines && *lines) {
 			err = add_line_metadata(lines, nlines, outoff,
