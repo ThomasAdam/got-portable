@@ -6840,16 +6840,14 @@ cancel_blame_view(void *arg)
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode,
-		    "pthread_mutex_unlock");
+		return got_error_set_errno(errcode, "pthread_mutex_lock");
 
 	if (*done)
 		err = got_error(GOT_ERR_CANCELLED);
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode,
-		    "pthread_mutex_lock");
+		return got_error_set_errno(errcode, "pthread_mutex_unlock");
 
 	return err;
 }
