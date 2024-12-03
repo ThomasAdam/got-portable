@@ -1239,15 +1239,17 @@ nextsep(char *s, char **t)
 	size_t			 r;
 
 	if (gmtime_r(&rc->committer_time, &tm) == NULL ||
-	    strftime(datebuf, sizeof(datebuf), "%a %b %d %T %Y UTC", &tm) == 0)
+	    asctime_r(&tm, datebuf) == NULL)
 		return (-1);
+
+	datebuf[strcspn(datebuf, "\n")] = '\0';
 !}
 commit {{ rc->commit_id }} {{ "\n" }}
 from: {{ rc->author | unsafe }} {{ "\n" }}
 {{ if strcmp(rc->committer, rc->author) != 0 }}
 via: {{ rc->committer | unsafe }} {{ "\n" }}
 {{ end }}
-date: {{ datebuf }} {{ "\n" }}
+date: {{ datebuf }} {{ " UTC" }} {{ "\n" }}
 {{ "\n" }}
 {{ rc->commit_msg | unsafe }} {{ "\n" }}
 {!
