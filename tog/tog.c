@@ -5716,12 +5716,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 			goto done;
 		}
 	}
-	s->first_displayed_line = 1;
-	s->last_displayed_line = view->nlines;
-	s->selected_line = 1;
-	s->repo = repo;
-	s->label1 = label1;
-	s->label2 = label2;
 
 	if (id1) {
 		s->id1 = got_object_id_dup(id1);
@@ -5762,6 +5756,11 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		goto done;
 	}
 
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->selected_line = 1;
+	s->label1 = label1;
+	s->label2 = label2;
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
