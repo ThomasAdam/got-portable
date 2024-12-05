@@ -153,6 +153,9 @@ sub handle_post {
 	printf "POST %s: 200 OK\n", $req->uri->path;
 }
 
+STDOUT->autoflush(1);
+printf "ready\n";
+
 while (1) {
 	my $client = $server->accept();
 

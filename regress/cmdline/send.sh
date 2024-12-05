@@ -1677,11 +1677,13 @@ test_send_basic_http() {
 	local testurl=http://127.0.0.1:$GOT_TEST_HTTP_PORT
 	local commit_id=`git_show_head $testroot/repo`
 
-	timeout 10 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
+	timeout 20 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
 	    > $testroot/http-server.log &
 	trap "kill %1" HUP INT QUIT PIPE TERM
 
-	sleep 2 # server starts up
+	while ! grep -q 'ready' $testroot/http-server.log; do
+		sleep 1 # server starts up
+	done
 
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
