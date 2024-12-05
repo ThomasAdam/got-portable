@@ -296,7 +296,7 @@ run_test()
 
 	if [ -n "$regress_run_only" ]; then
 		case "$regress_run_only" in
-		*$testfunc*) ;;
+		*$testfunc) ;;
 		*) return ;;
 		esac
 	fi
