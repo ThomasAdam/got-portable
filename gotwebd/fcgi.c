@@ -76,7 +76,7 @@ fcgi_request(int fd, short events, void *arg)
 		break;
 
 	case 0:
-		log_debug("closed connection");
+		log_info("closed connection");
 		goto fail;
 	default:
 		break;
@@ -326,14 +326,13 @@ send_response(struct request *c, int type, const uint8_t *data,
 				nanosleep(&ts, NULL);
 				continue;
 			}
-			log_debug("%s: write failure: %s", __func__,
-			    strerror(errno));
+			log_warn("%s: write failure", __func__);
 			c->sock->client_status = CLIENT_DISCONNECT;
 			return -1;
 		}
 
 		if (nw != tot)
-			log_debug("%s: partial write: %zu vs %zu", __func__,
+			log_warnx("%s: partial write: %zu vs %zu", __func__,
 			    nw, tot);
 
 		tot -= nw;
