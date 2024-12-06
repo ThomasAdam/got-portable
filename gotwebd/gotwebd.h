@@ -483,7 +483,6 @@ void fcgi_request(int, short, void *);
 void fcgi_timeout(int, short, void *);
 void fcgi_cleanup_request(struct request *);
 void fcgi_create_end_record(struct request *);
-void dump_fcgi_record(const char *, struct fcgi_record_header *);
 int fcgi_write(void *, const void *, size_t);
 
 /* got_operations.c */
