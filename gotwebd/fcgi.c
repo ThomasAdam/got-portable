@@ -45,6 +45,7 @@ void	 fcgi_parse_begin_request(uint8_t *, uint16_t, struct request *,
 void	 fcgi_parse_params(uint8_t *, uint16_t, struct request *, uint16_t);
 int	 fcgi_send_response(struct request *, int, const void *, size_t);
 
+void	 dump_fcgi_request_body(const char *, struct fcgi_record_header *);
 void	 dump_fcgi_record_header(const char *, struct fcgi_record_header *);
 void	 dump_fcgi_begin_request_body(const char *,
 	    struct fcgi_begin_request_body *);
@@ -119,11 +120,13 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 
 	h = (struct fcgi_record_header*) buf;
 
-	dump_fcgi_record("", h);
+	dump_fcgi_record_header("", h);
 
 	if (n < sizeof(struct fcgi_record_header) + ntohs(h->content_len)
 	    + h->padding_len)
 		return 0;
+
+	dump_fcgi_request_body("", h);
 
 	if (h->version != 1)
 		log_warn("wrong version");
@@ -306,7 +309,7 @@ send_response(struct request *c, int type, const uint8_t *data,
 	iov[2].iov_base = (void *)padding;
 	iov[2].iov_len = header.padding_len;
 
-	dump_fcgi_record("resp ", &header);
+	dump_fcgi_record_header("resp ", &header);
 
 	/*
 	 * XXX: add some simple write heuristics here
@@ -410,10 +413,8 @@ fcgi_cleanup_request(struct request *c)
 }
 
 void
-dump_fcgi_record(const char *p, struct fcgi_record_header *h)
+dump_fcgi_request_body(const char *p, struct fcgi_record_header *h)
 {
-	dump_fcgi_record_header(p, h);
-
 	if (h->type == FCGI_BEGIN_REQUEST)
 		dump_fcgi_begin_request_body(p,
 		    (struct fcgi_begin_request_body *)(h + 1));
