@@ -199,7 +199,7 @@ sockets_launch(void)
 	const struct got_error *error;
 
 	TAILQ_FOREACH(sock, &gotwebd_env->sockets, entry) {
-		log_debug("%s: configuring socket %d (%d)", __func__,
+		log_info("%s: configuring socket %d (%d)", __func__,
 		    sock->conf.id, sock->fd);
 
 		event_set(&sock->ev, sock->fd, EV_READ | EV_PERSIST,
@@ -210,7 +210,7 @@ sockets_launch(void)
 
 		evtimer_set(&sock->pause, sockets_accept_paused, sock);
 
-		log_debug("%s: running socket listener %d", __func__,
+		log_info("%s: running socket listener %d", __func__,
 		    sock->conf.id);
 	}
 
@@ -361,24 +361,20 @@ int
 sockets_privinit(struct gotwebd *env, struct socket *sock)
 {
 	if (sock->conf.af_type == AF_UNIX) {
-		log_debug("%s: initializing unix socket %s", __func__,
+		log_info("%s: initializing unix socket %s", __func__,
 		    sock->conf.unix_socket_name);
 		sock->fd = sockets_unix_socket_listen(env, sock);
-		if (sock->fd == -1) {
-			log_warnx("%s: create unix socket failed", __func__);
+		if (sock->fd == -1)
 			return -1;
-		}
 	}
 
 	if (sock->conf.af_type == AF_INET || sock->conf.af_type == AF_INET6) {
-		log_debug("%s: initializing %s FCGI socket on port %d",
+		log_info("%s: initializing %s FCGI socket on port %d",
 		    __func__, sock->conf.af_type == AF_INET ? "inet" : "inet6",
 		    sock->conf.fcgi_socket_port);
 		sock->fd = sockets_create_socket(&sock->conf.addr);
-		if (sock->fd == -1) {
-			log_warnx("%s: create FCGI socket failed", __func__);
+		if (sock->fd == -1)
 			return -1;
-		}
 	}
 
 	return 0;
@@ -469,14 +465,14 @@ sockets_create_socket(struct address *a)
 	flags = fcntl(fd, F_GETFL);
 	flags |= O_NONBLOCK;
 	if (fcntl(fd, F_SETFL, flags) == -1) {
-		log_info("%s: could not enable non-blocking I/O", __func__);
+		log_warn("%s: could not enable non-blocking I/O", __func__);
 		close(fd);
 		return -1;
 	}
 
 	if (bind(fd, (struct sockaddr *)&a->ss, a->slen) == -1) {
 		close(fd);
-		log_info("%s: can't bind to port %d", __func__, a->port);
+		log_warn("%s: can't bind to port %d", __func__, a->port);
 		return -1;
 	}
 
@@ -497,7 +493,7 @@ sockets_accept_reserve(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
 
 	if (getdtablecount() + reserve +
 	    ((*counter + 1) * FD_NEEDED) >= getdtablesize()) {
-		log_debug("inflight fds exceeded");
+		log_warnx("inflight fds exceeded");
 		errno = EMFILE;
 		return -1;
 	}
@@ -613,7 +609,7 @@ sockets_rlimit(int maxfd)
 
 	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
 		fatal("%s: failed to get resource limit", __func__);
-	log_debug("%s: max open files %llu", __func__,
+	log_info("%s: max open files %llu", __func__,
 	    (unsigned long long)rl.rlim_max);
 
 	/*

@@ -133,7 +133,7 @@ config_getsock(struct gotwebd *env, struct imsg *imsg)
 	memcpy(&sock_conf, p, sizeof(sock_conf));
 
 	if (IMSG_DATA_SIZE(imsg) != sizeof(sock_conf)) {
-		log_debug("%s: imsg size error", __func__);
+		log_warnx("%s: imsg size error", __func__);
 		return 1;
 	}
 
@@ -164,7 +164,7 @@ config_setfd(struct gotwebd *env)
 {
 	int i, j, fd;
 
-	log_debug("%s: Allocating %d file descriptors",
+	log_info("%s: Allocating %d file descriptors",
 	    __func__, PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES);
 
 	for (i = 0; i < PRIV_FDS__MAX + GOTWEB_PACK_NUM_TEMPFILES; i++) {
