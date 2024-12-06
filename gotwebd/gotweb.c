@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <vis.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -177,6 +178,38 @@ gotweb_process_request(struct request *c)
 	if (error) {
 		log_warnx("%s: %s", __func__, error->msg);
 		goto err;
+	}
+
+	/* Log the request. */
+	if (gotwebd_env->gotwebd_verbose > 0) {
+		char *server_name = NULL;
+		char *querystring = NULL;
+		char *document_uri = NULL;
+
+		if (c->server_name[0] &&
+		    stravis(&server_name, c->server_name, VIS_SAFE) == -1) {
+			log_warn("stravis");
+			server_name = NULL;
+		}
+		if (c->querystring[0] &&
+		    stravis(&querystring, c->querystring, VIS_SAFE) == -1) {
+			log_warn("stravis");
+			querystring = NULL;
+		}
+		if (c->document_uri[0] &&
+		    stravis(&document_uri, c->document_uri, VIS_SAFE) == -1) {
+			log_warn("stravis");
+			document_uri = NULL;
+		}
+
+		log_info("processing request: server='%s' query='%s' "
+		    "document_uri='%s'\n",
+		    server_name ? server_name : "",
+		    querystring ? querystring : "",
+		    document_uri ? document_uri : "");
+		free(server_name);
+		free(querystring);
+		free(document_uri);
 	}
 
 	/*
