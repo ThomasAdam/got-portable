@@ -20,6 +20,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #define _XOPEN_SOURCE_EXTENDED /* for ncurses wide-character functions */
 #include <curses.h>
 #include <panel.h>
@@ -47,6 +48,7 @@
 #include "got_object.h"
 #include "got_reference.h"
 #include "got_repository.h"
+#include "got_gotconfig.h"
 #include "got_diff.h"
 #include "got_opentemp.h"
 #include "got_utf8.h"
@@ -134,6 +136,7 @@ struct commit_queue_entry {
 	TAILQ_ENTRY(commit_queue_entry) entry;
 	struct got_object_id *id;
 	struct got_commit_object *commit;
+	int worktree_entry;
 	int idx;
 };
 TAILQ_HEAD(commit_queue_head, commit_queue_entry);
@@ -333,9 +336,28 @@ get_color_value(const char *envvar)
 	return default_color_value(envvar);
 }
 
+struct diff_worktree_arg {
+	struct got_repository		 *repo;
+	struct got_worktree		 *worktree;
+	struct got_diff_line		**lines;
+	struct got_diffstat_cb_arg	 *diffstat;
+	FILE				 *outfile;
+	FILE				 *f1;
+	FILE				 *f2;
+	const char			 *id_str;
+	size_t				 *nlines;
+	int				  diff_context;
+	int				  header_shown;
+	int				  diff_staged;
+	int				  ignore_whitespace;
+	int				  force_text_diff;
+	enum got_diff_algorithm		  diff_algo;
+};
+
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	const char *label1, *label2;
+	const char *worktree_root;
 	char *action;
 	FILE *f, *f1, *f2;
 	int fd1, fd2;
@@ -346,7 +368,10 @@ struct tog_diff_view_state {
 	int diff_context;
 	int ignore_whitespace;
 	int force_text_diff;
+	int diff_worktree;
+	int diff_staged;
 	struct got_repository *repo;
+	struct got_pathlist_head *paths;
 	struct got_diff_line *lines;
 	size_t nlines;
 	int matched_line;
@@ -354,6 +379,22 @@ struct tog_diff_view_state {
 
 	/* passed from log or blame view; may be NULL */
 	struct tog_view *parent_view;
+};
+
+#define TOG_WORKTREE_CHANGES_LOCAL_MSG		"work tree changes"
+#define TOG_WORKTREE_CHANGES_STAGED_MSG		"staged work tree changes"
+
+#define TOG_WORKTREE_CHANGES_LOCAL	(1 << 0)
+#define TOG_WORKTREE_CHANGES_STAGED	(1 << 1)
+#define TOG_WORKTREE_CHANGES_ALL	\
+	(TOG_WORKTREE_CHANGES_LOCAL | TOG_WORKTREE_CHANGES_STAGED)
+
+struct tog_worktree_ctx {
+	char		*wt_ref;
+	char		*wt_author;
+	char		*wt_root;
+	int		 wt_state;
+	int		 active;
 };
 
 pthread_mutex_t tog_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -366,6 +407,7 @@ struct tog_log_thread_args {
 	int load_all;
 	struct got_commit_graph *graph;
 	struct commit_queue *real_commits;
+	struct tog_worktree_ctx wctx;
 	const char *in_repo_path;
 	struct got_object_id *start_id;
 	struct got_repository *repo;
@@ -374,7 +416,9 @@ struct tog_log_thread_args {
 	pthread_cond_t log_loaded;
 	sig_atomic_t *quit;
 	struct commit_queue_entry **first_displayed_entry;
+	struct commit_queue_entry **last_displayed_entry;
 	struct commit_queue_entry **selected_entry;
+	int *selected;
 	int *searching;
 	int *search_next_done;
 	regex_t *regex;
@@ -384,6 +428,8 @@ struct tog_log_thread_args {
 	struct commit_queue *limit_commits;
 	struct got_worktree *worktree;
 	int need_commit_marker;
+	int need_wt_status;
+	int *view_nlines;
 };
 
 struct tog_log_view_state {
@@ -578,7 +624,8 @@ struct tog_help_view_state {
 	KEY_("@", "Toggle between displaying author and committer name"), \
 	KEY_("&", "Open prompt to enter term to limit commits displayed"), \
 	KEY_("C-g Backspace", "Cancel current search or log operation"), \
-	KEY_("C-l", "Reload the log view with new commits in the repository"), \
+	KEY_("C-l", "Reload the log view with new repository commits or " \
+	    "work tree changes"), \
 	\
 	KEYMAP_("Diff view", TOG_KEYMAP_DIFF), \
 	KEY_("K < ,", "Display diff of next line in the file/log entry"), \
@@ -724,9 +771,9 @@ struct tog_view {
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
-    struct got_object_id *, struct got_object_id *,
-    const char *, const char *, int, int, int, struct tog_view *,
-    struct got_repository *);
+    struct got_object_id *, struct got_object_id *, const char *, const char *,
+    int, int, int, int, int, const char *, struct tog_view *,
+    struct got_repository *, struct got_pathlist_head *);
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view *, int);
@@ -2469,6 +2516,191 @@ draw_commit_marker(struct tog_view *view, char c)
 	return NULL;
 }
 
+static void
+tog_waddwstr(struct tog_view *view, wchar_t *wstr, int width,
+    int *col, int color, int toeol)
+{
+	struct tog_color	*tc;
+	int			 x;
+
+	x = col != NULL ? *col : getcurx(view->window);
+	tc = color > 0 ? get_color(&view->state.log.colors, color) : NULL;
+
+	if (tc != NULL)
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	waddwstr(view->window, wstr);
+	x += MAX(width, 0);
+	if (toeol) {
+		while (x < view->ncols) {
+			waddch(view->window, ' ');
+			++x;
+		}
+	}
+	if (tc != NULL)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	if (col != NULL)
+		*col = x;
+}
+
+static void
+tog_waddnstr(struct tog_view *view, const char *str, int limit, int color)
+{
+	struct tog_color *tc;
+
+	if (limit == 0)
+		limit = view->ncols - getcurx(view->window);
+
+	tc = get_color(&view->state.log.colors, color);
+	if (tc != NULL)
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	waddnstr(view->window, str, limit);
+	if (tc != NULL)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+}
+
+static const struct got_error *
+draw_author(struct tog_view *view, char *author, int author_display_cols,
+    int limit, int *col, int color, int marker_column,
+    struct commit_queue_entry *entry)
+{
+	const struct got_error		*err;
+	struct tog_log_view_state	*s = &view->state.log;
+	struct tog_color		*tc;
+	wchar_t				*wauthor;
+	int				 author_width;
+
+	err = format_author(&wauthor, &author_width, author, limit, *col);
+	if (err != NULL)
+		return err;
+	if ((tc = get_color(&s->colors, color)) != NULL)
+		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	waddwstr(view->window, wauthor);
+	free(wauthor);
+
+	*col += author_width;
+	while (*col < limit && author_width < author_display_cols + 2) {
+		if (entry != NULL && s->marked_entry == entry &&
+		    author_width == marker_column) {
+			err = draw_commit_marker(view, '>');
+			if (err != NULL)
+				return err;
+		} else if (entry != NULL &&
+		    tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN &&
+		    author_width == marker_column &&
+		    entry->idx == tog_base_commit.idx && !s->limit_view) {
+			err = draw_commit_marker(view, tog_base_commit.marker);
+			if (err != NULL)
+				return err;
+		} else
+			waddch(view->window, ' ');
+		++(*col);
+		++(author_width);
+	}
+	if (tc != NULL)
+		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+
+	return NULL;
+}
+
+static const struct got_error *
+draw_idstr(struct tog_view *view, const char *id_str, int color)
+{
+	char *str = NULL;
+
+	if (strlen(id_str) > 9 && asprintf(&str, "%.8s ", id_str) == -1)
+		return got_error_from_errno("asprintf");
+
+	tog_waddnstr(view, str != NULL ? str : id_str, 0, color);
+	free(str);
+	return NULL;
+}
+
+static const struct got_error *
+draw_ymd(struct tog_view *view, time_t t, int *limit, int avail,
+    int date_display_cols)
+{
+	struct	tm tm;
+	char	datebuf[12];	/* YYYY-MM-DD + SPACE + NUL */
+
+	if (gmtime_r(&t, &tm) == NULL)
+		return got_error_from_errno("gmtime_r");
+	if (strftime(datebuf, sizeof(datebuf), "%F ", &tm) == 0)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (avail <= date_display_cols)
+		*limit = MIN(sizeof(datebuf) - 1, avail);
+	else
+		*limit = MIN(date_display_cols, sizeof(datebuf) - 1);
+
+	tog_waddnstr(view, datebuf, *limit, TOG_COLOR_DATE);
+	return NULL;
+}
+
+static const struct got_error *
+draw_worktree_entry(struct tog_view *view, int wt_entry,
+    const size_t date_display_cols, int author_display_cols)
+{
+	const struct got_error		*err = NULL;
+	struct tog_log_view_state	*s = &view->state.log;
+	wchar_t				*wmsg = NULL;
+	char				*author, *msg = NULL;
+	char				*base_commit_id = NULL;
+	const char			*p = TOG_WORKTREE_CHANGES_LOCAL_MSG;
+	int				 col, limit, scrollx, width;
+	const int			 avail = view->ncols;
+
+	err = draw_ymd(view, time(NULL), &col, avail, date_display_cols);
+	if (err != NULL)
+		return err;
+	if (col > avail)
+		return NULL;
+	if (avail >= 120) {
+		err = draw_idstr(view, "........ ", TOG_COLOR_COMMIT);
+		if (err != NULL)
+			return err;
+		col += 9;
+		if (col > avail)
+			return NULL;
+	}
+
+	author = strdup(s->thread_args.wctx.wt_author);
+	if (author == NULL)
+		return got_error_from_errno("strdup");
+
+	err = draw_author(view, author, author_display_cols, avail - col,
+	    &col, TOG_COLOR_AUTHOR, 0, NULL);
+	if (err != NULL)
+		goto done;
+	if (col > avail)
+		goto done;
+
+	err = got_object_id_str(&base_commit_id, tog_base_commit.id);
+	if (err != NULL)
+		goto done;
+	if (wt_entry & TOG_WORKTREE_CHANGES_STAGED)
+		p = TOG_WORKTREE_CHANGES_STAGED_MSG;
+	if (asprintf(&msg, "%s based on [%.10s]", p, base_commit_id) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	limit = avail - col;
+	if (view->child != NULL && !view_is_hsplit_top(view) && limit > 0)
+		limit--;	/* for the border */
+
+	err = format_line(&wmsg, &width, &scrollx, msg, view->x, limit, col, 1);
+	if (err != NULL)
+		goto done;
+	tog_waddwstr(view, &wmsg[scrollx], width, &col, 0, 1);
+
+done:
+	free(msg);
+	free(wmsg);
+	free(author);
+	free(base_commit_id);
+	return err;
+}
+
 static const struct got_error *
 draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
     const size_t date_display_cols, int author_display_cols)
@@ -2477,18 +2709,11 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = entry->commit;
 	struct got_object_id *id = entry->id;
-	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
-	char *refs_str = NULL;
-	char *logmsg0 = NULL, *logmsg = NULL;
-	char *author = NULL;
-	wchar_t *wrefstr = NULL, *wlogmsg = NULL, *wauthor = NULL;
-	int author_width, refstr_width, logmsg_width;
-	char *newline, *line = NULL;
-	int col, limit, scrollx, logmsg_x;
+	char *author, *newline, *logmsg, *logmsg0 = NULL, *refs_str = NULL;
+	wchar_t *wrefstr = NULL, *wlogmsg = NULL;
+	int refstr_width, logmsg_width, col, limit, scrollx, logmsg_x;
 	const int avail = view->ncols, marker_column = author_display_cols + 1;
-	struct tm tm;
 	time_t committer_time;
-	struct tog_color *tc;
 	struct got_reflist_head *refs;
 
 	if (tog_base_commit.id != NULL && tog_base_commit.idx == -1 &&
@@ -2503,82 +2728,38 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	}
 
 	committer_time = got_object_commit_get_committer_time(commit);
-	if (gmtime_r(&committer_time, &tm) == NULL)
-		return got_error_from_errno("gmtime_r");
-	if (strftime(datebuf, sizeof(datebuf), "%F ", &tm) == 0)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	if (avail <= date_display_cols)
-		limit = MIN(sizeof(datebuf) - 1, avail);
-	else
-		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
-	tc = get_color(&s->colors, TOG_COLOR_DATE);
-	if (tc)
-		wattr_on(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
-	waddnstr(view->window, datebuf, limit);
-	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
-	col = limit;
+	err = draw_ymd(view, committer_time, &col, avail, date_display_cols);
+	if (err != NULL)
+		return err;
 	if (col > avail)
-		goto done;
+		return NULL;
 
 	if (avail >= 120) {
 		char *id_str;
+
 		err = got_object_id_str(&id_str, id);
 		if (err)
-			goto done;
-		tc = get_color(&s->colors, TOG_COLOR_COMMIT);
-		if (tc)
-			wattr_on(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
-		wprintw(view->window, "%.8s ", id_str);
-		if (tc)
-			wattr_off(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
+			return err;
+		err = draw_idstr(view, id_str, TOG_COLOR_COMMIT);
 		free(id_str);
+		if (err != NULL)
+			return err;
 		col += 9;
 		if (col > avail)
-			goto done;
+			return NULL;
 	}
 
 	if (s->use_committer)
 		author = strdup(got_object_commit_get_committer(commit));
 	else
 		author = strdup(got_object_commit_get_author(commit));
-	if (author == NULL) {
-		err = got_error_from_errno("strdup");
+	if (author == NULL)
+		return got_error_from_errno("strdup");
+
+	err = draw_author(view, author, author_display_cols,
+	    avail - col, &col, TOG_COLOR_AUTHOR, marker_column, entry);
+	if (err != NULL)
 		goto done;
-	}
-	err = format_author(&wauthor, &author_width, author, avail - col, col);
-	if (err)
-		goto done;
-	tc = get_color(&s->colors, TOG_COLOR_AUTHOR);
-	if (tc)
-		wattr_on(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
-	waddwstr(view->window, wauthor);
-	col += author_width;
-	while (col < avail && author_width < author_display_cols + 2) {
-		if (s->marked_entry == entry && author_width == marker_column) {
-			err = draw_commit_marker(view, '>');
-			if (err != NULL)
-				goto done;
-		} else if (tog_base_commit.marker != GOT_WORKTREE_STATE_UNKNOWN
-		    && author_width == marker_column &&
-		    entry->idx == tog_base_commit.idx && !s->limit_view) {
-			err = draw_commit_marker(view, tog_base_commit.marker);
-			if (err != NULL)
-				goto done;
-		} else
-			waddch(view->window, ' ');
-		col++;
-		author_width++;
-	}
-	if (tc)
-		wattr_off(view->window,
-		    COLOR_PAIR(tc->colorpair), NULL);
 	if (col > avail)
 		goto done;
 
@@ -2613,15 +2794,8 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 		free(rs);
 		if (err)
 			goto done;
-		tc = get_color(&s->colors, TOG_COLOR_COMMIT);
-		if (tc)
-			wattr_on(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
-		waddwstr(view->window, &wrefstr[scrollx]);
-		if (tc)
-			wattr_off(view->window,
-			    COLOR_PAIR(tc->colorpair), NULL);
-		col += MAX(refstr_width, 0);
+		tog_waddwstr(view, &wrefstr[scrollx], refstr_width,
+		    &col, TOG_COLOR_COMMIT, 0);
 		if (col > avail)
 			goto done;
 
@@ -2655,20 +2829,14 @@ draw_commit(struct tog_view *view, struct commit_queue_entry *entry,
 	    limit, col, 1);
 	if (err)
 		goto done;
-	waddwstr(view->window, &wlogmsg[scrollx]);
-	col += MAX(logmsg_width, 0);
-	while (col < avail) {
-		waddch(view->window, ' ');
-		col++;
-	}
+	tog_waddwstr(view, &wlogmsg[scrollx], logmsg_width, &col, 0, 1);
+
 done:
 	free(logmsg0);
 	free(wlogmsg);
 	free(wrefstr);
 	free(refs_str);
 	free(author);
-	free(wauthor);
-	free(line);
 	return err;
 }
 
@@ -2701,7 +2869,8 @@ pop_commit(struct commit_queue *commits)
 
 	entry = TAILQ_FIRST(&commits->head);
 	TAILQ_REMOVE(&commits->head, entry, entry);
-	got_object_commit_close(entry->commit);
+	if (entry->worktree_entry == 0)
+		got_object_commit_close(entry->commit);
 	commits->ncommits--;
 	free(entry->id);
 	free(entry);
@@ -2864,43 +3033,346 @@ select_commit(struct tog_log_view_state *s)
 }
 
 static const struct got_error *
-draw_commits(struct tog_view *view)
+valid_author(const char *author)
+{
+	const char *email = author;
+
+	/*
+	 * Git' expects the author (or committer) to be in the form
+	 * "name <email>", which are mostly free form (see the
+	 * "committer" description in git-fast-import(1)).  We're only
+	 * doing this to avoid git's object parser breaking on commits
+	 * we create.
+	 */
+
+	while (*author && *author != '\n' && *author != '<' && *author != '>')
+		author++;
+	if (author != email && *author == '<' && *(author - 1) != ' ')
+		return got_error_fmt(GOT_ERR_COMMIT_BAD_AUTHOR, "%s: space "
+		    "between author name and email required", email);
+	if (*author++ != '<')
+		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
+	while (*author && *author != '\n' && *author != '<' && *author != '>')
+		author++;
+	if (strcmp(author, ">") != 0)
+		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
+	return NULL;
+}
+
+/* lifted from got.c:652 (TODO make lib routine) */
+static const struct got_error *
+get_author(char **author, struct got_repository *repo,
+    struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	struct tog_log_view_state *s = &view->state.log;
-	struct commit_queue_entry *entry = s->selected_entry;
-	int limit = view->nlines;
-	int width;
-	int ncommits, author_cols = 4, refstr_cols;
-	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
-	char *refs_str = NULL;
-	wchar_t *wline;
-	struct tog_color *tc;
-	static const size_t date_display_cols = 12;
-	struct got_reflist_head *refs;
+	const char *got_author = NULL, *name, *email;
+	const struct got_gotconfig *worktree_conf = NULL, *repo_conf = NULL;
 
-	if (view_is_hsplit_top(view))
-		--limit;  /* account for border */
+	*author = NULL;
 
-	if (s->selected_entry &&
-	    !(view->searching && view->search_next_done == 0)) {
-		err = got_object_id_str(&id_str, s->selected_entry->id);
-		if (err)
-			return err;
-		refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
-		    s->selected_entry->id);
-		err = build_refs_str(&refs_str, refs, s->selected_entry->id,
-		    s->repo);
-		if (err)
+	if (worktree)
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+	repo_conf = got_repo_get_gotconfig(repo);
+
+	/*
+	 * Priority of potential author information sources, from most
+	 * significant to least significant:
+	 * 1) work tree's .got/got.conf file
+	 * 2) repository's got.conf file
+	 * 3) repository's git config file
+	 * 4) environment variables
+	 * 5) global git config files (in user's home directory or /etc)
+	 */
+
+	if (worktree_conf)
+		got_author = got_gotconfig_get_author(worktree_conf);
+	if (got_author == NULL)
+		got_author = got_gotconfig_get_author(repo_conf);
+	if (got_author == NULL) {
+		name = got_repo_get_gitconfig_author_name(repo);
+		email = got_repo_get_gitconfig_author_email(repo);
+		if (name && email) {
+			if (asprintf(author, "%s <%s>", name, email) == -1)
+				return got_error_from_errno("asprintf");
+			return NULL;
+		}
+
+		got_author = getenv("GOT_AUTHOR");
+		if (got_author == NULL) {
+			name = got_repo_get_global_gitconfig_author_name(repo);
+			email = got_repo_get_global_gitconfig_author_email(
+			    repo);
+			if (name && email) {
+				if (asprintf(author, "%s <%s>", name, email)
+				    == -1)
+					return got_error_from_errno("asprintf");
+				return NULL;
+			}
+			/* TODO: Look up user in password database? */
+			return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+		}
+	}
+
+	*author = strdup(got_author);
+	if (*author == NULL)
+		return got_error_from_errno("strdup");
+
+	err = valid_author(*author);
+	if (err) {
+		free(*author);
+		*author = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+push_worktree_entry(struct tog_log_thread_args *ta, int wt_entry,
+    struct got_worktree *worktree)
+{
+	struct commit_queue_entry	*e, *entry;
+	int				 rc;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		return got_error_from_errno("calloc");
+
+	entry->idx = 0;
+	entry->worktree_entry = wt_entry;
+
+	rc = pthread_mutex_lock(&tog_mutex);
+	if (rc != 0) {
+		free(entry);
+		return got_error_set_errno(rc, "pthread_mutex_lock");
+	}
+
+	TAILQ_FOREACH(e, &ta->real_commits->head, entry)
+		++e->idx;
+
+	TAILQ_INSERT_HEAD(&ta->real_commits->head, entry, entry);
+	ta->wctx.wt_state |= wt_entry;
+	++ta->real_commits->ncommits;
+	++tog_base_commit.idx;
+
+	rc = pthread_mutex_unlock(&tog_mutex);
+	if (rc != 0)
+		return got_error_set_errno(rc, "pthread_mutex_unlock");
+
+	return NULL;
+}
+
+static const struct got_error *
+check_cancelled(void *arg)
+{
+	if (tog_sigint_received || tog_sigpipe_received)
+		return got_error(GOT_ERR_CANCELLED);
+	return NULL;
+}
+
+static const struct got_error *
+check_local_changes(void *arg, unsigned char status,
+    unsigned char staged_status, const char *path,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
+{
+	int *have_local_changes = arg;
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+	case GOT_STATUS_DELETE:
+	case GOT_STATUS_MODIFY:
+	case GOT_STATUS_CONFLICT:
+		*have_local_changes |= TOG_WORKTREE_CHANGES_LOCAL;
+	default:
+		break;
+	}
+
+	switch (staged_status) {
+	case GOT_STATUS_ADD:
+	case GOT_STATUS_DELETE:
+	case GOT_STATUS_MODIFY:
+		*have_local_changes |= TOG_WORKTREE_CHANGES_STAGED;
+	default:
+		break;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+tog_worktree_status(struct tog_log_thread_args *ta)
+{
+	const struct got_error		*err, *close_err;
+	struct tog_worktree_ctx		*wctx = &ta->wctx;
+	struct got_worktree		*wt = ta->worktree;
+	struct got_pathlist_head	 paths;
+	char				*cwd = NULL;
+	int				 wt_state = 0;
+
+	TAILQ_INIT(&paths);
+
+	if (wt == NULL) {
+		cwd = getcwd(NULL, 0);
+		if (cwd == NULL)
+			return got_error_from_errno("getcwd");
+
+		err = got_worktree_open(&wt, cwd, NULL);
+		if (err != NULL) {
+			if (err->code == GOT_ERR_NOT_WORKTREE) {
+				/*
+				 * Shouldn't happen; this routine should only
+				 * be called if tog is invoked in a worktree.
+				 */
+				wctx->active = 0;
+				err = NULL;
+			} else if (err->code == GOT_ERR_WORKTREE_BUSY)
+				err = NULL;	/* retry next redraw */
+			goto done;
+		}
+	}
+
+	err = got_pathlist_insert(NULL, &paths, "", NULL);
+	if (err != NULL)
+		goto done;
+
+	err = got_worktree_status(wt, &paths, ta->repo, 0,
+	    check_local_changes, &wt_state, check_cancelled, NULL);
+	if (err != NULL) {
+		if (err->code != GOT_ERR_CANCELLED)
+			goto done;
+		err = NULL;
+	}
+
+	if (wt_state != 0) {
+		err = get_author(&wctx->wt_author, ta->repo, wt);
+		if (err != NULL)
+			goto done;
+
+		wctx->wt_root = strdup(got_worktree_get_root_path(wt));
+		if (wctx->wt_root == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+
+		wctx->wt_ref = strdup(got_worktree_get_head_ref_name(wt));
+		if (wctx->wt_ref == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	/*
+	 * Push staged entry first so it's the second log entry
+	 * if there are both staged and unstaged work tree changes.
+	 */
+	if (wt_state & TOG_WORKTREE_CHANGES_STAGED &&
+	    (wctx->wt_state & TOG_WORKTREE_CHANGES_STAGED) == 0) {
+		err = push_worktree_entry(ta, TOG_WORKTREE_CHANGES_STAGED, wt);
+		if (err != NULL)
+			goto done;
+	}
+	if (wt_state & TOG_WORKTREE_CHANGES_LOCAL &&
+	    (wctx->wt_state & TOG_WORKTREE_CHANGES_LOCAL) == 0) {
+		err = push_worktree_entry(ta, TOG_WORKTREE_CHANGES_LOCAL, wt);
+		if (err != NULL)
 			goto done;
 	}
 
-	if (s->thread_args.commits_needed == 0 && !using_mock_io)
-		halfdelay(10); /* disable fast refresh */
+done:
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
+	if (ta->worktree == NULL && wt != NULL) {
+		close_err = got_worktree_close(wt);
+		if (close_err != NULL && err == NULL)
+			err = close_err;
+	}
+	free(cwd);
+	return err;
+}
+
+static const struct got_error *
+worktree_headref_str(char **ret, const char *ref)
+{
+	if (strncmp(ref, "refs/heads/", 11) == 0)
+		*ret = strdup(ref + 11);
+	else
+		*ret = strdup(ref);
+	if (*ret == NULL)
+		return got_error_from_errno("strdup");
+
+	return NULL;
+}
+
+static const struct got_error *
+fmtindex(char **index, int *ncommits, int wt_state,
+    struct commit_queue_entry *entry, int limit_view)
+{
+	int idx = 0;
+
+	if (!limit_view) {
+		if (*ncommits > 0 && wt_state & TOG_WORKTREE_CHANGES_LOCAL)
+			--(*ncommits);
+		if (*ncommits > 0 && wt_state & TOG_WORKTREE_CHANGES_STAGED)
+			--(*ncommits);
+	}
+
+	if (entry != NULL && entry->worktree_entry == 0) {
+		/*
+		 * Display 1-based index of selected commit entries only.
+		 * If a work tree entry is selected, show an index of 0.
+		 */
+		idx = entry->idx;
+		if (wt_state == 0 || limit_view)
+			++idx;
+		else if (wt_state > TOG_WORKTREE_CHANGES_STAGED)
+			--idx;
+	}
+	if (asprintf(index, " [%d/%d] ", idx, *ncommits) == -1) {
+		*index = NULL;
+		return got_error_from_errno("asprintf");
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+fmtheader(char **header, int *ncommits, struct commit_queue_entry *entry,
+    struct tog_view *view)
+{
+	const struct got_error		*err;
+	struct tog_log_view_state	*s = &view->state.log;
+	struct tog_worktree_ctx		*wctx = &s->thread_args.wctx;
+	struct got_reflist_head		*refs;
+	char				*id_str = NULL, *index = NULL;
+	char				*wthdr = NULL, *ncommits_str = NULL;
+	char				*refs_str = NULL;
+	int				 wt_entry;
+
+	*header = NULL;
+	wt_entry = entry != NULL ? entry->worktree_entry : 0;
+
+	if (entry && !(view->searching && view->search_next_done == 0)) {
+		if (entry->worktree_entry == 0) {
+			err = got_object_id_str(&id_str, entry->id);
+			if (err != NULL)
+				return err;
+			refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
+			    entry->id);
+			err = build_refs_str(&refs_str, refs,
+			    entry->id, s->repo);
+			if (err != NULL)
+				goto done;
+		} else {
+			err = worktree_headref_str(&refs_str, wctx->wt_ref);
+			if (err != NULL)
+				return err;
+		}
+	}
+
+	err = fmtindex(&index, ncommits, wctx->wt_state, entry, s->limit_view);
+	if (err != NULL)
+		goto done;
 
 	if (s->thread_args.commits_needed > 0 || s->thread_args.load_all) {
-		if (asprintf(&ncommits_str, " [%d/%d] %s",
-		    entry ? entry->idx + 1 : 0, s->commits->ncommits,
+		if (asprintf(&ncommits_str, "%s%s", index,
 		    (view->searching && !view->search_next_done) ?
 		    "searching..." : "loading...") == -1) {
 			err = got_error_from_errno("asprintf");
@@ -2919,11 +3391,10 @@ draw_commits(struct tog_view *view)
 				search_str = "searching...";
 		}
 
-		if (s->limit_view && s->commits->ncommits == 0)
+		if (s->limit_view && ncommits == 0)
 			limit_str = "no matches found";
 
-		if (asprintf(&ncommits_str, " [%d/%d] %s %s",
-		    entry ? entry->idx + 1 : 0, s->commits->ncommits,
+		if (asprintf(&ncommits_str, "%s%s %s", index,
 		    search_str ? search_str : (refs_str ? refs_str : ""),
 		    limit_str ? limit_str : "") == -1) {
 			err = got_error_from_errno("asprintf");
@@ -2931,67 +3402,107 @@ draw_commits(struct tog_view *view)
 		}
 	}
 
-	free(refs_str);
-	refs_str = NULL;
+	if (wt_entry != 0) {
+		const char *t = "", *p = TOG_WORKTREE_CHANGES_LOCAL_MSG;
 
-	if (s->in_repo_path && strcmp(s->in_repo_path, "/") != 0) {
-		if (asprintf(&header, "commit %s %s%s", id_str ? id_str :
-		    "........................................",
-		    s->in_repo_path, ncommits_str) == -1) {
+		if (wt_entry == TOG_WORKTREE_CHANGES_STAGED) {
+			p = TOG_WORKTREE_CHANGES_STAGED_MSG;
+			t = "-s ";
+		}
+		if (asprintf(&wthdr, "%s%s (%s)", t, wctx->wt_root, p) == -1) {
 			err = got_error_from_errno("asprintf");
-			header = NULL;
 			goto done;
 		}
-	} else if (asprintf(&header, "commit %s%s",
-	    id_str ? id_str : "........................................",
-	    ncommits_str) == -1) {
-		err = got_error_from_errno("asprintf");
-		header = NULL;
-		goto done;
 	}
+
+	if (s->in_repo_path != NULL && strcmp(s->in_repo_path, "/") != 0) {
+		if (asprintf(header, "%s%s %s%s",
+		    wt_entry == 0 ? "commit " : "diff ",
+		    wt_entry == 0 ? id_str ? id_str :
+		    "........................................" :
+		    wthdr != NULL ? wthdr : "", s->in_repo_path,
+		    ncommits_str) == -1)
+			err = got_error_from_errno("asprintf");
+	} else if (asprintf(header, "%s%s%s",
+	    wt_entry == 0 ? "commit " : "diff ",
+	    wt_entry == 0 ? id_str ? id_str :
+	    "........................................" :
+	    wthdr != NULL ? wthdr : "", ncommits_str) == -1)
+		err = got_error_from_errno("asprintf");
+	if (err != NULL)
+		*header = NULL;
+
+done:
+	free(wthdr);
+	free(index);
+	free(id_str);
+	free(refs_str);
+	free(ncommits_str);
+	return err;
+}
+
+static const struct got_error *
+draw_commits(struct tog_view *view)
+{
+	const struct got_error *err;
+	struct tog_log_view_state *s = &view->state.log;
+	struct commit_queue_entry *entry = s->selected_entry;
+	int width, limit = view->nlines;
+	int ncommits = s->commits->ncommits, author_cols = 4, refstr_cols;
+	char *header;
+	wchar_t *wline;
+	static const size_t date_display_cols = 12;
+
+	if (view_is_hsplit_top(view))
+		--limit;  /* account for border */
+
+	if (s->thread_args.commits_needed == 0 &&
+	    s->thread_args.need_wt_status == 0 &&
+	    s->thread_args.need_commit_marker == 0 && !using_mock_io)
+		halfdelay(10); /* disable fast refresh */
+
+	err = fmtheader(&header, &ncommits, entry, view);
+	if (err != NULL)
+		return err;
+
 	err = format_line(&wline, &width, NULL, header, 0, view->ncols, 0, 0);
+	free(header);
 	if (err)
-		goto done;
+		return err;
 
 	werase(view->window);
 
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
-	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
-	if (tc)
-		wattr_on(view->window, COLOR_PAIR(tc->colorpair), NULL);
-	waddwstr(view->window, wline);
-	while (width < view->ncols) {
-		waddch(view->window, ' ');
-		width++;
-	}
-	if (tc)
-		wattr_off(view->window, COLOR_PAIR(tc->colorpair), NULL);
+	tog_waddwstr(view, wline, width, NULL, TOG_COLOR_COMMIT, 1);
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
 	if (limit <= 1)
-		goto done;
+		return NULL;
 
 	/* Grow author column size if necessary, and set view->maxx. */
 	entry = s->first_displayed_entry;
 	ncommits = 0;
 	view->maxx = 0;
 	while (entry) {
+		struct got_reflist_head *refs;
 		struct got_commit_object *c = entry->commit;
-		char *author, *eol, *msg, *msg0;
+		char *author, *eol, *msg, *msg0, *refs_str;
 		wchar_t *wauthor, *wmsg;
 		int width;
+
 		if (ncommits >= limit - 1)
 			break;
-		if (s->use_committer)
+		if (entry->worktree_entry != 0)
+			author = strdup(s->thread_args.wctx.wt_author);
+		else if (s->use_committer)
 			author = strdup(got_object_commit_get_committer(c));
 		else
 			author = strdup(got_object_commit_get_author(c));
-		if (author == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
+		if (author == NULL)
+			return got_error_from_errno("strdup");
+
 		err = format_author(&wauthor, &width, author, COLS,
 		    date_display_cols);
 		if (author_cols < width)
@@ -2999,27 +3510,38 @@ draw_commits(struct tog_view *view)
 		free(wauthor);
 		free(author);
 		if (err)
-			goto done;
+			return err;
+		if (entry->worktree_entry != 0) {
+			if (entry->worktree_entry == TOG_WORKTREE_CHANGES_LOCAL)
+				width = sizeof(TOG_WORKTREE_CHANGES_LOCAL_MSG);
+			else
+				width = sizeof(TOG_WORKTREE_CHANGES_STAGED_MSG);
+			view->maxx = MAX(view->maxx, width - 1);
+			entry = TAILQ_NEXT(entry, entry);
+			++ncommits;
+			continue;
+		}
 		refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
 		    entry->id);
 		err = build_refs_str(&refs_str, refs, entry->id, s->repo);
 		if (err)
-			goto done;
+			return err;
 		if (refs_str) {
 			wchar_t *ws;
+
 			err = format_line(&ws, &width, NULL, refs_str,
 			    0, INT_MAX, date_display_cols + author_cols, 0);
 			free(ws);
 			free(refs_str);
 			refs_str = NULL;
 			if (err)
-				goto done;
+				return err;
 			refstr_cols = width + 3; /* account for [ ] + space */
 		} else
 			refstr_cols = 0;
 		err = got_object_commit_get_logmsg(&msg0, c);
 		if (err)
-			goto done;
+			return err;
 		msg = msg0;
 		while (*msg == '\n')
 			++msg;
@@ -3027,11 +3549,11 @@ draw_commits(struct tog_view *view)
 			*eol = '\0';
 		err = format_line(&wmsg, &width, NULL, msg, 0, INT_MAX,
 		    date_display_cols + author_cols + refstr_cols, 0);
-		if (err)
-			goto done;
-		view->maxx = MAX(view->maxx, width + refstr_cols);
 		free(msg0);
 		free(wmsg);
+		if (err)
+			return err;
+		view->maxx = MAX(view->maxx, width + refstr_cols);
 		ncommits++;
 		entry = TAILQ_NEXT(entry, entry);
 	}
@@ -3044,23 +3566,23 @@ draw_commits(struct tog_view *view)
 			break;
 		if (ncommits == s->selected)
 			wstandout(view->window);
-		err = draw_commit(view, entry, date_display_cols, author_cols);
+		if (entry->worktree_entry == 0)
+			err = draw_commit(view, entry,
+			    date_display_cols, author_cols);
+		else
+			err = draw_worktree_entry(view, entry->worktree_entry,
+			    date_display_cols, author_cols);
 		if (ncommits == s->selected)
 			wstandend(view->window);
 		if (err)
-			goto done;
+			return err;
 		ncommits++;
 		s->last_displayed_entry = entry;
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
 	view_border(view);
-done:
-	free(id_str);
-	free(refs_str);
-	free(ncommits_str);
-	free(header);
-	return err;
+	return NULL;
 }
 
 static void
@@ -3196,32 +3718,36 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 
 static const struct got_error *
 open_diff_view_for_commit(struct tog_view **new_view, int begin_y, int begin_x,
-    struct got_commit_object *commit, struct got_object_id *commit_id,
-    struct tog_view *log_view, struct got_repository *repo)
+    struct commit_queue_entry *entry, struct tog_view *log_view,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *p;
 	struct got_object_id *parent_id;
 	struct tog_view *diff_view;
 	struct tog_log_view_state *ls = NULL;
+	const char *worktree_root = NULL;
 
 	diff_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_DIFF);
 	if (diff_view == NULL)
 		return got_error_from_errno("view_open");
 
-	if (log_view != NULL)
+	if (log_view != NULL) {
 		ls = &log_view->state.log;
+		worktree_root = ls->thread_args.wctx.wt_root;
+	}
 
 	if (ls != NULL && ls->marked_entry != NULL &&
 	    ls->marked_entry != ls->selected_entry)
 		parent_id = ls->marked_entry->id;
-	else if ((p = STAILQ_FIRST(got_object_commit_get_parent_ids(commit))))
+	else if (entry->worktree_entry == 0 &&
+	    (p = STAILQ_FIRST(got_object_commit_get_parent_ids(entry->commit))))
 		parent_id = &p->id;
 	else
 		parent_id = NULL;
 
-	err = open_diff_view(diff_view, parent_id, commit_id,
-	    NULL, NULL, 3, 0, 0, log_view, repo);
+	err = open_diff_view(diff_view, parent_id, entry->id, NULL, NULL, 3, 0,
+	    0, 0, entry->worktree_entry, worktree_root, log_view, repo, NULL);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
@@ -3351,6 +3877,58 @@ browse_commit_tree(struct tog_view **new_view, int begin_y, int begin_x,
 	return tree_view_walk_path(s, entry->commit, path);
 }
 
+/*
+ * If work tree entries have been pushed onto the commit queue and the
+ * first commit entry is still displayed, scroll the view so the new
+ * work tree entries are visible. If the selection cursor is still on
+ * the first commit entry, keep the cursor in place such that the first
+ * work tree entry is selected, otherwise move the selection cursor so
+ * the currently selected commit stays selected if it remains on screen.
+ */
+static void
+worktree_entries_reveal(struct tog_log_thread_args *a)
+{
+	struct commit_queue_entry	**first = a->first_displayed_entry;
+	struct commit_queue_entry	**select = a->selected_entry;
+	int				 *cursor = a->selected;
+	int				  wts = a->wctx.wt_state;
+
+#define select_worktree_entry(_first, _selected) do {			\
+	*_first = TAILQ_FIRST(&a->real_commits->head);			\
+	*_selected = *_first;						\
+} while (0)
+
+	if (first == NULL)
+		select_worktree_entry(first, select);
+	else if (*select == *first) {
+		if (wts == TOG_WORKTREE_CHANGES_LOCAL && (*first)->idx == 1)
+			select_worktree_entry(first, select);
+		else if (wts == TOG_WORKTREE_CHANGES_STAGED &&
+		    (*first)->idx == 1)
+			select_worktree_entry(first, select);
+		else if (wts & TOG_WORKTREE_CHANGES_ALL && (*first)->idx == 2)
+			select_worktree_entry(first, select);
+	} else if (wts & TOG_WORKTREE_CHANGES_ALL && (*first)->idx == 2) {
+		*first = TAILQ_FIRST(&a->real_commits->head);
+		if (*cursor + 2 < *a->view_nlines - 1)
+			(*cursor) += 2;
+		else if (*cursor + 1 < *a->view_nlines - 1) {
+			*select = TAILQ_PREV(*select, commit_queue_head, entry);
+			++(*cursor);
+		} else {
+			*select = TAILQ_PREV(*select, commit_queue_head, entry);
+			*select = TAILQ_PREV(*select, commit_queue_head, entry);
+		}
+	} else if (wts != 0 && (*first)->idx == 1) {
+		*first = TAILQ_FIRST(&a->real_commits->head);
+		if (*cursor + 1 < *a->view_nlines - 1)
+			++(*cursor);
+		else
+			*select = TAILQ_PREV(*select, commit_queue_head, entry);
+	}
+#undef select_worktree_entry
+}
+
 static const struct got_error *
 block_signals_used_by_main_thread(void)
 {
@@ -3450,6 +4028,27 @@ log_thread(void *arg)
 			    "pthread_cond_signal");
 			pthread_mutex_unlock(&tog_mutex);
 			goto done;
+		}
+
+		if (a->commits_needed == 0 && a->need_wt_status) {
+			errcode = pthread_mutex_unlock(&tog_mutex);
+			if (errcode) {
+				err = got_error_set_errno(errcode,
+				    "pthread_mutex_unlock");
+				goto done;
+			}
+			err = tog_worktree_status(a);
+			if (err != NULL)
+				goto done;
+			errcode = pthread_mutex_lock(&tog_mutex);
+			if (errcode) {
+				err = got_error_set_errno(errcode,
+				    "pthread_mutex_lock");
+				goto done;
+			}
+			if (a->wctx.wt_state != 0)
+				worktree_entries_reveal(a);
+			a->need_wt_status = 0;
 		}
 
 		if (a->commits_needed == 0 &&
@@ -3578,6 +4177,23 @@ stop_log_thread(struct tog_log_view_state *s)
 	return err ? err : thread_err;
 }
 
+static void
+worktree_ctx_close(struct tog_log_thread_args *ta)
+{
+	struct tog_worktree_ctx *wctx = &ta->wctx;
+
+	if (wctx->active) {
+		free(wctx->wt_author);
+		wctx->wt_author = NULL;
+		free(wctx->wt_root);
+		wctx->wt_root = NULL;
+		free(wctx->wt_ref);
+		wctx->wt_ref = NULL;
+		wctx->wt_state = 0;
+		ta->need_wt_status = 1;
+	}
+}
+
 static const struct got_error *
 close_log_view(struct tog_view *view)
 {
@@ -3606,6 +4222,7 @@ close_log_view(struct tog_view *view)
 	s->start_id = NULL;
 	free(s->head_ref_name);
 	s->head_ref_name = NULL;
+	worktree_ctx_close(&s->thread_args);
 	return err;
 }
 
@@ -3694,10 +4311,12 @@ limit_log_view(struct tog_view *view)
 	TAILQ_FOREACH(entry, &s->real_commits.head, entry) {
 		int have_match = 0;
 
-		err = match_commit(&have_match, entry->id,
-		    entry->commit, &s->limit_regex);
-		if (err)
-			return err;
+		if (entry->worktree_entry == 0) {
+			err = match_commit(&have_match, entry->id,
+			    entry->commit, &s->limit_regex);
+			if (err)
+				return err;
+		}
 
 		if (have_match) {
 			struct commit_queue_entry *matched;
@@ -3820,14 +4439,16 @@ search_next_log_view(struct tog_view *view)
 			return trigger_log_thread(view, 0);
 		}
 
-		err = match_commit(&have_match, entry->id, entry->commit,
-		    &view->regex);
-		if (err)
-			break;
-		if (have_match) {
-			view->search_next_done = TOG_SEARCH_HAVE_MORE;
-			s->matched_entry = entry;
-			break;
+		if (entry->worktree_entry == 0) {
+			err = match_commit(&have_match, entry->id,
+			    entry->commit, &view->regex);
+			if (err)
+				break;
+			if (have_match) {
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
+				s->matched_entry = entry;
+				break;
+			}
 		}
 
 		s->search_entry = entry;
@@ -3964,6 +4585,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 			return got_error_set_errno(rc, "pthread_cond_init");
 	}
 
+	s->thread_args.view_nlines = &view->nlines;
 	s->thread_args.commits_needed = view->nlines;
 	s->thread_args.graph = thread_graph;
 	s->thread_args.real_commits = &s->real_commits;
@@ -3974,7 +4596,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.log_complete = 0;
 	s->thread_args.quit = &s->quit;
 	s->thread_args.first_displayed_entry = &s->first_displayed_entry;
+	s->thread_args.last_displayed_entry = &s->last_displayed_entry;
 	s->thread_args.selected_entry = &s->selected_entry;
+	s->thread_args.selected = &s->selected;
 	s->thread_args.searching = &view->searching;
 	s->thread_args.search_next_done = &view->search_next_done;
 	s->thread_args.regex = &view->regex;
@@ -3982,8 +4606,12 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.limit_regex = &s->limit_regex;
 	s->thread_args.limit_commits = &s->limit_commits;
 	s->thread_args.worktree = worktree;
-	if (worktree)
+	if (worktree) {
+		s->thread_args.wctx.active = 1;
+		s->thread_args.need_wt_status = 1;
 		s->thread_args.need_commit_marker = 1;
+	}
+
 done:
 	if (err) {
 		if (view->close == NULL)
@@ -4421,10 +5049,13 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->thread_args.commits_needed = view->lines;
 		s->matched_entry = NULL;
 		s->search_entry = NULL;
+		tog_base_commit.idx = -1;
+		worktree_ctx_close(&s->thread_args);
 		view->offset = 0;
 		break;
 	case 'm':
-		log_mark_commit(s);
+		if (s->selected_entry->worktree_entry == 0)
+			log_mark_commit(s);
 		break;
 	case 'R':
 		view->count = 0;
@@ -4764,8 +5395,9 @@ __dead static void
 usage_diff(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s diff [-aw] [-C number] [-r repository-path] "
-	    "object1 object2\n", getprogname());
+	fprintf(stderr, "usage: %s diff [-asw] [-C number] [-c commit] "
+	    "[-r repository-path] [object1 object2 | path ...]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -5394,15 +6026,508 @@ done:
 	return err;
 }
 
+static void
+evict_worktree_entry(struct tog_log_thread_args *ta, int victim)
+{
+	struct commit_queue_entry *e, *v = *ta->selected_entry;
+
+	if (victim == 0)
+		return;		/* paranoid check */
+
+	if (v->worktree_entry != victim) {
+		TAILQ_FOREACH(v, &ta->real_commits->head, entry) {
+			if (v->worktree_entry == victim)
+				break;
+		}
+		if (v == NULL)
+			return;
+	}
+
+	ta->wctx.wt_state &= ~victim;
+
+	if (*ta->selected_entry == v)
+		*ta->selected_entry = TAILQ_NEXT(v, entry);
+	if (*ta->first_displayed_entry == v)
+		*ta->first_displayed_entry = TAILQ_NEXT(v, entry);
+	if (*ta->last_displayed_entry == v)
+		*ta->last_displayed_entry = TAILQ_NEXT(v, entry);
+
+	for (e = TAILQ_NEXT(v, entry); e != NULL; e = TAILQ_NEXT(e, entry))
+		--e->idx;
+
+	--tog_base_commit.idx;
+	--ta->real_commits->ncommits;
+
+	TAILQ_REMOVE(&ta->real_commits->head, v, entry);
+	free(v);
+}
+
+/*
+ * Create a file which contains the target path of a symlink so we can feed
+ * it as content to the diff engine.
+ */
+ static const struct got_error *
+get_symlink_target_file(int *fd, int dirfd, const char *de_name,
+    const char *abspath)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	ssize_t target_len, outlen;
+
+	*fd = -1;
+
+	if (dirfd != -1) {
+		target_len = readlinkat(dirfd, de_name, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlinkat", abspath);
+	} else {
+		target_len = readlink(abspath, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlink", abspath);
+	}
+
+	*fd = got_opentempfd();
+	if (*fd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	outlen = write(*fd, target_path, target_len);
+	if (outlen == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	if (lseek(*fd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", abspath);
+		goto done;
+	}
+
+done:
+	if (err) {
+		close(*fd);
+		*fd = -1;
+	}
+	return err;
+}
+
+static const struct got_error *
+emit_base_commit_header(FILE *f, struct got_diff_line **lines, size_t *nlines,
+    struct got_object_id *commit_id, struct got_worktree *worktree)
+{
+	const struct got_error	*err;
+	struct got_object_id	*base_commit_id;
+	char			*base_commit_idstr;
+	int			 n;
+
+	if (worktree == NULL)	/* shouldn't happen */
+		return got_error(GOT_ERR_NOT_WORKTREE);
+
+	base_commit_id = got_worktree_get_base_commit_id(worktree);
+
+	if (commit_id != NULL) {
+		if (got_object_id_cmp(commit_id, base_commit_id) != 0)
+			base_commit_id = commit_id;
+	}
+
+	err = got_object_id_str(&base_commit_idstr, base_commit_id);
+	if (err != NULL)
+		return err;
+
+	if ((n = fprintf(f, "commit - %s\n", base_commit_idstr)) < 0)
+		err = got_error_from_errno("fprintf");
+	free(base_commit_idstr);
+	if (err != NULL)
+		return err;
+
+	return add_line_metadata(lines, nlines,
+	    (*lines)[*nlines - 1].offset + n, GOT_DIFF_LINE_META);
+}
+
+static const struct got_error *
+tog_worktree_diff(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
+{
+	const struct got_error		*err = NULL;
+	struct diff_worktree_arg	*a = arg;
+	struct got_blob_object		*blob1 = NULL;
+	struct stat			 sb;
+	FILE				*f2 = NULL;
+	char				*abspath = NULL, *label1 = NULL;
+	off_t				 size1 = 0;
+	off_t				 outoff = 0;
+	int				 fd = -1, fd1 = -1, fd2 = -1;
+	int				 n, f2_exists = 1;
+
+	if (a->diff_staged) {
+		if (staged_status != GOT_STATUS_MODIFY &&
+		    staged_status != GOT_STATUS_ADD &&
+		    staged_status != GOT_STATUS_DELETE)
+			return NULL;
+	} else {
+		if (staged_status == GOT_STATUS_DELETE)
+			return NULL;
+		if (status == GOT_STATUS_NONEXISTENT)
+			return got_error_set_errno(ENOENT, path);
+		if (status != GOT_STATUS_MODIFY &&
+		    status != GOT_STATUS_ADD &&
+		    status != GOT_STATUS_DELETE &&
+		    status != GOT_STATUS_CONFLICT)
+			return NULL;
+	}
+
+	err = got_opentemp_truncate(a->f1);
+	if (err != NULL)
+		return got_error_from_errno("got_opentemp_truncate");
+	err = got_opentemp_truncate(a->f2);
+	if (err != NULL)
+		return got_error_from_errno("got_opentemp_truncate");
+
+	if (!a->header_shown) {
+		n = fprintf(a->outfile, "path + %s%s\n",
+		    got_worktree_get_root_path(a->worktree),
+		    a->diff_staged ? " (staged changes)" : "");
+		if (n < 0)
+			return got_error_from_errno("fprintf");
+
+		outoff += n;
+		err = add_line_metadata(a->lines, a->nlines, outoff,
+		    GOT_DIFF_LINE_META);
+		if (err != NULL)
+			return err;
+
+		a->header_shown = 1;
+	}
+
+	err = emit_base_commit_header(a->outfile,
+	    a->lines, a->nlines, commit_id, a->worktree);
+	if (err != NULL)
+		return err;
+
+	if (a->diff_staged) {
+		const char *label1 = NULL, *label2 = NULL;
+
+		switch (staged_status) {
+		case GOT_STATUS_MODIFY:
+			label1 = path;
+			label2 = path;
+			break;
+		case GOT_STATUS_ADD:
+			label2 = path;
+			break;
+		case GOT_STATUS_DELETE:
+			label1 = path;
+			break;
+		default:
+			return got_error(GOT_ERR_FILE_STATUS);
+		}
+
+		fd1 = got_opentempfd();
+		if (fd1 == -1)
+			return got_error_from_errno("got_opentempfd");
+
+		fd2 = got_opentempfd();
+		if (fd2 == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+
+		err = got_diff_objects_as_blobs(a->lines, a->nlines,
+		    a->f1, a->f2, fd1, fd2, blob_id, staged_blob_id,
+		    label1, label2, a->diff_algo, a->diff_context,
+		    a->ignore_whitespace, a->force_text_diff,
+		    a->diffstat, a->repo, a->outfile);
+		goto done;
+	}
+
+	fd1 = got_opentempfd();
+	if (fd1 == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	if (staged_status == GOT_STATUS_ADD ||
+	    staged_status == GOT_STATUS_MODIFY) {
+		char *id_str;
+
+		err = got_object_open_as_blob(&blob1,
+		    a->repo, staged_blob_id, 8192, fd1);
+		if (err != NULL)
+			goto done;
+		err = got_object_id_str(&id_str, staged_blob_id);
+		if (err != NULL)
+			goto done;
+		if (asprintf(&label1, "%s (staged)", id_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(id_str);
+			goto done;
+		}
+		free(id_str);
+	} else if (status != GOT_STATUS_ADD) {
+		err = got_object_open_as_blob(&blob1,
+		    a->repo, blob_id, 8192, fd1);
+		if (err != NULL)
+			goto done;
+	}
+
+	if (status != GOT_STATUS_DELETE) {
+		if (asprintf(&abspath, "%s/%s",
+		    got_worktree_get_root_path(a->worktree), path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if (dirfd != -1) {
+			fd = openat(dirfd, de_name,
+			    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+			if (fd == -1) {
+				if (!got_err_open_nofollow_on_symlink()) {
+					err = got_error_from_errno2("openat",
+					    abspath);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd,
+				    dirfd, de_name, abspath);
+				if (err != NULL)
+					goto done;
+			}
+		} else {
+			fd = open(abspath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+			if (fd == -1) {
+				if (!got_err_open_nofollow_on_symlink()) {
+					err = got_error_from_errno2("open",
+					    abspath);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd,
+				    dirfd, de_name, abspath);
+				if (err != NULL)
+					goto done;
+			}
+		}
+		if (fstat(fd, &sb) == -1) {
+			err = got_error_from_errno2("fstat", abspath);
+			goto done;
+		}
+		f2 = fdopen(fd, "r");
+		if (f2 == NULL) {
+			err = got_error_from_errno2("fdopen", abspath);
+			goto done;
+		}
+		fd = -1;
+	} else {
+		sb.st_size = 0;
+		f2_exists = 0;
+	}
+
+	if (blob1 != NULL) {
+		err = got_object_blob_dump_to_file(&size1,
+		    NULL, NULL, a->f1, blob1);
+		if (err != NULL)
+			goto done;
+	}
+
+	err = got_diff_blob_file(a->lines, a->nlines, blob1, a->f1, size1,
+	    label1, f2 != NULL ? f2 : a->f2, f2_exists, &sb, path,
+	    tog_diff_algo, a->diff_context, a->ignore_whitespace,
+	    a->force_text_diff, a->diffstat, a->outfile);
+
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (blob1 != NULL)
+		got_object_blob_close(blob1);
+	if (f2 != NULL && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(abspath);
+	free(label1);
+	return err;
+}
+
+static const struct got_error *
+tog_diff_worktree(struct tog_diff_view_state *s, FILE *f,
+    struct got_diff_line **lines, size_t *nlines,
+    struct got_diffstat_cb_arg *dsa)
+{
+	const struct got_error		*close_err, *err;
+	struct got_worktree		*worktree = NULL;
+	struct diff_worktree_arg	 arg;
+	struct got_pathlist_head	 pathlist;
+	char				*cwd, *id_str = NULL;
+
+	TAILQ_INIT(&pathlist);
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	err = got_worktree_open(&worktree, cwd, NULL);
+	if (err != NULL)
+		goto done;
+
+	err = got_object_id_str(&id_str,
+	    got_worktree_get_base_commit_id(worktree));
+	if (err != NULL)
+		goto done;
+
+	err = got_repo_match_object_id(&s->id1, NULL, id_str,
+	    GOT_OBJ_TYPE_ANY, &tog_refs, s->repo);
+	if (err != NULL)
+		goto done;
+
+	arg.id_str = id_str;
+	arg.diff_algo = tog_diff_algo;
+	arg.repo = s->repo;
+	arg.worktree = worktree;
+	arg.diffstat = dsa;
+	arg.diff_context = s->diff_context;
+	arg.diff_staged = s->diff_staged;
+	arg.ignore_whitespace = s->ignore_whitespace;
+	arg.force_text_diff = s->force_text_diff;
+	arg.header_shown = 0;
+	arg.lines = lines;
+	arg.nlines = nlines;
+	arg.f1 = s->f1;
+	arg.f2 = s->f2;
+	arg.outfile = f;
+
+	err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
+	if (err != NULL)
+		goto done;
+
+	if (s->paths == NULL) {
+		err = got_pathlist_insert(NULL, &pathlist, "", NULL);
+		if (err != NULL)
+			goto done;
+	}
+
+	err = got_worktree_status(worktree, s->paths ? s->paths : &pathlist,
+	    s->repo, 0, tog_worktree_diff, &arg, NULL, NULL);
+	if (err != NULL)
+		goto done;
+
+	if (*nlines == 1) {
+		const char	*msg = TOG_WORKTREE_CHANGES_LOCAL_MSG;
+		int		 n, victim = TOG_WORKTREE_CHANGES_LOCAL;
+
+		if (s->diff_staged) {
+			victim = TOG_WORKTREE_CHANGES_STAGED;
+			msg = TOG_WORKTREE_CHANGES_STAGED_MSG;
+		}
+		if ((n = fprintf(f, "no %s\n", msg)) < 0) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+		err = add_line_metadata(lines, nlines, n, GOT_DIFF_LINE_META);
+		if (err != NULL)
+			goto done;
+		if (s->parent_view && s->parent_view->type == TOG_VIEW_LOG)
+			evict_worktree_entry(
+			    &s->parent_view->state.log.thread_args, victim);
+		err = got_error(GOT_ERR_DIFF_NOCHANGES);
+	}
+
+done:
+	free(cwd);
+	free(id_str);
+	got_pathlist_free(&pathlist, GOT_PATHLIST_FREE_NONE);
+	if (worktree != NULL) {
+		if ((close_err = got_worktree_close(worktree)) != NULL) {
+			if (err == NULL || err->code == GOT_ERR_DIFF_NOCHANGES)
+				err = close_err;
+		}
+	}
+	return err;
+}
+
+static const struct got_error *
+tog_diff_objects(struct tog_diff_view_state *s, FILE *f,
+    struct got_diff_line **lines, size_t *nlines,
+    struct got_diffstat_cb_arg *dsa)
+{
+	const struct got_error	*err;
+	int			 obj_type;
+
+	if (s->id1)
+		err = got_object_get_type(&obj_type, s->repo, s->id1);
+	else
+		err = got_object_get_type(&obj_type, s->repo, s->id2);
+	if (err != NULL)
+		return err;
+
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_BLOB:
+		err = got_diff_objects_as_blobs(lines, nlines, s->f1, s->f2,
+		    s->fd1, s->fd2, s->id1, s->id2, NULL, NULL, tog_diff_algo,
+		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
+		    dsa, s->repo, f);
+		if (err != NULL)
+			return err;
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		err = got_diff_objects_as_trees(lines, nlines,
+		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
+		    s->paths, "", "", tog_diff_algo, s->diff_context,
+		    s->ignore_whitespace, s->force_text_diff, dsa, s->repo, f);
+		if (err != NULL)
+			return err;
+		break;
+	case GOT_OBJ_TYPE_COMMIT: {
+		const struct got_object_id_queue *parent_ids;
+		struct got_commit_object *commit2;
+		struct got_object_qid *pid;
+		struct got_reflist_head *refs;
+
+		err = got_diff_objects_as_commits(lines, nlines, s->f1, s->f2,
+		    s->fd1, s->fd2, s->id1, s->id2, s->paths, tog_diff_algo,
+		    s->diff_context, s->ignore_whitespace, s->force_text_diff,
+		    dsa, s->repo, f);
+		if (err != NULL)
+			return err;
+
+		refs = got_reflist_object_id_map_lookup(tog_refs_idmap, s->id2);
+		/* Show commit info if we're diffing to a parent/root commit. */
+		if (s->id1 == NULL)
+			return write_commit_info(&s->lines, &s->nlines, s->id2,
+			    refs, s->repo, s->ignore_whitespace,
+			    s->force_text_diff, dsa, s->f);
+
+		err = got_object_open_as_commit(&commit2, s->repo,
+		    s->id2);
+		if (err != NULL)
+			return err;
+
+		parent_ids = got_object_commit_get_parent_ids(commit2);
+		STAILQ_FOREACH(pid, parent_ids, entry) {
+			if (got_object_id_cmp(s->id1, &pid->id) == 0) {
+				err = write_commit_info(&s->lines, &s->nlines,
+				    s->id2, refs, s->repo, s->ignore_whitespace,
+				    s->force_text_diff, dsa, s->f);
+				break;
+			}
+		}
+		if (commit2 != NULL)
+			got_object_commit_close(commit2);
+		if (err != NULL)
+			return err;
+		break;
+	}
+	default:
+		return got_error(GOT_ERR_OBJ_TYPE);
+	}
+
+	return NULL;
+}
+
 static const struct got_error *
 create_diff(struct tog_diff_view_state *s)
 {
 	const struct got_error *err = NULL;
 	FILE *tmp_diff_file = NULL;
-	int obj_type;
 	struct got_diff_line *lines = NULL;
 	struct got_pathlist_head changed_paths;
-	struct got_commit_object *commit2 = NULL;
 	struct got_diffstat_cb_arg dsa;
 	size_t nlines = 0;
 
@@ -5445,88 +6570,37 @@ create_diff(struct tog_diff_view_state *s)
 		goto done;
 	}
 
-	if (s->id1)
-		err = got_object_get_type(&obj_type, s->repo, s->id1);
-	else
-		err = got_object_get_type(&obj_type, s->repo, s->id2);
-	if (err)
-		goto done;
+	if (s->parent_view != NULL && s->parent_view->type == TOG_VIEW_LOG) {
+		struct tog_log_view_state *ls = &s->parent_view->state.log;
+		struct commit_queue_entry *cqe = ls->selected_entry;
 
-	switch (obj_type) {
-	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(&lines, &nlines,
-		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2,
-		    NULL, NULL, tog_diff_algo, s->diff_context,
-		    s->ignore_whitespace, s->force_text_diff, &dsa, s->repo,
-		    tmp_diff_file);
-		if (err != NULL)
-			goto done;
-		break;
-	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(&lines, &nlines,
-		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL, "", "",
-		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, &dsa, s->repo, tmp_diff_file);
-		if (err != NULL)
-			goto done;
-		break;
-	case GOT_OBJ_TYPE_COMMIT: {
-		const struct got_object_id_queue *parent_ids;
-		struct got_object_qid *pid;
-		struct got_reflist_head *refs;
-
-		err = got_diff_objects_as_commits(&lines, &nlines,
-		    s->f1, s->f2, s->fd1, s->fd2, s->id1, s->id2, NULL,
-		    tog_diff_algo, s->diff_context, s->ignore_whitespace,
-		    s->force_text_diff, &dsa, s->repo, tmp_diff_file);
-		if (err)
-			goto done;
-
-		refs = got_reflist_object_id_map_lookup(tog_refs_idmap, s->id2);
-		/* Show commit info if we're diffing to a parent/root commit. */
-		if (s->id1 == NULL) {
-			err = write_commit_info(&s->lines, &s->nlines, s->id2,
-			    refs, s->repo, s->ignore_whitespace,
-			    s->force_text_diff, &dsa, s->f);
-			if (err)
-				goto done;
-		} else {
-			err = got_object_open_as_commit(&commit2, s->repo,
-			    s->id2);
-			if (err)
-				goto done;
-
-			parent_ids = got_object_commit_get_parent_ids(commit2);
-			STAILQ_FOREACH(pid, parent_ids, entry) {
-				if (got_object_id_cmp(s->id1, &pid->id) == 0) {
-					err = write_commit_info(&s->lines,
-					    &s->nlines, s->id2, refs, s->repo,
-					    s->ignore_whitespace,
-					    s->force_text_diff, &dsa, s->f);
-					if (err)
-						goto done;
-					break;
-				}
-			}
+		if (cqe->worktree_entry != 0) {
+			if (cqe->worktree_entry == TOG_WORKTREE_CHANGES_STAGED)
+				s->diff_staged = 1;
+			s->diff_worktree = 1;
 		}
-		break;
-	}
-	default:
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
 	}
 
-	err = write_diffstat(s->f, &s->lines, &s->nlines, &dsa);
-	if (err != NULL)
-		goto done;
+	if (s->diff_worktree)
+		err = tog_diff_worktree(s, tmp_diff_file,
+		    &lines, &nlines, &dsa);
+	else
+		err = tog_diff_objects(s, tmp_diff_file,
+		    &lines, &nlines, &dsa);
+	if (err != NULL) {
+		if (err->code != GOT_ERR_DIFF_NOCHANGES)
+			goto done;
+	} else {
+		err = write_diffstat(s->f, &s->lines, &s->nlines, &dsa);
+		if (err != NULL)
+			goto done;
+	}
 
 	err = cat_diff(s->f, tmp_diff_file, &s->lines, &s->nlines,
 	    lines, nlines);
 
 done:
 	free(lines);
-	if (commit2 != NULL)
-		got_object_commit_close(commit2);
 	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	if (s->f && fflush(s->f) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
@@ -5688,7 +6762,9 @@ static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    struct tog_view *parent_view, struct got_repository *repo)
+    int diff_staged, int diff_worktree, const char *worktree_root,
+    struct tog_view *parent_view, struct got_repository *repo,
+    struct got_pathlist_head *paths)
 {
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
@@ -5713,19 +6789,21 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 	}
 
-	if (id1) {
-		s->id1 = got_object_id_dup(id1);
-		if (s->id1 == NULL) {
+	if (diff_worktree == 0) {
+		if (id1) {
+			s->id1 = got_object_id_dup(id1);
+			if (s->id1 == NULL) {
+				err = got_error_from_errno("got_object_id_dup");
+				goto done;
+			}
+		} else
+			s->id1 = NULL;
+
+		s->id2 = got_object_id_dup(id2);
+		if (s->id2 == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
 		}
-	} else
-		s->id1 = NULL;
-
-	s->id2 = got_object_id_dup(id2);
-	if (s->id2 == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		goto done;
 	}
 
 	s->f1 = got_opentemp();
@@ -5760,8 +6838,12 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->diff_context = diff_context;
 	s->ignore_whitespace = ignore_whitespace;
 	s->force_text_diff = force_text_diff;
+	s->diff_worktree = diff_worktree;
+	s->diff_staged = diff_staged;
 	s->parent_view = parent_view;
+	s->paths = paths;
 	s->repo = repo;
+	s->worktree_root = worktree_root;
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL && !using_mock_io) {
 		int rc;
@@ -5829,30 +6911,38 @@ show_diff_view(struct tog_view *view)
 {
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
-	char *id_str1 = NULL, *id_str2, *header;
-	const char *label1, *label2;
+	char *header;
 
-	if (s->id1) {
-		err = got_object_id_str(&id_str1, s->id1);
+	if (s->diff_worktree) {
+		if (asprintf(&header, "diff %s%s",
+		    s->diff_staged ? "-s " : "", s->worktree_root) == -1)
+			return got_error_from_errno("asprintf");
+	} else {
+		char		*id_str2, *id_str1 = NULL;
+		const char	*label1, *label2;
+
+		if (s->id1) {
+			err = got_object_id_str(&id_str1, s->id1);
+			if (err)
+				return err;
+			label1 = s->label1 ? s->label1 : id_str1;
+		} else
+			label1 = "/dev/null";
+
+		err = got_object_id_str(&id_str2, s->id2);
 		if (err)
 			return err;
-		label1 = s->label1 ? s->label1 : id_str1;
-	} else
-		label1 = "/dev/null";
+		label2 = s->label2 ? s->label2 : id_str2;
 
-	err = got_object_id_str(&id_str2, s->id2);
-	if (err)
-		return err;
-	label2 = s->label2 ? s->label2 : id_str2;
-
-	if (asprintf(&header, "diff %s %s", label1, label2) == -1) {
-		err = got_error_from_errno("asprintf");
+		if (asprintf(&header, "diff %s %s", label1, label2) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(id_str1);
+			free(id_str2);
+			return err;
+		}
 		free(id_str1);
 		free(id_str2);
-		return err;
 	}
-	free(id_str1);
-	free(id_str2);
 
 	err = draw_file(view, header);
 	free(header);
@@ -5864,9 +6954,10 @@ diff_write_patch(struct tog_view *view)
 {
 	const struct got_error		*err;
 	struct tog_diff_view_state	*s = &view->state.diff;
+	struct got_object_id		*id2 = s->id2;
 	FILE				*f = NULL;
 	char				 buf[BUFSIZ], pathbase[PATH_MAX];
-	char				*idstr2, *idstr1 = NULL, *path = NULL;
+	char				*idstr1, *idstr2 = NULL, *path = NULL;
 	size_t				 r;
 	off_t				 pos;
 	int				 rc;
@@ -5887,7 +6978,15 @@ diff_write_patch(struct tog_view *view)
 		if (err != NULL)
 			return err;
 	}
-	err = got_object_id_str(&idstr2, s->id2);
+	if (id2 == NULL) {
+		if (s->diff_worktree == 0 || tog_base_commit.id == NULL) {
+			/* illegal state that should not be possible */
+			err = got_error(GOT_ERR_NOT_WORKTREE);
+			goto done;
+		}
+		id2 = tog_base_commit.id;
+	}
+	err = got_object_id_str(&idstr2, id2);
 	if (err != NULL)
 		goto done;
 
@@ -5948,19 +7047,26 @@ set_selected_commit(struct tog_diff_view_state *s,
 	struct got_commit_object *selected_commit;
 	struct got_object_qid *pid;
 
-	free(s->id2);
-	s->id2 = got_object_id_dup(entry->id);
-	if (s->id2 == NULL)
-		return got_error_from_errno("got_object_id_dup");
-
-	err = got_object_open_as_commit(&selected_commit, s->repo, entry->id);
-	if (err)
-		return err;
-	parent_ids = got_object_commit_get_parent_ids(selected_commit);
 	free(s->id1);
-	pid = STAILQ_FIRST(parent_ids);
-	s->id1 = pid ? got_object_id_dup(&pid->id) : NULL;
-	got_object_commit_close(selected_commit);
+	s->id1 = NULL;
+	free(s->id2);
+	s->id2 = NULL;
+
+	if (entry->worktree_entry == 0) {
+		s->id2 = got_object_id_dup(entry->id);
+		if (s->id2 == NULL)
+			return got_error_from_errno("got_object_id_dup");
+
+		err = got_object_open_as_commit(&selected_commit,
+		    s->repo, entry->id);
+		if (err)
+			return err;
+		parent_ids = got_object_commit_get_parent_ids(selected_commit);
+		pid = STAILQ_FIRST(parent_ids);
+		s->id1 = pid ? got_object_id_dup(&pid->id) : NULL;
+		got_object_commit_close(selected_commit);
+	}
+
 	return NULL;
 }
 
@@ -6206,6 +7312,9 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			err = set_selected_commit(s, ls->selected_entry);
 			if (err)
 				break;
+
+			if (s->worktree_root == NULL)
+				s->worktree_root = ls->thread_args.wctx.wt_root;
 		} else if (s->parent_view->type == TOG_VIEW_BLAME) {
 			struct tog_blame_view_state *bs;
 			struct got_object_id *id, *prev_id;
@@ -6235,6 +7344,8 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			if (err)
 				break;
 		}
+		s->diff_staged = 0;
+		s->diff_worktree = 0;
 		s->first_displayed_line = 1;
 		s->last_displayed_line = view->nlines;
 		s->matched_line = 0;
@@ -6254,24 +7365,58 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	return err;
 }
 
+ static const struct got_error *
+get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
+    char *argv[], struct got_worktree *worktree)
+{
+	const struct got_error		*err = NULL;
+	char				*path;
+	struct got_pathlist_entry	*new;
+	int				 i;
+
+	if (argc == 0) {
+		path = strdup("");
+		if (path == NULL)
+			return got_error_from_errno("strdup");
+		return got_pathlist_insert(NULL, paths, path, NULL);
+	}
+
+	for (i = 0; i < argc; i++) {
+		err = got_worktree_resolve_path(&path, worktree, argv[i]);
+		if (err)
+			break;
+		err = got_pathlist_insert(&new, paths, path, NULL);
+		if (err != NULL || new == NULL) {
+			free(path);
+			if (err != NULL)
+				break;
+		}
+	}
+
+	return err;
+}
+
 static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_object_id *id1 = NULL, *id2 = NULL;
-	char *repo_path = NULL, *cwd = NULL;
-	char *id_str1 = NULL, *id_str2 = NULL;
-	char *keyword_idstr1 = NULL, *keyword_idstr2 = NULL;
-	char *label1 = NULL, *label2 = NULL;
-	int diff_context = 3, ignore_whitespace = 0;
-	int ch, force_text_diff = 0;
+	struct got_pathlist_head paths;
+	struct got_object_id *ids[2] = { NULL, NULL };
+	const char *commit_args[2] = { NULL, NULL };
+	char *labels[2] = { NULL, NULL };
+	char *repo_path = NULL, *worktree_path = NULL, *cwd = NULL;
+	int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
+	int i, ncommit_args = 0, diff_context = 3, ignore_whitespace = 0;
+	int ch, diff_staged = 0, diff_worktree = 0, force_text_diff = 0;
 	const char *errstr;
 	struct tog_view *view;
 	int *pack_fds = NULL;
 
-	while ((ch = getopt(argc, argv, "aC:r:w")) != -1) {
+	TAILQ_INIT(&paths);
+
+	while ((ch = getopt(argc, argv, "aC:c:r:sw")) != -1) {
 		switch (ch) {
 		case 'a':
 			force_text_diff = 1;
@@ -6283,12 +7428,20 @@ cmd_diff(int argc, char *argv[])
 				errx(1, "number of context lines is %s: %s",
 				    errstr, errstr);
 			break;
+		case 'c':
+			if (ncommit_args >= 2)
+				errx(1, "too many -c options used");
+			commit_args[ncommit_args++] = optarg;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 's':
+			diff_staged = 1;
 			break;
 		case 'w':
 			ignore_whitespace = 1;
@@ -6301,14 +7454,6 @@ cmd_diff(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
-
-	if (argc == 0) {
-		usage_diff(); /* TODO show local worktree changes */
-	} else if (argc == 2) {
-		id_str1 = argv[0];
-		id_str2 = argv[1];
-	} else
-		usage_diff();
 
 	error = got_repo_pack_fds_open(&pack_fds);
 	if (error)
@@ -6336,52 +7481,215 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (diff_staged && (worktree == NULL || ncommit_args > 0)) {
+		error = got_error_msg(GOT_ERR_BAD_OPTION,
+		    "-s can only be used when diffing a work tree");
+		goto done;
+	}
+
 	init_curses();
 
-	error = apply_unveil(got_repo_get_path(repo), NULL);
+	error = apply_unveil(got_repo_get_path(repo),
+	    worktree != NULL ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo, 0);
-	if (error)
-		goto done;
+	if (argc == 2 || ncommit_args > 0) {
+		int obj_type = (ncommit_args > 0 ?
+		    GOT_OBJ_TYPE_COMMIT : GOT_OBJ_TYPE_ANY);
 
-	if (id_str1 != NULL) {
-		error = got_keyword_to_idstr(&keyword_idstr1, id_str1,
-		    repo, worktree);
+		error = tog_load_refs(repo, 0);
 		if (error != NULL)
 			goto done;
-		if (keyword_idstr1 != NULL)
-			id_str1 = keyword_idstr1;
+
+		for (i = 0; i < (ncommit_args > 0 ? ncommit_args : argc); ++i) {
+			const char	*arg;
+			char		*keyword_idstr = NULL;
+
+			if (ncommit_args > 0)
+				arg = commit_args[i];
+			else
+				arg = argv[i];
+
+			error = got_keyword_to_idstr(&keyword_idstr, arg,
+			    repo, worktree);
+			if (error != NULL)
+				goto done;
+			if (keyword_idstr != NULL)
+				arg = keyword_idstr;
+
+			error = got_repo_match_object_id(&ids[i], &labels[i],
+			    arg, obj_type, &tog_refs, repo);
+			free(keyword_idstr);
+			if (error != NULL) {
+				if (error->code != GOT_ERR_NOT_REF &&
+				    error->code != GOT_ERR_NO_OBJ)
+					goto done;
+				if (ncommit_args > 0)
+					goto done;
+				error = NULL;
+				break;
+			}
+		}
 	}
-	if (id_str2 != NULL) {
-		error = got_keyword_to_idstr(&keyword_idstr2, id_str2,
-		    repo, worktree);
+
+	if (diff_staged && ids[0] != NULL) {
+		error = got_error_msg(GOT_ERR_BAD_OPTION,
+		    "-s can only be used when diffing a work tree");
+		goto done;
+	}
+
+	if (ncommit_args == 0 && (ids[0] == NULL || ids[1] == NULL)) {
+		if (worktree == NULL) {
+			if (argc == 2 && ids[0] == NULL) {
+				error = got_error_path(argv[0], GOT_ERR_NO_OBJ);
+				goto done;
+			} else if (argc == 2 && ids[1] == NULL) {
+				error = got_error_path(argv[1], GOT_ERR_NO_OBJ);
+				goto done;
+			} else if (argc > 0) {
+				error = got_error_fmt(GOT_ERR_NOT_WORKTREE,
+				    "%s", "specified paths cannot be resolved");
+				goto done;
+			} else {
+				error = got_error(GOT_ERR_NOT_WORKTREE);
+				goto done;
+			}
+		}
+
+		error = get_worktree_paths_from_argv(&paths, argc, argv,
+		    worktree);
 		if (error != NULL)
 			goto done;
-		if (keyword_idstr2 != NULL)
-			id_str2 = keyword_idstr2;
+
+		worktree_path = strdup(got_worktree_get_root_path(worktree));
+		if (worktree_path == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+		diff_worktree = 1;
 	}
 
-	error = got_repo_match_object_id(&id1, &label1, id_str1,
-	    GOT_OBJ_TYPE_ANY, &tog_refs, repo);
-	if (error)
-		goto done;
+	if (ncommit_args == 1) {  /* diff commit against its first parent */
+		struct got_commit_object *commit;
 
-	error = got_repo_match_object_id(&id2, &label2, id_str2,
-	    GOT_OBJ_TYPE_ANY, &tog_refs, repo);
-	if (error)
+		error = got_object_open_as_commit(&commit, repo, ids[0]);
+		if (error != NULL)
+			goto done;
+
+		labels[1] = labels[0];
+		ids[1] = ids[0];
+		if (got_object_commit_get_nparents(commit) > 0) {
+			const struct got_object_id_queue *pids;
+			struct got_object_qid *pid;
+
+			pids = got_object_commit_get_parent_ids(commit);
+			pid = STAILQ_FIRST(pids);
+			ids[0] = got_object_id_dup(&pid->id);
+			if (ids[0] == NULL) {
+				error = got_error_from_errno(
+				    "got_object_id_dup");
+				got_object_commit_close(commit);
+				goto done;
+			}
+			error = got_object_id_str(&labels[0], ids[0]);
+			if (error != NULL) {
+				got_object_commit_close(commit);
+				goto done;
+			}
+		} else {
+			ids[0] = NULL;
+			labels[0] = strdup("/dev/null");
+			if (labels[0] == NULL) {
+				error = got_error_from_errno("strdup");
+				got_object_commit_close(commit);
+				goto done;
+			}
+		}
+
+		got_object_commit_close(commit);
+	}
+
+	if (ncommit_args == 0 && argc > 2) {
+		error = got_error_msg(GOT_ERR_BAD_PATH,
+		    "path arguments cannot be used when diffing two objects");
 		goto done;
+	}
+
+	if (ids[0]) {
+		error = got_object_get_type(&type1, repo, ids[0]);
+		if (error != NULL)
+			goto done;
+	}
+
+	if (diff_worktree == 0) {
+		error = got_object_get_type(&type2, repo, ids[1]);
+		if (error != NULL)
+			goto done;
+		if (type1 != GOT_OBJ_TYPE_ANY && type1 != type2) {
+			error = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+		if (type1 == GOT_OBJ_TYPE_BLOB && argc > 2) {
+			error = got_error_msg(GOT_ERR_OBJ_TYPE,
+			    "path arguments cannot be used when diffing blobs");
+			goto done;
+		}
+	}
+
+	for (i = 0; ncommit_args > 0 && i < argc; i++) {
+		char *in_repo_path;
+		struct got_pathlist_entry *new;
+
+		if (worktree) {
+			const char *prefix;
+			char *p;
+
+			error = got_worktree_resolve_path(&p, worktree,
+			    argv[i]);
+			if (error != NULL)
+				goto done;
+			prefix = got_worktree_get_path_prefix(worktree);
+			while (prefix[0] == '/')
+				prefix++;
+			if (asprintf(&in_repo_path, "%s%s%s", prefix,
+			    (p[0] != '\0' && prefix[0] != '\0') ? "/" : "",
+			    p) == -1) {
+				error = got_error_from_errno("asprintf");
+				free(p);
+				goto done;
+			}
+			free(p);
+		} else {
+			char *mapped_path, *s;
+
+			error = got_repo_map_path(&mapped_path, repo, argv[i]);
+			if (error != NULL)
+				goto done;
+			s = mapped_path;
+			while (s[0] == '/')
+				s++;
+			in_repo_path = strdup(s);
+			if (in_repo_path == NULL) {
+				error = got_error_from_errno("asprintf");
+				free(mapped_path);
+				goto done;
+			}
+			free(mapped_path);
+
+		}
+		error = got_pathlist_insert(&new, &paths, in_repo_path, NULL);
+		if (error != NULL || new == NULL)
+			free(in_repo_path);
+		if (error != NULL)
+			goto done;
+	}
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_DIFF);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_diff_view(view, id1, id2, label1, label2, diff_context,
-	    ignore_whitespace, force_text_diff, NULL,  repo);
-	if (error)
-		goto done;
 
 	if (worktree) {
 		error = set_tog_base_commit(repo, worktree);
@@ -6393,17 +7701,23 @@ cmd_diff(int argc, char *argv[])
 		worktree = NULL;
 	}
 
+	error = open_diff_view(view, ids[0], ids[1], labels[0], labels[1],
+	    diff_context, ignore_whitespace, force_text_diff, diff_staged,
+	    diff_worktree, worktree_path, NULL, repo, &paths);
+	if (error)
+		goto done;
+
 	error = view_loop(view);
 
 done:
+	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(tog_base_commit.id);
-	free(keyword_idstr1);
-	free(keyword_idstr2);
-	free(label1);
-	free(label2);
-	free(id1);
-	free(id2);
+	free(worktree_path);
 	free(repo_path);
+	free(labels[0]);
+	free(labels[1]);
+	free(ids[0]);
+	free(ids[1]);
 	free(cwd);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
@@ -7334,7 +8648,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			}
 		}
 		err = open_diff_view(diff_view, pid ? &pid->id : NULL,
-		    id, NULL, NULL, 3, 0, 0, view, s->repo);
+		    id, NULL, NULL, 3, 0, 0, 0, 0, NULL, view, s->repo, NULL);
 		got_object_commit_close(commit);
 		if (err)
 			break;
@@ -9935,8 +11249,7 @@ view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
 			struct tog_log_view_state *s = &view->state.log;
 
 			err = open_diff_view_for_commit(new_view, y, x,
-			    s->selected_entry->commit, s->selected_entry->id,
-			    view, s->repo);
+			    s->selected_entry, view, s->repo);
 		} else
 			return got_error_msg(GOT_ERR_NOT_IMPL,
 			    "parent/child view pair not supported");

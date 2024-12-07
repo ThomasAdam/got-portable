@@ -5267,9 +5267,10 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			goto done;
 	}
 
-	err = got_diff_blob_file(blob1, a->f1, size1, label1, f2 ? f2 : a->f2,
-	    f2_exists, &sb, path, GOT_DIFF_ALGORITHM_PATIENCE, a->diff_context,
-	    a->ignore_whitespace, a->force_text_diff, a->diffstat, a->outfile);
+	err = got_diff_blob_file(NULL, NULL, blob1, a->f1, size1, label1,
+	    f2 ? f2 : a->f2, f2_exists, &sb, path, GOT_DIFF_ALGORITHM_PATIENCE,
+	    a->diff_context, a->ignore_whitespace, a->force_text_diff,
+	    a->diffstat, a->outfile);
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
 		err = got_error_from_errno("close");

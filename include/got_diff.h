@@ -74,11 +74,13 @@ const struct got_error *got_diff_blob(struct got_diff_line **, size_t *,
  * An optional const char * diff header label for the blob may be provided, too.
  * The number of context lines to show in the diff must be specified as well.
  * Whitespace differences may optionally be ignored.
+ * If not NULL, the two initial output arguments will be populated with an
+ * array of line metadata for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
-    off_t, const char *, FILE *, int, struct stat *, const char *,
-    enum got_diff_algorithm, int, int, int, struct got_diffstat_cb_arg *,
-    FILE *);
+const struct got_error *got_diff_blob_file(struct got_diff_line **, size_t *,
+    struct got_blob_object *, FILE *, off_t, const char *, FILE *, int,
+    struct stat *, const char *, enum got_diff_algorithm, int, int, int,
+    struct got_diffstat_cb_arg *, FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs

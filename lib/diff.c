@@ -346,19 +346,32 @@ got_diff_blob(struct got_diff_line **lines, size_t*nlines,
 }
 
 static const struct got_error *
-diff_blob_file(struct got_diffreg_result **resultp,
-    struct got_blob_object *blob1, FILE *f1, off_t size1, const char *label1,
-    FILE *f2, int f2_exists, struct stat *sb2, const char *label2,
-    enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
-    int force_text_diff, struct got_diffstat_cb_arg *diffstat, FILE *outfile)
+diff_blob_file(struct got_diff_line **lines, size_t *nlines,
+    struct got_diffreg_result **resultp, struct got_blob_object *blob1,
+    FILE *f1, off_t size1, const char *label1, FILE *f2, int f2_exists,
+    struct stat *sb2, const char *label2, enum got_diff_algorithm diff_algo,
+    int diff_context, int ignore_whitespace, int force_text_diff,
+    struct got_diffstat_cb_arg *diffstat, FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
 	char hex1[GOT_OBJECT_ID_HEX_MAXLEN];
 	const char *idstr1 = NULL;
 	struct got_diffreg_result *result = NULL;
+	off_t outoff = 0;
+	int n;
 
 	if (resultp)
 		*resultp = NULL;
+
+	if (lines != NULL && *lines != NULL) {
+		if (*nlines == 0) {
+			err = add_line_metadata(lines, nlines, 0,
+			    GOT_DIFF_LINE_NONE);
+			if (err != NULL)
+				return err;
+		} else
+			outoff = (*lines)[*nlines - 1].offset;
+	}
 
 	if (blob1)
 		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
@@ -367,6 +380,17 @@ diff_blob_file(struct got_diffreg_result **resultp,
 
 	if (outfile) {
 		char	*mode = NULL;
+
+		n = fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
+		if (n < 0)
+			return got_error_from_errno("fprintf");
+		if (lines != NULL && *lines != NULL) {
+			outoff += n;
+			err = add_line_metadata(lines, nlines, outoff,
+			    GOT_DIFF_LINE_BLOB_MIN);
+			if (err != NULL)
+				return err;
+		}
 
 		/* display file mode for new added files only */
 		if (f2_exists && blob1 == NULL) {
@@ -378,10 +402,18 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			    sb2->st_mode & mmask) == -1)
 				return got_error_from_errno("asprintf");
 		}
-		fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
-		fprintf(outfile, "file + %s%s\n",
+		n = fprintf(outfile, "file + %s%s\n",
 		    f2_exists ? label2 : "/dev/null", mode ? mode : "");
 		free(mode);
+		if (n < 0)
+			return got_error_from_errno("fprintf");
+		if (lines != NULL && *lines != NULL) {
+			outoff += n;
+			err = add_line_metadata(lines, nlines, outoff,
+			    GOT_DIFF_LINE_BLOB_PLUS);
+			if (err != NULL)
+				return err;
+		}
 	}
 
 	err = got_diffreg(&result, f1, f2, diff_algo, ignore_whitespace,
@@ -398,7 +430,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 	}
 
 	if (outfile) {
-		err = got_diffreg_output(NULL, NULL, result,
+		err = got_diffreg_output(lines, nlines, result,
 		    blob1 != NULL, f2_exists,
 		    label2, /* show local file's path, not a blob ID */
 		    label2, GOT_DIFF_OUTPUT_UNIDIFF,
@@ -453,15 +485,15 @@ done:
 }
 
 const struct got_error *
-got_diff_blob_file(struct got_blob_object *blob1, FILE *f1, off_t size1,
-    const char *label1, FILE *f2, int f2_exists, struct stat *sb2,
-    const char *label2, enum got_diff_algorithm diff_algo, int diff_context,
-    int ignore_whitespace, int force_text_diff,
-    struct got_diffstat_cb_arg *ds, FILE *outfile)
+got_diff_blob_file(struct got_diff_line **lines, size_t *nlines,
+    struct got_blob_object *blob1, FILE *f1, off_t size1, const char *label1,
+    FILE *f2, int f2_exists, struct stat *sb2, const char *label2,
+    enum got_diff_algorithm diff_algo, int diff_context, int ignore_whitespace,
+    int force_text_diff, struct got_diffstat_cb_arg *ds, FILE *outfile)
 {
-	return diff_blob_file(NULL, blob1, f1, size1, label1, f2, f2_exists,
-	    sb2, label2, diff_algo, diff_context, ignore_whitespace,
-	    force_text_diff, ds, outfile);
+	return diff_blob_file(lines, nlines, NULL, blob1, f1, size1, label1,
+	    f2, f2_exists, sb2, label2, diff_algo, diff_context,
+	    ignore_whitespace, force_text_diff, ds, outfile);
 }
 
 static const struct got_error *
