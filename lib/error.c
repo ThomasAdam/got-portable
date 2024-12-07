@@ -260,8 +260,6 @@ got_error(int code)
 {
 	size_t i;
 
-	if (code == GOT_ERR_PRIVSEP_NO_FD) abort();
-
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code)
 			return &got_errors[i];
