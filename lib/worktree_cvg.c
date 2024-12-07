@@ -1471,7 +1471,7 @@ append_ct_diff(struct got_commitable *ct, int *diff_header_shown,
 			goto done;
 	}
 
-	err = got_diff_blob_file(blob1, f1, size1, label1,
+	err = got_diff_blob_file(NULL, NULL, blob1, f1, size1, label1,
 	    ondisk_file ? ondisk_file : f2, f2_exists, &sb, ct->path,
 	    GOT_DIFF_ALGORITHM_PATIENCE, 3, 0, 0, NULL, diff_outfile);
 done:

@@ -248,6 +248,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_BAD_KEYWORD, "invalid commit keyword" },
 	{ GOT_ERR_UNKNOWN_CAPA, "unknown capability" },
 	{ GOT_ERR_REF_DUP_ENTRY, "duplicate reference entry" },
+	{ GOT_ERR_DIFF_NOCHANGES, "no changes match the requested diff" },
 };
 
 static struct got_custom_error {

@@ -189,6 +189,7 @@
 #define GOT_ERR_BAD_KEYWORD	172
 #define GOT_ERR_UNKNOWN_CAPA	173
 #define GOT_ERR_REF_DUP_ENTRY	174
+#define GOT_ERR_DIFF_NOCHANGES	175
 
 struct got_error {
         int code;

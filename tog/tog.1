@@ -44,7 +44,7 @@ is specified, or if just a
 .Ar path
 is specified.
 .It Diff view
-Displays changes made in a particular commit.
+Displays work tree changes or changes made in a particular commit.
 .It Blame view
 Displays the line-by-line history of a file.
 .It Tree view
@@ -260,7 +260,7 @@ key is pressed.
 .It Cm Ctrl+l
 Reload the
 .Cm log
-view with new commits found in the repository.
+view with new commits found in the repository or new work tree changes.
 .It Cm B
 Reload the
 .Cm log
@@ -345,13 +345,20 @@ work tree, use the repository path associated with this work tree.
 .El
 .It Xo
 .Cm diff
-.Op Fl aw
+.Op Fl asw
 .Op Fl C Ar number
+.Op Fl c Ar commit
 .Op Fl r Ar repository-path
-.Ar object1
-.Ar object2
+.Op Ar object1 Ar object2 | Ar path ...
 .Xc
-Display the differences between two objects in the repository.
+If invoked within a work tree without any arguments, display all local
+changes in the work tree.
+If one or more
+.Ar path
+arguments are specified, only show changes within the specified paths.
+.Pp
+Alternatively, if two object arguments are specified, display the differences
+between the two objects in the repository.
 Treat each of the two arguments as a reference, a tag name, an object
 ID, or a keyword and display differences between the corresponding
 objects.
@@ -489,6 +496,25 @@ Treat file contents as ASCII text even if binary data is detected.
 .It Fl C Ar number
 Set the number of context lines shown in the diff.
 By default, 3 lines of context are shown.
+.It Fl c Ar commit
+Show differences between commits in the repository.
+This option may be used up to two times.
+When used only once, show differences between the specified
+.Ar commit
+and its first parent commit.
+When used twice, show differences between the two specified commits.
+.Pp
+The expected argument is a commit ID hash, or an existing reference,
+tag name, or keyword, which is resolved to a commit ID.
+Unique abbreviated hash arguments are automatically expanded to a full hash.
+Both objects must be of the same type (i.e., blobs, trees, or commits).
+.Pp
+If the
+.Fl c
+option is used, all non-option arguments are interpreted as paths.
+If one or more such
+.Ar path
+arguments are provided, only show differences for the specified paths.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -496,6 +522,15 @@ working directory.
 If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
+.It Fl s
+Show changes staged with
+.Cm got stage
+instead of showing local changes in the work tree.
+This option is only valid when
+.Cm tog diff
+is invoked in a work tree with no
+.Fl c
+options.
 .It Fl w
 Ignore whitespace-only changes.
 .El
