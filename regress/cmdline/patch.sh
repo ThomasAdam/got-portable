@@ -233,7 +233,9 @@ test_patch_malformed() {
 EOF
 
 	echo -n > $testroot/stdout.expected
-	echo "got: malformed patch" > $testroot/stderr.expected
+	echo "got-read-patch: @@ -1 +1,2: malformed patch" \
+		> $testroot/stderr.expected
+	echo "got: malformed patch" >> $testroot/stderr.expected
 
 	(cd $testroot/wt && got patch patch) \
 		 > $testroot/stdout \
@@ -253,6 +255,10 @@ EOF
 		return 1
 	fi
 
+	echo -n > $testroot/stdout.expected
+	echo "got-read-patch: @@ -1 +1,2: malformed patch" \
+		> $testroot/stderr.expected
+	echo "got: malformed patch" >> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -288,6 +294,10 @@ EOF
 		return 1
 	fi
 
+	echo "got-read-patch: alpha: malformed patch" \
+		> $testroot/stderr.expected
+	echo "got: malformed patch" >> $testroot/stderr.expected
+
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -322,6 +332,10 @@ EOF
 		return 1
 	fi
 
+	echo "got-read-patch: @@ -0,0 +0,0 @@: malformed patch" \
+		> $testroot/stderr.expected
+	echo "got: malformed patch" >> $testroot/stderr.expected
+
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -354,7 +368,8 @@ there's no patch in here!
 EOF
 
 	echo -n > $testroot/stdout.expected
-	echo "got: no patch found" > $testroot/stderr.expected
+	echo "got-read-patch: no patch found" > $testroot/stderr.expected
+	echo "got: no patch found" >> $testroot/stderr.expected
 
 	(cd $testroot/wt && got patch patch) \
 		 > $testroot/stdout \

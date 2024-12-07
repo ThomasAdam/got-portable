@@ -334,7 +334,8 @@ find_diff(int *done, int *next, FILE *fp, int git, const char *commitid)
 			create = !strncmp(line+4, "0,0", 3);
 			if ((old == NULL && new == NULL) ||
 			    (!create && old == NULL))
-				err = got_error(GOT_ERR_PATCH_MALFORMED);
+				err = got_error_fmt(GOT_ERR_PATCH_MALFORMED,
+				    "%s", line);
 			else
 				err = send_patch(old, new, commitid,
 				    blob, xbit, git);
@@ -374,7 +375,8 @@ strtolnum(char **str, int *n)
 
 	*n = strtonum(*str, 0, INT_MAX, &errstr);
 	if (errstr != NULL)
-		return got_error(GOT_ERR_PATCH_MALFORMED);
+		return got_error_fmt(GOT_ERR_PATCH_MALFORMED,
+		    "%s: %s", *str, errstr);
 
 	*p = c;
 	*str = p;
@@ -384,7 +386,8 @@ strtolnum(char **str, int *n)
 static const struct got_error *
 parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 {
-	static const struct got_error *err = NULL;
+	const struct got_error *err = NULL;
+	char *s0 = s; 
 
 	if (strncmp(s, "@@ -", 4)) {
 		*done = 1;
@@ -409,7 +412,7 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 		s++;
 
 	if (*s != '+' || !*++s)
-		return got_error(GOT_ERR_PATCH_MALFORMED);
+		return got_error_fmt(GOT_ERR_PATCH_MALFORMED, "%s", s0);
 	err = strtolnum(&s, &hdr->newfrom);
 	if (err)
 		return err;
@@ -425,14 +428,14 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 		s++;
 
 	if (*s != '@')
-		return got_error(GOT_ERR_PATCH_MALFORMED);
+		return got_error_fmt(GOT_ERR_PATCH_MALFORMED, "%s", s0);
 
 	if (hdr->oldfrom >= INT_MAX - hdr->oldlines ||
 	    hdr->newfrom >= INT_MAX - hdr->newlines ||
 	    /* not so sure about this one */
 	    hdr->oldlines >= INT_MAX - hdr->newlines - 1 ||
 	    (hdr->oldlines == 0 && hdr->newlines == 0))
-		return got_error(GOT_ERR_PATCH_MALFORMED);
+		return got_error_fmt(GOT_ERR_PATCH_MALFORMED, "%s", s0);
 
 	if (hdr->oldlines == 0) {
 		/* larry says to "do append rather than insert"; I don't
@@ -451,7 +454,7 @@ parse_hdr(char *s, int *done, struct got_imsg_patch_hunk *hdr)
 static const struct got_error *
 send_line(const char *line, size_t len)
 {
-	static const struct got_error *err = NULL;
+	const struct got_error *err = NULL;
 	struct iovec iov[2];
 	int iovcnt = 0;
 
@@ -504,7 +507,7 @@ peek_special_line(FILE *fp)
 static const struct got_error *
 parse_hunk(FILE *fp, int *done)
 {
-	static const struct got_error *err = NULL;
+	const struct got_error *err = NULL;
 	struct got_imsg_patch_hunk hdr;
 	char	*line = NULL, ch;
 	size_t	 linesize = 0;
@@ -516,6 +519,8 @@ parse_hunk(FILE *fp, int *done)
 		*done = 1;
 		goto done;
 	}
+	if (line[linelen - 1] == '\n')
+		line[linelen - 1] = '\0';
 
 	err = parse_hdr(line, done, &hdr);
 	if (err)
@@ -569,12 +574,14 @@ parse_hunk(FILE *fp, int *done)
 			leftnew--;
 			break;
 		default:
-			err = got_error(GOT_ERR_PATCH_MALFORMED);
+			err = got_error_fmt(GOT_ERR_PATCH_MALFORMED,
+			    "%s", line);
 			goto done;
 		}
 
 		if (leftold < 0 || leftnew < 0) {
-			err = got_error(GOT_ERR_PATCH_MALFORMED);
+			err = got_error_fmt(GOT_ERR_PATCH_MALFORMED,
+			    "%s", line);
 			goto done;
 		}
 
@@ -692,17 +699,18 @@ main(int argc, char **argv)
 	err = got_privsep_flush_imsg(&ibuf);
 	imsg_free(&imsg);
 done:
+	if (err != NULL) {
+		if (err->code != GOT_ERR_PRIVSEP_PIPE) {
+			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+			fflush(stderr);
+		}
+		got_privsep_send_error(&ibuf, err);
+	}
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (fp != NULL && fclose(fp) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (err != NULL) {
-		got_privsep_send_error(&ibuf, err);
-		err = NULL;
-	}
 	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
-		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 	return err ? 1 : 0;
 }
