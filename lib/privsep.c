@@ -183,7 +183,7 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 
 	ret = imsgbuf_flush(ibuf);
 	if (ret == -1) {
-		fprintf(stderr, "%s: error %d \"%s\": imsg_flush: %s\n",
+		fprintf(stderr, "%s: error %d \"%s\": imsgbuf_flush: %s\n",
 		    getprogname(), err->code, err->msg, strerror(errno));
 		return;
 	}
@@ -199,7 +199,7 @@ flush_imsg(struct imsgbuf *ibuf)
 		return err;
 
 	if (imsgbuf_flush(ibuf) == -1)
-		return got_error_from_errno("imsg_flush");
+		return got_error_from_errno("imsgbuf_flush");
 
 	return NULL;
 }

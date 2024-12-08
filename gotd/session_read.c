@@ -206,7 +206,7 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
-			fatal("imsg_read error");
+			fatal("imsgbuf_read error");
 		if (n == 0) {
 			/* Connection closed. */
 			shut = 1;
@@ -749,7 +749,7 @@ session_dispatch(int fd, short event, void *arg)
 
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
-			fatal("imsg_read error");
+			fatal("imsgbuf_read error");
 		if (n == 0) {
 			/* Connection closed. */
 			shut = 1;

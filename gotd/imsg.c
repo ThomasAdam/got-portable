@@ -88,7 +88,7 @@ gotd_imsg_recv(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 	if (n == 0) {
 		n = imsgbuf_read(ibuf);
 		if (n == -1)
-			return got_error_from_errno("imsg_read");
+			return got_error_from_errno("imsgbuf_read");
 		if (n == 0)
 			return got_error(GOT_ERR_EOF);
 		n = imsg_get(ibuf, imsg);

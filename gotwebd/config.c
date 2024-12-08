@@ -177,7 +177,7 @@ config_setfd(struct gotwebd *env)
 				fatal("imsg_compose_event IMSG_CFG_FD");
 
 			if (imsgbuf_flush(&env->iev_server[j].ibuf) == -1)
-				fatal("imsg_flush");
+				fatal("imsgbuf_flush");
 			imsg_event_add(&env->iev_server[j]);
 		}
 	}
