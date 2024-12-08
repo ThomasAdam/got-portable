@@ -142,13 +142,13 @@ gotwebd_dispatch_sockets(int fd, short event, void *arg)
 
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
-			fatal("imsg_read error");
+			fatal("imsgbuf_read error");
 		if (n == 0)	/* Connection closed */
 			shut = 1;
 	}
 	if (event & EV_WRITE) {
 		if (imsgbuf_write(ibuf) == -1)
-			fatal("msgbuf_write");
+			fatal("imsgbuf_write");
 	}
 
 	for (;;) {
