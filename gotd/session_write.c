@@ -1218,7 +1218,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			 * Pending notifications should still be sent.
 			 */
 			if (STAILQ_FIRST(&notifications) != NULL)
-				return; 
+				return;
 			if (err->code == GOT_ERR_ERRNO && errno == EPIPE) {
 				disconnect(client);
 				return;
@@ -1248,7 +1248,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			 * Pending notifications should still be sent.
 			 */
 			if (STAILQ_FIRST(&notifications) != NULL)
-				return; 
+				return;
 			err = got_error(GOT_ERR_EOF);
 			disconnect_on_error(client, err);
 			return;
