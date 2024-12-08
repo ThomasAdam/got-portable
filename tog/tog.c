@@ -6363,9 +6363,27 @@ tog_diff_worktree(struct tog_diff_view_state *s, FILE *f,
 	if (cwd == NULL)
 		return got_error_from_errno("getcwd");
 
-	err = got_worktree_open(&worktree, cwd, NULL);
+	err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
 	if (err != NULL)
 		goto done;
+
+	err = got_worktree_open(&worktree, cwd, NULL);
+	if (err != NULL) {
+		if (err->code == GOT_ERR_WORKTREE_BUSY) {
+			int n;
+
+			if ((n = fprintf(f, "%s\n", err->msg)) < 0) {
+				err = got_ferror(f, GOT_ERR_IO);
+				goto done;
+			}
+			err = add_line_metadata(lines, nlines, n,
+			    GOT_DIFF_LINE_META);
+			if (err != NULL)
+				goto done;
+			err = got_error(GOT_ERR_DIFF_NOCHANGES);
+		}
+		goto done;
+	}
 
 	err = got_object_id_str(&id_str,
 	    got_worktree_get_base_commit_id(worktree));
@@ -6392,10 +6410,6 @@ tog_diff_worktree(struct tog_diff_view_state *s, FILE *f,
 	arg.f1 = s->f1;
 	arg.f2 = s->f2;
 	arg.outfile = f;
-
-	err = add_line_metadata(lines, nlines, 0, GOT_DIFF_LINE_NONE);
-	if (err != NULL)
-		goto done;
 
 	if (s->paths == NULL) {
 		err = got_pathlist_insert(NULL, &pathlist, "", NULL);
