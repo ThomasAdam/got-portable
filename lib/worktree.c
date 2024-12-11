@@ -4239,8 +4239,8 @@ got_worktree_status(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			status_cb, status_arg, cancel_cb, cancel_arg,
-			no_ignores, 0);
+		    status_cb, status_arg, cancel_cb, cancel_arg,
+		    no_ignores, 0);
 		if (err)
 			break;
 	}
