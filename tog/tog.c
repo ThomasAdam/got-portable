@@ -3215,8 +3215,14 @@ tog_worktree_status(struct tog_log_thread_args *ta)
 
 	if (wt_state != 0) {
 		err = get_author(&wctx->wt_author, ta->repo, wt);
-		if (err != NULL)
-			goto done;
+		if (err != NULL) {
+			if (err->code != GOT_ERR_COMMIT_NO_AUTHOR)
+				goto done;
+			if ((wctx->wt_author = strdup("")) == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
 
 		wctx->wt_root = strdup(got_worktree_get_root_path(wt));
 		if (wctx->wt_root == NULL) {
