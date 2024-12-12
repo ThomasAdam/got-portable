@@ -892,8 +892,10 @@ cmd_import(int argc, char *argv[])
 
 	if (repo_path == NULL) {
 		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno("getcwd");
+		if (repo_path == NULL) {
+			error = got_error_from_errno("getcwd");
+			goto done;
+		}
 	}
 	got_path_strip_trailing_slashes(repo_path);
 	error = get_gitconfig_path(&gitconfig_path);
@@ -931,15 +933,17 @@ cmd_import(int argc, char *argv[])
 
 	error = get_author(&author, repo, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	/*
 	 * Don't let the user create a branch name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (branch_name && branch_name[0] == '-')
-		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
+	if (branch_name && branch_name[0] == '-') {
+		error = got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
+		goto done;
+	}
 
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (error && error->code != GOT_ERR_NOT_REF)
@@ -1051,8 +1055,10 @@ done:
 		    getprogname(), logmsg_path);
 	} else if (logmsg_path && unlink(logmsg_path) == -1 && error == NULL)
 		error = got_error_from_errno2("unlink", logmsg_path);
+	got_pathlist_free(&ignores, GOT_PATHLIST_FREE_NONE);
 	free(logmsg);
 	free(logmsg_path);
+	free(path_dir);
 	free(repo_path);
 	free(editor);
 	free(new_commit_id);
