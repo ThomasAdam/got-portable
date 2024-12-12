@@ -3036,33 +3036,6 @@ select_commit(struct tog_log_view_state *s)
 	}
 }
 
-static const struct got_error *
-valid_author(const char *author)
-{
-	const char *email = author;
-
-	/*
-	 * Git' expects the author (or committer) to be in the form
-	 * "name <email>", which are mostly free form (see the
-	 * "committer" description in git-fast-import(1)).  We're only
-	 * doing this to avoid git's object parser breaking on commits
-	 * we create.
-	 */
-
-	while (*author && *author != '\n' && *author != '<' && *author != '>')
-		author++;
-	if (author != email && *author == '<' && *(author - 1) != ' ')
-		return got_error_fmt(GOT_ERR_COMMIT_BAD_AUTHOR, "%s: space "
-		    "between author name and email required", email);
-	if (*author++ != '<')
-		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
-	while (*author && *author != '\n' && *author != '<' && *author != '>')
-		author++;
-	if (strcmp(author, ">") != 0)
-		return got_error_fmt(GOT_ERR_COMMIT_NO_EMAIL, "%s", email);
-	return NULL;
-}
-
 /* lifted from got.c:652 (TODO make lib routine) */
 static const struct got_error *
 get_author(char **author, struct got_repository *repo,
@@ -3119,13 +3092,7 @@ get_author(char **author, struct got_repository *repo,
 
 	*author = strdup(got_author);
 	if (*author == NULL)
-		return got_error_from_errno("strdup");
-
-	err = valid_author(*author);
-	if (err) {
-		free(*author);
-		*author = NULL;
-	}
+		err = got_error_from_errno("strdup");
 	return err;
 }
 
