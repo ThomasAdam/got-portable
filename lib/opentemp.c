@@ -112,7 +112,7 @@ got_opentemp_named_fd(char **path, int *outfd, const char *basepath,
 
 	fd = mkstemps(*path, strlen(suffix));
 	if (fd == -1) {
-		err = got_error_from_errno("mkstemp");
+		err = got_error_from_errno2("mkstemps", *path);
 		free(*path);
 		*path = NULL;
 		return err;
