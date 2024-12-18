@@ -1534,13 +1534,14 @@ cmd_clone(int argc, char *argv[])
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
+	const char *jumphost = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:lmqR:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:J:lmqR:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1551,6 +1552,9 @@ cmd_clone(int argc, char *argv[])
 			if (error)
 				return error;
 			bflag = 1;
+			break;
+		case 'J':
+			jumphost = optarg;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -1670,7 +1674,7 @@ cmd_clone(int argc, char *argv[])
 		printf("Connecting to %s\n", git_url);
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (error)
 		goto done;
 
@@ -2662,6 +2666,7 @@ cmd_update(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	const char *refname;
 	struct got_reference *head_ref = NULL;
+	const char *jumphost = NULL;
 
 	TAILQ_INIT(&paths);
 	TAILQ_INIT(&refs);
@@ -2670,12 +2675,15 @@ cmd_update(int argc, char *argv[])
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "c:qr:vX")) != -1) {
+	while ((ch = getopt(argc, argv, "c:J:qr:vX")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
 				return got_error_from_errno("strdup");
+			break;
+		case 'J':
+			jumphost = optarg;
 			break;
 		case 't':
 			replace_tags = 1;
@@ -2828,7 +2836,7 @@ cmd_update(int argc, char *argv[])
 	}
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (error)
 		goto done;
 
@@ -7802,7 +7810,7 @@ cmd_commit(int argc, char *argv[])
 	int nremotes;
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
-	const char *remote_name;
+	const char *remote_name, *jumphost = NULL;
 	int verbosity = 0;
 	int i;
 
@@ -7816,7 +7824,7 @@ cmd_commit(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "A:CF:m:NnS")) != -1) {
+	while ((ch = getopt(argc, argv, "A:CF:J:m:NnS")) != -1) {
 		switch (ch) {
 		case 'A':
 			author = optarg;
@@ -8024,7 +8032,8 @@ cmd_commit(int argc, char *argv[])
 	error = got_worktree_cvg_commit(&id, worktree, &paths, author,
 	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, proto, host,
-	    port, server_path, verbosity, remote, check_cancelled, repo);
+	    port, server_path, jumphost, verbosity, remote,
+	    check_cancelled, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 		    cl_arg.logmsg_path != NULL)

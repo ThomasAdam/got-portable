@@ -31,8 +31,8 @@ const struct got_error *got_worktree_cvg_commit(struct got_object_id **,
     struct got_worktree *, struct got_pathlist_head *, const char *,
     const char *, int, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, const char *, const char *, const char *,
-    const char *, int, const struct got_remote_repo *, got_cancel_cb,
-    struct got_repository *);
+    const char *, const char *, int, const struct got_remote_repo *,
+    got_cancel_cb, struct got_repository *);
 
 /*
  * Get the reference name for a temporary commit to be trivially rebased

@@ -204,6 +204,7 @@ working directory.
 .Cm clone
 .Op Fl almqv
 .Op Fl b Ar branch
+.Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Ar repository-URL
 .Op Ar directory
@@ -338,6 +339,12 @@ repository's HEAD reference will be fetched.
 Cannot be used together with the
 .Fl a
 option.
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl l
 List branches and tags available for fetching from the remote repository
 and exit immediately.
@@ -425,6 +432,7 @@ The maximum is 3.
 .Cm fetch
 .Op Fl adlqtvX
 .Op Fl b Ar branch
+.Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Op Fl r Ar repository-path
 .Op Ar remote-repository
@@ -531,6 +539,12 @@ Any commit, tree, tag, and blob objects belonging to deleted branches or
 tags remain in the repository and may be removed separately with
 Git's garbage collector or
 .Cm gotadmin cleanup .
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl l
 List branches and tags available for fetching from the remote repository
 and exit immediately.
@@ -2331,6 +2345,7 @@ in the repository.
 .Op Fl afqTv
 .Op Fl b Ar branch
 .Op Fl d Ar branch
+.Op Fl J Ar jumphost
 .Op Fl r Ar repository-path
 .Op Fl t Ar tag
 .Op Ar remote-repository
@@ -2465,6 +2480,12 @@ copy of a branch or tag is known to be out-of-date and is considered
 disposable.
 The risks of creating inconsistencies between different repositories
 should also be taken into account.
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl q
 Suppress progress reporting output.
 The same option will be passed to

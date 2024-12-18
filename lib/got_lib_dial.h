@@ -23,7 +23,7 @@ const struct got_error *got_dial_git(int *newfd, const char *host,
 
 const struct got_error *got_dial_ssh(pid_t *newpid, int *newfd,
     const char *host, const char *port, const char *path,
-    const char *command, int verbosity);
+    const char *jumphost, const char *command, int verbosity);
 
 const struct got_error *got_dial_http(pid_t *newpid, int *newfd,
     const char *host, const char *port, const char *path, int, int);
