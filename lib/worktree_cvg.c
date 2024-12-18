@@ -2761,7 +2761,7 @@ done:
 
 static const struct got_error *
 fetch_updated_remote(const char *proto, const char *host, const char *port,
-    const char *server_path, int verbosity,
+    const char *server_path, const char *jumphost, int verbosity,
     const struct got_remote_repo *remote, struct got_repository *repo,
     struct got_reference *head_ref, const char *head_refname)
 {
@@ -2787,7 +2787,7 @@ fetch_updated_remote(const char *proto, const char *host, const char *port,
 		goto done;
 
 	err = got_fetch_connect(&fetchpid, &fetchfd, proto, host,
-	    port, server_path, verbosity);
+	    port, server_path, jumphost, verbosity);
 	if (err)
 		goto done;
 
@@ -2906,7 +2906,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     const char *proto, const char *host, const char *port,
-    const char *server_path, int verbosity,
+    const char *server_path, const char *jumphost, int verbosity,
     const struct got_remote_repo *remote,
     got_cancel_cb check_cancelled,
     struct got_repository *repo)
@@ -3086,7 +3086,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 
 	/* Attempt send to remote branch. */
 	err = got_send_connect(&sendpid, &sendfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (err)
 		goto done;
 
@@ -3107,7 +3107,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 		 * No trivial-rebase yet; require update to be run manually.
 		 */
 		err = fetch_updated_remote(proto, host, port, server_path,
-		    verbosity, remote, repo, head_ref, head_refname);
+		    jumphost, verbosity, remote, repo, head_ref, head_refname);
 		if (err == NULL)
 			goto done;
 		err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);

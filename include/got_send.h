@@ -26,13 +26,14 @@
  *
  * If successful return an open file descriptor for the connection which can
  * be passed to other functions below, and must be disposed of with close(2).
+ * A jumphost can be specified which will be passed to ssh(1) via -J.
  *
  * If an ssh(1) process was started return its PID as well, in which case
  * the caller should eventually send SIGTERM to the procress and wait for
  * the process to exit with waitpid(2). Otherwise, return PID -1.
  */
 const struct got_error *got_send_connect(pid_t *, int *, const char *,
-    const char *, const char *, const char *, int);
+    const char *, const char *, const char *, const char *, int);
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_send_progress_cb)(void *,

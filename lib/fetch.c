@@ -74,7 +74,8 @@
 
 const struct got_error *
 got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
-    const char *host, const char *port, const char *server_path, int verbosity)
+    const char *host, const char *port, const char *server_path,
+    const char *jumphost, int verbosity)
 {
 	const struct got_error *err = NULL;
 
@@ -83,7 +84,7 @@ got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
 		err = got_dial_ssh(fetchpid, fetchfd, host, port,
-		    server_path, GOT_DIAL_CMD_FETCH, verbosity);
+		    server_path, jumphost, GOT_DIAL_CMD_FETCH, verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = got_dial_git(fetchfd, host, port, server_path,
 		    GOT_DIAL_CMD_FETCH);

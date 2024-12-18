@@ -135,6 +135,7 @@ working directory.
 .Cm clone
 .Op Fl almqv
 .Op Fl b Ar branch
+.Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Ar repository-URL
 .Op Ar directory
@@ -240,6 +241,12 @@ repository's HEAD reference will be fetched.
 Cannot be used together with the
 .Fl a
 option.
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl l
 List branches and tags available for fetching from the remote repository
 and exit immediately.
@@ -401,6 +408,7 @@ Silence progress output.
 .Op Fl q
 .Op Fl b Ar branch
 .Op Fl c Ar commit
+.Op Fl J Ar jumphost
 .Op Ar path ...
 .Xc
 .Dl Pq alias: Cm up
@@ -497,6 +505,12 @@ An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl q
 Silence progress output.
 .El
@@ -1287,6 +1301,7 @@ is a directory.
 .Op Fl CNnS
 .Op Fl A Ar author
 .Op Fl F Ar path
+.Op Fl J Ar jumphost
 .Op Fl m Ar message
 .Op Ar path ...
 .Xc
@@ -1396,6 +1411,12 @@ Use the specified log message when creating the new commit.
 Cannot be used together with the
 .Fl F
 option.
+.It Fl J Ar jumphost
+Specify a
+.Ar jumphost
+to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl N
 This option prevents
 .Cm got commit

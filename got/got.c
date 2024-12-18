@@ -1632,6 +1632,7 @@ cmd_clone(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
+	const char *jumphost = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
@@ -1641,7 +1642,7 @@ cmd_clone(int argc, char *argv[])
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:lmqR:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:J:lmqR:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1652,6 +1653,9 @@ cmd_clone(int argc, char *argv[])
 			if (error)
 				return error;
 			bflag = 1;
+			break;
+		case 'J':
+			jumphost = optarg;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -1771,7 +1775,7 @@ cmd_clone(int argc, char *argv[])
 		printf("Connecting to %s\n", git_url);
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (error)
 		goto done;
 
@@ -2389,6 +2393,7 @@ cmd_fetch(int argc, char *argv[])
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
 	int *pack_fds = NULL, have_bflag = 0;
 	const char *remote_head = NULL, *worktree_branch = NULL;
+	const char *jumphost = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -2396,7 +2401,7 @@ cmd_fetch(int argc, char *argv[])
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:dlqR:r:tvX")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dJ:lqR:r:tvX")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -2410,6 +2415,9 @@ cmd_fetch(int argc, char *argv[])
 			break;
 		case 'd':
 			delete_refs = 1;
+			break;
+		case 'J':
+			jumphost = optarg;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -2648,7 +2656,7 @@ cmd_fetch(int argc, char *argv[])
 	}
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (error)
 		goto done;
 #ifndef PROFILE
@@ -9925,6 +9933,7 @@ cmd_send(int argc, char *argv[])
 	int send_all_branches = 0, send_all_tags = 0;
 	struct got_reference *ref = NULL;
 	int *pack_fds = NULL;
+	const char *jumphost = NULL;
 
 	TAILQ_INIT(&branches);
 	TAILQ_INIT(&tags);
@@ -9933,7 +9942,7 @@ cmd_send(int argc, char *argv[])
 	TAILQ_INIT(&delete_args);
 	TAILQ_INIT(&delete_branches);
 
-	while ((ch = getopt(argc, argv, "ab:d:fqr:Tt:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:d:fJ:qr:Tt:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			send_all_branches = 1;
@@ -9951,6 +9960,9 @@ cmd_send(int argc, char *argv[])
 			break;
 		case 'f':
 			overwrite_refs = 1;
+			break;
+		case 'J':
+			jumphost = optarg;
 			break;
 		case 'q':
 			verbosity = -1;
@@ -10219,7 +10231,7 @@ cmd_send(int argc, char *argv[])
 	}
 
 	error = got_send_connect(&sendpid, &sendfd, proto, host, port,
-	    server_path, verbosity);
+	    server_path, jumphost, verbosity);
 	if (error)
 		goto done;
 
