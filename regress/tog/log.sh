@@ -902,6 +902,136 @@ test_log_mark_keymap()
 	test_done "$testroot" $ret
 }
 
+test_log_worktree_entries()
+{
+	test_init log_worktree_entries 96 4
+	local repo="$testroot/repo"
+
+	got checkout "$repo" "$testroot/wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test dirty work tree (no staged changes)
+	cd "$testroot/wt"
+	echo "'alpha" >> alpha
+
+	local id=$(git_show_head "$repo")
+	local id10=$(trim_obj_id 10 $id)
+	local author_time=$(git_show_author_time "$repo")
+	local ymd=$(date -u -r "$author_time" +"%F")
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to fetch wt state
+	WAIT_FOR_UI	trigger redraw to reveal work tree entries
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	diff $testroot/wt (work tree changes) [0/1] master
+	$ymd flan_hacker  work tree changes based on [$id10]
+	$ymd flan_hacker *[master] adding the test tree
+
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test dirty work tree with staged changes too
+	echo "'beta" >> beta
+	got stage beta > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got stage failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to fetch wt state
+	j		select staged entry
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	diff -s $testroot/wt (staged work tree changes) [0/1] master
+	$ymd flan_hacker  work tree changes based on [$id10]
+	$ymd flan_hacker  staged work tree changes based on [$id10]
+	$ymd flan_hacker *[master] adding the test tree
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test with only staged changes
+	got revert alpha > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got revert failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to fetch wt state
+	WAIT_FOR_UI	trigger redraw to reveal work tree entries
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	diff -s $testroot/wt (staged work tree changes) [0/1] master
+	$ymd flan_hacker  staged work tree changes based on [$id10]
+	$ymd flan_hacker *[master] adding the test tree
+
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test with no author set
+	echo "'alpha" >> alpha
+
+	cat <<-EOF >$testroot/view.expected
+	diff $testroot/wt (work tree changes) [0/1] master
+	$ymd              work tree changes based on [$id10]
+	$ymd              staged work tree changes based on [$id10]
+	$ymd flan_hacker *[master] adding the test tree
+	EOF
+
+	unset GOT_AUTHOR
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" 0
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -915,3 +1045,4 @@ run_test test_log_show_base_commit
 run_test test_log_limit_view
 run_test test_log_search
 run_test test_log_mark_keymap
+run_test test_log_worktree_entries
