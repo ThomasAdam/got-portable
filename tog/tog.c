@@ -4065,10 +4065,14 @@ log_thread(void *arg)
 				if (tog_io.wait_for_ui) {
 					errcode = pthread_cond_signal(
 					    &a->log_loaded);
-					if (errcode && err == NULL)
+					if (errcode) {
 						err = got_error_set_errno(
 						    errcode,
 						    "pthread_cond_signal");
+						pthread_mutex_unlock(
+						    &tog_mutex);
+						goto done;
+					}
 				}
 
 				errcode = pthread_cond_wait(&a->need_commits,
@@ -4189,6 +4193,13 @@ close_log_view(struct tog_view *view)
 	errcode = pthread_cond_destroy(&s->thread_args.commit_loaded);
 	if (errcode && err == NULL)
 		err = got_error_set_errno(errcode, "pthread_cond_destroy");
+
+	if (using_mock_io) {
+		errcode = pthread_cond_destroy(&s->thread_args.log_loaded);
+		if (errcode && err == NULL)
+			err = got_error_set_errno(errcode,
+			    "pthread_cond_destroy");
+	}
 
 	free_commits(&s->limit_commits);
 	free_commits(&s->real_commits);
