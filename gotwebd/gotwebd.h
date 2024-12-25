@@ -441,6 +441,7 @@ void sockets(struct gotwebd *, int);
 void sockets_parse_sockets(struct gotwebd *);
 void sockets_socket_accept(int, short, void *);
 int sockets_privinit(struct gotwebd *, struct socket *);
+void sockets_purge(struct gotwebd *);
 
 /* gotweb.c */
 void gotweb_index_navs(struct request *, struct gotweb_url *, int *,
