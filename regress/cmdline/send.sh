@@ -20,6 +20,7 @@ test_send_basic() {
 	local testroot=`test_init send_basic`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
+
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -47,7 +48,7 @@ EOF
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	$(SHIM $testroot) got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -149,6 +150,7 @@ test_send_rebase_required() {
 	local testroot=`test_init send_rebase_required`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
+
 	got clone -q $testurl/repo $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -171,7 +173,7 @@ EOF
 	echo "modified alpha, too" > $testroot/wt-clone/alpha
 	(cd $testroot/wt-clone && got commit -m 'change alpha' >/dev/null)
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
@@ -239,7 +241,7 @@ EOF
 	local commit_id3=`git_show_head $testroot/repo-clone`
 
 	# non-default remote requires an explicit argument
-	$(SHIM $testroot ) got send -q -r $testroot/repo -f > $testroot/stdout \
+	got send -q -r $testroot/repo -f > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -357,7 +359,7 @@ test_send_merge_commit() {
 
 	git -C $testroot/repo config receive.denyCurrentBranch ignore
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo-clone
+	got send -q -r $testroot/repo-clone
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		test_done "$testroot" "$ret"
@@ -407,7 +409,7 @@ EOF
 
 	# Sending changes for a branch and deleting it at the same
 	# time is not allowed.
-	$(SHIM $testroot ) got send -q -r $testroot/repo -d branch1 -b branch1 \
+	got send -q -r $testroot/repo -d branch1 -b branch1 \
 		> $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -570,7 +572,7 @@ test_send_clone_and_send() {
 	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
 	local commit_id2=`git_show_head $testroot/repo-clone`
 
-	(cd $testroot/wt && $(SHIM $testroot ) got send -q > $testroot/stdout 2> $testroot/stderr)
+	(cd $testroot/wt && got send -q > $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -669,7 +671,7 @@ EOF
 	tag_id2=`got ref -r $testroot/repo -l | grep "^refs/tags/2.0" \
 		| tr -d ' ' | cut -d: -f2`
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -845,7 +847,7 @@ EOF
 	(cd $testroot/wt && got commit -m 'changing file alpha' > /dev/null)
 
 	# Send the new commit in isolation.
-	$(SHIM $testroot ) got send -q -r $testroot/repo > $testroot/stdout \
+	got send -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -930,7 +932,7 @@ EOF
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id3=`git_show_head $testroot/repo`
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1034,7 +1036,7 @@ test_send_new_branch() {
 	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
 	local commit_id2=`git_show_branch_head $testroot/repo-clone foo`
 
-	(cd $testroot/wt && $(SHIM $testroot ) got send -q > $testroot/stdout 2> $testroot/stderr)
+	(cd $testroot/wt && got send -q > $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1169,7 +1171,7 @@ test_send_all_branches() {
 		return 1
 	fi
 
-	$(SHIM $testroot ) got send -a -q -r $testroot/repo-clone > $testroot/stdout \
+	got send -a -q -r $testroot/repo-clone > $testroot/stdout \
 		2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -1330,7 +1332,7 @@ EOF
 		return 1
 	fi
 
-	$(SHIM $testroot ) got send -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	got send -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1441,7 +1443,7 @@ EOF
 	fi
 
 	# send tag 1.0 to repo-clone
-	$(SHIM $testroot ) got send -q -r $testroot/repo -t 1.0 > $testroot/stdout
+	got send -q -r $testroot/repo -t 1.0 > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1524,7 +1526,7 @@ EOF
 
 	got branch -r $testroot/repo foo
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1584,7 +1586,7 @@ cat >> $testroot/repo/.git/config <<EOF
 EOF
 
 	# unset in a subshell to avoid affecting our environment
-	(unset GOT_IGNORE_GITCONFIG && $(SHIM $testroot ) got send -q -r $testroot/repo foo)
+	(unset GOT_IGNORE_GITCONFIG && got send -q -r $testroot/repo foo)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1641,7 +1643,7 @@ EOF
 	echo "modified alpha" >$testroot/repo/alpha
 	git_commit "$testroot/repo" -m "modified alpha"
 
-	$(SHIM $testroot ) got send -q -r "$testroot/repo" >$testroot/stdout 2>$testroot/stderr
+	got send -q -r "$testroot/repo" >$testroot/stdout 2>$testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got send command failed unexpectedly" >&2
@@ -1711,7 +1713,7 @@ EOF
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	$(SHIM $testroot ) got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got send command succeeded unexpectedly" >&2
