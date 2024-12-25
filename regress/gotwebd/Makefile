@@ -9,7 +9,8 @@ CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 
 NOMAN = yes
 
-.PHONY: ensure_root prepare_test_env prepare_test_repo start_gotwebd
+.PHONY: ensure_root prepare_test_env prepare_test_repo start_gotwebd \
+	gotwebd_test_conf
 
 GOTWEBD_TEST_TMPDIR=/tmp
 GOTWEBD_TEST_ROOT?!!=mktemp -d "${GOTWEBD_TEST_TMPDIR}/gotwebd-test-XXXXXXXXXX"
@@ -17,6 +18,7 @@ GOTWEBD_TEST_CHROOT=${GOTWEBD_TEST_ROOT}/var/www
 GOTWEBD_TEST_CONF=${GOTWEBD_TEST_ROOT}/gotwebd.conf
 GOTWEBD_TEST_SOCK=${GOTWEBD_TEST_CHROOT}/gotweb.sock
 GOTWEBD_TEST_FCGI=${.OBJDIR}/${PROG}
+GOTWEBD_CHECK_MEMLEAK=export MALLOC_OPTIONS=1; ktrace -d -tu -i -f ${GOTWEBD_TEST_ROOT}/ktrace.out
 
 GOTWEBD_TEST_USER?=${DOAS_USER}
 .if empty(GOTWEBD_TEST_USER)
@@ -70,19 +72,27 @@ prepare_test_repo: prepare_test_env
 	@su -m ${GOTWEBD_TEST_USER} -c 'env ${GOTWEBD_TEST_ENV} \
 	    sh ${.CURDIR}/prepare_test_repo.sh "${GOTWEBD_TEST_CHROOT}"'
 
-start_gotwebd: prepare_test_repo gotwebd_test
+gotwebd_test_conf:
 	@echo 'user "${GOTWEBD_TEST_USER}"' > ${GOTWEBD_TEST_CONF}
 	@echo 'chroot "${GOTWEBD_TEST_CHROOT}"' >> ${GOTWEBD_TEST_CONF}
 	@echo 'listen on socket "${GOTWEBD_TEST_SOCK}"' >> ${GOTWEBD_TEST_CONF}
 	@echo 'server "localhost" {' >> ${GOTWEBD_TEST_CONF}
 	@echo '    show_repo_owner off' >> ${GOTWEBD_TEST_CONF}
 	@echo '}' >> ${GOTWEBD_TEST_CONF}
-	@${GOTWEBD_TRAP}; ${GOTWEBD_START_CMD}
+
+start_gotwebd: prepare_test_repo gotwebd_test gotwebd_test_conf
+	@${GOTWEBD_TRAP}; ${GOTWEBD_CHECK_MEMLEAK} ${GOTWEBD_START_CMD}
 	@${GOTWEBD_TRAP}; sleep .5
 
 test_gotwebd: start_gotwebd
 	@-$(GOTWEBD_TRAP); su -m ${GOTWEBD_TEST_USER} -c \
 		'env $(GOTWEBD_TEST_ENV) sh ${.CURDIR}/test_gotwebd.sh'
 	@${GOTWEBD_STOP_CMD} 2>/dev/null
+	@kdump -u malloc -f ${GOTWEBD_TEST_ROOT}/ktrace.out \
+		> ${GOTWEBD_TEST_ROOT}/leak-report && \
+	if grep -q "/gotwebd 0x" ${GOTWEBD_TEST_ROOT}/leak-report; then \
+		cat ${GOTWEBD_TEST_ROOT}/leak-report; \
+		exit 1; \
+	fi
 
 .include <bsd.regress.mk>
