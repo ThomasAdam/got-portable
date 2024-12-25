@@ -92,9 +92,6 @@ sockets(struct gotwebd *env, int fd)
 
 	sockets_rlimit(-1);
 
-	if (config_init(env) == -1)
-		fatal("failed to initialize configuration");
-
 	if ((env->iev_parent = malloc(sizeof(*env->iev_parent))) == NULL)
 		fatal("malloc");
 	if (imsgbuf_init(&env->iev_parent->ibuf, fd) == -1)
@@ -336,14 +333,26 @@ sockets_sighdlr(int sig, short event, void *arg)
 static void
 sockets_shutdown(void)
 {
-	struct server *srv, *tsrv;
-
 	sockets_purge(gotwebd_env);
 
 	/* clean servers */
-	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv)
-		free(srv);
+	while (!TAILQ_EMPTY(&gotwebd_env->servers)) {
+		struct server *srv;
 
+		srv = TAILQ_FIRST(&gotwebd_env->servers);
+		TAILQ_REMOVE(&gotwebd_env->servers, srv, entry);
+		free(srv);
+	}
+
+	while (!TAILQ_EMPTY(&gotwebd_env->addresses)) {
+		struct address *h;
+
+		h = TAILQ_FIRST(&gotwebd_env->addresses);
+		TAILQ_REMOVE(&gotwebd_env->addresses, h, entry);
+		free(h);
+	}
+
+	free(gotwebd_env->iev_parent);
 	free(gotwebd_env);
 
 	exit(0);
