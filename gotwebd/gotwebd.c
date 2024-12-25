@@ -485,6 +485,7 @@ gotwebd_shutdown(void)
 		close(env->iev_server[i].ibuf.fd);
 		env->iev_server[i].ibuf.fd = -1;
 	}
+	free(env->iev_server);
 
 	do {
 		pid = waitpid(WAIT_ANY, &status, 0);
