@@ -99,7 +99,7 @@ int				 n;
 int		 get_addrs(const char *, const char *);
 int		 get_unix_addr(const char *);
 int		 addr_dup_check(struct addresslist *, struct address *);
-int		 add_addr(struct address *);
+void		 add_addr(struct address *);
 
 typedef struct {
 	union {
@@ -1035,10 +1035,7 @@ get_addrs(const char *hostname, const char *servname)
 			fatalx("unknown address family %d", res->ai_family);
 		}
 
-		if (add_addr(h) == -1) {
-			freeaddrinfo(res0);
-			return -1;
-		}
+		add_addr(h);
 	}
 	freeaddrinfo(res0);
 	return (0);
@@ -1066,7 +1063,8 @@ get_unix_addr(const char *path)
 		return (-1);
 	}
 
-	return add_addr(h);
+	add_addr(h);
+	return (0);
 }
 
 int
@@ -1087,14 +1085,13 @@ addr_dup_check(struct addresslist *al, struct address *h)
 	return 0;
 }
 
-int
+void
 add_addr(struct address *h)
 {
 	if (addr_dup_check(&gotwebd->addresses, h) == 0) {
 		TAILQ_INSERT_TAIL(&gotwebd->addresses, h, entry);
-		return (0);
+		return;
 	}
 
 	free(h);
-	return (0);
 }
