@@ -506,6 +506,13 @@ gotwebd_shutdown(void)
 		TAILQ_REMOVE(&gotwebd_env->addresses, h, entry);
 		free(h);
 	}
+	while (!TAILQ_EMPTY(&gotwebd_env->servers)) {
+		struct server *srv;
+
+		srv = TAILQ_FIRST(&gotwebd_env->servers);
+		TAILQ_REMOVE(&gotwebd_env->servers, srv, entry);
+		free(srv);
+	}
 	free(gotwebd_env);
 
 	log_warnx("gotwebd terminating");
