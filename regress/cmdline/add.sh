@@ -29,7 +29,7 @@ test_add_basic() {
 	echo "new file" > $testroot/wt/foo
 
 	echo 'A  foo' > $testroot/stdout.expected
-	(cd $testroot/wt && $(SHIM $testroot) got add foo > $testroot/stdout)
+	(cd $testroot/wt && got add foo > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -52,7 +52,7 @@ test_double_add() {
 	echo "new file" > $testroot/wt/foo
 	(cd $testroot/wt && got add foo > /dev/null)
 
-	(cd $testroot/wt && $(SHIM $testroot) got add foo > $testroot/stdout)
+	(cd $testroot/wt && got add foo > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got add failed unexpectedly" >&2
@@ -100,7 +100,7 @@ test_add_multiple() {
 	echo "new file" > $testroot/wt/foo
 	echo "new file" > $testroot/wt/bar
 	echo "new file" > $testroot/wt/baz
-	(cd $testroot/wt && $(SHIM $testroot) got add foo bar baz > $testroot/stdout)
+	(cd $testroot/wt && got add foo bar baz > $testroot/stdout)
 	ret=$?
 	if [ $ret -ne 0 ]; then
 		echo "got add failed unexpectedly" >&2
@@ -155,7 +155,7 @@ test_add_file_in_new_subdir() {
 	echo "new file" > $testroot/wt/new/foo
 
 	echo 'A  new/foo' > $testroot/stdout.expected
-	(cd $testroot/wt && $(SHIM $testroot) got add new/foo > $testroot/stdout)
+	(cd $testroot/wt && got add new/foo > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -178,7 +178,7 @@ test_add_deleted() {
 	(cd $testroot/wt && got rm beta > /dev/null)
 
 	echo -n > $testroot/stdout.expected
-	(cd $testroot/wt && $(SHIM $testroot) got add beta > $testroot/stdout 2> $testroot/stderr)
+	(cd $testroot/wt && got add beta > $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
 		echo "got add command succeeded unexpectedly" >&2
@@ -239,7 +239,7 @@ test_add_force_delete_commit() {
 	# File 'new' was once in A status (locally added) but is now
 	# in "!" (missing) status since it was never committed.
 	# Removing it effectively reverts the local addition.
-	(cd $testroot/wt && $(SHIM $testroot) got remove -f new > $testroot/stdout \
+	(cd $testroot/wt && got remove -f new > $testroot/stdout \
 		2> $testroot/stderr)
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -334,7 +334,7 @@ test_add_directory() {
 		return 1
 	fi
 
-	(cd $testroot/wt && $(SHIM $testroot) got add -RI tree1 > $testroot/stdout)
+	(cd $testroot/wt && got add -RI tree1 > $testroot/stdout)
 
 	echo 'A  tree1/foo' > $testroot/stdout.expected
 
@@ -401,7 +401,7 @@ test_add_clashes_with_submodule() {
 	(cd $testroot/wt && got update > /dev/null)
 
 	# This currently fails with "work tree must be updated"...
-	(cd $testroot/wt && $(SHIM $testroot) got commit -m 'add file repo2' \
+	(cd $testroot/wt && got commit -m 'add file repo2' \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret=$?
 	if [ $ret -eq 0 ]; then
@@ -476,7 +476,7 @@ test_add_symlink() {
 	fi
 
 	echo "A  nonexistent.link" > $testroot/stdout.expected
-	(cd $testroot/wt && $(SHIM $testroot) got add nonexistent.link > $testroot/stdout)
+	(cd $testroot/wt && got add nonexistent.link > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
