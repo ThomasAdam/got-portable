@@ -338,8 +338,9 @@ test_memleak_done()
 	local testroot="$1"
 	local result="$2"
 
-	if kdump -u malloc -f $testroot/ktrace.out | grep -q " got 0x"; then
-		kdump -u malloc -f $testroot/ktrace.out
+	kdump -u malloc -f $testroot/ktrace.out > $testroot/leak-report
+	if egrep -q "( got 0x|/bin/got-)" $testroot/leak-report; then
+		cat $testroot/leak-report
 		result=1
 	fi
 
@@ -360,5 +361,5 @@ check_memleak()
 		exit 1
 	fi
 
-	echo "ktrace -dtu -f $testroot/ktrace.out"
+	echo "ktrace -d -tu -i -f $testroot/ktrace.out"
 }
