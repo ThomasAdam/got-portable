@@ -69,7 +69,6 @@ static struct timeval	timeout = { TIMEOUT_DEFAULT, 0 };
 static void	 sockets_sighdlr(int, short, void *);
 static void	 sockets_shutdown(void);
 static void	 sockets_launch(void);
-static void	 sockets_purge(struct gotwebd *);
 static void	 sockets_accept_paused(int, short, void *);
 static void	 sockets_rlimit(int);
 
@@ -227,7 +226,7 @@ sockets_launch(void)
 		fatal("unveil");
 }
 
-static void
+void
 sockets_purge(struct gotwebd *env)
 {
 	struct socket *sock, *tsock;
@@ -243,6 +242,7 @@ sockets_purge(struct gotwebd *env)
 		if (sock->fd != -1)
 			close(sock->fd);
 		TAILQ_REMOVE(&env->sockets, sock, entry);
+		free(sock);
 	}
 }
 
@@ -337,16 +337,8 @@ static void
 sockets_shutdown(void)
 {
 	struct server *srv, *tsrv;
-	struct socket *sock, *tsock;
 
 	sockets_purge(gotwebd_env);
-
-	/* clean sockets */
-	TAILQ_FOREACH_SAFE(sock, &gotwebd_env->sockets, entry, tsock) {
-		TAILQ_REMOVE(&gotwebd_env->sockets, sock, entry);
-		close(sock->fd);
-		free(sock);
-	}
 
 	/* clean servers */
 	TAILQ_FOREACH_SAFE(srv, &gotwebd_env->servers, entry, tsrv)

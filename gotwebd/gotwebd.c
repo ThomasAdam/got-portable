@@ -513,6 +513,7 @@ gotwebd_shutdown(void)
 		TAILQ_REMOVE(&gotwebd_env->servers, srv, entry);
 		free(srv);
 	}
+	sockets_purge(gotwebd_env);
 	free(gotwebd_env);
 
 	log_warnx("gotwebd terminating");
