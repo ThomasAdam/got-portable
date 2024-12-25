@@ -7474,7 +7474,7 @@ __dead static void
 usage_tag(void)
 {
 	fprintf(stderr, "usage: %s tag [-lVv] [-c commit] [-m message] "
-	    "[-r repository-path] [-s signer-id] name\n", getprogname());
+	    "[-r repository-path] [-S signer-id] name\n", getprogname());
 	exit(1);
 }
 
@@ -7904,7 +7904,7 @@ cmd_tag(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:lm:r:s:Vv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lm:r:S:Vv")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -7924,7 +7924,7 @@ cmd_tag(int argc, char *argv[])
 			}
 			got_path_strip_trailing_slashes(repo_path);
 			break;
-		case 's':
+		case 'S':
 			signer_id = optarg;
 			break;
 		case 'V':
@@ -7957,9 +7957,9 @@ cmd_tag(int argc, char *argv[])
 		}
 		if (signer_id) {
 			if (do_list)
-				option_conflict('l', 's');
+				option_conflict('l', 'S');
 			else
-				option_conflict('V', 's');
+				option_conflict('V', 'S');
 		}
 		if (argc > 1)
 			usage_tag();

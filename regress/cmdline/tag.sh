@@ -295,7 +295,7 @@ test_tag_create_ssh_signed() {
 		$testroot/repo/.git/got.conf
 
 	# Create a signed tag based on repository's HEAD reference
-	got tag -s $testroot/id_ed25519 -m 'test' -r $testroot/repo -c HEAD \
+	got tag -S $testroot/id_ed25519 -m 'test' -r $testroot/repo -c HEAD \
 		$tag > $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
@@ -390,7 +390,7 @@ test_tag_create_ssh_signed() {
 	fi
 
 	# Create another signed tag with a SHA1 commit ID
-	got tag -s $testroot/id_ed25519 -m 'test' -r $testroot/repo \
+	got tag -S $testroot/id_ed25519 -m 'test' -r $testroot/repo \
 		-c $commit_id $tag2 > $testroot/stdout
 
 	# Create another signed tag with key defined in got.conf(5)
@@ -435,7 +435,7 @@ test_tag_create_ssh_signed_missing_key() {
 	local tag=1.0.0
 
 	# Fail to create a signed tag due to a missing SSH key
-	got tag -s $testroot/bogus -m 'test' -r $testroot/repo \
+	got tag -S $testroot/bogus -m 'test' -r $testroot/repo \
 		-c HEAD	$tag > $testroot/stdout 2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
