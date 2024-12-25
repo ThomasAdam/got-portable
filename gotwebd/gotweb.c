@@ -202,7 +202,7 @@ gotweb_process_request(struct request *c)
 		}
 
 		log_info("processing request: server='%s' query='%s' "
-		    "document_uri='%s'\n",
+		    "document_uri='%s'",
 		    server_name ? server_name : "",
 		    querystring ? querystring : "",
 		    document_uri ? document_uri : "");
