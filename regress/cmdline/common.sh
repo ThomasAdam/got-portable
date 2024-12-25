@@ -32,7 +32,12 @@ export GOT_TEST_ALGO="${GOT_TEST_ALGO:-sha1}"
 
 export LC_ALL=C
 
+if [ -n "$MEM_CHECK" ]  &&  [ "$MEM_CHECK" -gt 0 ] && [ "$MEM_CHECK" -lt 5 ]; then
+		export MALLOC_OPTIONS="$MEM_CHECK"S
+		echo $MALLOC_OPTIONS
+else
 export MALLOC_OPTIONS=S
+fi
 
 if [ "$(date -u -r 86400 +%F 2>/dev/null)" != 1970-01-02 ]; then
 	DATECMD=
@@ -315,6 +320,13 @@ test_done()
 {
 	local testroot="$1"
 	local result="$2"
+	if [ -n "$MEM_CHECK" ]; then
+		if [ $(kdump -u malloc -f $testroot/ktrace.out | awk -v LINE="$MEM_CHECK" 'NR%LINE==1' | grep -c "got" ) -gt 2 ] ; then
+			kdump -u malloc -f $testroot/ktrace.out | sed 's/got/~\/bin\/got/' #| malloc_p
+			echo "FOUND MEMORY LEAK; leaving test data in $testroot"
+			return 1
+		fi
+	fi
 	if [ "$result" = "0" ]; then
 		test_cleanup "$testroot" || return 1
 		if [ -z "$GOT_TEST_QUIET" ]; then
@@ -328,3 +340,21 @@ test_done()
 		echo "test failed; leaving test data in $testroot"
 	fi
 }
+
+SHIM()
+{
+	if [ -n "$MEM_CHECK" ]; then
+
+		if [ -z "$1" ]; then
+			echo "Testroot not passed"
+			exit 1
+		fi
+		local testroot="$1"
+		if [ ! -d "$testroot" ]; then
+			echo "Directory does not exist"	
+			exit 1
+		fi
+		echo "ktrace -dtu -f $testroot/ktrace.out"
+	fi
+}
+
