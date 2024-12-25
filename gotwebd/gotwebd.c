@@ -499,6 +499,13 @@ gotwebd_shutdown(void)
 			    pid);
 	} while (pid != -1 || (pid == -1 && errno == EINTR));
 
+	while (!TAILQ_EMPTY(&gotwebd_env->addresses)) {
+		struct address *h;
+
+		h = TAILQ_FIRST(&gotwebd_env->addresses);
+		TAILQ_REMOVE(&gotwebd_env->addresses, h, entry);
+		free(h);
+	}
 	free(gotwebd_env);
 
 	log_warnx("gotwebd terminating");
