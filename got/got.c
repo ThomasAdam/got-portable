@@ -7553,6 +7553,80 @@ get_tag_refname(char **refname, const char *tag_name)
 }
 
 static const struct got_error *
+print_tag(struct got_tag_object *tag, struct got_commit_object *commit,
+    const char *refname, const char *refstr, const char *tagger,
+    time_t tagger_time, const char *id_str, const char *ssh_sig,
+    const char *allowed_signers, const char *revoked_signers, int verbosity,
+    int *bad_sigs)
+{
+	static const struct got_error *err = NULL;
+	char datebuf[26];
+	char *sig_msg = NULL, *tagmsg0 = NULL, *tagmsg, *line, *datestr;
+
+	printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr);
+	printf("from: %s\n", tagger);
+	datestr = get_datestr(&tagger_time, datebuf);
+	if (datestr)
+		printf("date: %s UTC\n", datestr);
+	if (commit)
+		printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+	else {
+		switch (got_object_tag_get_object_type(tag)) {
+		case GOT_OBJ_TYPE_BLOB:
+			printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			printf("object: %s %s\n", GOT_OBJ_LABEL_TREE, id_str);
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+			break;
+		case GOT_OBJ_TYPE_TAG:
+			printf("object: %s %s\n", GOT_OBJ_LABEL_TAG, id_str);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (ssh_sig) {
+		err = got_sigs_verify_tag_ssh(&sig_msg, tag, ssh_sig,
+		    allowed_signers, revoked_signers, verbosity);
+		if (err) {
+			if (err->code != GOT_ERR_BAD_TAG_SIGNATURE)
+				goto done;
+			*bad_sigs = 1;
+			err = NULL;
+		}
+		if (sig_msg)
+			printf("signature: %s", sig_msg);
+		else
+			printf("bad signature\n");
+		free(sig_msg);
+	}
+
+	if (commit) {
+		err = got_object_commit_get_logmsg(&tagmsg0, commit);
+		if (err)
+			goto done;
+	} else {
+		tagmsg0 = strdup(got_object_tag_get_message(tag));
+		if (tagmsg0 == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	tagmsg = tagmsg0;
+	while ((line = strsep(&tagmsg, "\n")) != NULL)
+		printf(" %s\n", line);
+
+ done:
+	free(tagmsg0);
+	return err;
+}
+
+static const struct got_error *
 list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
     const char *allowed_signers, const char *revoked_signers, int verbosity)
 {
@@ -7582,10 +7656,8 @@ list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
 
 	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname;
-		char *refstr, *tagmsg0, *tagmsg, *line, *id_str, *datestr;
-		char datebuf[26];
+		char *refstr, *id_str;
 		const char *tagger, *ssh_sig = NULL;
-		char *sig_msg = NULL;
 		time_t tagger_time;
 		struct got_object_id *id;
 		struct got_tag_object *tag;
@@ -7647,71 +7719,19 @@ list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
 			}
 		}
 
-		printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr);
-		free(refstr);
-		printf("from: %s\n", tagger);
-		datestr = get_datestr(&tagger_time, datebuf);
-		if (datestr)
-			printf("date: %s UTC\n", datestr);
+		err = print_tag(tag, commit, refname, refstr, tagger,
+		    tagger_time, id_str, ssh_sig, allowed_signers,
+		    revoked_signers, verbosity, &bad_sigs);
+
 		if (commit)
-			printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
-		else {
-			switch (got_object_tag_get_object_type(tag)) {
-			case GOT_OBJ_TYPE_BLOB:
-				printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB,
-				    id_str);
-				break;
-			case GOT_OBJ_TYPE_TREE:
-				printf("object: %s %s\n", GOT_OBJ_LABEL_TREE,
-				    id_str);
-				break;
-			case GOT_OBJ_TYPE_COMMIT:
-				printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT,
-				    id_str);
-				break;
-			case GOT_OBJ_TYPE_TAG:
-				printf("object: %s %s\n", GOT_OBJ_LABEL_TAG,
-				    id_str);
-				break;
-			default:
-				break;
-			}
-		}
-		free(id_str);
-
-		if (ssh_sig) {
-			err = got_sigs_verify_tag_ssh(&sig_msg, tag, ssh_sig,
-				allowed_signers, revoked_signers, verbosity);
-			if (err && err->code == GOT_ERR_BAD_TAG_SIGNATURE)
-				bad_sigs = 1;
-			else if (err)
-				break;
-			printf("signature: %s", sig_msg);
-			free(sig_msg);
-			sig_msg = NULL;
-		}
-
-		if (commit) {
-			err = got_object_commit_get_logmsg(&tagmsg0, commit);
-			if (err)
-				break;
 			got_object_commit_close(commit);
-		} else {
-			tagmsg0 = strdup(got_object_tag_get_message(tag));
+		if (tag)
 			got_object_tag_close(tag);
-			if (tagmsg0 == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		}
+		free(id_str);
+		free(refstr);
 
-		tagmsg = tagmsg0;
-		do {
-			line = strsep(&tagmsg, "\n");
-			if (line)
-				printf(" %s\n", line);
-		} while (line);
-		free(tagmsg0);
+		if (err)
+			break;
 	}
 done:
 	got_ref_list_free(&refs);
