@@ -7472,7 +7472,7 @@ done:
 __dead static void
 usage_tag(void)
 {
-	fprintf(stderr, "usage: %s tag [-lVv] [-c commit] [-m message] "
+	fprintf(stderr, "usage: %s tag [-lsVv] [-c commit] [-m message] "
 	    "[-r repository-path] [-S signer-id] name\n", getprogname());
 	exit(1);
 }
@@ -7553,6 +7553,70 @@ get_tag_refname(char **refname, const char *tag_name)
 }
 
 static const struct got_error *
+print_tag_oneline(struct got_tag_object *tag, struct got_commit_object *commit,
+    const char *refname, const char *refstr, time_t tagger_time,
+    const char *id_str)
+{
+	static const struct got_error *err = NULL;
+	const char *label = NULL;
+	struct tm tm;
+	char *tagmsg0 = NULL, *tagmsg;
+	char datebuf[11];
+
+	if (gmtime_r(&tagger_time, &tm) == NULL)
+		return got_error_from_errno("gmtime_r");
+	if (strftime(datebuf, sizeof(datebuf), "%F", &tm) == 0)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (commit) {
+		err = got_object_commit_get_logmsg(&tagmsg0, commit);
+		if (err)
+			return err;
+	} else {
+		tagmsg0 = strdup(got_object_tag_get_message(tag));
+		if (tagmsg0 == NULL)
+			return got_error_from_errno("strdup");
+	}
+
+	tagmsg = tagmsg0;
+	while (isspace((unsigned char)*tagmsg))
+		tagmsg++;
+	tagmsg[strcspn(tagmsg, "\n")] = '\0';
+
+	if (commit)
+		label = GOT_OBJ_LABEL_COMMIT;
+	else {
+		switch (got_object_tag_get_object_type(tag)) {
+		case GOT_OBJ_TYPE_BLOB:
+			label = GOT_OBJ_LABEL_BLOB;
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			label = GOT_OBJ_LABEL_TREE;
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			label = GOT_OBJ_LABEL_COMMIT;
+			break;
+		case GOT_OBJ_TYPE_TAG:
+			label = GOT_OBJ_LABEL_TAG;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (label)
+		printf("%s %s:%.10s %s: %s\n", datebuf, label, id_str, refname,
+		    tagmsg);
+	else
+		printf("%s tag:%.10s %s: %s\n", datebuf, refstr, refname,
+		    tagmsg);
+
+	free(tagmsg0);
+
+	return err;
+}
+
+static const struct got_error *
 print_tag(struct got_tag_object *tag, struct got_commit_object *commit,
     const char *refname, const char *refstr, const char *tagger,
     time_t tagger_time, const char *id_str, const char *ssh_sig,
@@ -7628,7 +7692,8 @@ print_tag(struct got_tag_object *tag, struct got_commit_object *commit,
 
 static const struct got_error *
 list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
-    const char *allowed_signers, const char *revoked_signers, int verbosity)
+    const char *allowed_signers, const char *revoked_signers, int verbosity,
+    int oneline)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
@@ -7719,9 +7784,13 @@ list_tags(struct got_repository *repo, const char *tag_name, int verify_tags,
 			}
 		}
 
-		err = print_tag(tag, commit, refname, refstr, tagger,
-		    tagger_time, id_str, ssh_sig, allowed_signers,
-		    revoked_signers, verbosity, &bad_sigs);
+		if (oneline)
+			err = print_tag_oneline(tag, commit, refname, refstr,
+			    tagger_time, id_str);
+		else
+			err = print_tag(tag, commit, refname, refstr, tagger,
+			    tagger_time, id_str, ssh_sig, allowed_signers,
+			    revoked_signers, verbosity, &bad_sigs);
 
 		if (commit)
 			got_object_commit_close(commit);
@@ -7914,7 +7983,7 @@ cmd_tag(int argc, char *argv[])
 	char *allowed_signers = NULL, *revoked_signers = NULL, *editor = NULL;
 	const char *signer_id = NULL;
 	const char *tag_name = NULL, *commit_id_arg = NULL, *tagmsg = NULL;
-	int ch, do_list = 0, verify_tags = 0, verbosity = 0;
+	int ch, do_list = 0, oneline = 0, verify_tags = 0, verbosity = 0;
 	int *pack_fds = NULL;
 
 #ifndef PROFILE
@@ -7923,7 +7992,7 @@ cmd_tag(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:lm:r:S:Vv")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lm:r:S:sVv")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -7946,6 +8015,9 @@ cmd_tag(int argc, char *argv[])
 		case 'S':
 			signer_id = optarg;
 			break;
+		case 's':
+			oneline = 1;
+			break;
 		case 'V':
 			verify_tags = 1;
 			break;
@@ -7964,7 +8036,9 @@ cmd_tag(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (do_list || verify_tags) {
+	if (oneline && !do_list)
+		errx(1, "-s option can only be used when listing tags");
+	else if (do_list || verify_tags) {
 		if (commit_id_arg != NULL)
 			errx(1,
 			    "-c option can only be used when creating a tag");
@@ -8054,7 +8128,7 @@ cmd_tag(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = list_tags(repo, tag_name, verify_tags, allowed_signers,
-		    revoked_signers, verbosity);
+		    revoked_signers, verbosity, oneline);
 	} else {
 		error = get_gitconfig_path(&gitconfig_path);
 		if (error)

@@ -223,6 +223,64 @@ test_tag_list() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_list_oneline() {
+	local testroot=`test_init tag_list`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag=1.0.0
+	local tag2=2.0.0
+
+	local head_ref=`got ref -r $testroot/repo -l | sed -n 's/^HEAD: //p'`
+	local tag_commit_id=`got ref -r $testroot/repo -l "$head_ref" |
+	    sed -n "s:^$head_ref\: ::p"`
+
+	# create tag with Git
+	git -C $testroot/repo tag -a -m 'test' $tag
+	# create tag with Got
+	(cd $testroot/repo && got tag -m 'test' $tag2 > /dev/null)
+
+	local tagger_time=`git_show_tagger_time $testroot/repo $tag`
+	d1=`date -u -r $tagger_time +"%F"`
+	local tagger_time2=`git_show_tagger_time $testroot/repo $tag2`
+	d2=`date -u -r $tagger_time2 +"%F"`
+
+	got tag -r $testroot/repo -ls > $testroot/stdout
+
+	echo "$d2 commit:$(trim_obj_id 10 "$tag_commit_id") $tag2: test" \
+	    > $testroot/stdout.expected
+	echo "$d1 commit:$(trim_obj_id 10 "$tag_commit_id") $tag: test" \
+	    >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -r $testroot/repo -ls $tag > $testroot/stdout
+
+	echo "$d1 commit:$(trim_obj_id 10 "$tag_commit_id") $tag: test" \
+	    > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -r $testroot/repo -ls $tag2 > $testroot/stdout
+
+	echo "$d2 commit:$(trim_obj_id 10 "$tag_commit_id") $tag2: test" \
+	    > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_tag_list_lightweight() {
 	local testroot=`test_init tag_list_lightweight`
 	local commit_id=`git_show_head $testroot/repo`
@@ -573,6 +631,7 @@ test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight
+run_test test_tag_list_oneline
 run_test test_tag_create_ssh_signed
 run_test test_tag_create_ssh_signed_missing_key
 run_test test_tag_commit_keywords
