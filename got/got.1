@@ -1725,7 +1725,7 @@ option to be used as well.
 .El
 .It Xo
 .Cm tag
-.Op Fl lVv
+.Op Fl lsVv
 .Op Fl c Ar commit
 .Op Fl m Ar message
 .Op Fl r Ar repository-path
@@ -1839,6 +1839,12 @@ command, using the signature namespace
 .Dq git
 for compatibility with
 .Xr git 1 .
+.It Fl s
+Display a short one-line summary of each tag, instead of the default
+history format.
+Can only be used with the
+.Fl l
+option.
 .It Fl V
 Verify tag object signatures.
 If a
