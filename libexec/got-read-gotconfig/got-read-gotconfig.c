@@ -613,6 +613,8 @@ main(int argc, char *argv[])
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
+	if (gotconfig)
+		gotconfig_free(gotconfig);
 	imsgbuf_clear(&ibuf);
 	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
