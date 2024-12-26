@@ -18,6 +18,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <errno.h>

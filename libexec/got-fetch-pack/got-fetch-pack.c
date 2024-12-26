@@ -18,6 +18,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -81,7 +82,7 @@ match_remote_ref(struct got_pathlist_head *have_refs,
 	 * we should use a flag instead */
 	memset(my_id, 0, sizeof(*my_id));
 
-	TAILQ_FOREACH(pe, have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, have_refs) {
 		struct got_object_id *id = pe->data;
 		if (strcmp(pe->path, refname) == 0) {
 			memcpy(my_id, id, sizeof(*my_id));
@@ -227,7 +228,7 @@ send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 	struct got_pathlist_entry *pe;
 
 	len = sizeof(struct got_imsg_fetch_symrefs);
-	TAILQ_FOREACH(pe, symrefs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, symrefs) {
 		const char *target = pe->data;
 		len += sizeof(struct got_imsg_fetch_symref) +
 		    pe->path_len + strlen(target);
@@ -245,7 +246,7 @@ send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
 	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1)
 		return got_error_from_errno("imsg_add FETCH_SYMREFS");
 
-	TAILQ_FOREACH(pe, symrefs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, symrefs) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 		const char *target = pe->data;
@@ -356,7 +357,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	ssize_t w;
 	struct got_ratelimit rl;
 
-	TAILQ_INIT(&symrefs);
+	RB_INIT(&symrefs);
 	got_hash_init(&ctx, GOT_HASH_SHA1);
 	got_ratelimit_init(&rl, 0, 500);
 
@@ -422,7 +423,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				goto done;
 			is_firstpkt = 0;
 			if (!fetch_all_branches) {
-				TAILQ_FOREACH(pe, &symrefs, entry) {
+				RB_FOREACH(pe, got_pathlist_head, &symrefs) {
 					const char *name = pe->path;
 					const char *symref_target = pe->data;
 					if (strcmp(name, GOT_REF_HEAD) != 0)
@@ -466,7 +467,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				found_branch = 1;
 				continue;
 			}
-			TAILQ_FOREACH(pe, wanted_branches, entry) {
+			RB_FOREACH(pe, got_pathlist_head, wanted_branches) {
 				if (match_branch(refname, pe->path))
 					break;
 			}
@@ -483,7 +484,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				    getprogname(), refname);
 			}
 		} else {
-			TAILQ_FOREACH(pe, wanted_refs, entry) {
+			RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 				if (match_wanted_ref(refname, pe->path))
 					break;
 			}
@@ -531,7 +532,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		struct got_pathlist_entry *pe;
 		static char msg[PATH_MAX + 33];
 
-		pe = TAILQ_FIRST(wanted_branches);
+		pe = RB_MIN(got_pathlist_head, wanted_branches);
 		if (pe) {
 			snprintf(msg, sizeof(msg),
 			    "branch \"%s\" not found on server", pe->path);
@@ -539,7 +540,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			goto done;
 		}
 
-		pe = TAILQ_FIRST(wanted_refs);
+		pe = RB_MIN(got_pathlist_head, wanted_refs);
 		if (pe) {
 			snprintf(msg, sizeof(msg),
 			    "reference \"%s\" not found on server", pe->path);
@@ -575,7 +576,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	if (nwant == 0)
 		goto done;
 
-	TAILQ_FOREACH(pe, have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, have_refs) {
 		struct got_object_id *id = pe->data;
 		got_object_id_hex(id, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
@@ -872,9 +873,9 @@ main(int argc, char **argv)
 		sleep (1);
 #endif
 
-	TAILQ_INIT(&have_refs);
-	TAILQ_INIT(&wanted_branches);
-	TAILQ_INIT(&wanted_refs);
+	RB_INIT(&have_refs);
+	RB_INIT(&wanted_branches);
+	RB_INIT(&wanted_refs);
 
 	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
 		warn("imsgbuf_init");

@@ -1403,7 +1403,7 @@ verify_packfile(void)
 		if (ref_update->delete_ref)
 			continue;
 
-		TAILQ_FOREACH(pe, repo_write.protected_tag_namespaces, entry) {
+		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_tag_namespaces) {
 			err = protect_tag_namespace(pe->path, &client->pack,
 			    packidx, ref_update);
 			if (err)
@@ -1435,14 +1435,15 @@ verify_packfile(void)
 			}
 		}
 
-		TAILQ_FOREACH(pe, repo_write.protected_branch_namespaces,
-		    entry) {
+		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branch_namespaces)
+		{
 			err = protect_branch_namespace(pe->path,
 			    &client->pack, packidx, ref_update);
 			if (err)
 				goto done;
 		}
-		TAILQ_FOREACH(pe, repo_write.protected_branches, entry) {
+		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
+		{
 			err = protect_branch(pe->path, &client->pack,
 			    packidx, ref_update);
 			if (err)
@@ -1475,20 +1476,22 @@ protect_refs_from_deletion(void)
 
 		refname = got_ref_get_name(ref_update->ref);
 
-		TAILQ_FOREACH(pe, repo_write.protected_tag_namespaces, entry) {
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_tag_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
-		TAILQ_FOREACH(pe, repo_write.protected_branch_namespaces,
-		    entry) {
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branch_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
-		TAILQ_FOREACH(pe, repo_write.protected_branches, entry) {
+		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
+		{
 			if (strcmp(refname, pe->path) == 0) {
 				return got_error_fmt(GOT_ERR_REF_PROTECTED,
 				    "%s", refname);
@@ -1719,7 +1722,7 @@ print_diffstat(struct got_diffstat_cb_arg *dsa, int fd)
 {
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, dsa->paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, dsa->paths) {
 		struct got_diff_changed_path *cp = pe->data;
 		int pad = dsa->max_path_len - pe->path_len + 1;
 
@@ -1882,7 +1885,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	const int shortlog_threshold = 50;
 
 	STAILQ_INIT(&reversed_commits);
-	TAILQ_INIT(&changed_paths);
+	RB_INIT(&changed_paths);
 
 	/* XXX first-parent only for now */
 	err = got_commit_graph_open(&graph, "/", 1);

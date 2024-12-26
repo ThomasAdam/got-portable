@@ -17,6 +17,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 
@@ -595,11 +596,11 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		fetchreq.worktree_branch_len = worktree_branch_len;
 	if (remote_head != NULL)
 		fetchreq.remote_head_len = remote_head_len;
-	TAILQ_FOREACH(pe, have_refs, entry)
+	RB_FOREACH(pe, got_pathlist_head, have_refs)
 		fetchreq.n_have_refs++;
-	TAILQ_FOREACH(pe, wanted_branches, entry)
+	RB_FOREACH(pe, got_pathlist_head, wanted_branches)
 		fetchreq.n_wanted_branches++;
-	TAILQ_FOREACH(pe, wanted_refs, entry)
+	RB_FOREACH(pe, got_pathlist_head, wanted_refs)
 		fetchreq.n_wanted_refs++;
 	if (imsg_add(wbuf, &fetchreq, sizeof(fetchreq)) == -1)
 		return got_error_from_errno("imsg_add FETCH_REQUEST");
@@ -626,7 +627,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	if (err)
 		return err;
 
-	TAILQ_FOREACH(pe, have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, have_refs) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 		struct got_object_id *id = pe->data;
@@ -650,7 +651,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return err;
 	}
 
-	TAILQ_FOREACH(pe, wanted_branches, entry) {
+	RB_FOREACH(pe, got_pathlist_head, wanted_branches) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 
@@ -675,7 +676,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 			return err;
 	}
 
-	TAILQ_FOREACH(pe, wanted_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 
@@ -899,9 +900,9 @@ got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
 	memset(&zero_id, 0, sizeof(zero_id));
 	memset(&sendreq, 0, sizeof(sendreq));
 	sendreq.verbosity = verbosity;
-	TAILQ_FOREACH(pe, have_refs, entry)
+	RB_FOREACH(pe, got_pathlist_head, have_refs)
 		sendreq.nrefs++;
-	TAILQ_FOREACH(pe, delete_refs, entry)
+	RB_FOREACH(pe, got_pathlist_head, delete_refs)
 		sendreq.nrefs++;
 	if (imsg_compose(ibuf, GOT_IMSG_SEND_REQUEST, 0, 0, fd,
 	    &sendreq, sizeof(sendreq)) == -1) {
@@ -915,7 +916,7 @@ got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head ,have_refs) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 		struct got_object_id *id = pe->data;
@@ -924,7 +925,7 @@ got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
 			goto done;
 	}
 
-	TAILQ_FOREACH(pe, delete_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, delete_refs) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 		err = send_send_ref(name, name_len, &zero_id, 1, ibuf);

@@ -751,7 +751,7 @@ free_ignores(struct got_pathlist_head *ignores)
 {
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, ignores, entry) {
+	RB_FOREACH(pe, got_pathlist_head, ignores) {
 		struct got_pathlist_head *ignorelist = pe->data;
 
 		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
@@ -772,7 +772,7 @@ read_ignores(struct got_pathlist_head *ignores, const char *path, FILE *f)
 	ignorelist = calloc(1, sizeof(*ignorelist));
 	if (ignorelist == NULL)
 		return got_error_from_errno("calloc");
-	TAILQ_INIT(ignorelist);
+	RB_INIT(ignorelist);
 
 	while ((linelen = getline(&line, &linesize, f)) != -1) {
 		if (linelen > 0 && line[linelen - 1] == '\n')
@@ -841,11 +841,11 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 	struct got_pathlist_entry *pe;
 
 	/* Handle patterns which match in all directories. */
-	TAILQ_FOREACH(pe, ignores, entry) {
+	RB_FOREACH(pe, got_pathlist_head, ignores) {
 		struct got_pathlist_head *ignorelist = pe->data;
 		struct got_pathlist_entry *pi;
 
-		TAILQ_FOREACH(pi, ignorelist, entry) {
+		RB_FOREACH(pi, got_pathlist_head, ignorelist) {
 			const char *p;
 
 			if (pi->path_len < 3 ||
@@ -873,12 +873,12 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 	 * parents, so we can find the most specific ignorelist by walking
 	 * ignores backwards.
 	 */
-	pe = TAILQ_LAST(ignores, got_pathlist_head);
+	pe = RB_MAX(got_pathlist_head, ignores);
 	while (pe) {
 		if (got_path_is_child(path, pe->path, pe->path_len)) {
 			struct got_pathlist_head *ignorelist = pe->data;
 			struct got_pathlist_entry *pi;
-			TAILQ_FOREACH(pi, ignorelist, entry) {
+			RB_FOREACH(pi, got_pathlist_head, ignorelist) {
 				int flags = FNM_LEADING_DIR;
 				if (strstr(pi->path, "/**/") == NULL)
 					flags |= FNM_PATHNAME;
@@ -888,7 +888,7 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 				return 1;
 			}
 		}
-		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
+		pe = RB_PREV(got_pathlist_head, ignores,  pe);
 	}
 
 	return 0;
@@ -1118,7 +1118,7 @@ report_children(struct got_pathlist_head *children,
 	struct got_pathlist_entry *pe;
 	char *ondisk_path = NULL;
 
-	TAILQ_FOREACH(pe, children, entry) {
+	RB_FOREACH(pe, got_pathlist_head, children) {
 		if (cancel_cb) {
 			err = cancel_cb(cancel_arg);
 			if (err)
@@ -1161,8 +1161,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct got_pathlist_head ignores, missing_children;
 	struct got_fileindex_entry *ie;
 
-	TAILQ_INIT(&ignores);
-	TAILQ_INIT(&missing_children);
+	RB_INIT(&ignores);
+	RB_INIT(&missing_children);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
@@ -1199,7 +1199,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 				if (err)
 					goto done;
 			}
-			if (TAILQ_EMPTY(&missing_children)) {
+			if (RB_EMPTY(&missing_children)) {
 				err = report_single_file_status(path,
 				    ondisk_path, fileindex,
 				    status_cb, status_arg, repo,
@@ -1835,7 +1835,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 	    te->name) == -1)
 		return got_error_from_errno("asprintf");
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		*modified = got_path_is_child(ct->in_repo_path, te_path,
 		    strlen(te_path));
@@ -1857,7 +1857,7 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 
 	*ctp = NULL;
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *ct_name = NULL;
 		int path_matches;
@@ -1957,11 +1957,11 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 	struct got_tree_entry *te, *new_te = NULL;
 	struct got_pathlist_entry *pe;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 	*nentries = 0;
 
 	/* Insert, and recurse into, newly added entries first. */
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *child_path = NULL, *slash;
 
@@ -2119,7 +2119,7 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_fileindex_entry *ie;
 		struct got_commitable *ct = pe->data;
 
@@ -2267,7 +2267,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	}
 
 	/* Create blobs from added and modified files and record their IDs. */
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *ondisk_path;
 
@@ -2334,7 +2334,7 @@ check_path_is_commitable(const char *path,
 	struct got_pathlist_entry *cpe = NULL;
 	size_t path_len = strlen(path);
 
-	TAILQ_FOREACH(cpe, commitable_paths, entry) {
+	RB_FOREACH(cpe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = cpe->data;
 		const char *ct_path = ct->path;
 
@@ -2372,7 +2372,7 @@ check_non_staged_files(struct got_fileindex *fileindex,
 	struct got_pathlist_entry *pe;
 	struct got_fileindex_entry *ie;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		if (pe->path[0] == '\0')
 			continue;
 		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
@@ -2444,7 +2444,7 @@ send_progress(void *arg, int ncolored, int nfound, int ntrees,
 
 		if (success) {
 			struct got_pathlist_entry *pe;
-			TAILQ_FOREACH(pe, a->delete_branches, entry) {
+			RB_FOREACH(pe, got_pathlist_head, a->delete_branches) {
 				const char *branchname = pe->path;
 				if (got_path_cmp(branchname, refname,
 				    strlen(branchname), strlen(refname)) == 0) {
@@ -2776,10 +2776,10 @@ fetch_updated_remote(const char *proto, const char *host, const char *port,
 	int fetchfd = -1;
 	pid_t fetchpid = -1;
 
-	TAILQ_INIT(&learned_refs);
-	TAILQ_INIT(&symrefs);
-	TAILQ_INIT(&wanted_branches);
-	TAILQ_INIT(&wanted_refs);
+	RB_INIT(&learned_refs);
+	RB_INIT(&symrefs);
+	RB_INIT(&wanted_branches);
+	RB_INIT(&wanted_refs);
 
 	err = got_pathlist_insert(NULL, &wanted_branches, head_refname,
 	    NULL);
@@ -2804,7 +2804,7 @@ fetch_updated_remote(const char *proto, const char *host, const char *port,
 		goto done;
 
 	/* Update references provided with the pack file. */
-	TAILQ_FOREACH(pe, &learned_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &learned_refs) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		struct got_reference *ref;
@@ -2828,7 +2828,7 @@ fetch_updated_remote(const char *proto, const char *host, const char *port,
 	}
 
 	/* Set the HEAD reference if the server provided one. */
-	TAILQ_FOREACH(pe, &symrefs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &symrefs) {
 		struct got_reference *target_ref;
 		const char *refname = pe->path;
 		const char *target = pe->data;
@@ -2935,10 +2935,10 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 	*new_commit_id = NULL;
 
 	memset(&cc_arg, 0, sizeof(cc_arg));
-	TAILQ_INIT(&commitable_paths);
-	TAILQ_INIT(&commit_reflist);
-	TAILQ_INIT(&tag_names);
-	TAILQ_INIT(&delete_branches);
+	RB_INIT(&commitable_paths);
+	RB_INIT(&commit_reflist);
+	RB_INIT(&tag_names);
+	RB_INIT(&delete_branches);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -3004,7 +3004,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 		}
 	}
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
@@ -3018,18 +3018,18 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 		}
 	}
 
-	if (TAILQ_EMPTY(&commitable_paths)) {
+	if (RB_EMPTY(&commitable_paths)) {
 		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
 		goto done;
 	}
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = check_path_is_commitable(pe->path, &commitable_paths);
 		if (err)
 			goto done;
 	}
 
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		const char *ct_path = ct->in_repo_path;
 
@@ -3154,7 +3154,7 @@ done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &commitable_paths) {
 		struct got_commitable *ct = pe->data;
 
 		free_commitable(ct);

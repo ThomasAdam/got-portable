@@ -2830,7 +2830,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		goto done;
 
 	/* Map all specified paths to in-repository trees. */
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		tpd = malloc(sizeof(*tpd));
 		if (tpd == NULL) {
 			err = got_error_from_errno("malloc");
@@ -2870,7 +2870,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		goto done;
 
 	tpd = STAILQ_FIRST(&tree_paths);
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		struct bump_base_commit_id_arg bbc_arg;
 
 		err = checkout_files(worktree, fileindex, tpd->relpath,
@@ -3712,7 +3712,7 @@ free_ignores(struct got_pathlist_head *ignores)
 {
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, ignores, entry) {
+	RB_FOREACH(pe, got_pathlist_head, ignores) {
 		struct got_pathlist_head *ignorelist = pe->data;
 
 		got_pathlist_free(ignorelist, GOT_PATHLIST_FREE_PATH);
@@ -3733,7 +3733,7 @@ read_ignores(struct got_pathlist_head *ignores, const char *path, FILE *f)
 	ignorelist = calloc(1, sizeof(*ignorelist));
 	if (ignorelist == NULL)
 		return got_error_from_errno("calloc");
-	TAILQ_INIT(ignorelist);
+	RB_INIT(ignorelist);
 
 	while ((linelen = getline(&line, &linesize, f)) != -1) {
 		if (linelen > 0 && line[linelen - 1] == '\n')
@@ -3807,11 +3807,11 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 	struct got_pathlist_entry *pe;
 
 	/* Handle patterns which match in all directories. */
-	TAILQ_FOREACH(pe, ignores, entry) {
+	RB_FOREACH(pe, got_pathlist_head, ignores) {
 		struct got_pathlist_head *ignorelist = pe->data;
 		struct got_pathlist_entry *pi;
 
-		TAILQ_FOREACH(pi, ignorelist, entry) {
+		RB_FOREACH(pi, got_pathlist_head, ignorelist) {
 			const char *p;
 
 			if (pi->path_len < 3 ||
@@ -3839,12 +3839,12 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 	 * parents, so we can find the most specific ignorelist by walking
 	 * ignores backwards.
 	 */
-	pe = TAILQ_LAST(ignores, got_pathlist_head);
+	pe = RB_MAX(got_pathlist_head, ignores);
 	while (pe) {
 		if (got_path_is_child(path, pe->path, pe->path_len)) {
 			struct got_pathlist_head *ignorelist = pe->data;
 			struct got_pathlist_entry *pi;
-			TAILQ_FOREACH(pi, ignorelist, entry) {
+			RB_FOREACH(pi, got_pathlist_head, ignorelist) {
 				int flags = FNM_LEADING_DIR;
 				if (strstr(pi->path, "/**/") == NULL)
 					flags |= FNM_PATHNAME;
@@ -3854,7 +3854,7 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 				return 1;
 			}
 		}
-		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
+		pe = RB_PREV(got_pathlist_head, ignores, pe);
 	}
 
 	return 0;
@@ -4084,7 +4084,7 @@ report_children(struct got_pathlist_head *children,
 	struct got_pathlist_entry *pe;
 	char *ondisk_path = NULL;
 
-	TAILQ_FOREACH(pe, children, entry) {
+	RB_FOREACH(pe, got_pathlist_head, children) {
 		if (cancel_cb) {
 			err = cancel_cb(cancel_arg);
 			if (err)
@@ -4127,8 +4127,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct got_pathlist_head ignores, missing_children;
 	struct got_fileindex_entry *ie;
 
-	TAILQ_INIT(&ignores);
-	TAILQ_INIT(&missing_children);
+	RB_INIT(&ignores);
+	RB_INIT(&missing_children);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
@@ -4165,7 +4165,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 				if (err)
 					goto done;
 			}
-			if (TAILQ_EMPTY(&missing_children)) {
+			if (RB_EMPTY(&missing_children)) {
 				err = report_single_file_status(path,
 				    ondisk_path, fileindex,
 				    status_cb, status_arg, repo,
@@ -4234,7 +4234,7 @@ got_worktree_status(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    status_cb, status_arg, cancel_cb, cancel_arg,
 		    no_ignores, 0);
@@ -4459,7 +4459,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	saa.progress_arg = progress_arg;
 	saa.repo = repo;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 			schedule_addition, &saa, NULL, NULL, no_ignores, 0);
 		if (err)
@@ -4654,7 +4654,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	sda.ignore_missing_paths = ignore_missing_paths;
 	sda.status_codes = status_codes;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		char *ondisk_status_path;
 
 		if (asprintf(&ondisk_status_path, "%s%s%s",
@@ -5251,8 +5251,8 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			if (a->added_files_to_unlink) {
 				struct got_pathlist_entry *pe;
 
-				TAILQ_FOREACH(pe, a->added_files_to_unlink,
-				    entry) {
+				RB_FOREACH(pe, got_pathlist_head,
+				    a->added_files_to_unlink) {
 					if (got_path_cmp(pe->path, relpath,
 					    pe->path_len, strlen(relpath)))
 						continue;
@@ -5435,7 +5435,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.patch_arg = patch_arg;
 	rfa.repo = repo;
 	rfa.unlink_added_files = 0;
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    revert_file, &rfa, NULL, NULL, 1, 0);
 		if (err)
@@ -6039,7 +6039,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 	    te->name) == -1)
 		return got_error_from_errno("asprintf");
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		*modified = got_path_is_child(ct->in_repo_path, te_path,
 		    strlen(te_path));
@@ -6061,7 +6061,7 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 
 	*ctp = NULL;
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *ct_name = NULL;
 		int path_matches;
@@ -6161,11 +6161,11 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 	struct got_tree_entry *te, *new_te = NULL;
 	struct got_pathlist_entry *pe;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 	*nentries = 0;
 
 	/* Insert, and recurse into, newly added entries first. */
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *child_path = NULL, *slash;
 
@@ -6323,7 +6323,7 @@ update_fileindex_after_commit(struct got_worktree *worktree,
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_fileindex_entry *ie;
 		struct got_commitable *ct = pe->data;
 
@@ -6475,7 +6475,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	}
 
 	/* Create blobs from added and modified files and record their IDs. */
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		char *ondisk_path;
 
@@ -6582,7 +6582,7 @@ check_path_is_commitable(const char *path,
 	struct got_pathlist_entry *cpe = NULL;
 	size_t path_len = strlen(path);
 
-	TAILQ_FOREACH(cpe, commitable_paths, entry) {
+	RB_FOREACH(cpe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = cpe->data;
 		const char *ct_path = ct->path;
 
@@ -6620,7 +6620,7 @@ check_non_staged_files(struct got_fileindex *fileindex,
 	struct got_pathlist_entry *pe;
 	struct got_fileindex_entry *ie;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		if (pe->path[0] == '\0')
 			continue;
 		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
@@ -6657,7 +6657,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	*new_commit_id = NULL;
 
 	memset(&cc_arg, 0, sizeof(cc_arg));
-	TAILQ_INIT(&commitable_paths);
+	RB_INIT(&commitable_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -6711,7 +6711,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		}
 	}
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
@@ -6725,18 +6725,18 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		}
 	}
 
-	if (TAILQ_EMPTY(&commitable_paths)) {
+	if (RB_EMPTY(&commitable_paths)) {
 		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
 		goto done;
 	}
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = check_path_is_commitable(pe->path, &commitable_paths);
 		if (err)
 			goto done;
 	}
 
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		const char *ct_path = ct->in_repo_path;
 
@@ -6769,7 +6769,7 @@ done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &commitable_paths) {
 		struct got_commitable *ct = pe->data;
 
 		free_commitable(ct);
@@ -7326,7 +7326,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	char *logmsg = NULL;
 
 	memset(&cc_arg, 0, sizeof(cc_arg));
-	TAILQ_INIT(&commitable_paths);
+	RB_INIT(&commitable_paths);
 	*new_commit_id = NULL;
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
@@ -7353,7 +7353,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	 */
 	if (merged_paths) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, merged_paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, merged_paths) {
 			err = worktree_status(worktree, pe->path, fileindex,
 			    repo, collect_commitables, &cc_arg, NULL, NULL, 1,
 			    0);
@@ -7367,7 +7367,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
-	if (TAILQ_EMPTY(&commitable_paths)) {
+	if (RB_EMPTY(&commitable_paths)) {
 		/* No-op change; commit will be elided. */
 		err = got_ref_delete(commit_ref, repo);
 		if (err)
@@ -7724,13 +7724,13 @@ get_paths_added_between_commits(struct got_pathlist_head *added_paths,
 	struct got_pathlist_entry *pe;
 	char *abspath = NULL, *wt_path = NULL;
 
-	TAILQ_INIT(&merged_paths);
+	RB_INIT(&merged_paths);
 
 	err = get_paths_changed_between_commits(&merged_paths, id1, id2, repo);
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, &merged_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head,  &merged_paths) {
 		struct got_diff_changed_path *change = pe->data;
 
 		if (change->status != GOT_STATUS_ADD)
@@ -7812,7 +7812,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	struct got_object_id *tree_id = NULL;
 	struct got_pathlist_head added_paths;
 
-	TAILQ_INIT(&added_paths);
+	RB_INIT(&added_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -8266,7 +8266,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	struct revert_file_args rfa;
 	struct got_pathlist_head added_paths;
 
-	TAILQ_INIT(&added_paths);
+	RB_INIT(&added_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -8730,7 +8730,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	memset(&cc_arg, 0, sizeof(cc_arg));
 	*new_commit_id = NULL;
 
-	TAILQ_INIT(&commitable_paths);
+	RB_INIT(&commitable_paths);
 
 	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
@@ -8779,7 +8779,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &commitable_paths) {
 		struct got_commitable *ct = pe->data;
 
 		free_commitable(ct);
@@ -9090,7 +9090,7 @@ got_worktree_merge_abort(struct got_worktree *worktree,
 	struct got_object_id *tree_id = NULL;
 	struct got_pathlist_head added_paths;
 
-	TAILQ_INIT(&added_paths);
+	RB_INIT(&added_paths);
 
 	err = get_merge_commit_ref_name(&commit_ref_name, worktree);
 	if (err)
@@ -9450,7 +9450,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	oka.fileindex = fileindex;
 	oka.repo = repo;
 	oka.have_changes = 0;
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    check_stage_ok, &oka, NULL, NULL, 1, 0);
 		if (err)
@@ -9470,7 +9470,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.status_arg = status_arg;
 	spa.staged_something = 0;
 	spa.allow_bad_symlinks = allow_bad_symlinks;
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    stage_path, &spa, NULL, NULL, 1, 0);
 		if (err)
@@ -10017,7 +10017,7 @@ got_worktree_unstage(struct got_worktree *worktree,
 	upa.progress_arg = progress_arg;
 	upa.patch_cb = patch_cb;
 	upa.patch_arg = patch_arg;
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    unstage_path, &upa, NULL, NULL, 1, 0);
 		if (err)
@@ -10063,7 +10063,7 @@ report_file_info(void *arg, struct got_fileindex_entry *ie)
 			return err;
 	}
 
-	TAILQ_FOREACH(pe, a->paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, a->paths) {
 		if (pe->path_len == 0 || strcmp(pe->path, ie->path) == 0 ||
 		    got_path_is_child(ie->path, pe->path, pe->path_len))
 			break;

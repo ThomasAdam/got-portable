@@ -18,6 +18,7 @@
 #include "got_compat.h"
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/types.h>
 
 #include <ctype.h>

@@ -262,16 +262,12 @@ realloc_ids(struct got_object_id ***ids, size_t *nalloc, size_t n)
 static struct got_pathlist_entry *
 find_ref(struct got_pathlist_head *refs, const char *refname)
 {
-	struct got_pathlist_entry *pe;
+	struct got_pathlist_entry find;
 
-	TAILQ_FOREACH(pe, refs, entry) {
-		if (got_path_cmp(pe->path, refname, strlen(pe->path),
-		    strlen(refname)) == 0) {
-			return pe;
-		}
-	}
+	find.path = refname;
+	find.path_len = strlen(refname);
+	return RB_FIND(got_pathlist_head, refs, &find);
 
-	return NULL;
 }
 
 static const struct got_error *
@@ -362,14 +358,14 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	FILE *delta_cache = NULL;
 	char *s = NULL;
 
-	TAILQ_INIT(&have_refs);
-	TAILQ_INIT(&their_refs);
+	RB_INIT(&have_refs);
+	RB_INIT(&their_refs);
 
 	if (got_repo_get_object_format(repo) != GOT_HASH_SHA1)
 		return got_error_fmt(GOT_ERR_NOT_IMPL,
 		    "sha256 object IDs unsupported in network protocol");
 
-	TAILQ_FOREACH(pe, branch_names, entry) {
+	RB_FOREACH(pe, got_pathlist_head, branch_names) {
 		const char *branchname = pe->path;
 		const char *targetname = pe->data;
 
@@ -397,7 +393,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		s = NULL;
 	}
 
-	TAILQ_FOREACH(pe, delete_branches, entry) {
+	RB_FOREACH(pe, got_pathlist_head, delete_branches) {
 		const char *branchname = pe->path;
 		struct got_pathlist_entry *ref;
 		if (strncmp(branchname, "refs/heads/", 11) != 0) {
@@ -414,7 +410,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		}
 	}
 
-	TAILQ_FOREACH(pe, tag_names, entry) {
+	RB_FOREACH(pe, got_pathlist_head, tag_names) {
 		const char *tagname = pe->path;
 		if (strncmp(tagname, "refs/tags/", 10) != 0) {
 			if (asprintf(&s, "refs/tags/%s", tagname) == -1) {
@@ -437,7 +433,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		s = NULL;
 	}
 
-	if (TAILQ_EMPTY(&have_refs) && TAILQ_EMPTY(delete_branches)) {
+	if (RB_EMPTY(&have_refs) && RB_EMPTY(delete_branches)) {
 		err = got_error(GOT_ERR_SEND_EMPTY);
 		goto done;
 	}
@@ -488,7 +484,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	 * Prepare the array of our object IDs which
 	 * will be needed for generating a pack file.
 	 */
-	TAILQ_FOREACH(pe, &have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head,  &have_refs) {
 		struct got_object_id *id = pe->data;
 
 		err = realloc_ids(&our_ids, &nalloc_ours, nours + 1);
@@ -513,7 +509,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	 * This array will be used to exclude objects which already
 	 * exist on the server from our pack file.
 	 */
-	TAILQ_FOREACH(pe, &their_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &their_refs) {
 		const char *refname = pe->path;
 		struct got_object_id *their_id = pe->data;
 		int have_their_id;
@@ -607,14 +603,14 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	}
 
 	/* Account for any new references we are going to upload. */
-	TAILQ_FOREACH(pe, &have_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &have_refs) {
 		const char *refname = pe->path;
 		if (find_ref(&their_refs, refname) == NULL)
 			refs_to_send++;
 	}
 
 	/* Account for any existing references we are going to delete. */
-	TAILQ_FOREACH(pe, delete_branches, entry) {
+	RB_FOREACH(pe, got_pathlist_head, delete_branches) {
 		const char *branchname = pe->path;
 		if (find_ref(&their_refs, branchname))
 			refs_to_delete++;

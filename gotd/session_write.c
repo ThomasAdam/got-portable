@@ -428,14 +428,14 @@ queue_notification(struct got_object_id *old_id, struct got_object_id *new_id,
 	    STAILQ_EMPTY(&repo_cfg->notification_targets))
 		return NULL; /* notifications unused */
 
-	TAILQ_FOREACH(pe, &repo_cfg->notification_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo_cfg->notification_refs) {
 		const char *refname = pe->path;
 		if (strcmp(got_ref_get_name(ref), refname) == 0)
 			break;
 	}
 	if (pe == NULL) {
-		TAILQ_FOREACH(pe, &repo_cfg->notification_ref_namespaces,
-		    entry) {
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo_cfg->notification_ref_namespaces) {
 			const char *namespace = pe->path;
 
 			err = validate_namespace(namespace);
@@ -452,8 +452,8 @@ queue_notification(struct got_object_id *old_id, struct got_object_id *new_id,
 	 * configuration file then only send notifications if a match
 	 * was found.
 	 */
-	if (pe == NULL && (!TAILQ_EMPTY(&repo_cfg->notification_refs) ||
-	    !TAILQ_EMPTY(&repo_cfg->notification_ref_namespaces)))
+	if (pe == NULL && (!RB_EMPTY(&repo_cfg->notification_refs) ||
+	    !RB_EMPTY(&repo_cfg->notification_ref_namespaces)))
 		return NULL;
 
 	notif = calloc(1, sizeof(*notif));

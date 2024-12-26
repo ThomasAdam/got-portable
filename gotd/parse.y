@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <ctype.h>
@@ -1329,12 +1330,12 @@ conf_new_repo(const char *name)
 		fatalx("%s: calloc", __func__);
 
 	STAILQ_INIT(&repo->rules);
-	TAILQ_INIT(&repo->protected_tag_namespaces);
-	TAILQ_INIT(&repo->protected_branch_namespaces);
-	TAILQ_INIT(&repo->protected_branches);
-	TAILQ_INIT(&repo->protected_branches);
-	TAILQ_INIT(&repo->notification_refs);
-	TAILQ_INIT(&repo->notification_ref_namespaces);
+	RB_INIT(&repo->protected_tag_namespaces);
+	RB_INIT(&repo->protected_branch_namespaces);
+	RB_INIT(&repo->protected_branches);
+	RB_INIT(&repo->protected_branches);
+	RB_INIT(&repo->notification_refs);
+	RB_INIT(&repo->notification_ref_namespaces);
 	STAILQ_INIT(&repo->notification_targets);
 
 	if (strlcpy(repo->name, name, sizeof(repo->name)) >=
@@ -1423,7 +1424,7 @@ conf_protect_tag_namespace(struct gotd_repo *repo, char *namespace)
 	    namespace) == -1)
 		return -1;
 
-	TAILQ_FOREACH(pe, &repo->protected_branch_namespaces, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->protected_branch_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
 			yyerror("duplicate protected namespace %s", namespace);
 			return -1;
@@ -1443,7 +1444,7 @@ conf_protect_branch_namespace(struct gotd_repo *repo, char *namespace)
 	    &repo->protected_branch_namespaces, namespace) == -1)
 		return -1;
 
-	TAILQ_FOREACH(pe, &repo->protected_tag_namespaces, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->protected_tag_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
 			yyerror("duplicate protected namespace %s", namespace);
 			return -1;
