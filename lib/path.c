@@ -236,7 +236,10 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	new->path = path;
 	new->path_len = path_len;
 	new->data = data;
-	RB_INSERT(got_pathlist_head, pathlist, new);
+	if (RB_INSERT(got_pathlist_head, pathlist, new)) {
+		free(new);
+		new = NULL;
+	}
 	if (inserted)
 		*inserted = new;
 	return NULL;
