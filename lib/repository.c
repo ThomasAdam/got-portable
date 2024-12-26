@@ -2214,6 +2214,7 @@ got_repo_find_object_id(struct got_object_id *id, struct got_repository *repo)
 
 	err = got_repo_match_object_id_prefix(&matched_id, id_str,
 	    GOT_OBJ_TYPE_ANY, repo);
+	free(matched_id);
 	free(id_str);
 	return err;
 }
