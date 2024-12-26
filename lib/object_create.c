@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/wait.h>
 
 #include <ctype.h>
@@ -329,7 +330,7 @@ got_object_tree_create(struct got_object_id **id,
 		return got_error_from_errno("calloc");
 
 	i = 0;
-	TAILQ_FOREACH(pe, paths, entry)
+	RB_FOREACH(pe, got_pathlist_head, paths)
 		sorted_entries[i++] = pe->data;
 	mergesort(sorted_entries, nentries, sizeof(struct got_tree_entry *),
 	    sort_tree_entries_the_way_git_likes_it);

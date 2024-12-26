@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 
 #include <string.h>
 #include <stdlib.h>
@@ -141,7 +142,7 @@ path_list(void)
 	struct got_pathlist_entry *pe;
 	size_t i;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 	for (i = 0; i < nitems(path_list_input); i++) {
 		err = got_pathlist_insert(NULL, &paths, path_list_input[i],
 		    NULL);
@@ -152,7 +153,7 @@ path_list(void)
 	}
 
 	i = 0;
-	TAILQ_FOREACH(pe, &paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &paths) {
 		test_printf("'%s' -- '%s'\n", pe->path, path_list_expected[i]);
 		if (i >= nitems(path_list_expected)) {
 			test_printf("too many elements on list\n");
@@ -177,7 +178,7 @@ path_list_reverse_input(void)
 	struct got_pathlist_entry *pe;
 	size_t i;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 	for (i = nitems(path_list_input); i > 0;) {
 		err = got_pathlist_insert(NULL, &paths, path_list_input[--i],
 		    NULL);
@@ -188,7 +189,7 @@ path_list_reverse_input(void)
 	}
 
 	i = 0;
-	TAILQ_FOREACH(pe, &paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &paths) {
 		test_printf("'%s' -- '%s'\n", pe->path,
 		    path_list_expected_reverse[i]);
 		if (i >= nitems(path_list_expected_reverse)) {

@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stdint.h>
 
 #include <limits.h>

@@ -17,6 +17,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -259,14 +260,14 @@ send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
 		    "unexpected message from server");
 	}
 
-	TAILQ_FOREACH(pe, refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, refs) {
 		if (strcmp(refname, pe->path) == 0) {
 			ref_valid = 1;
 			break;
 		}
 	}
 	if (!ref_valid) {
-		TAILQ_FOREACH(pe, delete_refs, entry) {
+		RB_FOREACH(pe, got_pathlist_head, delete_refs) {
 			if (strcmp(refname, pe->path) == 0) {
 				ref_valid = 1;
 				break;
@@ -358,9 +359,9 @@ send_pack(int fd, struct got_pathlist_head *refs,
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0;
 
-	TAILQ_INIT(&their_refs);
+	RB_INIT(&their_refs);
 
-	if (TAILQ_EMPTY(refs) && TAILQ_EMPTY(delete_refs))
+	if (RB_EMPTY(refs) && RB_EMPTY(delete_refs))
 		return got_error(GOT_ERR_SEND_EMPTY);
 
 	while (1) {
@@ -441,7 +442,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		id = NULL; /* do not free; owned by their_refs */
 	}
 
-	if (!TAILQ_EMPTY(delete_refs)) {
+	if (!RB_EMPTY(delete_refs)) {
 		if (my_capabilities == NULL ||
 		    strstr(my_capabilities, GOT_CAPA_DELETE_REFS) == NULL) {
 			err = got_error(GOT_ERR_CAPA_DELETE_REFS);
@@ -449,12 +450,12 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		}
 	}
 
-	TAILQ_FOREACH(pe, delete_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, delete_refs) {
 		const char *refname = pe->path;
 		struct got_pathlist_entry *their_pe;
 		struct got_object_id *their_id = NULL;
 
-		TAILQ_FOREACH(their_pe, &their_refs, entry) {
+		RB_FOREACH(their_pe, got_pathlist_head, &their_refs) {
 			const char *their_refname = their_pe->path;
 			if (got_path_cmp(refname, their_refname,
 			    strlen(refname), strlen(their_refname)) == 0) {
@@ -488,13 +489,13 @@ send_pack(int fd, struct got_pathlist_head *refs,
 		nsent++;
 	}
 
-	TAILQ_FOREACH(pe, refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, refs) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		struct got_object_id *their_id = NULL;
 		struct got_pathlist_entry *their_pe;
 
-		TAILQ_FOREACH(their_pe, &their_refs, entry) {
+		RB_FOREACH(their_pe, got_pathlist_head, &their_refs) {
 			const char *their_refname = their_pe->path;
 			if (got_path_cmp(refname, their_refname,
 			    strlen(refname), strlen(their_refname)) == 0) {
@@ -626,8 +627,8 @@ main(int argc, char **argv)
 		sleep (1);
 #endif
 
-	TAILQ_INIT(&refs);
-	TAILQ_INIT(&delete_refs);
+	RB_INIT(&refs);
+	RB_INIT(&delete_refs);
 
 	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
 		warn("imsgbuf_init");

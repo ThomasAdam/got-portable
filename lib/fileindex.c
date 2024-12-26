@@ -1060,9 +1060,10 @@ have_tracked_file_in_dir(struct got_fileindex *fileindex, const char *path)
 
 static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, struct got_pathlist_entry *dle, int fd,
-    const char *path, const char *rootpath, struct got_repository *repo,
-    int ignore, struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
+    struct got_fileindex_entry **ie, struct got_pathlist_entry *dle,
+    struct got_pathlist_head *dlh, int fd, const char *path,
+    const char *rootpath, struct got_repository *repo, int ignore,
+    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = dle->data;
@@ -1081,7 +1082,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 		char *subdirpath;
 		struct got_pathlist_head subdirlist;
 
-		TAILQ_INIT(&subdirlist);
+		RB_INIT(&subdirlist);
 
 		if (asprintf(&subpath, "%s%s%s", path,
 		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
@@ -1096,7 +1097,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
 		if (subdirfd == -1) {
 			if (errno == EACCES) {
-				*next = TAILQ_NEXT(dle, entry);
+				*next = RB_NEXT(got_pathlist_head, dlh, dle);
 				return NULL;
 			}
 			err = got_error_from_errno2("openat", subdirpath);
@@ -1132,7 +1133,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 			return err;
 	}
 
-	*next = TAILQ_NEXT(dle, entry);
+	*next = RB_NEXT(got_pathlist_head, dlh, dle);
 	return NULL;
 }
 
@@ -1177,7 +1178,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			return err;
 	}
 
-	dle = TAILQ_FIRST(dirlist);
+	dle = RB_MIN(got_pathlist_head, dirlist);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
 		if (dle && *ie) {
 			char *de_path;
@@ -1201,9 +1202,10 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				if (err)
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
-				err = walk_dir(&dle, fileindex, ie, dle, dirfd,
-				    path, rootpath, repo, 0, cb, cb_arg);
-			} else if (cmp < 0 ) {
+				err = walk_dir(&dle, fileindex, ie, dle,
+				    dirlist, dirfd, path, rootpath, repo, 0,
+				    cb, cb_arg);
+			} else if (cmp < 0) {
 				err = cb->diff_old(cb_arg, *ie, path);
 				if (err)
 					break;
@@ -1213,8 +1215,9 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				    dirfd);
 				if (err)
 					break;
-				err = walk_dir(&dle, fileindex, ie, dle, dirfd,
-				    path, rootpath, repo, ignore, cb, cb_arg);
+				err = walk_dir(&dle, fileindex, ie, dle,
+				    dirlist, dirfd, path, rootpath, repo,
+				    ignore, cb, cb_arg);
 			}
 			if (err)
 				break;
@@ -1231,8 +1234,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			err = cb->diff_new(&ignore, cb_arg, de, path, dirfd);
 			if (err)
 				break;
-			err = walk_dir(&dle, fileindex, ie, dle, dirfd, path,
-			    rootpath, repo, ignore, cb, cb_arg);
+			err = walk_dir(&dle, fileindex, ie, dle, dirlist,
+			    dirfd, path, rootpath, repo, ignore, cb, cb_arg);
 			if (err)
 				break;
 		}
@@ -1252,7 +1255,7 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
 	int fd2;
 	DIR *dir;
 
-	TAILQ_INIT(&dirlist);
+	RB_INIT(&dirlist);
 
 	/*
 	 * Duplicate the file descriptor so we can call closedir() below

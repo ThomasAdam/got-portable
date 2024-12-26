@@ -712,7 +712,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 		return got_error_from_errno("calloc");
 
 	RB_INIT(&repo->packidx_bloom_filters);
-	TAILQ_INIT(&repo->packidx_paths);
+	RB_INIT(&repo->packidx_paths);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		memset(&repo->privsep_children[i], 0,
@@ -1303,9 +1303,9 @@ purge_packidx_paths(struct got_pathlist_head *packidx_paths)
 {
 	struct got_pathlist_entry *pe;
 
-	while (!TAILQ_EMPTY(packidx_paths)) {
-		pe = TAILQ_FIRST(packidx_paths);
-		TAILQ_REMOVE(packidx_paths, pe, entry);
+	while (!RB_EMPTY(packidx_paths)) {
+		pe = RB_MIN(got_pathlist_head, packidx_paths);
+		RB_REMOVE(got_pathlist_head, packidx_paths, pe);
 		free((char *)pe->path);
 		free(pe);
 	}
@@ -1327,7 +1327,7 @@ refresh_packidx_paths(struct got_repository *repo)
 			err = got_error_from_errno2("stat", objects_pack_dir);
 			goto done;
 		}
-	} else if (TAILQ_EMPTY(&repo->packidx_paths) ||
+	} else if (RB_EMPTY(&repo->packidx_paths) ||
 	    sb.st_mtim.tv_sec != repo->pack_path_mtime.tv_sec ||
 	    sb.st_mtim.tv_nsec != repo->pack_path_mtime.tv_nsec) {
 		purge_packidx_paths(&repo->packidx_paths);
@@ -1382,7 +1382,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	if (err)
 		return err;
 
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		const char *path_packidx = pe->path;
 		int is_cached = 0;
 
@@ -1833,7 +1833,7 @@ retry:
 	tv.tv_sec = repo->pack_path_mtime.tv_sec;
 	tv.tv_nsec = repo->pack_path_mtime.tv_nsec;
 
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		const char *path_packidx;
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
@@ -2355,7 +2355,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 
 	*new_tree_id = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	dir = opendir(path_dir);
 	if (dir == NULL) {
@@ -2376,7 +2376,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		if (err)
 			goto done;
 
-		TAILQ_FOREACH(pe, ignores, entry) {
+		RB_FOREACH(pe, got_pathlist_head, ignores) {
 			if (type == DT_DIR && pe->path_len > 0 &&
 			    pe->path[pe->path_len - 1] == '/') {
 				char stripped[PATH_MAX];
@@ -2421,13 +2421,13 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		nentries++;
 	}
 
-	if (TAILQ_EMPTY(&paths)) {
+	if (RB_EMPTY(&paths)) {
 		err = got_error_msg(GOT_ERR_NO_TREE_ENTRY,
 		    "cannot create tree without any entries");
 		goto done;
 	}
 
-	TAILQ_FOREACH(pe, &paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head,  &paths) {
 		struct got_tree_entry *te = pe->data;
 		char *path;
 		if (!S_ISREG(te->mode) && !S_ISLNK(te->mode))

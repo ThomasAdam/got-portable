@@ -17,6 +17,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <errno.h>
@@ -213,43 +214,29 @@ got_path_cmp(const char *path1, const char *path2, size_t len1, size_t len2)
 	return (unsigned char)path1[i] < (unsigned char)path2[i] ? -1 : 1;
 }
 
+int
+got_pathlist_cmp(const struct got_pathlist_entry *p1,
+    const struct got_pathlist_entry *p2)
+{
+	return got_path_cmp(p1->path, p2->path, p1->path_len, p2->path_len);
+}
+
 const struct got_error *
 got_pathlist_insert(struct got_pathlist_entry **inserted,
     struct got_pathlist_head *pathlist, const char *path, void *data)
 {
-	struct got_pathlist_entry *new, *pe;
+	struct got_pathlist_entry *new;
 	size_t path_len = strlen(path);
 
 	if (inserted)
 		*inserted = NULL;
-
-	/*
-	 * Many callers will provide paths in a somewhat sorted order while
-	 * constructing a path list from inputs such as tree objects or
-	 * dirents. Iterating backwards from the tail of the list should
-	 * be more efficient than traversing through the entire list each
-	 * time an element is inserted.
-	 */
-	pe = TAILQ_LAST(pathlist, got_pathlist_head);
-	while (pe) {
-		int cmp = got_path_cmp(pe->path, path, pe->path_len, path_len);
-		if (cmp == 0)
-			return NULL;  /* duplicate */
-		else if (cmp < 0)
-			break;
-		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
-	}
-
 	new = malloc(sizeof(*new));
 	if (new == NULL)
 		return got_error_from_errno("malloc");
 	new->path = path;
 	new->path_len = path_len;
 	new->data = data;
-	if (pe)
-		TAILQ_INSERT_AFTER(pathlist, pe, new, entry);
-	else
-		TAILQ_INSERT_HEAD(pathlist, new, entry);
+	RB_INSERT(got_pathlist_head, pathlist, new);
 	if (inserted)
 		*inserted = new;
 	return NULL;
@@ -258,9 +245,9 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 void
 got_pathlist_free(struct got_pathlist_head *pathlist, int freemask)
 {
-	struct got_pathlist_entry *pe;
+	struct got_pathlist_entry *pe, *temp;
 
-	while ((pe = TAILQ_FIRST(pathlist)) != NULL) {
+	RB_FOREACH_SAFE(pe, got_pathlist_head, pathlist, temp) {
 		if (freemask & GOT_PATHLIST_FREE_PATH) {
 			free((char *)pe->path);
 			pe->path = NULL;
@@ -269,7 +256,7 @@ got_pathlist_free(struct got_pathlist_head *pathlist, int freemask)
 			free(pe->data);
 			pe->data = NULL;
 		}
-		TAILQ_REMOVE(pathlist, pe, entry);
+		RB_REMOVE(got_pathlist_head, pathlist, pe);
 		free(pe);
 	}
 }
@@ -549,3 +536,5 @@ got_path_move_file(const char *oldpath, const char *newpath)
 
 	return NULL;
 }
+
+RB_GENERATE(got_pathlist_head, got_pathlist_entry, entry, got_pathlist_cmp);

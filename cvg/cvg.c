@@ -18,6 +18,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -740,7 +741,7 @@ cmd_import(int argc, char *argv[])
 	int preserve_logmsg = 0;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&ignores);
+	RB_INIT(&ignores);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
@@ -1033,7 +1034,7 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	 * we have all required information.
 	 */
 	if (a->create_configs && !a->configs_created &&
-	    !TAILQ_EMPTY(a->config_info.symrefs)) {
+	    !RB_EMPTY(a->config_info.symrefs)) {
 		err = create_config_files(a->config_info.proto,
 		    a->config_info.host, a->config_info.port,
 		    a->config_info.remote_repo_path,
@@ -1127,14 +1128,14 @@ list_remote_refs(struct got_pathlist_head *symrefs,
 	const struct got_error *err;
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, symrefs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, symrefs) {
 		const char *refname = pe->path;
 		const char *targetref = pe->data;
 
 		printf("%s: %s\n", refname, targetref);
 	}
 
-	TAILQ_FOREACH(pe, refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, refs) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		char *id_str;
@@ -1207,7 +1208,7 @@ is_wanted_ref(struct got_pathlist_head *wanted_refs, const char *refname)
 {
 	struct got_pathlist_entry *pe;
 
-	TAILQ_FOREACH(pe, wanted_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 		if (match_wanted_ref(refname, pe->path))
 			return 1;
 	}
@@ -1249,9 +1250,9 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	char *branches = NULL, *refs = NULL;
 	ssize_t n;
 
-	if (!fetch_all_branches && !TAILQ_EMPTY(wanted_branches)) {
+	if (!fetch_all_branches && !RB_EMPTY(wanted_branches)) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, wanted_branches, entry) {
+		RB_FOREACH(pe, got_pathlist_head, wanted_branches) {
 			char *s;
 			branchname = pe->path;
 			if (strncmp(branchname, "refs/heads/", 11) == 0)
@@ -1273,9 +1274,9 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 			goto done;
 		}
 	}
-	if (!TAILQ_EMPTY(wanted_refs)) {
+	if (!RB_EMPTY(wanted_refs)) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, wanted_refs, entry) {
+		RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 			char *s;
 			const char *refname = pe->path;
 			if (strncmp(refname, "refs/", 5) == 0)
@@ -1374,9 +1375,9 @@ create_gitconfig(const char *git_url, const char *default_branch,
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
-	} else if (!TAILQ_EMPTY(wanted_branches)) {
+	} else if (!RB_EMPTY(wanted_branches)) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, wanted_branches, entry) {
+		RB_FOREACH(pe, got_pathlist_head, wanted_branches) {
 			char *s;
 			branchname = pe->path;
 			if (strncmp(branchname, "refs/heads/", 11) == 0)
@@ -1426,9 +1427,9 @@ create_gitconfig(const char *git_url, const char *default_branch,
 			goto done;
 		}
 	}
-	if (!TAILQ_EMPTY(wanted_refs)) {
+	if (!RB_EMPTY(wanted_refs)) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, wanted_refs, entry) {
+		RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 			char *s;
 			const char *refname = pe->path;
 			if (strncmp(refname, "refs/", 5) == 0)
@@ -1492,12 +1493,12 @@ create_config_files(const char *proto, const char *host, const char *port,
 	 * If we asked for a set of wanted branches then use the first
 	 * one of those.
 	 */
-	if (!TAILQ_EMPTY(wanted_branches)) {
-		pe = TAILQ_FIRST(wanted_branches);
+	if (!RB_EMPTY(wanted_branches)) {
+		pe = RB_MIN(got_pathlist_head, wanted_branches);
 		default_branch = pe->path;
 	} else {
 		/* First HEAD ref listed by server is the default branch. */
-		TAILQ_FOREACH(pe, symrefs, entry) {
+		RB_FOREACH(pe, got_pathlist_head, symrefs) {
 			const char *refname = pe->path;
 			const char *target = pe->data;
 
@@ -1542,10 +1543,10 @@ cmd_clone(int argc, char *argv[])
 	int *pack_fds = NULL;
 	const char *jumphost = NULL;
 
-	TAILQ_INIT(&refs);
-	TAILQ_INIT(&symrefs);
-	TAILQ_INIT(&wanted_branches);
-	TAILQ_INIT(&wanted_refs);
+	RB_INIT(&refs);
+	RB_INIT(&symrefs);
+	RB_INIT(&wanted_branches);
+	RB_INIT(&wanted_refs);
 
 	while ((ch = getopt(argc, argv, "ab:J:lmqR:v")) != -1) {
 		switch (ch) {
@@ -1591,16 +1592,16 @@ cmd_clone(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
+	if (fetch_all_branches && !RB_EMPTY(&wanted_branches))
 		option_conflict('a', 'b');
 	if (list_refs_only) {
-		if (!TAILQ_EMPTY(&wanted_branches))
+		if (!RB_EMPTY(&wanted_branches))
 			option_conflict('l', 'b');
 		if (fetch_all_branches)
 			option_conflict('l', 'a');
 		if (mirror_references)
 			option_conflict('l', 'm');
-		if (!TAILQ_EMPTY(&wanted_refs))
+		if (!RB_EMPTY(&wanted_refs))
 			option_conflict('l', 'R');
 	}
 
@@ -1739,7 +1740,7 @@ cmd_clone(int argc, char *argv[])
 	free(id_str);
 
 	/* Set up references provided with the pack file. */
-	TAILQ_FOREACH(pe, &refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &refs) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		char *remote_refname;
@@ -1777,7 +1778,7 @@ cmd_clone(int argc, char *argv[])
 	}
 
 	/* Set the HEAD reference if the server provided one. */
-	TAILQ_FOREACH(pe, &symrefs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &symrefs) {
 		struct got_reference *target_ref;
 		const char *refname = pe->path;
 		const char *target = pe->data;
@@ -1843,7 +1844,7 @@ cmd_clone(int argc, char *argv[])
 		 * a set of wanted branches use the first of one of those
 		 * which could be fetched instead.
 		 */
-		TAILQ_FOREACH(pe, &wanted_branches, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &wanted_branches) {
 			const char *target = pe->path;
 			struct got_reference *target_ref;
 
@@ -2200,7 +2201,7 @@ cmd_checkout(int argc, char *argv[])
 	struct got_checkout_progress_arg cpa;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
@@ -2674,12 +2675,12 @@ cmd_update(int argc, char *argv[])
 	struct got_reference *head_ref = NULL;
 	const char *jumphost = NULL;
 
-	TAILQ_INIT(&paths);
-	TAILQ_INIT(&refs);
-	TAILQ_INIT(&symrefs);
+	RB_INIT(&paths);
+	RB_INIT(&refs);
+	RB_INIT(&symrefs);
 	TAILQ_INIT(&remote_refs);
-	TAILQ_INIT(&wanted_branches);
-	TAILQ_INIT(&wanted_refs);
+	RB_INIT(&wanted_branches);
+	RB_INIT(&wanted_refs);
 
 	while ((ch = getopt(argc, argv, "c:J:qr:vX")) != -1) {
 		switch (ch) {
@@ -2913,7 +2914,7 @@ cmd_update(int argc, char *argv[])
 	}
 
 	/* Update references provided with the pack file. */
-	TAILQ_FOREACH(pe, &refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &refs) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		struct got_reference *ref;
@@ -3416,7 +3417,7 @@ match_changed_paths(int *have_match, struct got_pathlist_head *changed_paths,
 
 	*have_match = 0;
 
-	TAILQ_FOREACH(pe, changed_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, changed_paths) {
 		if (regexec(regex, pe->path, 1, &regmatch, 0) == 0) {
 			*have_match = 1;
 			break;
@@ -3606,7 +3607,7 @@ print_diffstat(struct got_diffstat_cb_arg *dsa, const char *header)
 	if (header != NULL)
 		printf("%s\n", header);
 
-	TAILQ_FOREACH(pe, dsa->paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, dsa->paths) {
 		struct got_diff_changed_path *cp = pe->data;
 		int pad = dsa->max_path_len - pe->path_len + 1;
 
@@ -3728,7 +3729,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	if (changed_paths && diffstat == NULL) {
 		struct got_pathlist_entry *pe;
 
-		TAILQ_FOREACH(pe, changed_paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, changed_paths) {
 			struct got_diff_changed_path *cp = pe->data;
 
 			printf(" %c  %s\n", cp->status, pe->path);
@@ -3790,7 +3791,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	struct got_pathlist_head changed_paths;
 
 	STAILQ_INIT(&reversed_commits);
-	TAILQ_INIT(&changed_paths);
+	RB_INIT(&changed_paths);
 
 	if (search_pattern && regcomp(&regex, search_pattern,
 	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
@@ -4498,8 +4499,8 @@ cmd_diff(int argc, char *argv[])
 	memset(&dsa, 0, sizeof(dsa));
 
 	TAILQ_INIT(&refs);
-	TAILQ_INIT(&paths);
-	TAILQ_INIT(&diffstat_paths);
+	RB_INIT(&paths);
+	RB_INIT(&diffstat_paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -5697,7 +5698,7 @@ cmd_status(int argc, char *argv[])
 	int ch, i, no_ignores = 0;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	memset(&st, 0, sizeof(st));
 	st.status_codes = NULL;
@@ -6484,7 +6485,7 @@ cmd_add(int argc, char *argv[])
 	int ch, can_recurse = 0, no_ignores = 0;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -6546,7 +6547,7 @@ cmd_add(int argc, char *argv[])
 	if (!can_recurse) {
 		char *ondisk_path;
 		struct stat sb;
-		TAILQ_FOREACH(pe, &paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &paths) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
 			    pe->path) == -1) {
@@ -6629,7 +6630,7 @@ cmd_remove(int argc, char *argv[])
 	int ignore_missing_paths = 0;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -6711,7 +6712,7 @@ cmd_remove(int argc, char *argv[])
 	if (!can_recurse) {
 		char *ondisk_path;
 		struct stat sb;
-		TAILQ_FOREACH(pe, &paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &paths) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
 			    pe->path) == -1) {
@@ -7172,7 +7173,7 @@ worktree_has_commitable_path(void *arg, unsigned char status,
 		if (a->commit_paths != NULL) {
 			struct got_pathlist_entry *pe;
 
-			TAILQ_FOREACH(pe, a->commit_paths, entry) {
+			RB_FOREACH(pe, got_pathlist_head, a->commit_paths) {
 				if (strncmp(path, pe->path,
 				    pe->path_len) == 0) {
 					*a->has_changes = 1;
@@ -7204,7 +7205,7 @@ commit_path_changed_in_worktree(struct wt_commitable_path_arg *wcpa,
 	struct got_tree_object		*tree = NULL, *ptree = NULL;
 	struct got_object_qid		*pid;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
@@ -7355,7 +7356,7 @@ cmd_revert(int argc, char *argv[])
 	struct choose_patch_arg cpa;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
@@ -7434,7 +7435,7 @@ cmd_revert(int argc, char *argv[])
 	if (!can_recurse) {
 		char *ondisk_path;
 		struct stat sb;
-		TAILQ_FOREACH(pe, &paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &paths) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
 			    pe->path) == -1) {
@@ -7614,7 +7615,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths,
 		goto done;
 	}
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, commitable_paths) {
 		struct got_commitable *ct = pe->data;
 		dprintf(fd, "#  %c  %s\n",
 		    got_commitable_get_status(ct),
@@ -7821,7 +7822,7 @@ cmd_commit(int argc, char *argv[])
 	int i;
 
 	TAILQ_INIT(&refs);
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
 #ifndef PROFILE
@@ -8114,7 +8115,7 @@ process_logmsg_refs(const char *ref_prefix, size_t prefix_len,
 	int					 found = 0;
 
 	TAILQ_INIT(&refs);
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, repo);
 	if (err)
@@ -8981,7 +8982,7 @@ print_path_info(void *arg, const char *path, mode_t mode, time_t mtime,
 	 * Clear error indication from any of the path arguments which
 	 * would cause this file index entry to be displayed.
 	 */
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		if (got_path_cmp(path, pe->path, strlen(path),
 		    pe->path_len) == 0 ||
 		    got_path_is_child(path, pe->path, pe->path_len))
@@ -9046,7 +9047,7 @@ cmd_info(int argc, char *argv[])
 	int ch, show_files = 0;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -9132,7 +9133,7 @@ cmd_info(int argc, char *argv[])
 
 	if (show_files) {
 		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, &paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &paths) {
 			if (pe->path_len == 0)
 				continue;
 			/*
@@ -9145,7 +9146,7 @@ cmd_info(int argc, char *argv[])
 		    print_path_info, &paths, check_cancelled, NULL);
 		if (error)
 			goto done;
-		TAILQ_FOREACH(pe, &paths, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &paths) {
 			if (pe->data != NULL) {
 				const struct got_error *perr;
 

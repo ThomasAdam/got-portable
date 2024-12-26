@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 
 #include <limits.h>
 #include <stdarg.h>

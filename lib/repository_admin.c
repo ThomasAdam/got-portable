@@ -1345,7 +1345,7 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 	int remove, redundant_packs = 0;
 
 	npacks = 0;
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry)
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths)
 		npacks++;
 
 	if (npacks == 0)
@@ -1356,7 +1356,7 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 		return got_error_from_errno("calloc");
 
 	i = 0;
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		err = got_repo_get_packidx(&packidx, pe->path, repo);
 		if (err)
 			goto done;

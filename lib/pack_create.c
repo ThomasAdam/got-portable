@@ -489,7 +489,7 @@ got_pack_find_pack_for_reuse(struct got_packidx **best_packidx,
 
 	*best_packidx = NULL;
 
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		const char *path_packidx = pe->path;
 		struct got_packidx *packidx;
 		int nobj;
@@ -1142,7 +1142,7 @@ got_pack_find_pack_for_commit_painting(struct got_packidx **best_packidx,
 	 * Find the largest pack which contains at least some of the
 	 * commits we are interested in.
 	 */
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		const char *path_packidx = pe->path;
 		struct got_packidx *packidx;
 		int nobj, idx, ncommits = 0;
@@ -1278,7 +1278,7 @@ find_pack_for_enumeration(struct got_packidx **best_packidx,
 	 * Find the largest pack which contains at least some of the
 	 * commits and tags we are interested in.
 	 */
-	TAILQ_FOREACH(pe, &repo->packidx_paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
 		const char *path_packidx = pe->path;
 		struct got_packidx *packidx;
 		int nobj, i, idx, ncommits = 0;

@@ -145,7 +145,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	 * Prevent fetching of references that won't make any
 	 * sense outside of the remote repository's context.
 	 */
-	TAILQ_FOREACH(pe, wanted_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, wanted_refs) {
 		const char *refname = pe->path;
 		if (strncmp(refname, "refs/got/", 9) == 0 ||
 		    strncmp(refname, "got/", 4) == 0 ||
@@ -160,7 +160,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	for (i = 0; i < nitems(tmpfds); i++)
 		tmpfds[i] = -1;
 
-	TAILQ_INIT(&have_refs);
+	RB_INIT(&have_refs);
 	TAILQ_INIT(&my_refs);
 
 	if (!list_refs_only) {

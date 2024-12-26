@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <stdio.h>
@@ -121,7 +122,7 @@ get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
 			return err;
 	}
 
-	pe = TAILQ_LAST(ds->paths, got_pathlist_head);
+	pe = RB_MAX(got_pathlist_head, ds->paths);
 	diffstat_field_width(&ds->max_path_len, &ds->add_cols, &ds->rm_cols,
 	    pe->path_len, change->add, change->rm);
 
@@ -1123,7 +1124,7 @@ diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
 	struct got_tree_object *subtree1 = NULL, *subtree2 = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
 
-	TAILQ_FOREACH(pe, paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, paths) {
 		int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
 		mode_t mode1 = 0, mode2 = 0;
 
@@ -1315,7 +1316,7 @@ diff_objects_as_trees(struct got_diff_line **lines, size_t *nlines,
 		arg.lines = NULL;
 		arg.nlines = 0;
 	}
-	if (paths == NULL || TAILQ_EMPTY(paths))
+	if (paths == NULL || RB_EMPTY(paths))
 		err = got_diff_tree(tree1, tree2, f1, f2, fd1, fd2, label1,
 		    label2, repo, got_diff_blob_output_unidiff, &arg, 1);
 	else

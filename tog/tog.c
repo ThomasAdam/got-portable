@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 
@@ -3175,7 +3176,7 @@ tog_worktree_status(struct tog_log_thread_args *ta)
 	char				*cwd = NULL;
 	int				 wt_state = 0;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	if (wt == NULL) {
 		cwd = getcwd(NULL, 0);
@@ -5833,7 +5834,7 @@ write_diffstat(FILE *outfile, struct got_diff_line **lines, size_t *nlines,
 	} else
 		offset = (*lines)[*nlines - 1].offset;
 
-	TAILQ_FOREACH(pe, dsa->paths, entry) {
+	RB_FOREACH(pe, got_pathlist_head, dsa->paths) {
 		struct got_diff_changed_path *cp = pe->data;
 		int pad = dsa->max_path_len - pe->path_len + 1;
 
@@ -6341,7 +6342,7 @@ tog_diff_worktree(struct tog_diff_view_state *s, FILE *f,
 	struct got_pathlist_head	 pathlist;
 	char				*cwd, *id_str = NULL;
 
-	TAILQ_INIT(&pathlist);
+	RB_INIT(&pathlist);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
@@ -6529,7 +6530,7 @@ create_diff(struct tog_diff_view_state *s)
 	struct got_diffstat_cb_arg dsa;
 	size_t nlines = 0;
 
-	TAILQ_INIT(&changed_paths);
+	RB_INIT(&changed_paths);
 	memset(&dsa, 0, sizeof(dsa));
 	dsa.paths = &changed_paths;
 	dsa.diff_algo = tog_diff_algo;
@@ -7412,7 +7413,7 @@ cmd_diff(int argc, char *argv[])
 	struct tog_view *view;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&paths);
+	RB_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "aC:c:r:sw")) != -1) {
 		switch (ch) {

@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/types.h>
 
 #include <ctype.h>
@@ -728,7 +729,7 @@ cmd_pack(int argc, char *argv[])
 	struct got_reflist_entry *re, *new;
 	int *pack_fds = NULL;
 
-	TAILQ_INIT(&exclude_args);
+	RB_INIT(&exclude_args);
 	TAILQ_INIT(&exclude_refs);
 	TAILQ_INIT(&include_refs);
 
@@ -788,7 +789,7 @@ cmd_pack(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	TAILQ_FOREACH(pe, &exclude_args, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &exclude_args) {
 		const char *refname = pe->path;
 		error = add_ref(&new, &exclude_refs, refname, repo);
 		if (error)
@@ -1435,7 +1436,7 @@ cmd_dump(int argc, char *argv[])
 	int verbosity = 0;
 	int i, ch;
 
-	TAILQ_INIT(&exclude_args);
+	RB_INIT(&exclude_args);
 	TAILQ_INIT(&exclude_refs);
 	TAILQ_INIT(&include_refs);
 
@@ -1487,7 +1488,7 @@ cmd_dump(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	TAILQ_FOREACH(pe, &exclude_args, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &exclude_args) {
 		refname = pe->path;
 		error = add_ref(&new, &exclude_refs, refname, repo);
 		if (error)
@@ -1569,10 +1570,10 @@ is_wanted_ref(struct got_pathlist_head *wanted, const char *ref)
 {
 	struct got_pathlist_entry *pe;
 
-	if (TAILQ_EMPTY(wanted))
+	if (RB_EMPTY(wanted))
 		return 1;
 
-	TAILQ_FOREACH(pe, wanted, entry) {
+	RB_FOREACH(pe, got_pathlist_head, wanted) {
 		if (strcmp(pe->path, ref) == 0)
 			return 1;
 	}
@@ -1685,8 +1686,8 @@ cmd_load(int argc, char *argv[])
 	int verbosity = 0;
 	int ch, i;
 
-	TAILQ_INIT(&include_args);
-	TAILQ_INIT(&available_refs);
+	RB_INIT(&include_args);
+	RB_INIT(&available_refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
@@ -1766,7 +1767,7 @@ cmd_load(int argc, char *argv[])
 		goto done;
 
 	if (list_refs_only) {
-		TAILQ_FOREACH(pe, &available_refs, entry) {
+		RB_FOREACH(pe, got_pathlist_head, &available_refs) {
 			const char *refname = pe->path;
 			struct got_object_id *id = pe->data;
 			char *idstr;
@@ -1785,7 +1786,7 @@ cmd_load(int argc, char *argv[])
 		goto done;
 
 	/* Update references */
-	TAILQ_FOREACH(pe, &available_refs, entry) {
+	RB_FOREACH(pe, got_pathlist_head, &available_refs) {
 		const struct got_error *unlock_err;
 		struct got_reference *ref;
 		const char *refname = pe->path;
