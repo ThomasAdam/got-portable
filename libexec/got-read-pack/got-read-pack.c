@@ -1069,15 +1069,18 @@ recv_object_id_queue(struct got_object_id_queue *queue,
 		for (i = 0; i < nids; i++) {
 			err = got_object_qid_alloc_partial(&qid);
 			if (err)
-				return err;
+				goto done;
 			memcpy(&qid->id, &ids[i], sizeof(qid->id));
 			STAILQ_INSERT_TAIL(queue, qid, entry);
 			err = got_object_idset_add(queued_ids, &qid->id, NULL);
 			if (err)
-				return err;
+				goto done;
 		}
+		free(ids);
+		ids = NULL;
 	}
-
+done:
+	free(ids);
 	return err;
 }
 
