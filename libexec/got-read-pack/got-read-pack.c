@@ -2143,8 +2143,10 @@ main(int argc, char *argv[])
 	commit_painting_free(&keep, &drop, &skip);
 	if (packidx)
 		got_packidx_close(packidx);
-	if (pack)
+	if (pack) {
 		got_pack_close(pack);
+		free(pack);
+	}
 	got_object_cache_close(&objcache);
 	if (basefile && fclose(basefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
