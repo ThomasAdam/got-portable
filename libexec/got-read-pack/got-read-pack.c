@@ -1589,14 +1589,10 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		if (parents) {
 			struct got_object_qid *pid;
 			STAILQ_FOREACH(pid, parents, entry) {
-				if (got_object_idset_contains(idset,
-				    &pid->id) ||
-				    got_object_idset_contains(queued_ids,
-				    &pid->id)) {
-					got_object_commit_close(commit);
-					commit = NULL;
+				if (got_object_idset_contains(idset, &pid->id))
 					continue;
-				}
+				if (got_object_idset_contains(queued_ids, &pid->id))
+					continue;
 				err = got_object_qid_alloc_partial(&qid);
 				if (err)
 					goto done;
