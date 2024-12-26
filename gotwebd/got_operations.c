@@ -788,6 +788,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	struct got_repository *repo = c->t->repo;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_object_id *blob_id = NULL;
 	struct got_reflist_head refs;
 	char *path = NULL, *in_repo_path = NULL;
 	int obj_type;
@@ -825,16 +826,16 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&commit_id, repo, commit, in_repo_path);
+	error = got_object_id_by_path(&blob_id, repo, commit, in_repo_path);
 	if (error)
 		goto done;
 
-	if (commit_id == NULL) {
+	if (blob_id == NULL) {
 		error = got_error(GOT_ERR_NO_OBJ);
 		goto done;
 	}
 
-	error = got_object_get_type(&obj_type, repo, commit_id);
+	error = got_object_get_type(&obj_type, repo, blob_id);
 	if (error)
 		goto done;
 
@@ -847,7 +848,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	if (error)
 		goto done;
 
-	error = got_object_open_as_blob(blob, repo, commit_id, BUF, *fd);
+	error = got_object_open_as_blob(blob, repo, blob_id, BUF, *fd);
 	if (error)
 		goto done;
 
@@ -871,6 +872,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	got_ref_list_free(&refs);
 	free(in_repo_path);
 	free(commit_id);
+	free(blob_id);
 	free(path);
 	return error;
 }
