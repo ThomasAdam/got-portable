@@ -1826,7 +1826,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	}
 	if (view->hiline && ch != ERR && ch != 0)
 		view->hiline = 0;  /* key pressed, clear line highlight */
-	nodelay(view->window, TRUE);
+	wtimeout(view->window, fast_refresh ? 100 : 1000);  /* milliseconds */
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode, "pthread_mutex_lock");
