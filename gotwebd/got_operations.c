@@ -601,6 +601,10 @@ got_get_repo_tags(struct request *c, size_t limit)
 
 		if (commit_found == 0 && qs->commit != NULL &&
 		    strncmp(id_str, qs->commit, strlen(id_str)) != 0) {
+			if (commit) {
+				got_object_commit_close(commit);
+				commit = NULL;
+			}
 			TAILQ_REMOVE(&t->repo_tags, new_repo_tag, entry);
 			gotweb_free_repo_tag(new_repo_tag);
 			continue;
