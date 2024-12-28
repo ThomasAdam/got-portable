@@ -158,6 +158,7 @@ done:
 		got_gotconfig_free(*conf);
 		*conf = NULL;
 	}
+	imsgbuf_clear(ibuf);
 	free(ibuf);
 	return err;
 }

@@ -205,6 +205,7 @@ done:
 		err = got_error_from_errno("close");
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", gitconfig_path);
+	imsgbuf_clear(ibuf);
 	free(ibuf);
 	return err;
 }
