@@ -232,6 +232,8 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	pid_t idxpid;
 	enum got_hash_algorithm repo_algo, bundle_algo;
 
+	memset(&idxibuf, 0, sizeof(idxibuf));
+
 	got_ratelimit_init(&rl, 0, 500);
 	repo_algo = got_repo_get_object_format(repo);
 	digest_len = got_hash_digest_length(repo_algo);
@@ -560,6 +562,8 @@ got_repo_load(FILE *in, struct got_pathlist_head *refs_found,
 	tmpidxpath = NULL;
 
  done:
+	if (idxibuf.w)
+		imsgbuf_clear(&idxibuf);
 	free(line);
 	free(packpath);
 	free(idxpath);
