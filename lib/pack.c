@@ -803,6 +803,7 @@ got_pack_start_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 	}
 done:
 	if (err) {
+		imsgbuf_clear(ibuf);
 		free(ibuf);
 		free(pack->privsep_child);
 		pack->privsep_child = NULL;
