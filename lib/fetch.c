@@ -136,6 +136,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	char *progress = NULL;
 
 	*pack_hash = NULL;
+	memset(&fetchibuf, 0, sizeof(fetchibuf));
+	memset(&idxibuf, 0, sizeof(idxibuf));
 
 	if (repo && got_repo_get_object_format(repo) != GOT_HASH_SHA1)
 		return got_error_fmt(GOT_ERR_NOT_IMPL,
@@ -548,6 +550,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	tmpidxpath = NULL;
 
 done:
+	if (fetchibuf.w)
+		imsgbuf_clear(&fetchibuf);
+	if (idxibuf.w)
+		imsgbuf_clear(&idxibuf);
 	if (tmppackpath && unlink(tmppackpath) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", tmppackpath);
 	if (tmpidxpath && unlink(tmpidxpath) == -1 && err == NULL)
