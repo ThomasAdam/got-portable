@@ -87,8 +87,9 @@ void
 sockets(struct gotwebd *env, int fd)
 {
 	struct event	 sighup, sigint, sigusr1, sigchld, sigterm;
+	struct event_base *evb;
 
-	event_init();
+	evb = event_init();
 
 	sockets_rlimit(-1);
 
@@ -123,6 +124,7 @@ sockets(struct gotwebd *env, int fd)
 #endif
 
 	event_dispatch();
+	event_base_free(evb);
 	sockets_shutdown();
 }
 
