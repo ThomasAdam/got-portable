@@ -1152,8 +1152,10 @@ done:
 		got_object_commit_close(commit);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (ibuf != NULL)
+	if (ibuf != NULL) {
 		imsgbuf_clear(ibuf);
+		free(ibuf);
+	}
 	if (imsg_fds[0] != -1 && close(imsg_fds[0]) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)
