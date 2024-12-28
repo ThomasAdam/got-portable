@@ -365,6 +365,8 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	RB_INIT(&have_refs);
 	RB_INIT(&their_refs);
 
+	memset(&sendibuf, 0, sizeof(sendibuf));
+
 	if (got_repo_get_object_format(repo) != GOT_HASH_SHA1)
 		return got_error_fmt(GOT_ERR_NOT_IMPL,
 		    "sha256 object IDs unsupported in network protocol");
@@ -700,6 +702,8 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		free(errmsg);
 	}
 done:
+	if (sendibuf.w)
+		imsgbuf_clear(&sendibuf);
 	if (sendpid != -1) {
 		if (err)
 			got_privsep_send_stop(imsg_sendfds[0]);
