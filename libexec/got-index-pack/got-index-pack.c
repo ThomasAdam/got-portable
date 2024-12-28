@@ -102,22 +102,23 @@ main(int argc, char **argv)
 	for (i = 0; i < nitems(tmpfiles); i++)
 		tmpfiles[i] = NULL;
 
-	memset(&pack, 0, sizeof(pack));
-	pack.fd = -1;
-	err = got_delta_cache_alloc(&pack.delta_cache);
-	if (err)
-		goto done;
-
 	if (imsgbuf_init(&ibuf, GOT_IMSG_FD_CHILD) == -1) {
 		warn("imsgbuf_init");
 		return 1;
 	}
 	imsgbuf_allow_fdpass(&ibuf);
+
+	memset(&pack, 0, sizeof(pack));
+	pack.fd = -1;
+	err = got_delta_cache_alloc(&pack.delta_cache);
+	if (err)
+		goto done;
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 #endif
@@ -222,8 +223,10 @@ done:
 		got_privsep_send_error(&ibuf, err);
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		exit(1);
 	}
 
+	imsgbuf_clear(&ibuf);
 	exit(0);
 }
