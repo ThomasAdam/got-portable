@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <imsg.h>
 #include <unistd.h>
 
@@ -54,7 +55,9 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 	int fd = -1;
 	int imsg_fds[2] = { -1, -1 };
 	pid_t pid;
-	struct imsgbuf *ibuf;
+	struct imsgbuf ibuf;
+
+	memset(&ibuf, 0, sizeof(ibuf));
 
 	*gitconfig_repository_format_version = 0;
 	if (extnames)
@@ -79,12 +82,6 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 		return got_error_from_errno2("open", gitconfig_path);
 	}
 
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
-
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
 		err = got_error_from_errno("socketpair");
 		goto done;
@@ -105,32 +102,32 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 		goto wait;
 	}
 	imsg_fds[1] = -1;
-	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+	if (imsgbuf_init(&ibuf, imsg_fds[0]) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
 		goto wait;
 	}
-	imsgbuf_allow_fdpass(ibuf);
+	imsgbuf_allow_fdpass(&ibuf);
 
-	err = got_privsep_send_gitconfig_parse_req(ibuf, fd);
+	err = got_privsep_send_gitconfig_parse_req(&ibuf, fd);
 	if (err)
 		goto wait;
 	fd = -1;
 
-	err = got_privsep_send_gitconfig_repository_format_version_req(ibuf);
+	err = got_privsep_send_gitconfig_repository_format_version_req(&ibuf);
 	if (err)
 		goto wait;
 
 	err = got_privsep_recv_gitconfig_int(
-	    gitconfig_repository_format_version, ibuf);
+	    gitconfig_repository_format_version, &ibuf);
 	if (err)
 		goto wait;
 
 	if (extnames && extvals && nextensions) {
 		err = got_privsep_send_gitconfig_repository_extensions_req(
-		    ibuf);
+		    &ibuf);
 		if (err)
 			goto wait;
-		err = got_privsep_recv_gitconfig_int(nextensions, ibuf);
+		err = got_privsep_recv_gitconfig_int(nextensions, &ibuf);
 		if (err)
 			goto wait;
 		if (*nextensions > 0) {
@@ -148,7 +145,7 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 			for (i = 0; i < *nextensions; i++) {
 				char *ext, *val;
 				err = got_privsep_recv_gitconfig_pair(&ext,
-				    &val, ibuf);
+				    &val, &ibuf);
 				if (err)
 					goto wait;
 				(*extnames)[i] = ext;
@@ -157,38 +154,38 @@ got_repo_read_gitconfig(int *gitconfig_repository_format_version,
 		}
 	}
 
-	err = got_privsep_send_gitconfig_author_name_req(ibuf);
+	err = got_privsep_send_gitconfig_author_name_req(&ibuf);
 	if (err)
 		goto wait;
 
-	err = got_privsep_recv_gitconfig_str(gitconfig_author_name, ibuf);
+	err = got_privsep_recv_gitconfig_str(gitconfig_author_name, &ibuf);
 	if (err)
 		goto wait;
 
-	err = got_privsep_send_gitconfig_author_email_req(ibuf);
+	err = got_privsep_send_gitconfig_author_email_req(&ibuf);
 	if (err)
 		goto wait;
 
-	err = got_privsep_recv_gitconfig_str(gitconfig_author_email, ibuf);
+	err = got_privsep_recv_gitconfig_str(gitconfig_author_email, &ibuf);
 	if (err)
 		goto wait;
 
 	if (remotes && nremotes) {
-		err = got_privsep_send_gitconfig_remotes_req(ibuf);
+		err = got_privsep_send_gitconfig_remotes_req(&ibuf);
 		if (err)
 			goto wait;
 
 		err = got_privsep_recv_gitconfig_remotes(remotes,
-		    nremotes, ibuf);
+		    nremotes, &ibuf);
 		if (err)
 			goto wait;
 	}
 
 	if (gitconfig_owner) {
-		err = got_privsep_send_gitconfig_owner_req(ibuf);
+		err = got_privsep_send_gitconfig_owner_req(&ibuf);
 		if (err)
 			goto wait;
-		err = got_privsep_recv_gitconfig_str(gitconfig_owner, ibuf);
+		err = got_privsep_recv_gitconfig_str(gitconfig_owner, &ibuf);
 		if (err)
 			goto wait;
 	}
@@ -205,7 +202,7 @@ done:
 		err = got_error_from_errno("close");
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", gitconfig_path);
-	imsgbuf_clear(ibuf);
-	free(ibuf);
+	if (ibuf.w)
+		imsgbuf_clear(&ibuf);
 	return err;
 }
