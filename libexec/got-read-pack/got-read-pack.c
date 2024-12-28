@@ -2008,6 +2008,7 @@ main(int argc, char *argv[])
 	if (err) {
 		err = got_error_from_errno("got_object_cache_init");
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 
@@ -2016,6 +2017,7 @@ main(int argc, char *argv[])
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 #endif
@@ -2023,12 +2025,14 @@ main(int argc, char *argv[])
 	err = receive_packidx(&packidx, &ibuf);
 	if (err) {
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 
 	err = receive_pack(&pack, &ibuf);
 	if (err) {
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 
