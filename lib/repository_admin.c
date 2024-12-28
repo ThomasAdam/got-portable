@@ -287,6 +287,8 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 	const char *repo_path = got_repo_get_path_git_dir(repo);
 	struct stat sb;
 
+	memset(&idxibuf, 0, sizeof(idxibuf));
+
 	for (i = 0; i < nitems(tmpfds); i++)
 		tmpfds[i] = -1;
 
@@ -419,6 +421,8 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 	tmpidxpath = NULL;
 
 done:
+	if (idxibuf.w)
+		imsgbuf_clear(&idxibuf);
 	if (tmpidxpath && unlink(tmpidxpath) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", tmpidxpath);
 	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)
