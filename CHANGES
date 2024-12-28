@@ -1,3 +1,26 @@
+* got 0.107; 2024-12-28
+- gotwebd.css styling tweaks
+- hide ssh debug output during fetch/send -v, keep showing it at -vv and -vvv
+- discern mixed-commit worktree diffs with commit ID headers
+- gotwebd: avoid printf("%s", NULL) when path parameter is not in query
+- implement a regression test harness for gotwebd
+- fix free() called with bogus pointer in 'got fetch'; regression from 0.106
+- ensure config privsep children get collected upon error to prevent zombies
+- fix some fprintf(3) failure checks
+- gotwebd: replace strftime(3) with asctime_r(3) for the sake of consistency
+- tweak gotwebd log message levels, and log requests in verbose (-v) mode
+- prevent out-of-bounds read during gotwebd fcgi record debugging
+- implement tog work tree diff support via log view and CLI
+- improve error reporting when 'got patch' encounters malformed patches
+- improve got_opentemp_named_fd error reporting by showing the path template
+- add ssh -J jumphost support to got and cvg commands which use the network
+- add regression tests checking for memory leaks with Otto malloc and ktrace
+- got tag: change -s signer to -S signer
+- got tag: provide one-line output mode via new -s option
+- tog: use wtimeout(3) instead of nodelay(3) to honour our display refresh rate 
+- switch got_pathlist data store from TAILQ to RB-tree
+- plug many memory leaks, some of which affected gotwebd in particular
+
 * got 0.106; 2024-11-21
 - prevent gotd from exiting with pending notifications if client disconnects
 - convert got to the new imsg API
