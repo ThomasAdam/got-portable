@@ -1043,16 +1043,12 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL;
 	char *oldpath, *newpath;
-	struct imsgbuf *ibuf;
+	struct imsgbuf ibuf;
 	int imsg_fds[2] = {-1, -1};
 	int overlapcnt, done = 0, failed = 0;
 	pid_t pid;
 
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
+	memset(&ibuf, 0, sizeof(ibuf));
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
 		err = got_error_from_errno("socketpair");
@@ -1074,13 +1070,13 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		goto done;
 	}
 	imsg_fds[1] = -1;
-	if (imsgbuf_init(ibuf, imsg_fds[0]) == -1) {
+	if (imsgbuf_init(&ibuf, imsg_fds[0]) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
 		goto done;
 	}
-	imsgbuf_allow_fdpass(ibuf);
+	imsgbuf_allow_fdpass(&ibuf);
 
-	err = send_patch(ibuf, fd);
+	err = send_patch(&ibuf, fd);
 	fd = -1;
 	if (err)
 		goto done;
@@ -1108,7 +1104,7 @@ got_patch(int fd, struct got_worktree *worktree, struct got_repository *repo,
 		pa.progress_arg = progress_arg;
 		pa.head = &p.head;
 
-		err = recv_patch(ibuf, &done, &p, strip);
+		err = recv_patch(&ibuf, &done, &p, strip);
 		if (err || done)
 			break;
 
@@ -1152,10 +1148,8 @@ done:
 		got_object_commit_close(commit);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (ibuf != NULL) {
-		imsgbuf_clear(ibuf);
-		free(ibuf);
-	}
+	if (ibuf.w)
+		imsgbuf_clear(&ibuf);
 	if (imsg_fds[0] != -1 && close(imsg_fds[0]) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)
