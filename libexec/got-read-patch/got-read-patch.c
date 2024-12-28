@@ -662,6 +662,7 @@ main(int argc, char **argv)
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 
@@ -722,5 +723,6 @@ done:
 		err = got_error_from_errno("fclose");
 	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	imsgbuf_clear(&ibuf);
 	return err ? 1 : 0;
 }
