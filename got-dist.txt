@@ -332,6 +332,7 @@
 /regress/cmdline/integrate.sh
 /regress/cmdline/load.sh
 /regress/cmdline/log.sh
+/regress/cmdline/memleak.sh
 /regress/cmdline/merge.sh
 /regress/cmdline/pack.sh
 /regress/cmdline/patch.sh
@@ -374,6 +375,18 @@
 /regress/gotd/repo_write_readonly.sh
 /regress/gotd/request_bad.sh
 /regress/gotd/test_git_interop.sh
+/regress/gotwebd
+/regress/gotwebd/Makefile
+/regress/gotwebd/action_blame.html
+/regress/gotwebd/action_commits.html
+/regress/gotwebd/action_diff.html
+/regress/gotwebd/action_patch.html
+/regress/gotwebd/action_summary.html
+/regress/gotwebd/action_tree.html
+/regress/gotwebd/common.sh
+/regress/gotwebd/gotwebd_test.c
+/regress/gotwebd/prepare_test_repo.sh
+/regress/gotwebd/test_gotwebd.sh
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
