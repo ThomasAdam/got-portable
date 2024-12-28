@@ -889,6 +889,7 @@ main(int argc, char **argv)
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		return 1;
 	}
 #endif
@@ -1111,8 +1112,10 @@ done:
 	if (err != NULL) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);
+		imsgbuf_clear(&ibuf);
 		exit(1);
 	}
 
+	imsgbuf_clear(&ibuf);
 	exit(0);
 }
