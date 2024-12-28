@@ -270,6 +270,7 @@ int
 main(int argc, char **argv)
 {
 	struct event		 sigint, sigterm, sighup, sigpipe, sigusr1;
+	struct event_base	*evb;
 	struct gotwebd		*env;
 	struct passwd		*pw;
 	int			 ch, i;
@@ -367,7 +368,7 @@ main(int argc, char **argv)
 	if (!env->gotwebd_debug && daemon(1, 0) == -1)
 		fatal("daemon");
 
-	event_init();
+	evb = event_init();
 
 	env->nserver = env->prefork_gotwebd;
 	env->iev_server = calloc(env->nserver, sizeof(*env->iev_server));
@@ -421,6 +422,7 @@ main(int argc, char **argv)
 #endif
 
 	event_dispatch();
+	event_base_free(evb);
 
 	log_debug("%s gotwebd exiting", getprogname());
 
