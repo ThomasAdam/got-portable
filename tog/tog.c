@@ -3837,12 +3837,23 @@ browse_commit_tree(struct tog_view **new_view, int begin_y, int begin_x,
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id *commit_id;
+
+	*new_view = NULL;
+
+	if (entry->id != NULL)
+		commit_id = entry->id;
+	else if (entry->worktree_entry)
+		commit_id = tog_base_commit.id;
+	else /* cannot happen */
+		return got_error(GOT_ERR_NOT_WORKTREE);
 
 	tree_view = view_open(0, 0, begin_y, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = open_tree_view(tree_view, entry->id, head_ref_name, repo);
+	err = open_tree_view(tree_view, commit_id, head_ref_name, repo);
 	if (err)
 		return err;
 	s = &tree_view->state.tree;
@@ -3852,7 +3863,22 @@ browse_commit_tree(struct tog_view **new_view, int begin_y, int begin_x,
 	if (got_path_is_root_dir(path))
 		return NULL;
 
-	return tree_view_walk_path(s, entry->commit, path);
+	if (entry->worktree_entry) {
+		err = got_object_open_as_commit(&commit, repo, commit_id);
+		if (err != NULL)
+			goto done;
+	}
+
+	err = tree_view_walk_path(s, commit ? commit : entry->commit, path);
+
+done:
+	if (commit != NULL)
+		got_object_commit_close(commit);
+	if (err != NULL) {
+		view_close(tree_view);
+		*new_view = NULL;
+	}
+	return err;
 }
 
 /*
