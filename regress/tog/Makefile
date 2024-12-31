@@ -1,4 +1,4 @@
-REGRESS_TARGETS=log diff blame tree
+REGRESS_TARGETS=log diff blame tree ref
 NOOBJ=Yes
 
 GOT_TEST_ROOT=/tmp
@@ -14,5 +14,8 @@ blame:
 
 tree:
 	./tree.sh -q -r "$(GOT_TEST_ROOT)"
+
+ref:
+	./ref.sh -q -r "$(GOT_TEST_ROOT)"
 
 .include <bsd.regress.mk>
