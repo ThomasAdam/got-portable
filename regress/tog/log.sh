@@ -542,7 +542,7 @@ test_log_commit_keywords()
 test_log_show_base_commit()
 {
 	# make view wide enough to show full headline
-	test_init log_show_base_commit 80 3
+	test_init log_show_base_commit 80 4
 	local repo="$testroot/repo"
 	local id=$(git_show_head "$repo")
 
@@ -574,6 +574,7 @@ test_log_show_base_commit()
 	$(trim 80 "commit $head_id [1/2] master")
 	$ymd flan_hacker *[master] base commit
 	$ymd flan_hacker  adding the test tree
+
 	EOF
 
 	tog log
@@ -590,6 +591,7 @@ test_log_show_base_commit()
 	$(trim 80 "commit $head_id [1/2] master")
 	$ymd flan_hacker  [master] base commit
 	$ymd flan_hacker  adding the test tree
+
 	EOF
 
 	tog log -r "$repo"
@@ -615,6 +617,31 @@ test_log_show_base_commit()
 	$(trim 80 "commit $head_id [1/3] master")
 	$ymd flan_hacker ~[master] new base mixed-commit
 	$ymd flan_hacker  base commit
+	$ymd flan_hacker  adding the test tree
+	EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# check marker is not incorrectly drawn when opening a nested log view
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	T		# open tree view of base commit
+	j		# select beta tree entry
+	L		# load log view of commits involving beta
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	$(trim 80 "commit $id /beta [1/1]")
+	$ymd flan_hacker  adding the test tree
+
+
 	EOF
 
 	tog log
