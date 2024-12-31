@@ -1321,8 +1321,16 @@ view_request_new(struct tog_view **requested, struct tog_view *view,
 		view_get_split(view, &y, &x);
 
 	err = view_dispatch_request(&new_view, view, request, y, x);
-	if (err)
-		return err;
+	if (err) {
+		/*
+		 * The ref view expects its selected entry to resolve to
+		 * a commit object id to open either a log or tree view.
+		 */
+		if (err->code != GOT_ERR_OBJ_TYPE)
+			return err;
+		view->action = "commit reference required";
+		return NULL;
+	}
 
 	if (view_is_parent_view(view) && view->mode == TOG_VIEW_SPLIT_HRZN &&
 	    request != TOG_VIEW_HELP) {
@@ -10054,23 +10062,29 @@ resolve_reflist_entry(struct got_object_id **commit_id,
 	case GOT_OBJ_TYPE_COMMIT:
 		break;
 	case GOT_OBJ_TYPE_TAG:
-		err = got_object_open_as_tag(&tag, repo, obj_id);
-		if (err)
-			goto done;
-		err = got_object_get_type(&obj_type, repo,
-		    got_object_tag_get_object_id(tag));
-		if (err)
-			goto done;
-		if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+		/*
+		 * Git allows nested tags that point to tags; keep peeling
+		 * till we reach the bottom, which is always a non-tag ref.
+		 */
+		do {
+			if (tag != NULL)
+				got_object_tag_close(tag);
+			err = got_object_open_as_tag(&tag, repo, obj_id);
+			if (err)
+				goto done;
+			free(obj_id);
+			obj_id = got_object_id_dup(
+			    got_object_tag_get_object_id(tag));
+			if (obj_id == NULL) {
+				err = got_error_from_errno("got_object_id_dup");
+				goto done;
+			}
+			err = got_object_get_type(&obj_type, repo, obj_id);
+			if (err)
+				goto done;
+		} while (obj_type == GOT_OBJ_TYPE_TAG);
+		if (obj_type != GOT_OBJ_TYPE_COMMIT)
 			err = got_error(GOT_ERR_OBJ_TYPE);
-			goto done;
-		}
-		free(obj_id);
-		obj_id = got_object_id_dup(got_object_tag_get_object_id(tag));
-		if (obj_id == NULL) {
-			err = got_error_from_errno("got_object_id_dup");
-			goto done;
-		}
 		break;
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);
