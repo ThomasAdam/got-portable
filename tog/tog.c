@@ -10052,13 +10052,11 @@ resolve_reflist_entry(struct got_object_id **commit_id,
 
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_COMMIT:
-		*commit_id = obj_id;
 		break;
 	case GOT_OBJ_TYPE_TAG:
 		err = got_object_open_as_tag(&tag, repo, obj_id);
 		if (err)
 			goto done;
-		free(obj_id);
 		err = got_object_get_type(&obj_type, repo,
 		    got_object_tag_get_object_id(tag));
 		if (err)
@@ -10067,9 +10065,9 @@ resolve_reflist_entry(struct got_object_id **commit_id,
 			err = got_error(GOT_ERR_OBJ_TYPE);
 			goto done;
 		}
-		*commit_id = got_object_id_dup(
-		    got_object_tag_get_object_id(tag));
-		if (*commit_id == NULL) {
+		free(obj_id);
+		obj_id = got_object_id_dup(got_object_tag_get_object_id(tag));
+		if (obj_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
 		}
@@ -10082,10 +10080,10 @@ resolve_reflist_entry(struct got_object_id **commit_id,
 done:
 	if (tag)
 		got_object_tag_close(tag);
-	if (err) {
-		free(*commit_id);
-		*commit_id = NULL;
-	}
+	if (err == NULL)
+		*commit_id = obj_id;
+	else
+		free(obj_id);
 	return err;
 }
 
