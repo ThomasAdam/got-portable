@@ -290,6 +290,49 @@ EOF
 		return 1
 	fi
 
+	# test T keymap on a work tree entry
+	got checkout "$testroot/repo" "$testroot/wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cd "$testroot/wt"
+	echo "'alpha" >> alpha
+
+	local id10=$(trim_obj_id 10 $head_id)
+
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	WAIT_FOR_UI	wait for log thread to fetch wt state
+	T		open tree view
+	S		toggle horizontal split
+	SCREENDUMP
+	EOF
+
+	cat <<EOF >$testroot/view.expected
+diff $testroot/wt (work tree changes) [0/1] maste
+$ymd flan_hacker  work tree changes based on [$id10]
+--------------------------------------------------------------------------------
+commit $head_id
+[1/4] /
+
+  alpha
+  beta
+  epsilon/
+  gamma/
+EOF
+
+	tog log
+	cmp -s "$testroot/view.expected" "$testroot/view"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/view.expected" "$testroot/view"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
