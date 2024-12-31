@@ -9671,7 +9671,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected++;
 			break;
 		}
-		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
+		if (s->last_displayed_entry == NULL ||
+		    got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further */
 			view->count = 0;
@@ -9687,7 +9688,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case CTRL('f'):
 	case 'f':
 	case ' ':
-		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
+		if (s->last_displayed_entry == NULL ||
+		    got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)

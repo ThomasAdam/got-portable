@@ -341,9 +341,42 @@ test_tree_commit_keywords()
 	test_done "$testroot" "$ret"
 }
 
+test_tree_insufficient_height()
+{
+	test_init tree_insufficient_height 120 3
+
+	local id=$(git_show_head $testroot/repo)
+
+	# Cover the path that guards a NULL dereference when scrolling
+	# down in a tree view too small to display any tree entries.
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	j		attempt to scroll down
+	f
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id
+	[1/4] /
+
+	EOF
+
+	cd $testroot/repo && tog tree
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_vsplit_blame
 run_test test_tree_hsplit_blame
 run_test test_tree_symlink
 run_test test_tree_commit_keywords
+run_test test_tree_insufficient_height
