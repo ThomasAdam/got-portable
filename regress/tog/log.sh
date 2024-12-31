@@ -1102,6 +1102,38 @@ test_log_worktree_entries()
 	test_done "$testroot" 0
 }
 
+test_log_tiny_child_tree_view()
+{
+	test_init log_tiny_child_tree_view 120 3
+
+	local id=$(git_show_head $testroot/repo)
+
+	# This test covers the offset_selection_down() path ensuring
+	# indexes are properly clamped to prevent negative values.
+	cat <<-EOF >$TOG_TEST_SCRIPT
+	T		open tree view in vsplit
+	F		toggle fullscreen to hit offset_selection_down()
+	SCREENDUMP
+	EOF
+
+	cat <<-EOF >$testroot/view.expected
+	commit $id
+	[1/4] /
+
+	EOF
+
+	cd $testroot/repo && tog log
+	cmp -s $testroot/view.expected $testroot/view
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/view.expected $testroot/view
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_log_hsplit_diff
 run_test test_log_vsplit_diff
@@ -1116,3 +1148,4 @@ run_test test_log_limit_view
 run_test test_log_search
 run_test test_log_mark_keymap
 run_test test_log_worktree_entries
+run_test test_log_tiny_child_tree_view

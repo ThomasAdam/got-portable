@@ -11469,7 +11469,7 @@ offset_selection_down(struct tog_view *view)
 		view->offset = offset;
 		if (scrolld && offset) {
 			err = scrolld(view, offset);
-			*selected -= offset;
+			*selected -= MIN(*selected, offset);
 		}
 	}
 
