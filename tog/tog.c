@@ -4021,6 +4021,8 @@ log_thread(void *arg)
 			    TAILQ_FIRST(&a->real_commits->head);
 			*a->selected_entry = *a->first_displayed_entry;
 		}
+		if (done)
+			a->log_complete = 1;
 
 		errcode = pthread_cond_signal(&a->commit_loaded);
 		if (errcode) {
