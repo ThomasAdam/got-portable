@@ -11305,6 +11305,7 @@ view_dispatch_request(struct tog_view **new_view, struct tog_view *view,
 			    "parent/child view pair not supported");
 		break;
 	case TOG_VIEW_LOG:
+		tog_base_commit.idx = -1;
 		if (view->type == TOG_VIEW_BLAME)
 			err = log_annotated_line(new_view, y, x,
 			    view->state.blame.repo, view->state.blame.id_to_log);
