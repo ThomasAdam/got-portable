@@ -10770,14 +10770,17 @@ done:
 	if (worktree != NULL)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
-		if (close_err)
+		const struct got_error *close_err;
+
+		close_err = got_repo_close(repo);
+		if (close_err && error == NULL)
 			error = close_err;
 	}
 	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
+		const struct got_error *pack_err;
+
+		pack_err = got_repo_pack_fds_close(pack_fds);
+		if (pack_err && error == NULL)
 			error = pack_err;
 	}
 	tog_free_refs();
