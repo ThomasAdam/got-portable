@@ -26,23 +26,23 @@ testroot="/tmp"
 
 while getopts b:fGR:r:Ww: arg; do
 	case $arg in
-		b)
-			branch="$OPTARG" ;;
-		f)
-			force=1 ;;
-		G)
-			gotd=1 ;;
-		W)
-			webd=1 ;;
-		w)
-			worktree="$OPTARG" ;;
-		r)
-			fromaddr_arg="-r $OPTARG" ;;
-		R)
-			testroot="$OPTARG" ;;
-		?)
-			echo "usage: $usage" >&2
-			exit 1 ;;
+	b)
+		branch="$OPTARG" ;;
+	f)
+		force=1 ;;
+	G)
+		gotd=1 ;;
+	W)
+		webd=1 ;;
+	w)
+		worktree="$OPTARG" ;;
+	r)
+		fromaddr_arg="-r $OPTARG" ;;
+	R)
+		testroot="$OPTARG" ;;
+	?)
+		echo "usage: $usage" >&2
+		exit 1 ;;
 	esac
 done
 shift $(($OPTIND - 1))
