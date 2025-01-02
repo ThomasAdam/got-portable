@@ -32,14 +32,14 @@ while getopts b:fGR:r:Ww: arg; do
 		force=1 ;;
 	G)
 		gotd=1 ;;
+	R)
+		testroot="$OPTARG" ;;
+	r)
+		fromaddr_arg="-r $OPTARG" ;;
 	W)
 		webd=1 ;;
 	w)
 		worktree="$OPTARG" ;;
-	r)
-		fromaddr_arg="-r $OPTARG" ;;
-	R)
-		testroot="$OPTARG" ;;
 	?)
 		echo "usage: $usage" >&2
 		exit 1 ;;
