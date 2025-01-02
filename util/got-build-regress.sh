@@ -24,7 +24,7 @@ gotd=0
 webd=0
 testroot="/tmp"
 
-while getopts b:fGR:r:w: arg; do
+while getopts b:fGR:r:Ww: arg; do
 	case $arg in
 		b)
 			branch="$OPTARG" ;;
