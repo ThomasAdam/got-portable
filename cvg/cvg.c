@@ -18,7 +18,6 @@
  */
 
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>

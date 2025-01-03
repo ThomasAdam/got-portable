@@ -17,7 +17,6 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
 
