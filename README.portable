@@ -73,6 +73,32 @@ To run the test suite:
  $ make tests
 ```
 
+The tests depend on git and the HTTP::Daemon Perl module.
+
+Got may have to be installed system-wide before the tests will run
+successfully because paths to helper programs, such as got-read-pack,
+are hard-coded in user-facing binaries, such as got and tog.
+
+Operations such as clone and send which use the network will be trying to
+connect to 127.0.0.1 over ssh, as the same user who invoked 'make tests'.
+The command 'ssh 127.0.0.1' must succeed without any interactive prompting.
+The host key may need to be manually accepted once before running tests.
+An SSH key can be installed in ~/.ssh/authorized_keys for authentication.
+
+The OpenBSD version of Got also has tests for gotd and gotwebd.
+These tests cannot be run in -portable yet.
+
+There are environment variables which control some test parameters:
+
+GOT_TEST_PACK=1 will force tests to use pack files instead of loose
+objects. GOT_TEST_PACK=ref-delta will force use of pack files with
+ref-deltas rather than offset-deltas.
+
+GOT_TEST_ALGO=sha256 will run tests with sha256 repositories.
+
+GOT_TEST_ROOT can be set to a path where temporary test data gets stored.
+This defaults to /tmp.
+
 Dependencies
 ============
 
