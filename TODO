@@ -89,3 +89,6 @@ gotadmin:
 - speed up 'gotadmin pack -a' is too slow on repositories with many pack files
 - support "thin" bundles; git will hardcode --thin when using an
   exclude base.
+- fix 'gotadmin cleanup' to work on partially packed repositories; the current
+  logic only works if 'gotadmin pack -a' was run before. Perhaps integrate the
+  creation of packs into 'gotadmin cleanup' itself, like git gc does it?
