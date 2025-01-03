@@ -988,7 +988,7 @@ test_log_commit_keywords() {
 		set -- "$@" "$(git_show_head $testroot/repo)"
 	done
 
-	for i in $(seq 16 2); do
+	for i in $(seq 16 -1 2); do
 		printf '%s %.7s commit number %s\n' \
 		    "$d" $(pop_idx $i $@) "$(( i-1 ))" \
 		    >> $testroot/stdout.expected
@@ -1026,7 +1026,7 @@ test_log_commit_keywords() {
 
 	echo -n > "$testroot/stdout.expected"
 
-	for i in $(seq 9 2); do
+	for i in $(seq 9 -1 2); do
 		printf '%s %.7s commit number %s\n' \
 		    "$d" $(pop_idx $i $@) "$(( i-1 ))" \
 		    >> $testroot/stdout.expected
@@ -1047,7 +1047,7 @@ test_log_commit_keywords() {
 	# from head to the base commit using -x
 	printf '%s %-7s commit number 16\n' "$d" "master" > \
 	    $testroot/stdout.expected
-	for i in $(seq 16 9); do
+	for i in $(seq 16 -1 9); do
 		printf '%s %.7s commit number %s\n' \
 		    "$d" $(pop_idx $i $@) $(( i-1 )) \
 		    >> $testroot/stdout.expected
