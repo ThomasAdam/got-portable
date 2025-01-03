@@ -273,6 +273,13 @@ AC_CHECK_FUNCS([ \
 	wcwidth \
 ])
 
+AC_CHECK_DECL(
+	RB_GENERATE_STATIC,
+	found_sys_tree_h=yes,
+	found_sys_tree_h=no,
+	[#include <sys/tree.h>]
+)
+
 AM_CONDITIONAL([HAVE_SETPROCTITLE], [test "x$ac_cv_func_setproctitle" = xyes])
 
 if test "x$ac_cv_func_sysconf" = xyes; then
@@ -697,6 +704,7 @@ if test "$PLATFORM" = "linux"; then
 			AC_SUBST(libbsd_CFLAGS)
 			AC_SUBST(libbsd_LIBS)
 			AC_DEFINE([HAVE_LIBBSD], [1], [BSD UUID])
+			AC_DEFINE([HAVE_TREE_H], [test x"$found_sys_tree_h" = "xyes"], [HAVE_TREE_H])
 		],
 		[
 			AC_MSG_ERROR("*** couldn't find libbsd-overlay via pkg-config")
@@ -751,14 +759,6 @@ if test "x$found_queue_h" = xyes; then
 else
 	AC_MSG_ERROR("*** sys/queue.h missing key defines ***)
 fi
-
-AC_CHECK_DECL(
-	RB_GENERATE_STATIC,
-	found_sys_tree_h=yes,
-	found_sys_tree_h=no,
-	[#include <sys/tree.h>]
-)
-
 
 # Look for crypto (part of openssl)
 # Note:  libcrypto (via openssl) has a .pc file in pretty-much all distros and
