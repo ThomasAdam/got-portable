@@ -40,8 +40,8 @@ test_import_basic() {
 	fi
 
 	local head_commit=`git_show_head $testroot/repo`
-	echo "A  $testroot/tree/gamma/delta" > $testroot/stdout.expected
-	echo "A  $testroot/tree/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/tree/epsilon/zeta" > $testroot/stdout.expected
+	echo "A  $testroot/tree/gamma/delta" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/alpha" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
 	echo "Created branch refs/heads/main with commit $head_commit" \
@@ -165,8 +165,8 @@ test_import_specified_head() {
 	fi
 
 	local head_commit=`git_show_head $testroot/repo`
-	echo "A  $testroot/tree/gamma/delta" > $testroot/stdout.expected
-	echo "A  $testroot/tree/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/tree/epsilon/zeta" > $testroot/stdout.expected
+	echo "A  $testroot/tree/gamma/delta" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/alpha" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
 	echo "Created branch refs/heads/$headref with commit $head_commit" \
@@ -324,8 +324,8 @@ test_import_detached_head() {
 
 	local main_commit=`git -C $testroot/repo show-ref main | \
 	    cut -d ' ' -f 1`
-	echo "A  $testroot/import/gamma/delta" > $testroot/stdout.expected
-	echo "A  $testroot/import/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/import/epsilon/zeta" > $testroot/stdout.expected
+	echo "A  $testroot/import/gamma/delta" >> $testroot/stdout.expected
 	echo "A  $testroot/import/alpha" >> $testroot/stdout.expected
 	echo "A  $testroot/import/beta" >> $testroot/stdout.expected
 	echo "Created branch refs/heads/main with commit $main_commit" \

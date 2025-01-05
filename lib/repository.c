@@ -2284,6 +2284,41 @@ done:
 }
 
 static const struct got_error *
+insert_dir_entry(struct dirent *de, long pos,
+    struct got_pathlist_head *dirents)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *new_pe;
+	char *d_name;
+	long *ppos;
+
+	d_name = strdup(de->d_name);
+	if (d_name == NULL)
+		return got_error_from_errno("strdup");
+
+	/* Record the offset to this dirent in struct DIR as path data. */
+	ppos = malloc(sizeof(*ppos));
+	if (ppos == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	*ppos = pos;
+
+	err = got_pathlist_insert(&new_pe, dirents, d_name, ppos);
+	if (err)
+		goto done;
+
+	if (new_pe == NULL)
+		err = got_error(GOT_ERR_TREE_DUP_ENTRY);
+done:
+	if (err) {
+		free(d_name);
+		free(ppos);
+	}
+	return err;
+}
+
+static const struct got_error *
 insert_tree_entry(struct got_tree_entry *new_te,
     struct got_pathlist_head *paths)
 {
@@ -2342,6 +2377,37 @@ done:
 }
 
 static const struct got_error *
+match_ignores(int *ignore, char *d_name, int type,
+    struct got_pathlist_head *ignores)
+{
+	struct got_pathlist_entry *pe;
+
+	*ignore = 0;
+
+	RB_FOREACH(pe, got_pathlist_head, ignores) {
+		if (type == DT_DIR && pe->path_len > 0 &&
+		    pe->path[pe->path_len - 1] == '/') {
+			char stripped[PATH_MAX];
+
+			if (strlcpy(stripped, pe->path,
+			    sizeof(stripped)) >= sizeof(stripped))
+				return got_error(GOT_ERR_NO_SPACE);
+
+			got_path_strip_trailing_slashes(stripped);
+			if (fnmatch(stripped, d_name, 0) == 0) {
+				*ignore = 1;
+				break;
+			}
+		} else if (fnmatch(pe->path, d_name, 0) == 0) {
+			*ignore = 1;
+			break;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 write_tree(struct got_object_id **new_tree_id, const char *path_dir,
     struct got_pathlist_head *ignores, struct got_repository *repo,
     got_repo_import_cb progress_cb, void *progress_arg)
@@ -2351,12 +2417,14 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	struct dirent *de;
 	int nentries;
 	struct got_tree_entry *new_te = NULL;
-	struct got_pathlist_head paths;
+	struct got_pathlist_head paths, dirents;
 	struct got_pathlist_entry *pe;
+	long pos;
 
 	*new_tree_id = NULL;
 
 	RB_INIT(&paths);
+	RB_INIT(&dirents);
 
 	dir = opendir(path_dir);
 	if (dir == NULL) {
@@ -2364,39 +2432,45 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		goto done;
 	}
 
-	nentries = 0;
+	/*
+	 * Sort dirents into a pathlist. Otherwise subdir-iteration order
+	 * depends on the readdir() function, which varies between different
+	 * operating systems, making regression testing more difficult.
+	 * This smells of TOCTOU, but if dirents appear, disappear, or change
+	 * during import then we have a racy situation no matter what.
+	 */
+	pos = telldir(dir);
 	while ((de = readdir(dir)) != NULL) {
+		if (strcmp(de->d_name, ".") != 0 &&
+		    strcmp(de->d_name, "..") != 0) {
+			err = insert_dir_entry(de, pos, &dirents);
+			if (err)
+				goto done;
+		}
+		pos = telldir(dir);
+	}
+
+	nentries = 0;
+	RB_FOREACH(pe, got_pathlist_head, &dirents) {
 		int ignore = 0;
 		int type;
+		long *pos = pe->data;
 
-		if (strcmp(de->d_name, ".") == 0 ||
-		    strcmp(de->d_name, "..") == 0)
-			continue;
+		seekdir(dir, *pos);
+		de = readdir(dir);
+		if (de == NULL) { /* should not happen */
+			err = got_error_fmt(GOT_ERR_EOF,
+			    "unexpected EOF on directory '%s' while seeking "
+			    "to entry '%s' at offset '%ld'\n", path_dir,
+			    pe->path, *pos);
+			goto done;
+		}
 
 		err = got_path_dirent_type(&type, path_dir, de);
 		if (err)
 			goto done;
 
-		RB_FOREACH(pe, got_pathlist_head, ignores) {
-			if (type == DT_DIR && pe->path_len > 0 &&
-			    pe->path[pe->path_len - 1] == '/') {
-				char stripped[PATH_MAX];
-
-				if (strlcpy(stripped, pe->path,
-				    sizeof(stripped)) >= sizeof(stripped)) {
-					err = got_error(GOT_ERR_NO_SPACE);
-					goto done;
-				}
-				got_path_strip_trailing_slashes(stripped);
-				if (fnmatch(stripped, de->d_name, 0) == 0) {
-					ignore = 1;
-					break;
-				}
-			} else if (fnmatch(pe->path, de->d_name, 0) == 0) {
-				ignore = 1;
-				break;
-			}
-		}
+		err = match_ignores(&ignore, de->d_name, type, ignores);
 		if (ignore)
 			continue;
 
@@ -2447,6 +2521,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 done:
 	if (dir)
 		closedir(dir);
+	got_pathlist_free(&dirents, GOT_PATHLIST_FREE_ALL);
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_NONE);
 	return err;
 }
