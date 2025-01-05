@@ -2440,6 +2440,10 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	 * during import then we have a racy situation no matter what.
 	 */
 	pos = telldir(dir);
+	if (pos == -1) {
+		err = got_error_from_errno2("telldir", path_dir);
+		goto done;
+	}
 	while ((de = readdir(dir)) != NULL) {
 		if (strcmp(de->d_name, ".") != 0 &&
 		    strcmp(de->d_name, "..") != 0) {
@@ -2448,6 +2452,10 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 				goto done;
 		}
 		pos = telldir(dir);
+		if (pos == -1) {
+			err = got_error_from_errno2("telldir", path_dir);
+			goto done;
+		}
 	}
 
 	nentries = 0;
