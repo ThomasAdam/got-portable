@@ -6,6 +6,15 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.107 (2024-01-05)
+
+* Changes from got-0.107
+
+  The -portable release also includes the following changes:
+
+  - Add additional test suite information to README.portable.
+  - Fix seq(1) calls in tests.
+
 # got-portable 0.106 (2024-11-28)
 
 * Changes from got-0.106
