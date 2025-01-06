@@ -8382,12 +8382,7 @@ close_blame_view(struct tog_view *view)
 	if (s->blame.thread)
 		err = stop_blame(&s->blame);
 
-	while (!STAILQ_EMPTY(&s->blamed_commits)) {
-		struct got_object_qid *blamed_commit;
-		blamed_commit = STAILQ_FIRST(&s->blamed_commits);
-		STAILQ_REMOVE_HEAD(&s->blamed_commits, entry);
-		got_object_qid_free(blamed_commit);
-	}
+	got_object_id_queue_free(&s->blamed_commits);
 
 	if (using_mock_io) {
 		struct tog_blame_thread_args *bta = &s->blame.thread_args;
