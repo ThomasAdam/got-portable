@@ -869,11 +869,23 @@ test_clone_basic_http() {
 
 	timeout 20 ./http-server -p $GOT_TEST_HTTP_PORT $testroot \
 	    > $testroot/http-server.log &
-	trap "kill %1" HUP INT QUIT PIPE TERM
 
-	while ! grep -q 'ready' $testroot/http-server.log; do
-		sleep 1 # server starts up
+	sleep 1 # server starts up
+	for i in 1 2 3 4; do
+		if grep -q ': ready' $testroot/http-server.log; then
+			break
+		fi
+		if [ $i -eq 4 ]; then
+			echo "http-server startup timeout" >&2
+			test_done "$testroot" "1"
+			# timeout(1) will kill the server eventually
+			return 1
+		fi
+		sleep 1 # server is still starting up
 	done
+
+	http_pid=`head -n 1 $testroot/http-server.log | cut -d ':' -f1`
+	trap "kill -9 $http_pid; wait $http_pid" HUP INT QUIT PIPE TERM
 
 	# Test our custom HTTP server with git clone. Should succeed.
 	git clone -q $testurl/repo $testroot/repo-clone-with-git
@@ -893,8 +905,8 @@ test_clone_basic_http() {
 		return 1
 	fi
 
-	kill %1
-	wait %1 # wait for http-server
+	kill $http_pid
+	wait $http_pid
 
 	got log -l0 -p -r $testroot/repo > $testroot/log-repo
 	ret=$?

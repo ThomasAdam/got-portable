@@ -154,7 +154,7 @@ sub handle_post {
 }
 
 STDOUT->autoflush(1);
-printf "ready\n";
+printf "$$: ready\n";
 
 while (1) {
 	my $client = $server->accept();
