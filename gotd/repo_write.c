@@ -1955,11 +1955,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 done:
 	if (commit)
 		got_object_commit_close(commit);
-	while (!STAILQ_EMPTY(&reversed_commits)) {
-		qid = STAILQ_FIRST(&reversed_commits);
-		STAILQ_REMOVE_HEAD(&reversed_commits, entry);
-		got_object_qid_free(qid);
-	}
+	got_object_id_queue_free(&reversed_commits);
 	got_pathlist_free(&changed_paths, GOT_PATHLIST_FREE_ALL);
 	got_commit_graph_close(graph);
 	return err;
