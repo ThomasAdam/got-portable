@@ -1871,6 +1871,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	case '?':
 	case 'H':
 	case KEY_F(1):
+		view->count = 0;
 		if (view->type == TOG_VIEW_HELP)
 			err = view->reset(view);
 		else
@@ -4902,6 +4903,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 
 	switch (ch) {
 	case '&':
+		view->count = 0;
 		err = limit_log_view(view);
 		break;
 	case 'q':
@@ -7393,6 +7395,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = create_diff(s);
 		break;
 	case 'p':
+		view->count = 0;
 		err = diff_write_patch(view);
 		break;
 	default:
