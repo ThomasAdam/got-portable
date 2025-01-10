@@ -980,8 +980,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-R reference] "
-	    "repository-URL [directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-J jumphost ] "
+	    "[-R reference] repository-URL [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -2493,8 +2493,8 @@ print_merge_progress_stats(struct got_update_progress_arg *upa)
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-qtvX] [-c commit] [-r remote] "
-	    "[path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s update [-qtvX] [-c commit] [-J jumphost ] "
+	    "[-r remote] [path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -7489,8 +7489,8 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-CNnS] [-A author] [-F path] "
-	    "[-m message] [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-CNnS] [-A author] [-J jumphost ] "
+	    "[-F path] [-m message] [path ...]\n", getprogname());
 	exit(1);
 }
 
