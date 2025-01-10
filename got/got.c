@@ -1074,8 +1074,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-R reference] "
-	    "repository-URL [directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-J jumphost ] "
+	    "[-R reference] " "repository-URL [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -2137,7 +2137,7 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-adlqtvX] [-b branch] "
+	fprintf(stderr, "usage: %s fetch [-adlqtvX] [-b branch] [-J jumphost ] "
 	    "[-R reference] [-r repository-path] [remote-repository]\n",
 	    getprogname());
 	exit(1);
@@ -9795,8 +9795,8 @@ __dead static void
 usage_send(void)
 {
 	fprintf(stderr, "usage: %s send [-afqTv] [-b branch] [-d branch] "
-	    "[-r repository-path] [-t tag] [remote-repository]\n",
-	    getprogname());
+	    "[-J jumphost ] [-r repository-path] [-t tag] "
+	    "[remote-repository]\n", getprogname());
 	exit(1);
 }
 
