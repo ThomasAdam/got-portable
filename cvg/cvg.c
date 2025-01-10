@@ -7844,6 +7844,9 @@ cmd_commit(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			break;
+		case 'J':
+			jumphost = optarg;
+			break;
 		case 'm':
 			if (prepared_logmsg)
 				option_conflict('m', 'F');
