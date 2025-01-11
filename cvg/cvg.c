@@ -978,8 +978,9 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-J jumphost ] "
-	    "[-R reference] repository-URL [directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] "
+	    "[-i identity-file] [-J jumphost] [-R reference] "
+	    "repository-URL [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -1539,6 +1540,7 @@ cmd_clone(int argc, char *argv[])
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
+	const char *identity_file = NULL;
 	const char *jumphost = NULL;
 
 	RB_INIT(&refs);
@@ -1546,7 +1548,7 @@ cmd_clone(int argc, char *argv[])
 	RB_INIT(&wanted_branches);
 	RB_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:J:lmqR:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:i:J:lmqR:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1557,6 +1559,9 @@ cmd_clone(int argc, char *argv[])
 			if (error)
 				return error;
 			bflag = 1;
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -1679,7 +1684,7 @@ cmd_clone(int argc, char *argv[])
 		printf("Connecting to %s\n", git_url);
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, jumphost, verbosity);
+	    server_path, jumphost, identity_file, verbosity);
 	if (error)
 		goto done;
 
@@ -2491,8 +2496,9 @@ print_merge_progress_stats(struct got_update_progress_arg *upa)
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-qtvX] [-c commit] [-J jumphost ] "
-	    "[-r remote] [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s update [-qtvX] [-c commit] "
+	    "[-i identity-file] [-J jumphost] [-r remote] [path ...]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -2671,6 +2677,7 @@ cmd_update(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	const char *refname;
 	struct got_reference *head_ref = NULL;
+	const char *identity_file = NULL;
 	const char *jumphost = NULL;
 
 	RB_INIT(&paths);
@@ -2680,12 +2687,15 @@ cmd_update(int argc, char *argv[])
 	RB_INIT(&wanted_branches);
 	RB_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "c:J:qr:vX")) != -1) {
+	while ((ch = getopt(argc, argv, "c:i:J:qr:vX")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
 				return got_error_from_errno("strdup");
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -2841,7 +2851,7 @@ cmd_update(int argc, char *argv[])
 	}
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, jumphost, verbosity);
+	    server_path, jumphost, identity_file, verbosity);
 	if (error)
 		goto done;
 
@@ -7487,8 +7497,9 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-CNnS] [-A author] [-J jumphost ] "
-	    "[-F path] [-m message] [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-CNnS] [-A author] "
+	    "[-i identity-file] [-J jumphost] [-F path] [-m message] "
+	    "[path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -7811,7 +7822,7 @@ cmd_commit(int argc, char *argv[])
 	int nremotes;
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
-	const char *remote_name, *jumphost = NULL;
+	const char *remote_name, *jumphost = NULL, *identity_file = NULL;
 	int verbosity = 0;
 	int i;
 
@@ -7825,7 +7836,7 @@ cmd_commit(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "A:CF:J:m:NnS")) != -1) {
+	while ((ch = getopt(argc, argv, "A:CF:i:J:m:NnS")) != -1) {
 		switch (ch) {
 		case 'A':
 			author = optarg;
@@ -7843,6 +7854,9 @@ cmd_commit(int argc, char *argv[])
 			if (prepared_logmsg == NULL)
 				return got_error_from_errno2("realpath",
 				    optarg);
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -8036,7 +8050,7 @@ cmd_commit(int argc, char *argv[])
 	error = got_worktree_cvg_commit(&id, worktree, &paths, author,
 	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, proto, host,
-	    port, server_path, jumphost, verbosity, remote,
+	    port, server_path, jumphost, identity_file, verbosity, remote,
 	    check_cancelled, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&

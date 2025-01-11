@@ -135,6 +135,7 @@ working directory.
 .Cm clone
 .Op Fl almqv
 .Op Fl b Ar branch
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Ar repository-URL
@@ -241,6 +242,12 @@ repository's HEAD reference will be fetched.
 Cannot be used together with the
 .Fl a
 option.
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost
@@ -408,6 +415,7 @@ Silence progress output.
 .Op Fl q
 .Op Fl b Ar branch
 .Op Fl c Ar commit
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Ar path ...
 .Xc
@@ -505,6 +513,12 @@ An abbreviated hash argument will be expanded to a commit ID
 automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost
@@ -1301,6 +1315,7 @@ is a directory.
 .Op Fl CNnS
 .Op Fl A Ar author
 .Op Fl F Ar path
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Fl m Ar message
 .Op Ar path ...
@@ -1411,6 +1426,12 @@ Use the specified log message when creating the new commit.
 Cannot be used together with the
 .Fl F
 option.
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost

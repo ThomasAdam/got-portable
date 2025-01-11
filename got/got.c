@@ -1074,8 +1074,9 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] [-J jumphost ] "
-	    "[-R reference] " "repository-URL [directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-almqv] [-b branch] "
+	    "[-i identity-file] [-J jumphost] [-R reference] "
+	    "repository-URL [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -1632,7 +1633,7 @@ cmd_clone(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
-	const char *jumphost = NULL;
+	const char *jumphost = NULL, *identity_file = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int bflag = 0, list_refs_only = 0;
 	int *pack_fds = NULL;
@@ -1642,7 +1643,7 @@ cmd_clone(int argc, char *argv[])
 	RB_INIT(&wanted_branches);
 	RB_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:J:lmqR:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:i:J:lmqR:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1653,6 +1654,9 @@ cmd_clone(int argc, char *argv[])
 			if (error)
 				return error;
 			bflag = 1;
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -1775,7 +1779,7 @@ cmd_clone(int argc, char *argv[])
 		printf("Connecting to %s\n", git_url);
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, jumphost, verbosity);
+	    server_path, jumphost, identity_file, verbosity);
 	if (error)
 		goto done;
 
@@ -2137,9 +2141,9 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-adlqtvX] [-b branch] [-J jumphost ] "
-	    "[-R reference] [-r repository-path] [remote-repository]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s fetch [-adlqtvX] [-b branch] "
+	    "[-i identity-file] [-J jumphost] [-R reference] "
+	    "[-r repository-path] [remote-repository]\n", getprogname());
 	exit(1);
 }
 
@@ -2393,7 +2397,7 @@ cmd_fetch(int argc, char *argv[])
 	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
 	int *pack_fds = NULL, have_bflag = 0;
 	const char *remote_head = NULL, *worktree_branch = NULL;
-	const char *jumphost = NULL;
+	const char *jumphost = NULL, *identity_file = NULL;
 
 	RB_INIT(&refs);
 	RB_INIT(&symrefs);
@@ -2401,7 +2405,7 @@ cmd_fetch(int argc, char *argv[])
 	RB_INIT(&wanted_branches);
 	RB_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:dJ:lqR:r:tvX")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:di:J:lqR:r:tvX")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -2415,6 +2419,9 @@ cmd_fetch(int argc, char *argv[])
 			break;
 		case 'd':
 			delete_refs = 1;
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -2656,7 +2663,7 @@ cmd_fetch(int argc, char *argv[])
 	}
 
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
-	    server_path, jumphost, verbosity);
+	    server_path, jumphost, identity_file, verbosity);
 	if (error)
 		goto done;
 #ifndef PROFILE
@@ -9795,7 +9802,7 @@ __dead static void
 usage_send(void)
 {
 	fprintf(stderr, "usage: %s send [-afqTv] [-b branch] [-d branch] "
-	    "[-J jumphost ] [-r repository-path] [-t tag] "
+	    "[-i identity-file] [-J jumphost] [-r repository-path] [-t tag] "
 	    "[remote-repository]\n", getprogname());
 	exit(1);
 }
@@ -10023,7 +10030,7 @@ cmd_send(int argc, char *argv[])
 	int send_all_branches = 0, send_all_tags = 0;
 	struct got_reference *ref = NULL;
 	int *pack_fds = NULL;
-	const char *jumphost = NULL;
+	const char *jumphost = NULL, *identity_file = NULL;
 
 	RB_INIT(&branches);
 	RB_INIT(&tags);
@@ -10032,7 +10039,7 @@ cmd_send(int argc, char *argv[])
 	RB_INIT(&delete_args);
 	RB_INIT(&delete_branches);
 
-	while ((ch = getopt(argc, argv, "ab:d:fJ:qr:Tt:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:d:fi:J:qr:Tt:v")) != -1) {
 		switch (ch) {
 		case 'a':
 			send_all_branches = 1;
@@ -10050,6 +10057,9 @@ cmd_send(int argc, char *argv[])
 			break;
 		case 'f':
 			overwrite_refs = 1;
+			break;
+		case 'i':
+			identity_file = optarg;
 			break;
 		case 'J':
 			jumphost = optarg;
@@ -10321,7 +10331,7 @@ cmd_send(int argc, char *argv[])
 	}
 
 	error = got_send_connect(&sendpid, &sendfd, proto, host, port,
-	    server_path, jumphost, verbosity);
+	    server_path, jumphost, identity_file, verbosity);
 	if (error)
 		goto done;
 
