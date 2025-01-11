@@ -263,13 +263,13 @@ escape_path(char *buf, size_t bufsize, const char *path)
 const struct got_error *
 got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
     const char *port, const char *path, const char *jumphost,
-    const char *command, int verbosity)
+    const char *identity_file, const char *command, int verbosity)
 {
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
 	char escaped_path[PATH_MAX];
-	const char *argv[13];
+	const char *argv[15];
 	int i = 0, j;
 
 	*newpid = -1;
@@ -290,6 +290,10 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 		/* ssh(1) allows up to 3 "-v" options. */
 		for (j = 0; j < MIN(3, verbosity); j++)
 			argv[i++] = "-v";
+	}
+	if (identity_file) {
+		argv[i++] = "-i";
+		argv[i++] = identity_file;
 	}
 	if (jumphost) {
 		argv[i++] = "-J";

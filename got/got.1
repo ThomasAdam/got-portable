@@ -204,6 +204,7 @@ working directory.
 .Cm clone
 .Op Fl almqv
 .Op Fl b Ar branch
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Ar repository-URL
@@ -339,6 +340,12 @@ repository's HEAD reference will be fetched.
 Cannot be used together with the
 .Fl a
 option.
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost
@@ -432,6 +439,7 @@ The maximum is 3.
 .Cm fetch
 .Op Fl adlqtvX
 .Op Fl b Ar branch
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Fl R Ar reference
 .Op Fl r Ar repository-path
@@ -539,6 +547,12 @@ Any commit, tree, tag, and blob objects belonging to deleted branches or
 tags remain in the repository and may be removed separately with
 Git's garbage collector or
 .Cm gotadmin cleanup .
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost
@@ -2351,6 +2365,7 @@ in the repository.
 .Op Fl afqTv
 .Op Fl b Ar branch
 .Op Fl d Ar branch
+.Op Fl i Ar identity-file
 .Op Fl J Ar jumphost
 .Op Fl r Ar repository-path
 .Op Fl t Ar tag
@@ -2486,6 +2501,12 @@ copy of a branch or tag is known to be out-of-date and is considered
 disposable.
 The risks of creating inconsistencies between different repositories
 should also be taken into account.
+.It Fl i Ar identity-file
+Specify an
+.Ar identity-file ,
+containing a private SSH key, to use with SSH connections.
+The same option will be passed to
+.Xr ssh 1 .
 .It Fl J Ar jumphost
 Specify a
 .Ar jumphost

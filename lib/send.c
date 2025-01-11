@@ -87,7 +87,7 @@
 const struct got_error *
 got_send_connect(pid_t *sendpid, int *sendfd, const char *proto,
     const char *host, const char *port, const char *server_path,
-    const char *jumphost, int verbosity)
+    const char *jumphost, const char *identity_file, int verbosity)
 {
 	const struct got_error *err = NULL;
 
@@ -96,7 +96,7 @@ got_send_connect(pid_t *sendpid, int *sendfd, const char *proto,
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
 		err = got_dial_ssh(sendpid, sendfd, host, port, server_path,
-		    jumphost, GOT_DIAL_CMD_SEND, verbosity);
+		    jumphost, identity_file, GOT_DIAL_CMD_SEND, verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = got_dial_git(sendfd, host, port, server_path,
 		    GOT_DIAL_CMD_SEND);
