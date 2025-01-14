@@ -349,8 +349,8 @@ main(int argc, char **argv)
 	log_setverbose(env->gotwebd_verbose);
 
 	if (server_proc) {
-		setproctitle("sockets");
-		log_procinit("sockets");
+		setproctitle("server");
+		log_procinit("server");
 
 		if (chroot(env->httpd_chroot) == -1)
 			fatal("chroot %s", env->httpd_chroot);
