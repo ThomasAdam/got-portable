@@ -402,6 +402,11 @@ main(int argc, char **argv)
 	if (gotwebd_configure(env) == -1)
 		fatalx("configuration failed");
 
+	if (setgroups(1, &pw->pw_gid) == -1 ||
+	    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) == -1 ||
+	    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1)
+		fatal("failed to drop privileges");
+
 #ifdef PROFILE
 	if (unveil("gmon.out", "rwc") != 0)
 		err(1, "gmon.out");
