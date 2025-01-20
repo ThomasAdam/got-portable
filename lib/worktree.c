@@ -1836,8 +1836,22 @@ get_file_status(unsigned char *status, struct stat *sb,
 		goto done;
 	}
 	fd = -1;
+
+	if (staged_status == GOT_STATUS_NO_CHANGE &&
+	    S_ISREG(sb->st_mode) &&
+	    got_fileindex_entry_filetype_get(ie) ==
+	    GOT_FILEIDX_MODE_REGULAR_FILE &&
+	    ie->size != (sb->st_size & 0xffffffff)) {
+		/*
+		 * The size of regular files differs. We can skip the full
+		 * content comparison loop below but still need to check
+		 * for conflict markers.
+		 */
+		*status = GOT_STATUS_MODIFY;
+	}
+
 	hdrlen = got_object_blob_get_hdrlen(blob);
-	for (;;) {
+	while (*status == GOT_STATUS_NO_CHANGE) {
 		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
 		err = got_object_blob_read_block(&blen, blob);
 		if (err)
@@ -5352,6 +5366,11 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 					goto done;
 				}
 			}
+			err = got_fileindex_entry_update(ie,
+			    a->worktree->root_fd, relpath,
+			    &blob->id, &ie->commit, 0);
+			if (err)
+				goto done;
 		} else {
 			int is_bad_symlink = 0;
 			if (te && S_ISLNK(te->mode)) {
@@ -5369,14 +5388,11 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			}
 			if (err)
 				goto done;
-			if (status == GOT_STATUS_DELETE ||
-			    status == GOT_STATUS_MODE_CHANGE) {
-				err = got_fileindex_entry_update(ie,
-				    a->worktree->root_fd, relpath,
-				    &blob->id, a->worktree->base_commit_id, 1);
-				if (err)
-					goto done;
-			}
+			err = got_fileindex_entry_update(ie,
+			    a->worktree->root_fd, relpath,
+			    &blob->id, &ie->commit, 0);
+			if (err)
+				goto done;
 			if (is_bad_symlink) {
 				got_fileindex_entry_filetype_set(ie,
 				    GOT_FILEIDX_MODE_BAD_SYMLINK);
