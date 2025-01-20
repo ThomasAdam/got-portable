@@ -1534,11 +1534,12 @@ done:
 }
 
 /*
- * Upgrade STATUS_MODIFY to STATUS_CONFLICT if a
- * conflict marker is found in newly added lines only.
+ * Detect whether a file is in STATUS_MODIFY or in STATUS_CONFLICT.
+ * The latter is determined by the presence of conflict markers on
+ * newly added lines.
  */
 static const struct got_error *
-get_modified_file_content_status(unsigned char *status,
+get_modified_file_status(unsigned char *status,
     struct got_blob_object *blob, const char *path, struct stat *sb,
     FILE *ondisk_file)
 {
@@ -1555,9 +1556,6 @@ get_modified_file_content_status(unsigned char *status,
 	char *line = NULL;
 	size_t linesize = 0;
 	ssize_t linelen;
-
-	if (*status != GOT_STATUS_MODIFY)
-		return NULL;
 
 	f1 = got_opentemp();
 	if (f1 == NULL)
@@ -1582,12 +1580,22 @@ get_modified_file_content_status(unsigned char *status,
 		struct diff_chunk_context cc = {};
 		off_t pos;
 
-		/*
-		 * We can optimise a little by advancing straight
-		 * to the next chunk if this one has no added lines.
-		 */
 		c = diff_chunk_get(r, n);
 
+		/*
+		 * Upgrade NO_CHANGE to MODIFY in case there are
+		 * chunks which contain changes.
+		 */
+		if (*status == GOT_STATUS_NO_CHANGE &&
+		    (diff_chunk_type(c) == CHUNK_MINUS ||
+		    diff_chunk_type(c) == CHUNK_PLUS))
+			*status = GOT_STATUS_MODIFY;
+
+		/*
+		 * We can optimise conflict detection a little by
+		 * advancing straight to the next chunk if this
+		 * one has no added lines.
+		 */
 		if (diff_chunk_type(c) != CHUNK_PLUS) {
 			nchunks_parsed = 1;
 			continue;  /* removed or unchanged lines */
@@ -1722,18 +1730,42 @@ get_symlink_modification_status(unsigned char *status,
 }
 
 static const struct got_error *
+file_is_binary(int *is_binary , FILE *f)
+{
+	const struct got_error *err = NULL;
+	char buf[8192];
+	size_t r;
+	off_t pos = ftello(f);
+
+	*is_binary = 0;
+
+	if (fseek(f, 0L, SEEK_SET) == -1)
+		return got_ferror(f, GOT_ERR_IO);
+
+	r = fread(buf, 1, sizeof(buf), f);
+	if (r == 0 && ferror(f))
+		return got_error_from_errno("fread");
+
+	if (r > 0)
+		*is_binary = memchr(buf, '\0', r) != NULL;
+
+	if (fseek(f, pos, SEEK_SET) == -1 && err == NULL)
+		err = got_ferror(f, GOT_ERR_IO);
+
+	return err;
+}
+
+static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
     int dirfd, const char *de_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id id;
-	size_t hdrlen;
 	int fd = -1, fd1 = -1;
 	FILE *f = NULL;
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
-	size_t flen, blen;
 	unsigned char staged_status;
 
 	staged_status = get_staged_status(ie);
@@ -1842,52 +1874,25 @@ get_file_status(unsigned char *status, struct stat *sb,
 	    got_fileindex_entry_filetype_get(ie) ==
 	    GOT_FILEIDX_MODE_REGULAR_FILE &&
 	    ie->size != (sb->st_size & 0xffffffff)) {
-		/*
-		 * The size of regular files differs. We can skip the full
-		 * content comparison loop below but still need to check
-		 * for conflict markers.
-		 */
+		int is_binary;
+
+		/* The size of regular files differs. */
 		*status = GOT_STATUS_MODIFY;
+
+		/*
+		 * We can skip the diff engine for binary files on disk.
+		 * Text files still need to be checked for conflict markers.
+		 */
+		err = file_is_binary(&is_binary, f);
+		if (err || is_binary)
+			goto done;
 	}
 
-	hdrlen = got_object_blob_get_hdrlen(blob);
-	while (*status == GOT_STATUS_NO_CHANGE) {
-		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
-		err = got_object_blob_read_block(&blen, blob);
-		if (err)
-			goto done;
-		/* Skip length of blob object header first time around. */
-		flen = fread(fbuf, 1, sizeof(fbuf) - hdrlen, f);
-		if (flen == 0 && ferror(f)) {
-			err = got_error_from_errno("fread");
-			goto done;
-		}
-		if (blen - hdrlen == 0) {
-			if (flen != 0)
-				*status = GOT_STATUS_MODIFY;
-			break;
-		} else if (flen == 0) {
-			if (blen - hdrlen != 0)
-				*status = GOT_STATUS_MODIFY;
-			break;
-		} else if (blen - hdrlen == flen) {
-			/* Skip blob object header first time around. */
-			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
-				*status = GOT_STATUS_MODIFY;
-				break;
-			}
-		} else {
-			*status = GOT_STATUS_MODIFY;
-			break;
-		}
-		hdrlen = 0;
-	}
+	err = get_modified_file_status(status, blob, ie->path, sb, f);
+	if (err)
+		goto done;
 
-	if (*status == GOT_STATUS_MODIFY) {
-		rewind(f);
-		err = get_modified_file_content_status(status, blob, ie->path,
-		    sb, f);
-	} else if (xbit_differs(ie, sb->st_mode))
+	if (*status == GOT_STATUS_NO_CHANGE && xbit_differs(ie, sb->st_mode))
 		*status = GOT_STATUS_MODE_CHANGE;
 done:
 	if (fd1 != -1 && close(fd1) == -1 && err == NULL)
