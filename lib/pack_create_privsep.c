@@ -188,7 +188,7 @@ got_pack_search_deltas(struct got_packidx **packidx, struct got_pack **pack,
 
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
 		    ncolored, nfound, ntrees, 0L, ncommits,
-		    got_object_idset_num_elements(idset), v->nmeta, 0);
+		    got_object_idset_num_elements(idset), v->nmeta, 0, 0);
 		if (err)
 			break;
 	}
@@ -261,7 +261,7 @@ recv_painted_commit(void *arg, struct got_object_id *id, intptr_t color)
 	}
 
 	return got_pack_report_progress(a->progress_cb, a->progress_arg, a->rl,
-	    *a->ncolored, 0, 0, 0L, 0, 0, 0, 0);
+	    *a->ncolored, 0, 0, 0L, 0, 0, 0, 0, 0);
 }
 
 static const struct got_error *
@@ -445,7 +445,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		}
 
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
+		    *ncolored, 0, 0, 0L, 0, 0, 0, 0, 0);
 		if (err)
 			break;
 

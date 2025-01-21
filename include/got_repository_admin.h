@@ -17,7 +17,7 @@
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_pack_progress_cb)(void *arg,
     int ncolored, int nfound, int ntrees, off_t packfile_size, int ncommits,
-    int nobj_total, int obj_deltify, int nobj_written);
+    int nobj_total, int obj_deltify, int nobj_written, int pack_done);
 
 /*
  * Attempt to pack objects reachable via 'include_refs' into a new packfile.
@@ -49,12 +49,12 @@ got_repo_find_pack(FILE **packfile, struct got_object_id **pack_hash,
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_pack_index_progress_cb)(void *arg,
     off_t packfile_size, int nobj_total, int nobj_indexed,
-    int nobj_loose, int nobj_resolved);
+    int nobj_loose, int nobj_resolved, int indexing_done);
 
 /* (Re-)Index the pack file identified by the given hash. */
 const struct got_error *
-got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
-    struct got_repository *repo,
+got_repo_index_pack(char **idxpath, FILE *packfile,
+    struct got_object_id *pack_hash, struct got_repository *repo,
     got_pack_index_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
 
@@ -73,9 +73,10 @@ typedef const struct got_error *(*got_cleanup_progress_cb)(void *arg,
     int ncommits, int nloose, int npurged, int nredundant);
 
 /*
- * Walk objects reachable via references to determine whether any loose
- * objects can be removed from disk. Do remove such objects from disk
- * unless the dry_run parameter is set.
+ * Walk objects reachable via references and, unless the dry-run parameter
+ * is set, pack all referenced objects into a single pack.
+ * Then determine whether any loose objects can be removed from disk.
+ * Do remove such objects from disk unless the dry_run parameter is set.
  * Do not remove objects with a modification timestamp above an
  * implementation-defined timestamp threshold, unless ignore_mtime is set.
  * Remove packfiles which objects are either unreachable or provided
@@ -91,6 +92,8 @@ got_repo_cleanup(struct got_repository *repo,
     int *ncommits, int *nloose,
     int *npacked, int dry_run, int ignore_mtime,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
+    got_pack_progress_cb pack_progress_cb, void *pack_progress_arg,
+    got_pack_index_progress_cb index_progress_cb, void *index_progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
 
 /* A callback function which gets invoked with cleanup information to print. */

@@ -442,7 +442,7 @@ const struct got_error *
 got_pack_report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, int ncolored, int nfound, int ntrees,
     off_t packfile_size, int ncommits, int nobj_total, int obj_deltify,
-    int nobj_written)
+    int nobj_written, int pack_done)
 {
 	const struct got_error *err;
 	int elapsed;
@@ -455,7 +455,8 @@ got_pack_report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
 		return err;
 
 	return progress_cb(progress_arg, ncolored, nfound, ntrees,
-	    packfile_size, ncommits, nobj_total, obj_deltify, nobj_written);
+	    packfile_size, ncommits, nobj_total, obj_deltify, nobj_written,
+	    pack_done);
 }
 
 const struct got_error *
@@ -563,7 +564,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int ncolored,
 		}
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
 		    ncolored, nfound, ntrees, 0L, ncommits, nreused + nmeta,
-		    nreused + i, 0);
+		    nreused + i, 0, 0);
 		if (err)
 			goto done;
 		m = meta[i];
@@ -747,7 +748,7 @@ got_pack_add_object(int want_meta, struct got_object_idset *idset,
 
 		(*nfound)++;
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+		    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0, 0);
 		if (err) {
 			clear_meta(m);
 			free(m);
@@ -778,7 +779,7 @@ got_pack_load_tree_entries(struct got_object_id_queue *ids, int want_meta,
 
 	(*ntrees)++;
 	err = got_pack_report_progress(progress_cb, progress_arg, rl,
-	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0);
+	    *ncolored, *nfound, *ntrees, 0L, 0, 0, 0, 0, 0);
 	if (err)
 		return err;
 
@@ -1761,7 +1762,7 @@ genpack(struct got_object_id *pack_hash, int packfd,
 	for (i = 0; i < ndeltify; i++) {
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
 		    ncolored, nfound, ntrees, packfile_size, nours,
-		    ndeltify + nreuse, ndeltify + nreuse, i);
+		    ndeltify + nreuse, ndeltify + nreuse, i, 0);
 		if (err)
 			goto done;
 		m = deltify[i];
@@ -1790,7 +1791,7 @@ genpack(struct got_object_id *pack_hash, int packfd,
 	for (i = 0; i < nreuse; i++) {
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
 		    ncolored, nfound, ntrees, packfile_size, nours,
-		    ndeltify + nreuse, ndeltify + nreuse, ndeltify + i);
+		    ndeltify + nreuse, ndeltify + nreuse, ndeltify + i, 0);
 		if (err)
 			goto done;
 		m = reuse[i];
@@ -1810,7 +1811,7 @@ genpack(struct got_object_id *pack_hash, int packfd,
 	if (progress_cb) {
 		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
 		    packfile_size, nours, ndeltify + nreuse,
-		    ndeltify + nreuse, ndeltify + nreuse);
+		    ndeltify + nreuse, ndeltify + nreuse, 1);
 		if (err)
 			goto done;
 	}
@@ -1872,7 +1873,7 @@ got_pack_create(struct got_object_id *packhash, int packfd, FILE *delta_cache,
 
 	if (progress_cb) {
 		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
-		    0L, nours, got_object_idset_num_elements(idset), 0, 0);
+		    0L, nours, got_object_idset_num_elements(idset), 0, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -1943,7 +1944,7 @@ got_pack_create(struct got_object_id *packhash, int packfd, FILE *delta_cache,
 		err = progress_cb(progress_arg, ncolored, nfound, ntrees,
 		    1 /* packfile_size */, nours,
 		    got_object_idset_num_elements(idset),
-		    deltify.nmeta + reuse.nmeta, 0);
+		    deltify.nmeta + reuse.nmeta, 0, 0);
 		if (err)
 			goto done;
 	}

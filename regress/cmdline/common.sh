@@ -184,7 +184,7 @@ git_fsck()
 	local testroot="$1"
 	local repo="$2"
 
-	git -C $repo fsck --strict \
+	git -C $repo fsck --strict --no-reflogs \
 		> $testroot/fsck.stdout 2> $testroot/fsck.stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then

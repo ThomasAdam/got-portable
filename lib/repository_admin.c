@@ -139,6 +139,79 @@ done:
 	return err;
 }
 
+static const struct got_error *
+create_temp_packfile(int *packfd, char **tmpfile_path,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path;
+
+	*packfd = -1;
+
+	if (asprintf(&path, "%s/%s/packing.pack",
+	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = got_opentemp_named_fd(tmpfile_path, packfd, path, "");
+	if (err)
+		goto done;
+
+	if (fchmod(*packfd, GOT_DEFAULT_PACK_MODE) == -1)
+		err = got_error_from_errno2("fchmod", *tmpfile_path);
+done:
+	if (err) {
+		close(*packfd);
+		*packfd = -1;
+		free(*tmpfile_path);
+		*tmpfile_path = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+install_packfile(FILE **packfile, int *packfd, char **packfile_path,
+    char **tmpfile_path, struct got_object_id *pack_hash,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *hash_str;
+
+	err = got_object_id_str(&hash_str, pack_hash);
+	if (err)
+		return err;
+
+	if (asprintf(packfile_path, "%s/%s/pack-%s.pack",
+	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR,
+	    hash_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (lseek(*packfd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+
+	if (rename(*tmpfile_path, *packfile_path) == -1) {
+		err = got_error_from_errno3("rename", *tmpfile_path,
+		    *packfile_path);
+		goto done;
+	}
+
+	free(*tmpfile_path);
+	*tmpfile_path = NULL;
+
+	*packfile = fdopen(*packfd, "w");
+	if (*packfile == NULL) {
+		err = got_error_from_errno2("fdopen", *packfile_path);
+		goto done;
+	}
+	*packfd = -1;
+done:
+	free(hash_str);
+	return err;
+}
+
 const struct got_error *
 got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
     struct got_reflist_head *include_refs,
@@ -150,8 +223,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	const struct got_error *err = NULL;
 	struct got_object_id **ours = NULL, **theirs = NULL;
 	int nours = 0, ntheirs = 0, packfd = -1, i;
-	char *tmpfile_path = NULL, *path = NULL, *packfile_path = NULL;
-	char *hash_str = NULL;
+	char *tmpfile_path = NULL, *packfile_path = NULL;
 	FILE *delta_cache = NULL;
 	struct got_ratelimit rl;
 
@@ -160,19 +232,9 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 
 	got_ratelimit_init(&rl, 0, 500);
 
-	if (asprintf(&path, "%s/%s/packing.pack",
-	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	err = got_opentemp_named_fd(&tmpfile_path, &packfd, path, "");
+	err = create_temp_packfile(&packfd, &tmpfile_path, repo);
 	if (err)
-		goto done;
-
-	if (fchmod(packfd, GOT_DEFAULT_PACK_MODE) == -1) {
-		err = got_error_from_errno2("fchmod", tmpfile_path);
-		goto done;
-	}
+		return err;
 
 	delta_cache = got_opentemp();
 	if (delta_cache == NULL) {
@@ -212,34 +274,8 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	if (err)
 		goto done;
 
-	err = got_object_id_str(&hash_str, *pack_hash);
-	if (err)
-		goto done;
-	if (asprintf(&packfile_path, "%s/%s/pack-%s.pack",
-	    got_repo_get_path_git_dir(repo), GOT_OBJECTS_PACK_DIR,
-	    hash_str) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	if (lseek(packfd, 0L, SEEK_SET) == -1) {
-		err = got_error_from_errno("lseek");
-		goto done;
-	}
-	if (rename(tmpfile_path, packfile_path) == -1) {
-		err = got_error_from_errno3("rename", tmpfile_path,
-		    packfile_path);
-		goto done;
-	}
-	free(tmpfile_path);
-	tmpfile_path = NULL;
-
-	*packfile = fdopen(packfd, "w");
-	if (*packfile == NULL) {
-		err = got_error_from_errno2("fdopen", tmpfile_path);
-		goto done;
-	}
-	packfd = -1;
+	err = install_packfile(packfile, &packfd, &packfile_path,
+	    &tmpfile_path, *pack_hash, repo);
 done:
 	for (i = 0; i < nours; i++)
 		free(ours[i]);
@@ -255,8 +291,6 @@ done:
 		err = got_error_from_errno2("unlink", tmpfile_path);
 	free(tmpfile_path);
 	free(packfile_path);
-	free(hash_str);
-	free(path);
 	if (err) {
 		free(*pack_hash);
 		*pack_hash = NULL;
@@ -268,8 +302,8 @@ done:
 }
 
 const struct got_error *
-got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
-    struct got_repository *repo,
+got_repo_index_pack(char **idxpath, FILE *packfile,
+    struct got_object_id *pack_hash, struct got_repository *repo,
     got_pack_index_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -279,14 +313,16 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 	int npackfd = -1, idxfd = -1, nidxfd = -1;
 	int tmpfds[3];
 	int idxstatus, done = 0;
+	int nobj_total = 0, nobj_indexed = 0, nobj_loose = 0, nobj_resolved = 0;
 	const struct got_error *err;
 	struct imsgbuf idxibuf;
 	pid_t idxpid;
 	char *tmpidxpath = NULL;
-	char *packfile_path = NULL, *idxpath = NULL, *id_str = NULL;
+	char *packfile_path = NULL, *id_str = NULL;
 	const char *repo_path = got_repo_get_path_git_dir(repo);
 	struct stat sb;
 
+	*idxpath = NULL;
 	memset(&idxibuf, 0, sizeof(idxibuf));
 
 	for (i = 0; i < nitems(tmpfds); i++)
@@ -335,7 +371,7 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		goto done;
 	}
 
-	if (asprintf(&idxpath, "%s/%s/pack-%s.idx",
+	if (asprintf(idxpath, "%s/%s/pack-%s.idx",
 	    repo_path, GOT_OBJECTS_PACK_DIR, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -383,8 +419,6 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 	}
 	done = 0;
 	while (!done) {
-		int nobj_total, nobj_indexed, nobj_loose, nobj_resolved;
-
 		if (cancel_cb) {
 			err = cancel_cb(cancel_arg);
 			if (err)
@@ -399,10 +433,17 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		if (nobj_indexed != 0) {
 			err = progress_cb(progress_arg, sb.st_size,
 			    nobj_total, nobj_indexed, nobj_loose,
-			    nobj_resolved);
+			    nobj_resolved, 0);
 			if (err)
 				break;
 		}
+	}
+	if (done) {
+		err = progress_cb(progress_arg, sb.st_size,
+		    nobj_total, nobj_indexed, nobj_loose,
+		    nobj_resolved, done);
+		if (err)
+			goto done;
 	}
 	if (close(imsg_idxfds[0]) == -1) {
 		err = got_error_from_errno("close");
@@ -413,8 +454,8 @@ got_repo_index_pack(FILE *packfile, struct got_object_id *pack_hash,
 		goto done;
 	}
 
-	if (rename(tmpidxpath, idxpath) == -1) {
-		err = got_error_from_errno3("rename", tmpidxpath, idxpath);
+	if (rename(tmpidxpath, *idxpath) == -1) {
+		err = got_error_from_errno3("rename", tmpidxpath, *idxpath);
 		goto done;
 	}
 	free(tmpidxpath);
@@ -434,7 +475,6 @@ done:
 			err = got_error_from_errno("close");
 	}
 	free(tmpidxpath);
-	free(idxpath);
 	free(packfile_path);
 	return err;
 }
@@ -1417,6 +1457,8 @@ got_repo_cleanup(struct got_repository *repo,
     off_t *pack_before, off_t *pack_after,
     int *ncommits, int *nloose, int *npacked, int dry_run, int ignore_mtime,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
+    got_pack_progress_cb pack_progress_cb, void *pack_progress_arg,
+    got_pack_index_progress_cb index_progress_cb, void *index_progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *unlock_err, *err = NULL;
@@ -1427,11 +1469,15 @@ got_repo_cleanup(struct got_repository *repo,
 	struct got_reflist_entry *re;
 	struct got_object_id **referenced_ids;
 	int i, nreferenced;
-	int npurged = 0;
+	int npurged = 0, packfd = -1;
+	char *tmpfile_path = NULL, *packfile_path = NULL, *idxpath = NULL;
+	FILE *delta_cache = NULL, *packfile = NULL;
+	struct got_object_id pack_hash;
 	time_t max_mtime = 0;
 
 	TAILQ_INIT(&refs);
 	got_ratelimit_init(&rl, 0, 500);
+	memset(&pack_hash, 0, sizeof(pack_hash));
 
 	*loose_before = 0;
 	*loose_after = 0;
@@ -1444,6 +1490,16 @@ got_repo_cleanup(struct got_repository *repo,
 	err = repo_cleanup_lock(repo, &lk);
 	if (err)
 		return err;
+
+	err = create_temp_packfile(&packfd, &tmpfile_path, repo);
+	if (err)
+		goto done;
+
+	delta_cache = got_opentemp();
+	if (delta_cache == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
 
 	traversed_ids = got_object_idset_alloc();
 	if (traversed_ids == NULL) {
@@ -1483,6 +1539,28 @@ got_repo_cleanup(struct got_repository *repo,
 			goto done;
 	}
 
+	err = got_pack_create(&pack_hash, packfd, delta_cache,
+	    NULL, 0, referenced_ids, nreferenced, repo, 0,
+	    0, 0, pack_progress_cb, pack_progress_arg,
+	    &rl, cancel_cb, cancel_arg);
+	if (err)
+		goto done;
+
+	err = install_packfile(&packfile, &packfd, &packfile_path,
+	    &tmpfile_path, &pack_hash, repo);
+	if (err)
+		goto done;
+
+	err = got_repo_index_pack(&idxpath, packfile, &pack_hash, repo,
+	    index_progress_cb, index_progress_arg,
+	    cancel_cb, cancel_arg);
+	if (err)
+		goto done;
+
+	err = got_repo_list_packidx(&repo->packidx_paths, repo);
+	if (err)
+		goto done;
+
 	err = repo_purge_unreferenced_loose_objects(repo, traversed_ids,
 	    loose_before, loose_after, *ncommits, nloose, npacked, &npurged,
 	    dry_run, ignore_mtime, max_mtime, &rl, progress_cb, progress_arg,
@@ -1497,6 +1575,12 @@ got_repo_cleanup(struct got_repository *repo,
 	if (err)
 		goto done;
 
+	if (dry_run) {
+		if (idxpath && unlink(idxpath) == -1)
+			err = got_error_from_errno2("unlink", idxpath);
+		if (packfile_path && unlink(packfile_path) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink", packfile_path);
+	}
  done:
 	if (lk) {
 		unlock_err = got_lockfile_unlock(lk, got_repo_get_fd(repo));
@@ -1505,6 +1589,15 @@ got_repo_cleanup(struct got_repository *repo,
 	}
 	if (traversed_ids)
 		got_object_idset_free(traversed_ids);
+	if (packfd != -1 && close(packfd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", packfile_path);
+	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (tmpfile_path && unlink(tmpfile_path) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tmpfile_path);
+	free(tmpfile_path);
+	free(packfile_path);
+	free(idxpath);
 	return err;
 }
 
