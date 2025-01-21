@@ -460,9 +460,100 @@ test_cleanup_missing_pack_file() {
 	test_done "$testroot" "$ret"
 }
 
+test_cleanup_non_commit_ref() {
+	local testroot=`test_init cleanup_non_commit_ref`
+	local commit_id=`git_show_head $testroot/repo`
+
+	mkdir -p $testroot/t
+	echo foo > $testroot/t/foo
+
+	foo_id=$(git -C $testroot/repo hash-object -t blob -w $testroot/t/foo)
+
+	# verify that the blob object can be read
+	got cat -r $testroot/repo "$foo_id" > $testroot/stdout
+	cmp -s $testroot/t/foo $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/t/foo $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a reference which points at the blob
+	got ref -r $testroot/repo -c $foo_id blobref
+
+	# create a tree object
+	printf "10644 blob $foo_id\tfoo\n" > $testroot/tree-desc
+	tree_id=$(git -C $testroot/repo mktree < $testroot/tree-desc)
+
+	# verify that the tree object can be read
+	got cat -r $testroot/repo "$tree_id" > $testroot/stdout
+	printf "$foo_id 0010644 foo\n" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a reference which points at the tree
+	got ref -r $testroot/repo -c "$tree_id" treeref
+
+	# list references
+	got ref -r $testroot/repo -l > $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+HEAD: refs/heads/master
+refs/blobref: $foo_id
+refs/heads/master: $commit_id
+refs/treeref: $tree_id
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# gotadmin cleanup should not purge referenced objects
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
+		2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotadmin cleanup failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# verify that the blob object can be read
+	got cat -r $testroot/repo "$foo_id" > $testroot/stdout
+	cmp -s $testroot/t/foo $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/t/foo $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# verify that the tree object can be read
+	got cat -r $testroot/repo "$tree_id" > $testroot/stdout
+	printf "$foo_id 0010644 foo\n" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cleanup_unreferenced_loose_objects
 run_test test_cleanup_redundant_loose_objects
 run_test test_cleanup_redundant_pack_files
 run_test test_cleanup_precious_objects
 run_test test_cleanup_missing_pack_file
+run_test test_cleanup_non_commit_ref
