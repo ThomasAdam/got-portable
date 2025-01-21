@@ -264,8 +264,9 @@ and a break-down of the number of objects per object type.
 .Op Fl r Ar repository-path
 .Xc
 .Dl Pq alias: Cm cl
-Purge unreferenced loose objects and redundant pack files from the
-repository and display the amount of disk space which has been freed
+Repack the repository and then purge unreferenced loose objects and
+redundant pack files.
+Display the amount of disk space which has been freed
 as a result.
 .Pp
 Unreferenced objects are present in the repository but cannot be
@@ -290,12 +291,8 @@ Packed objects are stored in pack files under
 .Pp
 If redundant copies of packed objects exist in loose form, such
 redundant copies will be purged.
-If all the objects of a pack file are present in other pack files,
-the redundant pack file will be purged.
-Pack files will usually become redundant as a result of repacking the
-repository with
-.Nm
-.Cm pack Fl a .
+If all the objects of a pack file are present in a bigger pack file,
+the redundant smaller pack file will be purged.
 .Pp
 References in the
 .Pa refs/got
