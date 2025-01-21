@@ -159,8 +159,10 @@ create_temp_packfile(int *packfd, char **tmpfile_path,
 	if (fchmod(*packfd, GOT_DEFAULT_PACK_MODE) == -1)
 		err = got_error_from_errno2("fchmod", *tmpfile_path);
 done:
+	free(path);
 	if (err) {
-		close(*packfd);
+		if (*packfd != -1)
+			close(*packfd);
 		*packfd = -1;
 		free(*tmpfile_path);
 		*tmpfile_path = NULL;
@@ -284,7 +286,8 @@ done:
 		free(theirs[i]);
 	free(theirs);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
-		err = got_error_from_errno2("close", packfile_path);
+		err = got_error_from_errno2("close",
+		    packfile_path ? packfile_path : tmpfile_path);
 	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (tmpfile_path && unlink(tmpfile_path) == -1 && err == NULL)
@@ -1590,7 +1593,8 @@ got_repo_cleanup(struct got_repository *repo,
 	if (traversed_ids)
 		got_object_idset_free(traversed_ids);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
-		err = got_error_from_errno2("close", packfile_path);
+		err = got_error_from_errno2("close",
+		    packfile_path ? packfile_path : tmpfile_path);
 	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (tmpfile_path && unlink(tmpfile_path) == -1 && err == NULL)
