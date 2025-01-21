@@ -1011,33 +1011,55 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 		}
 
 		if (tag) {
-			/* Find a tree object to scan. */
+			struct got_object_id *id;
+
 			obj_type = got_object_tag_get_object_type(tag);
+			while (obj_type == GOT_OBJ_TYPE_TAG) {
+				struct got_tag_object *next_tag;
+
+				id = got_object_tag_get_object_id(tag);
+				if (!got_object_idset_contains(traversed_ids,
+				    id)) {
+					err = got_object_idset_add(
+					    traversed_ids, id, NULL);
+					if (err)
+						goto done;
+				}
+
+				err = got_object_open_as_tag(&next_tag, repo,
+				    id);
+				if (err)
+					goto done;
+
+				got_object_tag_close(tag);
+				tag = next_tag;
+				obj_type = got_object_tag_get_object_type(tag);
+			}
+			id = got_object_tag_get_object_id(tag);
 			switch (obj_type) {
 			case GOT_OBJ_TYPE_COMMIT:
 				err = got_object_open_as_commit(&commit, repo,
-				    got_object_tag_get_object_id(tag));
+				    id);
 				if (err)
 					goto done;
 				tree_id = got_object_commit_get_tree_id(commit);
 				break;
 			case GOT_OBJ_TYPE_TREE:
-				tree_id = got_object_tag_get_object_id(tag);
+				tree_id = id;
 				break;
-			default:
-				/*
-				 * Tag points at something other than a
-				 * commit or tree. Leave this weird tag object
-				 * and the object it points to.
-				 */
+			case GOT_OBJ_TYPE_BLOB:
 				if (got_object_idset_contains(traversed_ids,
-				    got_object_tag_get_object_id(tag)))
+				    id))
 					break;
-				err = got_object_idset_add(traversed_ids,
-				    got_object_tag_get_object_id(tag), NULL);
+				err = got_object_idset_add(traversed_ids, id,
+				    NULL);
 				if (err)
 					goto done;
 				break;
+			default:
+				/* should not happen */
+				err = got_error(GOT_ERR_OBJ_TYPE);
+				goto done;
 			}
 		} else if (tree_id == NULL) {
 			/* Blob which has already been marked as traversed. */

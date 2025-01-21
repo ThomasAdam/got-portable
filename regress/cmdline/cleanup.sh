@@ -500,12 +500,104 @@ test_cleanup_non_commit_ref() {
 	# create a reference which points at the tree
 	got ref -r $testroot/repo -c "$tree_id" treeref
 
+	inner_tag_date=$(date +%s)
+
+	# Create a nested tag of another tree.
+	# Ensure that gotadmin cleanup follows chains of tags and
+	# all objects referenced via this chain.
+
+	echo bar > $testroot/t/bar
+	bar_id=$(git -C $testroot/repo hash-object -t blob -w $testroot/t/bar)
+
+	printf "10644 blob $foo_id\tfoo\n" > $testroot/tree-desc2
+	printf "10644 blob $bar_id\tbar\n" >> $testroot/tree-desc2
+	tree_id2=$(git -C $testroot/repo mktree < $testroot/tree-desc2)
+
+	# verify that the second tree object can be read
+	got cat -r $testroot/repo "$tree_id2" > $testroot/stdout
+	printf "$bar_id 0010644 bar\n" > $testroot/stdout.expected
+	printf "$foo_id 0010644 foo\n" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/inner-tag-desc <<EOF
+object $tree_id2
+type tree
+tag treetag
+tagger $GOT_AUTHOR $inner_tag_date +0000
+
+tagging a tree
+EOF
+	inner_tag_id=$(git -C $testroot/repo hash-object -t tag -w \
+		$testroot/inner-tag-desc)
+
+	# verify that the inner tag object can be read
+	got cat -r $testroot/repo "$inner_tag_id" > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<EOF
+object $tree_id2
+type tree
+tag treetag
+tagger $GOT_AUTHOR $inner_tag_date +0000
+messagelen 16
+
+tagging a tree
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	tag_date=$(date +%s)
+
+	cat > $testroot/tag-desc <<EOF
+object $inner_tag_id
+type tag
+tag tagtag
+tagger $GOT_AUTHOR $tag_date +0000
+
+tagging a tag
+EOF
+	tag_id=$(git -C $testroot/repo hash-object -t tag -w $testroot/tag-desc)
+
+	# verify that the tag object can be read
+	got cat -r $testroot/repo "$tag_id" > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<EOF
+object $inner_tag_id
+type tag
+tag tagtag
+tagger $GOT_AUTHOR $tag_date +0000
+messagelen 15
+
+tagging a tag
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a reference which points at the outer tag
+	got ref -r $testroot/repo -c "$tag_id" tagref
+
 	# list references
 	got ref -r $testroot/repo -l > $testroot/stdout
 	cat > $testroot/stdout.expected <<EOF
 HEAD: refs/heads/master
 refs/blobref: $foo_id
 refs/heads/master: $commit_id
+refs/tagref: $tag_id
 refs/treeref: $tree_id
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -539,6 +631,58 @@ EOF
 	# verify that the tree object can be read
 	got cat -r $testroot/repo "$tree_id" > $testroot/stdout
 	printf "$foo_id 0010644 foo\n" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# verify that the second tree object can be read
+	got cat -r $testroot/repo "$tree_id2" > $testroot/stdout
+	printf "$bar_id 0010644 bar\n" > $testroot/stdout.expected
+	printf "$foo_id 0010644 foo\n" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# verify that the inner tag object can be read
+	got cat -r $testroot/repo "$inner_tag_id" > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<EOF
+object $tree_id2
+type tree
+tag treetag
+tagger $GOT_AUTHOR $inner_tag_date +0000
+messagelen 16
+
+tagging a tree
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# verify that the outer tag object can be read
+	got cat -r $testroot/repo "$tag_id" > $testroot/stdout
+
+	cat > $testroot/stdout.expected <<EOF
+object $inner_tag_id
+type tag
+tag tagtag
+tagger $GOT_AUTHOR $tag_date +0000
+messagelen 15
+
+tagging a tag
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
 	if [ $ret -ne 0 ]; then
