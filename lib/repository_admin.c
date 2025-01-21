@@ -987,11 +987,19 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 			    &qid->id);
 			if (err)
 				goto done;
+			tree_id = got_object_commit_get_tree_id(commit);
 			break;
 		case GOT_OBJ_TYPE_TAG:
 			err = got_object_open_as_tag(&tag, repo, &qid->id);
 			if (err)
 				goto done;
+			/* tree_id will be set below */
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			tree_id = &qid->id;
+			break;
+		case GOT_OBJ_TYPE_BLOB:
+			tree_id = NULL;
 			break;
 		default:
 			/* should not happen */
@@ -999,10 +1007,8 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 			goto done;
 		}
 
-		/* Find a tree object to scan. */
-		if (commit) {
-			tree_id = got_object_commit_get_tree_id(commit);
-		} else if (tag) {
+		if (tag) {
+			/* Find a tree object to scan. */
 			obj_type = got_object_tag_get_object_type(tag);
 			switch (obj_type) {
 			case GOT_OBJ_TYPE_COMMIT:
@@ -1030,6 +1036,9 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 					goto done;
 				break;
 			}
+		} else if (tree_id == NULL) {
+			/* Blob which has already been marked as traversed. */
+			continue;
 		}
 
 		if (tree_id) {
@@ -1037,6 +1046,7 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 			    repo, cancel_cb, cancel_arg);
 			if (err)
 				break;
+			tree_id = NULL;
 		}
 
 		if (commit || tag)
@@ -1528,8 +1538,7 @@ got_repo_cleanup(struct got_repository *repo,
 	}
 
 	err = get_reflist_object_ids(&referenced_ids, &nreferenced,
-	    (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
-	    &refs, repo, cancel_cb, cancel_arg);
+	    GOT_OBJ_TYPE_ANY, &refs, repo, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
