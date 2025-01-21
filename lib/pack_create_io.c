@@ -156,7 +156,7 @@ search_delta_for_object(struct got_object_id *id, void *data, void *arg)
 
 		err = got_pack_report_progress(a->progress_cb, a->progress_arg,
 		    a->rl, a->ncolored, a->nfound, a->ntrees, 0L, a->ncommits,
-		    got_object_idset_num_elements(a->idset), a->v->nmeta, 0);
+		    got_object_idset_num_elements(a->idset), a->v->nmeta, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -312,7 +312,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		}
 
 		err = got_pack_report_progress(progress_cb, progress_arg, rl,
-		    *ncolored, 0, 0, 0L, 0, 0, 0, 0);
+		    *ncolored, 0, 0, 0L, 0, 0, 0, 0, 0);
 		if (err)
 			break;
 

@@ -510,7 +510,7 @@ struct repo_read_pack_progress_arg {
 static const struct got_error *
 pack_progress(void *arg, int ncolored, int nfound, int ntrees,
     off_t packfile_size, int ncommits, int nobj_total, int nobj_deltify,
-    int nobj_written)
+    int nobj_written, int pack_done)
 {
 	struct repo_read_pack_progress_arg *a = arg;
 	struct gotd_imsg_packfile_progress iprog;

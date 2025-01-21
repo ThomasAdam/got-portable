@@ -106,7 +106,7 @@ const struct got_error *
 got_pack_report_progress(got_pack_progress_cb progress_cb, void *progress_arg,
     struct got_ratelimit *rl, int ncolored, int nfound, int ntrees,
     off_t packfile_size, int ncommits, int nobj_total, int obj_deltify,
-    int nobj_written);
+    int nobj_written, int pack_done);
 
 const struct got_error *
 got_pack_load_packed_object_ids(int *found_all_objects,

@@ -520,7 +520,7 @@ print_load_info(FILE *out, int print_colored, int print_found, int print_trees,
 static const struct got_error *
 pack_progress(void *arg, int ncolored, int nfound, int ntrees,
     off_t packfile_size, int ncommits, int nobj_total, int nobj_deltify,
-    int nobj_written)
+    int nobj_written, int pack_done)
 {
 	struct got_pack_progress_arg *a = arg;
 	char scaled_size[FMT_SCALED_STRSIZE];
@@ -621,17 +621,18 @@ pack_progress(void *arg, int ncolored, int nfound, int ntrees,
 	if (print_written)
 		fprintf(a->out, "; writing pack: %*s %d%%",
 		    FMT_SCALED_STRSIZE - 2, scaled_size, p_written);
-	if (print_searching || print_total || print_deltify ||
-	    print_written) {
+	if (print_searching || print_total || print_deltify || print_written) {
 		a->printed_something = 1;
 		fflush(a->out);
 	}
+	if (pack_done)
+		fprintf(a->out, "\n");
 	return NULL;
 }
 
 static const struct got_error *
 pack_index_progress(void *arg, off_t packfile_size, int nobj_total,
-    int nobj_indexed, int nobj_loose, int nobj_resolved)
+    int nobj_indexed, int nobj_loose, int nobj_resolved, int indexing_done)
 {
 	struct got_pack_progress_arg *a = arg;
 	char scaled_size[FMT_SCALED_STRSIZE];
@@ -678,7 +679,9 @@ pack_index_progress(void *arg, off_t packfile_size, int nobj_total,
 		printf("; indexing %d%%", p_indexed);
 	if (print_resolved)
 		printf("; resolving deltas %d%%", p_resolved);
-	if (print_size || print_indexed || print_resolved)
+	if (indexing_done)
+		printf("\n");
+	if (print_size || print_indexed || print_resolved || indexing_done)
 		fflush(stdout);
 
 	return NULL;
@@ -719,7 +722,7 @@ cmd_pack(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	int ch, i, loose_obj_only = 1, force_refdelta = 0, verbosity = 0;
 	struct got_object_id *pack_hash = NULL;
-	char *id_str = NULL;
+	char *id_str = NULL, *idxpath = NULL;
 	struct got_pack_progress_arg ppa;
 	FILE *packfile = NULL;
 	struct got_pathlist_head exclude_args;
@@ -844,7 +847,7 @@ cmd_pack(int argc, char *argv[])
 	if (verbosity >= 0)
 		printf("\nWrote %s.pack\n", id_str);
 
-	error = got_repo_index_pack(packfile, pack_hash, repo,
+	error = got_repo_index_pack(&idxpath, packfile, pack_hash, repo,
 	    pack_index_progress, &ppa, check_cancelled, NULL);
 	if (error)
 		goto done;
@@ -865,6 +868,7 @@ done:
 	free(id_str);
 	free(pack_hash);
 	free(repo_path);
+	free(idxpath);
 	return error;
 }
 
@@ -883,7 +887,7 @@ cmd_indexpack(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	int ch;
 	struct got_object_id *pack_hash = NULL;
-	char *packfile_path = NULL;
+	char *packfile_path = NULL, *idxpath = NULL;
 	char *id_str = NULL;
 	struct got_pack_progress_arg ppa;
 	FILE *packfile = NULL;
@@ -939,7 +943,7 @@ cmd_indexpack(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_index_pack(packfile, pack_hash, repo,
+	error = got_repo_index_pack(&idxpath, packfile, pack_hash, repo,
 	    pack_index_progress, &ppa, check_cancelled, NULL);
 	if (error)
 		goto done;
@@ -955,6 +959,7 @@ done:
 	}
 	free(id_str);
 	free(pack_hash);
+	free(idxpath);
 	return error;
 }
 
@@ -1266,6 +1271,7 @@ cmd_cleanup(int argc, char *argv[])
 	int ch, dry_run = 0, verbosity = 0;
 	int ncommits = 0, nloose = 0, npacked = 0;
 	int remove_lonely_packidx = 0, ignore_mtime = 0;
+	struct got_pack_progress_arg ppa;
 	struct got_cleanup_progress_arg cpa;
 	struct got_lonely_packidx_progress_arg lpa;
 	off_t loose_before, loose_after;
@@ -1279,7 +1285,7 @@ cmd_cleanup(int argc, char *argv[])
 	int *pack_fds = NULL;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
@@ -1353,11 +1359,16 @@ cmd_cleanup(int argc, char *argv[])
 	cpa.dry_run = dry_run;
 	cpa.verbosity = verbosity;
 
+	memset(&ppa, 0, sizeof(ppa));
+	ppa.out = stdout;
+	ppa.verbosity = verbosity;
+
 	error = got_repo_cleanup(repo, &loose_before, &loose_after,
 	    &pack_before, &pack_after, &ncommits, &nloose, &npacked,
 	    dry_run, ignore_mtime, cleanup_progress, &cpa,
+	    pack_progress, &ppa, pack_index_progress, &ppa,
 	    check_cancelled, NULL);
-	if (cpa.printed_something)
+	if (ppa.printed_something || cpa.printed_something)
 		printf("\n");
 	if (error)
 		goto done;
@@ -1562,7 +1573,7 @@ load_progress(void *arg, off_t packfile_size, int nobj_total,
     int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
 	return pack_index_progress(arg, packfile_size, nobj_total,
-	    nobj_indexed, nobj_loose, nobj_resolved);
+	    nobj_indexed, nobj_loose, nobj_resolved, 0);
 }
 
 static int
