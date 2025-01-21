@@ -1735,14 +1735,17 @@ get_symlink_modification_status(unsigned char *status,
 static const struct got_error *
 file_is_binary(int *is_binary , FILE *f)
 {
-	const struct got_error *err = NULL;
 	char buf[8192];
 	size_t r;
-	off_t pos = ftello(f);
+	off_t pos;
 
 	*is_binary = 0;
 
-	if (fseek(f, 0L, SEEK_SET) == -1)
+	pos = ftello(f);
+	if (pos == -1)
+		return got_error_from_errno("ftello");
+
+	if (fseeko(f, 0L, SEEK_SET) == -1)
 		return got_ferror(f, GOT_ERR_IO);
 
 	r = fread(buf, 1, sizeof(buf), f);
@@ -1752,10 +1755,10 @@ file_is_binary(int *is_binary , FILE *f)
 	if (r > 0)
 		*is_binary = memchr(buf, '\0', r) != NULL;
 
-	if (fseek(f, pos, SEEK_SET) == -1 && err == NULL)
-		err = got_ferror(f, GOT_ERR_IO);
+	if (fseeko(f, pos, SEEK_SET) == -1)
+		return got_ferror(f, GOT_ERR_IO);
 
-	return err;
+	return NULL;
 }
 
 static const struct got_error *
