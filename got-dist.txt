@@ -383,10 +383,12 @@
 /regress/gotwebd/action_patch.html
 /regress/gotwebd/action_summary.html
 /regress/gotwebd/action_tree.html
+/regress/gotwebd/commits_page.html
 /regress/gotwebd/common.sh
 /regress/gotwebd/gotwebd_test.c
 /regress/gotwebd/prepare_test_repo.sh
 /regress/gotwebd/test_gotwebd.sh
+/regress/gotwebd/test_gotwebd_paginate.sh
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
@@ -431,6 +433,7 @@
 /regress/tog/common.sh
 /regress/tog/diff.sh
 /regress/tog/log.sh
+/regress/tog/ref.sh
 /regress/tog/tree.sh
 /template
 /template/Makefile
