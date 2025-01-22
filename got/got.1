@@ -483,8 +483,13 @@ and
 options.
 .Pp
 New changes will be stored in a separate pack file downloaded from the server.
-Optionally, separate pack files stored in the repository can be combined with
-.Xr git-repack 1 .
+Over time, small pack files will accumulate as a result of repeatedly running
+.Ic got fetch .
+For best performance, multiple small pack files can be combined into a single
+larger pack file with
+.Ic gotadmin cleanup .
+The number of pack files in the repository is displayed by
+.Ic gotadmin info .
 .Pp
 By default, branch references in the
 .Dq refs/remotes/
@@ -646,7 +651,7 @@ are allowed.
 Only references are deleted.
 Any commit, tree, tag, and blob objects fetched from a remote repository
 will generally be stored in pack files and may be removed separately with
-.Xr git-repack 1
+.Ic gotadmin cleanup
 and Git's garbage collector.
 .El
 .Tg co
