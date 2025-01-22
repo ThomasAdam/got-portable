@@ -6,7 +6,7 @@
 - tog: fix a deadlock (hang) in the log view implementation
 - tog: plug a memory leak
 - tog: do not exit if a tag pointing at a non-commit is selected in ref view
-- tog: do nog mark an incorrect base commit in nested log views
+- tog: do not mark an incorrect base commit in nested log views
 - tog: fix NULL deref when scrolling small tree views down
 - tog: avoid showing a negative log view entry index
 - tog: do not apply a pointless count modifier to the H, &, p keymaps
