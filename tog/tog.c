@@ -3143,7 +3143,15 @@ push_worktree_entry(struct tog_log_thread_args *ta, int wt_entry,
 static const struct got_error *
 check_cancelled(void *arg)
 {
-	if (tog_sigint_received || tog_sigpipe_received)
+	int rc, quit = 0;
+
+	if ((rc = pthread_mutex_lock(&tog_mutex)) != 0)
+		return got_error_set_errno(rc, "pthread_mutex_lock");
+	if (tog_sigint_received || tog_sigpipe_received || *((int *)arg))
+		quit = 1;
+	if ((rc = pthread_mutex_unlock(&tog_mutex)) != 0)
+		return got_error_set_errno(rc, "pthread_mutex_unlock");
+	if (quit)
 		return got_error(GOT_ERR_CANCELLED);
 	return NULL;
 }
@@ -3215,12 +3223,9 @@ tog_worktree_status(struct tog_log_thread_args *ta)
 		goto done;
 
 	err = got_worktree_status(wt, &paths, ta->repo, 0,
-	    check_local_changes, &wt_state, check_cancelled, NULL);
-	if (err != NULL) {
-		if (err->code != GOT_ERR_CANCELLED)
-			goto done;
-		err = NULL;
-	}
+	    check_local_changes, &wt_state, check_cancelled, ta->quit);
+	if (err != NULL)
+		goto done;
 
 	if (wt_state != 0) {
 		err = get_author(&wctx->wt_author, ta->repo, wt);
@@ -4052,8 +4057,11 @@ log_thread(void *arg)
 				goto done;
 			}
 			err = tog_worktree_status(a);
-			if (err != NULL)
+			if (err != NULL) {
+				if (err->code == GOT_ERR_CANCELLED)
+					err = NULL;
 				goto done;
+			}
 			errcode = pthread_mutex_lock(&tog_mutex);
 			if (errcode) {
 				err = got_error_set_errno(errcode,
