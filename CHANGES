@@ -1,3 +1,26 @@
+* got 0.108; 2025-01-22
+- add ssh -i identity-file support to commands which use the network
+- make 'got import' output independent of readdir(3) entry order
+- avoid full file content comparisons in 'got status' for speed
+- tog: fix NULL deref when log view T keymap is used on worktree entry
+- tog: fix a deadlock (hang) in the log view implementation
+- tog: plug a memory leak
+- tog: do not exit if a tag pointing at a non-commit is selected in ref view
+- tog: do nog mark an incorrect base commit in nested log views
+- tog: fix NULL deref when scrolling small tree views down
+- tog: avoid showing a negative log view entry index
+- tog: do not apply a pointless count modifier to the H, &, p keymaps
+- tog: do not make users wait for the worktree diff to quit out of tog
+- gotwebd: make parent process drop root privileges
+- gotwebd: drop read access to /var/www from parent process
+- gotwebd: rename "socket" processes to "server"
+- gotadmin cleanup: pack the repository before removing objects
+- gotadmin cleanup: do not delete directly referenced trees and blobs
+- gotadmin cleanup: do not delete objects reachable via nested tags
+- regress: skip test memleak_send_basic in sha256 mode; expected to fail
+- regress: make seq(1) invocations portable to fix test failures on linux
+- regress/gotwebd: implement paginated commits test
+
 * got 0.107; 2024-12-28
 - gotwebd.css styling tweaks
 - hide ssh debug output during fetch/send -v, keep showing it at -vv and -vvv
