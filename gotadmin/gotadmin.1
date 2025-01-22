@@ -280,11 +280,10 @@ branches, tags, or other references with
 or
 .Cm got fetch -X .
 .Pp
-Loose objects are stored as individual files beneath the repository's
+Loose objects are stored as individual files in subdirectories of the
+repository's
 .Pa objects/
-directory,
-spread across 256 sub-directories named after the 256 possible
-hexadecimal values of the first byte of an object identifier.
+directory.
 .Pp
 Packed objects are stored in pack files under
 .Pa objects/pack/ .
