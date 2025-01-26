@@ -171,9 +171,9 @@ start_gotd_rw_protected: ensure_root
 	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
 	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
 	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
-	@echo '    protect branch "foo"' >> $(PWD)/gotd.conf
+	@echo '    protect branch foo' >> $(PWD)/gotd.conf
 	@echo '    protect tag namespace "refs/tags/"' >> $(PWD)/gotd.conf
-	@echo '    protect branch "refs/heads/main"' >> $(PWD)/gotd.conf
+	@echo '    protect { branch refs/heads/main }' >> $(PWD)/gotd.conf
 	@echo "}" >> $(PWD)/gotd.conf
 	@$(GOTD_TRAP); $(GOTD_START_CMD)
 	@$(GOTD_TRAP); sleep .5
