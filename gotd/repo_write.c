@@ -1505,6 +1505,51 @@ protect_refs_from_deletion(void)
 }
 
 static const struct got_error *
+protect_refs_from_moving(void)
+{
+	const struct got_error *err = NULL;
+	struct repo_write_client *client = &repo_write_client;
+	struct gotd_ref_update *ref_update;
+	struct got_pathlist_entry *pe;
+	const char *refname;
+
+	STAILQ_FOREACH(ref_update, &client->ref_updates, entry) {
+		if (ref_update->delete_ref)
+			continue;
+
+		if (got_object_id_cmp(&ref_update->old_id,
+		    &ref_update->new_id) == 0)
+			continue;
+
+		refname = got_ref_get_name(ref_update->ref);
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_tag_namespaces) {
+			err = protect_ref_namespace(refname, pe->path);
+			if (err)
+				return err;
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branch_namespaces) {
+			err = protect_ref_namespace(refname, pe->path);
+			if (err)
+				return err;
+		}
+
+		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
+		{
+			if (strcmp(refname, pe->path) == 0) {
+				return got_error_fmt(GOT_ERR_REF_PROTECTED,
+				    "%s", refname);
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 install_packfile(struct gotd_imsgev *iev)
 {
 	struct repo_write_client *client = &repo_write_client;
@@ -2251,6 +2296,14 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 				 */
 				repo_write.repo->pack_path_mtime.tv_sec = 0;
 				repo_write.repo->pack_path_mtime.tv_nsec = 0;
+			} else {
+				/*
+				 * Clients sending empty pack files might be
+				 * attempting to move a protected reference.
+				 */
+				err = protect_refs_from_moving();
+				if (err)
+					break;
 			}
 			err = update_refs(iev);
 			if (err) {

@@ -199,7 +199,7 @@ test_modify_protected_branch() {
 
 	got checkout $testroot/repo-clone $testroot/wt >/dev/null
 
-	for i in 1 2 3; do
+	for i in 1 2; do
 		echo "more alpha" >> $testroot/wt/alpha
 		(cd $testroot/wt && got commit -m "more" >/dev/null)
 	done
