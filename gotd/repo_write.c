@@ -840,8 +840,8 @@ copy_ref_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
 }
 
 static const struct got_error *
-copy_offset_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
-    struct got_hash *ctx)
+copy_offset_delta(int infd, int outfd, off_t *outsize, BUF *buf,
+    size_t *buf_pos, struct got_hash *ctx)
 {
 	const struct got_error *err = NULL;
 	uint64_t o = 0;
@@ -1405,7 +1405,8 @@ verify_packfile(void)
 		if (ref_update->delete_ref)
 			continue;
 
-		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_tag_namespaces) {
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_tag_namespaces) {
 			err = protect_tag_namespace(pe->path, &client->pack,
 			    packidx, ref_update);
 			if (err)
@@ -1437,15 +1438,15 @@ verify_packfile(void)
 			}
 		}
 
-		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branch_namespaces)
-		{
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branch_namespaces) {
 			err = protect_branch_namespace(pe->path,
 			    &client->pack, packidx, ref_update);
 			if (err)
 				goto done;
 		}
-		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
-		{
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branches) {
 			err = protect_branch(pe->path, &client->pack,
 			    packidx, ref_update);
 			if (err)
@@ -1492,8 +1493,8 @@ protect_refs_from_deletion(void)
 				return err;
 		}
 
-		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
-		{
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branches) {
 			if (strcmp(refname, pe->path) == 0) {
 				return got_error_fmt(GOT_ERR_REF_PROTECTED,
 				    "%s", refname);
@@ -1537,8 +1538,8 @@ protect_refs_from_moving(void)
 				return err;
 		}
 
-		RB_FOREACH(pe, got_pathlist_head, repo_write.protected_branches)
-		{
+		RB_FOREACH(pe, got_pathlist_head,
+		    repo_write.protected_branches) {
 			if (strcmp(refname, pe->path) == 0) {
 				return got_error_fmt(GOT_ERR_REF_PROTECTED,
 				    "%s", refname);
@@ -1774,8 +1775,8 @@ print_diffstat(struct got_diffstat_cb_arg *dsa, int fd)
 		int pad = dsa->max_path_len - pe->path_len + 1;
 
 		dprintf(fd, " %c  %s%*c | %*d+ %*d-\n", cp->status,
-		     pe->path, pad, ' ', dsa->add_cols + 1, cp->add,
-		     dsa->rm_cols + 1, cp->rm);
+		    pe->path, pad, ' ', dsa->add_cols + 1, cp->add,
+		    dsa->rm_cols + 1, cp->rm);
 	}
 	dprintf(fd,
 	    "\n%d file%s changed, %d insertion%s(+), %d deletion%s(-)\n\n",
@@ -2326,9 +2327,8 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (!shut && check_cancelled(NULL) == NULL) {
-		if (err &&
-		    gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
-		        client->id, err) == -1) {
+		if (err && gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
+		    client->id, err) == -1) {
 			log_warnx("could not send error to parent: %s",
 			    err->msg);
 		}
