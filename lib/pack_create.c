@@ -1046,6 +1046,77 @@ got_pack_paint_commit(struct got_object_qid *qid, intptr_t color)
 }
 
 const struct got_error *
+got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
+    struct got_object_idset *set, struct got_object_idset *skip,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object_id_queue ids;
+	struct got_object_qid *qid;
+	struct got_commit_object *commit;
+	const struct got_object_id_queue *parents;
+
+	STAILQ_INIT(&ids);
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		return err;
+
+	while (commit) {
+		parents = got_object_commit_get_parent_ids(commit);
+		if (parents) {
+			struct got_object_qid *pid;
+			STAILQ_FOREACH(pid, parents, entry) {
+				/*
+				 * No need to traverse parents which are
+				 * already in the desired set or are
+				 * marked for skipping already.
+				 */
+				if (got_object_idset_contains(set, &pid->id))
+					continue;
+				if (skip != set &&
+				    got_object_idset_contains(skip, &pid->id))
+					continue;
+
+				err = got_pack_queue_commit_id(&ids, &pid->id,
+				    color, repo);
+				if (err)
+					break;
+			}
+		}
+		got_object_commit_close(commit);
+		commit = NULL;
+
+		qid = STAILQ_FIRST(&ids);
+		if (qid) {
+			STAILQ_REMOVE_HEAD(&ids, entry);
+			if (!got_object_idset_contains(set, &qid->id)) {
+				err = got_object_idset_add(set, &qid->id,
+				    NULL);
+				if (err)
+					break;
+			}
+
+			err = got_object_open_as_commit(&commit, repo,
+			    &qid->id);
+			if (err)
+				break;
+
+			got_object_qid_free(qid);
+			qid = NULL;
+		}
+	}
+
+	if (commit)
+		got_object_commit_close(commit);
+	if (qid)
+		got_object_qid_free(qid);
+	got_object_id_queue_free(&ids);
+
+	return err;
+}
+
+const struct got_error *
 got_pack_queue_commit_id(struct got_object_id_queue *ids,
     struct got_object_id *id, intptr_t color, struct got_repository *repo)
 {
