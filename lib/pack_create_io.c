@@ -278,6 +278,14 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				err = got_pack_paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+				err = got_pack_repaint_parent_commits(&qid->id,
+				    COLOR_SKIP, skip, skip, repo);
+				if (err)
+					goto done;
 			} else
 				(*ncolored)++;
 			err = got_object_idset_add(keep, &qid->id, NULL);
@@ -287,6 +295,14 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		case COLOR_DROP:
 			if (got_object_idset_contains(keep, &qid->id)) {
 				err = got_pack_paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+				err = got_pack_repaint_parent_commits(&qid->id,
+				    COLOR_SKIP, skip, skip, repo);
 				if (err)
 					goto done;
 			} else

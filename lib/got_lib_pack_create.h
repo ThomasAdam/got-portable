@@ -55,6 +55,9 @@ enum got_pack_findtwixt_color {
 
 const struct got_error *got_pack_paint_commit(struct got_object_qid *qid,
     intptr_t color);
+const struct got_error *got_pack_repaint_parent_commits(
+    struct got_object_id *commit_id, int color, struct got_object_idset *set,
+    struct got_object_idset *skip, struct got_repository *repo);
 const struct got_error *got_pack_queue_commit_id(
     struct got_object_id_queue *ids, struct got_object_id *id, intptr_t color,
     struct got_repository *repo);
