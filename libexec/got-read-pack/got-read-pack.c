@@ -1051,8 +1051,8 @@ recv_object_ids(struct got_object_idset *idset, struct imsgbuf *ibuf)
 }
 
 static const struct got_error *
-recv_object_id_queue(struct got_object_id_queue *queue,
-    struct got_object_idset *queued_ids, struct imsgbuf *ibuf)
+recv_object_id_queue(size_t *nids_total, struct got_object_id_queue *queue,
+    void *data, struct got_object_idset *queued_ids, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	int done = 0;
@@ -1060,19 +1060,26 @@ recv_object_id_queue(struct got_object_id_queue *queue,
 	struct got_object_id *ids;
 	size_t nids, i;
 
+	*nids_total = 0;
 	for (;;) {
 		err = got_privsep_recv_object_idlist(&done, &ids, &nids, ibuf);
 		if (err || done)
 			break;
+		*nids_total += nids;
 		for (i = 0; i < nids; i++) {
 			err = got_object_qid_alloc_partial(&qid);
 			if (err)
 				goto done;
 			memcpy(&qid->id, &ids[i], sizeof(qid->id));
+			if (data)
+				qid->data = data;
 			STAILQ_INSERT_TAIL(queue, qid, entry);
-			err = got_object_idset_add(queued_ids, &qid->id, NULL);
-			if (err)
-				goto done;
+			if (queued_ids) {
+				err = got_object_idset_add(queued_ids,
+				    &qid->id, NULL);
+				if (err)
+					goto done;
+			}
 		}
 		free(ids);
 		ids = NULL;
@@ -1453,7 +1460,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	struct got_object_idset *idset, *queued_ids = NULL;
 	int i, idx, have_all_entries = 1;
 	struct enumerated_tree *trees = NULL;
-	size_t ntrees = 0, nalloc = 16;
+	size_t ntrees = 0, nalloc = 16, nids = 0;
 
 	STAILQ_INIT(&commit_ids);
 
@@ -1473,7 +1480,7 @@ enumeration_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		goto done;
 	}
 
-	err = recv_object_id_queue(&commit_ids, queued_ids, ibuf);
+	err = recv_object_id_queue(&nids, &commit_ids, NULL, queued_ids, ibuf);
 	if (err)
 		goto done;
 
@@ -1671,6 +1678,87 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 }
 
 static const struct got_error *
+repaint_parent_commits(struct got_object_id *commit_id, int color,
+    struct got_object_idset *set, struct got_object_idset *skip,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err;
+	struct got_object_id_queue ids;
+	struct got_object_qid *qid = NULL;
+	struct got_commit_object *commit;
+	const struct got_object_id_queue *parents;
+	int idx;
+
+	STAILQ_INIT(&ids);
+
+	idx = got_packidx_get_object_idx(packidx, commit_id);
+	if (idx == -1)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	err = open_commit(&commit, pack, packidx, idx, commit_id, objcache);
+	if (err)
+		return err;
+
+	while (commit) {
+		parents = got_object_commit_get_parent_ids(commit);
+		if (parents) {
+			struct got_object_qid *pid;
+			STAILQ_FOREACH(pid, parents, entry) {
+				/*
+				 * No need to traverse parents which are
+				 * already in the desired set or are
+				 * marked for skipping already.
+				 */
+				if (got_object_idset_contains(set, &pid->id))
+					continue;
+				if (skip != set &&
+				    got_object_idset_contains(skip, &pid->id))
+					continue;
+
+				err = queue_commit_id(&ids, &pid->id, color);
+				if (err)
+					break;
+			}
+		}
+		got_object_commit_close(commit);
+		commit = NULL;
+
+		qid = STAILQ_FIRST(&ids);
+		if (qid) {
+			STAILQ_REMOVE_HEAD(&ids, entry);
+			if (!got_object_idset_contains(set, &qid->id)) {
+				err = got_object_idset_add(set, &qid->id,
+				    NULL);
+				if (err)
+					break;
+			}
+
+			idx = got_packidx_get_object_idx(packidx, &qid->id);
+			if (idx == -1) {
+				err = got_error(GOT_ERR_NO_OBJ);
+				break;
+			}
+
+			err = open_commit(&commit, pack, packidx, idx,
+			    &qid->id, objcache);
+			if (err)
+				break;
+
+			got_object_qid_free(qid);
+			qid = NULL;
+		}
+	}
+
+	if (commit)
+		got_object_commit_close(commit);
+	if (qid)
+		got_object_qid_free(qid);
+	got_object_id_queue_free(&ids);
+
+	return err;
+}
+static const struct got_error *
 paint_commits(struct got_object_id_queue *ids, int *nids,
     struct got_object_idset *keep, struct got_object_idset *drop,
     struct got_object_idset *skip, struct got_pack *pack,
@@ -1725,6 +1813,15 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
 					goto done;
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+				err = repaint_parent_commits(&qid->id,
+				    COLOR_SKIP, skip, skip, pack, packidx,
+				    objcache);
+				if (err)
+					goto done;
 			}
 			err = got_object_idset_add(keep, &qid->id, NULL);
 			if (err)
@@ -1738,6 +1835,15 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 			}
 			if (got_object_idset_contains(keep, &qid->id)) {
 				err = paint_commit(qid, COLOR_SKIP);
+				if (err)
+					goto done;
+				err = got_object_idset_add(skip, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+				err = repaint_parent_commits(&qid->id,
+				    COLOR_SKIP, skip, skip, pack, packidx,
+				    objcache);
 				if (err)
 					goto done;
 			}
@@ -1870,24 +1976,47 @@ commit_painting_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_object_idset *drop, struct got_object_idset *skip)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_commit_painting_request ireq;
-	struct got_object_id id;
 	size_t datalen;
 	struct got_object_id_queue ids;
+	size_t nkeep = 0, ndrop = 0, nskip = 0;
 	int nids = 0;
+	uintptr_t color;
 
 	STAILQ_INIT(&ids);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ireq))
+	if (datalen != 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ireq, imsg->data, sizeof(ireq));
-	memcpy(&id, &ireq.id, sizeof(id));
 
-	err = queue_commit_id(&ids, &id, ireq.color);
+	color = COLOR_KEEP;
+	err = recv_object_id_queue(&nkeep, &ids, (void *)color, NULL, ibuf);
 	if (err)
-		return err;
-	nids = 1;
+		goto done;
+	if (nids + nkeep > INT_MAX) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	nids += nkeep;
+
+	color = COLOR_DROP;
+	err = recv_object_id_queue(&ndrop, &ids, (void *)color, NULL, ibuf);
+	if (err)
+		goto done;
+	if (nids + ndrop > INT_MAX) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	nids += ndrop;
+
+	color = COLOR_SKIP;
+	err = recv_object_id_queue(&nskip, &ids, (void *)color, NULL, ibuf);
+	if (err)
+		goto done;
+	if (nids + nskip > INT_MAX) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	nids += nskip;
 
 	err = paint_commits(&ids, &nids, keep, drop, skip,
 	    pack, packidx, ibuf, objcache);

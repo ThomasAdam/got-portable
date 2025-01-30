@@ -346,13 +346,6 @@ struct got_imsg_reused_deltas {
 	/ sizeof(struct got_imsg_reused_delta))
 };
 
-/* Structure for GOT_IMSG_COMMIT_PAINTING_REQUEST. */
-struct got_imsg_commit_painting_request {
-	struct got_object_id id;
-	int idx;
-	int color;
-} __attribute__((__packed__));
-
 /* Structure for GOT_IMSG_PAINTED_COMMITS. */
 struct got_imsg_painted_commit {
 	struct got_object_id id;
@@ -833,8 +826,7 @@ const struct got_error *got_privsep_recv_reused_deltas(int *,
     struct got_imsg_reused_delta *, size_t *, struct imsgbuf *);
 
 const struct got_error *got_privsep_init_commit_painting(struct imsgbuf *);
-const struct got_error *got_privsep_send_painting_request(struct imsgbuf *,
-    int, struct got_object_id *, intptr_t);
+const struct got_error *got_privsep_send_painting_request(struct imsgbuf *);
 typedef const struct got_error *(*got_privsep_recv_painted_commit_cb)(void *,
     struct got_object_id *, intptr_t);
 const struct got_error *got_privsep_send_painted_commits(struct imsgbuf *,
