@@ -114,9 +114,8 @@ send_filtered_id_queue(struct imsgbuf *ibuf, struct got_object_id_queue *ids,
 				return err;
 			nids = 0;
 		}
-		
 	}
-	
+
 	if (nids > 0) {
 		err = got_privsep_send_object_idlist(ibuf, filtered_ids, nids);
 		if (err)

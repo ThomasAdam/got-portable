@@ -3377,8 +3377,7 @@ const struct got_error *
 got_privsep_init_commit_painting(struct imsgbuf *ibuf)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_PAINTING_INIT,
-	    0, 0, -1, NULL, 0)
-	    == -1)
+	    0, 0, -1, NULL, 0) == -1)
 		return got_error_from_errno("imsg_compose "
 		    "COMMIT_PAINTING_INIT");
 
