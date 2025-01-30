@@ -256,24 +256,29 @@ recv_painted_commit(void *arg, struct got_object_id *id, intptr_t color)
 		if (err)
 			return err;
 	}
-
 	switch (color) {
 	case COLOR_KEEP:
-		err = got_object_idset_add(a->keep, id, NULL);
-		if (err)
-			return err;
-		(*a->ncolored)++;
+		if (!got_object_idset_contains(a->keep, id)) {
+			err = got_object_idset_add(a->keep, id, NULL);
+			if (err)
+				return err;
+			(*a->ncolored)++;
+		}
 		break;
 	case COLOR_DROP:
-		err = got_object_idset_add(a->drop, id, NULL);
-		if (err)
-			return err;
-		(*a->ncolored)++;
+		if (!got_object_idset_contains(a->drop, id)) {
+			err = got_object_idset_add(a->drop, id, NULL);
+			if (err)
+				return err;
+			(*a->ncolored)++;
+		}
 		break;
 	case COLOR_SKIP:
-		err = got_object_idset_add(a->skip, id, NULL);
-		if (err)
-			return err;
+		if (!got_object_idset_contains(a->skip, id)) {
+			err = got_object_idset_add(a->skip, id, NULL);
+			if (err)
+				return err;
+		}
 		break;
 	default:
 		/* should not happen */
