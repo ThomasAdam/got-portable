@@ -3387,18 +3387,10 @@ got_privsep_init_commit_painting(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_painting_request(struct imsgbuf *ibuf, int idx,
-    struct got_object_id *id, intptr_t color)
+got_privsep_send_painting_request(struct imsgbuf *ibuf)
 {
-	struct got_imsg_commit_painting_request ireq;
-
-	memset(&ireq, 0, sizeof(ireq));
-	memcpy(&ireq.id, id, sizeof(ireq.id));
-	ireq.idx = idx;
-	ireq.color = color;
-
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_PAINTING_REQUEST, 0, 0, -1,
-	    &ireq, sizeof(ireq)) == -1)
+	    NULL, 0) == -1)
 		return got_error_from_errno("imsg_compose "
 		    "COMMIT_PAINTING_REQUEST");
 

@@ -772,6 +772,75 @@ test_pack_exclude_via_ancestor_commit() {
 	test_done "$testroot" "$ret"
 }
 
+test_pack_exclude_via_ancestor_commit_packed() {
+	local testroot=`test_init pack_exclude`
+	local commit0=`git_show_head $testroot/repo`
+
+	# no pack files should exist yet
+	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in 1 2 3 4 5 6 7; do 
+		echo a new line >> $testroot/wt/alpha
+		(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
+	done
+	local parent_commit=`git_show_head $testroot/repo`
+
+	echo a new line >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
+
+	got ref -r $testroot/repo -c $parent_commit refs/heads/pleasepackthis
+
+	# pack the repository and remove loose objects
+	gotadmin cleanup -aq -r $testroot/repo > /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotadmin cleanup failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Packing the 'pleasepackthis' branch while exluding commits
+	# reachable via 'master' should result in an empty pack file.
+	gotadmin pack -a -r $testroot/repo -x master pleasepackthis \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "gotadmin pack succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "gotadmin: not enough objects to pack" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
 test_parseargs "$@"
 run_test test_pack_all_loose_objects
 run_test test_pack_exclude
@@ -783,3 +852,4 @@ run_test test_pack_all_objects
 run_test test_pack_bad_ref
 run_test test_pack_tagged_tag
 run_test test_pack_exclude_via_ancestor_commit
+run_test test_pack_exclude_via_ancestor_commit_packed

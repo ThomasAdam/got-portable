@@ -96,6 +96,39 @@ send_idset(struct imsgbuf *ibuf, struct got_object_idset *idset)
 }
 
 static const struct got_error *
+send_filtered_id_queue(struct imsgbuf *ibuf, struct got_object_id_queue *ids,
+    uintptr_t color)
+{
+	const struct got_error *err = NULL;
+	struct got_object_qid *qid;
+	struct got_object_id *filtered_ids[GOT_IMSG_OBJ_ID_LIST_MAX_NIDS];
+	int nids = 0;
+
+	STAILQ_FOREACH(qid, ids, entry) {
+		if (color != (intptr_t)qid->data)
+			continue;
+
+		filtered_ids[nids++] = &qid->id;
+		if (nids >= GOT_IMSG_OBJ_ID_LIST_MAX_NIDS) {
+			err = got_privsep_send_object_idlist(ibuf,
+			    filtered_ids, nids);
+			if (err)
+				return err;
+			nids = 0;
+		}
+		
+	}
+	
+	if (nids > 0) {
+		err = got_privsep_send_object_idlist(ibuf, filtered_ids, nids);
+		if (err)
+			return err;
+	}
+
+	return got_privsep_send_object_idlist_done(ibuf);
+}
+
+static const struct got_error *
 recv_reused_delta(struct got_imsg_reused_delta *delta,
     struct got_object_idset *idset, struct got_pack_metavec *v)
 {
@@ -211,6 +244,7 @@ struct recv_painted_commit_arg {
 	struct got_ratelimit *rl;
 	got_cancel_cb cancel_cb;
 	void *cancel_arg;
+	struct got_object_qid **qid0;
 };
 
 static const struct got_error *
@@ -255,6 +289,8 @@ recv_painted_commit(void *arg, struct got_object_id *id, intptr_t color)
 			continue;
 		STAILQ_REMOVE(a->ids, qid, got_object_qid, entry);
 		color = (intptr_t)qid->data;
+		if (*(a->qid0) == qid)
+			*(a->qid0) = NULL;
 		got_object_qid_free(qid);
 		(*a->nqueued)--;
 		if (color == COLOR_SKIP)
@@ -267,9 +303,9 @@ recv_painted_commit(void *arg, struct got_object_id *id, intptr_t color)
 }
 
 static const struct got_error *
-paint_packed_commits(struct got_pack *pack, struct got_object_id *id,
-    int idx, intptr_t color, int *ncolored, int *nqueued, int *nskip,
-    struct got_object_id_queue *ids,
+paint_packed_commits(struct got_object_qid **qid0,
+    struct got_pack *pack, intptr_t color,
+    int *ncolored, int *nqueued, int *nskip, struct got_object_id_queue *ids,
     struct got_object_idset *keep, struct got_object_idset *drop,
     struct got_object_idset *skip, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
@@ -282,8 +318,22 @@ paint_packed_commits(struct got_pack *pack, struct got_object_id *id,
 
 	STAILQ_INIT(&next_ids);
 
-	err = got_privsep_send_painting_request(pack->privsep_child->ibuf,
-	    idx, id, color);
+	err = got_privsep_send_painting_request(pack->privsep_child->ibuf);
+	if (err)
+		return err;
+
+	err = send_filtered_id_queue(pack->privsep_child->ibuf, ids,
+	    COLOR_KEEP);
+	if (err)
+		return err;
+
+	err = send_filtered_id_queue(pack->privsep_child->ibuf, ids,
+	    COLOR_DROP);
+	if (err)
+		return err;
+
+	err = send_filtered_id_queue(pack->privsep_child->ibuf, ids,
+	    COLOR_SKIP);
 	if (err)
 		return err;
 
@@ -299,6 +349,7 @@ paint_packed_commits(struct got_pack *pack, struct got_object_id *id,
 	arg.rl = rl;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
+	arg.qid0 = qid0;
 	err = got_privsep_recv_painted_commits(&next_ids,
 	    recv_painted_commit, &arg, pack->privsep_child->ibuf);
 	if (err)
@@ -338,6 +389,33 @@ paint_packed_commits(struct got_pack *pack, struct got_object_id *id,
 	return err;
 }
 
+static const struct got_error *
+pin_pack_for_commit_painting(struct got_pack **pack,
+    struct got_packidx **packidx, struct got_object_id_queue *ids, int nqueued,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+
+	err = got_pack_find_pack_for_commit_painting(packidx, ids, nqueued,
+	    repo);
+	if (err || *packidx == NULL) {
+		*pack = NULL;
+		return err;
+	}
+
+	err = got_pack_cache_pack_for_packidx(pack, *packidx, repo);
+	if (err)
+		return err;
+
+	if ((*pack)->privsep_child == NULL) {
+		err = got_pack_start_privsep_child(*pack, *packidx);
+		if (err)
+			return err;
+	}
+
+	return got_repo_pin_pack(repo, *packidx, *pack);
+}
+
 const struct got_error *
 got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
     struct got_object_idset *keep, struct got_object_idset *drop,
@@ -354,6 +432,10 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 	int nqueued = nids, nskip = 0;
 	int idx;
 
+	err = pin_pack_for_commit_painting(&pack, &packidx, ids, nqueued, repo);
+	if (err)
+		return err;
+
 	while (!STAILQ_EMPTY(ids) && nskip != nqueued) {
 		intptr_t color;
 
@@ -363,10 +445,63 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				break;
 		}
 
+		/* Pinned pack may have moved to different cache slot. */
+		pack = got_repo_get_pinned_pack(repo);
+		if (pack == NULL) {
+			err = pin_pack_for_commit_painting(&pack, &packidx,
+			    ids, nqueued, repo);
+			if (err)
+				break;
+		}
+
 		qid = STAILQ_FIRST(ids);
+		color = (intptr_t)qid->data;
+
+		/* Use the fast path if we have a suitable pack file. */
+		if (packidx && pack) {
+			idx = got_packidx_get_object_idx(packidx, &qid->id);
+			if (idx != -1) {
+				err = got_privsep_init_commit_painting(
+				    pack->privsep_child->ibuf);
+				if (err)
+					goto done;
+				err = send_idset(pack->privsep_child->ibuf,
+				    keep);
+				if (err)
+					goto done;
+				err = send_idset(pack->privsep_child->ibuf,
+				    drop);
+				if (err)
+					goto done;
+				err = send_idset(pack->privsep_child->ibuf,
+				    skip);
+				if (err)
+					goto done;
+				err = paint_packed_commits(&qid, pack,
+				    color, ncolored, &nqueued, &nskip,
+				    ids, keep, drop, skip, repo,
+				    progress_cb, progress_arg, rl,
+				    cancel_cb, cancel_arg);
+				if (err)
+					goto done;
+				if (qid) {
+					STAILQ_REMOVE(ids, qid,
+					    got_object_qid, entry);
+					nqueued--;
+					got_object_qid_free(qid);
+					qid = NULL;
+				}
+				continue;
+			}
+		}
+
 		STAILQ_REMOVE_HEAD(ids, entry);
 		nqueued--;
-		color = (intptr_t)qid->data;
+
+		got_repo_unpin_pack(repo);
+		pack = NULL;
+		packidx = NULL;
+
 		if (color == COLOR_SKIP)
 			nskip--;
 
@@ -386,25 +521,6 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 			got_object_qid_free(qid);
 			qid = NULL;
 			continue;
-		}
-
-		/* Pinned pack may have moved to different cache slot. */
-		pack = got_repo_get_pinned_pack(repo);
-
-		if (packidx && pack) {
-			idx = got_packidx_get_object_idx(packidx, &qid->id);
-			if (idx != -1) {
-				err = paint_packed_commits(pack, &qid->id,
-				    idx, color, ncolored, &nqueued, &nskip,
-				    ids, keep, drop, skip, repo,
-				    progress_cb, progress_arg, rl,
-				    cancel_cb, cancel_arg);
-				if (err)
-					break;
-				got_object_qid_free(qid);
-				qid = NULL;
-				continue;
-			}
 		}
 
 		switch (color) {
@@ -483,44 +599,6 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				nqueued++;
 				if (color == COLOR_SKIP)
 					nskip++;
-			}
-		}
-
-		if (pack == NULL && (commit->flags & GOT_COMMIT_FLAG_PACKED)) {
-			if (packidx == NULL) {
-				err = got_pack_find_pack_for_commit_painting(
-				    &packidx, ids, nqueued, repo);
-				if (err)
-					goto done;
-			}
-			if (packidx != NULL) {
-				err = got_pack_cache_pack_for_packidx(&pack,
-				    packidx, repo);
-				if (err)
-					goto done;
-				if (pack->privsep_child == NULL) {
-					err = got_pack_start_privsep_child(
-					    pack, packidx);
-					if (err)
-						goto done;
-				}
-				err = got_privsep_init_commit_painting(
-				    pack->privsep_child->ibuf);
-				if (err)
-					goto done;
-				err = send_idset(pack->privsep_child->ibuf,
-				    keep);
-				if (err)
-					goto done;
-				err = send_idset(pack->privsep_child->ibuf, drop);
-				if (err)
-					goto done;
-				err = send_idset(pack->privsep_child->ibuf, skip);
-				if (err)
-					goto done;
-				err = got_repo_pin_pack(repo, packidx, pack);
-				if (err)
-					goto done;
 			}
 		}
 
