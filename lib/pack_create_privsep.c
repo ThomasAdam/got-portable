@@ -479,7 +479,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				    ids, keep, drop, skip, repo,
 				    progress_cb, progress_arg, rl,
 				    cancel_cb, cancel_arg);
-				if (err)
+				if (err && qid == NULL)
 					goto done;
 				if (qid) {
 					STAILQ_REMOVE(ids, qid,
@@ -487,6 +487,8 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 					nqueued--;
 					got_object_qid_free(qid);
 					qid = NULL;
+					if (err)
+						goto done;
 				}
 				continue;
 			}
