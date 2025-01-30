@@ -1681,45 +1681,48 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 }
 
 static const struct got_error *
-repaint_parent_commits(struct got_object_id *commit_id, int color,
-    struct got_object_idset *set, struct got_object_idset *skip,
+repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
+    int color, struct got_object_idset *set, struct got_object_idset *skip,
+    struct got_object_id_queue *ids, int *nids,
+    struct got_object_id_queue *painted, int *npainted,
     struct got_pack *pack, struct got_packidx *packidx,
     struct got_object_cache *objcache)
 {
 	const struct got_error *err;
-	struct got_object_id_queue ids;
-	struct got_object_qid *qid = NULL;
-	struct got_commit_object *commit;
 	const struct got_object_id_queue *parents;
-	int idx;
+	struct got_commit_object *commit;
+	struct got_object_id_queue repaint;
 
-	STAILQ_INIT(&ids);
+	STAILQ_INIT(&repaint);
 
-	idx = got_packidx_get_object_idx(packidx, commit_id);
-	if (idx == -1)
-		return got_error(GOT_ERR_NO_OBJ);
-
-	err = open_commit(&commit, pack, packidx, idx, commit_id, objcache);
+	err = open_commit(&commit, pack, packidx, commit_idx, commit_id,
+	    objcache);
 	if (err)
 		return err;
 
 	while (commit) {
+		struct got_object_qid *pid;
+		int idx;
+
 		parents = got_object_commit_get_parent_ids(commit);
 		if (parents) {
-			struct got_object_qid *pid;
 			STAILQ_FOREACH(pid, parents, entry) {
+				idx = got_packidx_get_object_idx(packidx,
+				    &pid->id);
 				/*
-				 * No need to traverse parents which are
-				 * already in the desired set or are
-				 * marked for skipping already.
+				 * No need to traverse parents which are not in
+				 * the pack file, are already in the desired
+				 * set, or are marked for skipping already.
 				 */
+				if (idx == -1)
+					continue;
 				if (got_object_idset_contains(set, &pid->id))
 					continue;
-				if (skip != set &&
+				if (set != skip &&
 				    got_object_idset_contains(skip, &pid->id))
 					continue;
 
-				err = queue_commit_id(&ids, &pid->id, color);
+				err = queue_commit_id(&repaint, &pid->id, color);
 				if (err)
 					break;
 			}
@@ -1727,40 +1730,71 @@ repaint_parent_commits(struct got_object_id *commit_id, int color,
 		got_object_commit_close(commit);
 		commit = NULL;
 
-		qid = STAILQ_FIRST(&ids);
-		if (qid) {
-			STAILQ_REMOVE_HEAD(&ids, entry);
-			if (!got_object_idset_contains(set, &qid->id)) {
-				err = got_object_idset_add(set, &qid->id,
-				    NULL);
+		pid = STAILQ_FIRST(&repaint);
+		if (pid) {
+			struct got_object_qid *qid, *tmp;
+
+			err = paint_commit(pid, color);
+			if (err)
+				break;
+
+			if (!got_object_idset_contains(set, &pid->id)) {
+				err = got_object_idset_add(set, &pid->id, NULL);
 				if (err)
 					break;
 			}
 
-			idx = got_packidx_get_object_idx(packidx, &qid->id);
+			STAILQ_REMOVE_HEAD(&repaint, entry);
+
+			/* Insert or replace this commit on the painted list. */
+			STAILQ_FOREACH(qid, painted, entry) {
+				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
+					continue;
+				paint_commit(qid, color);
+				got_object_qid_free(pid);
+				pid = qid;
+				break;
+			}
+			if (qid == NULL) {
+				STAILQ_INSERT_TAIL(painted, pid, entry);
+				(*npainted)++;
+			}
+
+			/*
+			 * In case this commit is on the caller's list of
+			 * pending commits to traverse, repaint it there.
+			 */
+			STAILQ_FOREACH_SAFE(qid, ids, entry, tmp) {
+				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
+					continue;
+				paint_commit(qid, color);
+				break;
+			}
+
+			idx = got_packidx_get_object_idx(packidx, &pid->id);
 			if (idx == -1) {
+				/*
+				 * Should not happen because we only queue
+				 * parents which exist in our pack file.
+				 */
 				err = got_error(GOT_ERR_NO_OBJ);
 				break;
 			}
 
 			err = open_commit(&commit, pack, packidx, idx,
-			    &qid->id, objcache);
+			    &pid->id, objcache);
 			if (err)
 				break;
-
-			got_object_qid_free(qid);
-			qid = NULL;
 		}
 	}
 
 	if (commit)
 		got_object_commit_close(commit);
-	if (qid)
-		got_object_qid_free(qid);
-	got_object_id_queue_free(&ids);
+	got_object_id_queue_free(&repaint);
 
 	return err;
 }
+
 static const struct got_error *
 paint_commits(struct got_object_id_queue *ids, int *nids,
     struct got_object_idset *keep, struct got_object_idset *drop,
@@ -1807,11 +1841,6 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 
 		switch (color) {
 		case COLOR_KEEP:
-			if (got_object_idset_contains(keep, &qid->id)) {
-				got_object_qid_free(qid);
-				qid = NULL;
-				continue;
-			}
 			if (got_object_idset_contains(drop, &qid->id)) {
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
@@ -1820,22 +1849,22 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 				    NULL);
 				if (err)
 					goto done;
-				err = repaint_parent_commits(&qid->id,
-				    COLOR_SKIP, skip, skip, pack, packidx,
+				err = repaint_parent_commits(&qid->id, idx,
+				    COLOR_SKIP, skip, skip, ids, nids,
+				    &painted, &npainted, pack, packidx,
 				    objcache);
 				if (err)
 					goto done;
+				break;
 			}
-			err = got_object_idset_add(keep, &qid->id, NULL);
-			if (err)
-				goto done;
+			if (!got_object_idset_contains(keep, &qid->id)) {
+				err = got_object_idset_add(keep, &qid->id,
+				    NULL);
+				if (err)
+					goto done;
+			}
 			break;
 		case COLOR_DROP:
-			if (got_object_idset_contains(drop, &qid->id)) {
-				got_object_qid_free(qid);
-				qid = NULL;
-				continue;
-			}
 			if (got_object_idset_contains(keep, &qid->id)) {
 				err = paint_commit(qid, COLOR_SKIP);
 				if (err)
@@ -1844,23 +1873,26 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 				    NULL);
 				if (err)
 					goto done;
-				err = repaint_parent_commits(&qid->id,
-				    COLOR_SKIP, skip, skip, pack, packidx,
+				err = repaint_parent_commits(&qid->id, idx,
+				    COLOR_SKIP, skip, skip, ids, nids,
+				    &painted, &npainted, pack, packidx,
 				    objcache);
 				if (err)
 					goto done;
+				break;
 			}
-			err = got_object_idset_add(drop, &qid->id, NULL);
-			if (err)
-				goto done;
-			break;
-		case COLOR_SKIP:
-			if (!got_object_idset_contains(skip, &qid->id)) {
-				err = got_object_idset_add(skip, &qid->id,
+			if (!got_object_idset_contains(drop, &qid->id)) {
+				err = got_object_idset_add(drop, &qid->id,
 				    NULL);
 				if (err)
 					goto done;
 			}
+			break;
+		case COLOR_SKIP:
+			err = got_object_idset_add(skip, &qid->id,
+			    NULL);
+			if (err)
+				goto done;
 			break;
 		default:
 			/* should not happen */

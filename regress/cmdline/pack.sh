@@ -799,7 +799,21 @@ test_pack_exclude_via_ancestor_commit_packed() {
 		return 1
 	fi
 
-	for i in 1 2 3 4 5 6 7; do 
+	for i in 1 2 3; do 
+		echo a new line >> $testroot/wt/alpha
+		(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
+	done
+
+	# pack the repository's current history
+	gotadmin pack -q -r $testroot/repo > /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotadmin pack failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in 4 5 6; do 
 		echo a new line >> $testroot/wt/alpha
 		(cd $testroot/wt && got commit -m "edit alpha" >/dev/null)
 	done
@@ -810,11 +824,13 @@ test_pack_exclude_via_ancestor_commit_packed() {
 
 	got ref -r $testroot/repo -c $parent_commit refs/heads/pleasepackthis
 
-	# pack the repository and remove loose objects
-	gotadmin cleanup -aq -r $testroot/repo > /dev/null 2> $testroot/stderr
+	# Pack the next batch of repository history. This test is designed
+	# to# trigger a code path where got-read-pack cannot find a parent
+	# commit in its pack file.
+	gotadmin pack -q -r $testroot/repo > /dev/null 2> $testroot/stderr
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		echo "gotadmin cleanup failed unexpectedly" >&2
+		echo "gotadmin pack failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
