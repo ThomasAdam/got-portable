@@ -600,7 +600,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 				err = got_pack_queue_commit_id(ids, &pid->id,
 				    color, repo);
 				if (err)
-					break;
+					goto done;
 				nqueued++;
 				if (color == COLOR_SKIP)
 					nskip++;
