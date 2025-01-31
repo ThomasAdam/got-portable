@@ -34,7 +34,7 @@ got_pack_cache_pack_for_packidx(struct got_pack **pack,
 
 const struct got_error *
 got_pack_find_pack_for_commit_painting(struct got_packidx **best_packidx,
-    struct got_object_id_queue *ids, int nids, struct got_repository *repo);
+    struct got_object_id_queue *ids, struct got_repository *repo);
 const struct got_error *got_pack_find_pack_for_reuse(
     struct got_packidx **best_packidx, struct got_repository *repo);
 

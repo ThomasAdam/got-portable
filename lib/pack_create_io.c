@@ -358,7 +358,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 			 */
 			if (packidx == NULL) {
 				err = got_pack_find_pack_for_commit_painting(
-				    &packidx, ids, nqueued, repo);
+				    &packidx, ids, repo);
 				if (err)
 					goto done;
 			}

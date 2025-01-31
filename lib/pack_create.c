@@ -1197,7 +1197,7 @@ done:
 
 const struct got_error *
 got_pack_find_pack_for_commit_painting(struct got_packidx **best_packidx,
-    struct got_object_id_queue *ids, int nids, struct got_repository *repo)
+    struct got_object_id_queue *ids, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
