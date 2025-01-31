@@ -400,8 +400,7 @@ pin_pack_for_commit_painting(struct got_pack **pack,
 {
 	const struct got_error *err;
 
-	err = got_pack_find_pack_for_commit_painting(packidx, ids, nqueued,
-	    repo);
+	err = got_pack_find_pack_for_commit_painting(packidx, ids, repo);
 	if (err || *packidx == NULL) {
 		*pack = NULL;
 		return err;
