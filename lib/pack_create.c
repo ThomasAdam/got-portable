@@ -1259,7 +1259,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 	const struct got_error *err = NULL;
 	struct got_object_id_queue ids;
 	struct got_object_idset *keep, *drop, *skip = NULL;
-	int i, nkeep;
+	int i, nkeep, nqueued = 0;
 
 	STAILQ_INIT(&ids);
 	*res = NULL;
@@ -1289,6 +1289,7 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
 		if (err)
 			goto done;
+		nqueued++;
 	}
 
 	for (i = 0; i < ntail; i++) {
@@ -1298,9 +1299,10 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 		err = queue_commit_or_tag_id(id, COLOR_DROP, &ids, repo);
 		if (err)
 			goto done;
+		nqueued++;
 	}
 
-	err = got_pack_paint_commits(ncolored, &ids, nhead + ntail,
+	err = got_pack_paint_commits(ncolored, &ids, nqueued,
 	    keep, drop, skip, repo, progress_cb, progress_arg, rl,
 	    cancel_cb, cancel_arg);
 	if (err)
