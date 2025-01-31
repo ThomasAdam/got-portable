@@ -393,7 +393,7 @@ paint_packed_commits(struct got_object_qid **qid0,
 
 static const struct got_error *
 pin_pack_for_commit_painting(struct got_pack **pack,
-    struct got_packidx **packidx, struct got_object_id_queue *ids, int nqueued,
+    struct got_packidx **packidx, struct got_object_id_queue *ids,
     struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -433,7 +433,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 	int nqueued = nids, nskip = 0;
 	int idx;
 
-	err = pin_pack_for_commit_painting(&pack, &packidx, ids, nqueued, repo);
+	err = pin_pack_for_commit_painting(&pack, &packidx, ids, repo);
 	if (err)
 		return err;
 
@@ -450,7 +450,7 @@ got_pack_paint_commits(int *ncolored, struct got_object_id_queue *ids, int nids,
 		pack = got_repo_get_pinned_pack(repo);
 		if (pack == NULL) {
 			err = pin_pack_for_commit_painting(&pack, &packidx,
-			    ids, nqueued, repo);
+			    ids, repo);
 			if (err)
 				break;
 		}
