@@ -1095,11 +1095,9 @@ got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
 			break;
 
 		STAILQ_REMOVE_HEAD(&ids, entry);
-		if (!got_object_idset_contains(set, &qid->id)) {
-			err = got_object_idset_add(set, &qid->id, NULL);
-			if (err)
-				break;
-		}
+		err = got_object_idset_add(set, &qid->id, NULL);
+		if (err)
+			break;
 
 		err = got_object_open_as_commit(&commit, repo, &qid->id);
 		if (err)
