@@ -1698,7 +1698,7 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		return err;
 
 	while (commit) {
-		struct got_object_qid *pid;
+		struct got_object_qid *pid, *qid, *tmp;
 		int idx;
 
 		parents = got_object_commit_get_parent_ids(commit);
@@ -1729,65 +1729,64 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		commit = NULL;
 
 		pid = STAILQ_FIRST(&repaint);
-		if (pid) {
-			struct got_object_qid *qid, *tmp;
+		if (pid == NULL)
+			break;
 
-			err = paint_commit(pid, color);
-			if (err)
-				break;
+		err = paint_commit(pid, color);
+		if (err)
+			break;
 
-			if (!got_object_idset_contains(set, &pid->id)) {
-				err = got_object_idset_add(set, &pid->id, NULL);
-				if (err)
-					break;
-			}
-
-			STAILQ_REMOVE_HEAD(&repaint, entry);
-
-			/* Insert or replace this commit on the painted list. */
-			STAILQ_FOREACH(qid, painted, entry) {
-				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
-					continue;
-				err = paint_commit(qid, color);
-				if (err)
-					goto done;
-				got_object_qid_free(pid);
-				pid = qid;
-				break;
-			}
-			if (qid == NULL) {
-				STAILQ_INSERT_TAIL(painted, pid, entry);
-				(*npainted)++;
-			}
-
-			/*
-			 * In case this commit is on the caller's list of
-			 * pending commits to traverse, repaint it there.
-			 */
-			STAILQ_FOREACH_SAFE(qid, ids, entry, tmp) {
-				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
-					continue;
-				err = paint_commit(qid, color);
-				if (err)
-					goto done;
-				break;
-			}
-
-			idx = got_packidx_get_object_idx(packidx, &pid->id);
-			if (idx == -1) {
-				/*
-				 * Should not happen because we only queue
-				 * parents which exist in our pack file.
-				 */
-				err = got_error(GOT_ERR_NO_OBJ);
-				break;
-			}
-
-			err = open_commit(&commit, pack, packidx, idx,
-			    &pid->id, objcache);
+		if (!got_object_idset_contains(set, &pid->id)) {
+			err = got_object_idset_add(set, &pid->id, NULL);
 			if (err)
 				break;
 		}
+
+		STAILQ_REMOVE_HEAD(&repaint, entry);
+
+		/* Insert or replace this commit on the painted list. */
+		STAILQ_FOREACH(qid, painted, entry) {
+			if (got_object_id_cmp(&qid->id, &pid->id) != 0)
+				continue;
+			err = paint_commit(qid, color);
+			if (err)
+				goto done;
+			got_object_qid_free(pid);
+			pid = qid;
+			break;
+		}
+		if (qid == NULL) {
+			STAILQ_INSERT_TAIL(painted, pid, entry);
+			(*npainted)++;
+		}
+
+		/*
+		 * In case this commit is on the caller's list of
+		 * pending commits to traverse, repaint it there.
+		 */
+		STAILQ_FOREACH_SAFE(qid, ids, entry, tmp) {
+			if (got_object_id_cmp(&qid->id, &pid->id) != 0)
+				continue;
+			err = paint_commit(qid, color);
+			if (err)
+				goto done;
+			break;
+		}
+
+		idx = got_packidx_get_object_idx(packidx, &pid->id);
+		if (idx == -1) {
+			/*
+			 * Should not happen because we only queue
+			 * parents which exist in our pack file.
+			 */
+			err = got_error(GOT_ERR_NO_OBJ);
+			break;
+		}
+
+		err = open_commit(&commit, pack, packidx, idx, &pid->id,
+		    objcache);
+		if (err)
+			break;
 	}
 done:
 	if (commit)
