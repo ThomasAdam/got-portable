@@ -1719,9 +1719,10 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 				    got_object_idset_contains(skip, &pid->id))
 					continue;
 
-				err = queue_commit_id(&repaint, &pid->id, color);
+				err = queue_commit_id(&repaint, &pid->id,
+				    color);
 				if (err)
-					break;
+					goto done;
 			}
 		}
 		got_object_commit_close(commit);
@@ -1747,7 +1748,9 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 			STAILQ_FOREACH(qid, painted, entry) {
 				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
 					continue;
-				paint_commit(qid, color);
+				err = paint_commit(qid, color);
+				if (err)
+					goto done;
 				got_object_qid_free(pid);
 				pid = qid;
 				break;
@@ -1764,7 +1767,9 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 			STAILQ_FOREACH_SAFE(qid, ids, entry, tmp) {
 				if (got_object_id_cmp(&qid->id, &pid->id) != 0)
 					continue;
-				paint_commit(qid, color);
+				err = paint_commit(qid, color);
+				if (err)
+					goto done;
 				break;
 			}
 
@@ -1784,7 +1789,7 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 				break;
 		}
 	}
-
+done:
 	if (commit)
 		got_object_commit_close(commit);
 	got_object_id_queue_free(&repaint);
