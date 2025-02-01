@@ -1701,7 +1701,7 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		return err;
 
 	while (commit) {
-		struct got_object_qid *pid, *qid, *tmp;
+		struct got_object_qid *pid, *qid;
 		int idx;
 
 		parents = got_object_commit_get_parent_ids(commit);
@@ -1765,7 +1765,7 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		 * In case this commit is on the caller's list of
 		 * pending commits to traverse, repaint it there.
 		 */
-		STAILQ_FOREACH_SAFE(qid, ids, entry, tmp) {
+		STAILQ_FOREACH(qid, ids, entry) {
 			if (got_object_id_cmp(&qid->id, &pid->id) != 0)
 				continue;
 			err = paint_commit(qid, color);
