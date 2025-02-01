@@ -1091,23 +1091,22 @@ got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
 		commit = NULL;
 
 		qid = STAILQ_FIRST(&ids);
-		if (qid) {
-			STAILQ_REMOVE_HEAD(&ids, entry);
-			if (!got_object_idset_contains(set, &qid->id)) {
-				err = got_object_idset_add(set, &qid->id,
-				    NULL);
-				if (err)
-					break;
-			}
+		if (qid == NULL)
+			break;
 
-			err = got_object_open_as_commit(&commit, repo,
-			    &qid->id);
+		STAILQ_REMOVE_HEAD(&ids, entry);
+		if (!got_object_idset_contains(set, &qid->id)) {
+			err = got_object_idset_add(set, &qid->id, NULL);
 			if (err)
 				break;
-
-			got_object_qid_free(qid);
-			qid = NULL;
 		}
+
+		err = got_object_open_as_commit(&commit, repo, &qid->id);
+		if (err)
+			break;
+
+		got_object_qid_free(qid);
+		qid = NULL;
 	}
 
 	if (commit)
