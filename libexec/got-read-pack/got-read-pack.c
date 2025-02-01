@@ -1739,11 +1739,9 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		if (err)
 			break;
 
-		if (!got_object_idset_contains(set, &pid->id)) {
-			err = got_object_idset_add(set, &pid->id, NULL);
-			if (err)
-				break;
-		}
+		err = got_object_idset_add(set, &pid->id, NULL);
+		if (err)
+			break;
 
 		STAILQ_REMOVE_HEAD(&repaint, entry);
 
