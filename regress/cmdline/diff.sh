@@ -1812,6 +1812,135 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_diff_long_path_diffstat() {
+	local testroot=$(test_init diff_long_path_diffstat)
+	local id_root=$(git_show_head "$testroot/repo")
+	local blobid_beta=$(get_blob_id "$testroot/repo" "" beta)
+	local blobid_alpha=$(get_blob_id "$testroot/repo" "" alpha)
+	local blobid_zeta=$(get_blob_id "$testroot/repo" "epsilon" zeta)
+	local blobid_delta=$(get_blob_id "$testroot/repo" "gamma" delta)
+	local wspadding="                                "
+	local longpathdir=c123456789-0123456789/d123456789
+	local longerpathdir=$longpathdir/$longpathdir/$longpathdir
+	local longerpath=$longerpathdir/longerpath
+	local longpath=$longpathdir/longpath
+
+	got checkout "$testroot/repo" "$testroot/wt" > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	(cd "$testroot/wt" && got branch longpath >/dev/null)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got branch failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	mkdir -p "$testroot/wt/$longerpathdir"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "failed to make directory $testroot/wt/$longerpathdir" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	echo "xbeta" > $testroot/wt/beta
+	echo "xalpha" > $testroot/wt/alpha
+	echo "xdelta" > $testroot/wt/gamma/delta
+	echo "xzeta" > $testroot/wt/epsilon/zeta
+	echo "longpath" > $testroot/wt/$longpath
+	echo "longerpath" > $testroot/wt/$longerpath
+
+	(cd "$testroot/wt" && got add "$longpath" "$longerpath" >/dev/null)
+	if [ $ret -ne 0 ]; then
+		echo "got add failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	(cd "$testroot/wt" && got commit -m "longpath" >/dev/null)
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" $ret
+		return 1
+	fi
+
+	local blobid_longpath=$(get_blob_id "$testroot/repo" \
+	    "$longpathdir" longpath longpath)
+	local blobid_longerpath=$(get_blob_id "$testroot/repo" \
+	    "$longerpathdir" longerpath longpath)
+
+	cat <<-EOF >$testroot/stdout.expected
+	diffstat refs/heads/master refs/heads/longpath
+	 M  alpha      $wspadding $wspadding $wspadding  |  1+  1-
+	 M  beta       $wspadding $wspadding $wspadding  |  1+  1-
+	 A  $longerpath  |  1+  0-
+	 A  $longpath  $wspadding $wspadding   |  1+  0-
+	 M  epsilon/zeta $wspadding$wspadding$wspadding  |  1+  1-
+	 M  gamma/delta  $wspadding$wspadding$wspadding  |  1+  1-
+
+	6 files changed, 6 insertions(+), 4 deletions(-)
+
+	diff refs/heads/master refs/heads/longpath
+	commit - $id_root
+	commit + $(cd "$testroot/wt" && got br -l | fgrep '*' | cut -d' ' -f3)
+	blob - $blobid_alpha
+	blob + $(get_blob_id "$testroot/repo" "" alpha longpath)
+	--- alpha
+	+++ alpha
+	@@ -1 +1 @@
+	-alpha
+	+xalpha
+	blob - $blobid_beta
+	blob + $(get_blob_id "$testroot/repo" "" beta longpath)
+	--- beta
+	+++ beta
+	@@ -1 +1 @@
+	-beta
+	+xbeta
+	blob - $blobid_zeta
+	blob + $(get_blob_id "$testroot/repo" "epsilon" zeta longpath)
+	--- epsilon/zeta
+	+++ epsilon/zeta
+	@@ -1 +1 @@
+	-zeta
+	+xzeta
+	blob - /dev/null
+	blob + $blobid_longerpath (mode 644)
+	--- /dev/null
+	+++ $longerpath
+	@@ -0,0 +1 @@
+	+longerpath
+	blob - /dev/null
+	blob + $blobid_longpath (mode 644)
+	--- /dev/null
+	+++ $longpath
+	@@ -0,0 +1 @@
+	+longpath
+	blob - $blobid_delta
+	blob + $(get_blob_id "$testroot/repo" "gamma" delta longpath)
+	--- gamma/delta
+	+++ gamma/delta
+	@@ -1 +1 @@
+	-delta
+	+xdelta
+	EOF
+
+	(cd "$testroot/wt" && got diff -d master longpath > "$testroot/stdout")
+
+	cmp -s "$testroot/stdout.expected" "$testroot/stdout"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u "$testroot/stdout.expected" "$testroot/stdout"
+	fi
+	test_done "$testroot" $ret
+}
+
 test_diff_file_to_dir() {
 	local testroot=`test_init diff_file_to_dir`
 	local commit_id0=`git_show_head $testroot/repo`
@@ -2404,6 +2533,7 @@ run_test test_diff_crlf
 run_test test_diff_worktree_newfile_xbit
 run_test test_diff_commit_diffstat
 run_test test_diff_worktree_diffstat
+run_test test_diff_long_path_diffstat
 run_test test_diff_file_to_dir
 run_test test_diff_dir_to_file
 run_test test_diff_path_in_root_commit
