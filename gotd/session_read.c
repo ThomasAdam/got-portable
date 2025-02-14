@@ -72,6 +72,7 @@ static struct gotd_session_read {
 	struct timeval request_timeout;
 	enum gotd_session_read_state state;
 	struct gotd_imsgev repo_child_iev;
+	int repo_child_packfd;
 } gotd_session;
 
 static struct gotd_session_client {
@@ -430,20 +431,24 @@ send_packfile(struct gotd_session_client *client)
 		return err;
 	}
 
-	/* Send pack pipe end 0 to repo child process. */
-	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
+	/*
+	 * Send pack data pipe end 0 to gotsh(1) (expects just an fd, no data).
+	 *
+	 * We will forward the other pipe end to the repo_read process only
+	 * once we have confirmation that gotsh(1) has received its end.
+	 * It is important that we send a pipe end to gotsh(1) before the
+	 * repo_read process starts sending pack progress messages via imsg
+	 * to prevent spurious "unexpected privsep message" errors from gotsh.
+	 */
+	if (gotd_imsg_compose_event(&client->iev,
 	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		close(pipe[1]);
 		return err;
 	}
 
-	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
-	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[1], NULL, 0) == -1)
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-
-	return err;
+	gotd_session.repo_child_packfd = pipe[1];
+	return NULL;
 }
 
 static void
@@ -596,6 +601,24 @@ session_dispatch_client(int fd, short events, void *arg)
 			gotd_session.state = GOTD_STATE_DONE;
 			client->accept_flush_pkt = 1;
 			err = send_packfile(client);
+			break;
+		case GOTD_IMSG_PACKFILE_READY:
+			if (gotd_session.repo_child_packfd == -1) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			/*
+			 * gotsh(1) has received its send of the pack pipe.
+			 * Send pack pipe end 1 to repo child process.
+			 */
+			if (gotd_imsg_compose_event(
+			    &gotd_session.repo_child_iev,
+			    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD,
+			    gotd_session.repo_child_packfd, NULL, 0) == -1) {
+				err = got_error_from_errno("imsg compose "
+				    "PACKFILE_PIPE");
+			} else
+				gotd_session.repo_child_packfd = -1;
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
@@ -831,6 +854,7 @@ session_read_main(const char *title, const char *repo_path,
 	memcpy(&gotd_session.request_timeout, request_timeout,
 	    sizeof(gotd_session.request_timeout));
 	gotd_session.repo_cfg = repo_cfg;
+	gotd_session.repo_child_packfd = -1;
 
 	if (imsgbuf_init(&gotd_session.notifier_iev.ibuf, -1) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
@@ -907,5 +931,7 @@ session_read_shutdown(void)
 	got_repo_pack_fds_close(gotd_session.pack_fds);
 	got_repo_temp_fds_close(gotd_session.temp_fds);
 	free(gotd_session_client.username);
+	if (gotd_session.repo_child_packfd != -1)
+		close(gotd_session.repo_child_packfd);
 	exit(0);
 }
