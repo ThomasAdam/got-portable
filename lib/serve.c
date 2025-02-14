@@ -694,10 +694,16 @@ recv_done(int *packfd, int outfd, struct imsgbuf *ibuf, int chattygot)
 			break;
 		case GOTD_IMSG_PACKFILE_PIPE:
 			fd = imsg_get_fd(&imsg);
-			if (fd != -1)
-				*packfd = fd;
-			else
+			if (fd == -1) {
 				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			}
+			*packfd = fd;
+			if (imsg_compose(ibuf, GOTD_IMSG_PACKFILE_READY,
+			    0, 0, -1, NULL, 0) == -1)
+				err = got_error_from_errno("imsg_compose "
+				    "PACKFILE_READY");
+			err = gotd_imsg_flush(ibuf);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
