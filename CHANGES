@@ -1,3 +1,10 @@
+* got 0.109; 2025-02-14
+- fix gotd failing to protect references when the client sends an empty pack
+- during pack generation, fix exclusion of commits via an ancestor commit
+- fix a bogus "received unexpected privsep message" error from gotsh
+- fix diffstat path order bug in field width computation
+- gotwebd: preserve 'folder=' parameter when following More links
+
 * got 0.108; 2025-01-22
 - add ssh -i identity-file support to commands which use the network
 - make 'got import' output independent of readdir(3) entry order
