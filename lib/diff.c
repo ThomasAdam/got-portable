@@ -118,11 +118,9 @@ get_diffstat(struct got_diffstat_cb_arg *ds, const char *path,
 	err = got_pathlist_insert(&pe, ds->paths, path, change);
 	if (err || pe == NULL) {
 		free(change);
-		if (err)
-			return err;
+		return err;
 	}
 
-	pe = RB_MAX(got_pathlist_head, ds->paths);
 	diffstat_field_width(&ds->max_path_len, &ds->add_cols, &ds->rm_cols,
 	    pe->path_len, change->add, change->rm);
 
