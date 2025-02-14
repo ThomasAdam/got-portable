@@ -418,7 +418,7 @@ test_tag_created() {
 	local commit_id=`git_show_head $testroot/repo-clone`
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 	local tag_id=`got ref -r $testroot/repo-clone -l \
-		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+		| grep "^refs/tags/1.0" | tr -d ' ' | cut -d: -f2`
 	local short_tag_id=`trim_obj_id 12 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
@@ -499,7 +499,7 @@ test_tag_changed() {
 	got tag -r $testroot/repo-clone -m "new tag" 1.0 > /dev/null
 	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.0`
 	local tag_id=`got ref -r $testroot/repo-clone -l \
-		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+		| grep "^refs/tags/1.0" | tr -d ' ' | cut -d: -f2`
 	local short_tag_id=`trim_obj_id 12 $tag_id`
 
 	(printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
