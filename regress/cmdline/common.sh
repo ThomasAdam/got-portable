@@ -207,9 +207,10 @@ get_blob_id()
 	repo="$1"
 	tree_path="$2"
 	filename="$3"
+	commit="${4:+-c $4}"
 
-	got tree -r $repo -i $tree_path | grep "[0-9a-f] ${filename}$" | \
-		cut -d' ' -f 1
+	got tree -r $repo $commit -i $tree_path | \
+		grep "[0-9a-f] ${filename}$" | cut -d' ' -f 1
 }
 
 test_init()
