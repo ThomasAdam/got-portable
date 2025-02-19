@@ -1,0 +1,81 @@
+#!/usr/bin/env perl
+#
+# Copyright (c) 2025 Stefan Sperling <stsp@openbsd.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# # THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+require Net::Daemon;
+
+package GOTDSMTPServer;
+our @ISA = qw(Net::Daemon);
+
+our $rounds = 1;
+
+sub Run ($) {
+	my ($self) = @_;
+	my ($line, $sock, $rc);
+	my @smtp_codes = (220, 250, 250, 250, 354, 250, 221);
+
+	$sock = $self->{'socket'};
+	foreach (@smtp_codes) {
+		$rc = printf $sock "$_\r\n";
+		if (!$rc) {
+			$self->Error("Client connection error %s",
+			$sock->error());
+			$sock->close();
+			kill(SIGTERM, $$);
+			return;
+		}
+		if (!defined($line = $sock->getline())) {
+			if ($sock->error()) {
+				$self->Error("Client connection error %s",
+				$sock->error());
+			}
+			$sock->close();
+			kill(SIGTERM, $$);
+			return;
+		}
+		print $line;
+	}
+
+	while (1) {
+		if (!defined($line = $sock->getline())) {
+			if ($sock->error()) {
+				$self->Error("Client connection error %s",
+				$sock->error());
+			}
+			$sock->close();
+			$rounds -= 1;
+			if ($rounds > 0) {
+				return;
+			} else {
+				kill(SIGTERM, $$);
+			}
+		}
+		print $line;
+	}
+}
+
+package main;
+
+use Getopt::Long qw(:config bundling);
+
+my $port = 2525;
+
+GetOptions("p:i" => \$port, "r:i" => \$rounds) or die("usage: $0 [-p port] [-r rounds]\n");
+
+my $server = GOTDSMTPServer->new({'pidfile' => 'none', 'mode' => 'single', \
+	'localaddr' => 127.0.0.1, 'localport' => 2525}, \@ARGV);
+
+STDOUT->autoflush(1);
+
+$server->Bind();

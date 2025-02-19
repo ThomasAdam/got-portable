@@ -631,6 +631,114 @@ test_file_empty() {
 	test_done "$testroot" "$ret"
 }
 
+test_tag_and_commit_created() {
+	local testroot=`test_init tag_and_commit_created 1`
+
+	got clone -a -q ${GOTD_TEST_REPO_URL} $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	got checkout -q $testroot/repo-clone $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "change alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'make changes' > /dev/null)
+	local commit_id=`git_show_head $testroot/repo-clone`
+	local author_time=`git_show_author_time $testroot/repo-clone`
+
+	got tag -r $testroot/repo-clone -m "new tag" 1.1 > /dev/null
+	local commit_id=`git_show_head $testroot/repo-clone`
+	local tagger_time=`git_show_tagger_time $testroot/repo-clone 1.1`
+	local tag_id=`got ref -r $testroot/repo-clone -l \
+		| grep "^refs/tags/1.1" | tr -d ' ' | cut -d: -f2`
+	local short_tag_id=`trim_obj_id 12 $tag_id`
+
+	./smtp-server -p $GOTD_TEST_SMTP_PORT -r 2 \
+		> $testroot/stdout 2>$testroot/stderr &
+
+	sleep 1 # server starts up
+
+	got send -t 1.1 -q -r $testroot/repo-clone
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	wait %1 # wait for smtp-server
+
+	HOSTNAME=`hostname`
+	short_commit_id=`trim_obj_id 12 $commit_id`
+
+	printf "HELO localhost\r\n" > $testroot/stdout.expected
+	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
+		>> $testroot/stdout.expected
+	printf "RCPT TO:<${GOTD_DEVUSER}>\r\n" >> $testroot/stdout.expected
+	printf "DATA\r\n" >> $testroot/stdout.expected
+	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
+	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
+	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
+	printf "${GOTD_DEVUSER} created refs/tags/1.1: $short_tag_id\r\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf "tag refs/tags/1.1\n" >> $testroot/stdout.expected
+	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
+	d=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
+	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "object: commit $commit_id\n" >> $testroot/stdout.expected
+	printf "messagelen: 9\n" >> $testroot/stdout.expected
+	printf " \n" >> $testroot/stdout.expected
+	printf " new tag\n \n" >> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf ".\r\n" >> $testroot/stdout.expected
+	printf "QUIT\r\n" >> $testroot/stdout.expected
+	printf "HELO localhost\r\n" >> $testroot/stdout.expected
+	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
+		>> $testroot/stdout.expected
+	printf "RCPT TO:<${GOTD_DEVUSER}>\r\n" >> $testroot/stdout.expected
+	printf "DATA\r\n" >> $testroot/stdout.expected
+	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
+	printf "To: ${GOTD_DEVUSER}\r\n" >> $testroot/stdout.expected
+	printf "Subject: $GOTD_TEST_REPO_NAME: " >> $testroot/stdout.expected
+	printf "${GOTD_DEVUSER} changed refs/heads/main: $short_commit_id\r\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf "commit $commit_id\n" >> $testroot/stdout.expected
+	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
+	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 14\n" >> $testroot/stdout.expected
+	printf " \n" >> $testroot/stdout.expected
+	printf " make changes\n \n" >> $testroot/stdout.expected
+	printf " M  alpha  |  1+  0-\n\n"  >> $testroot/stdout.expected
+	printf "1 file changed, 1 insertion(+), 0 deletions(-)\n\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf ".\r\n" >> $testroot/stdout.expected
+	printf "QUIT\r\n" >> $testroot/stdout.expected
+
+	grep -v ^Date $testroot/stdout > $testroot/stdout.filtered
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_file_changed
 run_test test_many_commits_not_summarized
@@ -640,3 +748,4 @@ run_test test_branch_removed
 run_test test_tag_created
 run_test test_tag_changed
 run_test test_file_empty
+run_test test_tag_and_commit_created
