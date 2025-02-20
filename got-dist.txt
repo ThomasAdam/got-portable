@@ -374,6 +374,7 @@
 /regress/gotd/repo_write_protected.sh
 /regress/gotd/repo_write_readonly.sh
 /regress/gotd/request_bad.sh
+/regress/gotd/smtp-server
 /regress/gotd/test_git_interop.sh
 /regress/gotwebd
 /regress/gotwebd/Makefile
