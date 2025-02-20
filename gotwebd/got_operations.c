@@ -1108,7 +1108,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 		goto done;
 
 	error = got_blame(in_repo_path, commit_id, repo,
-	    GOT_DIFF_ALGORITHM_MYERS, got_gotweb_blame_cb, &bca, NULL, NULL,
+	    GOT_DIFF_ALGORITHM_PATIENCE, got_gotweb_blame_cb, &bca, NULL, NULL,
 	    fd1, fd2, f1, f2);
 
  done:
@@ -1213,18 +1213,18 @@ got_open_diff_for_output(FILE **fp, struct request *c)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, f1, f2, fd1, fd2,
-		     id1, id2, NULL, NULL, GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		     NULL, repo, f3);
+		     id1, id2, NULL, NULL, GOT_DIFF_ALGORITHM_PATIENCE,
+		     3, 0, 0, NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, f1, f2, fd1, fd2,
-		    id1, id2, NULL, "", "",  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		    NULL, repo, f3);
+		    id1, id2, NULL, "", "", GOT_DIFF_ALGORITHM_PATIENCE,
+		    3, 0, 0, NULL, repo, f3);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, f1, f2, fd1,
-		    fd2, id1, id2, NULL,  GOT_DIFF_ALGORITHM_MYERS, 3, 0, 0,
-		    NULL, repo, f3);
+		    fd2, id1, id2, NULL,  GOT_DIFF_ALGORITHM_PATIENCE,
+		    3, 0, 0, NULL, repo, f3);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
