@@ -1,3 +1,8 @@
+* got 0.110; 2025-02-20
+- fix an endless loop in got-read-pack (regression from 0.109)
+- change gotwebd diff algorithm from Myers to Patience diff
+- gotd regress depends on p5-Net-Daemon now due to an added test case
+
 * got 0.109; 2025-02-14
 - fix gotd failing to protect references when the client sends an empty pack
 - during pack generation, fix exclusion of commits via an ancestor commit
