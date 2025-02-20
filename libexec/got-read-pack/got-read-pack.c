@@ -1840,6 +1840,18 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 			qid = NULL;
 			continue;
 		}
+		if (color == COLOR_KEEP &&
+		    got_object_idset_contains(keep, &qid->id)) {
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
+		if (color == COLOR_DROP &&
+		    got_object_idset_contains(drop, &qid->id)) {
+			got_object_qid_free(qid);
+			qid = NULL;
+			continue;
+		}
 
 		switch (color) {
 		case COLOR_KEEP:
