@@ -132,7 +132,7 @@ main(int argc, char *argv[])
 		goto done;
 
 	/*
-	 * Run parse_config() before unveil(2) because parse_config()
+	 * Run gotd_parse_config() before unveil(2) because gotd_parse_config()
 	 * checks whether repository paths exist on disk.
 	 * Parsing errors and warnings will be logged to stderr.
 	 * Upon failure we will run Git's native tooling so do not
@@ -141,7 +141,7 @@ main(int argc, char *argv[])
 	confpath = getenv("GOTD_CONF_PATH");
 	if (confpath == NULL)
 		confpath = GOTD_CONF_PATH;
-	parse_config(confpath, PROC_GITWRAPPER, NULL, &gotd);
+	gotd_parse_config(confpath, PROC_GITWRAPPER, NULL, &gotd);
 
 	error = apply_unveil(myserver);
 	if (error)

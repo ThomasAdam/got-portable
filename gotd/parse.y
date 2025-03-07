@@ -1185,7 +1185,7 @@ closefile(struct file *xfile)
 }
 
 int
-parse_config(const char *filename, enum gotd_procid proc_id,
+gotd_parse_config(const char *filename, enum gotd_procid proc_id,
     struct gotd_secrets *secrets, struct gotd *env)
 {
 	struct sym *sym, *next;
