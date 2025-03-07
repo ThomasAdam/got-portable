@@ -378,7 +378,7 @@ disconnect(struct gotd_client *client)
 
 	idisconnect.client_id = client->id;
 	if (gotd_imsg_compose_event(&listen_proc->iev,
-	    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
+	    GOTD_IMSG_DISCONNECT, GOTD_PROC_GOTD, -1,
 	    &idisconnect, sizeof(idisconnect)) == -1)
 		log_warn("imsg compose DISCONNECT");
 
@@ -405,7 +405,7 @@ disconnect_on_error(struct gotd_client *client, const struct got_error *err)
 		log_warnx("uid %d: %s", client->euid, err->msg);
 		if (client->fd != -1) {
 			if (imsgbuf_init(&ibuf, client->fd) != -1) {
-				gotd_imsg_send_error(&ibuf, 0, PROC_GOTD,
+				gotd_imsg_send_error(&ibuf, 0, GOTD_PROC_GOTD,
 				    err);
 				imsgbuf_clear(&ibuf);
 			} else
@@ -430,8 +430,8 @@ send_repo_info(struct gotd_imsgev *iev, struct gotd_repo *repo)
 	    >= sizeof(irepo.repo_path))
 		return got_error_msg(GOT_ERR_NO_SPACE, "repo path too long");
 
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_REPO, PROC_GOTD, -1,
-	    &irepo, sizeof(irepo)) == -1) {
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_REPO, GOTD_PROC_GOTD,
+	    -1, &irepo, sizeof(irepo)) == -1) {
 		err = got_error_from_errno("imsg compose INFO_REPO");
 		if (err)
 			return err;
@@ -467,8 +467,8 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 	if (client->session)
 		iclient.session_child_pid = client->session->pid;
 
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT, PROC_GOTD, -1,
-	    &iclient, sizeof(iclient)) == -1) {
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT,
+	    GOTD_PROC_GOTD, -1, &iclient, sizeof(iclient)) == -1) {
 		err = got_error_from_errno("imsg compose INFO_CLIENT");
 		if (err)
 			return err;
@@ -493,8 +493,8 @@ send_info(struct gotd_client *client)
 	info.nrepos = gotd.nrepos;
 	info.nclients = client_cnt - 1;
 
-	if (gotd_imsg_compose_event(&client->iev, GOTD_IMSG_INFO, PROC_GOTD, -1,
-	    &info, sizeof(info)) == -1) {
+	if (gotd_imsg_compose_event(&client->iev, GOTD_IMSG_INFO,
+	    GOTD_PROC_GOTD, -1, &info, sizeof(info)) == -1) {
 		err = got_error_from_errno("imsg compose INFO");
 		if (err)
 			return err;
@@ -743,7 +743,7 @@ done:
 
 		idisconnect.client_id = client->id;
 		if (gotd_imsg_compose_event(&listen_proc->iev,
-		    GOTD_IMSG_DISCONNECT, PROC_GOTD, -1,
+		    GOTD_IMSG_DISCONNECT, GOTD_PROC_GOTD, -1,
 		    &idisconnect, sizeof(idisconnect)) == -1)
 			log_warn("imsg compose DISCONNECT");
 
@@ -755,7 +755,7 @@ done:
 	return err;
 }
 
-static const char *gotd_proc_names[PROC_MAX] = {
+static const char *gotd_proc_names[GOTD_PROC_MAX] = {
 	"parent",
 	"listen",
 	"auth",
@@ -926,7 +926,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	const struct got_error *err;
 	int ret = 0;
 
-	if (proc->type == PROC_REPO_READ || proc->type == PROC_REPO_WRITE) {
+	if (proc->type == GOTD_PROC_REPO_READ ||
+	    proc->type == GOTD_PROC_REPO_WRITE) {
 		if (client->repo == NULL)
 			fatalx("no process found for uid %d", client->euid);
 		if (proc->pid != client->repo->pid) {
@@ -937,8 +938,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			return 0;
 		}
 	}
-	if (proc->type == PROC_SESSION_READ ||
-	    proc->type == PROC_SESSION_WRITE) {
+	if (proc->type == GOTD_PROC_SESSION_READ ||
+	    proc->type == GOTD_PROC_SESSION_WRITE) {
 		if (client->session == NULL) {
 			log_warnx("no session found for uid %d", client->euid);
 			return 0;
@@ -957,7 +958,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 		ret = 1;
 		break;
 	case GOTD_IMSG_CONNECT:
-		if (proc->type != PROC_LISTEN) {
+		if (proc->type != GOTD_PROC_LISTEN) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "new connection for uid %d from PID %d "
 			    "which is not the listen process",
@@ -966,7 +967,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			ret = 1;
 		break;
 	case GOTD_IMSG_ACCESS_GRANTED:
-		if (proc->type != PROC_AUTH) {
+		if (proc->type != GOTD_PROC_AUTH) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "authentication of uid %d from PID %d "
 			    "which is not the auth process",
@@ -975,8 +976,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			ret = 1;
 		break;
 	case GOTD_IMSG_CLIENT_SESSION_READY:
-		if (proc->type != PROC_SESSION_READ &&
-		    proc->type != PROC_SESSION_WRITE) {
+		if (proc->type != GOTD_PROC_SESSION_READ &&
+		    proc->type != GOTD_PROC_SESSION_WRITE) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "unexpected \"ready\" signal from PID %d",
 			    proc->pid);
@@ -984,8 +985,8 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 			ret = 1;
 		break;
 	case GOTD_IMSG_REPO_CHILD_READY:
-		if (proc->type != PROC_REPO_READ &&
-		    proc->type != PROC_REPO_WRITE) {
+		if (proc->type != GOTD_PROC_REPO_READ &&
+		    proc->type != GOTD_PROC_REPO_WRITE) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
 			    "unexpected \"ready\" signal from PID %d",
 			    proc->pid);
@@ -1042,7 +1043,7 @@ connect_repo_child(struct gotd_client *client,
 
 	/* Pass repo child pipe to session child process. */
 	if (gotd_imsg_compose_event(session_iev, GOTD_IMSG_CONNECT_REPO_CHILD,
-	    PROC_GOTD, pipe[0], &ireq, sizeof(ireq)) == -1) {
+	    GOTD_PROC_GOTD, pipe[0], &ireq, sizeof(ireq)) == -1) {
 		err = got_error_from_errno("imsg compose CONNECT_REPO_CHILD");
 		close(pipe[0]);
 		close(pipe[1]);
@@ -1051,7 +1052,8 @@ connect_repo_child(struct gotd_client *client,
 
 	/* Pass session child pipe to repo child process. */
 	if (gotd_imsg_compose_event(&repo_proc->iev,
-	    GOTD_IMSG_CONNECT_REPO_CHILD, PROC_GOTD, pipe[1], NULL, 0) == -1) {
+	    GOTD_IMSG_CONNECT_REPO_CHILD, GOTD_PROC_GOTD, pipe[1],
+	    NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose CONNECT_REPO_CHILD");
 		close(pipe[1]);
 		return err;
@@ -1351,7 +1353,7 @@ connect_session(struct gotd_client *client)
 	iconnect.username_len = strlen(client->username);
 
 	wbuf = imsg_create(&client->session->iev.ibuf, GOTD_IMSG_CONNECT,
-	    PROC_GOTD, gotd.pid, sizeof(iconnect) + iconnect.username_len);
+	    GOTD_PROC_GOTD, gotd.pid, sizeof(iconnect) + iconnect.username_len);
 	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg compose CONNECT");
 		close(s);
@@ -1470,9 +1472,9 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				enum gotd_procid proc_type;
 
 				if (client->required_auth & GOTD_AUTH_WRITE)
-					proc_type = PROC_REPO_WRITE;
+					proc_type = GOTD_PROC_REPO_WRITE;
 				else
-					proc_type = PROC_REPO_READ;
+					proc_type = GOTD_PROC_REPO_READ;
 
 				err = start_repo_child(client, proc_type, repo,
 				    gotd.argv0, gotd.confpath, gotd.daemonize,
@@ -1525,7 +1527,7 @@ connect_notifier_and_session(struct gotd_client *client)
 
 	/* Pass notifier pipe to session . */
 	if (gotd_imsg_compose_event(session_iev, GOTD_IMSG_CONNECT_NOTIFIER,
-	    PROC_GOTD, pipe[0], NULL, 0) == -1) {
+	    GOTD_PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose CONNECT_NOTIFIER");
 		close(pipe[0]);
 		close(pipe[1]);
@@ -1534,7 +1536,7 @@ connect_notifier_and_session(struct gotd_client *client)
 
 	/* Pass session pipe to notifier. */
 	if (gotd_imsg_compose_event(&gotd.notify_proc->iev,
-	    GOTD_IMSG_CONNECT_SESSION, PROC_GOTD, pipe[1], NULL, 0) == -1) {
+	    GOTD_IMSG_CONNECT_SESSION, GOTD_PROC_GOTD, pipe[1], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose CONNECT_SESSION");
 		close(pipe[1]);
 		return err;
@@ -1667,25 +1669,25 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 
 	argv[argc++] = argv0;
 	switch (proc_id) {
-	case PROC_LISTEN:
+	case GOTD_PROC_LISTEN:
 		argv[argc++] = "-TL";
 		break;
-	case PROC_AUTH:
+	case GOTD_PROC_AUTH:
 		argv[argc++] = "-TA";
 		break;
-	case PROC_SESSION_READ:
+	case GOTD_PROC_SESSION_READ:
 		argv[argc++] = "-Ts";
 		break;
-	case PROC_SESSION_WRITE:
+	case GOTD_PROC_SESSION_WRITE:
 		argv[argc++] = "-TS";
 		break;
-	case PROC_REPO_READ:
+	case GOTD_PROC_REPO_READ:
 		argv[argc++] = "-TR";
 		break;
-	case PROC_REPO_WRITE:
+	case GOTD_PROC_REPO_WRITE:
 		argv[argc++] = "-TW";
 		break;
-	case PROC_NOTIFY:
+	case GOTD_PROC_NOTIFY:
 		argv[argc++] = "-TN";
 		break;
 	default:
@@ -1730,7 +1732,7 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	/* proc->tmo is initialized in main() after event_init() */
 
-	proc->type = PROC_LISTEN;
+	proc->type = GOTD_PROC_LISTEN;
 
 	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1)
@@ -1763,7 +1765,7 @@ start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 
 	/* proc->tmo is initialized in main() after event_init() */
 
-	proc->type = PROC_NOTIFY;
+	proc->type = GOTD_PROC_NOTIFY;
 
 #ifdef SOCK_CLOEXEC
 	sock_flags |= SOCK_CLOEXEC;
@@ -1805,9 +1807,9 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	if (client_is_reading(client))
-		proc->type = PROC_SESSION_READ;
+		proc->type = GOTD_PROC_SESSION_READ;
 	else
-		proc->type = PROC_SESSION_WRITE;
+		proc->type = GOTD_PROC_SESSION_WRITE;
 	if (strlcpy(proc->repo_name, repo->name,
 	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 		fatalx("repository name too long: %s", repo->name);
@@ -1849,7 +1851,8 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	sock_flags |= SOCK_CLOEXEC;
 #endif
 
-	if (proc_type != PROC_REPO_READ && proc_type != PROC_REPO_WRITE)
+	if (proc_type != GOTD_PROC_REPO_READ &&
+	    proc_type != GOTD_PROC_REPO_WRITE)
 		return got_error_msg(GOT_ERR_NOT_IMPL, "bad process type");
 
 	proc = calloc(1, sizeof(*proc));
@@ -1864,8 +1867,7 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 		fatalx("repository name too long: %s", repo->name);
 	log_debug("starting %s for repository %s",
-	    proc->type == PROC_REPO_READ ? "reader" : "writer", repo->name);
-
+	    proc->type == GOTD_PROC_REPO_READ ? "reader" : "writer", repo->name);
 	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
 	    sizeof(proc->repo_path))
 		fatalx("repository path too long: %s", repo->path);
@@ -1924,7 +1926,7 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	TAILQ_INSERT_HEAD(&procs, proc, entry);
 	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
-	proc->type = PROC_AUTH;
+	proc->type = GOTD_PROC_AUTH;
 	if (strlcpy(proc->repo_name, repo->name,
 	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 		fatalx("repository name too long: %s", repo->name);
@@ -1958,7 +1960,7 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	iauth.required_auth = required_auth;
 	iauth.client_id = client->id;
 	if (gotd_imsg_compose_event(&proc->iev, GOTD_IMSG_AUTHENTICATE,
-	    PROC_GOTD, fd, &iauth, sizeof(iauth)) == -1) {
+	    GOTD_PROC_GOTD, fd, &iauth, sizeof(iauth)) == -1) {
 		log_warn("imsg compose AUTHENTICATE");
 		close(fd);
 		/* Let the auth_timeout handler tidy up. */
@@ -2081,7 +2083,7 @@ main(int argc, char **argv)
 	struct passwd *pw = NULL;
 	uid_t uid;
 	char *repo_path = NULL;
-	enum gotd_procid proc_id = PROC_GOTD;
+	enum gotd_procid proc_id = GOTD_PROC_GOTD;
 	struct event evsigint, evsigterm, evsighup, evsigusr1, evsigchld;
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
@@ -2120,25 +2122,25 @@ main(int argc, char **argv)
 		case 'T':
 			switch (*optarg) {
 			case 'A':
-				proc_id = PROC_AUTH;
+				proc_id = GOTD_PROC_AUTH;
 				break;
 			case 'L':
-				proc_id = PROC_LISTEN;
+				proc_id = GOTD_PROC_LISTEN;
 				break;
 			case 'N':
-				proc_id = PROC_NOTIFY;
+				proc_id = GOTD_PROC_NOTIFY;
 				break;
 			case 'R':
-				proc_id = PROC_REPO_READ;
+				proc_id = GOTD_PROC_REPO_READ;
 				break;
 			case 's':
-				proc_id = PROC_SESSION_READ;
+				proc_id = GOTD_PROC_SESSION_READ;
 				break;
 			case 'S':
-				proc_id = PROC_SESSION_WRITE;
+				proc_id = GOTD_PROC_SESSION_WRITE;
 				break;
 			case 'W':
-				proc_id = PROC_REPO_WRITE;
+				proc_id = GOTD_PROC_REPO_WRITE;
 				break;
 			default:
 				errx(1, "unknown proc type %s", optarg);
@@ -2159,10 +2161,11 @@ main(int argc, char **argv)
 	if (argc != 0)
 		usage();
 
-	if (geteuid() && (proc_id == PROC_GOTD || proc_id == PROC_LISTEN))
+	if (geteuid() && (proc_id == GOTD_PROC_GOTD ||
+	    proc_id == GOTD_PROC_LISTEN))
 		fatalx("need root privileges");
 
-	if (proc_id == PROC_GOTD) {
+	if (proc_id == GOTD_PROC_GOTD) {
 		const char *p = secretspath ? secretspath : GOTD_SECRETS_PATH;
 
 		fp = fopen(p, "r");
@@ -2235,7 +2238,7 @@ main(int argc, char **argv)
 	log_init(daemonize ? 0 : 1, LOG_DAEMON);
 	log_setverbose(verbosity);
 
-	if (proc_id == PROC_GOTD) {
+	if (proc_id == GOTD_PROC_GOTD) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		if (daemonize && daemon(1, 0) == -1)
@@ -2243,7 +2246,7 @@ main(int argc, char **argv)
 		gotd.pid = getpid();
 		start_listener(argv0, confpath, daemonize, verbosity);
 		start_notifier(argv0, confpath, daemonize, verbosity);
-	} else if (proc_id == PROC_LISTEN) {
+	} else if (proc_id == GOTD_PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		if (verbosity) {
 			log_info("socket: %s", gotd.unix_socket_path);
@@ -2256,11 +2259,13 @@ main(int argc, char **argv)
 			fatal("cannot listen on unix socket %s",
 			    gotd.unix_socket_path);
 		}
-	} else if (proc_id == PROC_AUTH) {
+	} else if (proc_id == GOTD_PROC_AUTH) {
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
-	} else if (proc_id == PROC_REPO_READ || proc_id == PROC_REPO_WRITE ||
-	    proc_id == PROC_SESSION_READ || proc_id == PROC_SESSION_WRITE) {
+	} else if (proc_id == GOTD_PROC_REPO_READ ||
+	    proc_id == GOTD_PROC_REPO_WRITE ||
+	    proc_id == GOTD_PROC_SESSION_READ ||
+	    proc_id == GOTD_PROC_SESSION_WRITE) {
 		error = got_repo_pack_fds_open(&pack_fds);
 		if (error != NULL)
 			fatalx("cannot open pack tempfiles: %s", error->msg);
@@ -2271,7 +2276,7 @@ main(int argc, char **argv)
 			fatalx("repository path not specified");
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
-	} else if (proc_id == PROC_NOTIFY) {
+	} else if (proc_id == GOTD_PROC_NOTIFY) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
 		if (gethostname(hostname, sizeof(hostname)) == -1)
 			fatal("gethostname");
@@ -2296,14 +2301,14 @@ main(int argc, char **argv)
 	event_init();
 
 	switch (proc_id) {
-	case PROC_GOTD:
+	case GOTD_PROC_GOTD:
 #ifndef PROFILE
 		/* "exec" promise will be limited to argv[0] via unveil(2). */
 		if (pledge("stdio proc exec sendfd recvfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
 		break;
-	case PROC_LISTEN:
+	case GOTD_PROC_LISTEN:
 #ifndef PROFILE
 		if (pledge("stdio sendfd unix unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2321,7 +2326,7 @@ main(int argc, char **argv)
 		    gotd.nconnection_limits);
 		/* NOTREACHED */
 		break;
-	case PROC_AUTH:
+	case GOTD_PROC_AUTH:
 #ifndef PROFILE
 		if (pledge("stdio getpw recvfd unix unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2339,8 +2344,8 @@ main(int argc, char **argv)
 		auth_main(title, &gotd.repos, repo_path);
 		/* NOTREACHED */
 		break;
-	case PROC_SESSION_READ:
-	case PROC_SESSION_WRITE:
+	case GOTD_PROC_SESSION_READ:
+	case GOTD_PROC_SESSION_WRITE:
 #ifndef PROFILE
 		/*
 		 * The "recvfd" promise is only needed during setup and
@@ -2350,7 +2355,7 @@ main(int argc, char **argv)
 		    "unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		if (proc_id == PROC_SESSION_READ)
+		if (proc_id == GOTD_PROC_SESSION_READ)
 			apply_unveil_repo_readonly(repo_path, 1);
 		else {
 			apply_unveil_repo_readwrite(repo_path);
@@ -2358,10 +2363,7 @@ main(int argc, char **argv)
 			if (repo == NULL)
 				fatalx("no repository for path %s", repo_path);
 		}
-
-		drop_privs(pw);
-
-		if (proc_id == PROC_SESSION_READ)
+		if (proc_id == GOTD_PROC_SESSION_READ)
 			session_read_main(title, repo_path, pack_fds, temp_fds,
 			    &gotd.request_timeout, repo);
 		else
@@ -2369,7 +2371,7 @@ main(int argc, char **argv)
 			    &gotd.request_timeout, repo);
 		/* NOTREACHED */
 		break;
-	case PROC_REPO_READ:
+	case GOTD_PROC_REPO_READ:
 		set_max_datasize();
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
@@ -2390,7 +2392,7 @@ main(int argc, char **argv)
 		repo_read_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		exit(0);
-	case PROC_REPO_WRITE:
+	case GOTD_PROC_REPO_WRITE:
 		set_max_datasize();
 
 		diff_f1 = got_opentemp();
@@ -2429,7 +2431,7 @@ main(int argc, char **argv)
 		    &repo->protected_branches);
 		/* NOTREACHED */
 		exit(0);
-	case PROC_NOTIFY:
+	case GOTD_PROC_NOTIFY:
 #ifndef PROFILE
 		if (pledge("stdio proc exec recvfd unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2448,7 +2450,7 @@ main(int argc, char **argv)
 		fatal("invalid process id %d", proc_id);
 	}
 
-	if (proc_id != PROC_GOTD)
+	if (proc_id != GOTD_PROC_GOTD)
 		fatal("invalid process id %d", proc_id);
 
 	evtimer_set(&gotd.listen_proc->tmo, kill_proc_timeout,

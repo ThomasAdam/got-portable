@@ -231,7 +231,7 @@ main		: LISTEN ON STRING {
 				yyerror("bad unix socket path \"%s\": "
 				    "must be an absolute path", $3);
 
-			if (gotd_proc_id == PROC_LISTEN) {
+			if (gotd_proc_id == GOTD_PROC_LISTEN) {
 				if (strlcpy(gotd->unix_socket_path, $3,
 				    sizeof(gotd->unix_socket_path)) >=
 				    sizeof(gotd->unix_socket_path)) {
@@ -273,7 +273,7 @@ conflags	: REQUEST TIMEOUT timeout		{
 			    sizeof(gotd->request_timeout));
 		}
 		| LIMIT USER STRING NUMBER	{
-			if (gotd_proc_id == PROC_LISTEN &&
+			if (gotd_proc_id == GOTD_PROC_LISTEN &&
 			    conf_limit_user_connections($3, $4) == -1) {
 				free($3);
 				YYERROR;
@@ -290,8 +290,8 @@ protectflags_l	: protectflags optnl protectflags_l
 		;
 
 protectflags	: TAG NAMESPACE STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
 				if (conf_protect_tag_namespace(new_repo, $3)) {
 					free($3);
 					YYERROR;
@@ -300,8 +300,8 @@ protectflags	: TAG NAMESPACE STRING {
 			free($3);
 		}
 		| BRANCH NAMESPACE STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
 				if (conf_protect_branch_namespace(new_repo,
 				    $3)) {
 					free($3);
@@ -311,8 +311,8 @@ protectflags	: TAG NAMESPACE STRING {
 			free($3);
 		}
 		| BRANCH STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
 				if (conf_protect_branch(new_repo, $2)) {
 					free($2);
 					YYERROR;
@@ -330,9 +330,9 @@ notifyflags_l	: notifyflags optnl notifyflags_l
 		;
 
 notifyflags	: BRANCH STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_branch(new_repo, $2)) {
 					free($2);
 					YYERROR;
@@ -341,9 +341,9 @@ notifyflags	: BRANCH STRING {
 			free($2);
 		}
 		| REFERENCE NAMESPACE STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_ref_namespace(new_repo, $3)) {
 					free($3);
 					YYERROR;
@@ -352,9 +352,9 @@ notifyflags	: BRANCH STRING {
 			free($3);
 		}
 		| EMAIL TO STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, NULL, NULL)) {
 					free($3);
@@ -364,9 +364,9 @@ notifyflags	: BRANCH STRING {
 			free($3);
 		}
 		| EMAIL FROM STRING TO STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, NULL, NULL)) {
 					free($3);
@@ -378,9 +378,9 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL TO STRING REPLY TO STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, NULL, NULL)) {
 					free($3);
@@ -392,9 +392,9 @@ notifyflags	: BRANCH STRING {
 			free($6);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, NULL, NULL)) {
 					free($3);
@@ -408,9 +408,9 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL TO STRING RELAY STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, NULL)) {
 					free($3);
@@ -422,9 +422,9 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, NULL)) {
 					free($3);
@@ -438,9 +438,9 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, NULL)) {
 					free($3);
@@ -454,9 +454,9 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, NULL)) {
 					free($3);
@@ -472,9 +472,9 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| EMAIL TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, $7)) {
 					free($3);
@@ -488,9 +488,9 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, $9)) {
 					free($3);
@@ -506,9 +506,9 @@ notifyflags	: BRANCH STRING {
 			free($9);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, $10)) {
 					free($3);
@@ -524,9 +524,9 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, $12)) {
 					free($3);
@@ -544,9 +544,9 @@ notifyflags	: BRANCH STRING {
 			free($12);
 		}
 		| EMAIL TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, port_sprintf($7))) {
 					free($3);
@@ -558,9 +558,9 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, port_sprintf($9))) {
 					free($3);
@@ -574,9 +574,9 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, port_sprintf($10))) {
 					free($3);
@@ -590,9 +590,9 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, port_sprintf($12))) {
 					free($3);
@@ -608,9 +608,9 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| URL STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, NULL,
 				    NULL, 0)) {
 					free($2);
@@ -620,9 +620,9 @@ notifyflags	: BRANCH STRING {
 			free($2);
 		}
 		| URL STRING AUTH STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, $4, NULL,
 				    0)) {
 					free($2);
@@ -634,9 +634,9 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING AUTH STRING INSECURE {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, $4, NULL,
 				    1)) {
 					free($2);
@@ -648,9 +648,9 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING HMAC STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, NULL, $4,
 				    0)) {
 					free($2);
@@ -662,9 +662,9 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING AUTH STRING HMAC STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, $4, $6,
 				    0)) {
 					free($2);
@@ -678,9 +678,9 @@ notifyflags	: BRANCH STRING {
 			free($6);
 		}
 		| URL STRING AUTH STRING INSECURE HMAC STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (conf_notify_http(new_repo, $2, $4, $7,
 				    1)) {
 					free($2);
@@ -706,12 +706,12 @@ repository	: REPOSITORY STRING {
 				}
 			}
 
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_AUTH ||
-			    gotd_proc_id == PROC_REPO_WRITE ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_GITWRAPPER |
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_AUTH ||
+			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_GITWRAPPER |
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -720,12 +720,12 @@ repository	: REPOSITORY STRING {
 		;
 
 repoopts1	: PATH STRING {
-			if (gotd_proc_id == PROC_GOTD ||
-			    gotd_proc_id == PROC_AUTH ||
-			    gotd_proc_id == PROC_REPO_WRITE ||
-			    gotd_proc_id == PROC_SESSION_WRITE ||
-			    gotd_proc_id == PROC_GITWRAPPER ||
-			    gotd_proc_id == PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD ||
+			    gotd_proc_id == GOTD_PROC_AUTH ||
+			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
+			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
+			    gotd_proc_id == GOTD_PROC_GITWRAPPER ||
+			    gotd_proc_id == GOTD_PROC_NOTIFY) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -746,7 +746,8 @@ repoopts1	: PATH STRING {
 					if (errno == ENOENT) {
 						log_warn("%s", $2);
 					} else if (errno != EACCES ||
-					    gotd_proc_id != PROC_GITWRAPPER) {
+					    gotd_proc_id !=
+					    GOTD_PROC_GITWRAPPER) {
 						yyerror("realpath %s: %s", $2,
 						    strerror(errno));
 						free($2);
@@ -762,14 +763,14 @@ repoopts1	: PATH STRING {
 			free($2);
 		}
 		| PERMIT RO numberstring {
-			if (gotd_proc_id == PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
 			} else
 				free($3);
 		}
 		| PERMIT RW numberstring {
-			if (gotd_proc_id == PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED,
 				    GOTD_AUTH_READ | GOTD_AUTH_WRITE, $3);
@@ -777,7 +778,7 @@ repoopts1	: PATH STRING {
 				free($3);
 		}
 		| DENY numberstring {
-			if (gotd_proc_id == PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_AUTH) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_DENIED, 0, $2);
 			} else
@@ -1189,7 +1190,7 @@ gotd_parse_config(const char *filename, enum gotd_procid proc_id,
 {
 	struct sym *sym, *next;
 	struct gotd_repo *repo;
-	int require_config_file = (proc_id != PROC_GITWRAPPER);
+	int require_config_file = (proc_id != GOTD_PROC_GITWRAPPER);
 
 	memset(env, 0, sizeof(*env));
 
@@ -1245,7 +1246,7 @@ gotd_parse_config(const char *filename, enum gotd_procid proc_id,
 		}
 	}
 
-	if (proc_id == PROC_GOTD && TAILQ_EMPTY(&gotd->repos)) {
+	if (proc_id == GOTD_PROC_GOTD && TAILQ_EMPTY(&gotd->repos)) {
 		log_warnx("no repository defined in configuration file");
 		return (-1);
 	}
@@ -1644,7 +1645,7 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *auth, char *hmac,
 		}
 	}
 
-	if (auth != NULL && gotd_proc_id == PROC_GOTD &&
+	if (auth != NULL && gotd_proc_id == GOTD_PROC_GOTD &&
 	    (gotd->secrets == NULL || gotd_secrets_get(gotd->secrets,
 	    GOTD_SECRET_AUTH, auth) == NULL)) {
 		yyerror("no auth secret `%s' defined", auth);
@@ -1652,7 +1653,7 @@ conf_notify_http(struct gotd_repo *repo, char *url, char *auth, char *hmac,
 		goto done;
 	}
 
-	if (hmac != NULL && gotd_proc_id == PROC_GOTD &&
+	if (hmac != NULL && gotd_proc_id == GOTD_PROC_GOTD &&
 	    (gotd->secrets == NULL && gotd_secrets_get(gotd->secrets,
 	    GOTD_SECRET_HMAC, hmac) == NULL)) {
 		yyerror("no hmac secret `%s' defined", hmac);

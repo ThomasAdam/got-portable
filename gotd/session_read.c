@@ -102,7 +102,7 @@ disconnect(struct gotd_session_client *client)
 	log_debug("uid %d: disconnecting", client->euid);
 
 	if (gotd_imsg_compose_event(&gotd_session.parent_iev,
-	    GOTD_IMSG_DISCONNECT, PROC_SESSION_READ, -1, NULL, 0) == -1)
+	    GOTD_IMSG_DISCONNECT, GOTD_PROC_SESSION_READ, -1, NULL, 0) == -1)
 		log_warn("imsg compose DISCONNECT");
 
 	imsgbuf_clear(&gotd_session.repo_child_iev.ibuf);
@@ -137,7 +137,8 @@ disconnect_on_error(struct gotd_session_client *client,
 		if (imsgbuf_init(&ibuf, client->fd) == -1) {
 			log_warn("imsgbuf_init");
 		} else {
-			gotd_imsg_send_error(&ibuf, 0, PROC_SESSION_READ, err);
+			gotd_imsg_send_error(&ibuf, 0,
+			    GOTD_PROC_SESSION_READ, err);
 			imsgbuf_clear(&ibuf);
 		}
 	}
@@ -354,7 +355,7 @@ forward_want(struct gotd_session_client *client, struct imsg *imsg)
 	memcpy(iwant.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
 
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
-	    GOTD_IMSG_WANT, PROC_SESSION_READ, -1,
+	    GOTD_IMSG_WANT, GOTD_PROC_SESSION_READ, -1,
 	    &iwant, sizeof(iwant)) == -1)
 		return got_error_from_errno("imsg compose WANT");
 
@@ -378,7 +379,7 @@ forward_have(struct gotd_session_client *client, struct imsg *imsg)
 	memcpy(ihave.object_id, ireq.object_id, SHA1_DIGEST_LENGTH);
 
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
-	    GOTD_IMSG_HAVE, PROC_SESSION_READ, -1,
+	    GOTD_IMSG_HAVE, GOTD_PROC_SESSION_READ, -1,
 	    &ihave, sizeof(ihave)) == -1)
 		return got_error_from_errno("imsg compose HAVE");
 
@@ -423,7 +424,7 @@ send_packfile(struct gotd_session_client *client)
 		return got_error_from_errno("got_opentempfd");
 
 	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
-	    GOTD_IMSG_SEND_PACKFILE, PROC_GOTD, client->delta_cache_fd,
+	    GOTD_IMSG_SEND_PACKFILE, GOTD_PROC_GOTD, client->delta_cache_fd,
 	    &ipack, sizeof(ipack)) == -1) {
 		err = got_error_from_errno("imsg compose SEND_PACKFILE");
 		close(pipe[0]);
@@ -441,7 +442,7 @@ send_packfile(struct gotd_session_client *client)
 	 * to prevent spurious "unexpected privsep message" errors from gotsh.
 	 */
 	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD, pipe[0], NULL, 0) == -1) {
+	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		close(pipe[1]);
 		return err;
@@ -613,7 +614,7 @@ session_dispatch_client(int fd, short events, void *arg)
 			 */
 			if (gotd_imsg_compose_event(
 			    &gotd_session.repo_child_iev,
-			    GOTD_IMSG_PACKFILE_PIPE, PROC_GOTD,
+			    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_GOTD,
 			    gotd_session.repo_child_packfd, NULL, 0) == -1) {
 				err = got_error_from_errno("imsg compose "
 				    "PACKFILE_PIPE");
@@ -654,7 +655,7 @@ list_refs_request(void)
 		return got_error_from_errno("dup");
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LIST_REFS_INTERNAL,
-	    PROC_SESSION_READ, fd, NULL, 0) == -1) {
+	    GOTD_PROC_SESSION_READ, fd, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose LIST_REFS_INTERNAL");
 		close(fd);
 		return err;
@@ -730,7 +731,7 @@ recv_repo_child(struct imsg *imsg)
 
 	memcpy(&ichild, imsg->data, sizeof(ichild));
 
-	if (ichild.proc_id != PROC_REPO_READ)
+	if (ichild.proc_id != GOTD_PROC_REPO_READ)
 		return got_error_msg(GOT_ERR_PRIVSEP_MSG,
 		    "bad child process type");
 
@@ -908,7 +909,7 @@ session_read_main(const char *title, const char *repo_path,
 	event_set(&gotd_session.parent_iev.ev, gotd_session.parent_iev.ibuf.fd,
 	    EV_READ, session_dispatch, &gotd_session.parent_iev);
 	if (gotd_imsg_compose_event(&gotd_session.parent_iev,
-	    GOTD_IMSG_CLIENT_SESSION_READY, PROC_SESSION_READ,
+	    GOTD_IMSG_CLIENT_SESSION_READY, GOTD_PROC_SESSION_READ,
 	    -1, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose CLIENT_SESSION_READY");
 		goto done;
