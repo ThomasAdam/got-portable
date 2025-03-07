@@ -190,6 +190,11 @@
 #define GOT_ERR_UNKNOWN_CAPA	173
 #define GOT_ERR_REF_DUP_ENTRY	174
 #define GOT_ERR_DIFF_NOCHANGES	175
+#define GOT_ERR_USER		176
+#define GOT_ERR_USER_EXISTS	177
+#define GOT_ERR_GROUP		178
+#define GOT_ERR_GROUP_EXISTS	179
+#define GOT_ERR_AUTHORIZED_KEY	180
 
 struct got_error {
         int code;

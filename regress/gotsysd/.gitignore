@@ -1,0 +1,15 @@
+SHA256.sig
+auto_install.conf
+bsd.rd
+bsd.rd.fs
+got.conf
+gotd.conf
+gotsys.conf
+gotsysd.conf
+gotsysd_bsd.rd
+gotsysd_sshkey
+gotsysd_sshkey.pub
+gotsysd_test_vm_base.qcow2
+gotsysd_vm_passwd
+install.site
+stamp-setup_test_vm

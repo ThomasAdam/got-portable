@@ -1,4 +1,4 @@
-SUBDIR = libexec got tog gotadmin
+SUBDIR = libexec got tog gotadmin gotsys
 
 .PHONY: release dist
 
@@ -8,6 +8,7 @@ SUBDIR += regress
 
 .if make(clean) || make(obj) || make(release)
 SUBDIR += gotwebd gotd gotsh gotctl template gitwrapper
+SUBDIR += gotsysd gotsys gotsysctl
 .endif
 
 .if make(tags) || make(cleandir)
@@ -66,5 +67,13 @@ server-regress:
 
 webd-regress:
 	${MAKE} -C regress/gotwebd
+
+sysd:
+	${MAKE} -C gotsysctl
+	${MAKE} -C gotsysd
+
+sysd-install:
+	${MAKE} -C gotsysctl install
+	${MAKE} -C gotsysd install
 
 .include <bsd.subdir.mk>

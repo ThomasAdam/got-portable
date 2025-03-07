@@ -1,0 +1,78 @@
+.\"
+.\" Copyright (c) 2025 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTSYSCTL 8
+.Os
+.Sh NAME
+.Nm gotsysctl
+.Nd control the Game of Trees System Daemon
+.Sh SYNOPSIS
+.Nm
+.Op Fl hV
+.Op Fl f Ar path
+.Ar command
+.Op Ar arg ...
+.Sh DESCRIPTION
+.Nm
+controls the
+.Xr gotsysd 8
+daemon.
+.Pp
+.Nm
+connects to the
+.Xr gotsysd 8
+unix socket, sends a command, and displays the response from
+.Xr gotsysd 8 .
+Access to the
+.Xr gotsysd 8
+unix socket is restricted to specific user accounts,
+see
+.Xr gotsysd.conf 5 .
+.Pp
+The options for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl h
+Display usage information and exit immediately.
+.It Fl f Ar path
+Set the
+.Ar path
+to the unix socket which
+.Xr gotsysd 8
+is listening on.
+If not specified, the path
+.Pa /var/run/gotsysd.sock
+will be used.
+.It Fl V , -version
+Display program version and exit immediately.
+.El
+.Pp
+The commands for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Cm info
+Display information about a running
+.Xr gotsysd 8
+instance.
+.El
+.Sh SEE ALSO
+.Xr gotsys.conf 5 ,
+.Xr gotsysd.conf 5 ,
+.Xr gotsysd 8
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

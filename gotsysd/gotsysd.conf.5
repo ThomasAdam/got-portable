@@ -1,0 +1,135 @@
+.\"
+.\" Copyright (c) 2024 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTSYSD.CONF 5
+.Os
+.Sh NAME
+.Nm gotsysd.conf
+.Nd gotsysd configuration file
+.Sh DESCRIPTION
+.Nm
+is the run-time configuration file for
+.Xr gotsysd 8 .
+.Pp
+nhe file format is line-based, with one configuration directive per line.
+Comments can be put anywhere in the file using a hash mark
+.Pq Sq # ,
+and extend to the end of the current line.
+Arguments names not beginning with a letter, digit or underscore,
+as well as reserved words
+.Pq such as Ic listen , Ic repository No or Ic user ,
+must be quoted.
+Arguments containing whitespace should be surrounded by double quotes
+.Pq \&" .
+.Pp
+Macros can be defined that are later expanded in context.
+Macro names must start with a letter, digit, or underscore, and may
+contain any of those characters, but may not be reserved words.
+Macros are not expanded inside quotes.
+For example:
+.Bd -literal -offset indent
+path = "/var/run/gotsysd.sock"
+listen on $path
+.Ed
+.Sh GLOBAL CONFIGURATION
+ The available global configuration directives are as follows:
+.Bl -tag -width Ds
+.It Ic gotd Ic user Ar user
+The name of the
+.Xr gotd 8
+user account.
+Defauls to
+.Dq _gotd .
+.Xr gotsysd 8
+will switch to this user account as needed.
+.It Ic listen on Ar path
+Set the path to the unix socket which
+.Xr gotsysd 8
+should listen on.
+If not specified, the path
+.Pa /var/run/gotsysd.sock
+will be used.
+.It Ic permit Ar identity
+Permit
+.Xr gotsysd 8
+unix socket access to users with the username
+.Ar identity .
+Group names may be matched by prepending a colon
+.Pq Sq \&:
+to
+.Ar identity .
+Numeric IDs are also accepted.
+.Pp
+Multiple
+.Ic permit
+rules can be specified.
+.Pp
+If no
+.Ic permit
+rule is specified, the users root and _gotd are granted access by default.
+.It Ic repository Ic directory Ar path
+Set the path to the repository directory within which Git repositories
+will be created and managed by
+.Xr gotsysd 8 .
+This repository directory must be owned by and be exclusively accessible to the
+.Xr gotd 8
+user.
+.Pp
+If not specified, the path
+.Pa /git
+will be used.
+.It Ic uid range Ar start Ar end
+Set the start and end (inclusive) of the range from which
+.Xr gotsysd 8
+will allocate user and group IDs when creating user accounts specified in
+.Xr gotsys.conf 5 .
+The
+.Ar start
+of this range must be greater than 1000 and must be smaller than the
+.Ar end .
+.Pp
+The default range is 5000 to 5999.
+.It Ic user Ar user
+Set the
+.Ar user
+which will run
+.Xr gotsysd 8 .
+Initially,
+.Xr gotsysd 8
+requires root privileges.
+Afterwards,
+.Xr gotsysd 8
+partly drops privileges to its own
+.Ar user
+and to the
+.Xr gotd 8
+user.
+If not specified, the user _gotsysd will be used.
+Numeric user IDs are also accepted.
+.El
+.Sh EXAMPLES
+The following example shows default settings:
+.Bd -literal -offset indent
+user _gotsysd
+gotd user _gotd
+listen on "/var/run/gotsysd.sock"
+repository directory "/git"
+uid range 5000 5999
+.Ed
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr gotd 8 ,
+.Xr gotsysd 8

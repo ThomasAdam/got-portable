@@ -241,6 +241,11 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_UNKNOWN_CAPA, "unknown capability" },
 	{ GOT_ERR_REF_DUP_ENTRY, "duplicate reference entry" },
 	{ GOT_ERR_DIFF_NOCHANGES, "no changes match the requested diff" },
+	{ GOT_ERR_USER, "no such user" },
+	{ GOT_ERR_USER_EXISTS, "user already exists" },
+	{ GOT_ERR_GROUP, "no such group" },
+	{ GOT_ERR_GROUP_EXISTS, "group already exists" },
+	{ GOT_ERR_AUTHORIZED_KEY, "no authorized key found" },
 };
 
 static struct got_custom_error {
