@@ -1,0 +1,145 @@
+/*
+ * Copyright (c) 2025 Stefan Sperling <stsp@openbsd.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+struct gotsys_authorized_key {
+	STAILQ_ENTRY(gotsys_authorized_key) entry;
+	char *keytype;
+	char *key;
+	char *comment;
+};
+STAILQ_HEAD(gotsys_authorized_keys_list, gotsys_authorized_key);
+
+/* Must fit into an imsg with some spare overhead. */
+#define GOTSYS_AUTHORIZED_KEY_MAXLEN	(MAX_IMSGSIZE - IMSG_HEADER_SIZE - 512)
+
+#define GOTSYS_SYSTEM_REPOSITORY_NAME	"gotsys"
+
+struct gotsys_user {
+	STAILQ_ENTRY(gotsys_user) entry;
+	char *name;
+	char *password;
+	struct gotsys_authorized_keys_list authorized_keys;
+};
+STAILQ_HEAD(gotsys_userlist, gotsys_user);
+
+struct gotsys_group {
+	STAILQ_ENTRY(gotsys_group) entry;
+	char *name;
+	struct gotsys_userlist members;
+};
+STAILQ_HEAD(gotsys_grouplist, gotsys_group);
+
+enum gotsys_notification_target_type {
+	GOTSYS_NOTIFICATION_VIA_EMAIL,
+	GOTSYS_NOTIFICATION_VIA_HTTP
+};
+
+struct gotsys_notification_target {
+	STAILQ_ENTRY(gotsys_notification_target) entry;
+
+	enum gotsys_notification_target_type type;
+	union {
+		struct {
+			char *sender;
+			char *recipient;
+			char *responder;
+			char *hostname;
+			char *port;
+		} email;
+		struct {
+			int   tls;
+			char *hostname;
+			char *port;
+			char *path;
+			char *user;
+			char *password;
+			char *hmac_secret;
+		} http;
+	} conf;
+};
+STAILQ_HEAD(gotsys_notification_targets, gotsys_notification_target);
+
+enum gotsys_access {
+	GOTSYS_ACCESS_DENIED = -1,
+	GOTSYS_ACCESS_PERMITTED = 1
+};
+
+struct gotsys_access_rule {
+	STAILQ_ENTRY(gotsys_access_rule) entry;
+
+	enum gotsys_access access;
+
+	int authorization;
+#define GOTSYS_AUTH_READ		0x1
+#define GOTSYS_AUTH_WRITE		0x2
+
+	char *identifier;
+};
+STAILQ_HEAD(gotsys_access_rule_list, gotsys_access_rule);
+
+struct gotsys_repo {
+	TAILQ_ENTRY(gotsys_repo) entry;
+
+	char name[NAME_MAX];
+
+	struct gotsys_access_rule_list access_rules;
+
+	struct got_pathlist_head protected_tag_namespaces;
+	struct got_pathlist_head protected_branch_namespaces;
+	struct got_pathlist_head protected_branches;
+
+	struct got_pathlist_head notification_refs;
+	struct got_pathlist_head notification_ref_namespaces;
+	struct gotsys_notification_targets notification_targets;
+};
+TAILQ_HEAD(gotsys_repolist, gotsys_repo);
+
+struct gotsys_conf {
+	struct gotsys_userlist users;
+	struct gotsys_grouplist groups;
+	struct gotsys_repolist repos;
+	int nrepos;
+};
+
+void gotsys_conf_init(struct gotsys_conf *);
+const struct got_error *gotsys_conf_parse(const char *, struct gotsys_conf *,
+    int *);
+void gotsys_authorized_key_free(struct gotsys_authorized_key *);
+void gotsys_authorized_keys_list_purge(struct gotsys_authorized_keys_list *);
+void gotsys_user_free(struct gotsys_user *);
+void gotsys_userlist_purge(struct gotsys_userlist *);
+void gotsys_group_free(struct gotsys_group *);
+void gotsys_grouplist_purge(struct gotsys_grouplist *);
+void gotsys_access_rule_free(struct gotsys_access_rule *);
+void gotsys_notification_target_free(struct gotsys_notification_target *);
+void gotsys_repo_free(struct gotsys_repo *);
+void gotsys_conf_clear(struct gotsys_conf *);
+const struct got_error *gotsys_conf_new_authorized_key(
+    struct gotsys_authorized_key **, char *, char *, char *);
+const struct got_error *gotsys_conf_new_user(struct gotsys_user **,
+    const char *);
+const struct got_error *gotsys_conf_new_group(struct gotsys_group **,
+    const char *);
+const struct got_error *gotsys_conf_new_group_member(struct gotsys_grouplist *,
+    const char *, const char *);
+const struct got_error *gotsys_conf_new_repo(struct gotsys_repo **,
+    const char *);
+const struct got_error *gotsys_conf_validate_name(const char *, const char *);
+const struct got_error *gotsys_conf_validate_repo_name(const char *);
+const struct got_error *gotsys_conf_validate_password(const char *, const char *);
+const struct got_error *gotsys_conf_new_access_rule(
+    struct gotsys_access_rule **, enum gotsys_access, int, const char *,
+    struct gotsys_userlist *, struct gotsys_grouplist *);

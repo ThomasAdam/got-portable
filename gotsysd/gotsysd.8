@@ -1,0 +1,123 @@
+.\"
+.\" Copyright (c) 2024 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTSYSD 8
+.Os
+.Sh NAME
+.Nm gotsysd
+.Nd Game of Trees System Daemon
+.Sh SYNOPSIS
+.Nm
+.Op Fl dnv
+.Op Fl f Ar config-file
+.Sh DESCRIPTION
+.Nm
+manages the system configuration of a Git repository server running
+.Xr gotd 8 .
+.Pp
+.Nm
+allows remote administrators to configure aspects of Git repository
+services without having shell access to the Git server's operating system.
+Remote administrators merely need to be granted write access to a
+special-purpose
+.Em system repository
+called
+.Pa gotsys.git
+in order to configure Git repository services.
+.Pp
+Tasks carried out by
+.Nm
+include the creation of Git repositores to be served by
+.Xr gotd 8 ,
+and the creation of user accounts which use the
+.Xr gotsh 1
+shell to access
+.Xr gotd 8 .
+The desired system configuration is described by the file
+.Xr gotsys.conf 5
+in the system repository.
+.Pp
+The
+.Nm
+configuration file format is described in
+.Xr gotsysd.conf 5 .
+.Nm
+can be run without a configuration file, using default settings.
+.Pp
+.Nm
+listens on a
+.Xr unix 4
+socket for notifications issued by
+.Xr gotd 8 ,
+and for commands issued via
+.Xr gotsysctl 8 .
+.Xr gotd 8
+notifications are sent when a remote administrator modifies the file
+.Xr gotsys.conf 5
+in the system repository.
+.Pp
+Only the users root and _gotd are granted access to the
+.Nm
+unix socket by default.
+Alternative access rules can be configured in
+.Xr gotsysd.conf 5 .
+.Pp
+The options for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl d
+Do not daemonize.
+Send log output to stderr.
+.It Fl f Ar config-file
+Set the path to the configuration file.
+If not specified, the file
+.Pa /etc/gotsysd.conf
+will be used.
+This file is not required to exist.
+.It Fl n
+Configtest mode.
+Only check the configuration file for validity.
+.It Fl v
+Verbose mode.
+Verbosity increases if this option is used multiple times.
+.El
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /etc/gotsysd.conf
+Default location of the configuration file.
+.It Pa /git
+Default directory containing Git repositories managed by
+.Nm .
+This path can be configured in
+.Xr gotsysd.conf 5 .
+.It Pa /var/run/gotsysd.sock
+Default location of the unix socket which
+.Nm
+is listening on.
+This path can be configured in
+.Xr gotsysd.conf 5 .
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr gotsh 1 ,
+.Xr gotsys 1 ,
+.Xr gotsys.conf 5 ,
+.Xr gotsysd.conf 5 ,
+.Xr gotd 8 ,
+.Xr gotsysctl 8
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

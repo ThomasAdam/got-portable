@@ -1,0 +1,166 @@
+.\"
+.\" Copyright (c) 2025 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTSYS 1
+.Dd $Mdocdate$
+.Os
+.Sh NAME
+.Nm gotsys
+.Nd manage
+.Xr gotsys.conf 5
+.Sh SYNOPSIS
+.Nm
+.Op Fl hV
+.Ar command
+.Op Ar arg ...
+.Sh DESCRIPTION
+.Nm
+performs tasks involving the
+.Xr gotsys.conf 5
+configuration file consumed by
+.Xr gotsysd 8 .
+.Pp
+The options for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl h
+Display usage information and exit immediately.
+.It Fl V , -version
+Display program version and exit immediately.
+.El
+.Pp
+The commands for
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Cm apply Oo Fl c Ar commit Oc Oo Fl f Ar socket Oc Oo Fl r Ar repository-path Oc Oo Ar file Oc
+Trigger system configuration tasks based on the
+.Xr gotsys.conf 5
+configuration
+.Ar file
+found in the
+.Xr gotsysd 8
+system repository.
+If no
+.Ar file
+argument is specified, the file path
+.Pa gotsys.conf
+will be used.
+.Pp
+Usually,
+.Xr gotd 8
+will trigger system configuration tasks whenever a new version of
+.Xr  gotsys.conf 5
+is sent to the
+.Xr gotsysd 8
+.Em system repository .
+If system configuration fails or causes problems for any reason, system administrators
+with shell access to the server can use
+.Ic gotsys apply
+to reconfigure the system back into a working state.
+.Pp
+.Ic gotsys apply
+requires on-disk read access to the
+.Xr gotsysd 8
+system repository, as well as access to the
+.Xr gotsysd 8
+unix socket.
+By default, only the root and _gotd users have the required
+access permissions.
+.Pp
+The options for
+.Cm gotsys apply
+are as follows:
+.Bl -tag -width Ds
+.It Fl c Ar commit
+Obtain the
+.Xr gotsys.conf 5
+configuration
+.Ar file
+from the specified
+.Ar commit .
+.Pp
+The expected
+.Ar commit
+argument is a commit ID, or a reference name or a keyword
+which will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full commit ID
+automatically, provided the abbreviation is unique.
+.Pp
+If no
+.Ar commit
+is specified, a commit corresponding to the repository's HEAD reference
+will be used.
+.It Fl f Ar socket
+Set the path to the unix
+.Ar socket
+which
+.Xr gotsysd 8
+is listening on.
+If not specified, the path
+.Pa /var/run/gotsysd.sock
+will be used.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, the repository path
+.Pa /git/gotsys.git
+will be used.
+.El
+.It Cm check Oo Fl q Oc Oo Ar file Oc 
+Read a
+.Xr gotsys.conf 5
+configuration
+.Ar file
+and report any errors.
+If no
+.Ar file
+is specified, the file
+.Pa gotsys.conf
+in the current working directory will be read.
+.Pp
+.Ic gotsys check
+is intended to be used by administrators who manage a
+.Xr gotd 8
+server remotely by committing changes to
+.Xr gotsys.conf 5 .
+.Ppd
+Files which do not pass
+.Ic gotsys check
+will be rejected by the server.
+Running
+.Ic gotsys check
+before committing changes to
+.Xr gotsys.conf 5
+is therefore recommended.
+.Pp
+The options for
+.Cm gotsys check
+are as follows:
+.Bl -tag -width Ds
+.It Fl q
+Stay silent on standard output.
+Only report errors.
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std gotsys
+.Sh SEE ALSO
+.Xr gotsys.conf 5 ,
+.Xr gotd 8 ,
+.Xr gotsysd 8
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

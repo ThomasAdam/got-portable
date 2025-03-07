@@ -1,0 +1,52 @@
+Running gotsysd regression tests requires some manual system preparation.
+
+vmd(8) must be running:
+
+  # rcctl enable vmd
+  # rcctl start vmd
+
+pf(4) must be configured to pass traffic from the default guest IP range
+to the internet. Assuming the default route interface is em0, this line
+in /etc/pf.conf should work:
+
+  match out on em0 from "100.64.0.0/10" nat-to (em0)
+
+pf(4) must be configured to pass DNS requests from the guest IP range
+to a working DNS resolver:
+
+  match in on tap inet proto udp from "100.64.0.0/10" to any \
+	port domain rdr-to 127.0.0.1
+
+Replace 127.0.0.1 with your preferred resolver.
+
+The pf(4) ruleset must be reloaded:
+
+  # pfctl -f /etc/pf.conf
+
+IP forwarding must be enabled for IPv4 traffic:
+
+  # sysctl net.inet.ip.forwarding=1
+
+The test suite defaults to the virtual machine name: gotsysd-test
+This name can be passed to vmctl(8) to control the VM.
+
+The tests require a base disk image which is used to avoid running a
+full VM installation for each run of the tests. The base image must be
+created manually by performing a scripted autoinstall(8) installation:
+
+  # make vm
+
+The base disk image will be removed by 'make clean'.
+
+Once the installation has completed, wait until the guest has booted into
+the installed system. Once the installed system has booted successfully,
+the VM can be shut down from the host:
+
+  # vmctl stop gotsysd-test
+
+Now the actual test suite can be run with:
+
+  # make
+
+A test VM will be started automatically and stopped again once the tests
+have finished running.
