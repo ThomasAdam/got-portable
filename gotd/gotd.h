@@ -491,8 +491,7 @@ struct gotd_imsg_notify {
 	/* Followed by username_len data bytes. */
 };
 
-int enter_chroot(const char *);
-int parse_config(const char *, enum gotd_procid, struct gotd_secrets *,
+int gotd_parse_config(const char *, enum gotd_procid, struct gotd_secrets *,
     struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);

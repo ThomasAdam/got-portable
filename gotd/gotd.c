@@ -2179,7 +2179,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (parse_config(confpath, proc_id, secrets, &gotd) != 0)
+	if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 		return 1;
 
 	pw = getpwnam(gotd.user_name);
