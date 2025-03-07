@@ -361,7 +361,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	}
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFICATION_SENT,
-	    PROC_NOTIFY, -1, NULL, 0) == -1) {
+	    GOTD_PROC_NOTIFY, -1, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose NOTIFY");
 		goto done;
 	}

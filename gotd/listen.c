@@ -348,8 +348,8 @@ gotd_accept(int fd, short event, void *arg)
 		log_warn("%s: dup", __func__);
 		goto err;
 	}
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_CONNECT, PROC_LISTEN, s,
-	    &iconn, sizeof(iconn)) == -1) {
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_CONNECT,
+	    GOTD_PROC_LISTEN, s, &iconn, sizeof(iconn)) == -1) {
 		log_warn("imsg compose CONNECT");
 		goto err;
 	}

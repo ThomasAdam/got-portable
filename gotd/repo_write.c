@@ -165,7 +165,7 @@ send_peeled_tag_ref(struct got_reference *ref, struct got_object *obj,
 		goto done;
 	}
 
-	wbuf = imsg_create(ibuf, GOTD_IMSG_REF, PROC_REPO_WRITE,
+	wbuf = imsg_create(ibuf, GOTD_IMSG_REF, GOTD_PROC_REPO_WRITE,
 	    repo_write.pid, len);
 	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg_create REF");
@@ -213,7 +213,7 @@ send_ref(struct got_reference *ref, struct imsgbuf *ibuf)
 	if (err)
 		return err;
 
-	wbuf = imsg_create(ibuf, GOTD_IMSG_REF, PROC_REPO_WRITE,
+	wbuf = imsg_create(ibuf, GOTD_IMSG_REF, GOTD_PROC_REPO_WRITE,
 	    repo_write.pid, len);
 	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg_create REF");
@@ -305,7 +305,7 @@ list_refs(struct imsg *imsg)
 			irefs.nrefs++;
 	}
 
-	if (imsg_compose(&ibuf, GOTD_IMSG_REFLIST, PROC_REPO_WRITE,
+	if (imsg_compose(&ibuf, GOTD_IMSG_REFLIST, GOTD_PROC_REPO_WRITE,
 	    repo_write.pid, -1, &irefs, sizeof(irefs)) == -1) {
 		err = got_error_from_errno("imsg_compose REFLIST");
 		goto done;
@@ -706,7 +706,7 @@ recv_ref_update(struct imsg *imsg)
 		}
 	}
 
-	gotd_imsg_send_ack(&ref_update->new_id, &ibuf, PROC_REPO_WRITE,
+	gotd_imsg_send_ack(&ref_update->new_id, &ibuf, GOTD_PROC_REPO_WRITE,
 	    repo_write.pid);
 
 	ref_update->ref = ref;
@@ -1179,8 +1179,8 @@ report_pack_status(const struct got_error *unpack_err)
 		istatus.reason_len = strlen(unpack_ok);
 
 	len = sizeof(istatus) + istatus.reason_len;
-	wbuf = imsg_create(&ibuf, GOTD_IMSG_PACKFILE_STATUS, PROC_REPO_WRITE,
-	    repo_write.pid, len);
+	wbuf = imsg_create(&ibuf, GOTD_IMSG_PACKFILE_STATUS,
+	    GOTD_PROC_REPO_WRITE, repo_write.pid, len);
 	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg_create PACKFILE_STATUS");
 		goto done;
@@ -1561,7 +1561,7 @@ install_packfile(struct gotd_imsgev *iev)
 	memcpy(inst.pack_sha1, client->pack_sha1, SHA1_DIGEST_LENGTH);
 
 	ret = gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_INSTALL,
-	    PROC_REPO_WRITE, -1, &inst, sizeof(inst));
+	    GOTD_PROC_REPO_WRITE, -1, &inst, sizeof(inst));
 	if (ret == -1)
 		return got_error_from_errno("imsg_compose PACKFILE_INSTALL");
 
@@ -1578,7 +1578,7 @@ send_ref_updates_start(int nref_updates, struct gotd_imsgev *iev)
 	istart.nref_updates = nref_updates;
 
 	ret = gotd_imsg_compose_event(iev, GOTD_IMSG_REF_UPDATES_START,
-	    PROC_REPO_WRITE, -1, &istart, sizeof(istart));
+	    GOTD_PROC_REPO_WRITE, -1, &istart, sizeof(istart));
 	if (ret == -1)
 		return got_error_from_errno("imsg_compose REF_UPDATES_START");
 
@@ -1602,8 +1602,8 @@ send_ref_update(struct gotd_ref_update *ref_update, struct gotd_imsgev *iev)
 	iref.name_len = strlen(refname);
 
 	len = sizeof(iref) + iref.name_len;
-	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_REF_UPDATE, PROC_REPO_WRITE,
-	    repo_write.pid, len);
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_REF_UPDATE,
+	    GOTD_PROC_REPO_WRITE, repo_write.pid, len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create REF_UPDATE");
 
@@ -2183,7 +2183,7 @@ render_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	}
 
 	len = sizeof(ireq) + ireq.refname_len;
-	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY, PROC_REPO_WRITE,
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFY, GOTD_PROC_REPO_WRITE,
 	    repo_write.pid, len);
 	if (wbuf == NULL) {
 		err = got_error_from_errno("imsg_create REF");
@@ -2327,8 +2327,8 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	}
 
 	if (!shut && check_cancelled(NULL) == NULL) {
-		if (err && gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
-		    client->id, err) == -1) {
+		if (err && gotd_imsg_send_error_event(iev,
+		    GOTD_PROC_REPO_WRITE, client->id, err) == -1) {
 			log_warnx("could not send error to parent: %s",
 			    err->msg);
 		}
@@ -2418,7 +2418,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 		imsg_free(&imsg);
 	}
 
-	if (err && gotd_imsg_send_error_event(iev, PROC_REPO_WRITE,
+	if (err && gotd_imsg_send_error_event(iev, GOTD_PROC_REPO_WRITE,
 	    client->id, err) == -1)
 		log_warnx("could not send error to parent: %s", err->msg);
 done:
@@ -2495,7 +2495,7 @@ repo_write_main(const char *title, const char *repo_path,
 	iev.handler_arg = NULL;
 	event_set(&iev.ev, iev.ibuf.fd, EV_READ, repo_write_dispatch, &iev);
 	if (gotd_imsg_compose_event(&iev, GOTD_IMSG_REPO_CHILD_READY,
-	    PROC_REPO_WRITE, -1, NULL, 0) == -1) {
+	    GOTD_PROC_REPO_WRITE, -1, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose REPO_CHILD_READY");
 		goto done;
 	}

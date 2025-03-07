@@ -141,7 +141,7 @@ main(int argc, char *argv[])
 	confpath = getenv("GOTD_CONF_PATH");
 	if (confpath == NULL)
 		confpath = GOTD_CONF_PATH;
-	gotd_parse_config(confpath, PROC_GITWRAPPER, NULL, &gotd);
+	gotd_parse_config(confpath, GOTD_PROC_GITWRAPPER, NULL, &gotd);
 
 	error = apply_unveil(myserver);
 	if (error)

@@ -226,7 +226,8 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 	err = auth_check(&username, &gotd_auth.repo->rules,
 	    gotd_auth.repo->name, iauth.euid, iauth.egid, iauth.required_auth);
 	if (err) {
-		gotd_imsg_send_error(ibuf, PROC_AUTH, iauth.client_id, err);
+		gotd_imsg_send_error(ibuf, GOTD_PROC_AUTH,
+		    iauth.client_id, err);
 		goto done;
 	}
 
@@ -235,7 +236,7 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 		len = maxlen;
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_ACCESS_GRANTED,
-	    PROC_AUTH, -1, username, len) == -1)
+	    GOTD_PROC_AUTH, -1, username, len) == -1)
 		err = got_error_from_errno("imsg compose ACCESS_GRANTED");
 done:
 	free(username);
