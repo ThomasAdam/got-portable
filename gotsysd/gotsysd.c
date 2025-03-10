@@ -1591,7 +1591,7 @@ open_gotsysd_db(void)
 		fatal("mkdir %s", GOTSYSD_DB_PATH);
 
 	gotsysd.db_commit_fd = open(GOTSYSD_DB_COMMIT_PATH,
-	    O_RDWR | O_NOFOLLOW | O_CREAT | O_EXLOCK | O_CLOEXEC,
+	    O_RDWR | O_NOFOLLOW | O_CREAT | O_NONBLOCK | O_EXLOCK | O_CLOEXEC,
 	    0600);
 	if (gotsysd.db_commit_fd == -1)
 		fatal("open %s", GOTSYSD_DB_COMMIT_PATH);
