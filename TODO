@@ -91,9 +91,7 @@ gotadmin:
   exclude base.
 
 gotsysd:
-- persist latest commit hash gotsys.conf was obtained from during sysconf
 - show latest commit hash in 'gotsys info'
-- make tests watch for commit hash changing to detect that gotsysd is done
 - have gotd notify gotsysd when gotsys.conf is changed to trigger 'gotsys apply'
 - have gotd validate gotsys.conf syntax before accepting changes
 - create anonymous user and configure sshd according to anonymous permit rules
