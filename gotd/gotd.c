@@ -2307,7 +2307,7 @@ main(int argc, char **argv)
 		}
 		if (proc_id == GOTD_PROC_SESSION_READ)
 			session_read_main(title, repo_path, pack_fds, temp_fds,
-			    &gotd.request_timeout, repo);
+			    &gotd.request_timeout);
 		else
 			session_write_main(title, repo_path, pack_fds, temp_fds,
 			    &gotd.request_timeout, repo);

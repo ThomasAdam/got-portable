@@ -65,7 +65,6 @@ static struct gotd_session_read {
 	pid_t pid;
 	const char *title;
 	struct got_repository *repo;
-	struct gotd_repo *repo_cfg;
 	int *pack_fds;
 	int *temp_fds;
 	struct gotd_imsgev parent_iev;
@@ -843,8 +842,7 @@ done:
 
 void
 session_read_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds, struct timeval *request_timeout,
-    struct gotd_repo *repo_cfg)
+    int *pack_fds, int *temp_fds, struct timeval *request_timeout)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -855,7 +853,6 @@ session_read_main(const char *title, const char *repo_path,
 	gotd_session.temp_fds = temp_fds;
 	memcpy(&gotd_session.request_timeout, request_timeout,
 	    sizeof(gotd_session.request_timeout));
-	gotd_session.repo_cfg = repo_cfg;
 	gotd_session.repo_child_packfd = -1;
 
 	if (imsgbuf_init(&gotd_session.notifier_iev.ibuf, -1) == -1) {

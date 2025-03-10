@@ -15,4 +15,4 @@
  */
 
 void session_read_main(const char *, const char *, int *, int *,
-    struct timeval *, struct gotd_repo *);
+    struct timeval *);
