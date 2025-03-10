@@ -2345,6 +2345,20 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_SESSION_READ:
+#ifndef PROFILE
+		/*
+		 * The "recvfd" promise is only needed during setup and
+		 * will be removed in a later pledge(2) call.
+		 */
+		if (pledge("stdio rpath wpath cpath recvfd sendfd fattr flock "
+		    "unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+		apply_unveil_repo_readonly(repo_path, 1);
+		session_read_main(title, repo_path, pack_fds, temp_fds,
+		    &gotd.request_timeout);
+		/* NOTREACHED */
+		break;
 	case GOTD_PROC_SESSION_WRITE:
 #ifndef PROFILE
 		/*
@@ -2355,20 +2369,12 @@ main(int argc, char **argv)
 		    "unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		if (proc_id == GOTD_PROC_SESSION_READ)
-			apply_unveil_repo_readonly(repo_path, 1);
-		else {
-			apply_unveil_repo_readwrite(repo_path);
-			repo = gotd_find_repo_by_path(repo_path, &gotd);
-			if (repo == NULL)
-				fatalx("no repository for path %s", repo_path);
-		}
-		if (proc_id == GOTD_PROC_SESSION_READ)
-			session_read_main(title, repo_path, pack_fds, temp_fds,
-			    &gotd.request_timeout);
-		else
-			session_write_main(title, repo_path, pack_fds, temp_fds,
-			    &gotd.request_timeout, repo);
+		apply_unveil_repo_readwrite(repo_path);
+		repo = gotd_find_repo_by_path(repo_path, &gotd);
+		if (repo == NULL)
+			fatalx("no repository for path %s", repo_path);
+		session_write_main(title, repo_path, pack_fds, temp_fds,
+		    &gotd.request_timeout, repo);
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_REPO_READ:
