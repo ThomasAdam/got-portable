@@ -1672,7 +1672,7 @@ main(int argc, char **argv)
 	if (proc_id == GOTSYSD_PROC_SYSCONF) {
 		if (argc != 1)
 			usage();
-		commit_id_str = argv[1];
+		commit_id_str = argv[0];
 	} else if (argc != 0)
 		usage();
 
