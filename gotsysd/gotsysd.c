@@ -304,15 +304,28 @@ send_info(struct gotsysd_client *client)
 {
 	const struct got_error *err = NULL;
 	struct gotsysd_imsg_info info;
+	size_t hexsize;
+	struct got_object_id commit_id;
 
 	log_debug("info request from %s", client->username);
 
+	memset(&info, 0, sizeof(info));
 	info.pid = gotsysd.pid;
 	info.verbosity = gotsysd.verbosity;
 	strlcpy(info.repository_directory, gotsysd.repos_path,
 	    sizeof(info.repository_directory));
 	info.uid_start = gotsysd.uid_start;
 	info.uid_end = gotsysd.uid_end;
+
+	hexsize = gotsysd.gotsys_conf_commit_id_len + 1;
+	if (hexsize == SHA1_DIGEST_STRING_LENGTH &&
+	    got_parse_object_id(&commit_id, gotsysd.gotsys_conf_commit_id,
+	        GOT_HASH_SHA1))
+		memcpy(&info.commit_id, &commit_id, sizeof(info.commit_id));
+	else if (hexsize == SHA256_DIGEST_STRING_LENGTH &&
+	    got_parse_object_id(&commit_id, gotsysd.gotsys_conf_commit_id,
+	        GOT_HASH_SHA256))
+		memcpy(&info.commit_id, &commit_id, sizeof(info.commit_id));
 
 	if (gotsysd_imsg_compose_event(&client->iev, GOTSYSD_IMSG_INFO,
 	    GOTSYSD_PROC_GOTSYSD, -1, &info, sizeof(info)) == -1) {
