@@ -26,6 +26,8 @@
 #include <imsg.h>
 #include <limits.h>
 #include <pwd.h>
+#include <sha1.h>
+#include <sha2.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +40,7 @@
 #include "got_error.h"
 #include "got_path.h"
 #include "got_opentemp.h"
+#include "got_object.h"
 
 #include "gotsysd.h"
 #include "gotsys.h"
