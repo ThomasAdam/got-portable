@@ -104,6 +104,16 @@ Default directory containing Git repositories managed by
 .Nm .
 This path can be configured in
 .Xr gotsysd.conf 5 .
+.It Pa /var/db/gotsysd
+The directory where
+.Nm
+stores persistent state.
+Files in this directory are opened with exclusive locks, ensuring
+that only one instance of
+.Nm
+runs on a given
+.Ox
+system.
 .It Pa /var/run/gotsysd.sock
 Default location of the unix socket which
 .Nm
