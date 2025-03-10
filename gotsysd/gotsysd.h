@@ -257,6 +257,13 @@ struct gotsysd_imsg_info {
 	uid_t uid_end;
 };
 
+/* Structure for GOTSYSD_IMSG_CMD_SYSCONF */
+struct gotsysd_imsg_cmd_sysconf {
+	struct got_object_id commit_id;
+
+	/* Configuration file descriptor is passed via imsg. */
+};
+
 struct gotsysd_imsg_connect_proc {
 	enum gotsysd_procid procid;
 	/* ibuf fd is passed via imsg */
