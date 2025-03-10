@@ -260,9 +260,9 @@ struct gotsysd_imsg_info {
 	pid_t pid;
 	int verbosity;
 	char repository_directory[_POSIX_PATH_MAX];
-	char system_repository[_POSIX_PATH_MAX];
 	uid_t uid_start;
 	uid_t uid_end;
+	struct got_object_id commit_id;
 };
 
 /* Structure for GOTSYSD_IMSG_CMD_SYSCONF */

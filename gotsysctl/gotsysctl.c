@@ -84,9 +84,10 @@ usage_info(void)
 static const struct got_error *
 show_info(struct imsg *imsg)
 {
+	const struct got_error *err = NULL;
 	struct gotsysd_imsg_info info;
 	size_t datalen;
-	char *repo_dir_safe = NULL, *system_repo_safe = NULL;
+	char *repo_dir_safe = NULL, *commit_id_str = NULL;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(info))
@@ -94,25 +95,27 @@ show_info(struct imsg *imsg)
 	memcpy(&info, imsg->data, sizeof(info));
 
 	info.repository_directory[sizeof(info.repository_directory) - 1] = '\0';
-	info.system_repository[sizeof(info.system_repository) - 1] = '\0';
+
+	if (info.commit_id.algo == GOT_HASH_SHA1 ||
+	    info.commit_id.algo == GOT_HASH_SHA256) {
+		err = got_object_id_str(&commit_id_str, &info.commit_id);
+		if (err)
+			return err;
+	}
 
 	if (stravis(&repo_dir_safe, info.repository_directory,
 	    VIS_SAFE) == -1)
 		return got_error_from_errno("stravis");
-	if (stravis(&system_repo_safe, info.system_repository,
-	    VIS_SAFE) == -1) {
-		free(repo_dir_safe);
-		return got_error_from_errno("stravis");
-	}	
 
 	printf("gotsysd PID: %d\n", info.pid);
 	printf("verbosity: %d\n", info.verbosity);
 	printf("repository directory: %s\n", repo_dir_safe);
-	printf("system repository: %s\n", system_repo_safe);
 	printf("UID range: %u-%u\n", info.uid_start, info.uid_end);
+	printf("gotsys.conf commit: %s\n",
+	    commit_id_str ? commit_id_str : "unknown");
 
 	free(repo_dir_safe);
-	free(system_repo_safe);
+	free(commit_id_str);
 	return NULL;
 }
 
@@ -147,7 +150,7 @@ cmd_info(int argc, char *argv[], int gotsysd_sock)
 
 	if (imsg_compose(&ibuf, GOTSYSD_IMSG_CMD_INFO, 0, 0, -1,
 	    NULL, 0) == -1) {
-		err= got_error_from_errno("imsg_compose INFO");
+		err = got_error_from_errno("imsg_compose INFO");
 		goto done;
 	}
 
