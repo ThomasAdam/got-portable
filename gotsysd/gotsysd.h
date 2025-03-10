@@ -262,17 +262,6 @@ struct gotsysd_imsg_connect_proc {
 	/* ibuf fd is passed via imsg */
 };
 
-/* Structure for GOTSYSD_IMSG_START_PROG_READ_CONF. */
-struct gotsysd_imsg_start_prog_read_conf {
-	size_t system_repo_strlen;
-	size_t commit_id_strlen;
-
-	/*
-	 * Followed by system_repo_strlen + commit_id_strlen
-	 * data bytes.
-	 */
-};
-
 /* Structure for GOTSYSD_IMSG_START_PROG_USERKEYS. */
 struct gotsysd_imsg_start_prog_userkeys {
 	size_t username_len;
