@@ -107,27 +107,29 @@ done:
 }
 
 static const struct got_error *
-read_gotsysconf(struct got_repository *repo, const char *commit_id_str,
-    const char *filename, int tmpfd, FILE *outfile)
+read_gotsysconf(struct got_object_id **commit_id, struct got_repository *repo,
+    const char *commit_id_str, const char *filename, int tmpfd, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_reflist_head refs;
-	struct got_object_id *id = NULL, *commit_id = NULL;
+	struct got_object_id *id = NULL;
 	struct got_commit_object *commit = NULL;
 	int obj_type;
 
 	TAILQ_INIT(&refs);
 
+	*commit_id = NULL;
+
 	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (err)
 		goto done;
 
-	err = got_repo_match_object_id(&commit_id, NULL,
+	err = got_repo_match_object_id(commit_id, NULL,
 	    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (err)
 		goto done;
 
-	err = got_object_open_as_commit(&commit, repo, commit_id);
+	err = got_object_open_as_commit(&commit, repo, *commit_id);
 	if (err)
 		goto done;
 
@@ -149,7 +151,10 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	got_ref_list_free(&refs);
-	free(commit_id);
+	if (err) {
+		free(*commit_id);
+		*commit_id = NULL;
+	}
 	free(id);
 	return err;
 }
@@ -227,6 +232,8 @@ cmd_apply(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	int ch, ret, fd = -1, sysconf_fd = -1, gotsysd_sock = -1;
 	FILE *sysconf_file = NULL;
+	struct got_object_id *commit_id = NULL;
+	struct gotsysd_imsg_cmd_sysconf sysconf_cmd;
 	int *pack_fds = NULL;
 	ssize_t n;
 
@@ -318,7 +325,7 @@ cmd_apply(int argc, char *argv[])
 	if (err)
 		goto done;
 
-	err = read_gotsysconf(repo, commit_id_str, filename, fd,
+	err = read_gotsysconf(&commit_id, repo, commit_id_str, filename, fd,
 	    sysconf_file);
 	if (err)
 		goto done;
@@ -340,8 +347,11 @@ cmd_apply(int argc, char *argv[])
 		goto done;
 	}
 
+	memset(&sysconf_cmd, 9, sizeof(sysconf_cmd));
+	memcpy(&sysconf_cmd.commit_id, commit_id,
+	    sizeof(sysconf_cmd.commit_id));
 	ret = imsg_compose(&ibuf, GOTSYSD_IMSG_CMD_SYSCONF, 0, getpid(),
-	    sysconf_fd, NULL, 0);
+	    sysconf_fd, &sysconf_cmd, sizeof(sysconf_cmd));
 	if (ret == -1) {
 		err = got_error_from_errno("imsg_compose");
 		goto done;
@@ -396,6 +406,7 @@ done:
 	free(repo_path);
 	if (commit)
 		got_object_commit_close(commit);
+	free(commit_id);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (err == NULL)

@@ -15,6 +15,8 @@
  */
 
 #define GOTSYSD_CONF_PATH		"/etc/gotsysd.conf"
+#define GOTSYSD_DB_PATH			"/var/db/gotsysd"
+#define GOTSYSD_DB_COMMIT_PATH		GOTSYSD_DB_PATH "/commit"
 #define GOTSYSD_UNIX_SOCKET		"/var/run/gotsysd.sock"
 #define GOTSYSD_UNIX_SOCKET_BACKLOG	10
 #define GOTSYSD_USER			"_gotsysd"
@@ -88,6 +90,7 @@ STAILQ_HEAD(gotsysd_access_rule_list, gotsysd_access_rule);
 struct gotsysd_pending_sysconf_cmd {
 	STAILQ_ENTRY(gotsysd_pending_sysconf_cmd) entry;
 	int fd;
+	struct got_object_id commit_id;
 };
 STAILQ_HEAD(gotsysd_pending_sysconf_cmd_list,
     gotsysd_pending_sysconf_cmd);
@@ -98,11 +101,15 @@ struct gotsysd {
 	char repos_path[_POSIX_PATH_MAX];
 	char user_name[32];
 	char gotd_username[32];
+	char gotsys_conf_commit_id[GOT_OBJECT_ID_HEX_MAXLEN];
+	size_t gotsys_conf_commit_id_len;
+	int db_commit_fd;
 	struct gotsysd_child_proc *listen_proc;
 	struct gotsysd_child_proc *priv_proc;
 	struct gotsysd_child_proc *libexec_proc;
 	struct gotsysd_child_proc *sysconf_proc;
 	int sysconf_fd;
+	char *sysconf_commit_id_str;
 	struct gotsysd_access_rule_list access_rules;
 	struct event sysconf_tmo;
 	struct gotsysd_pending_sysconf_cmd_list sysconf_pending;
@@ -137,6 +144,7 @@ enum gotsysd_imsg_type {
 	/* Internal sysconf messages. */
 	GOTSYSD_IMSG_SYSCONF_READY,
 	GOTSYSD_IMSG_SYSCONF_FD,
+	GOTSYSD_IMSG_SYSCONF_SUCCESS,
 
 	/* Child processes management. */
 	GOTSYSD_IMSG_CONNECT_PROC,

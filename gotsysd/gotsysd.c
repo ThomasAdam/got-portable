@@ -41,6 +41,7 @@
 #include "got_object.h"
 
 #include "got_lib_poll.h"
+#include "got_lib_hash.h"
 
 #include "gotsysd.h"
 #include "log.h"
@@ -157,10 +158,10 @@ free_proc(struct gotsysd_child_proc *proc)
 }
 
 static pid_t
-start_child(enum gotsysd_procid proc_id, char *argv0,
-    const char *confpath, int fd, int daemonize, int verbosity)
+start_child(enum gotsysd_procid proc_id, char *argv0, const char *confpath,
+    int fd, int daemonize, int verbosity, char *commit_id_str)
 {
-	const char	*argv[7];
+	const char	*argv[8];
 	int		 argc = 0;
 	pid_t		 pid;
 
@@ -210,6 +211,8 @@ start_child(enum gotsysd_procid proc_id, char *argv0,
 		argv[argc++] = "-v";
 	if (verbosity > 1)
 		argv[argc++] = "-v";
+	if (commit_id_str)
+		argv[argc++] = commit_id_str;
 	argv[argc++] = NULL;
 
 	execvp(argv0, (char * const *)argv);
@@ -355,6 +358,50 @@ connect_proc(struct gotsysd_child_proc *proc1,
 	return NULL;
 }
 
+static const struct got_error *
+write_gotsys_db_file(void)
+{
+	char buf[GOT_OBJECT_ID_HEX_MAXLEN];
+	ssize_t w;
+	size_t len;
+	int ret;
+
+	if (gotsysd.sysconf_commit_id_str == NULL) {
+		log_warn("sysconf succeeded with unknown commit ID");
+		return NULL;
+	}
+
+	if (lseek(gotsysd.db_commit_fd, 0L, SEEK_SET) == -1)
+		return got_error_from_errno2("lseek", GOTSYSD_DB_COMMIT_PATH);
+
+	len = strlen(gotsysd.sysconf_commit_id_str);
+	if (len == 0 || len > GOT_OBJECT_ID_HEX_MAXLEN)
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	ret = snprintf(buf, sizeof(buf), "%s\n", gotsysd.sysconf_commit_id_str);
+	if (ret == -1)
+		return got_error_from_errno("snprintf");
+	if (ret != len + 1)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	w = write(gotsysd.db_commit_fd, buf, len + 1);
+	if (w == -1)
+		return got_error_from_errno2("write", GOTSYSD_DB_COMMIT_PATH);
+	if (w != len + 1)
+		return got_error_fmt(GOT_ERR_IO, "short write to %s, wrote "
+		    "only %zd of %zu bytes", GOTSYSD_DB_COMMIT_PATH, w, len);
+
+	if (fsync(gotsysd.db_commit_fd) == -1)
+		return got_error_from_errno2("fsync", GOTSYSD_DB_COMMIT_PATH);
+
+	gotsysd.gotsys_conf_commit_id_len = len;
+	memcpy(gotsysd.gotsys_conf_commit_id, gotsysd.sysconf_commit_id_str,
+	    gotsysd.gotsys_conf_commit_id_len);
+	free(gotsysd.sysconf_commit_id_str);
+	gotsysd.sysconf_commit_id_str = NULL;
+	return NULL;
+}
+
 static void
 gotsysd_dispatch_sysconf_child(int fd, short event, void *arg)
 {
@@ -414,15 +461,17 @@ gotsysd_dispatch_sysconf_child(int fd, short event, void *arg)
 			err = connect_proc(gotsysd.sysconf_proc, priv_proc);
 			if (err)
 				break;
-			log_debug("%s: sending sysconf fd %d", __func__,
-			    gotsysd.sysconf_fd);
 			if (gotsysd_imsg_compose_event(iev,
 			    GOTSYSD_IMSG_SYSCONF_FD, GOTSYSD_PROC_GOTSYSD,
 			    gotsysd.sysconf_fd, NULL, 0) == -1) {
-				err = got_error_from_errno("imsg compose SYSCONF_FD");
+				err = got_error_from_errno("imsg compose "
+				    "SYSCONF_FD");
 				break;
 			}
 			gotsysd.sysconf_fd = -1;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_SUCCESS:
+			err = write_gotsys_db_file();
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
@@ -462,20 +511,30 @@ done:
 }
 
 static const struct got_error *
-start_sysconf_child(int sysconf_fd)
+start_sysconf_child(int sysconf_fd, struct got_object_id *commit_id)
 {
+	const struct got_error *err = NULL;
 	struct gotsysd_child_proc *proc;
+	char *commit_id_str;
+
+	err = got_object_id_str(&commit_id_str, commit_id);
+	if (err)
+		return err;
 
 	proc = calloc(1, sizeof(*proc));
-	if (proc == NULL)
-		return got_error_from_errno("calloc");
+	if (proc == NULL) {
+		err = got_error_from_errno("calloc");
+		free(commit_id_str);
+		return err;
+	}
 
 	TAILQ_INSERT_HEAD(&procs, proc, entry);
 	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	proc->type = GOTSYSD_PROC_SYSCONF;
 
-	log_debug("running system configuration tasks");
+	log_debug("running system configuration tasks for gotsys.conf from "
+	    "gotsys.git commit %s", commit_id_str);
 
 	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
 	    PF_UNSPEC, proc->pipe) == -1)
@@ -483,7 +542,7 @@ start_sysconf_child(int sysconf_fd)
 
 	proc->pid = start_child(proc->type, gotsysd.argv0,
 	    gotsysd.confpath, proc->pipe[1], gotsysd.daemonize,
-	    gotsysd.verbosity);
+	    gotsysd.verbosity, commit_id_str);
 
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
@@ -501,6 +560,7 @@ start_sysconf_child(int sysconf_fd)
 
 	gotsysd.sysconf_proc = proc;
 	gotsysd.sysconf_fd = sysconf_fd;
+	gotsysd.sysconf_commit_id_str = commit_id_str;
 	return NULL;
 }
 
@@ -523,7 +583,7 @@ sysconf_cmd_timeout(int fd, short ev, void *d)
 
 	STAILQ_REMOVE_HEAD(&gotsysd.sysconf_pending, entry);
 	
-	err = start_sysconf_child(cmd->fd);
+	err = start_sysconf_child(cmd->fd, &cmd->commit_id);
 	if (err) {
 		log_warn("could not start sysconf child process: %s",
 		    err->msg);
@@ -546,20 +606,27 @@ run_sysconf(struct gotsysd_client *client, struct imsg *imsg)
 {
 	const struct got_error *err = NULL;
 	size_t datalen;
+	struct gotsysd_imsg_cmd_sysconf sysconf_cmd;
 	int sysconf_fd;
 
 	log_debug("sysconf request from %s", client->username);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != 0)
+	if (datalen != sizeof(sysconf_cmd))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-
+	memcpy(&sysconf_cmd, imsg->data, sizeof(sysconf_cmd));
+	
 	sysconf_fd = imsg_get_fd(imsg);
 	if (sysconf_fd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
+	/* Hash parsing code will abort() if it sees other values. */
+	if (sysconf_cmd.commit_id.algo != GOT_HASH_SHA1 &&
+	    sysconf_cmd.commit_id.algo != GOT_HASH_SHA256)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
 	if (gotsysd.sysconf_proc == NULL) {
-		err = start_sysconf_child(sysconf_fd);
+		err = start_sysconf_child(sysconf_fd, &sysconf_cmd.commit_id);
 		if (err) {
 			close(sysconf_fd);
 			return err;
@@ -579,8 +646,9 @@ run_sysconf(struct gotsysd_client *client, struct imsg *imsg)
 			return got_error_from_errno("calloc");
 		}
 		cmd->fd = sysconf_fd;
-		STAILQ_INSERT_TAIL(&gotsysd.sysconf_pending,
-		    cmd, entry);
+		memcpy(&cmd->commit_id, &sysconf_cmd.commit_id,
+		    sizeof(cmd->commit_id));
+		STAILQ_INSERT_TAIL(&gotsysd.sysconf_pending, cmd, entry);
 		evtimer_add(&gotsysd.sysconf_tmo, &tv);
 	}
 
@@ -856,7 +924,7 @@ start_auth_child(struct gotsysd_client *client, char *argv0,
 		fatal("socketpair");
 
 	proc->pid = start_child(proc->type, argv0, confpath,
-	    proc->pipe[1], daemonize, verbosity);
+	    proc->pipe[1], daemonize, verbosity, NULL);
 
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
@@ -1059,7 +1127,7 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 		fatal("socketpair");
 
 	proc->pid = start_child(proc->type, argv0, confpath,
-	    proc->pipe[1], daemonize, verbosity);
+	    proc->pipe[1], daemonize, verbosity, NULL);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -1213,7 +1281,7 @@ start_priv(char *argv0, const char *confpath, int daemonize, int verbosity)
 		fatal("socketpair");
 
 	proc->pid = start_child(proc->type, argv0, confpath,
-	    proc->pipe[1], daemonize, verbosity);
+	    proc->pipe[1], daemonize, verbosity, NULL);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -1302,7 +1370,7 @@ start_libexec(char *argv0, const char *confpath, int daemonize, int verbosity)
 		fatal("socketpair");
 
 	proc->pid = start_child(proc->type, argv0, confpath,
-	    proc->pipe[1], daemonize, verbosity);
+	    proc->pipe[1], daemonize, verbosity, NULL);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -1404,6 +1472,9 @@ gotsysd_shutdown(void)
 		free(cmd);
 	}
 
+	if (gotsysd.db_commit_fd != -1)
+		close(gotsysd.db_commit_fd);
+
 	log_info("terminating");
 	exit(0);
 }
@@ -1475,6 +1546,8 @@ gotsysd_sighdlr(int sig, short event, void *arg)
 					close(gotsysd.sysconf_fd);
 					gotsysd.sysconf_fd = -1;
 				}
+				free(gotsysd.sysconf_commit_id_str);
+				gotsysd.sysconf_commit_id_str = NULL;
 			}
 
 			if (proc == gotsysd.priv_proc) 
@@ -1494,6 +1567,48 @@ gotsysd_sighdlr(int sig, short event, void *arg)
 	}
 }
 
+static void
+open_gotsysd_db(void)
+{
+	char hex[GOT_OBJECT_ID_HEX_MAXLEN];
+	char digest[GOT_OBJECT_ID_MAXLEN];
+	ssize_t r;
+
+	if (mkdir(GOTSYSD_DB_PATH, 0700) == -1 && errno != EEXIST)
+		fatal("mkdir %s", GOTSYSD_DB_PATH);
+
+	gotsysd.db_commit_fd = open(GOTSYSD_DB_COMMIT_PATH,
+	    O_RDWR | O_NOFOLLOW | O_CREAT | O_EXLOCK | O_CLOEXEC,
+	    0600);
+	if (gotsysd.db_commit_fd == -1)
+		fatal("open %s", GOTSYSD_DB_COMMIT_PATH);
+
+	r = read(gotsysd.db_commit_fd, hex, sizeof(hex));
+	if (r == -1)
+	    fatal("read %s", GOTSYSD_DB_COMMIT_PATH);
+	if (r <= 0 || hex[r - 1] != '\n')
+		return;
+	hex[r - 1] = '\0';
+
+	if (r == SHA1_DIGEST_STRING_LENGTH &&
+	    got_parse_hash_digest(digest, hex, GOT_HASH_SHA1)) {
+		gotsysd.gotsys_conf_commit_id_len = strlcpy(
+		    gotsysd.gotsys_conf_commit_id, hex,
+		     sizeof(gotsysd.gotsys_conf_commit_id));
+		if (gotsysd.gotsys_conf_commit_id_len >=
+		     sizeof(gotsysd.gotsys_conf_commit_id))
+			fatal("commit id buffer  too small");
+	} else if (r == SHA256_DIGEST_STRING_LENGTH &&
+	    got_parse_hash_digest(digest, hex, GOT_HASH_SHA256)) {
+		gotsysd.gotsys_conf_commit_id_len = strlcpy(
+		    gotsysd.gotsys_conf_commit_id, hex,
+		     sizeof(gotsysd.gotsys_conf_commit_id));
+		if (gotsysd.gotsys_conf_commit_id_len >=
+		     sizeof(gotsysd.gotsys_conf_commit_id))
+			fatal("commit id buffer  too small");
+	}
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1505,6 +1620,7 @@ main(int argc, char **argv)
 	struct passwd *pw = NULL;
 	uid_t uid;
 	const char *errstr;
+	char *commit_id_str = NULL;
 	int ch, fd = -1, daemonize = 1, verbosity = 0, noaction = 0;
 
 	log_init(1, LOG_DAEMON); /* Log to stderr until daemonized. */
@@ -1554,8 +1670,9 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (proc_id == GOTSYSD_PROC_SYSCONF) {
-		if (argc > 1)
+		if (argc != 1)
 			usage();
+		commit_id_str = argv[1];
 	} else if (argc != 0)
 		usage();
 
@@ -1576,6 +1693,7 @@ main(int argc, char **argv)
 	gotsysd.verbosity = verbosity;
 	gotsysd.confpath = confpath;
 	gotsysd.sysconf_fd = -1;
+	gotsysd.sysconf_commit_id_str = commit_id_str;
 	STAILQ_INIT(&gotsysd.sysconf_pending);
 
 	/* Require an absolute path in argv[0] for reliable re-exec. */
@@ -1624,6 +1742,7 @@ main(int argc, char **argv)
 	log_setverbose(verbosity);
 
 	if (proc_id == GOTSYSD_PROC_GOTSYSD) {
+		open_gotsysd_db();
 		snprintf(title, sizeof(title), "%s",
 		    gotsysd_proc_names[proc_id]);
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
@@ -1672,7 +1791,8 @@ main(int argc, char **argv)
 	case GOTSYSD_PROC_GOTSYSD:
 #ifndef PROFILE
 		/* "exec" promise will be limited to argv[0] via unveil(2). */
-		if (pledge("stdio proc exec sendfd recvfd unveil", NULL) == -1)
+		if (pledge("stdio rpath wpath proc exec sendfd recvfd unveil",
+		    NULL) == -1)
 			fatal("pledge");
 #endif
 		apply_unveil_selfexec();
