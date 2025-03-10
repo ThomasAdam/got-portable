@@ -51,6 +51,7 @@ repository gotsys.git {
 EOF
 	(cd ${testroot}/wt && got commit \
 		-m "create user ${GOTSYSD_DEV_USER}" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	# Ensure that the GOTSYSD_DEV_USER account does not exist yet.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
@@ -105,7 +106,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	# The GOTSYSD_DEV_USER account should now exist.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
@@ -298,6 +316,7 @@ repository gotsys.git {
 EOF
 	(cd ${testroot}/wt && got commit \
 		-m "change password of ${GOTSYSD_DEV_USER}" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
 		root@${VMIP} grep ${GOTSYSD_DEV_USER} /etc/master.passwd \
@@ -320,7 +339,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
 		root@${VMIP} grep ${GOTSYSD_DEV_USER} /etc/master.passwd \
@@ -373,6 +409,7 @@ repository gotsys.git {
 EOF
 	(cd ${testroot}/wt && got commit \
 		-m "remove the deleteme user from gotsys.conf" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
 		root@${VMIP} grep ${GOTSYSD_DEV_USER} /etc/master.passwd \
@@ -395,7 +432,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
 		root@${VMIP} grep deleteme /etc/master.passwd \
@@ -523,6 +577,7 @@ repository gotsys.git {
 EOF
 	(cd ${testroot}/wt && got commit \
 		-m "create user ${GOTSYSD_DEV_USER}" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	# Ensure that the developers group does not exist yet.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
@@ -556,7 +611,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	# The developers group should now exist.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
@@ -672,6 +744,7 @@ repository gotsys.git {
 EOF
 	(cd ${testroot}/wt && got commit \
 		-m "remove the developers group" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	# Ensure that the developers group exists.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
@@ -708,7 +781,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	# The developers group should still exist because we do not
 	# recycle GIDs. But the group should have no members.
@@ -810,6 +900,7 @@ repository "foo" {
 }
 EOF
 	(cd ${testroot}/wt && got commit -m "create repository foo" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
 	ret=$?
@@ -822,7 +913,24 @@ EOF
 	# Until gotd can do so we have to trigger reconfiguration manually.
 	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
-	sleep 5 # XXX find a way to detect that gotsysd is done
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	# The new repository should now exist.
 	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} ls /git \
