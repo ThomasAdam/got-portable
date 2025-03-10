@@ -1804,7 +1804,7 @@ main(int argc, char **argv)
 	case GOTSYSD_PROC_GOTSYSD:
 #ifndef PROFILE
 		/* "exec" promise will be limited to argv[0] via unveil(2). */
-		if (pledge("stdio rpath wpath proc exec sendfd recvfd unveil",
+		if (pledge("stdio wpath proc exec sendfd recvfd unveil",
 		    NULL) == -1)
 			fatal("pledge");
 #endif
