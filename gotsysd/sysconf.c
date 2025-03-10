@@ -64,6 +64,7 @@ static struct gotsysd_sysconf {
 	pid_t pid;
 	uid_t uid;
 	const char *title;
+	struct gotsysd_imsgev parent_iev;
 	struct gotsysd_imsgev libexec_iev;
 	struct gotsysd_imsgev priv_iev;
 	struct gotsys_userlist *users_cur;
@@ -842,7 +843,13 @@ sysconf_dispatch_priv(int fd, short event, void *arg)
 			break;
 		case GOTSYSD_IMSG_SYSCONF_APPLY_CONF_DONE:
 			gotsysd_sysconf.state = SYSCONF_STATE_DONE;
-			shut = 1;
+			if (gotsysd_imsg_compose_event(
+			    &gotsysd_sysconf.parent_iev,
+			    GOTSYSD_IMSG_SYSCONF_SUCCESS,
+			    GOTSYSD_PROC_SYSCONF, -1, NULL, 0) == -1) {
+				log_warnx("%s: %s", gotsysd_sysconf.title,
+				    strerror(errno));
+			}
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
@@ -938,8 +945,6 @@ sysconf_dispatch(int fd, short event, void *arg)
 	ssize_t n;
 	int shut = 0;
 
-	log_debug("%s: event 0x%x", __func__, event);
-
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
 			fatal("imsgbuf_read error");
@@ -951,6 +956,9 @@ sysconf_dispatch(int fd, short event, void *arg)
 		err = gotsysd_imsg_flush(ibuf);
 		if (err)
 			fatalx("%s", err->msg);
+
+		if (gotsysd_sysconf.state == SYSCONF_STATE_DONE)
+			shut = 1;
 	}
 
 	for (;;) {
@@ -1019,8 +1027,8 @@ sysconf_dispatch(int fd, short event, void *arg)
 void
 sysconf_main(const char *title, uid_t uid_start, uid_t uid_end)
 {
-	struct gotsysd_imsgev iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
+	struct gotsysd_imsgev *iev = &gotsysd_sysconf.parent_iev;
 
 	gotsys_conf_init(&gotsysconf);
 
@@ -1044,15 +1052,15 @@ sysconf_main(const char *title, uid_t uid_start, uid_t uid_end)
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	if (imsgbuf_init(&iev.ibuf, GOTSYSD_FILENO_MSG_PIPE) == -1)
+	if (imsgbuf_init(&iev->ibuf, GOTSYSD_FILENO_MSG_PIPE) == -1)
 		fatal("imsgbuf_init");
-	imsgbuf_allow_fdpass(&iev.ibuf);
-	iev.handler = sysconf_dispatch;
-	iev.events = EV_READ;
-	iev.handler_arg = NULL;
-	event_set(&iev.ev, iev.ibuf.fd, EV_READ, sysconf_dispatch, &iev);
+	imsgbuf_allow_fdpass(&iev->ibuf);
+	iev->handler = sysconf_dispatch;
+	iev->events = EV_READ;
+	iev->handler_arg = NULL;
+	event_set(&iev->ev, iev->ibuf.fd, EV_READ, sysconf_dispatch, iev);
 
-	if (gotsysd_imsg_compose_event(&iev, GOTSYSD_IMSG_SYSCONF_READY,
+	if (gotsysd_imsg_compose_event(iev, GOTSYSD_IMSG_SYSCONF_READY,
 	    GOTSYSD_PROC_SYSCONF, -1, NULL, 0) == -1) {
 		log_warnx("%s: %s", title, strerror(errno));
 	}
