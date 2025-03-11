@@ -273,13 +273,13 @@ Group names may be matched by prepending a colon
 .Pq Sq \&:
 to
 .Ar identity .
-.\".Pp
-.\"The special user
-.\".Ar identity
-.\".Dq anonymous
-.\"can be used when public read-only access to repositories over SSH is desired.
-.\"The anonymous user has an empty password, cannot use an SSH public key, and
-.\"can only be granted read-only access.
+.Pp
+The special user
+.Ar identity
+.Dq anonymous
+can be used when public read-only access to repositories over SSH is desired.
+The anonymous user has an empty password, cannot use an SSH public key, and
+can only be granted read-only access.
 .\".It Ic protect Brq Ar ...
 .\"The
 .\".Cm protect
@@ -497,7 +497,7 @@ repository "src" {
 .\"	publish
 .\"
 	permit rw :developers
-.\"	permit ro anonymous
+	permit ro anonymous
 .\"
 .\"	protect branch "main"
 .\"	protect tag namespace "refs/tags/"
@@ -507,7 +507,7 @@ repository "openbsd/ports" {
 .\"	publish
 .\"
 	permit rw :porters
-.\"	permit ro anonymous
+	permit ro anonymous
 	deny flan_hacker
 
 .\"	protect {
