@@ -584,12 +584,6 @@ gotsys_conf_new_group(struct gotsys_group **group, const char *groupname)
 {
 	const struct got_error *err;
 
-	*group = NULL;
-
-	err = gotsys_conf_validate_name(groupname, "group");
-	if (err)
-		return err;
-
 	*group = calloc(1, sizeof(**group));
 	if (*group == NULL)
 		return got_error_from_errno("calloc");

@@ -167,7 +167,11 @@ recv_group(struct gotsys_group **group, struct imsg *imsg)
 	if (groupname == NULL)
 		return got_error_from_errno("strndup");
 
-	err = gotsys_conf_new_group(group, groupname); /* validates name */
+	err = gotsys_conf_validate_name(groupname, "group");
+	if (err)
+		goto done;
+
+	err = gotsys_conf_new_group(group, groupname);
 	if (err)
 		goto done;
 	free(groupname);
