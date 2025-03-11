@@ -465,14 +465,24 @@ add_users(void)
 	STAILQ_FOREACH_SAFE(user, &adduser_users, entry, tmp) {
 		uid_t uid;
 
-		err = gotsys_conf_validate_name(user->name, "user");
-		if (err)
-			goto done;
-		if (user->password) {
-			err = gotsys_conf_validate_password(user->name,
-			    user->password);
+		if (strcmp(user->name, "anonymous") == 0) {
+			if (user->password == NULL ||
+			    user->password[0] != '\0') {
+				err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
+				    "the \"anonymous\" user must use an "
+				    "empty password");
+				goto done;
+			}
+		} else {
+			err = gotsys_conf_validate_name(user->name, "user");
 			if (err)
 				goto done;
+			if (user->password) {
+				err = gotsys_conf_validate_password(user->name,
+				    user->password);
+				if (err)
+					goto done;
+			}
 		}
 
 		STAILQ_REMOVE(&adduser_users, user, gotsys_user, entry);

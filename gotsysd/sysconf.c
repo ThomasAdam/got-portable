@@ -74,6 +74,7 @@ static struct gotsysd_sysconf {
 	enum gotsysd_sysconf_state state;
 	uid_t uid_start;
 	uid_t uid_end;
+	int have_anonymous_user;
 } gotsysd_sysconf;
 
 static struct gotsys_conf gotsysconf;
@@ -118,6 +119,26 @@ start_useradd(void)
 		return got_error_from_errno("imsg_compose START_PROG_USERADD");
 	}
 
+	return NULL;
+}
+
+static const struct got_error *
+add_anonymous_user(struct gotsys_userlist *users)
+{
+	const struct got_error *err;
+	struct gotsys_user *user;
+
+	err = gotsys_conf_new_user(&user, "anonymous");
+	if (err)
+		return err;
+	user->password = strdup("");
+	if (user->password == NULL) {
+		err = got_error_from_errno("strdup");
+		gotsys_user_free(user);
+		return err;
+	}
+
+	STAILQ_INSERT_TAIL(&gotsysconf.users, user, entry);
 	return NULL;
 }
 
@@ -345,6 +366,13 @@ sysconf_dispatch_libexec(int fd, short event, void *arg)
 			    &gotsysconf.users, &gotsysconf.groups);
 			if (err)
 				break;
+			if (!gotsysd_sysconf.have_anonymous_user &&
+			    strcmp(rule->identifier, "anonymous") == 0) {
+				err = add_anonymous_user(&gotsysconf.users);
+				if (err)
+					break;
+				gotsysd_sysconf.have_anonymous_user = 1;
+			}
 			rules = &gotsysd_sysconf.repo_cur->access_rules;
 			STAILQ_INSERT_TAIL(rules, rule, entry);
 			break;
@@ -694,6 +722,8 @@ sysconf_dispatch_priv(int fd, short event, void *arg)
 			gotsysd_sysconf.state =
 			    SYSCONF_STATE_INSTALL_AUTHORIZED_KEYS;
 			user = STAILQ_FIRST(&gotsysconf.users);
+			if (user && strcmp(user->name, "anonymous") == 0)
+				user = STAILQ_NEXT(user, entry);
 			if (user == NULL) {
 				err = got_error_msg(GOT_ERR_PARSE_CONFIG,
 				    "no users defined in configuration file");
@@ -742,6 +772,8 @@ sysconf_dispatch_priv(int fd, short event, void *arg)
 			log_debug("authorized keys installed for user %s",
 			    gotsysd_sysconf.user_cur->name);
 			user = STAILQ_NEXT(gotsysd_sysconf.user_cur, entry);
+			if (user && strcmp(user->name, "anonymous") == 0)
+				user = STAILQ_NEXT(user, entry);
 			if (user) {
 				err = start_userkeys(iev, user);
 				if (err)

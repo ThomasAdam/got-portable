@@ -167,11 +167,13 @@ create_homedirs(void)
 				if (err->code != GOT_ERR_PARSE_CONFIG)
 					break;
 				/*
-				 * Ignore existing users with invalid names.
+				 * Ignore existing users with invalid names
+				 * except "anonymous".
 				 * Such users were not created by us.
 				 */
 				err = NULL;
-				goto next;
+				if (strcmp(pw->pw_name, "anonymous") != 0)
+					goto next;
 			}
 			/*
 			 * Ignore existing users in our UID range which do

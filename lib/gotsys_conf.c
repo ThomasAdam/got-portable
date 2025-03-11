@@ -730,7 +730,14 @@ gotsys_conf_new_access_rule(struct gotsys_access_rule **rule,
 			    "reference to undeclared group '%s' via "
 			    "access rule", name);
 		}
-	} else if (strcmp(name, "anonymous") != 0) {
+	} else if (strcmp(name, "anonymous") == 0) {
+		if (access == GOTSYS_ACCESS_PERMITTED &&
+		    (authorization & GOTSYS_AUTH_WRITE)) {
+			return got_error_msg(GOT_ERR_PARSE_CONFIG,
+			    "the \"anonymous\" user must not have write "
+			    "permission");
+		}
+	} else {
 		struct gotsys_user *user = NULL;
 
 		STAILQ_FOREACH(user, users, entry) {
