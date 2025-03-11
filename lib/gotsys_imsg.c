@@ -151,6 +151,7 @@ gotsys_imsg_recv_users(struct imsg *imsg, struct gotsys_userlist *users)
 	offset = 0;
 	while (remain > 0) {
 		size_t namelen, pwlen, ulen;
+		int is_anonymous_user = 0;
 
 		if (remain < sizeof(iuser))
 			return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -197,10 +198,13 @@ gotsys_imsg_recv_users(struct imsg *imsg, struct gotsys_userlist *users)
 			continue;
 		}
 
-		err = gotsys_conf_validate_name(name, "user");
-		if (err) {
-			free(name);
-			return err;
+		is_anonymous_user = (strcmp(name, "anonymous") == 0);
+		if (!is_anonymous_user) {
+			err = gotsys_conf_validate_name(name, "user");
+			if (err) {
+				free(name);
+				return err;
+			}
 		}
 
 		err = gotsys_conf_new_user(&user, name);
@@ -210,6 +214,13 @@ gotsys_imsg_recv_users(struct imsg *imsg, struct gotsys_userlist *users)
 			return err;
 
 		if (pwlen) {
+			if (is_anonymous_user) {
+				err = got_error_msg(GOT_ERR_PRIVSEP_MSG,
+				    "the \"anonymous\" user must use an "
+				    "empty password");
+				gotsys_user_free(user);
+				return err;
+			}
 			user->password = strndup(imsg->data + offset +
 			    sizeof(iuser) + namelen, pwlen);
 			if (user->password == NULL) {
@@ -219,6 +230,13 @@ gotsys_imsg_recv_users(struct imsg *imsg, struct gotsys_userlist *users)
 			}
 			if (strlen(user->password) != pwlen) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				gotsys_user_free(user);
+				return err;
+			}
+		} else if (is_anonymous_user) {
+			user->password = strdup("");
+			if (user->password == NULL) {
+				err = got_error_from_errno("strdup");
 				gotsys_user_free(user);
 				return err;
 			}
