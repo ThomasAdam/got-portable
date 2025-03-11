@@ -197,6 +197,12 @@ gotsys_imsg_recv_users(struct imsg *imsg, struct gotsys_userlist *users)
 			continue;
 		}
 
+		err = gotsys_conf_validate_name(name, "user");
+		if (err) {
+			free(name);
+			return err;
+		}
+
 		err = gotsys_conf_new_user(&user, name);
 		free(name);
 		name = NULL;
