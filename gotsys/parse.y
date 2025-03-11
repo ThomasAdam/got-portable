@@ -183,6 +183,13 @@ main		: USER STRING {
 				}
 			}
 
+			err = gotsys_conf_validate_name($2, "user");
+			if (err) {
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
 			err = gotsys_conf_new_user(&new_user, $2);
 			if (err) {
 				yyerror("%s", err->msg);

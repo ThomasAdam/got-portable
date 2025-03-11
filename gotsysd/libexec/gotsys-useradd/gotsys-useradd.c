@@ -439,6 +439,10 @@ add_users(void)
 		}
 		if (user != NULL)
 			continue; /* will go on existing_users list */
+
+		err = gotsys_conf_validate_name(pw->pw_name, "user");
+		if (err)
+			goto done;
  
 		err = gotsys_conf_new_user(&user, pw->pw_name);
 		if (err)

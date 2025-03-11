@@ -563,12 +563,6 @@ gotsys_conf_new_user(struct gotsys_user **user, const char *username)
 {
 	const struct got_error *err;
 
-	*user = NULL;
-
-	err = gotsys_conf_validate_name(username, "user");
-	if (err)
-		return err;
-
 	*user = calloc(1, sizeof(**user));
 	if (*user == NULL)
 		return got_error_from_errno("calloc");
