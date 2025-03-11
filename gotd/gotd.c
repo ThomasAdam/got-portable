@@ -74,6 +74,7 @@
 enum gotd_client_state {
 	GOTD_CLIENT_STATE_NEW,
 	GOTD_CLIENT_STATE_ACCESS_GRANTED,
+	GOTD_CLIENT_STATE_NOTIFY,
 };
 
 struct gotd_child_proc {
@@ -764,7 +765,8 @@ static const char *gotd_proc_names[GOTD_PROC_MAX] = {
 	"repo_read",
 	"repo_write",
 	"gitwrapper",
-	"notify"
+	"notify",
+	"gotsys",
 };
 
 static void
@@ -1003,6 +1005,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 	case GOTD_IMSG_PACKFILE_INSTALL:
 	case GOTD_IMSG_REF_UPDATES_START:
 	case GOTD_IMSG_REF_UPDATE:
+	case GOTD_IMSG_REFS_UPDATED:
 		err = ensure_proc_is_writing(client, proc);
 		if (err)
 			log_warnx("uid %d: %s", client->euid, err->msg);
@@ -1385,6 +1388,54 @@ connect_session(struct gotd_client *client)
 }
 
 static void
+run_gotsys_apply(struct gotd_repo *repo)
+{
+	struct gotd_child_proc *proc;
+	const char	*argv[4];
+	int		 argc = 0;
+	pid_t		 pid;
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL) {
+		log_warn("calloc");
+		return;
+	}
+	proc->iev.ibuf.fd = -1;
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
+
+	proc->type = GOTD_PROC_GOTSYS;
+	if (strlcpy(proc->repo_name, repo->name,
+	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
+		fatalx("repository name too long: %s", repo->name);
+	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
+	    sizeof(proc->repo_path))
+		fatalx("repository path too long: %s", repo->path);
+
+	switch (pid = fork()) {
+	case -1:
+		fatal("cannot fork");
+	case 0:
+		break;
+	default:
+		proc->pid = pid;
+		return;
+	}
+
+	closefrom(STDERR_FILENO + 1);
+
+	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
+	argv[argc++] = "apply";
+	argv[argc++] = "-r";
+	argv[argc++] = repo->path;
+	argv[argc++] = NULL;
+
+	execvp(argv[0], (char * const *)argv);
+	fatal("execvp");
+}
+
+static void
 gotd_dispatch_client_session(int fd, short event, void *arg)
 {
 	const struct got_error *err = NULL;
@@ -1428,6 +1479,7 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 		const struct got_error *err = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0, do_start_repo_child = 0;
+		int refs_updated = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -1445,6 +1497,13 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				break;
 			}
 			do_start_repo_child = 1;
+			break;
+		case GOTD_IMSG_REFS_UPDATED:
+			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			refs_updated = 1;
 			break;
 		case GOTD_IMSG_DISCONNECT:
 			do_disconnect = 1;
@@ -1485,6 +1544,36 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 			if (err) {
 				log_warnx("uid %d: %s", client->euid, err->msg);
 				do_disconnect = 1;
+			}
+		}
+
+		if (refs_updated) {
+			const char *name = client->session->repo_name;
+			struct gotd_repo *repo;
+
+			client->state = GOTD_CLIENT_STATE_NOTIFY;
+
+			if (strcmp(name, "gotsys") == 0 ||
+			    strcmp(name, "gotsys.git") == 0) {
+				repo = gotd_find_repo_by_name(name,
+				    &gotd.repos);
+				if (repo != NULL)
+					run_gotsys_apply(repo);
+			}
+
+			/*
+			 * session_write may now proceed to send notifications
+			 * and disconnect the client.
+			 */
+			if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFY,
+			    GOTD_PROC_GOTD, -1, NULL, 0) == -1) {
+				err = got_error_from_errno("imsg compose "
+				    "NOTIFY");
+				if (err) {
+					log_warnx("uid %d: %s", client->euid,
+					    err->msg);
+					do_disconnect = 1;
+				}
 			}
 		}
 
@@ -2012,6 +2101,9 @@ apply_unveil_none(void)
 static void
 apply_unveil_selfexec(void)
 {
+	if (unveil(GOTD_PATH_PROG_GOTSYS, "x") == -1)
+		fatal("unveil %s", GOTD_PATH_PROG_GOTSYS);
+
 	if (unveil(gotd.argv0, "x") == -1)
 		fatal("unveil %s", gotd.argv0);
 

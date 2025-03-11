@@ -103,9 +103,6 @@ EOF
 		return 1
 	fi
 
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
-
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected
 	for i in 1 2 3 4 5; do
@@ -336,9 +333,6 @@ EOF
 		return 1
 	fi
 
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
-
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected
 	for i in 1 2 3 4 5; do
@@ -428,9 +422,6 @@ EOF
 		test_done "$testroot" 1
 		return 1
 	fi
-
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected
@@ -608,9 +599,6 @@ EOF
 		return 1
 	fi
 
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
-
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected
 	for i in 1 2 3 4 5; do
@@ -778,9 +766,6 @@ EOF
 		return 1
 	fi
 
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
-
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected
 	for i in 1 2 3 4 5; do
@@ -909,9 +894,6 @@ EOF
 		test_done "$testroot" 1
 		return 1
 	fi
-
-	# Until gotd can do so we have to trigger reconfiguration manually.
-	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} gotsys apply
 
 	# Wait for gotsysd to apply the new configuration.
 	echo "$commit_id" > $testroot/stdout.expected

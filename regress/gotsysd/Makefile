@@ -181,6 +181,7 @@ ${GOTD_CONF}:
 
 ${GOTSYSD_CONF}:
 	@${UNPRIV} "echo permit root > $@"
+	@${UNPRIV} "echo permit _gotd >> $@"
 
 ${GOTSYS_CONF}: ${GOTSYSD_SSH_PUBKEY}
 	@${UNPRIV} "echo user ${GOTSYSD_TEST_USER} { >> $@"
