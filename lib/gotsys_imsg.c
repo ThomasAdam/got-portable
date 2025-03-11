@@ -321,6 +321,12 @@ gotsys_imsg_recv_group(struct imsg *imsg, struct gotsys_group **group)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	}
 
+	err = gotsys_conf_validate_name(name, "group");
+	if (err) {
+		free(name);
+		return err;
+	}
+		
 	err = gotsys_conf_new_group(group, name);
 	free(name);
 	return err;

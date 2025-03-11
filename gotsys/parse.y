@@ -212,6 +212,13 @@ main		: USER STRING {
 				}
 			}
 
+			err = gotsys_conf_validate_name($2, "group");
+			if (err) {
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
 			err = gotsys_conf_new_group(&group, $2);
 			if (err) {
 				yyerror("%s", err->msg);
