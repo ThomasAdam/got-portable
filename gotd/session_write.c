@@ -269,12 +269,14 @@ send_ref_update_ok(struct gotd_session_client *client,
 	return NULL;
 }
 
-static void
-send_refs_updated(struct gotd_session_client *client)
+static const struct got_error *
+send_refs_updated(struct gotd_imsgev *iev)
 {
-	if (gotd_imsg_compose_event(&client->iev, GOTD_IMSG_REFS_UPDATED,
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_REFS_UPDATED,
 	    GOTD_PROC_SESSION_WRITE, -1, NULL, 0) == -1)
-		log_warn("imsg compose REFS_UPDATED");
+		return got_error_from_errno("imsg compose REFS_UPDATED");
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -675,7 +677,6 @@ update_ref(int *shut, struct gotd_session_client *client,
 	struct got_reference *ref = NULL;
 	struct gotd_imsg_ref_update iref;
 	struct got_object_id old_id, new_id;
-	struct gotd_session_notif *notif;
 	struct got_object_id *id = NULL;
 	char *refname = NULL;
 	size_t datalen;
@@ -815,24 +816,6 @@ done:
 	} else
 		send_ref_update_ok(client, &iref, refname);
 
-	if (client->nref_updates > 0) {
-		client->nref_updates--;
-		if (client->nref_updates == 0) {
-			send_refs_updated(client);
-			notif = STAILQ_FIRST(&notifications);
-			if (notif) {
-				gotd_session.state = GOTD_STATE_NOTIFY;
-				err = request_notification(notif);
-				if (err) {
-					log_warn("could not send notification: "
-					    "%s", err->msg);
-					client->flush_disconnect = 1;
-				}
-			} else
-				client->flush_disconnect = 1;
-		}
-
-	}
 	if (locked) {
 		const struct got_error *unlock_err;
 		unlock_err = got_ref_unlock(ref);
@@ -949,6 +932,18 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 				err = forward_notification(client, &imsg);
 			if (err)
 				log_warnx("uid %d: %s", client->euid, err->msg);
+
+			if (do_ref_update && client->nref_updates > 0) {
+				client->nref_updates--;
+				if (client->nref_updates == 0) {
+					err = send_refs_updated(
+					    &gotd_session.parent_iev);
+					if (err) {
+						log_warn("%s", err->msg);
+						shut = 1;
+					}
+				}
+			}
 
 			notif = STAILQ_FIRST(&notifications);
 			if (notif && do_notify) {
@@ -1622,6 +1617,7 @@ session_dispatch(int fd, short event, void *arg)
 		const struct got_error *err = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0, do_list_refs = 0;
+		int send_notifications = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -1648,6 +1644,9 @@ session_dispatch(int fd, short event, void *arg)
 				break;
 			do_list_refs = 1;
 			break;
+		case GOTD_IMSG_NOTIFY:
+			send_notifications = 1;
+			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
@@ -1661,6 +1660,27 @@ session_dispatch(int fd, short event, void *arg)
 				disconnect(client);
 		} else if (do_list_refs)
 			err = list_refs_request();
+		else if (send_notifications) {
+			struct gotd_session_notif *notif;
+
+			err = send_refs_updated(&client->iev);
+			if (err) {
+				log_warnx("uid %d: %s", client->euid, err->msg);
+				err = NULL;
+			}
+
+			notif = STAILQ_FIRST(&notifications);
+			if (notif) {
+				gotd_session.state = GOTD_STATE_NOTIFY;
+				err = request_notification(notif);
+				if (err) {
+					log_warn("could not send notification: "
+					    "%s", err->msg);
+					client->flush_disconnect = 1;
+				}
+			} else
+				client->flush_disconnect = 1;
+		}
 
 		if (err)
 			log_warnx("uid %d: %s", client->euid, err->msg);
