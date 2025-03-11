@@ -1427,6 +1427,7 @@ apply_unveil_priv_helpers(void)
 	    GOTSYSD_PATH_PROG_GROUPADD,
 	    GOTSYSD_PATH_PROG_WRITE_CONF,
 	    GOTSYSD_PATH_PROG_APPLY_CONF,
+	    GOTSYSD_PATH_PROG_SSHDCONFIG,
 	};
 	size_t i;
 

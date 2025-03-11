@@ -57,6 +57,7 @@ enum gotsysd_sysconf_state {
 	SYSCONF_STATE_CREATE_REPOS,
 	SYSCONF_STATE_CREATE_GOTD_CONF,
 	SYSCONF_STATE_RESTART_GOTD,
+	SYSCONF_STATE_CONFIGURE_SSHD,
 	SYSCONF_STATE_DONE,
 };
 
@@ -602,6 +603,18 @@ start_apply_conf(struct gotsysd_imsgev *iev)
 
 	return NULL;
 }
+
+static const struct got_error *
+start_sshdconf(struct gotsysd_imsgev *iev)
+{
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_START_PROG_SSHDCONFIG, GOTSYSD_PROC_SYSCONF,
+	    -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg compose START_SSHDCONFIG");
+
+	return NULL;
+}
+
 static void
 sysconf_dispatch_priv(int fd, short event, void *arg)
 {
@@ -842,6 +855,40 @@ sysconf_dispatch_priv(int fd, short event, void *arg)
 			}
 			break;
 		case GOTSYSD_IMSG_SYSCONF_APPLY_CONF_DONE:
+			if (gotsysd_sysconf.state !=
+			    SYSCONF_STATE_RESTART_GOTD) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+			}
+			gotsysd_sysconf.state = SYSCONF_STATE_CONFIGURE_SSHD;
+			err = start_sshdconf(iev);
+			break;
+		case GOTSYSD_IMSG_SYSCONF_SSHDCONFIG_READY:
+			if (gotsysd_sysconf.state !=
+			    SYSCONF_STATE_CONFIGURE_SSHD) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+			}
+			/* Not sending any params yet, but that could change. */
+			if (gotsysd_imsg_compose_event(iev,
+			    GOTSYSD_IMSG_SYSCONF_INSTALL_SSHD_CONFIG,
+			    GOTSYSD_PROC_SYSCONF, -1, NULL, 0) == -1) {
+				log_warnx("%s: %s", gotsysd_sysconf.title,
+				    strerror(errno));
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_INSTALL_SSHD_CONFIG_DONE:
+			if (gotsysd_sysconf.state !=
+			    SYSCONF_STATE_CONFIGURE_SSHD) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+			}
 			gotsysd_sysconf.state = SYSCONF_STATE_DONE;
 			if (gotsysd_imsg_compose_event(
 			    &gotsysd_sysconf.parent_iev,
