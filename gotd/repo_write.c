@@ -2308,9 +2308,8 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 					break;
 			}
 			err = update_refs(iev);
-			if (err) {
+			if (err)
 				log_warnx("update refs: %s", err->msg);
-			}
 			break;
 		case GOTD_IMSG_NOTIFY:
 			err = render_notification(&imsg, iev);
