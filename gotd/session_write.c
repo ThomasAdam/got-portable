@@ -1108,7 +1108,6 @@ recv_packfile(struct gotd_session_client *client)
 	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_SESSION_WRITE, pipe[0],
 	        NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-		pipe[0] = -1;
 		goto done;
 	}
 	pipe[0] = -1;
@@ -1116,8 +1115,10 @@ recv_packfile(struct gotd_session_client *client)
 	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
 	if (gotd_imsg_compose_event(&client->iev,
 	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_SESSION_WRITE, pipe[1],
-	    NULL, 0) == -1)
+	    NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
+		goto done;
+	}
 	pipe[1] = -1;
 
 	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.pack",
@@ -1155,7 +1156,6 @@ recv_packfile(struct gotd_session_client *client)
 	    GOTD_IMSG_PACKIDX_FILE, GOTD_PROC_SESSION_WRITE,
 	    idxfd, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKIDX_FILE");
-		idxfd = -1;
 		goto done;
 	}
 	idxfd = -1;
@@ -1168,7 +1168,6 @@ recv_packfile(struct gotd_session_client *client)
 	    GOTD_IMSG_RECV_PACKFILE, GOTD_PROC_SESSION_WRITE, packfd,
 	    &ipack, sizeof(ipack)) == -1) {
 		err = got_error_from_errno("imsg compose RECV_PACKFILE");
-		packfd = -1;
 		goto done;
 	}
 	packfd = -1;

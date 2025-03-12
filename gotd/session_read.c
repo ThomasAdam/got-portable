@@ -428,6 +428,8 @@ send_packfile(struct gotd_session_client *client)
 		err = got_error_from_errno("imsg compose SEND_PACKFILE");
 		close(pipe[0]);
 		close(pipe[1]);
+		close(client->delta_cache_fd);
+		client->delta_cache_fd = -1;
 		return err;
 	}
 
@@ -443,6 +445,7 @@ send_packfile(struct gotd_session_client *client)
 	if (gotd_imsg_compose_event(&client->iev,
 	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
+		close(pipe[0]);
 		close(pipe[1]);
 		return err;
 	}
