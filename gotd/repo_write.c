@@ -2230,7 +2230,7 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			fatalx("%s", err->msg);
 	}
 
-	for (;;) {
+	while (err == NULL) {
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
 		if (n == 0)	/* No more messages. */
@@ -2318,6 +2318,7 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
 
