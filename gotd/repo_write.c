@@ -1389,10 +1389,9 @@ verify_packfile(void)
 	if (fstat(client->packidx_fd, &sb) == -1)
 		return got_error_from_errno("pack index fstat");
 
-	packidx = malloc(sizeof(*packidx));
+	packidx = calloc(1, sizeof(*packidx));
 	if (packidx == NULL)
-		return got_error_from_errno("malloc");
-	memset(packidx, 0, sizeof(*packidx));
+		return got_error_from_errno("calloc");
 	packidx->fd = client->packidx_fd;
 	client->packidx_fd = -1;
 	packidx->len = sb.st_size;
