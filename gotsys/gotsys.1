@@ -120,7 +120,7 @@ If not specified, the repository path
 .Pa /git/gotsys.git
 will be used.
 .El
-.It Cm check Oo Fl q Oc Oo Ar file Oc 
+.It Cm check Oo Fl q Oc Oo Fl f Ar file Oc 
 Read a
 .Xr gotsys.conf 5
 configuration
@@ -151,6 +151,14 @@ The options for
 .Cm gotsys check
 are as follows:
 .Bl -tag -width Ds
+.It Fl f Ar file
+The path to the configuration
+.Ar file
+to read.
+A hyphen
+.Pq -
+can be used to read standard input:
+.Cm gotsys check -f -
 .It Fl q
 Stay silent on standard output.
 Only report errors.
