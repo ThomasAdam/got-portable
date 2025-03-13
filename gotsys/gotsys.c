@@ -431,8 +431,20 @@ done:
 __dead static void
 usage_check(void)
 {
-	fprintf(stderr, "usage: %s check [-q] [file]\n", getprogname());
+	fprintf(stderr, "usage: %s check [-q] [-f file]\n", getprogname());
 	exit(1);
+}
+
+static const struct got_error *
+unveil_none(void)
+{
+	if (unveil("/", "") != 0)
+		return got_error_from_errno("unveil");
+
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno("unveil");
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -458,7 +470,7 @@ cmd_check(int argc, char *argv[])
 {
 	const struct got_error *err;
 	int ch, fd = -1, quiet = 0;
-	const char *configfile;
+	char *configfile = NULL;
 	struct gotsys_conf gotsysconf;
 	struct stat sb;
 
@@ -469,6 +481,21 @@ cmd_check(int argc, char *argv[])
 		case 'q':
 			quiet = 1;
 			break;
+		case 'f':
+			if (strcmp(optarg, "-") == 0) {
+				fd = STDIN_FILENO;
+				configfile = strdup("stdin");
+				if (configfile == NULL)
+					return got_error_from_errno("strdup");
+				break;
+			}
+			configfile = realpath(optarg, NULL);
+			if (configfile == NULL) {
+				return got_error_from_errno2("realpath",
+				    optarg);
+			}
+			got_path_strip_trailing_slashes(configfile);
+			break;
 		default:
 			usage_check();
 			/* NOTREACHED */
@@ -478,10 +505,14 @@ cmd_check(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc > 1)
+	if (argc > 0)
 		usage_check();
 
-	configfile = (argc == 1 ? argv[0] : GOTSYSD_SYSCONF_FILENAME);
+	if (fd != STDIN_FILENO && configfile == NULL) {
+		configfile = strdup(GOTSYSD_SYSCONF_FILENAME);
+		if (configfile == NULL)
+			return got_error_from_errno("strdup");
+	}
 
 #ifndef PROFILE
 	if (pledge("stdio rpath unveil", NULL) == -1) {
@@ -489,13 +520,21 @@ cmd_check(int argc, char *argv[])
 		goto done;
 	}
 #endif
-	err = unveil_conf(configfile);
-	if (err)
-		return err;
+	if (fd == STDIN_FILENO) {
+		err = unveil_none();
+		if (err)
+			goto done;
+	} else {
+		err = unveil_conf(configfile);
+		if (err)
+			goto done;
 
-	fd = open(configfile, O_RDONLY);
-	if (fd == -1)
-		return got_error_from_errno2("open", configfile);
+		fd = open(configfile, O_RDONLY);
+		if (fd == -1) {
+			err = got_error_from_errno2("open", configfile);
+			goto done;
+		}
+	}
 
 #ifndef PROFILE
 	if (pledge("stdio", NULL) == -1) {
@@ -503,15 +542,16 @@ cmd_check(int argc, char *argv[])
 		goto done;
 	}
 #endif
-
-	if (fstat(fd, &sb) == -1) {
-		err = got_error_from_errno2("fstat", configfile);
-		goto done;
-	}
-	if (!S_ISREG(sb.st_mode)) {
-		err = got_error_fmt(GOT_ERR_BAD_PATH,
-		    "%s is not a regular file", configfile);
-		goto done;
+	if (fd != STDIN_FILENO) {
+		if (fstat(fd, &sb) == -1) {
+			err = got_error_from_errno2("fstat", configfile);
+			goto done;
+		}
+		if (!S_ISREG(sb.st_mode)) {
+			err = got_error_fmt(GOT_ERR_BAD_PATH,
+			    "%s is not a regular file", configfile);
+			goto done;
+		}
 	}
 
 	err = gotsys_conf_parse(configfile, &gotsysconf, &fd);
@@ -521,8 +561,9 @@ cmd_check(int argc, char *argv[])
 	if (!quiet)
 		printf("configuration OK\n");
 done:
-	if (fd != -1 && close(fd) == -1 && err == NULL)
+	if (fd != -1 && fd != STDIN_FILENO && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", configfile);
+	free(configfile);
 	return err;
 }
 

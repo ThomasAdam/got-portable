@@ -1009,7 +1009,7 @@ repository "gotsys" {
 	permit rw anonymous
 }
 EOF
-	gotsys check ${testroot}/bad-gotsys.conf \
+	gotsys check -f ${testroot}/bad-gotsys.conf \
 		> $testroot/stdout  2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
