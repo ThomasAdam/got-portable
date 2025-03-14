@@ -91,7 +91,6 @@ gotadmin:
   exclude base.
 
 gotsysd:
-- have gotd validate gotsys.conf syntax before accepting changes
 - add graceful reload support to gotd and use it instead of restarting gotd
 - allow setting the repository default branch (HEAD) via gotsys.conf
 - send protected branches/tags from gotsys-read-conf and apply during sysconf
