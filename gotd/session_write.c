@@ -79,6 +79,7 @@ static struct gotd_session_write {
 	struct gotd_repo *repo_cfg;
 	int *pack_fds;
 	int *temp_fds;
+	int content_fd;
 	struct gotd_imsgev parent_iev;
 	struct gotd_imsgev notifier_iev;
 	struct timeval request_timeout;
@@ -189,6 +190,140 @@ session_write_sighdlr(int sig, short event, void *arg)
 	default:
 		fatalx("unexpected signal");
 	}
+}
+
+static const struct got_error *
+recv_packfile_received(int *pack_empty, struct imsg *imsg)
+{
+	struct gotd_imsg_packfile_received recvd;
+	size_t datalen;
+
+	*pack_empty = 0;
+
+	log_debug("packfile-received received");
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(recvd))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&recvd, imsg->data, sizeof(recvd));
+
+	if (recvd.pack_empty)
+		*pack_empty = 1;
+
+	return NULL;
+}
+
+static const struct got_error *
+request_gotsys_conf(struct gotd_imsgev *iev)
+{
+	struct gotd_imsg_packfile_get_content content_req;
+	const char *refname = "refs/heads/main";
+	const char *path = "gotsys.conf";
+	struct ibuf *wbuf;
+	size_t len;
+	int fd = -1;
+
+	if (ftruncate(gotd_session.content_fd, 0L) == -1)
+		return got_error_from_errno("ftruncate");
+	
+	len = sizeof(content_req) + strlen(refname) + strlen(path);
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_PACKFILE_GET_CONTENT,
+	    GOTD_PROC_SESSION_WRITE, gotd_session.pid, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create PACKFILE_GET_CONTENT");
+
+	memset(&content_req, 0, sizeof(content_req));
+	content_req.refname_len = strlen(refname);
+	content_req.path_len = strlen(path);
+
+	if (imsg_add(wbuf, &content_req, sizeof(content_req)) == -1)
+		return got_error_from_errno("imsg_add PACKFILE_GET_CONTENT");
+	if (imsg_add(wbuf, refname, content_req.refname_len) == -1)
+		return got_error_from_errno("imsg_add PACKFILE_GET_CONTENT");
+	if (imsg_add(wbuf, path, content_req.path_len) == -1)
+		return got_error_from_errno("imsg_add PACKFILE_GET_CONTENT");
+
+	fd = dup(gotd_session.content_fd);
+	if (fd == -1) {
+		ibuf_free(wbuf);
+		return got_error_from_errno("dup");
+	}
+	ibuf_fd_set(wbuf, fd);
+
+	imsg_close(&iev->ibuf, wbuf);
+
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static int
+need_packfile_verification(void)
+{
+	return (strcmp(gotd_session.repo_cfg->name, "gotsys") == 0 ||
+	    strcmp(gotd_session.repo_cfg->name, "gotsys.git") == 0);
+}
+
+static const struct got_error *
+verify_packfile(struct gotd_imsgev *iev)
+{
+	/* For now, verification is only implemented for gotsys.git. */
+	return request_gotsys_conf(iev);
+}
+
+static const struct got_error *
+recv_content_written(int *ref_found, struct imsg *imsg)
+{
+	struct gotd_imsg_packfile_content_written cw;
+	size_t datalen;
+
+	*ref_found = 0;
+
+	log_debug("content-written received");
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(cw))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&cw, imsg->data, sizeof(cw));
+	
+	if (cw.ref_found) {
+		*ref_found = 1;
+
+		/* Currently we only look for gotsys.conf content. */
+		if (!cw.wrote_content) {
+			return got_error_msg(GOT_ERR_BAD_OBJ_DATA,
+			    "gotsys.conf not found in pack file");
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+verify_gotsys_conf(void)
+{
+	struct gotd_imsgev *iev = &gotd_session.parent_iev;
+	int fd;
+
+	fd = dup(gotd_session.content_fd);
+	if (fd == -1)
+		return got_error_from_errno("dup");
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_RUN_GOTSYS_CHECK,
+	    GOTD_PROC_SESSION_WRITE, fd, NULL, 0) == -1) {
+		close(fd);
+		return got_error_from_errno("imsg compose RUN_GOTSYS_CHECK");
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+send_packfile_verified(struct gotd_imsgev *iev)
+{
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_VERIFIED,
+	    GOTD_PROC_SESSION_WRITE, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg compose PACKFILE_VERIFIED");
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -875,6 +1010,9 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 		uint32_t client_id = 0;
 		int do_disconnect = 0;
 		int do_ref_updates = 0, do_ref_update = 0;
+		int do_packfile_verification = 0;
+		int do_content_verification = 0;
+		int packfile_verified = 0;
 		int do_packfile_install = 0, do_notify = 0;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
@@ -887,6 +1025,30 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			do_disconnect = 1;
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
+		case GOTD_IMSG_PACKFILE_RECEIVED: {
+			int pack_empty;
+
+			err = recv_packfile_received(&pack_empty, &imsg);
+			if (err)
+				break;
+			if (!pack_empty && need_packfile_verification())
+				do_packfile_verification = 1;
+			else
+				packfile_verified = 1;
+			break;
+		}
+		case GOTD_IMSG_PACKFILE_CONTENT_WRITTEN: {
+			int ref_found;
+
+			err = recv_content_written(&ref_found, &imsg);
+			if (err == NULL) {
+				if (ref_found)
+					do_content_verification = 1;
+				else
+					packfile_verified = 1;
+			}
+			break;
+		}
 		case GOTD_IMSG_PACKFILE_INSTALL:
 			err = recv_packfile_install(&imsg);
 			if (err == NULL)
@@ -920,7 +1082,13 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 		} else {
 			struct gotd_session_notif *notif;
 
-			if (do_packfile_install)
+			if (do_packfile_verification) {
+				err = verify_packfile(iev);
+			} else if (do_content_verification) {
+				err = verify_gotsys_conf();
+			} else if (packfile_verified) {
+				err = send_packfile_verified(iev);
+			} else if (do_packfile_install)
 				err = install_pack(client,
 				    gotd_session.repo->path, &imsg);
 			else if (do_ref_updates)
@@ -1591,6 +1759,7 @@ session_dispatch(int fd, short event, void *arg)
 	const struct got_error *err = NULL;
 	struct gotd_imsgev *iev = arg;
 	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_imsgev *repo_child_iev = &gotd_session.repo_child_iev;
 	struct gotd_session_client *client = &gotd_session_client;
 	ssize_t n;
 	int shut = 0;
@@ -1646,6 +1815,24 @@ session_dispatch(int fd, short event, void *arg)
 		case GOTD_IMSG_NOTIFY:
 			send_notifications = 1;
 			break;
+		case GOTD_IMSG_PACKFILE_VERIFIED:
+			if (gotd_session.state != GOTD_STATE_EXPECT_PACKFILE) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				do_disconnect = 1;
+				break;
+			}
+			if (repo_child_iev->ibuf.fd == -1) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				do_disconnect = 1;
+				break;
+			}
+			if (gotd_imsg_forward(repo_child_iev, &imsg,
+			    -1) == -1) {
+				err = got_error_from_errno("imsg compose "
+				    " PACKFILE_VERIFIED");
+				do_disconnect = 1;
+			}
+			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
@@ -1696,8 +1883,8 @@ done:
 
 void
 session_write_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds, struct timeval *request_timeout,
-    struct gotd_repo *repo_cfg)
+    int *pack_fds, int *temp_fds, int content_fd,
+    struct timeval *request_timeout, struct gotd_repo *repo_cfg)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -1708,6 +1895,7 @@ session_write_main(const char *title, const char *repo_path,
 	gotd_session.pid = getpid();
 	gotd_session.pack_fds = pack_fds;
 	gotd_session.temp_fds = temp_fds;
+	gotd_session.content_fd = content_fd;
 	memcpy(&gotd_session.request_timeout, request_timeout,
 	    sizeof(gotd_session.request_timeout));
 	gotd_session.repo_cfg = repo_cfg;
@@ -1751,6 +1939,8 @@ session_write_main(const char *title, const char *repo_path,
 	gotd_session_client.nref_updates = -1;
 	gotd_session_client.delta_cache_fd = -1;
 	gotd_session_client.accept_flush_pkt = 1;
+
+	gotd_session.repo_child_iev.ibuf.fd = -1;
 
 	if (imsgbuf_init(&gotd_session.parent_iev.ibuf, GOTD_FILENO_MSG_PIPE)
 	    == -1) {

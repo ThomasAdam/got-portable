@@ -15,7 +15,7 @@
  */
 
 void repo_write_main(const char *, const char *, int *, int *,
-    FILE *, FILE *, int, int,
+    FILE *, FILE *, FILE *, FILE *, int, int,
     struct got_pathlist_head *, struct got_pathlist_head *,
     struct got_pathlist_head *);
 void repo_write_shutdown(void);

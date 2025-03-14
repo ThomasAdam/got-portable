@@ -1103,6 +1103,96 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_bad_gotsysconf() {
+	local testroot=`test_init bad_gotsysconf 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# An attempt to send an invalid gotsys.conf file
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+looser ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+looser ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	permit rw ${GOTSYSD_DEV_USER}
+	permit ro anonymous
+}
+EOF
+	gotsys check -f ${testroot}/wt/gotsys.conf \
+		> $testroot/stdout  2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "gotsys check suceeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "gotsys: ${testroot}/wt/gotsys.conf: line 3: syntax error" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd ${testroot}/wt && got commit -m "commit a bad gotsys.conf" \
+		>/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO} \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Unfortunately there are two different possible error messages
+	# depending on the order of server-side events.
+	cat > ${testroot}/stderr.expected1 <<EOF
+git-receive-pack: gotsys check failure
+got-send-pack: gotsys check failure
+got: could not send pack file
+EOF
+	cat > ${testroot}/stderr.expected2 <<EOF
+git-receive-pack: gotsys: stdin: line 3: syntax error
+got-send-pack: gotsys: stdin: line 3: syntax error
+got: could not send pack file
+EOF
+	cmp -s $testroot/stderr.expected1 $testroot/stderr
+	ret1=$?
+	cmp -s $testroot/stderr.expected2 $testroot/stderr
+	ret2=$?
+	if [ $ret1 -ne 0 -a $ret2 -ne 0 ]; then
+		echo -n "unexpected error upon invalid gotsys.conf: " >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 test_parseargs "$@"
 run_test test_user_add
 run_test test_user_mod
@@ -1111,3 +1201,4 @@ run_test test_group_add
 run_test test_group_del
 run_test test_repo_create
 run_test test_user_anonymous
+run_test test_bad_gotsysconf

@@ -25,6 +25,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <err.h>
 #include <errno.h>
@@ -103,7 +104,9 @@ struct gotd_client {
 	struct gotd_child_proc		*repo;
 	struct gotd_child_proc		*auth;
 	struct gotd_child_proc		*session;
+	struct gotd_child_proc		*gotsys;
 	int				 required_auth;
+	int				 gotsys_error_sent;
 };
 STAILQ_HEAD(gotd_clients, gotd_client);
 
@@ -257,6 +260,8 @@ find_client_by_proc_fd(int fd)
 				return c;
 			if (c->session && c->session->iev.ibuf.fd == fd)
 				return c;
+			if (c->gotsys && c->gotsys->pipe[0] == fd)
+				return c;
 		}
 	}
 
@@ -310,6 +315,8 @@ proc_done(struct gotd_child_proc *proc)
 	TAILQ_REMOVE(&procs, proc, entry);
 
 	client = find_client_by_proc_fd(proc->iev.ibuf.fd);
+	if (client == NULL)
+		client = find_client_by_proc_fd(proc->pipe[0]);
 	if (client != NULL) {
 		if (proc == client->repo)
 			client->repo = NULL;
@@ -317,7 +324,8 @@ proc_done(struct gotd_child_proc *proc)
 			client->auth = NULL;
 		if (proc == client->session)
 			client->session = NULL;
-		disconnect(client);
+		if (proc == client->gotsys)
+			client->gotsys = NULL;
 	}
 
 	if (proc == gotd.notify_proc)
@@ -365,6 +373,16 @@ kill_session_proc(struct gotd_client *client)
 }
 
 static void
+kill_gotsys_proc(struct gotd_client *client)
+{
+	if (client->gotsys == NULL)
+		return;
+
+	kill_proc(client->gotsys, 0);
+	client->gotsys = NULL;
+}
+
+static void
 disconnect(struct gotd_client *client)
 {
 	struct gotd_imsg_disconnect idisconnect;
@@ -376,6 +394,7 @@ disconnect(struct gotd_client *client)
 	kill_auth_proc(client);
 	kill_session_proc(client);
 	kill_repo_proc(client);
+	kill_gotsys_proc(client);
 
 	idisconnect.client_id = client->id;
 	if (gotd_imsg_compose_event(&listen_proc->iev,
@@ -834,9 +853,44 @@ find_proc_by_pid(pid_t pid)
 	return proc;
 }
 
+static const struct got_error *
+gotsys_exit(struct gotd_child_proc *proc, int status)
+{
+	struct gotd_client *client;
+
+	log_debug("gotsys check (PID %d) %s", proc->pid,
+	    WEXITSTATUS(status) == 0 ? "succeeded" : "failed"); 
+
+	client = find_client_by_proc_fd(proc->pipe[0]);
+	if (client == NULL)
+		return NULL;
+
+	if (client->session == NULL)
+		return NULL;
+
+	if (WEXITSTATUS(status) == 0) {
+		if (gotd_imsg_compose_event(&client->session->iev,
+		    GOTD_IMSG_PACKFILE_VERIFIED, GOTD_PROC_GOTD,
+		    -1, NULL, 0) == -1)
+			return got_error_from_errno("imsg compose "
+			    "PACKFILE_VERIFIED");
+	} else if (!client->gotsys_error_sent && client->session != NULL) {
+		const struct got_error *err;
+
+		err = got_error_msg(GOT_ERR_PARSE_CONFIG,
+		    "gotsys check failure");
+		if (gotd_imsg_send_error_event(&client->session->iev,
+		    GOTD_PROC_GOTD, client->id, err) == -1)
+			log_warn("imsg send error");
+	}
+
+	return NULL;
+}
+
 void
 gotd_sighdlr(int sig, short event, void *arg)
 {
+	const struct got_error *err;
 	struct gotd_child_proc *proc;
 	pid_t pid;
 	int status;
@@ -881,6 +935,12 @@ gotd_sighdlr(int sig, short event, void *arg)
 			if (WIFSIGNALED(status)) {
 				log_warnx("child PID %d terminated with"
 				    " signal %d", pid, WTERMSIG(status));
+			}
+
+			if (proc->type == GOTD_PROC_GOTSYS) {
+				err = gotsys_exit(proc, status);
+				if (err)
+					log_warn("%s", err->msg);
 			}
 
 			proc_done(proc);
@@ -1010,6 +1070,19 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 		if (err)
 			log_warnx("uid %d: %s", client->euid, err->msg);
 		else
+			ret = 1;
+		break;
+	case GOTD_IMSG_RUN_GOTSYS_CHECK:
+		if (proc->type != GOTD_PROC_SESSION_WRITE) {
+			err = got_error_fmt(GOT_ERR_BAD_PACKET,
+			    "unexpected \"ready\" signal from PID %d",
+			    proc->pid);
+			break;
+		}
+		err = ensure_proc_is_writing(client, proc);
+		if (err) {
+			log_warnx("uid %d: %s", client->euid, err->msg);
+		}
 			ret = 1;
 		break;
 	default:
@@ -1388,6 +1461,130 @@ connect_session(struct gotd_client *client)
 }
 
 static void
+gotd_read_gotsys_check_stderr(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_child_proc *proc = arg;
+	struct gotd_client *client;
+	ssize_t n, i;
+	char buf[1024];
+
+	memset(buf, 0, sizeof(buf));
+
+	log_debug("%s", __func__);
+
+	if (event & EV_READ) {
+		n = read(fd, buf, sizeof(buf) - 1 /* keep a trailing NUL */);
+		if (n == 0) /* stderr pipe closed */
+			goto done;
+
+		/* Deliver the 'gotsys check' error to the client session. */
+		for (i = 0; i < n; i++) {
+			if (!isprint(buf[i])) {
+				buf[i] = '\0';
+				break;
+			}
+		}
+		err = got_error_msg(GOT_ERR_PARSE_CONFIG, buf);
+		log_warnx("gotsys check: %s", err->msg);
+
+		client = find_client_by_proc_fd(fd);
+		if (client == NULL) {
+			/* Can happen during process teardown. */
+			warnx("cannot find client for fd %d", fd);
+			goto done;
+		}
+
+		if (client->session != NULL &&
+		    gotd_imsg_send_error_event(&client->session->iev,
+		    GOTD_PROC_GOTD, client->id, err) == -1)
+			log_warn("imsg send error");
+		else
+			client->gotsys_error_sent = 1;
+	}
+done:
+	event_del(&proc->iev.ev);
+}
+
+static const struct got_error *
+run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
+    int content_fd)
+{
+	struct gotd_child_proc *proc;
+	const char	*argv[4];
+	int		 argc = 0;
+	pid_t		 pid;
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL)
+		return got_error_from_errno("calloc");
+
+	proc->type = GOTD_PROC_GOTSYS;
+	if (strlcpy(proc->repo_name, repo->name,
+	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
+		fatalx("repository name too long: %s", repo->name);
+	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
+	    sizeof(proc->repo_path))
+		fatalx("repository path too long: %s", repo->path);
+
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1) {
+		free(proc);
+		return got_error_from_errno("socketpair");
+	}
+
+	proc->iev.handler = gotd_read_gotsys_check_stderr;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+	event_set(&proc->iev.ev, proc->pipe[0], EV_READ,
+	    gotd_read_gotsys_check_stderr, proc);
+	event_add(&proc->iev.ev, NULL);
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
+
+	switch (pid = fork()) {
+	case -1:
+		fatal("cannot fork");
+	case 0:
+		break;
+	default:
+		proc->pid = pid;
+		close(proc->pipe[1]);
+		proc->pipe[1] = -1;
+		client->gotsys = proc;
+		log_debug("running gotsys check (PID %d)", pid);
+		return NULL;
+	}
+
+	if (content_fd != STDIN_FILENO) {
+		    if (dup2(content_fd, STDIN_FILENO) == -1)
+			fatal("cannot redirect stdin");
+	} else if (fcntl(content_fd, F_SETFD, 0) == -1)
+		fatal("cannot fcntl stdin");
+
+	if (proc->pipe[1] != STDERR_FILENO) {
+		if (dup2(proc->pipe[1], STDERR_FILENO) == -1)
+			fatal("cannot redirect stderr");
+	} else if (fcntl(proc->pipe[1], F_SETFD, 0) == -1)
+		fatal("cannot fcntl stderr");
+
+	closefrom(STDERR_FILENO + 1);
+
+	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
+	argv[argc++] = "check";
+	argv[argc++] = "-f";
+	argv[argc++] = "-";
+	argv[argc++] = NULL;
+
+	execvp(argv[0], (char * const *)argv);
+	fatal("execvp");
+	/* NOTREACHED */
+	return NULL; 
+}
+
+static void
 run_gotsys_apply(struct gotd_repo *repo)
 {
 	struct gotd_child_proc *proc;
@@ -1420,6 +1617,7 @@ run_gotsys_apply(struct gotd_repo *repo)
 		break;
 	default:
 		proc->pid = pid;
+		log_debug("running gotsys apply (PID %d)", pid);
 		return;
 	}
 
@@ -1479,7 +1677,8 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 		const struct got_error *err = NULL;
 		uint32_t client_id = 0;
 		int do_disconnect = 0, do_start_repo_child = 0;
-		int refs_updated = 0;
+		int do_gotsys_check = 0, refs_updated = 0;
+		int fd = -1;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -1497,6 +1696,18 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				break;
 			}
 			do_start_repo_child = 1;
+			break;
+		case GOTD_IMSG_RUN_GOTSYS_CHECK:
+			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			fd = imsg_get_fd(&imsg);
+			if (fd == -1) {
+				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			}
+			do_gotsys_check = 1;
 			break;
 		case GOTD_IMSG_REFS_UPDATED:
 			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
@@ -1544,6 +1755,20 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 			if (err) {
 				log_warnx("uid %d: %s", client->euid, err->msg);
 				do_disconnect = 1;
+			}
+		}
+
+		if (do_gotsys_check) {
+			struct gotd_repo *repo;
+
+			repo = gotd_find_repo_by_name("gotsys", &gotd.repos);
+			if (repo == NULL)
+				repo = gotd_find_repo_by_name("gotsys.git",
+				    &gotd.repos);
+			if (repo) {
+				err = run_gotsys_check(client, repo, fd);
+				if (err)
+					do_disconnect = 1;
 			}
 		}
 
@@ -2182,8 +2407,8 @@ main(int argc, char **argv)
 	char *default_sender = NULL;
 	char hostname[_POSIX_HOST_NAME_MAX + 1];
 	FILE *fp;
-	FILE *diff_f1 = NULL, *diff_f2 = NULL;
-	int diff_fd1 = -1, diff_fd2 = -1;
+	FILE *diff_f1 = NULL, *diff_f2 = NULL, *tmp_f1 = NULL, *tmp_f2 = NULL;
+	int diff_fd1 = -1, diff_fd2 = -1, tmp_fd = -1;
 	const char *errstr;
 
 	TAILQ_INIT(&procs);
@@ -2452,6 +2677,9 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_SESSION_WRITE:
+		tmp_fd = got_opentempfd();
+		if (tmp_fd == -1)
+			fatal("got_opentempfd");
 #ifndef PROFILE
 		/*
 		 * The "recvfd" promise is only needed during setup and
@@ -2465,7 +2693,7 @@ main(int argc, char **argv)
 		repo = gotd_find_repo_by_path(repo_path, &gotd);
 		if (repo == NULL)
 			fatalx("no repository for path %s", repo_path);
-		session_write_main(title, repo_path, pack_fds, temp_fds,
+		session_write_main(title, repo_path, pack_fds, temp_fds, tmp_fd,
 		    &gotd.request_timeout, repo);
 		/* NOTREACHED */
 		break;
@@ -2505,6 +2733,12 @@ main(int argc, char **argv)
 		diff_fd2 = got_opentempfd();
 		if (diff_fd2 == -1)
 			fatal("got_opentempfd");
+		tmp_f1 = got_opentemp();
+		if (tmp_f1 == NULL)
+			fatal("got_opentemp");
+		tmp_f2 = got_opentemp();
+		if (tmp_f2 == NULL)
+			fatal("got_opentemp");
 #ifndef PROFILE
 		if (pledge("stdio rpath recvfd unveil", NULL) == -1)
 			err(1, "pledge");
@@ -2523,7 +2757,7 @@ main(int argc, char **argv)
 		drop_privs(pw);
 
 		repo_write_main(title, repo_path, pack_fds, temp_fds,
-		    diff_f1, diff_f2, diff_fd1, diff_fd2,
+		    tmp_f1, tmp_f2, diff_f1, diff_f2, diff_fd1, diff_fd2,
 		    &repo->protected_tag_namespaces,
 		    &repo->protected_branch_namespaces,
 		    &repo->protected_branches);
