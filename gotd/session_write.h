@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void session_write_main(const char *, const char *, int *, int *,
+void session_write_main(const char *, const char *, int *, int *, int,
     struct timeval *, struct gotd_repo *);

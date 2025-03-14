@@ -216,6 +216,7 @@ enum gotd_imsg_type {
 	/* Sending or receiving a pack file. */
 	GOTD_IMSG_SEND_PACKFILE, /* The server is sending a pack file. */
 	GOTD_IMSG_RECV_PACKFILE, /* The server is receiving a pack file. */
+	GOTD_IMSG_PACKFILE_RECEIVED,
 	GOTD_IMSG_PACKIDX_FILE,  /* Temporary file handle for new pack index. */
 	GOTD_IMSG_PACKFILE_PIPE, /* Pipe to send/receive a pack file stream. */
 	GOTD_IMSG_PACKFILE_PROGRESS, /* Progress reporting. */
@@ -223,6 +224,12 @@ enum gotd_imsg_type {
 	GOTD_IMSG_PACKFILE_STATUS, /* Received pack success/failure status. */
 	GOTD_IMSG_PACKFILE_INSTALL, /* Received pack file can be installed. */
 	GOTD_IMSG_PACKFILE_DONE, /* Pack file has been sent/received. */
+
+	/* Pack file content verification. */
+	GOTD_IMSG_PACKFILE_GET_CONTENT,
+	GOTD_IMSG_PACKFILE_CONTENT_WRITTEN,
+	GOTD_IMSG_RUN_GOTSYS_CHECK,
+	GOTD_IMSG_PACKFILE_VERIFIED,
 
 	/* Reference updates. */
 	GOTD_IMSG_REF_UPDATES_START, /* Ref updates starting. */
@@ -378,6 +385,30 @@ struct gotd_imsg_ref_update {
 	/* Followed by name_len data bytes. */
 } __attribute__((__packed__));
 
+/* Structure for GOTD_IMSG_PACKFILE_GET_CONTENT. */
+struct gotd_imsg_packfile_get_content {
+	size_t refname_len;
+	size_t path_len;
+
+	/* Followed by refname_len + path_len data bytes. */
+
+	/* Content file descriptor is passed via imsg. */
+};
+
+/* Structure for GOTD_IMSG_PACKFILE_CONTENT_WRITTEN. */
+struct gotd_imsg_packfile_content_written {
+	/* If zero, the requested reference is not being updated. */
+	int ref_found;
+
+	/*
+	 * If wrote_content is zero, nothing was found at the requested path.
+	 *
+	 * Else, content as it appears in the pack file was written to the
+	 * file descriptor. If this content is empty, the file will be empty.
+	 */
+	int wrote_content;
+};
+
 /* Structure for GOTD_IMSG_REF_UPDATES_START data. */
 struct gotd_imsg_ref_updates_start {
 	int nref_updates;
@@ -419,6 +450,11 @@ struct gotd_imsg_recv_packfile {
 	int report_status;
 
 	/* pack destination temp file is sent as a file descriptor */
+};
+
+/* Structure for GOTD_IMSG_PACKFILE_RECEIVED data. */
+struct gotd_imsg_packfile_received {
+	int pack_empty;
 };
 
 /*

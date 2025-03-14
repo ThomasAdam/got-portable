@@ -74,6 +74,8 @@ static struct repo_write {
 	struct got_repository *repo;
 	int *pack_fds;
 	int *temp_fds;
+	FILE *base_file;
+	FILE *accum_file;
 	int session_fd;
 	struct gotd_imsgev session_iev;
 	struct got_pathlist_head *protected_tag_namespaces;
@@ -86,6 +88,7 @@ static struct repo_write {
 		int fd2;
 	} diff;
 	int refs_listed;
+	int have_packfile;
 } repo_write;
 
 struct gotd_ref_update {
@@ -103,6 +106,7 @@ static struct repo_write_client {
 	int				 fd;
 	int				 pack_pipe;
 	struct got_pack			 pack;
+	struct got_packidx		 *packidx;
 	uint8_t				 pack_sha1[SHA1_DIGEST_LENGTH];
 	int				 packidx_fd;
 	struct gotd_ref_updates		 ref_updates;
@@ -1364,10 +1368,9 @@ done:
 static const struct got_error *
 verify_packfile(void)
 {
-	const struct got_error *err = NULL, *close_err;
+	const struct got_error *err = NULL;
 	struct repo_write_client *client = &repo_write_client;
 	struct gotd_ref_update *ref_update;
-	struct got_packidx *packidx = NULL;
 	struct stat sb;
 	char *id_str = NULL;
 	struct got_object *obj = NULL;
@@ -1391,14 +1394,18 @@ verify_packfile(void)
 	if (fstat(client->packidx_fd, &sb) == -1)
 		return got_error_from_errno("pack index fstat");
 
-	packidx = calloc(1, sizeof(*packidx));
-	if (packidx == NULL)
-		return got_error_from_errno("calloc");
-	packidx->fd = client->packidx_fd;
-	client->packidx_fd = -1;
-	packidx->len = sb.st_size;
+	if (client->packidx != NULL)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	err = got_packidx_init_hdr(packidx, 1, client->pack.filesize);
+	client->packidx = calloc(1, sizeof(*client->packidx));
+	if (client->packidx == NULL)
+		return got_error_from_errno("calloc");
+
+	client->packidx->fd = client->packidx_fd;
+	client->packidx_fd = -1;
+	client->packidx->len = sb.st_size;
+
+	err = got_packidx_init_hdr(client->packidx, 1, client->pack.filesize);
 	if (err)
 		return err;
 
@@ -1409,7 +1416,7 @@ verify_packfile(void)
 		RB_FOREACH(pe, got_pathlist_head,
 		    repo_write.protected_tag_namespaces) {
 			err = protect_tag_namespace(pe->path, &client->pack,
-			    packidx, ref_update);
+			    client->packidx, ref_update);
 			if (err)
 				goto done;
 		}
@@ -1427,7 +1434,7 @@ verify_packfile(void)
 			got_object_close(obj);
 			obj = NULL;
 		} else {
-			int idx = got_packidx_get_object_idx(packidx,
+			int idx = got_packidx_get_object_idx(client->packidx,
 			    &ref_update->new_id);
 			if (idx == -1) {
 				got_object_id_hex(&ref_update->new_id,
@@ -1442,23 +1449,20 @@ verify_packfile(void)
 		RB_FOREACH(pe, got_pathlist_head,
 		    repo_write.protected_branch_namespaces) {
 			err = protect_branch_namespace(pe->path,
-			    &client->pack, packidx, ref_update);
+			    &client->pack, client->packidx, ref_update);
 			if (err)
 				goto done;
 		}
 		RB_FOREACH(pe, got_pathlist_head,
 		    repo_write.protected_branches) {
 			err = protect_branch(pe->path, &client->pack,
-			    packidx, ref_update);
+			    client->packidx, ref_update);
 			if (err)
 				goto done;
 		}
 	}
 
 done:
-	close_err = got_packidx_close(packidx);
-	if (close_err && err == NULL)
-		err = close_err;
 	free(id_str);
 	if (obj)
 		got_object_close(obj);
@@ -2208,6 +2212,345 @@ done:
 	return err;
 }
 
+static const struct got_error *
+send_packfile_received(struct gotd_imsgev *iev, int have_packfile)
+{
+	struct gotd_imsg_packfile_received recvd;
+	int ret;
+
+	if (have_packfile)
+		recvd.pack_empty = 0;
+	else
+		recvd.pack_empty = 1;
+
+	ret = gotd_imsg_compose_event(iev, GOTD_IMSG_PACKFILE_RECEIVED,
+	    GOTD_PROC_REPO_WRITE, -1, &recvd, sizeof(recvd));
+	if (ret == -1)
+		return got_error_from_errno("imsg_compose PACKFILE_RECEIVED");
+
+	return NULL;
+}
+
+static const struct got_error *
+open_tree(struct got_tree_object **tree, struct got_pack *pack,
+    struct got_packidx *packidx, int idx, struct got_object_id *tree_id)
+{
+	const struct got_error *err;
+	struct got_parsed_tree_entry *entries = NULL;
+	size_t nentries = 0, nentries_alloc = 0, i;
+	struct got_object *obj = NULL;
+	uint8_t *buf = NULL;
+	size_t len;
+
+	*tree = NULL;
+
+	err = got_packfile_open_object(&obj, pack, packidx, idx, tree_id);
+	if (err)
+		return err;
+
+	if (obj->type != GOT_OBJ_TYPE_TREE) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
+	if (err)
+		goto done;
+	
+	err = got_object_parse_tree(&entries, &nentries, &nentries_alloc,
+	    buf, len, GOT_HASH_SHA1);
+	if (err)
+		goto done;
+
+	*tree = malloc(sizeof(**tree));
+	if (*tree == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	(*tree)->entries = calloc(nentries, sizeof(struct got_tree_entry));
+	if ((*tree)->entries == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	(*tree)->nentries = nentries;
+	(*tree)->refcnt = 0;
+
+	for (i = 0; i < nentries; i++) {
+		struct got_parsed_tree_entry *pe = &entries[i];
+		struct got_tree_entry *te = &(*tree)->entries[i];
+
+		if (strlcpy(te->name, pe->name,
+		    sizeof(te->name)) >= sizeof(te->name)) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+		memcpy(te->id.hash, pe->id, pe->digest_len);
+		te->id.algo = GOT_HASH_SHA1;
+		te->mode = pe->mode;
+		te->idx = i;
+	}
+done:
+	if (err && *tree) {
+		got_object_tree_close(*tree);
+		*tree = NULL;
+	}
+	got_object_close(obj);
+	free(buf);
+	return err;
+}
+
+static struct got_tree_entry *
+find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
+{
+	int i;
+
+	/* Note that tree entries are sorted in strncmp() order. */
+	for (i = 0; i < tree->nentries; i++) {
+		struct got_tree_entry *te = &tree->entries[i];
+		int cmp = strncmp(te->name, name, len);
+		if (cmp < 0)
+			continue;
+		if (cmp > 0)
+			break;
+		if (te->name[len] == '\0')
+			return te;
+	}
+	return NULL;
+}
+
+static const struct got_error *
+find_id_by_path(struct got_object_id **id,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_tree_object *tree, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *subtree = NULL;
+	struct got_tree_entry *te = NULL;
+	const char *seg, *s;
+	size_t seglen;
+
+	*id = NULL;
+
+	s = path;
+	while (s[0] == '/')
+		s++;
+	seg = s;
+	seglen = 0;
+	subtree = tree;
+	while (*s) {
+		struct got_tree_object *next_tree;
+
+		if (*s != '/') {
+			s++;
+			seglen++;
+			if (*s)
+				continue;
+		}
+
+		te = find_entry_by_name(subtree, seg, seglen);
+		if (te == NULL)
+			break;
+
+		if (*s == '\0')
+			break;
+
+		seg = s + 1;
+		seglen = 0;
+		s++;
+		if (*s) {
+			int idx;
+
+			idx = got_packidx_get_object_idx(packidx, &te->id);
+			if (idx == -1)  {
+				te = NULL;
+				break;
+			}
+			err = open_tree(&next_tree, pack, packidx, idx,
+			    &te->id);
+			te = NULL;
+			if (err)
+				goto done;
+			if (subtree != tree)
+				got_object_tree_close(subtree);
+			subtree = next_tree;
+		}
+	}
+
+	if (te) {
+		*id = got_object_id_dup(&te->id);
+		if (*id == NULL)
+			return got_error_from_errno("got_object_id_dup");
+	} else
+		err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
+done:
+	if (subtree && subtree != tree)
+		got_object_tree_close(subtree);
+	return err;
+}
+
+static const struct got_error *
+get_content_from_packfile(struct gotd_imsgev *iev, struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	struct repo_write_client *client = &repo_write_client;
+	struct gotd_imsg_packfile_get_content content_req;
+	struct gotd_imsg_packfile_content_written written_resp;
+	size_t datalen;
+	char *refname = NULL;
+	char *path = NULL;
+	int fd = -1, idx;
+	struct gotd_ref_update *ref_update;
+	struct got_object_id *tree_id = NULL, *content_id = NULL;
+	struct got_object *obj = NULL;
+	uint8_t *buf = NULL;
+	size_t len;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
+	FILE *outfile = NULL;
+
+	memset(&written_resp, 0, sizeof(written_resp));
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(content_req))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&content_req, imsg->data, sizeof(content_req)); 
+
+	if (content_req.path_len == 0 ||
+	    content_req.refname_len == 0 ||
+	    datalen != sizeof(content_req) + content_req.refname_len +
+	    content_req.path_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	
+	refname = strndup(imsg->data + sizeof(content_req),
+	    content_req.refname_len);
+	if (strlen(refname) != content_req.refname_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	path = strndup(imsg->data + sizeof(content_req) +
+	    content_req.refname_len, content_req.path_len);
+	if (strlen(path) != content_req.path_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	if (got_path_is_root_dir(path)) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
+
+	outfile = fdopen(fd, "w");
+	if (outfile == NULL) {
+		err = got_error_from_errno("fdopen");
+		goto done;
+	}
+	fd = -1;
+
+	STAILQ_FOREACH(ref_update, &client->ref_updates, entry) {
+		if (strcmp(got_ref_get_name(ref_update->ref), refname) == 0)
+			break;
+	}
+	if (ref_update == NULL)
+		goto send_response;
+
+	written_resp.ref_found = 1;	
+
+	idx = got_packidx_get_object_idx(client->packidx, &ref_update->new_id);
+	if (idx == -1) 
+		goto send_response;
+
+	err = got_packfile_open_object(&obj, &client->pack, client->packidx,
+	   idx, &ref_update->new_id);
+	if (err)
+		goto done;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		goto send_response;
+
+	err = got_packfile_extract_object_to_mem(&buf, &len, obj,
+	    &client->pack);
+	if (err)
+		goto done;
+	got_object_close(obj);
+	obj = NULL;
+	
+	err = got_object_parse_commit(&commit, buf, len, GOT_HASH_SHA1);
+	if (err)
+		goto done;
+
+	tree_id = got_object_id_dup(commit->tree_id);
+	if (tree_id == NULL)
+		err = got_error_from_errno("got_object_id_dup");
+
+	got_object_commit_close(commit);
+	commit = NULL;
+	free(buf);
+	buf = NULL;
+	len = 0;
+
+	idx = got_packidx_get_object_idx(client->packidx, tree_id);
+	if (idx == -1) 
+		goto send_response;
+
+	err = open_tree(&tree, &client->pack, client->packidx, idx, tree_id);
+	if (err)
+		goto done;
+
+	err = find_id_by_path(&content_id, &client->pack, client->packidx,
+	    tree, path);
+	if (err)
+		goto done;
+
+	idx = got_packidx_get_object_idx(client->packidx, content_id);
+	if (idx == -1) 
+		goto send_response;
+
+	err = got_packfile_open_object(&obj, &client->pack, client->packidx,
+	   idx, content_id);
+	if (err)
+		goto done;
+
+	if (obj->type != GOT_OBJ_TYPE_BLOB)
+		goto send_response;
+
+	err = got_packfile_extract_object(&client->pack, obj, outfile,
+	    repo_write.base_file, repo_write.accum_file);
+	if (err)
+		goto done;
+	
+	written_resp.wrote_content = 1;	
+send_response:
+	if (imsg_compose(&iev->ibuf, GOTD_IMSG_PACKFILE_CONTENT_WRITTEN,
+	    GOTD_PROC_REPO_WRITE, repo_write.pid, -1, &written_resp,
+	    sizeof(written_resp)) == -1) {
+		err = got_error_from_errno("imsg_compose "
+		    "PACKFILE_CONTENT_WRITTEn");
+		goto done;
+	}
+	err = gotd_imsg_flush(&iev->ibuf);
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (outfile && fclose(outfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(refname);
+	free(path);
+	free(tree_id);
+	free(buf);
+	if (obj)
+		got_object_close(obj);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
 static void
 repo_write_dispatch_session(int fd, short event, void *arg)
 {
@@ -2217,7 +2560,7 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 	struct imsg imsg;
 	struct repo_write_client *client = &repo_write_client;
 	ssize_t n;
-	int shut = 0, have_packfile = 0;
+	int shut = 0;
 
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
@@ -2274,18 +2617,42 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 			err = protect_refs_from_deletion();
 			if (err)
 				break;
-			err = recv_packfile(&have_packfile, &imsg);
+			err = recv_packfile(&repo_write.have_packfile, &imsg);
 			if (err) {
 				log_warnx("receive packfile: %s", err->msg);
 				break;
 			}
-			if (have_packfile) {
+			if (repo_write.have_packfile) {
 				err = verify_packfile();
 				if (err) {
 					log_warnx("verify packfile: %s",
 					    err->msg);
 					break;
 				}
+			} else {
+				/*
+				 * Clients sending empty pack files might be
+				 * attempting to move a protected reference.
+				 */
+				err = protect_refs_from_moving();
+				if (err)
+					break;
+			}
+			err = send_packfile_received(iev,
+			    repo_write.have_packfile);
+			if (err)
+				log_warnx("receive packfile: %s", err->msg);
+			break;
+		case GOTD_IMSG_PACKFILE_GET_CONTENT:
+			if (!repo_write.have_packfile ||
+			    client->packidx == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = get_content_from_packfile(iev, &imsg);
+			break;
+		case GOTD_IMSG_PACKFILE_VERIFIED:
+			if (repo_write.have_packfile) {
 				err = install_packfile(iev);
 				if (err) {
 					log_warnx("install packfile: %s",
@@ -2298,14 +2665,6 @@ repo_write_dispatch_session(int fd, short event, void *arg)
 				 */
 				repo_write.repo->pack_path_mtime.tv_sec = 0;
 				repo_write.repo->pack_path_mtime.tv_nsec = 0;
-			} else {
-				/*
-				 * Clients sending empty pack files might be
-				 * attempting to move a protected reference.
-				 */
-				err = protect_refs_from_moving();
-				if (err)
-					break;
 			}
 			err = update_refs(iev);
 			if (err)
@@ -2434,7 +2793,7 @@ done:
 
 void
 repo_write_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds,
+    int *pack_fds, int *temp_fds, FILE *base_file, FILE *accum_file,
     FILE *diff_f1, FILE *diff_f2, int diff_fd1, int diff_fd2,
     struct got_pathlist_head *protected_tag_namespaces,
     struct got_pathlist_head *protected_branch_namespaces,
@@ -2453,6 +2812,8 @@ repo_write_main(const char *title, const char *repo_path,
 	repo_write.pid = getpid();
 	repo_write.pack_fds = pack_fds;
 	repo_write.temp_fds = temp_fds;
+	repo_write.base_file = base_file;
+	repo_write.accum_file = accum_file;
 	repo_write.session_fd = -1;
 	repo_write.session_iev.ibuf.fd = -1;
 	repo_write.protected_tag_namespaces = protected_tag_namespaces;
@@ -2531,6 +2892,8 @@ repo_write_shutdown(void)
 		free(ref_update);
 	}
 
+	if (client->packidx)
+		got_packidx_close(client->packidx);
 	got_pack_close(&client->pack);
 	if (client->fd != -1)
 		close(client->fd);
