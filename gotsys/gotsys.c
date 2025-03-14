@@ -650,6 +650,7 @@ main(int argc, char *argv[])
 		error = cmd->cmd_main(argc, argv);
 		if (error) {
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+			fflush(stderr);
 			return 1;
 		}
 
@@ -658,5 +659,6 @@ main(int argc, char *argv[])
 
 	fprintf(stderr, "%s: unknown command '%s'\n", getprogname(), argv[0]);
 	list_commands(stderr);
+	fflush(stderr);
 	return 1;
 }
