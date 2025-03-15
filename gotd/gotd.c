@@ -2606,8 +2606,8 @@ main(int argc, char **argv)
 	setproctitle("%s", title);
 	log_procinit(title);
 
-	if (proc_id != PROC_GOTD && proc_id != PROC_LISTEN &&
-	    proc_id != PROC_REPO_READ && proc_id != PROC_REPO_WRITE) {
+	if (proc_id != GOTD_PROC_GOTD && proc_id != GOTD_PROC_LISTEN &&
+	    proc_id != GOTD_PROC_REPO_READ && proc_id != GOTD_PROC_REPO_WRITE) {
 		/* Drop root privileges. */
 		if (setgid(pw->pw_gid) == -1)
 			fatal("setgid %d failed", pw->pw_gid);
