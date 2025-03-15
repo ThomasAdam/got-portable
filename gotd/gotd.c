@@ -1514,7 +1514,11 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 	const char	*argv[4];
 	int		 argc = 0;
 	pid_t		 pid;
+	int		 sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
 
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)
 		return got_error_from_errno("calloc");
@@ -1527,7 +1531,7 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 	    sizeof(proc->repo_path))
 		fatalx("repository path too long: %s", repo->path);
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1) {
 		free(proc);
 		return got_error_from_errno("socketpair");
