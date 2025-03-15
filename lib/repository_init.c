@@ -16,15 +16,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/time.h>
-#include <sys/tree.h>
 #include <sys/queue.h>
 
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sha1.h>
-#include <sha2.h>
 
 #include "got_error.h"
 #include "got_path.h"
