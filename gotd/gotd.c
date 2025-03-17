@@ -115,6 +115,7 @@ static SIPHASH_KEY clients_hash_key;
 volatile int client_cnt;
 static struct timeval auth_timeout = { 5, 0 };
 static struct gotd gotd;
+static int gotd_socket = -1;
 
 void gotd_sighdlr(int sig, short event, void *arg);
 static void gotd_shutdown(void);
@@ -1138,6 +1139,30 @@ connect_repo_child(struct gotd_client *client,
 	return NULL;
 }
 
+static const struct got_error *
+setup_listener(struct gotd_imsgev *iev)
+{
+	struct gotd_imsg_listen_socket isocket;
+	size_t i;
+
+	memset(&isocket, 0, sizeof(isocket));
+	isocket.nconnection_limits = gotd.nconnection_limits;
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LISTEN_SOCKET,
+	    GOTD_PROC_GOTD, gotd_socket, &isocket, sizeof(isocket)) == -1)
+		return got_error_from_errno("imsg compose LISTEN_SOCKET");
+
+	for (i = 0; i < gotd.nconnection_limits; i++) {
+		if (gotd_imsg_compose_event(iev, GOTD_IMSG_CONNECTION_LIMIT,
+		    GOTD_PROC_GOTD, -1, &gotd.connection_limits[i],
+		    sizeof(*gotd.connection_limits)) == -1)
+			return got_error_from_errno("imsg compose "
+			    "CONNECTION_LIMIT");
+	}
+
+	return NULL;
+}
+
 static void
 gotd_dispatch_listener(int fd, short event, void *arg)
 {
@@ -1184,6 +1209,9 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 			do_disconnect = 1;
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
+		case GOTD_IMSG_LISTENER_READY:
+			err = setup_listener(&proc->iev);
+			break;
 		case GOTD_IMSG_CONNECT:
 			err = recv_connect(&client_id, &imsg);
 			break;
@@ -1192,9 +1220,18 @@ gotd_dispatch_listener(int fd, short event, void *arg)
 			break;
 		}
 
+		if (client_id == 0) {
+			if (err)
+				log_warnx("%s", err->msg);
+			imsg_free(&imsg);
+			continue;
+		}
+
 		client = find_client(client_id);
 		if (client == NULL) {
 			log_warnx("%s: client not found", __func__);
+			if (err)
+				log_warnx("%s", err->msg);
 			imsg_free(&imsg);
 			continue;
 		}
@@ -2396,7 +2433,7 @@ main(int argc, char **argv)
 {
 	const struct got_error *error = NULL;
 	struct gotd_secrets *secrets = NULL;
-	int ch, fd = -1, daemonize = 1, verbosity = 0, noaction = 0;
+	int ch, daemonize = 1, verbosity = 0, noaction = 0;
 	const char *confpath = GOTD_CONF_PATH;
 	char *secretspath = NULL;
 	char *argv0 = argv[0];
@@ -2482,9 +2519,10 @@ main(int argc, char **argv)
 	if (argc != 0)
 		usage();
 
-	if (geteuid() && (proc_id == GOTD_PROC_GOTD ||
-	    proc_id == GOTD_PROC_LISTEN))
+	if (geteuid() && proc_id == GOTD_PROC_GOTD)
 		fatalx("need root privileges");
+	if (geteuid() == 0 && proc_id != GOTD_PROC_GOTD)
+		fatalx("must not run as root");
 
 	if (proc_id == GOTD_PROC_GOTD) {
 		const char *p = secretspath ? secretspath : GOTD_SECRETS_PATH;
@@ -2503,48 +2541,66 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
-		return 1;
+	if (proc_id != GOTD_PROC_LISTEN) {
+		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
+			return 1;
 
-	pw = getpwnam(gotd.user_name);
-	if (pw == NULL) {
-		uid = strtonum(gotd.user_name, 0, UID_MAX - 1, &errstr);
-		if (errstr == NULL)
-			pw = getpwuid(uid);
-	}
-	if (pw == NULL)
-		fatalx("user %s not found", gotd.user_name);
+		pw = getpwnam(gotd.user_name);
+		if (pw == NULL) {
+			uid = strtonum(gotd.user_name, 0, UID_MAX - 1, &errstr);
+			if (errstr == NULL)
+				pw = getpwuid(uid);
+		}
+		if (pw == NULL)
+			fatalx("user %s not found", gotd.user_name);
 
-	if (pw->pw_uid == 0)
-		fatalx("cannot run %s as the superuser", getprogname());
+		if (pw->pw_uid == 0)
+			fatalx("cannot run %s as the superuser", getprogname());
 
-	/*
-	 * SHA2 repositories cannot be used with gotd until Git protocol v2
-	 * support is added. Reject them at startup for now.
-	 */
-	TAILQ_FOREACH(repo, &gotd.repos, entry) {
-		struct got_repository *r;
+		/*
+		 * SHA2 repositories cannot be used with gotd until Git protov2
+		 * support is added. Reject them at startup for now.
+		 */
+		TAILQ_FOREACH(repo, &gotd.repos, entry) {
+			struct got_repository *r;
 
-		error = got_repo_open(&r, repo->path, NULL, NULL);
-		if (error) {
-			if (error->code == GOT_ERR_ERRNO && errno == ENOENT)
-				continue;
-			fatalx("%s: %s", repo->path, error->msg);
+			error = got_repo_open(&r, repo->path, NULL, NULL);
+			if (error) {
+				if (error->code == GOT_ERR_ERRNO &&
+				    errno == ENOENT)
+					continue;
+				fatalx("%s: %s", repo->path, error->msg);
+			}
+
+			if (got_repo_get_object_format(r) != GOT_HASH_SHA1) {
+				error = got_error_msg(GOT_ERR_NOT_IMPL,
+				    "sha256 object IDs unsupported in network "
+				    "protocol");
+				fatalx("%s: %s", repo->path, error->msg);
+			}
+
+			got_repo_close(r);
 		}
 
-		if (got_repo_get_object_format(r) != GOT_HASH_SHA1) {
-			error = got_error_msg(GOT_ERR_NOT_IMPL,
-			    "sha256 object IDs unsupported in network "
-			    "protocol");
-			fatalx("%s: %s", repo->path, error->msg);
+		if (noaction) {
+			fprintf(stderr, "configuration OK\n");
+			return 0;
+		}
+	
+		if (proc_id == GOTD_PROC_GOTD) {
+			gotd_socket = unix_socket_listen(gotd.unix_socket_path,
+			    pw->pw_uid, pw->pw_gid);
+			if (gotd_socket == -1) {
+				fatal("cannot listen on unix socket %s",
+				    gotd.unix_socket_path);
+			}
 		}
 
-		got_repo_close(r);
-	}
-
-	if (noaction) {
-		fprintf(stderr, "configuration OK\n");
-		return 0;
+		if (gethostname(hostname, sizeof(hostname)) == -1)
+			fatal("gethostname");
+		if (asprintf(&default_sender, "%s@%s", pw->pw_name,
+		    hostname) == -1)
+			fatal("asprintf");
 	}
 
 	gotd.argv0 = argv0;
@@ -2565,21 +2621,8 @@ main(int argc, char **argv)
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
 		gotd.pid = getpid();
-		start_listener(argv0, confpath, daemonize, verbosity);
-		start_notifier(argv0, confpath, daemonize, verbosity);
 	} else if (proc_id == GOTD_PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		if (verbosity) {
-			log_info("socket: %s", gotd.unix_socket_path);
-			log_info("user: %s", pw->pw_name);
-		}
-
-		fd = unix_socket_listen(gotd.unix_socket_path, pw->pw_uid,
-		    pw->pw_gid);
-		if (fd == -1) {
-			fatal("cannot listen on unix socket %s",
-			    gotd.unix_socket_path);
-		}
 	} else if (proc_id == GOTD_PROC_AUTH) {
 		snprintf(title, sizeof(title), "%s %s",
 		    gotd_proc_names[proc_id], repo_path);
@@ -2599,20 +2642,14 @@ main(int argc, char **argv)
 		    gotd_proc_names[proc_id], repo_path);
 	} else if (proc_id == GOTD_PROC_NOTIFY) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		if (gethostname(hostname, sizeof(hostname)) == -1)
-			fatal("gethostname");
-		if (asprintf(&default_sender, "%s@%s",
-		    pw->pw_name, hostname) == -1)
-			fatal("asprintf");
 	} else
 		fatal("invalid process id %d", proc_id);
 
 	setproctitle("%s", title);
 	log_procinit(title);
 
-	if (proc_id != GOTD_PROC_GOTD && proc_id != GOTD_PROC_LISTEN &&
-	    proc_id != GOTD_PROC_REPO_READ && proc_id != GOTD_PROC_REPO_WRITE) {
-		/* Drop root privileges. */
+	/* Drop root privileges. */
+	if (pw) {
 		if (setgid(pw->pw_gid) == -1)
 			fatal("setgid %d failed", pw->pw_gid);
 		if (setuid(pw->pw_uid) == -1)
@@ -2623,6 +2660,12 @@ main(int argc, char **argv)
 
 	switch (proc_id) {
 	case GOTD_PROC_GOTD:
+		if (verbosity) {
+			log_info("socket: %s", gotd.unix_socket_path);
+			log_info("user: %s", pw->pw_name);
+		}
+		start_listener(argv0, confpath, daemonize, verbosity);
+		start_notifier(argv0, confpath, daemonize, verbosity);
 #ifndef PROFILE
 		/* "exec" promise will be limited to argv[0] via unveil(2). */
 		if (pledge("stdio proc exec sendfd recvfd unveil", NULL) == -1)
@@ -2631,7 +2674,11 @@ main(int argc, char **argv)
 		break;
 	case GOTD_PROC_LISTEN:
 #ifndef PROFILE
-		if (pledge("stdio sendfd unix unveil", NULL) == -1)
+		/*
+		 * The "recvfd" promise is only needed during setup and
+		 * will be removed in a later pledge(2) call.
+		 */
+		if (pledge("stdio recvfd sendfd unix unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
 		/*
@@ -2640,11 +2687,7 @@ main(int argc, char **argv)
 		 */
 		apply_unveil_none();
 
-		enter_chroot(GOTD_EMPTY_PATH);
-		drop_privs(pw);
-
-		listen_main(title, fd, gotd.connection_limits,
-		    gotd.nconnection_limits);
+		listen_main(title);
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_AUTH:

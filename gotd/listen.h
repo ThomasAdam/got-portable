@@ -14,6 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void listen_main(const char *title, int gotd_socket,
-    struct gotd_uid_connection_limit *connection_limits,
-    size_t nconnection_limits);
+void listen_main(const char *title);

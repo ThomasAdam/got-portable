@@ -231,7 +231,7 @@ main		: LISTEN ON STRING {
 				yyerror("bad unix socket path \"%s\": "
 				    "must be an absolute path", $3);
 
-			if (gotd_proc_id == GOTD_PROC_LISTEN) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (strlcpy(gotd->unix_socket_path, $3,
 				    sizeof(gotd->unix_socket_path)) >=
 				    sizeof(gotd->unix_socket_path)) {
@@ -273,7 +273,7 @@ conflags	: REQUEST TIMEOUT timeout		{
 			    sizeof(gotd->request_timeout));
 		}
 		| LIMIT USER STRING NUMBER	{
-			if (gotd_proc_id == GOTD_PROC_LISTEN &&
+			if (gotd_proc_id == GOTD_PROC_GOTD &&
 			    conf_limit_user_connections($3, $4) == -1) {
 				free($3);
 				YYERROR;
