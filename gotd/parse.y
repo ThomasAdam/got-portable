@@ -708,7 +708,6 @@ repository	: REPOSITORY STRING {
 			}
 
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_AUTH ||
 			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
 			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
 			    gotd_proc_id == GOTD_PROC_GITWRAPPER |
@@ -722,7 +721,6 @@ repository	: REPOSITORY STRING {
 
 repoopts1	: PATH STRING {
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_AUTH ||
 			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
 			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
 			    gotd_proc_id == GOTD_PROC_GITWRAPPER ||
@@ -764,14 +762,14 @@ repoopts1	: PATH STRING {
 			free($2);
 		}
 		| PERMIT RO numberstring {
-			if (gotd_proc_id == GOTD_PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED, GOTD_AUTH_READ, $3);
 			} else
 				free($3);
 		}
 		| PERMIT RW numberstring {
-			if (gotd_proc_id == GOTD_PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_PERMITTED,
 				    GOTD_AUTH_READ | GOTD_AUTH_WRITE, $3);
@@ -779,7 +777,7 @@ repoopts1	: PATH STRING {
 				free($3);
 		}
 		| DENY numberstring {
-			if (gotd_proc_id == GOTD_PROC_AUTH) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				conf_new_access_rule(new_repo,
 				    GOTD_ACCESS_DENIED, 0, $2);
 			} else

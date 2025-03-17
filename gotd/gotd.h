@@ -250,6 +250,8 @@ enum gotd_imsg_type {
 	GOTD_IMSG_CONNECT_REPO_CHILD,
 
 	/* Auth child process. */
+	GOTD_IMSG_AUTH_READY,
+	GOTD_IMSG_AUTH_ACCESS_RULE,
 	GOTD_IMSG_AUTHENTICATE,
 	GOTD_IMSG_ACCESS_GRANTED,
 
@@ -515,6 +517,16 @@ struct gotd_imsg_auth {
 	gid_t egid;
 	int required_auth;
 	uint32_t client_id;
+	char repo_name[NAME_MAX];
+};
+
+/* Structure for GOTD_IMSG_AUTH_ACCESS_RULE. */
+struct gotd_imsg_auth_access_rule {
+	enum gotd_access access;
+	int authorization;
+	size_t identifier_len;
+
+	/* Followed by identifier_len bytes. */
 };
 
 /* Structures for GOTD_IMSG_NOTIFY. */

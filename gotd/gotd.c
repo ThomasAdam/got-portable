@@ -1015,6 +1015,7 @@ verify_imsg_src(struct gotd_client *client, struct gotd_child_proc *proc,
 		} else
 			ret = 1;
 		break;
+	case GOTD_IMSG_AUTH_READY:
 	case GOTD_IMSG_ACCESS_GRANTED:
 		if (proc->type != GOTD_PROC_AUTH) {
 			err = got_error_fmt(GOT_ERR_BAD_PACKET,
@@ -1302,6 +1303,94 @@ done:
 	}
 }
 
+static const struct got_error *
+send_access_rule(struct gotd_imsgev *iev, struct gotd_access_rule *rule)
+{
+	struct gotd_imsg_auth_access_rule irule;
+	struct ibuf *wbuf = NULL;
+
+	memset(&irule, 0, sizeof(irule));
+
+	switch (rule->access) {
+	case GOTD_ACCESS_DENIED:
+	case GOTD_ACCESS_PERMITTED:
+		irule.access = rule->access;
+		break;
+	default:
+		return got_error_fmt(GOT_ERR_NOT_IMPL,
+		    "unknown access %d", rule->access);
+	}
+	irule.authorization = rule->authorization;
+	irule.identifier_len = strlen(rule->identifier);
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_AUTH_ACCESS_RULE,
+	    0, 0, sizeof(irule) + irule.identifier_len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create AUTH_ACCESS_RULE");
+
+	if (imsg_add(wbuf, &irule, sizeof(irule)) == -1)
+		return got_error_from_errno("imsg_add AUTH_ACCESS_FULE");
+	if (imsg_add(wbuf, rule->identifier, irule.identifier_len) == -1)
+		return got_error_from_errno("imsg_add AUTH_ACCESS_FULE");
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_access_rules(struct gotd_imsgev *iev, char *repo_name)
+{
+	const struct got_error *err = NULL;
+	struct gotd_repo *repo;
+	struct gotd_access_rule *rule;
+
+	repo = gotd_find_repo_by_name(repo_name, &gotd.repos);
+	if (repo == NULL) {
+		return got_error_fmt(GOT_ERR_NOT_GIT_REPO,
+		    "repository %s not found in config",
+		    repo_name);
+	}
+
+	STAILQ_FOREACH(rule, &repo->rules, entry) {
+		err = send_access_rule(iev, rule);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+send_authreq(struct gotd_imsgev *iev, struct gotd_client *client)
+{
+	struct gotd_imsg_auth iauth;
+	int fd;
+
+	fd = dup(client->fd);
+	if (fd == -1)
+		return got_error_from_errno("dup");
+
+	memset(&iauth, 0, sizeof(iauth));
+
+	iauth.euid = client->euid;
+	iauth.egid = client->egid;
+	iauth.required_auth = client->required_auth;
+	iauth.client_id = client->id;
+	if (strlcpy(iauth.repo_name, client->auth->repo_name,
+	    sizeof(iauth.repo_name)) >= sizeof(iauth.repo_name)) {
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "repository name too long");
+	}
+
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_AUTHENTICATE,
+	    GOTD_PROC_GOTD, fd, &iauth, sizeof(iauth)) == -1) {
+		log_warn("imsg compose AUTHENTICATE");
+		close(fd);
+		/* Let the auth_timeout handler tidy up. */
+	}
+
+	return NULL;
+}
 static void
 gotd_dispatch_auth_child(int fd, short event, void *arg)
 {
@@ -1362,6 +1451,17 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 		do_disconnect = 1;
 		err = gotd_imsg_recv_error(&client_id, &imsg);
 		break;
+	case GOTD_IMSG_AUTH_READY:
+		if (client->state != GOTD_CLIENT_STATE_NEW) {
+			do_disconnect = 1;
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		err = send_access_rules(iev, client->auth->repo_name);
+		if (err)
+			break;
+		err = send_authreq(iev, client);
+		break;
 	case GOTD_IMSG_ACCESS_GRANTED:
 		if (client->state != GOTD_CLIENT_STATE_NEW) {
 			do_disconnect = 1;
@@ -1385,6 +1485,11 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 			disconnect_on_error(client, err);
 		else
 			disconnect(client);
+		imsg_free(&imsg);
+		return;
+	}
+
+	if (imsg.hdr.type != GOTD_IMSG_ACCESS_GRANTED) {
 		imsg_free(&imsg);
 		return;
 	}
@@ -2208,23 +2313,11 @@ start_auth_child(struct gotd_client *client, int required_auth,
     struct gotd_repo *repo, char *argv0, const char *confpath,
     int daemonize, int verbosity)
 {
-	const struct got_error *err = NULL;
 	struct gotd_child_proc *proc;
-	struct gotd_imsg_auth iauth;
-	int fd;
-
-	memset(&iauth, 0, sizeof(iauth));
-
-	fd = dup(client->fd);
-	if (fd == -1)
-		return got_error_from_errno("dup");
 
 	proc = calloc(1, sizeof(*proc));
-	if (proc == NULL) {
-		err = got_error_from_errno("calloc");
-		close(fd);
-		return err;
-	}
+	if (proc == NULL)
+		return got_error_from_errno("calloc");
 
 	TAILQ_INSERT_HEAD(&procs, proc, entry);
 	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
@@ -2255,17 +2348,6 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
 	    gotd_dispatch_auth_child, &proc->iev);
 	gotd_imsg_event_add(&proc->iev);
-
-	iauth.euid = client->euid;
-	iauth.egid = client->egid;
-	iauth.required_auth = required_auth;
-	iauth.client_id = client->id;
-	if (gotd_imsg_compose_event(&proc->iev, GOTD_IMSG_AUTHENTICATE,
-	    GOTD_PROC_GOTD, fd, &iauth, sizeof(iauth)) == -1) {
-		log_warn("imsg compose AUTHENTICATE");
-		close(fd);
-		/* Let the auth_timeout handler tidy up. */
-	}
 
 	client->auth = proc;
 	client->required_auth = required_auth;
@@ -2487,7 +2569,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (proc_id != GOTD_PROC_LISTEN) {
+	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -2649,7 +2731,7 @@ main(int argc, char **argv)
 		 */
 		apply_unveil_none();
 
-		auth_main(title, &gotd.repos, repo_path);
+		auth_main(title);
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_SESSION_READ:

@@ -14,5 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void auth_main(const char *title, struct gotd_repolist *repos,
-    const char *repo_path);
+void auth_main(const char *);
