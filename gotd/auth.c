@@ -46,7 +46,7 @@
 static struct gotd_auth {
 	pid_t pid;
 	const char *title;
-	struct gotd_repo *repo;
+	struct gotd_access_rule_list rules;
 } gotd_auth;
 
 static void auth_shutdown(void);
@@ -220,10 +220,15 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (iauth.egid != egid)
 		return got_error(GOT_ERR_GID);
 
+	len = strnlen(iauth.repo_name, sizeof(iauth.repo_name));
+	if (len == 0 || len >= sizeof(iauth.repo_name))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	iauth.repo_name[len] = '\0';
+
 	log_debug("authenticating uid %d gid %d", euid, egid);
 
-	err = auth_check(&username, &gotd_auth.repo->rules,
-	    gotd_auth.repo->name, iauth.euid, iauth.egid, iauth.required_auth);
+	err = auth_check(&username, &gotd_auth.rules,
+	    iauth.repo_name, iauth.euid, iauth.egid, iauth.required_auth);
 	if (err) {
 		gotd_imsg_send_error(ibuf, GOTD_PROC_AUTH,
 		    iauth.client_id, err);
@@ -240,6 +245,79 @@ recv_authreq(struct imsg *imsg, struct gotd_imsgev *iev)
 done:
 	free(username);
 	return err;
+}
+
+static const struct got_error *
+recv_access_rule(struct imsg *imsg)
+{
+	const struct got_error *err;
+	struct gotd_imsg_auth_access_rule irule;
+	enum gotd_access access;
+	size_t datalen;
+	char *identifier = NULL;
+	struct gotd_access_rule *rule = NULL;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(irule))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&irule, imsg->data, sizeof(irule));
+	if (datalen != sizeof(irule) + irule.identifier_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (irule.identifier_len == 0) {
+		return got_error_msg(GOT_ERR_PRIVSEP_LEN,
+		    "empty access rule identifier");
+	}
+	if (irule.identifier_len > _PW_NAME_LEN) {
+		return got_error_msg(GOT_ERR_PRIVSEP_LEN,
+		    "access rule identifier too long");
+	}
+
+	switch (irule.access) {
+	case GOTD_ACCESS_PERMITTED:
+		if (irule.authorization == 0) {
+			return got_error_msg(GOT_ERR_PRIVSEP_MSG,
+			    "permit access rule without read or write "
+			    "authorization");
+		}
+		access = GOTD_ACCESS_PERMITTED;
+		break;
+	case GOTD_ACCESS_DENIED:
+		if (irule.authorization != 0) {
+			return got_error_msg(GOT_ERR_PRIVSEP_MSG,
+			    "deny access rule with read or write "
+			    "authorization");
+		}
+		access = GOTD_ACCESS_DENIED;
+		break;
+	default:
+		return got_error_msg(GOT_ERR_PRIVSEP_MSG,
+		    "invalid access rule");
+	}
+
+	if (irule.authorization & ~(GOTD_AUTH_READ | GOTD_AUTH_WRITE)) {
+		return got_error_msg(GOT_ERR_PRIVSEP_MSG,
+		    "invalid access rule authorization flags");
+	}
+	
+	identifier = strndup(imsg->data + sizeof(irule), irule.identifier_len);
+	if (identifier == NULL)
+		return got_error_from_errno("strndup");
+	if (strlen(identifier) != irule.identifier_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		free(identifier);
+		return err;
+	}
+
+	rule = calloc(1, sizeof(*rule));
+	if (rule == NULL)
+		return got_error_from_errno("calloc");
+
+	rule->access = access;
+	rule->authorization = irule.authorization;
+	rule->identifier = identifier;
+	STAILQ_INSERT_TAIL(&gotd_auth.rules, rule, entry);
+	return NULL;
 }
 
 static void
@@ -272,6 +350,9 @@ auth_dispatch(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_AUTH_ACCESS_RULE:
+			err = recv_access_rule(&imsg);
+			break;
 		case GOTD_IMSG_AUTHENTICATE:
 			err = recv_authreq(&imsg, iev);
 			if (err)
@@ -295,23 +376,14 @@ auth_dispatch(int fd, short event, void *arg)
 }
 
 void
-auth_main(const char *title, struct gotd_repolist *repos,
-    const char *repo_path)
+auth_main(const char *title)
 {
-	struct gotd_repo *repo = NULL;
 	struct gotd_imsgev iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 
 	gotd_auth.title = title;
 	gotd_auth.pid = getpid();
-	TAILQ_FOREACH(repo, repos, entry) {
-		if (got_path_cmp(repo->path, repo_path,
-		    strlen(repo->path), strlen(repo_path)) == 0)
-			break;
-	}
-	if (repo == NULL)
-		fatalx("repository %s not found in config", repo_path);
-	gotd_auth.repo = repo;
+	STAILQ_INIT(&gotd_auth.rules);
 
 	signal_set(&evsigint, SIGINT, auth_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, auth_sighdlr, NULL);
@@ -331,8 +403,10 @@ auth_main(const char *title, struct gotd_repolist *repos,
 	iev.events = EV_READ;
 	iev.handler_arg = NULL;
 	event_set(&iev.ev, iev.ibuf.fd, EV_READ, auth_dispatch, &iev);
-	if (event_add(&iev.ev, NULL) == -1)
-		fatalx("event add");
+
+	if (gotd_imsg_compose_event(&iev, GOTD_IMSG_AUTH_READY,
+	    GOTD_PROC_AUTH, -1, NULL, 0) == -1)
+		fatal("imsg compose AUTH_READY");
 
 	event_dispatch();
 
