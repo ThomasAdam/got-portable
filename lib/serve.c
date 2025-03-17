@@ -200,8 +200,20 @@ announce_refs(int outfd, struct imsgbuf *ibuf, int client_is_reading,
 		return got_error_from_errno("imsg_compose LIST_REFS");
 
 	err = gotd_imsg_flush(ibuf);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_EOF) {
+			const struct got_error *err2;
+
+			/* Connection closed early. Try to find out why. */
+			err2 = gotd_imsg_poll_recv(&imsg, ibuf, 0);
+			if (err2)
+				return err;
+			if (imsg.hdr.type == GOTD_IMSG_ERROR)
+				err = gotd_imsg_recv_error(NULL, &imsg);
+			imsg_free(&imsg);
+		}
 		return err;
+	}
 
 	while (!have_nrefs || nrefs > 0) {
 		err = gotd_imsg_poll_recv(&imsg, ibuf, 0);

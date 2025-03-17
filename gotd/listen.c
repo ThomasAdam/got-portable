@@ -330,8 +330,21 @@ gotd_accept(int fd, short event, void *arg)
 			max_connections = limit->max_connections;
 
 		if (counter->nconnections >= max_connections) {
+			const struct got_error *error;
+			struct imsgbuf ibuf;
+
 			log_warnx("maximum connections exceeded for uid %d",
 			    euid);
+
+			/* Report error to client and close connection. */
+			if (imsgbuf_init(&ibuf, s) == -1) {
+				log_warn("imsgbuf_init");
+				goto err;
+			}
+			error = got_error(GOT_ERR_CONNECTION_LIMIT);
+			if (gotd_imsg_send_error(&ibuf, GOTD_PROC_LISTEN,
+			    0, error) == -1)
+				log_warn("imsg send error");
 			goto err;
 		}
 		counter->nconnections++;

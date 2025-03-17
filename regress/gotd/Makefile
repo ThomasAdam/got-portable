@@ -7,7 +7,7 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_write_protected test_repo_write_readonly \
 	test_email_notification test_http_notification \
 	test_git_interop test_email_and_http_notification \
-	test_http_notification_hmac
+	test_http_notification_hmac test_connection_limit
 NOOBJ=Yes
 CLEANFILES=gotd.conf gotd-secrets.conf
 
@@ -233,6 +233,17 @@ start_gotd_http_notification_hmac: ensure_root ensure_secrets
 	@$(GOTD_TRAP); $(GOTD_START_CMD) -s $(PWD)/gotd-secrets.conf
 	@$(GOTD_TRAP); sleep .5
 
+start_gotd_connection_limit: ensure_root
+	@echo 'listen on "$(GOTD_SOCK)"' > $(PWD)/gotd.conf
+	@echo 'connection limit user ${GOTD_DEVUSER} 2' >> $(PWD)/gotd.conf
+	@echo "user $(GOTD_USER)" >> $(PWD)/gotd.conf
+	@echo 'repository "test-repo" {' >> $(PWD)/gotd.conf
+	@echo '    path "$(GOTD_TEST_REPO)"' >> $(PWD)/gotd.conf
+	@echo '    permit rw $(GOTD_DEVUSER)' >> $(PWD)/gotd.conf
+	@echo "}" >> $(PWD)/gotd.conf
+	@$(GOTD_TRAP); $(GOTD_START_CMD)
+	@$(GOTD_TRAP); sleep .5
+
 prepare_test_repo: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh'
@@ -333,5 +344,10 @@ test_git_interop: prepare_test_repo start_gotd_rw
 		'env $(GOTD_TEST_ENV) sh ./test_git_interop.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./check_test_repo.sh'
+
+test_connection_limit: prepare_test_repo start_gotd_connection_limit
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./connection_limit.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
 
 .include <bsd.regress.mk>
