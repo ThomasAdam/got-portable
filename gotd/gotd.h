@@ -238,6 +238,9 @@ enum gotd_imsg_type {
 	GOTD_IMSG_REFS_UPDATED, /* The server processed all ref updates. */
 
 	/* Client connections. */
+	GOTD_IMSG_LISTENER_READY,
+	GOTD_IMSG_LISTEN_SOCKET,
+	GOTD_IMSG_CONNECTION_LIMIT,
 	GOTD_IMSG_DISCONNECT,
 	GOTD_IMSG_CONNECT,
 
@@ -475,6 +478,13 @@ struct gotd_imsg_packfile_progress {
 /* Structure for GOTD_IMSG_PACKFILE_INSTALL. */
 struct gotd_imsg_packfile_install {
 	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
+};
+
+/* Structure for GOTD_IMSG_LISTEN_SOCKET data. */
+struct gotd_imsg_listen_socket {
+	size_t nconnection_limits;
+
+	/* listen fd passed via imsg */
 };
 
 /* Structure for GOTD_IMSG_DISCONNECT data. */

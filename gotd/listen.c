@@ -73,9 +73,11 @@ static struct {
 	const char *title;
 	int fd;
 	struct gotd_imsgev iev;
-	struct gotd_imsgev pause;
+	struct gotd_imsgev parent_iev;
+	struct event pause_ev;
 	struct gotd_uid_connection_limit *connection_limits;
 	size_t nconnection_limits;
+	size_t nconnection_limits_received;
 } gotd_listen;
 
 static int inflight;
@@ -261,7 +263,7 @@ gotd_accept(int fd, short event, void *arg)
 	backoff.tv_sec = 1;
 	backoff.tv_usec = 0;
 
-	if (event_add(&gotd_listen.iev.ev, NULL) == -1) {
+	if (event_add(&iev->ev, NULL) == -1) {
 		log_warn("event_add");
 		return;
 	}
@@ -281,8 +283,8 @@ gotd_accept(int fd, short event, void *arg)
 			return;
 		case EMFILE:
 		case ENFILE:
-			event_del(&gotd_listen.iev.ev);
-			evtimer_add(&gotd_listen.pause.ev, &backoff);
+			event_del(&iev->ev);
+			evtimer_add(&gotd_listen.pause_ev, &backoff);
 			return;
 		default:
 			log_warn("accept");
@@ -361,8 +363,9 @@ gotd_accept(int fd, short event, void *arg)
 		log_warn("%s: dup", __func__);
 		goto err;
 	}
-	if (gotd_imsg_compose_event(iev, GOTD_IMSG_CONNECT,
-	    GOTD_PROC_LISTEN, s, &iconn, sizeof(iconn)) == -1) {
+	if (gotd_imsg_compose_event(&gotd_listen.parent_iev,
+	    GOTD_IMSG_CONNECT, GOTD_PROC_LISTEN, s,
+	    &iconn, sizeof(iconn)) == -1) {
 		log_warn("imsg compose CONNECT");
 		goto err;
 	}
@@ -374,6 +377,88 @@ err:
 		disconnect(client);
 	if (s != -1)
 		close(s);
+}
+
+static const struct got_error *
+recv_listen_socket(struct imsg *imsg)
+{
+	struct gotd_imsg_listen_socket isocket;
+	size_t datalen;
+
+	if (gotd_listen.fd != -1 ||
+	    gotd_listen.nconnection_limits_received != 0)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(isocket))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&isocket, imsg->data, sizeof(isocket));
+
+	gotd_listen.fd = imsg_get_fd(imsg);
+	if (gotd_listen.fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+#ifndef PROFILE
+	/* The "recvfd" promise is no longer needed. */
+	if (pledge("stdio sendfd unix", NULL) == -1)
+		fatal("pledge");
+#endif
+
+	gotd_listen.nconnection_limits = isocket.nconnection_limits;
+	gotd_listen.nconnection_limits_received = 0;
+
+	if (gotd_listen.nconnection_limits > 0) {
+		gotd_listen.connection_limits =
+		    calloc(gotd_listen.nconnection_limits,
+		        sizeof(gotd_listen.connection_limits[0]));
+		if (gotd_listen.connection_limits == NULL)
+			return got_error_from_errno("calloc");
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+recv_connection_limit(struct imsg *imsg)
+{
+	struct gotd_uid_connection_limit *limit;
+	size_t datalen, idx;
+
+	if (gotd_listen.nconnection_limits == 0 ||
+	    gotd_listen.nconnection_limits_received >=
+	    gotd_listen.nconnection_limits)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(*limit))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	idx = gotd_listen.nconnection_limits_received;
+	limit = &gotd_listen.connection_limits[idx];
+	memcpy(limit, imsg->data, sizeof(*limit));
+	gotd_listen.nconnection_limits_received++;
+
+	return NULL;
+}
+
+static void
+start_listening(void)
+{
+	struct gotd_imsgev *iev;
+
+	iev = &gotd_listen.iev;
+	if (imsgbuf_init(&iev->ibuf, gotd_listen.fd) == -1)
+		fatal("imsgbuf_init");
+	iev->handler = gotd_accept;
+	iev->events = EV_READ;
+	iev->handler_arg = NULL;
+	event_set(&iev->ev, gotd_listen.fd, EV_READ | EV_PERSIST,
+	    gotd_accept, iev);
+	if (event_add(&iev->ev, NULL))
+		fatalx("event add");
+	evtimer_set(&gotd_listen.pause_ev, gotd_accept_paused, NULL);
+
+	log_debug("listening for client connections");
 }
 
 static const struct got_error *
@@ -427,6 +512,21 @@ listen_dispatch(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_LISTEN_SOCKET:
+			err = recv_listen_socket(&imsg);
+			if (err)
+				break;
+			if (gotd_listen.nconnection_limits == 0)
+				start_listening();
+			break;
+		case GOTD_IMSG_CONNECTION_LIMIT:
+			err = recv_connection_limit(&imsg);
+			if (err)
+				break;
+			if (gotd_listen.nconnection_limits ==
+			    gotd_listen.nconnection_limits_received)
+				start_listening();
+			break;
 		case GOTD_IMSG_DISCONNECT:
 			err = recv_disconnect(&imsg);
 			if (err)
@@ -450,11 +550,9 @@ listen_dispatch(int fd, short event, void *arg)
 }
 
 void
-listen_main(const char *title, int gotd_socket,
-    struct gotd_uid_connection_limit *connection_limits,
-    size_t nconnection_limits)
+listen_main(const char *title)
 {
-	struct gotd_imsgev iev;
+	struct gotd_imsgev *iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 
 	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
@@ -462,9 +560,10 @@ listen_main(const char *title, int gotd_socket,
 
 	gotd_listen.title = title;
 	gotd_listen.pid = getpid();
-	gotd_listen.fd = gotd_socket;
-	gotd_listen.connection_limits = connection_limits;
-	gotd_listen.nconnection_limits = nconnection_limits;
+	gotd_listen.fd = -1;
+	gotd_listen.connection_limits = NULL;
+	gotd_listen.nconnection_limits = 0;
+	gotd_listen.nconnection_limits_received = 0;
 
 	signal_set(&evsigint, SIGINT, listen_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, listen_sighdlr, NULL);
@@ -477,21 +576,18 @@ listen_main(const char *title, int gotd_socket,
 	signal_add(&evsighup, NULL);
 	signal_add(&evsigusr1, NULL);
 
-	if (imsgbuf_init(&iev.ibuf, GOTD_FILENO_MSG_PIPE) == -1)
+	iev = &gotd_listen.parent_iev;
+	if (imsgbuf_init(&iev->ibuf, GOTD_FILENO_MSG_PIPE) == -1)
 		fatal("imsgbuf_init");
-	imsgbuf_allow_fdpass(&iev.ibuf);
-	iev.handler = listen_dispatch;
-	iev.events = EV_READ;
-	iev.handler_arg = NULL;
-	event_set(&iev.ev, iev.ibuf.fd, EV_READ, listen_dispatch, &iev);
-	if (event_add(&iev.ev, NULL) == -1)
-		fatalx("event add");
+	imsgbuf_allow_fdpass(&iev->ibuf);
+	iev->handler = listen_dispatch;
+	iev->events = EV_READ;
+	iev->handler_arg = NULL;
+	event_set(&iev->ev, iev->ibuf.fd, EV_READ, listen_dispatch, iev);
 
-	event_set(&gotd_listen.iev.ev, gotd_listen.fd, EV_READ | EV_PERSIST,
-	    gotd_accept, &iev);
-	if (event_add(&gotd_listen.iev.ev, NULL))
-		fatalx("event add");
-	evtimer_set(&gotd_listen.pause.ev, gotd_accept_paused, NULL);
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LISTENER_READY,
+	    GOTD_PROC_GOTD, -1, NULL, 0) == -1)
+		fatal("imsg compose LISTENER_READY");
 
 	event_dispatch();
 
