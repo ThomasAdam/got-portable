@@ -78,9 +78,9 @@ static struct repo_write {
 	FILE *accum_file;
 	int session_fd;
 	struct gotd_imsgev session_iev;
-	struct got_pathlist_head *protected_tag_namespaces;
-	struct got_pathlist_head *protected_branch_namespaces;
-	struct got_pathlist_head *protected_branches;
+	struct got_pathlist_head protected_tag_namespaces;
+	struct got_pathlist_head protected_branch_namespaces;
+	struct got_pathlist_head protected_branches;
 	struct {
 		FILE *f1;
 		FILE *f2;
@@ -89,6 +89,9 @@ static struct repo_write {
 	} diff;
 	int refs_listed;
 	int have_packfile;
+	struct got_pathlist_head *protected_refs_cur;
+	size_t nprotected_refs_needed;
+	size_t nprotected_refs_received;
 } repo_write;
 
 struct gotd_ref_update {
@@ -1414,7 +1417,7 @@ verify_packfile(void)
 			continue;
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_tag_namespaces) {
+		    &repo_write.protected_tag_namespaces) {
 			err = protect_tag_namespace(pe->path, &client->pack,
 			    client->packidx, ref_update);
 			if (err)
@@ -1447,14 +1450,14 @@ verify_packfile(void)
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branch_namespaces) {
+		    &repo_write.protected_branch_namespaces) {
 			err = protect_branch_namespace(pe->path,
 			    &client->pack, client->packidx, ref_update);
 			if (err)
 				goto done;
 		}
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branches) {
+		    &repo_write.protected_branches) {
 			err = protect_branch(pe->path, &client->pack,
 			    client->packidx, ref_update);
 			if (err)
@@ -1485,21 +1488,21 @@ protect_refs_from_deletion(void)
 		refname = got_ref_get_name(ref_update->ref);
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_tag_namespaces) {
+		    &repo_write.protected_tag_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branch_namespaces) {
+		    &repo_write.protected_branch_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branches) {
+		    &repo_write.protected_branches) {
 			if (strcmp(refname, pe->path) == 0) {
 				return got_error_fmt(GOT_ERR_REF_PROTECTED,
 				    "%s", refname);
@@ -1530,21 +1533,21 @@ protect_refs_from_moving(void)
 		refname = got_ref_get_name(ref_update->ref);
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_tag_namespaces) {
+		    &repo_write.protected_tag_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branch_namespaces) {
+		    &repo_write.protected_branch_namespaces) {
 			err = protect_ref_namespace(refname, pe->path);
 			if (err)
 				return err;
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
-		    repo_write.protected_branches) {
+		    &repo_write.protected_branches) {
 			if (strcmp(refname, pe->path) == 0) {
 				return got_error_fmt(GOT_ERR_REF_PROTECTED,
 				    "%s", refname);
@@ -2730,6 +2733,51 @@ recv_connect(struct imsg *imsg)
 	return NULL;
 }
 
+static const struct got_error *
+recv_pathlist(size_t *npaths, struct imsg *imsg)
+{
+	struct gotd_imsg_pathlist ilist;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(ilist))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&ilist, imsg->data, sizeof(ilist));
+
+	if (ilist.nelem == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	*npaths = ilist.nelem;
+	return NULL;
+}
+
+static const struct got_error *
+recv_pathlist_elem(struct imsg *imsg, struct got_pathlist_head *paths)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsg_pathlist_elem ielem;
+	size_t datalen;
+	char *path;
+	struct got_pathlist_entry *pe;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(ielem))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&ielem, imsg->data, sizeof(ielem));
+
+	if (datalen != sizeof(ielem) + ielem.path_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	path = strndup(imsg->data + sizeof(ielem), ielem.path_len);
+	if (path == NULL)
+		return got_error_from_errno("strndup");
+
+	err = got_pathlist_insert(&pe, paths, path, NULL);
+	if (err || pe == NULL)
+		free(path);
+	return err;
+}
+
 static void
 repo_write_dispatch(int fd, short event, void *arg)
 {
@@ -2740,6 +2788,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 	ssize_t n;
 	int shut = 0;
 	struct repo_write_client *client = &repo_write_client;
+	size_t npaths;
 
 	if (event & EV_READ) {
 		if ((n = imsgbuf_read(ibuf)) == -1)
@@ -2766,6 +2815,68 @@ repo_write_dispatch(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_PROTECTED_TAG_NAMESPACES:
+			if (repo_write.protected_refs_cur != NULL ||
+			    repo_write.nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			repo_write.protected_refs_cur =
+			    &repo_write.protected_tag_namespaces;
+			repo_write.nprotected_refs_needed = npaths;
+			repo_write.nprotected_refs_received = 0;
+			break;
+		case GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES:
+			if (repo_write.protected_refs_cur != NULL ||
+			    repo_write.nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			repo_write.protected_refs_cur =
+			    &repo_write.protected_branch_namespaces;
+			repo_write.nprotected_refs_needed = npaths;
+			repo_write.nprotected_refs_received = 0;
+			break;
+		case GOTD_IMSG_PROTECTED_BRANCHES:
+			if (repo_write.protected_refs_cur != NULL ||
+			    repo_write.nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			repo_write.protected_refs_cur =
+			    &repo_write.protected_branches;
+			repo_write.nprotected_refs_needed = npaths;
+			repo_write.nprotected_refs_received = 0;
+			break;
+		case GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM:
+		case GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM:
+		case GOTD_IMSG_PROTECTED_BRANCHES_ELEM:
+			if (repo_write.protected_refs_cur == NULL ||
+			    repo_write.nprotected_refs_needed == 0 ||
+			    repo_write.nprotected_refs_received >=
+			    repo_write.nprotected_refs_needed) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = recv_pathlist_elem(&imsg,
+			    repo_write.protected_refs_cur);
+			if (err)
+				break;
+			if (++repo_write.nprotected_refs_received >=
+			    repo_write.nprotected_refs_needed) {
+				repo_write.protected_refs_cur = NULL;
+				repo_write.nprotected_refs_needed = 0;
+			}
+			break;
 		case GOTD_IMSG_CONNECT_REPO_CHILD:
 			err = recv_connect(&imsg);
 			break;
@@ -2794,10 +2905,7 @@ done:
 void
 repo_write_main(const char *title, const char *repo_path,
     int *pack_fds, int *temp_fds, FILE *base_file, FILE *accum_file,
-    FILE *diff_f1, FILE *diff_f2, int diff_fd1, int diff_fd2,
-    struct got_pathlist_head *protected_tag_namespaces,
-    struct got_pathlist_head *protected_branch_namespaces,
-    struct got_pathlist_head *protected_branches)
+    FILE *diff_f1, FILE *diff_f2, int diff_fd1, int diff_fd2)
 {
 	const struct got_error *err = NULL;
 	struct repo_write_client *client = &repo_write_client;
@@ -2816,9 +2924,9 @@ repo_write_main(const char *title, const char *repo_path,
 	repo_write.accum_file = accum_file;
 	repo_write.session_fd = -1;
 	repo_write.session_iev.ibuf.fd = -1;
-	repo_write.protected_tag_namespaces = protected_tag_namespaces;
-	repo_write.protected_branch_namespaces = protected_branch_namespaces;
-	repo_write.protected_branches = protected_branches;
+	RB_INIT(&repo_write.protected_tag_namespaces);
+	RB_INIT(&repo_write.protected_branch_namespaces);
+	RB_INIT(&repo_write.protected_branches);
 	repo_write.diff.f1 = diff_f1;
 	repo_write.diff.f2 = diff_f2;
 	repo_write.diff.fd1 = diff_fd1;

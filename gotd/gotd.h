@@ -131,8 +131,11 @@ struct gotd_repo {
 
 	struct gotd_access_rule_list rules;
 	struct got_pathlist_head protected_tag_namespaces;
+	size_t nprotected_tag_namespaces;
 	struct got_pathlist_head protected_branch_namespaces;
+	size_t nprotected_branch_namespaces;
 	struct got_pathlist_head protected_branches;
+	size_t nprotected_branches;
 
 	struct got_pathlist_head notification_refs;
 	struct got_pathlist_head notification_ref_namespaces;
@@ -254,6 +257,14 @@ enum gotd_imsg_type {
 	GOTD_IMSG_AUTH_ACCESS_RULE,
 	GOTD_IMSG_AUTHENTICATE,
 	GOTD_IMSG_ACCESS_GRANTED,
+
+	/* Protected references. */
+	GOTD_IMSG_PROTECTED_TAG_NAMESPACES,
+	GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM,
+	GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES,
+	GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM,
+	GOTD_IMSG_PROTECTED_BRANCHES,
+	GOTD_IMSG_PROTECTED_BRANCHES_ELEM,
 
 	/* Notify child process. */
 	GOTD_IMSG_CONNECT_NOTIFIER,
@@ -527,6 +538,32 @@ struct gotd_imsg_auth_access_rule {
 	size_t identifier_len;
 
 	/* Followed by identifier_len bytes. */
+};
+
+/*
+ * Structure for sending path lists over imsg. Used with:
+ * GOTD_IMSG_PROTECTED_TAG_NAMESPACES
+ * GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES
+ * GOTD_IMSG_PROTECTED_BRANCHES
+ */
+struct gotd_imsg_pathlist {
+	size_t nelem;
+
+	/* Followed by nelem path list elements. */
+};
+
+/*
+ * Structure for a path list element. Used with:
+ * GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM
+ * GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM
+ * GOTD_IMSG_PROTECTED_BRANCHES_ELEM
+ */
+struct gotd_imsg_pathlist_elem {
+	size_t path_len;
+	size_t data_len;
+
+	/* Followed by path_len bytes. */
+	/* Followed by data_len bytes. */
 };
 
 /* Structures for GOTD_IMSG_NOTIFY. */
