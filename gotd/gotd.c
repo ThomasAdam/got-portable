@@ -2005,6 +2005,99 @@ connect_notifier_and_session(struct gotd_client *client)
 	return NULL;
 }
 
+static const struct got_error *
+send_protected_ref(struct gotd_imsgev *iev, const char *refname,
+    int imsg_type)
+{
+	struct gotd_imsg_pathlist_elem ielem;
+	struct ibuf *wbuf = NULL;
+
+	memset(&ielem, 0, sizeof(ielem));
+	ielem.path_len = strlen(refname);
+
+	wbuf = imsg_create(&iev->ibuf, imsg_type, GOTD_PROC_GOTD, gotd.pid,
+	    sizeof(ielem) + ielem.path_len);
+	if (wbuf == NULL)
+		return got_error_from_errno_fmt("imsg_create %d", imsg_type);
+
+	if (imsg_add(wbuf, &ielem, sizeof(ielem)) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+	if (imsg_add(wbuf, refname, ielem.path_len) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_protected_refs(struct gotd_imsgev *iev, const char *repo_name)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct gotd_imsg_pathlist ilist;
+	struct gotd_repo *repo;
+
+	memset(&ilist, 0, sizeof(ilist));
+
+	repo = gotd_find_repo_by_name(repo_name, &gotd.repos);
+	if (repo == NULL)
+		return got_error(GOT_ERR_NOT_GIT_REPO);
+
+	ilist.nelem = repo->nprotected_tag_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotd_imsg_compose_event(iev,
+		    GOTD_IMSG_PROTECTED_TAG_NAMESPACES,
+		    GOTD_PROC_GOTD, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_TAG_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->protected_tag_namespaces) {
+			err = send_protected_ref(iev, pe->path,
+			    GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	ilist.nelem = repo->nprotected_branch_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotd_imsg_compose_event(iev,
+		    GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES,
+		    GOTD_PROC_GOTD, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_BRANCH_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->protected_branch_namespaces) {
+			err = send_protected_ref(iev, pe->path,
+			    GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	ilist.nelem = repo->nprotected_branches;
+	if (ilist.nelem > 0) {
+		if (gotd_imsg_compose_event(iev, GOTD_IMSG_PROTECTED_BRANCHES,
+		    GOTD_PROC_GOTD, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_BRANCH_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head, &repo->protected_branches) {
+			err = send_protected_ref(iev, pe->path,
+			    GOTD_IMSG_PROTECTED_BRANCHES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	return NULL;
+}
+
 static void
 gotd_dispatch_repo_child(int fd, short event, void *arg)
 {
@@ -2060,6 +2153,11 @@ gotd_dispatch_repo_child(int fd, short event, void *arg)
 			err = gotd_imsg_recv_error(&client_id, &imsg);
 			break;
 		case GOTD_IMSG_REPO_CHILD_READY:
+			if (client_is_writing(client)) {
+				err = send_protected_refs(iev, proc->repo_name);
+				if (err)
+					break;
+			}
 			err = connect_session(client);
 			if (err)
 				break;
@@ -2618,7 +2716,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH) {
+	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH &&
+	    proc_id != GOTD_PROC_REPO_WRITE) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -2866,23 +2965,8 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		apply_unveil_repo_readonly(repo_path, 0);
-		repo = gotd_find_repo_by_path(repo_path, &gotd);
-		if (repo == NULL)
-			fatalx("no repository for path %s", repo_path);
-
-		if (enter_chroot(repo_path)) {
-			free(repo_path);
-			repo_path = strdup("/");
-			if (repo_path == NULL)
-				fatal("strdup");
-		}
-		drop_privs(pw);
-
 		repo_write_main(title, repo_path, pack_fds, temp_fds,
-		    tmp_f1, tmp_f2, diff_f1, diff_f2, diff_fd1, diff_fd2,
-		    &repo->protected_tag_namespaces,
-		    &repo->protected_branch_namespaces,
-		    &repo->protected_branches);
+		    tmp_f1, tmp_f2, diff_f1, diff_f2, diff_fd1, diff_fd2);
 		/* NOTREACHED */
 		exit(0);
 	case GOTD_PROC_NOTIFY:

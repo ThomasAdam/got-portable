@@ -290,8 +290,7 @@ protectflags_l	: protectflags optnl protectflags_l
 		;
 
 protectflags	: TAG NAMESPACE STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_protect_tag_namespace(new_repo, $3)) {
 					free($3);
 					YYERROR;
@@ -300,8 +299,7 @@ protectflags	: TAG NAMESPACE STRING {
 			free($3);
 		}
 		| BRANCH NAMESPACE STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_protect_branch_namespace(new_repo,
 				    $3)) {
 					free($3);
@@ -311,8 +309,7 @@ protectflags	: TAG NAMESPACE STRING {
 			free($3);
 		}
 		| BRANCH STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_REPO_WRITE) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_protect_branch(new_repo, $2)) {
 					free($2);
 					YYERROR;
@@ -707,7 +704,6 @@ repository	: REPOSITORY STRING {
 			}
 
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
 			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
 			    gotd_proc_id == GOTD_PROC_GITWRAPPER |
 			    gotd_proc_id == GOTD_PROC_NOTIFY) {
@@ -720,7 +716,6 @@ repository	: REPOSITORY STRING {
 
 repoopts1	: PATH STRING {
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_REPO_WRITE ||
 			    gotd_proc_id == GOTD_PROC_SESSION_WRITE ||
 			    gotd_proc_id == GOTD_PROC_GITWRAPPER ||
 			    gotd_proc_id == GOTD_PROC_NOTIFY) {
@@ -1421,6 +1416,7 @@ conf_protect_tag_namespace(struct gotd_repo *repo, char *namespace)
 	if (conf_protect_ref_namespace(&new, &repo->protected_tag_namespaces,
 	    namespace) == -1)
 		return -1;
+	repo->nprotected_tag_namespaces++;
 
 	RB_FOREACH(pe, got_pathlist_head, &repo->protected_branch_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
@@ -1441,6 +1437,7 @@ conf_protect_branch_namespace(struct gotd_repo *repo, char *namespace)
 	if (conf_protect_ref_namespace(&new,
 	    &repo->protected_branch_namespaces, namespace) == -1)
 		return -1;
+	repo->nprotected_branch_namespaces++;
 
 	RB_FOREACH(pe, got_pathlist_head, &repo->protected_tag_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
@@ -1487,6 +1484,7 @@ conf_protect_branch(struct gotd_repo *repo, char *branchname)
 			yyerror("duplicate protect branch %s", branchname);
 		return -1;
 	}
+	repo->nprotected_branches++;
 
 	return 0;
 }
