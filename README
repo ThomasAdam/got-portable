@@ -134,6 +134,30 @@ be run from the top-level directory:
 The test suite switches to non-root users as appropriate.
 
 
+gotsysd(8) is a daemon which can be used to manage a gotd(8) server by
+committing a configuration file to the special "gotsys.git" repository.
+
+To compile gotsysd on OpenBSD, run:
+
+ $ make sysd
+ # make sysd-install
+
+This will create the following files:
+  the daemon program /usr/local/sbin/gotsysd
+  the control program /usr/local/sbin/gotsysctl
+  man pages (only installed if building sources from a Got release tarball)
+
+Related documentation is available in manual pages:
+
+ $ man -l gotsys/gotsys.conf.5
+ $ man -l gotsys/gotsys.1
+ $ man -l gotsysd/gotsysd.8
+ $ man -l gotsysd/gotsysd.conf.5
+ $ man -l gotsysctl/gotsysctl.8
+
+See regress/gotsysd/README for information about the gotsysd test suite.
+
+
 Got can be built with profiling enabled to debug performance issues.
 Note that profiled builds cannot make use of pledge(2).
 Profiling should only be enabled for one program at a time. Otherwise,
