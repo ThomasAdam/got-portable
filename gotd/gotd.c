@@ -3138,18 +3138,15 @@ main(int argc, char **argv)
 	setproctitle("%s", title);
 	log_procinit(title);
 
-	/* Drop root privileges. */
-	if (pw) {
-		if (setgid(pw->pw_gid) == -1)
-			fatal("setgid %d failed", pw->pw_gid);
-		if (setuid(pw->pw_uid) == -1)
-			fatal("setuid %d failed", pw->pw_uid);
-	}
-
 	event_init();
 
 	switch (proc_id) {
 	case GOTD_PROC_GOTD:
+		/* Drop root privileges. */
+		if (setgid(pw->pw_gid) == -1)
+			fatal("setgid %d failed", pw->pw_gid);
+		if (setuid(pw->pw_uid) == -1)
+			fatal("setuid %d failed", pw->pw_uid);
 		if (verbosity) {
 			log_info("socket: %s", gotd.unix_socket_path);
 			log_info("user: %s", pw->pw_name);
