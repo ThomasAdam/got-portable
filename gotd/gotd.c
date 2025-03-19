@@ -474,7 +474,7 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 
 	proc = client->repo;
 	if (proc) {
-		if (strlcpy(iclient.repo_name, proc->repo_path,
+		if (strlcpy(iclient.repo_name, proc->repo_name,
 		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
 			return got_error_msg(GOT_ERR_NO_SPACE,
 			    "repo name too long");
