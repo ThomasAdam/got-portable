@@ -40,6 +40,23 @@ EOF
 		return 1
 	fi
 
+	sleep 1
+
+	# All connections are closed, so we should be able to connect again.
+	got clone -q -l ssh://${GOTD_DEVUSER}@127.0.0.1/${GOTD_TEST_REPO_NAME} \
+		> $testroot/stdout 2> $testroot/stderr
+
+	grep ^HEAD $testroot/stdout > $testroot/stdout.filtered
+	echo 'HEAD: refs/heads/main' > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	test_done "$testroot" "0"
 }
 
