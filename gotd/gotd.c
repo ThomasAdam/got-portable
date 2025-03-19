@@ -1487,7 +1487,8 @@ gotd_dispatch_auth_child(int fd, short event, void *arg)
 			disconnect(client);
 		imsg_free(&imsg);
 		return;
-	}
+	} else if (err)
+		log_warn("uid %d: %s", client->euid, err->msg);
 
 	if (imsg.hdr.type != GOTD_IMSG_ACCESS_GRANTED) {
 		imsg_free(&imsg);
