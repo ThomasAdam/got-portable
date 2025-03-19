@@ -2733,51 +2733,6 @@ recv_connect(struct imsg *imsg)
 	return NULL;
 }
 
-static const struct got_error *
-recv_pathlist(size_t *npaths, struct imsg *imsg)
-{
-	struct gotd_imsg_pathlist ilist;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(ilist))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ilist, imsg->data, sizeof(ilist));
-
-	if (ilist.nelem == 0)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	*npaths = ilist.nelem;
-	return NULL;
-}
-
-static const struct got_error *
-recv_pathlist_elem(struct imsg *imsg, struct got_pathlist_head *paths)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_pathlist_elem ielem;
-	size_t datalen;
-	char *path;
-	struct got_pathlist_entry *pe;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(ielem))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&ielem, imsg->data, sizeof(ielem));
-
-	if (datalen != sizeof(ielem) + ielem.path_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	path = strndup(imsg->data + sizeof(ielem), ielem.path_len);
-	if (path == NULL)
-		return got_error_from_errno("strndup");
-
-	err = got_pathlist_insert(&pe, paths, path, NULL);
-	if (err || pe == NULL)
-		free(path);
-	return err;
-}
-
 static void
 repo_write_dispatch(int fd, short event, void *arg)
 {
@@ -2821,7 +2776,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			err = recv_pathlist(&npaths, &imsg);
+			err = gotd_imsg_recv_pathlist(&npaths, &imsg);
 			if (err)
 				break;
 			repo_write.protected_refs_cur =
@@ -2835,7 +2790,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			err = recv_pathlist(&npaths, &imsg);
+			err = gotd_imsg_recv_pathlist(&npaths, &imsg);
 			if (err)
 				break;
 			repo_write.protected_refs_cur =
@@ -2849,7 +2804,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			err = recv_pathlist(&npaths, &imsg);
+			err = gotd_imsg_recv_pathlist(&npaths, &imsg);
 			if (err)
 				break;
 			repo_write.protected_refs_cur =
@@ -2867,7 +2822,7 @@ repo_write_dispatch(int fd, short event, void *arg)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			err = recv_pathlist_elem(&imsg,
+			err = gotd_imsg_recv_pathlist_elem(&imsg,
 			    repo_write.protected_refs_cur);
 			if (err)
 				break;
