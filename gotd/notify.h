@@ -14,4 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void notify_main(const char *, struct gotd_repolist *, const char *);
+void notify_main(const char *);

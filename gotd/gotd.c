@@ -853,6 +853,8 @@ gotd_shutdown(void)
 
 	kill_proc(gotd.listen_proc, 0);
 
+	free(gotd.default_sender);
+
 	log_info("terminating");
 	exit(0);
 }
@@ -1278,6 +1280,201 @@ done:
 	}
 }
 
+static const struct got_error *
+send_notification_target_email(struct gotd_imsgev *iev, const char *repo_name,
+    struct gotd_notification_target *target)
+{
+	struct gotd_imsg_notitfication_target_email itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	if (target->conf.email.sender)
+		itarget.sender_len = strlen(target->conf.email.sender);
+	else
+		itarget.sender_len = strlen(gotd.default_sender);
+	if (target->conf.email.recipient)
+		itarget.recipient_len = strlen(target->conf.email.recipient);
+	if (target->conf.email.responder)
+		itarget.responder_len = strlen(target->conf.email.responder);
+	if (target->conf.email.hostname)
+		itarget.hostname_len = strlen(target->conf.email.hostname);
+	if (target->conf.email.port)
+		itarget.port_len = strlen(target->conf.email.port);
+	itarget.repo_name_len = strlen(repo_name);
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_EMAIL,
+	    0, 0, sizeof(itarget) + itarget.sender_len + itarget.recipient_len +
+	    itarget.responder_len + itarget.hostname_len + itarget.port_len +
+	    itarget.repo_name_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+	if (target->conf.email.sender) {
+		if (imsg_add(wbuf, target->conf.email.sender,
+		    itarget.sender_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	} else {
+		if (imsg_add(wbuf, gotd.default_sender,
+		    itarget.sender_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.recipient) {
+		if (imsg_add(wbuf, target->conf.email.recipient,
+		    itarget.recipient_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.responder) {
+		if (imsg_add(wbuf, target->conf.email.responder,
+		    itarget.responder_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.hostname) {
+		if (imsg_add(wbuf, target->conf.email.hostname,
+		    itarget.hostname_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.port) {
+		if (imsg_add(wbuf, target->conf.email.port,
+		    itarget.port_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (imsg_add(wbuf, repo_name, itarget.repo_name_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_notification_target_http(struct gotd_imsgev *iev, const char *repo_name,
+    struct gotd_notification_target *target)
+{
+	struct gotd_imsg_notitfication_target_http itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	itarget.tls = target->conf.http.tls;
+	itarget.hostname_len = strlen(target->conf.http.hostname);
+	itarget.port_len = strlen(target->conf.http.port);
+	itarget.path_len = strlen(target->conf.http.path);
+	if (target->conf.http.auth)
+		itarget.auth_len = strlen(target->conf.http.auth);
+	if (target->conf.http.hmac)
+		itarget.hmac_len = strlen(target->conf.http.hmac);
+	itarget.repo_name_len = strlen(repo_name);
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_HTTP,
+	    0, 0, sizeof(itarget) + itarget.hostname_len + itarget.port_len +
+	    itarget.path_len + itarget.auth_len + itarget.hmac_len +
+	    itarget.repo_name_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.hostname,
+	    itarget.hostname_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.port,
+	    itarget.port_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.path,
+	    itarget.path_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (target->conf.http.auth) {
+		if (imsg_add(wbuf, target->conf.http.auth,
+		    itarget.auth_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_HTTP");
+		}
+	}
+	if (target->conf.http.hmac) {
+		if (imsg_add(wbuf, target->conf.http.hmac,
+		    itarget.hmac_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_HTTP");
+		}
+	}
+	if (imsg_add(wbuf, repo_name, itarget.repo_name_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_notification_target(struct gotd_imsgev *iev, const char *repo_name,
+    struct gotd_notification_target *target)
+{
+	const struct got_error *err = NULL;
+
+	switch (target->type) {
+	case GOTD_NOTIFICATION_VIA_EMAIL:
+		err = send_notification_target_email(iev, repo_name, target);
+		break;
+	case GOTD_NOTIFICATION_VIA_HTTP:
+		err = send_notification_target_http(iev, repo_name, target);
+		break;
+	default:
+		log_warn("unsupported notification target type %d",
+		    target->type);
+		break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+send_notification_targets(struct gotd_imsgev *iev, const char *repo_name,
+    struct gotd_notification_targets *targets)
+{
+	const struct got_error *err = NULL;
+	struct gotd_notification_target *target;
+
+	STAILQ_FOREACH(target, targets, entry) {
+		err = send_notification_target(iev, repo_name, target);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
 static void
 gotd_dispatch_notifier(int fd, short event, void *arg)
 {
@@ -1315,6 +1512,17 @@ gotd_dispatch_notifier(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_NOTIFIER_READY: {
+			struct gotd_repo *repo;
+
+			TAILQ_FOREACH(repo, &gotd.repos, entry) {
+				err = send_notification_targets(iev,
+				    repo->name, &repo->notification_targets);
+				if (err)
+					break;
+			}
+			break;
+		}
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
@@ -1830,172 +2038,12 @@ send_request_timeout(struct gotd_imsgev *iev, struct timeval *timeout)
 }
 
 static const struct got_error *
-send_notification_target_email(struct gotd_imsgev *iev,
-    struct gotd_notification_target *target)
-{
-	struct gotd_imsg_notitfication_target_email itarget;
-	struct ibuf *wbuf = NULL;
-
-	memset(&itarget, 0, sizeof(itarget));
-
-	if (target->conf.email.sender)
-		itarget.sender_len = strlen(target->conf.email.sender);
-	if (target->conf.email.recipient)
-		itarget.recipient_len = strlen(target->conf.email.recipient);
-	if (target->conf.email.responder)
-		itarget.responder_len = strlen(target->conf.email.responder);
-	if (target->conf.email.hostname)
-		itarget.hostname_len = strlen(target->conf.email.hostname);
-	if (target->conf.email.port)
-		itarget.port_len = strlen(target->conf.email.port);
-
-	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_EMAIL,
-	    0, 0, sizeof(itarget) + itarget.sender_len + itarget.recipient_len +
-	    itarget.responder_len + itarget.hostname_len + itarget.port_len);
-	if (wbuf == NULL) {
-		return got_error_from_errno("imsg_create "
-		    "NOTIFICATION_TARGET_EMAIL");
-	}
-
-	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
-		return got_error_from_errno("imsg_add "
-		    "NOTIFICATION_TARGET_EMAIL");
-	}
-	if (target->conf.email.sender) {
-		if (imsg_add(wbuf, target->conf.email.sender,
-		    itarget.sender_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_EMAIL");
-		}
-	}
-	if (target->conf.email.recipient) {
-		if (imsg_add(wbuf, target->conf.email.recipient,
-		    itarget.recipient_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_EMAIL");
-		}
-	}
-	if (target->conf.email.responder) {
-		if (imsg_add(wbuf, target->conf.email.responder,
-		    itarget.responder_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_EMAIL");
-		}
-	}
-	if (target->conf.email.hostname) {
-		if (imsg_add(wbuf, target->conf.email.hostname,
-		    itarget.hostname_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_EMAIL");
-		}
-	}
-	if (target->conf.email.port) {
-		if (imsg_add(wbuf, target->conf.email.port,
-		    itarget.port_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_EMAIL");
-		}
-	}
-
-	imsg_close(&iev->ibuf, wbuf);
-	return gotd_imsg_flush(&iev->ibuf);
-}
-
-static const struct got_error *
-send_notification_target_http(struct gotd_imsgev *iev,
-    struct gotd_notification_target *target)
-{
-	struct gotd_imsg_notitfication_target_http itarget;
-	struct ibuf *wbuf = NULL;
-
-	memset(&itarget, 0, sizeof(itarget));
-
-	itarget.tls = target->conf.http.tls;
-	itarget.hostname_len = strlen(target->conf.http.hostname);
-	itarget.port_len = strlen(target->conf.http.port);
-	itarget.path_len = strlen(target->conf.http.path);
-	if (target->conf.http.auth)
-		itarget.auth_len = strlen(target->conf.http.auth);
-	if (target->conf.http.hmac)
-		itarget.hmac_len = strlen(target->conf.http.hmac);
-
-	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_HTTP,
-	    0, 0, sizeof(itarget) + itarget.hostname_len + itarget.port_len +
-	    itarget.path_len + itarget.auth_len + itarget.hmac_len);
-	if (wbuf == NULL) {
-		return got_error_from_errno("imsg_create "
-		    "NOTIFICATION_TARGET_HTTP");
-	}
-
-	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
-		return got_error_from_errno("imsg_add "
-		    "NOTIFICATION_TARGET_HTTP");
-	}
-	if (imsg_add(wbuf, target->conf.http.hostname,
-	    itarget.hostname_len) == -1) {
-		return got_error_from_errno("imsg_add "
-		    "NOTIFICATION_TARGET_HTTP");
-	}
-	if (imsg_add(wbuf, target->conf.http.port,
-	    itarget.port_len) == -1) {
-		return got_error_from_errno("imsg_add "
-		    "NOTIFICATION_TARGET_HTTP");
-	}
-	if (imsg_add(wbuf, target->conf.http.path,
-	    itarget.path_len) == -1) {
-		return got_error_from_errno("imsg_add "
-		    "NOTIFICATION_TARGET_HTTP");
-	}
-
-	if (target->conf.http.auth) {
-		if (imsg_add(wbuf, target->conf.http.auth,
-		    itarget.auth_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_HTTP");
-		}
-	}
-	if (target->conf.http.hmac) {
-		if (imsg_add(wbuf, target->conf.http.hmac,
-		    itarget.hmac_len) == -1) {
-			return got_error_from_errno("imsg_add "
-			    "NOTIFICATION_TARGET_HTTP");
-		}
-	}
-
-	imsg_close(&iev->ibuf, wbuf);
-	return gotd_imsg_flush(&iev->ibuf);
-}
-
-static const struct got_error *
-send_notification_target(struct gotd_imsgev *iev,
-    struct gotd_notification_target *target)
-{
-	const struct got_error *err = NULL;
-
-	switch (target->type) {
-	case GOTD_NOTIFICATION_VIA_EMAIL:
-		err = send_notification_target_email(iev, target);
-		break;
-	case GOTD_NOTIFICATION_VIA_HTTP:
-		err = send_notification_target_http(iev, target);
-		break;
-	default:
-		log_warn("unsupported notification target type %d",
-		    target->type);
-		break;
-	}
-
-	return err;
-}
-
-static const struct got_error *
 send_notification_config(struct gotd_imsgev *iev, char *repo_name)
 {
 	const struct got_error *err = NULL;
 	struct gotd_repo *repo;
 	struct got_pathlist_entry *pe;
 	struct gotd_imsg_pathlist ilist;
-	struct gotd_notification_target *target;
 
 	memset(&ilist, 0, sizeof(ilist));
 
@@ -2037,13 +2085,8 @@ send_notification_config(struct gotd_imsgev *iev, char *repo_name)
 		}
 	}
 
-	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
-		err = send_notification_target(iev, target);
-		if (err)
-			return err;
-	}
-
-	return NULL;
+	return send_notification_targets(iev, repo->name,
+	    &repo->notification_targets);
 }
 
 static void
@@ -2581,6 +2624,7 @@ start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 	proc->iev.handler_arg = NULL;
 	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
 	    gotd_dispatch_notifier, &proc->iev);
+	gotd_imsg_event_add(&proc->iev);
 
 	gotd.notify_proc = proc;
 }
@@ -2846,7 +2890,6 @@ main(int argc, char **argv)
 	struct event evsigint, evsigterm, evsighup, evsigusr1, evsigchld;
 	int *pack_fds = NULL, *temp_fds = NULL;
 	struct gotd_repo *repo = NULL;
-	char *default_sender = NULL;
 	char hostname[_POSIX_HOST_NAME_MAX + 1];
 	FILE *fp;
 	FILE *diff_f1 = NULL, *diff_f2 = NULL, *tmp_f1 = NULL, *tmp_f2 = NULL;
@@ -2944,7 +2987,7 @@ main(int argc, char **argv)
 
 	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH &&
 	    proc_id != GOTD_PROC_REPO_WRITE &&
-	    proc_id != GOTD_PROC_SESSION_WRITE) {
+	    proc_id != GOTD_PROC_SESSION_WRITE && proc_id != GOTD_PROC_NOTIFY) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -3001,7 +3044,7 @@ main(int argc, char **argv)
 
 		if (gethostname(hostname, sizeof(hostname)) == -1)
 			fatal("gethostname");
-		if (asprintf(&default_sender, "%s@%s", pw->pw_name,
+		if (asprintf(&gotd.default_sender, "%s@%s", pw->pw_name,
 		    hostname) == -1)
 			fatal("asprintf");
 	}
@@ -3192,7 +3235,7 @@ main(int argc, char **argv)
 		 */
 		unveil_notification_helpers();
 
-		notify_main(title, &gotd.repos, default_sender);
+		notify_main(title);
 		/* NOTREACHED */
 		exit(0);
 	default:
@@ -3278,7 +3321,6 @@ main(int argc, char **argv)
 
 	free(repo_path);
 	free(secretspath);
-	free(default_sender);
 	gotd_shutdown();
 
 	return 0;
