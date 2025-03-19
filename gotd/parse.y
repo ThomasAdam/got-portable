@@ -327,8 +327,7 @@ notifyflags_l	: notifyflags optnl notifyflags_l
 		;
 
 notifyflags	: BRANCH STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_branch(new_repo, $2)) {
 					free($2);
 					YYERROR;
@@ -337,8 +336,7 @@ notifyflags	: BRANCH STRING {
 			free($2);
 		}
 		| REFERENCE NAMESPACE STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_ref_namespace(new_repo, $3)) {
 					free($3);
 					YYERROR;
@@ -347,8 +345,7 @@ notifyflags	: BRANCH STRING {
 			free($3);
 		}
 		| EMAIL TO STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, NULL, NULL)) {
 					free($3);
@@ -358,8 +355,7 @@ notifyflags	: BRANCH STRING {
 			free($3);
 		}
 		| EMAIL FROM STRING TO STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, NULL, NULL)) {
 					free($3);
@@ -371,8 +367,7 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL TO STRING REPLY TO STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, NULL, NULL)) {
 					free($3);
@@ -384,8 +379,7 @@ notifyflags	: BRANCH STRING {
 			free($6);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, NULL, NULL)) {
 					free($3);
@@ -399,8 +393,7 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL TO STRING RELAY STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, NULL)) {
 					free($3);
@@ -412,8 +405,7 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, NULL)) {
 					free($3);
@@ -427,8 +419,7 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, NULL)) {
 					free($3);
@@ -442,8 +433,7 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, NULL)) {
 					free($3);
@@ -459,8 +449,7 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| EMAIL TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, $7)) {
 					free($3);
@@ -474,8 +463,7 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, $9)) {
 					free($3);
@@ -491,8 +479,7 @@ notifyflags	: BRANCH STRING {
 			free($9);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, $10)) {
 					free($3);
@@ -508,8 +495,7 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, $12)) {
 					free($3);
@@ -527,8 +513,7 @@ notifyflags	: BRANCH STRING {
 			free($12);
 		}
 		| EMAIL TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    NULL, $5, port_sprintf($7))) {
 					free($3);
@@ -540,8 +525,7 @@ notifyflags	: BRANCH STRING {
 			free($5);
 		}
 		| EMAIL FROM STRING TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    NULL, $7, port_sprintf($9))) {
 					free($3);
@@ -555,8 +539,7 @@ notifyflags	: BRANCH STRING {
 			free($7);
 		}
 		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, NULL, $3,
 				    $6, $8, port_sprintf($10))) {
 					free($3);
@@ -570,8 +553,7 @@ notifyflags	: BRANCH STRING {
 			free($8);
 		}
 		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_email(new_repo, $3, $5,
 				    $8, $10, port_sprintf($12))) {
 					free($3);
@@ -587,8 +569,7 @@ notifyflags	: BRANCH STRING {
 			free($10);
 		}
 		| URL STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, NULL,
 				    NULL, 0)) {
 					free($2);
@@ -598,8 +579,7 @@ notifyflags	: BRANCH STRING {
 			free($2);
 		}
 		| URL STRING AUTH STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, $4, NULL,
 				    0)) {
 					free($2);
@@ -611,8 +591,7 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING AUTH STRING INSECURE {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, $4, NULL,
 				    1)) {
 					free($2);
@@ -624,8 +603,7 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING HMAC STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, NULL, $4,
 				    0)) {
 					free($2);
@@ -637,8 +615,7 @@ notifyflags	: BRANCH STRING {
 			free($4);
 		}
 		| URL STRING AUTH STRING HMAC STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, $4, $6,
 				    0)) {
 					free($2);
@@ -652,8 +629,7 @@ notifyflags	: BRANCH STRING {
 			free($6);
 		}
 		| URL STRING AUTH STRING INSECURE HMAC STRING {
-			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			if (gotd_proc_id == GOTD_PROC_GOTD) {
 				if (conf_notify_http(new_repo, $2, $4, $7,
 				    1)) {
 					free($2);
@@ -680,8 +656,7 @@ repository	: REPOSITORY STRING {
 			}
 
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_GITWRAPPER |
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			    gotd_proc_id == GOTD_PROC_GITWRAPPER) {
 				new_repo = conf_new_repo($2);
 			}
 			free($2);
@@ -691,8 +666,7 @@ repository	: REPOSITORY STRING {
 
 repoopts1	: PATH STRING {
 			if (gotd_proc_id == GOTD_PROC_GOTD ||
-			    gotd_proc_id == GOTD_PROC_GITWRAPPER ||
-			    gotd_proc_id == GOTD_PROC_NOTIFY) {
+			    gotd_proc_id == GOTD_PROC_GITWRAPPER) {
 				if (!got_path_is_absolute($2)) {
 					yyerror("%s: path %s is not absolute",
 					    __func__, $2);
@@ -1279,22 +1253,14 @@ conf_limit_user_connections(const char *user, int maximum)
 	return 0;
 }
 
-static struct gotd_repo *
-conf_new_repo(const char *name)
+const struct got_error *
+gotd_conf_new_repo(struct gotd_repo **new_repo, const char *name)
 {
 	struct gotd_repo *repo;
 
-	if (name[0] == '\0') {
-		fatalx("syntax error: empty repository name found in %s",
-		    file->name);
-	}
-
-	if (strchr(name, '\n') != NULL)
-		fatalx("repository names must not contain linefeeds: %s", name);
-
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL)
-		fatalx("%s: calloc", __func__);
+		return got_error_from_errno("calloc");
 
 	STAILQ_INIT(&repo->rules);
 	RB_INIT(&repo->protected_tag_namespaces);
@@ -1306,8 +1272,33 @@ conf_new_repo(const char *name)
 	STAILQ_INIT(&repo->notification_targets);
 
 	if (strlcpy(repo->name, name, sizeof(repo->name)) >=
-	    sizeof(repo->name))
-		fatalx("%s: strlcpy", __func__);
+	    sizeof(repo->name)) {
+		free(repo);
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "repository name too long");
+	}
+
+	*new_repo = repo;
+	return NULL;
+}
+
+static struct gotd_repo *
+conf_new_repo(const char *name)
+{
+	const struct got_error *err;
+	struct gotd_repo *repo;
+
+	if (name[0] == '\0') {
+		fatalx("syntax error: empty repository name found in %s",
+		    file->name);
+	}
+
+	if (strchr(name, '\n') != NULL)
+		fatalx("repository names must not contain linefeeds: %s", name);
+
+	err = gotd_conf_new_repo(&repo, name);
+	if (err)
+		fatalx("%s", err->msg);
 
 	TAILQ_INSERT_TAIL(&gotd->repos, repo, entry);
 	gotd->nrepos++;

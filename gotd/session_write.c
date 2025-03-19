@@ -1765,240 +1765,6 @@ recv_repo_child(struct imsg *imsg)
 }
 
 static void
-free_notification_target(struct gotd_notification_target *target)
-{
-	if (target == NULL)
-		return;
-
-	switch (target->type) {
-	case GOTD_NOTIFICATION_VIA_EMAIL:
-		free(target->conf.email.sender);
-		free(target->conf.email.recipient);
-		free(target->conf.email.responder);
-		free(target->conf.email.hostname);
-		free(target->conf.email.port);
-		break;
-	case GOTD_NOTIFICATION_VIA_HTTP:
-		free(target->conf.http.hostname);
-		free(target->conf.http.port);
-		free(target->conf.http.path);
-		free(target->conf.http.auth);
-		free(target->conf.http.hmac);
-		break;
-	default:
-		break;
-	}
-
-	free(target);
-}
-
-static const struct got_error *
-recv_notification_target_email(struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_notitfication_target_email itarget;
-	struct gotd_notification_target *target;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(itarget))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&itarget, imsg->data, sizeof(itarget));
-
-	if (datalen != sizeof(itarget) + itarget.sender_len +
-	    itarget.recipient_len + itarget.responder_len +
-	    itarget.hostname_len + itarget.port_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	if (itarget.recipient_len == 0)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	target = calloc(1, sizeof(*target));
-	if (target == NULL)
-		return got_error_from_errno("calloc");
-
-	target->type = GOTD_NOTIFICATION_VIA_EMAIL;
-
-	if (itarget.sender_len) {
-		target->conf.email.sender = strndup(imsg->data +
-		    sizeof(itarget), itarget.sender_len);
-		if (target->conf.email.sender == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.email.sender) != itarget.sender_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	target->conf.email.recipient = strndup(imsg->data + sizeof(itarget) +
-	    itarget.sender_len, itarget.recipient_len);
-	if (target->conf.email.recipient == NULL) {
-		err = got_error_from_errno("strndup");
-		goto done;
-	}
-	if (strlen(target->conf.email.recipient) != itarget.recipient_len) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-	
-	if (itarget.responder_len) {
-		target->conf.email.responder = strndup(imsg->data +
-		    sizeof(itarget) + itarget.sender_len + itarget.recipient_len,
-		    itarget.responder_len);
-		if (target->conf.email.responder == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.email.responder) !=
-		    itarget.responder_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	if (itarget.hostname_len) {
-		target->conf.email.hostname = strndup(imsg->data +
-		    sizeof(itarget) + itarget.sender_len +
-		    itarget.recipient_len + itarget.responder_len,
-		    itarget.hostname_len);
-		if (target->conf.email.hostname == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.email.hostname) !=
-		    itarget.hostname_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	if (itarget.port_len) {
-		target->conf.email.port = strndup(imsg->data +
-		    sizeof(itarget) + itarget.sender_len +
-		    itarget.recipient_len + itarget.responder_len +
-		    itarget.hostname_len, itarget.port_len);
-		if (target->conf.email.port == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.email.port) != itarget.port_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	STAILQ_INSERT_TAIL(&gotd_session.notification_targets, target, entry);
-	target = NULL;
-done:
-	if (err)
-		free_notification_target(target);
-	return err;
-}
-
-static const struct got_error *
-recv_notification_target_http(struct imsg *imsg)
-{
-	const struct got_error *err = NULL;
-	struct gotd_imsg_notitfication_target_http itarget;
-	struct gotd_notification_target *target;
-	size_t datalen;
-
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(itarget))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&itarget, imsg->data, sizeof(itarget));
-
-	if (datalen != sizeof(itarget) + itarget.hostname_len +
-	    itarget.port_len + itarget.path_len + itarget.auth_len +
-	    itarget.hmac_len)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	if (itarget.hostname_len == 0 || itarget.port_len == 0 ||
-	    itarget.path_len == 0)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	target = calloc(1, sizeof(*target));
-	if (target == NULL)
-		return got_error_from_errno("calloc");
-
-	target->type = GOTD_NOTIFICATION_VIA_HTTP;
-
-	target->conf.http.tls = itarget.tls;
-
-	target->conf.http.hostname = strndup(imsg->data +
-	    sizeof(itarget), itarget.hostname_len);
-	if (target->conf.http.hostname == NULL) {
-		err = got_error_from_errno("strndup");
-		goto done;
-	}
-	if (strlen(target->conf.http.hostname) != itarget.hostname_len) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-
-	target->conf.http.port = strndup(imsg->data + sizeof(itarget) +
-	    itarget.hostname_len, itarget.port_len);
-	if (target->conf.http.port == NULL) {
-		err = got_error_from_errno("strndup");
-		goto done;
-	}
-	if (strlen(target->conf.http.port) != itarget.port_len) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-	
-	target->conf.http.path = strndup(imsg->data +
-	    sizeof(itarget) + itarget.hostname_len + itarget.port_len,
-	    itarget.path_len);
-	if (target->conf.http.path == NULL) {
-		err = got_error_from_errno("strndup");
-		goto done;
-	}
-	if (strlen(target->conf.http.path) != itarget.path_len) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-
-	if (itarget.auth_len) {
-		target->conf.http.auth = strndup(imsg->data +
-		    sizeof(itarget) + itarget.hostname_len +
-		    itarget.port_len + itarget.path_len,
-		    itarget.auth_len);
-		if (target->conf.http.auth == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.http.auth) != itarget.auth_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	if (itarget.hmac_len) {
-		target->conf.http.hmac = strndup(imsg->data +
-		    sizeof(itarget) + itarget.hostname_len +
-		    itarget.port_len + itarget.path_len +
-		    itarget.auth_len, itarget.hmac_len);
-		if (target->conf.http.hmac == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		if (strlen(target->conf.http.hmac) != itarget.hmac_len) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-	}
-
-	STAILQ_INSERT_TAIL(&gotd_session.notification_targets, target, entry);
-	target = NULL;
-done:
-	if (err)
-		free_notification_target(target);
-	return err;
-}
-
-static void
 session_dispatch(int fd, short event, void *arg)
 {
 	const struct got_error *err = NULL;
@@ -2097,12 +1863,28 @@ session_dispatch(int fd, short event, void *arg)
 				gotd_session.num_notification_refs_needed = 0;
 			}
 			break;
-		case GOTD_IMSG_NOTIFICATION_TARGET_EMAIL:
-			err = recv_notification_target_email(&imsg);
+		case GOTD_IMSG_NOTIFICATION_TARGET_EMAIL: {
+			struct gotd_notification_target *target;
+
+			err = gotd_imsg_recv_notification_target_email(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(&gotd_session.notification_targets,
+			    target, entry);
 			break;
-		case GOTD_IMSG_NOTIFICATION_TARGET_HTTP:
-			err = recv_notification_target_http(&imsg);
+		}
+		case GOTD_IMSG_NOTIFICATION_TARGET_HTTP: {
+			struct gotd_notification_target *target;
+
+			err = gotd_imsg_recv_notification_target_http(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(&gotd_session.notification_targets,
+			    target, entry);
 			break;
+		}
 		case GOTD_IMSG_CONNECT_NOTIFIER:
 			err = recv_notifier(&imsg);
 			break;

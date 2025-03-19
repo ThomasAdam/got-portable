@@ -50,8 +50,7 @@ static struct gotd_notify {
 	pid_t pid;
 	const char *title;
 	struct gotd_imsgev parent_iev;
-	struct gotd_repolist *repos;
-	const char *default_sender;
+	struct gotd_repolist repos;
 } gotd_notify;
 
 struct gotd_notify_session {
@@ -239,10 +238,7 @@ notify_email(struct gotd_notification_target *target, const char *subject_line,
 	argv[i++] = GOTD_PATH_PROG_NOTIFY_EMAIL;
 
 	argv[i++] = "-f";
-	if (target->conf.email.sender)
-		argv[i++] = target->conf.email.sender;
-	else
-		argv[i++] = gotd_notify.default_sender;
+	argv[i++] = target->conf.email.sender;
 
 	if (target->conf.email.responder) {
 		argv[i++] = "-r";
@@ -331,7 +327,7 @@ send_notification(struct imsg *imsg, struct gotd_imsgev *iev)
 	if (datalen != sizeof(inotify) + inotify.username_len)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	repo = gotd_find_repo_by_name(inotify.repo_name, gotd_notify.repos);
+	repo = gotd_find_repo_by_name(inotify.repo_name, &gotd_notify.repos);
 	if (repo == NULL)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
@@ -501,6 +497,24 @@ notify_ibuf_get_str(char **ret, struct ibuf *ibuf)
 	return NULL;
 }
 
+static const struct got_error *
+add_notification_target(const char *repo_name,
+    struct gotd_notification_target *target)
+{
+	const struct got_error *err = NULL;
+	struct gotd_repo *repo;
+
+	repo = gotd_find_repo_by_name(repo_name, &gotd_notify.repos);
+	if (repo == NULL) {
+		err = gotd_conf_new_repo(&repo, repo_name);
+		if (err)
+			return err;
+		TAILQ_INSERT_TAIL(&gotd_notify.repos, repo, entry);
+	}
+
+	STAILQ_INSERT_TAIL(&repo->notification_targets, target, entry);
+	return NULL;
+}
 static void
 notify_dispatch(int fd, short event, void *arg)
 {
@@ -538,6 +552,32 @@ notify_dispatch(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
+		case GOTD_IMSG_NOTIFICATION_TARGET_EMAIL: {
+			struct gotd_notification_target *target;
+			char *repo_name;
+
+			err = gotd_imsg_recv_notification_target_email(
+			    &repo_name, &target, &imsg);
+			if (err)
+				break;
+			err = add_notification_target(repo_name, target);
+			if (err)
+				gotd_free_notification_target(target);
+			break;
+		}
+		case GOTD_IMSG_NOTIFICATION_TARGET_HTTP: {
+			struct gotd_notification_target *target;
+			char *repo_name;
+
+			err = gotd_imsg_recv_notification_target_http(
+			    &repo_name, &target, &imsg);
+			if (err)
+				break;
+			err = add_notification_target(repo_name, target);
+			if (err)
+				gotd_free_notification_target(target);
+			break;
+		}
 		case GOTD_IMSG_CONNECT_SESSION:
 			err = recv_session(&imsg);
 			break;
@@ -602,8 +642,7 @@ done:
 }
 
 void
-notify_main(const char *title, struct gotd_repolist *repos,
-    const char *default_sender)
+notify_main(const char *title)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -611,9 +650,8 @@ notify_main(const char *title, struct gotd_repolist *repos,
 	arc4random_buf(&sessions_hash_key, sizeof(sessions_hash_key));
 
 	gotd_notify.title = title;
-	gotd_notify.repos = repos;
-	gotd_notify.default_sender = default_sender;
 	gotd_notify.pid = getpid();
+	TAILQ_INIT(&gotd_notify.repos);
 
 	signal_set(&evsigint, SIGINT, gotd_notify_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, gotd_notify_sighdlr, NULL);
@@ -635,7 +673,9 @@ notify_main(const char *title, struct gotd_repolist *repos,
 	gotd_notify.parent_iev.handler_arg = NULL;
 	event_set(&gotd_notify.parent_iev.ev, gotd_notify.parent_iev.ibuf.fd,
 	    EV_READ, notify_dispatch, &gotd_notify.parent_iev);
-	gotd_imsg_event_add(&gotd_notify.parent_iev);
+	if (gotd_imsg_compose_event(&gotd_notify.parent_iev,
+	    GOTD_IMSG_NOTIFIER_READY, GOTD_PROC_NOTIFY, -1, NULL, 0) == -1)
+		fatal("imsg compose NOTIFIER_READY");
 
 	event_dispatch();
 

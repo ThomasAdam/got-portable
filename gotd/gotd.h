@@ -181,6 +181,7 @@ struct gotd {
 	struct gotd_uid_connection_limit *connection_limits;
 	size_t nconnection_limits;
 	struct gotd_secrets *secrets;
+	char *default_sender;
 
 	char *argv0;
 	const char *confpath;
@@ -273,6 +274,7 @@ enum gotd_imsg_type {
 	GOTD_IMSG_PROTECTED_BRANCHES_ELEM,
 
 	/* Notify child process. */
+	GOTD_IMSG_NOTIFIER_READY,
 	GOTD_IMSG_NOTIFICATION_REFS,
 	GOTD_IMSG_NOTIFICATION_REFS_ELEM,
 	GOTD_IMSG_NOTIFICATION_REF_NAMESPACES,
@@ -591,10 +593,11 @@ struct gotd_imsg_notitfication_target_email {
 	size_t responder_len;
 	size_t hostname_len;
 	size_t port_len;
+	size_t repo_name_len;
 
 	/*
 	 * Followed by sender_len + responder_len + responder_len +
-	 * hostname_len + port_len bytes.
+	 * hostname_len + port_len + repo_name_len bytes.
 	 */
 };
 
@@ -606,10 +609,11 @@ struct gotd_imsg_notitfication_target_http {
 	size_t path_len;
 	size_t auth_len;
 	size_t hmac_len;;
+	size_t repo_name_len;
 
 	/*
 	 * Followed by hostname_len + port_len + path_len + auth_len +
-	 * hmac_len bytes.
+	 * hmac_len + repo_name_len bytes.
 	 */
 };
 
@@ -645,6 +649,7 @@ struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(
 int gotd_parseuid(const char *s, uid_t *uid);
 const struct got_error *gotd_parse_url(char **, char **, char **,
     char **, const char *);
+const struct got_error *gotd_conf_new_repo(struct gotd_repo **, const char *);
 
 /* imsg.c */
 const struct got_error *gotd_imsg_flush(struct imsgbuf *);
@@ -668,3 +673,8 @@ void gotd_imsg_send_nak(struct got_object_id *, struct imsgbuf *,
 const struct got_error *gotd_imsg_recv_pathlist(size_t *, struct imsg *);
 const struct got_error *gotd_imsg_recv_pathlist_elem(struct imsg *,
     struct got_pathlist_head *);
+void gotd_free_notification_target(struct gotd_notification_target *);
+const struct got_error *gotd_imsg_recv_notification_target_email(char **,
+    struct gotd_notification_target **, struct imsg *);
+const struct got_error *gotd_imsg_recv_notification_target_http(char **,
+    struct gotd_notification_target **, struct imsg *);
