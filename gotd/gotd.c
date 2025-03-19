@@ -2173,11 +2173,10 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
+			err = send_request_timeout(iev, &gotd.request_timeout);
+			if (err)
+				break;
 			if (client_is_writing(client)) {
-				err = send_request_timeout(iev,
-				    &gotd.request_timeout);
-				if (err)
-					break;
 				err = send_notification_config(iev,
 				    proc->repo_name);
 				if (err)
@@ -3036,7 +3035,9 @@ main(int argc, char **argv)
 
 	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH &&
 	    proc_id != GOTD_PROC_REPO_WRITE &&
-	    proc_id != GOTD_PROC_SESSION_WRITE && proc_id != GOTD_PROC_NOTIFY) {
+	    proc_id != GOTD_PROC_REPO_READ &&
+	    proc_id != GOTD_PROC_SESSION_WRITE && proc_id != GOTD_PROC_NOTIFY &&
+	    proc_id != GOTD_PROC_SESSION_READ) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -3212,8 +3213,7 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		apply_unveil_repo_readonly(repo_path, 1);
-		session_read_main(title, repo_path, pack_fds, temp_fds,
-		    &gotd.request_timeout);
+		session_read_main(title, repo_path, pack_fds, temp_fds);
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_SESSION_WRITE:
