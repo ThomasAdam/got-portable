@@ -145,11 +145,11 @@ show_client_info(struct imsg *imsg)
 	if (info.repo_child_pid)
 		printf("repo PID %ld, ", (long)info.repo_child_pid);
 	if (info.is_writing) {
-		printf("writing to %s%s%s\n", info.repo_name,
+		printf("writing to repository \"%s\"%s%s\n", info.repo_name,
 		    datestr ? " since " : "",
 		    datestr ? datestr : "");
 	} else {
-		printf("reading from %s%s%s\n", info.repo_name,
+		printf("reading from repository \"%s\"%s%s\n", info.repo_name,
 		    datestr ? " since " : "",
 		    datestr ? datestr : "");
 	}
