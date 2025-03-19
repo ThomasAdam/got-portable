@@ -107,26 +107,53 @@ show_repo_info(struct imsg *imsg)
 	return NULL;
 }
 
+static char *
+get_datestr(time_t *time, char *datebuf)
+{
+	struct tm mytm, *tm;
+	char *p, *s;
+
+	tm = localtime_r(time, &mytm);
+	if (tm == NULL)
+		return NULL;
+	s = asctime_r(tm, datebuf);
+	if (s == NULL)
+		return NULL;
+	p = strchr(s, '\n');
+	if (p)
+		*p = '\0';
+	return s;
+}
+
 static const struct got_error *
 show_client_info(struct imsg *imsg)
 {
 	struct gotd_imsg_info_client info;
 	size_t datalen;
+	char *datestr;
+	char datebuf[26];
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(info))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&info, imsg->data, sizeof(info));
 
+	datestr = get_datestr(&info.time_connected, datebuf);
+
 	printf("client UID %d, GID %d, ", info.euid, info.egid);
 	if (info.session_child_pid)
 		printf("session PID %ld, ", (long)info.session_child_pid);
 	if (info.repo_child_pid)
 		printf("repo PID %ld, ", (long)info.repo_child_pid);
-	if (info.is_writing)
-		printf("writing to %s\n", info.repo_name);
-	else
-		printf("reading from %s\n", info.repo_name);
+	if (info.is_writing) {
+		printf("writing to %s%s%s\n", info.repo_name,
+		    datestr ? " since " : "",
+		    datestr ? datestr : "");
+	} else {
+		printf("reading from %s%s%s\n", info.repo_name,
+		    datestr ? " since " : "",
+		    datestr ? datestr : "");
+	}
 
 	return NULL;
 }
