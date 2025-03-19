@@ -141,7 +141,9 @@ struct gotd_repo {
 	size_t nprotected_branches;
 
 	struct got_pathlist_head notification_refs;
+	size_t num_notification_refs;
 	struct got_pathlist_head notification_ref_namespaces;
+	size_t num_notification_ref_namespaces;
 	struct gotd_notification_targets notification_targets;
 };
 TAILQ_HEAD(gotd_repolist, gotd_repo);
@@ -247,6 +249,7 @@ enum gotd_imsg_type {
 	GOTD_IMSG_LISTENER_READY,
 	GOTD_IMSG_LISTEN_SOCKET,
 	GOTD_IMSG_CONNECTION_LIMIT,
+	GOTD_IMSG_REQUEST_TIMEOUT,
 	GOTD_IMSG_DISCONNECT,
 	GOTD_IMSG_CONNECT,
 
@@ -270,6 +273,12 @@ enum gotd_imsg_type {
 	GOTD_IMSG_PROTECTED_BRANCHES_ELEM,
 
 	/* Notify child process. */
+	GOTD_IMSG_NOTIFICATION_REFS,
+	GOTD_IMSG_NOTIFICATION_REFS_ELEM,
+	GOTD_IMSG_NOTIFICATION_REF_NAMESPACES,
+	GOTD_IMSG_NOTIFICATION_REF_NAMESPACES_ELEM,
+	GOTD_IMSG_NOTIFICATION_TARGET_EMAIL,
+	GOTD_IMSG_NOTIFICATION_TARGET_HTTP,
 	GOTD_IMSG_CONNECT_NOTIFIER,
 	GOTD_IMSG_CONNECT_SESSION,
 	GOTD_IMSG_NOTIFY,
@@ -521,6 +530,7 @@ struct gotd_imsg_connect {
 
 /* Structure for GOTD_IMSG_CONNECT_REPO_CHILD. */
 struct gotd_imsg_connect_repo_child {
+	char repo_name[NAME_MAX];
 	enum gotd_procid proc_id;
 
 	/* repo child imsg pipe is passed via imsg fd */
@@ -549,6 +559,8 @@ struct gotd_imsg_auth_access_rule {
  * GOTD_IMSG_PROTECTED_TAG_NAMESPACES
  * GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES
  * GOTD_IMSG_PROTECTED_BRANCHES
+ * GOTD_IMSG_NOTIFY_BRANCHES
+ * GOTD_IMSG_NOTIFY_REF_NAMESPACES
  */
 struct gotd_imsg_pathlist {
 	size_t nelem;
@@ -561,6 +573,8 @@ struct gotd_imsg_pathlist {
  * GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM
  * GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM
  * GOTD_IMSG_PROTECTED_BRANCHES_ELEM
+ * GOTD_IMSG_NOTIFY_BRANCHES_ELEM
+ * GOTD_IMSG_NOTIFY_REF_NAMESPACES_ELEM
  */
 struct gotd_imsg_pathlist_elem {
 	size_t path_len;
@@ -568,6 +582,35 @@ struct gotd_imsg_pathlist_elem {
 
 	/* Followed by path_len bytes. */
 	/* Followed by data_len bytes. */
+};
+
+/* Structure for GOTD_IMSG_NOTIFICATION_TARGET_EMAIL. */
+struct gotd_imsg_notitfication_target_email {
+	size_t sender_len;
+	size_t recipient_len;
+	size_t responder_len;
+	size_t hostname_len;
+	size_t port_len;
+
+	/*
+	 * Followed by sender_len + responder_len + responder_len +
+	 * hostname_len + port_len bytes.
+	 */
+};
+
+/* Structure for GOTD_IMSG_NOTIFICATION_TARGET_HTTP. */
+struct gotd_imsg_notitfication_target_http {
+	int tls;
+	size_t hostname_len;
+	size_t port_len;
+	size_t path_len;
+	size_t auth_len;
+	size_t hmac_len;;
+
+	/*
+	 * Followed by hostname_len + port_len + path_len + auth_len +
+	 * hmac_len bytes.
+	 */
 };
 
 /* Structures for GOTD_IMSG_NOTIFY. */
@@ -622,3 +665,6 @@ void gotd_imsg_send_ack(struct got_object_id *, struct imsgbuf *,
     uint32_t, pid_t);
 void gotd_imsg_send_nak(struct got_object_id *, struct imsgbuf *,
     uint32_t, pid_t);
+const struct got_error *gotd_imsg_recv_pathlist(size_t *, struct imsg *);
+const struct got_error *gotd_imsg_recv_pathlist_elem(struct imsg *,
+    struct got_pathlist_head *);

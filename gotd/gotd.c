@@ -1146,6 +1146,14 @@ connect_repo_child(struct gotd_client *client,
 		fatal("socketpair");
 
 	memset(&ireq, 0, sizeof(ireq));
+	if (strlcpy(ireq.repo_name, repo_proc->repo_name,
+	    sizeof(ireq.repo_name)) >= sizeof(ireq.repo_name)) {
+		err = got_error_msg(GOT_ERR_NO_SPACE,
+		    "repository name too long");
+		close(pipe[0]);
+		close(pipe[1]);
+		return err;
+	}
 	ireq.proc_id = repo_proc->type;
 
 	/* Pass repo child pipe to session child process. */
@@ -1809,6 +1817,257 @@ run_gotsys_apply(struct gotd_repo *repo)
 	fatal("execvp");
 }
 
+static const struct got_error *
+send_pathlist_elem(struct gotd_imsgev *iev, const char *refname, int imsg_type)
+{
+	struct gotd_imsg_pathlist_elem ielem;
+	struct ibuf *wbuf = NULL;
+
+	memset(&ielem, 0, sizeof(ielem));
+	ielem.path_len = strlen(refname);
+
+	wbuf = imsg_create(&iev->ibuf, imsg_type, GOTD_PROC_GOTD, gotd.pid,
+	    sizeof(ielem) + ielem.path_len);
+	if (wbuf == NULL)
+		return got_error_from_errno_fmt("imsg_create %d", imsg_type);
+
+	if (imsg_add(wbuf, &ielem, sizeof(ielem)) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+	if (imsg_add(wbuf, refname, ielem.path_len) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_request_timeout(struct gotd_imsgev *iev, struct timeval *timeout)
+{
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_REQUEST_TIMEOUT,
+	    GOTD_PROC_GOTD, -1, timeout, sizeof(*timeout)) == -1) {
+		return got_error_from_errno("imsg compose REQUEST_TIMEOUT");
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+send_notification_target_email(struct gotd_imsgev *iev,
+    struct gotd_notification_target *target)
+{
+	struct gotd_imsg_notitfication_target_email itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	if (target->conf.email.sender)
+		itarget.sender_len = strlen(target->conf.email.sender);
+	if (target->conf.email.recipient)
+		itarget.recipient_len = strlen(target->conf.email.recipient);
+	if (target->conf.email.responder)
+		itarget.responder_len = strlen(target->conf.email.responder);
+	if (target->conf.email.hostname)
+		itarget.hostname_len = strlen(target->conf.email.hostname);
+	if (target->conf.email.port)
+		itarget.port_len = strlen(target->conf.email.port);
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_EMAIL,
+	    0, 0, sizeof(itarget) + itarget.sender_len + itarget.recipient_len +
+	    itarget.responder_len + itarget.hostname_len + itarget.port_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+	if (target->conf.email.sender) {
+		if (imsg_add(wbuf, target->conf.email.sender,
+		    itarget.sender_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.recipient) {
+		if (imsg_add(wbuf, target->conf.email.recipient,
+		    itarget.recipient_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.responder) {
+		if (imsg_add(wbuf, target->conf.email.responder,
+		    itarget.responder_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.hostname) {
+		if (imsg_add(wbuf, target->conf.email.hostname,
+		    itarget.hostname_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.port) {
+		if (imsg_add(wbuf, target->conf.email.port,
+		    itarget.port_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_notification_target_http(struct gotd_imsgev *iev,
+    struct gotd_notification_target *target)
+{
+	struct gotd_imsg_notitfication_target_http itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	itarget.tls = target->conf.http.tls;
+	itarget.hostname_len = strlen(target->conf.http.hostname);
+	itarget.port_len = strlen(target->conf.http.port);
+	itarget.path_len = strlen(target->conf.http.path);
+	if (target->conf.http.auth)
+		itarget.auth_len = strlen(target->conf.http.auth);
+	if (target->conf.http.hmac)
+		itarget.hmac_len = strlen(target->conf.http.hmac);
+
+	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_NOTIFICATION_TARGET_HTTP,
+	    0, 0, sizeof(itarget) + itarget.hostname_len + itarget.port_len +
+	    itarget.path_len + itarget.auth_len + itarget.hmac_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.hostname,
+	    itarget.hostname_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.port,
+	    itarget.port_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.path,
+	    itarget.path_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (target->conf.http.auth) {
+		if (imsg_add(wbuf, target->conf.http.auth,
+		    itarget.auth_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_HTTP");
+		}
+	}
+	if (target->conf.http.hmac) {
+		if (imsg_add(wbuf, target->conf.http.hmac,
+		    itarget.hmac_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_HTTP");
+		}
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_notification_target(struct gotd_imsgev *iev,
+    struct gotd_notification_target *target)
+{
+	const struct got_error *err = NULL;
+
+	switch (target->type) {
+	case GOTD_NOTIFICATION_VIA_EMAIL:
+		err = send_notification_target_email(iev, target);
+		break;
+	case GOTD_NOTIFICATION_VIA_HTTP:
+		err = send_notification_target_http(iev, target);
+		break;
+	default:
+		log_warn("unsupported notification target type %d",
+		    target->type);
+		break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+send_notification_config(struct gotd_imsgev *iev, char *repo_name)
+{
+	const struct got_error *err = NULL;
+	struct gotd_repo *repo;
+	struct got_pathlist_entry *pe;
+	struct gotd_imsg_pathlist ilist;
+	struct gotd_notification_target *target;
+
+	memset(&ilist, 0, sizeof(ilist));
+
+	repo = gotd_find_repo_by_name(repo_name, &gotd.repos);
+	if (repo == NULL)
+		return got_error(GOT_ERR_NOT_GIT_REPO);
+
+	ilist.nelem = repo->num_notification_refs;
+	if (ilist.nelem > 0) {
+		if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFICATION_REFS,
+		    GOTD_PROC_GOTD, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "NOTIFICATION_REFS");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head, &repo->notification_refs) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTD_IMSG_NOTIFICATION_REFS_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	ilist.nelem = repo->num_notification_ref_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotd_imsg_compose_event(iev,
+		    GOTD_IMSG_NOTIFICATION_REF_NAMESPACES,
+		    GOTD_PROC_GOTD, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "NOTIFICATION_REF_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->notification_ref_namespaces) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTD_IMSG_NOTIFICATION_REF_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		err = send_notification_target(iev, target);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
 static void
 gotd_dispatch_client_session(int fd, short event, void *arg)
 {
@@ -1870,6 +2129,16 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
+			}
+			if (client_is_writing(client)) {
+				err = send_request_timeout(iev,
+				    &gotd.request_timeout);
+				if (err)
+					break;
+				err = send_notification_config(iev,
+				    proc->repo_name);
+				if (err)
+					break;
 			}
 			do_start_repo_child = 1;
 			break;
@@ -2036,30 +2305,6 @@ connect_notifier_and_session(struct gotd_client *client)
 }
 
 static const struct got_error *
-send_protected_ref(struct gotd_imsgev *iev, const char *refname,
-    int imsg_type)
-{
-	struct gotd_imsg_pathlist_elem ielem;
-	struct ibuf *wbuf = NULL;
-
-	memset(&ielem, 0, sizeof(ielem));
-	ielem.path_len = strlen(refname);
-
-	wbuf = imsg_create(&iev->ibuf, imsg_type, GOTD_PROC_GOTD, gotd.pid,
-	    sizeof(ielem) + ielem.path_len);
-	if (wbuf == NULL)
-		return got_error_from_errno_fmt("imsg_create %d", imsg_type);
-
-	if (imsg_add(wbuf, &ielem, sizeof(ielem)) == -1)
-		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
-	if (imsg_add(wbuf, refname, ielem.path_len) == -1)
-		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
-
-	imsg_close(&iev->ibuf, wbuf);
-	return gotd_imsg_flush(&iev->ibuf);
-}
-
-static const struct got_error *
 send_protected_refs(struct gotd_imsgev *iev, const char *repo_name)
 {
 	const struct got_error *err = NULL;
@@ -2084,7 +2329,7 @@ send_protected_refs(struct gotd_imsgev *iev, const char *repo_name)
 
 		RB_FOREACH(pe, got_pathlist_head,
 		    &repo->protected_tag_namespaces) {
-			err = send_protected_ref(iev, pe->path,
+			err = send_pathlist_elem(iev, pe->path,
 			    GOTD_IMSG_PROTECTED_TAG_NAMESPACES_ELEM);
 			if (err)
 				return err;
@@ -2102,7 +2347,7 @@ send_protected_refs(struct gotd_imsgev *iev, const char *repo_name)
 
 		RB_FOREACH(pe, got_pathlist_head,
 		    &repo->protected_branch_namespaces) {
-			err = send_protected_ref(iev, pe->path,
+			err = send_pathlist_elem(iev, pe->path,
 			    GOTD_IMSG_PROTECTED_BRANCH_NAMESPACES_ELEM);
 			if (err)
 				return err;
@@ -2118,7 +2363,7 @@ send_protected_refs(struct gotd_imsgev *iev, const char *repo_name)
 		}
 
 		RB_FOREACH(pe, got_pathlist_head, &repo->protected_branches) {
-			err = send_protected_ref(iev, pe->path,
+			err = send_pathlist_elem(iev, pe->path,
 			    GOTD_IMSG_PROTECTED_BRANCHES_ELEM);
 			if (err)
 				return err;
@@ -2747,7 +2992,8 @@ main(int argc, char **argv)
 	}
 
 	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH &&
-	    proc_id != GOTD_PROC_REPO_WRITE) {
+	    proc_id != GOTD_PROC_REPO_WRITE &&
+	    proc_id != GOTD_PROC_SESSION_WRITE) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -2941,11 +3187,8 @@ main(int argc, char **argv)
 			err(1, "pledge");
 #endif
 		apply_unveil_repo_readwrite(repo_path);
-		repo = gotd_find_repo_by_path(repo_path, &gotd);
-		if (repo == NULL)
-			fatalx("no repository for path %s", repo_path);
-		session_write_main(title, repo_path, pack_fds, temp_fds, tmp_fd,
-		    &gotd.request_timeout, repo);
+		session_write_main(title, repo_path, pack_fds, temp_fds,
+		    tmp_fd);
 		/* NOTREACHED */
 		break;
 	case GOTD_PROC_REPO_READ:
