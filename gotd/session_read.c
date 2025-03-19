@@ -810,6 +810,11 @@ session_dispatch(int fd, short event, void *arg)
 		case GOTD_IMSG_DISCONNECT:
 			do_disconnect = 1;
 			break;
+		case GOTD_IMSG_REQUEST_TIMEOUT:
+			if (imsg_get_data(&imsg, &gotd_session.request_timeout,
+			    sizeof(gotd_session.request_timeout)) == -1)
+				err = got_error_from_errno("imsg_get_data");
+			break;
 		case GOTD_IMSG_CONNECT_REPO_CHILD:
 			err = recv_repo_child(&imsg);
 			if (err)
@@ -845,7 +850,7 @@ done:
 
 void
 session_read_main(const char *title, const char *repo_path,
-    int *pack_fds, int *temp_fds, struct timeval *request_timeout)
+    int *pack_fds, int *temp_fds)
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
@@ -854,8 +859,8 @@ session_read_main(const char *title, const char *repo_path,
 	gotd_session.pid = getpid();
 	gotd_session.pack_fds = pack_fds;
 	gotd_session.temp_fds = temp_fds;
-	memcpy(&gotd_session.request_timeout, request_timeout,
-	    sizeof(gotd_session.request_timeout));
+	gotd_session.request_timeout.tv_sec = GOTD_DEFAULT_REQUEST_TIMEOUT;
+	gotd_session.request_timeout.tv_usec = 0;
 	gotd_session.repo_child_packfd = -1;
 
 	if (imsgbuf_init(&gotd_session.notifier_iev.ibuf, -1) == -1) {

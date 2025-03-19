@@ -14,5 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void session_read_main(const char *, const char *, int *, int *,
-    struct timeval *);
+void session_read_main(const char *, const char *, int *, int *);
