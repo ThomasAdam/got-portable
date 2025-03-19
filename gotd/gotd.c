@@ -2984,11 +2984,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (proc_id != GOTD_PROC_LISTEN && proc_id != GOTD_PROC_AUTH &&
-	    proc_id != GOTD_PROC_REPO_WRITE &&
-	    proc_id != GOTD_PROC_REPO_READ &&
-	    proc_id != GOTD_PROC_SESSION_WRITE && proc_id != GOTD_PROC_NOTIFY &&
-	    proc_id != GOTD_PROC_SESSION_READ) {
+	if (proc_id == GOTD_PROC_GOTD) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
@@ -3034,13 +3030,11 @@ main(int argc, char **argv)
 			return 0;
 		}
 	
-		if (proc_id == GOTD_PROC_GOTD) {
-			gotd_socket = unix_socket_listen(gotd.unix_socket_path,
-			    pw->pw_uid, pw->pw_gid);
-			if (gotd_socket == -1) {
-				fatal("cannot listen on unix socket %s",
-				    gotd.unix_socket_path);
-			}
+		gotd_socket = unix_socket_listen(gotd.unix_socket_path,
+		    pw->pw_uid, pw->pw_gid);
+		if (gotd_socket == -1) {
+			fatal("cannot listen on unix socket %s",
+			    gotd.unix_socket_path);
 		}
 
 		if (gethostname(hostname, sizeof(hostname)) == -1)
