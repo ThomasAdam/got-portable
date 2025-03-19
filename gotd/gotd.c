@@ -579,7 +579,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
-		if (strlcpy(client->repo_name, ireq.repo_name,
+		if (strlcpy(client->repo_name, repo->name,
 		    sizeof(client->repo_name)) >= sizeof(client->repo_name)) {
 			return got_error_msg(GOT_ERR_NO_SPACE,
 			    "repository name too long");
@@ -596,7 +596,7 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
-		if (strlcpy(client->repo_name, ireq.repo_name,
+		if (strlcpy(client->repo_name, repo->name,
 		    sizeof(client->repo_name)) >= sizeof(client->repo_name)) {
 			return got_error_msg(GOT_ERR_NO_SPACE,
 			    "repository name too long");
