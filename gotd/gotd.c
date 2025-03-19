@@ -107,6 +107,8 @@ struct gotd_client {
 	struct gotd_child_proc		*gotsys;
 	int				 required_auth;
 	int				 gotsys_error_sent;
+	struct timespec			 time_connected;
+	char				 repo_name[NAME_MAX];
 };
 STAILQ_HEAD(gotd_clients, gotd_client);
 
@@ -472,21 +474,23 @@ send_client_info(struct gotd_imsgev *iev, struct gotd_client *client)
 	iclient.euid = client->euid;
 	iclient.egid = client->egid;
 
-	proc = client->repo;
-	if (proc) {
-		if (strlcpy(iclient.repo_name, proc->repo_name,
-		    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
-			return got_error_msg(GOT_ERR_NO_SPACE,
-			    "repo name too long");
-		}
-		if (client_is_writing(client))
-			iclient.is_writing = 1;
-
-		iclient.repo_child_pid = proc->pid;
+	if (strlcpy(iclient.repo_name, client->repo_name,
+	    sizeof(iclient.repo_name)) >= sizeof(iclient.repo_name)) {
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "repo name too long");
 	}
+
+	proc = client->repo;
+	if (proc)
+		iclient.repo_child_pid = proc->pid;
+
+	if (client_is_writing(client))
+		iclient.is_writing = 1;
 
 	if (client->session)
 		iclient.session_child_pid = client->session->pid;
+
+	iclient.time_connected = client->time_connected.tv_sec;
 
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_INFO_CLIENT,
 	    GOTD_PROC_GOTD, -1, &iclient, sizeof(iclient)) == -1) {
@@ -579,6 +583,11 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
+		if (strlcpy(client->repo_name, ireq.repo_name,
+		    sizeof(client->repo_name)) >= sizeof(client->repo_name)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "repository name too long");
+		}
 		err = start_auth_child(client, GOTD_AUTH_READ, repo,
 		    gotd.argv0, gotd.confpath, gotd.daemonize,
 		    gotd.verbosity);
@@ -591,6 +600,11 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 		repo = gotd_find_repo_by_name(ireq.repo_name, &gotd.repos);
 		if (repo == NULL)
 			return got_error(GOT_ERR_NOT_GIT_REPO);
+		if (strlcpy(client->repo_name, ireq.repo_name,
+		    sizeof(client->repo_name)) >= sizeof(client->repo_name)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "repository name too long");
+		}
 		err = start_auth_child(client,
 		    GOTD_AUTH_READ | GOTD_AUTH_WRITE,
 		    repo, gotd.argv0, gotd.confpath, gotd.daemonize,
@@ -733,6 +747,11 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	/* The auth process will verify UID/GID for us. */
 	client->euid = iconnect.euid;
 	client->egid = iconnect.egid;
+
+	if (clock_gettime(CLOCK_REALTIME, &client->time_connected) == -1) {
+		err = got_error_from_errno("clock_gettime");
+		goto done;
+	}
 
 	client->fd = imsg_get_fd(imsg);
 	if (client->fd == -1) {

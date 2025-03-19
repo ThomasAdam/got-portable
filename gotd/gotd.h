@@ -313,6 +313,7 @@ struct gotd_imsg_info_client {
 	int is_writing;
 	pid_t session_child_pid;
 	pid_t repo_child_pid;
+	time_t time_connected;
 };
 
 /* Structure for GOTD_IMSG_LIST_REFS. */
