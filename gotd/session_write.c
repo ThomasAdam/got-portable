@@ -1884,6 +1884,11 @@ session_dispatch(int fd, short event, void *arg)
 			    target, entry);
 			break;
 		}
+		case GOTD_IMSG_REQUEST_TIMEOUT:
+			if (imsg_get_data(&imsg, &gotd_session.request_timeout,
+			    sizeof(gotd_session.request_timeout)) == -1)
+				err = got_error_from_errno("imsg_get_data");
+			break;
 		case GOTD_IMSG_CONNECT_NOTIFIER:
 			err = recv_notifier(&imsg);
 			break;
