@@ -1843,7 +1843,6 @@ session_dispatch(int fd, short event, void *arg)
 			gotd_session.num_notification_refs_needed = npaths;
 			gotd_session.num_notification_refs_received = 0;
 			break;
-			break;
 		case GOTD_IMSG_NOTIFICATION_REFS_ELEM:
 		case GOTD_IMSG_NOTIFICATION_REF_NAMESPACES_ELEM:
 			if (gotd_session.notification_refs_cur == NULL ||
