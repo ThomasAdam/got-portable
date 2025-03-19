@@ -314,6 +314,7 @@ static void
 proc_done(struct gotd_child_proc *proc)
 {
 	struct gotd_client *client;
+	int do_disconnect = 0;
 
 	TAILQ_REMOVE(&procs, proc, entry);
 
@@ -321,12 +322,18 @@ proc_done(struct gotd_child_proc *proc)
 	if (client == NULL)
 		client = find_client_by_proc_fd(proc->pipe[0]);
 	if (client != NULL) {
-		if (proc == client->repo)
+		if (proc == client->repo) {
 			client->repo = NULL;
-		if (proc == client->auth)
+			do_disconnect = 1;
+		}
+		if (proc == client->auth) {
 			client->auth = NULL;
-		if (proc == client->session)
+			do_disconnect = 1;
+		}
+		if (proc == client->session) {
 			client->session = NULL;
+			do_disconnect = 1;
+		}
 		if (proc == client->gotsys)
 			client->gotsys = NULL;
 	}
@@ -343,6 +350,9 @@ proc_done(struct gotd_child_proc *proc)
 	}
 
 	free(proc);
+
+	if (do_disconnect)
+		disconnect(client);
 }
 
 static void
