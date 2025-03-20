@@ -166,7 +166,6 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 
 	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
 		return got_error_from_errno("imsgbuf_init");
-	imsgbuf_allow_fdpass(&ibuf);
 
 	if (imsg_compose(&ibuf, GOTD_IMSG_INFO, 0, 0, -1, NULL, 0) == -1) {
 		imsgbuf_clear(&ibuf);
@@ -223,7 +222,6 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 
 	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
 		return got_error_from_errno("imsgbuf_init");
-	imsgbuf_allow_fdpass(&ibuf);
 
 	if (imsg_compose(&ibuf, GOTD_IMSG_STOP, 0, 0, -1, NULL, 0) == -1) {
 		imsgbuf_clear(&ibuf);
