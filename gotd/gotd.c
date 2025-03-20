@@ -2982,9 +2982,7 @@ main(int argc, char **argv)
 				fatalx("failed to parse secrets file %s: %s",
 				    p, error->msg);
 		}
-	}
 
-	if (proc_id == GOTD_PROC_GOTD) {
 		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
 			return 1;
 
