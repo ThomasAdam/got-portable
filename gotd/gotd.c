@@ -768,6 +768,11 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
 	}
+	if (fcntl(client->fd, F_SETFD, FD_CLOEXEC) == -1) {
+		err = got_error_from_errno("fcntl");
+		goto done;
+	}
+
 	if (imsgbuf_init(&client->iev.ibuf, client->fd) == -1) {
 		err = got_error_from_errno("imsgbuf_init");
 		goto done;
