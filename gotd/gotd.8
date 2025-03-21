@@ -115,7 +115,8 @@ The flan_hacker user can now populate the empty repository with
 .Xr gotsh 1 ,
 .Xr git-repository 5 ,
 .Xr gotd.conf 5
-.Xr gotd-secrets.conf 5
+.Xr gotd-secrets.conf 5 ,
+.Xr gotctl 8
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .Sh CAVEATS
@@ -125,3 +126,15 @@ cannot serve repositories that use the sha256 object ID hashing algorithm
 because
 .Nm
 does not yet support version 2 of the Git network protocol.
+.Pp
+.Nm
+cannot honour the SIGHUP signal because the
+.Pa /etc/gotd-secrets.conf
+file is only readable by root, and
+.Nm
+runs entirely without root privileges after initial startup.
+The configuration of a running
+.Nm
+instance can be reloaded by running
+.Cm gotctl reload
+as root.
