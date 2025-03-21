@@ -3078,6 +3078,11 @@ start_auth_child(struct gotd_client *client, int required_auth,
     int daemonize, int verbosity)
 {
 	struct gotd_child_proc *proc;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL)

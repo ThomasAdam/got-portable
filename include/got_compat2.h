@@ -65,6 +65,9 @@
 #define __attribute__(a)
 #endif
 
+#ifndef _PW_NAME_LEN
+#define	_PW_NAME_LEN		31	/* max length, not counting NUL */
+#endif
 
 #ifndef UID_MAX
 # define UID_MAX	UINT_MAX	/* max value for a uid_t */
