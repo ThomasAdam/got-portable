@@ -3441,8 +3441,6 @@ main(int argc, char **argv)
 		if (gotd_parse_config(confpath, gotd_reload_conf_fd,
 		    GOTD_PROC_GOTD, secrets, &gotd) != 0)
 			return 1;
-		close(gotd_reload_conf_fd);
-		gotd_reload_conf_fd = -1;
 
 		pw = getpwnam(gotd.user_name);
 		if (pw == NULL) {
