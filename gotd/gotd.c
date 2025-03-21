@@ -120,6 +120,12 @@ volatile int client_cnt;
 static struct timeval auth_timeout = { 5, 0 };
 static struct gotd gotd;
 static int gotd_socket = -1;
+static int gotd_reload_conf_fd = -1;
+static int gotd_reload_secrets_fd = -1;
+static int have_reload_secrets;
+static char *gotd_reload_secrets_path;
+static int listener_halted;
+static uint32_t reload_client_id;
 
 void gotd_sighdlr(int sig, short event, void *arg);
 static void gotd_shutdown(void);
@@ -131,6 +137,9 @@ static const struct got_error *start_auth_child(struct gotd_client *, int,
     struct gotd_repo *, char *, const char *, int, int);
 static void kill_proc(struct gotd_child_proc *, int);
 static void disconnect(struct gotd_client *);
+static pid_t start_child(enum gotd_procid, const char *, char *,
+    const char *, const char *, int, int, int);
+static void kill_proc_timeout(int, short, void *);
 
 __dead static void
 usage(void)
@@ -413,6 +422,9 @@ disconnect(struct gotd_client *client)
 	free(client->username);
 	free(client);
 	client_cnt--;
+
+	if (listener_halted && client_cnt == 0)
+		event_loopexit(NULL);
 }
 
 static void
@@ -553,6 +565,226 @@ stop_gotd(struct gotd_client *client)
 }
 
 static const struct got_error *
+send_reload_config(struct gotd_imsgev *iev)
+{
+	const struct got_error *err = NULL;
+	int fd;
+
+	fd = dup(gotd_socket);
+	if (fd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
+
+	if (imsg_compose(&iev->ibuf, GOTD_IMSG_LISTEN_SOCKET,
+	    GOTD_PROC_GOTD, gotd.pid, fd, NULL, 0) == -1) {
+		close(fd);
+		err = got_error_from_errno("imsg compose LISTEN_SOCKET");
+		goto done;
+	}
+
+	if (imsg_compose(&iev->ibuf, GOTD_IMSG_RELOAD_SECRETS,
+	    GOTD_PROC_GOTD, gotd.pid, gotd_reload_secrets_fd, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose RELOAD_SECRETS");
+		goto done;
+	}
+
+	if (imsg_compose(&iev->ibuf, GOTD_IMSG_GOTD_CONF,
+	    GOTD_PROC_GOTD, gotd.pid, gotd_reload_conf_fd, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose GOTD_CONF");
+		goto done;
+	}
+
+	err = gotd_imsg_flush(&iev->ibuf);
+	if (err)
+		return err;
+done:
+	if (gotd_reload_conf_fd != -1) {
+		close(gotd_reload_conf_fd);
+		gotd_reload_conf_fd = -1;
+	}
+
+	if (gotd_reload_conf_fd != -1) {
+		close(gotd_reload_secrets_fd);
+		gotd_reload_secrets_fd = -1;
+	}
+	have_reload_secrets = 0;
+
+	return err;
+}
+
+static const struct got_error *
+halt_listener(struct gotd_imsgev *iev)
+{
+	if (gotd_imsg_compose_event(&gotd.listen_proc->iev,
+	    GOTD_IMSG_HALT, GOTD_PROC_GOTD, -1,
+	    &reload_client_id, sizeof(reload_client_id)) == -1)
+		return got_error_from_errno("imsg compose HALT");
+
+	listener_halted = 1;
+	return NULL;
+}
+
+static void
+gotd_dispatch_reload(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_child_proc *proc = gotd.reload_proc;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
+	if (proc->iev.ibuf.fd != fd)
+		fatalx("%s: unexpected fd %d", __func__, fd);
+
+	if (event & EV_READ) {
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		err = gotd_imsg_flush(ibuf);
+		if (err)
+			fatalx("%s", err->msg);
+	}
+
+	for (;;) {
+		const struct got_error *err = NULL;
+
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			err = gotd_imsg_recv_error(NULL, &imsg);
+			break;
+		case GOTD_IMSG_RELOAD_READY:
+			err = send_reload_config(iev);
+			if (err)
+				break;
+			err = halt_listener(iev);
+			if (err)
+				break;
+			shut = 1;
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		if (err) {
+			log_warnx("reloading failed: %s", err->msg);
+			kill_proc(gotd.reload_proc, 0);
+			gotd.reload_proc = NULL;
+			imsg_free(&imsg);
+			return;
+		}
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+		if (listener_halted && client_cnt == 0)
+			event_loopexit(NULL);
+	}
+}
+
+static const struct got_error *
+reload_gotd(struct gotd_client *client, struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	size_t datalen;
+	char *confpath = NULL;
+	struct gotd_child_proc *proc = NULL;
+
+	if (client->euid != 0)
+		return got_error_set_errno(EPERM, "reload");
+
+	if (gotd.reload_proc != NULL || gotd_reload_conf_fd != -1)
+		return got_error_set_errno(EALREADY, "reload");
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	confpath = strndup(imsg->data, datalen);
+	if (confpath == NULL)
+		return got_error_from_errno("strndup");
+	
+	gotd_reload_conf_fd = imsg_get_fd(imsg);
+	if (gotd_reload_conf_fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
+
+	/* TODO: parse provided config for verification */
+
+	proc = calloc(1, sizeof(*proc));
+	if (proc == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	proc->type = GOTD_PROC_RELOAD;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	    PF_UNSPEC, proc->pipe) == -1) {
+		err = got_error_from_errno("socketpair");
+		free(proc);
+		proc = NULL;
+		goto done;
+	}
+
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+
+	proc->pid = start_child(GOTD_PROC_RELOAD, NULL, gotd.argv0,
+	    confpath, gotd_reload_secrets_path, proc->pipe[1],
+	    gotd.daemonize, gotd.verbosity);
+	imsgbuf_allow_fdpass(&proc->iev.ibuf);
+	proc->iev.handler = gotd_dispatch_reload;
+	proc->iev.events = EV_READ;
+	proc->iev.handler_arg = NULL;
+	event_set(&proc->iev.ev, proc->iev.ibuf.fd, EV_READ,
+	    gotd_dispatch_reload, &proc->iev);
+	gotd_imsg_event_add(&proc->iev);
+	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
+
+	TAILQ_INSERT_HEAD(&procs, proc, entry);
+
+	gotd.reload_proc = proc;
+
+	log_info("gotd is reloading with PID %d", proc->pid);
+
+	reload_client_id = client->id;
+done:
+	if (err) {
+		if (proc) {
+			close(proc->pipe[0]);
+			close(proc->pipe[1]);
+			free(proc);
+		}
+	}
+	free(confpath);
+	return err;
+}
+
+static const struct got_error *
 start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 {
 	const struct got_error *err;
@@ -615,6 +847,38 @@ start_client_authentication(struct gotd_client *client, struct imsg *imsg)
 	return NULL;
 }
 
+static const struct got_error *
+recv_reload_secrets(struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	size_t datalen;
+
+	gotd_reload_secrets_fd = imsg_get_fd(imsg);
+	if (gotd_reload_secrets_fd == -1)
+		return NULL; /* no secrets being used */
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen == 0) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	gotd_reload_secrets_path = strndup(imsg->data, datalen);
+	if (gotd_reload_secrets_path == NULL)
+		err = got_error_from_errno("strndup");
+done:
+	if (err) {
+		if (gotd_reload_secrets_fd != -1) {
+			close(gotd_reload_secrets_fd);
+			gotd_reload_secrets_fd = -1;
+		}
+		free(gotd_reload_secrets_path);
+		gotd_reload_secrets_path = NULL;
+	}
+
+	return err;
+}
+
 static void
 gotd_request(int fd, short events, void *arg)
 {
@@ -624,6 +888,7 @@ gotd_request(int fd, short events, void *arg)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	ssize_t n;
+	int do_disconnect = 0;
 
 	if (events & EV_WRITE) {
 		err = gotd_imsg_flush(ibuf);
@@ -663,7 +928,7 @@ gotd_request(int fd, short events, void *arg)
 		}
 	}
 
-	while (err == NULL) {
+	while (err == NULL && !do_disconnect) {
 		n = imsg_get(ibuf, &imsg);
 		if (n == -1) {
 			err = got_error_from_errno("imsg_get");
@@ -681,6 +946,22 @@ gotd_request(int fd, short events, void *arg)
 		case GOTD_IMSG_STOP:
 			err = stop_gotd(client);
 			break;
+		case GOTD_IMSG_RELOAD_SECRETS:
+			if (have_reload_secrets) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = recv_reload_secrets(&imsg);
+			if (err)
+				break;
+			have_reload_secrets = 1;
+			break;
+		case GOTD_IMSG_RELOAD:
+			err = reload_gotd(client, &imsg);
+			if (err)
+				break;
+			do_disconnect = 1;
+			break;
 		case GOTD_IMSG_LIST_REFS:
 			err = start_client_authentication(client, &imsg);
 			break;
@@ -695,6 +976,8 @@ gotd_request(int fd, short events, void *arg)
 
 	if (err) {
 		disconnect_on_error(client, err);
+	} else if (do_disconnect) {
+		disconnect(client);
 	} else {
 		gotd_imsg_event_add(&client->iev);
 	}
@@ -807,6 +1090,8 @@ static const char *gotd_proc_names[GOTD_PROC_MAX] = {
 	"gitwrapper",
 	"notify",
 	"gotsys",
+	"reload",
+	"gotctl",
 };
 
 static void
@@ -925,10 +1210,10 @@ gotd_sighdlr(int sig, short event, void *arg)
 
 	switch (sig) {
 	case SIGHUP:
-		log_info("%s: ignoring SIGHUP", __func__);
+		log_info("ignoring SIGHUP; run 'gotctl reload' instead");
 		break;
 	case SIGUSR1:
-		log_info("%s: ignoring SIGUSR1", __func__);
+		log_info("ignoring SIGUSR1");
 		break;
 	case SIGTERM:
 	case SIGINT:
@@ -1171,13 +1456,20 @@ setup_listener(struct gotd_imsgev *iev)
 {
 	struct gotd_imsg_listen_socket isocket;
 	size_t i;
+	int fd;
 
 	memset(&isocket, 0, sizeof(isocket));
 	isocket.nconnection_limits = gotd.nconnection_limits;
 
+	fd = dup(gotd_socket);
+	if (fd == -1)
+		return got_error_from_errno("dup");
+
 	if (gotd_imsg_compose_event(iev, GOTD_IMSG_LISTEN_SOCKET,
-	    GOTD_PROC_GOTD, gotd_socket, &isocket, sizeof(isocket)) == -1)
+	    GOTD_PROC_GOTD, fd, &isocket, sizeof(isocket)) == -1) {
+		close(fd);
 		return got_error_from_errno("imsg compose LISTEN_SOCKET");
+	}
 
 	for (i = 0; i < gotd.nconnection_limits; i++) {
 		if (gotd_imsg_compose_event(iev, GOTD_IMSG_CONNECTION_LIMIT,
@@ -2495,9 +2787,10 @@ done:
 
 static pid_t
 start_child(enum gotd_procid proc_id, const char *repo_path,
-    char *argv0, const char *confpath, int fd, int daemonize, int verbosity)
+    char *argv0, const char *confpath, const char *secretspath,
+    int fd, int daemonize, int verbosity)
 {
-	const char	*argv[11];
+	const char	*argv[13];
 	int		 argc = 0;
 	pid_t		 pid;
 
@@ -2540,12 +2833,20 @@ start_child(enum gotd_procid proc_id, const char *repo_path,
 	case GOTD_PROC_NOTIFY:
 		argv[argc++] = "-TN";
 		break;
+	case GOTD_PROC_RELOAD:
+		argv[argc++] = "-TG";
+		break;
 	default:
 		fatalx("invalid process id %d", proc_id);
 	}
 
 	argv[argc++] = "-f";
 	argv[argc++] = confpath;
+
+	if (secretspath) {
+		argv[argc++] = "-s";
+		argv[argc++] = secretspath;
+	}
 
 	if (repo_path) {
 		argv[argc++] = "-P";
@@ -2583,7 +2884,7 @@ start_listener(char *argv0, const char *confpath, int daemonize, int verbosity)
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 
-	proc->pid = start_child(proc->type, NULL, argv0, confpath,
+	proc->pid = start_child(proc->type, NULL, argv0, confpath, NULL,
 	    proc->pipe[1], daemonize, verbosity);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
@@ -2614,7 +2915,7 @@ start_notifier(char *argv0, const char *confpath, int daemonize, int verbosity)
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 
-	proc->pid = start_child(proc->type, NULL, argv0, confpath,
+	proc->pid = start_child(proc->type, NULL, argv0, confpath, NULL,
 	    proc->pipe[1], daemonize, verbosity);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
@@ -2658,7 +2959,7 @@ start_session_child(struct gotd_client *client, struct gotd_repo *repo,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
-	    confpath, proc->pipe[1], daemonize, verbosity);
+	    confpath, NULL, proc->pipe[1], daemonize, verbosity);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -2707,7 +3008,7 @@ start_repo_child(struct gotd_client *client, enum gotd_procid proc_type,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
-	    confpath, proc->pipe[1], daemonize, verbosity);
+	    confpath, NULL, proc->pipe[1], daemonize, verbosity);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -2752,7 +3053,7 @@ start_auth_child(struct gotd_client *client, int required_auth,
 	    PF_UNSPEC, proc->pipe) == -1)
 		fatal("socketpair");
 	proc->pid = start_child(proc->type, proc->repo_path, argv0,
-	    confpath, proc->pipe[1], daemonize, verbosity);
+	    confpath, NULL, proc->pipe[1], daemonize, verbosity);
 	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1)
 		fatal("imsgbuf_init");
 	imsgbuf_allow_fdpass(&proc->iev.ibuf);
@@ -2926,6 +3227,9 @@ main(int argc, char **argv)
 			case 'A':
 				proc_id = GOTD_PROC_AUTH;
 				break;
+			case 'G':
+				proc_id = GOTD_PROC_RELOAD;
+				break;
 			case 'L':
 				proc_id = GOTD_PROC_LISTEN;
 				break;
@@ -2970,6 +3274,7 @@ main(int argc, char **argv)
 
 	if (proc_id == GOTD_PROC_GOTD) {
 		const char *p = secretspath ? secretspath : GOTD_SECRETS_PATH;
+		int conf_fd = -1;
 
 		fp = fopen(p, "r");
 		if (fp == NULL && (secretspath != NULL || errno != ENOENT))
@@ -2984,8 +3289,15 @@ main(int argc, char **argv)
 				    p, error->msg);
 		}
 
-		if (gotd_parse_config(confpath, proc_id, secrets, &gotd) != 0)
+		conf_fd = open(confpath, O_RDONLY | O_NOFOLLOW);
+		if (conf_fd == -1)
+			fatal("open %s", confpath);
+
+		if (gotd_parse_config(confpath, conf_fd, proc_id, secrets,
+		    &gotd) != 0)
 			return 1;
+		close(conf_fd);
+		conf_fd = -1;
 
 		pw = getpwnam(gotd.user_name);
 		if (pw == NULL) {
@@ -3041,6 +3353,132 @@ main(int argc, char **argv)
 		if (asprintf(&gotd.default_sender, "%s@%s", pw->pw_name,
 		    hostname) == -1)
 			fatal("asprintf");
+	} else if (proc_id == GOTD_PROC_RELOAD) {
+		struct imsgbuf ibuf;
+		struct imsg imsg;
+
+		if (imsgbuf_init(&ibuf, GOTD_FILENO_MSG_PIPE) == -1)
+			fatal("imsgbuf_init");
+		imsgbuf_allow_fdpass(&ibuf);
+	
+		if (imsg_compose(&ibuf, GOTD_IMSG_RELOAD_READY,
+		    GOTD_PROC_RELOAD, getpid(), -1, NULL, 0) == -1)
+			fatal("imsg compose RELOAD_READY");
+		error = gotd_imsg_flush(&ibuf);
+		if (error) {
+			gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+			fatal("imsg flush: %s", error->msg);
+		}
+		while (error == NULL &&
+		    (gotd_socket == -1  || gotd_reload_conf_fd == -1)) {
+			error = gotd_imsg_poll_recv(&imsg, &ibuf, 0);
+			if (error)
+				break;
+			switch (imsg.hdr.type) {
+			case GOTD_IMSG_ERROR:
+				error = gotd_imsg_recv_error(NULL, &imsg);
+				break;
+			case GOTD_IMSG_LISTEN_SOCKET:
+				if (gotd_socket != -1) {
+					error = got_error(GOT_ERR_PRIVSEP_MSG);
+					break;
+				}
+				gotd_socket = imsg_get_fd(&imsg);
+				if (gotd_socket != -1)
+					break;
+				error = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			case GOTD_IMSG_RELOAD_SECRETS:
+				if (have_reload_secrets) {
+					error = got_error(GOT_ERR_PRIVSEP_MSG);
+					break;
+				}
+				error = recv_reload_secrets(&imsg);
+				if (error)
+					break;
+				have_reload_secrets = 1;
+				break;
+			case GOTD_IMSG_GOTD_CONF:
+				if (!have_reload_secrets ||
+				    gotd_reload_conf_fd != -1) {
+					error = got_error(GOT_ERR_PRIVSEP_MSG);
+					break;
+				}
+				gotd_reload_conf_fd = imsg_get_fd(&imsg);
+				if (gotd_reload_conf_fd != -1)
+					break;
+				error = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				break;
+			}
+		}
+
+		if (error) {
+			gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+			fatal("reloading: %s", error->msg);
+		}
+
+		if (gotd_reload_secrets_fd != -1) {
+			char *p = gotd_reload_secrets_path;
+
+			check_file_secrecy(gotd_reload_secrets_fd, p);
+			fp = fdopen(gotd_reload_secrets_fd, "r");
+			if (fp == NULL) {
+				error = got_error_from_errno2("fdopen",
+				    gotd_reload_secrets_path);
+				gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+				fatal("reloading: %s", error->msg);
+			}
+
+			error = gotd_secrets_parse(p, fp, &secrets);
+			fclose(fp);
+			if (error) {
+				gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+				fatalx("failed to parse secrets file %s: %s",
+				    p, error->msg);
+			}
+		}
+
+		if (gotd_parse_config(confpath, gotd_reload_conf_fd,
+		    GOTD_PROC_GOTD, secrets, &gotd) != 0)
+			return 1;
+		close(gotd_reload_conf_fd);
+		gotd_reload_conf_fd = -1;
+
+		pw = getpwnam(gotd.user_name);
+		if (pw == NULL) {
+			uid = strtonum(gotd.user_name, 0, UID_MAX - 1, &errstr);
+			if (errstr == NULL)
+				pw = getpwuid(uid);
+		}
+		if (pw == NULL) {
+			error = got_error_fmt(GOT_ERR_UID,
+			    "user %s not found", gotd.user_name);
+			gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+			fatalx("%s", error->msg);
+		}
+
+		if (pw->pw_uid == 0) {
+			error = got_error_fmt(GOT_ERR_UID,
+			    "cannot run %s as the superuser", getprogname());
+			gotd_imsg_send_error(&ibuf, proc_id, 0, error);
+			fatalx("%s", error->msg);
+		}
+
+		if (gethostname(hostname, sizeof(hostname)) == -1)
+			fatal("gethostname");
+		if (asprintf(&gotd.default_sender, "%s@%s", pw->pw_name,
+		    hostname) == -1)
+			fatal("asprintf");
+
+		imsgbuf_clear(&ibuf);
+		close(GOTD_FILENO_MSG_PIPE);
+
+		/* Clear state such that reloading again will work. */
+		close(gotd_reload_conf_fd);
+		gotd_reload_conf_fd = -1;
+		close(gotd_reload_secrets_fd);
+		gotd_reload_secrets_fd = -1;
+		have_reload_secrets = 0;
 	}
 
 	gotd.argv0 = argv0;
@@ -3060,6 +3498,11 @@ main(int argc, char **argv)
 		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
+		gotd.pid = getpid();
+	} else if (proc_id == GOTD_PROC_RELOAD) {
+		snprintf(title, sizeof(title), "%s",
+		    gotd_proc_names[GOTD_PROC_GOTD]);
+		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
 		gotd.pid = getpid();
 	} else if (proc_id == GOTD_PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
@@ -3097,6 +3540,9 @@ main(int argc, char **argv)
 			fatal("setgid %d failed", pw->pw_gid);
 		if (setuid(pw->pw_uid) == -1)
 			fatal("setuid %d failed", pw->pw_uid);
+		/* FALLTHROUGH */
+	case GOTD_PROC_RELOAD:
+		proc_id = GOTD_PROC_GOTD;
 		if (verbosity) {
 			log_info("socket: %s", gotd.unix_socket_path);
 			log_info("user: %s", pw->pw_name);

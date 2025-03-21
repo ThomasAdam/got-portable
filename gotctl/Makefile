@@ -4,11 +4,13 @@
 
 PROG=		gotctl
 SRCS=		gotctl.c error.c imsg.c object_qid.c path.c \
-		pollfd.c hash.c
+		pollfd.c hash.c parse.y log.c secrets.c reference_parse.c
 
 MAN =		${PROG}.8
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR}/../gotd
+
+CLEANFILES = parse.c
 
 .if defined(PROFILE)
 LDADD = -lutil_p -levent_p

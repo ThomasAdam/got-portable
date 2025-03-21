@@ -18,9 +18,12 @@
 #include <sys/tree.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 
 #include <err.h>
+#include <errno.h>
 #include <event.h>
+#include <fcntl.h>
 #include <imsg.h>
 #include <limits.h>
 #include <locale.h>
@@ -29,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <getopt.h>
 #include <unistd.h>
 
@@ -40,6 +44,8 @@
 #include "got_lib_gitproto.h"
 
 #include "gotd.h"
+#include "secrets.h"
+#include "log.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -58,13 +64,16 @@ __dead static void	usage(int, int);
 
 __dead static void	usage_info(void);
 __dead static void	usage_stop(void);
+__dead static void	usage_reload(void);
 
 static const struct got_error*		cmd_info(int, char *[], int);
 static const struct got_error*		cmd_stop(int, char *[], int);
+static const struct got_error*		cmd_reload(int, char *[], int);
 
 static const struct gotctl_cmd gotctl_commands[] = {
 	{ "info",	cmd_info,	usage_info },
 	{ "stop",	cmd_stop,	usage_stop },
+	{ "reload",	cmd_reload,	usage_reload },
 };
 
 __dead static void
@@ -165,6 +174,12 @@ cmd_info(int argc, char *argv[], int gotd_sock)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno("unveil");
+#ifndef PROFILE
+	if (pledge("stdio", NULL) == -1)
+		return got_error_from_errno("pledge");
+#endif
 	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
 		return got_error_from_errno("imsgbuf_init");
 
@@ -221,6 +236,12 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno("unveil");
+#ifndef PROFILE
+	if (pledge("stdio", NULL) == -1)
+		return got_error_from_errno("pledge");
+#endif
 	if (imsgbuf_init(&ibuf, gotd_sock) == -1)
 		return got_error_from_errno("imsgbuf_init");
 
@@ -254,6 +275,254 @@ cmd_stop(int argc, char *argv[], int gotd_sock)
 	return err;
 }
 
+__dead static void
+usage_reload(void)
+{
+	fprintf(stderr, "usage: %s reload [-c config-file] [-s secrets]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+check_file_secrecy(int fd, const char *fname)
+{
+	struct stat st;
+
+	if (fstat(fd, &st))
+		return got_error_from_errno2("stat", fname);
+
+	if (st.st_uid != 0) {
+		return got_error_fmt(GOT_ERR_UID,
+		    "secrets file %s must be owned by root", fname);
+	}
+
+	if (st.st_gid != 0) {
+		return got_error_fmt(GOT_ERR_GID,
+		    "secrets file %s must be owned by group wheel/root",
+		    fname);
+	}
+
+	if (st.st_mode & (S_IWGRP | S_IXGRP | S_IRWXO)) {
+		return got_error_fmt(GOT_ERR_GID,
+		    "secrets file %s must not be group writable or world "
+		    "readable/writable", fname);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+cmd_reload(int argc, char *argv[], int gotd_sock)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf ibuf;
+	struct gotd gotd;
+	struct gotd_secrets *secrets = NULL;
+	struct imsg imsg;
+	char *confpath = NULL, *secretspath = NULL;
+	int ch, conf_fd = -1, secrets_fd = -1;
+	int no_action = 0;
+
+	log_init(1, LOG_DAEMON); /* log to stderr . */
+
+#ifndef PROFILE
+	if (pledge("stdio rpath sendfd unveil", NULL) == -1)
+		return got_error_from_errno("pledge");
+#endif
+	while ((ch = getopt(argc, argv, "c:ns:")) != -1) {
+		switch (ch) {
+		case 'c':
+			if (unveil(optarg, "r") != 0)
+				return got_error_from_errno("unveil");
+			confpath = realpath(optarg, NULL);
+			if (confpath == NULL) {
+				return got_error_from_errno2("realpath",
+				    optarg);
+			}
+			break;
+		case 'n':
+			no_action = 1;
+			break;
+		case 's':
+			if (unveil(optarg, "r") != 0)
+				return got_error_from_errno("unveil");
+			secretspath = realpath(optarg, NULL);
+			if (secretspath == NULL) {
+				return got_error_from_errno2("realpath",
+				    optarg);
+			}
+			break;
+		default:
+			usage_reload();
+			/* NOTREACHED */
+		}
+	}
+
+	if (confpath == NULL) {
+		confpath = strdup(GOTD_CONF_PATH);
+		if (confpath == NULL)
+			return got_error_from_errno("strdup");
+	}
+
+	if (unveil(confpath, "r") != 0)
+		return got_error_from_errno("unveil");
+
+	if (unveil(secretspath ? secretspath : GOTD_SECRETS_PATH, "r") != 0)
+		return got_error_from_errno("unveil");
+
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno("unveil");
+
+	secrets_fd = open(secretspath ? secretspath : GOTD_SECRETS_PATH,
+	    O_RDONLY | O_NOFOLLOW);
+	if (secrets_fd == -1) {
+		if (secretspath != NULL || errno != ENOENT) {
+			return got_error_from_errno2("open",
+			    secretspath ? secretspath : GOTD_SECRETS_PATH);
+		}
+	} else if (secretspath == NULL) {
+		secretspath = strdup(GOTD_SECRETS_PATH);
+		if (secretspath == NULL)
+			return got_error_from_errno("strdup");
+	}
+
+	conf_fd = open(confpath, O_RDONLY | O_NOFOLLOW);
+	if (conf_fd == -1)
+		return got_error_from_errno2("open", confpath);
+
+	if (secrets_fd != -1) {
+		int fd;
+		FILE *fp;
+
+		err = check_file_secrecy(secrets_fd, secretspath);
+		if (err)
+			goto done;
+
+		fd = dup(secrets_fd);
+		if (fd == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
+
+		fp = fdopen(fd, "r");
+		if (fp == NULL) {
+			err = got_error_from_errno2("fdopen", secretspath);
+			close(fd);
+			goto done;
+		}
+		err = gotd_secrets_parse(secretspath, fp, &secrets);
+		fclose(fp);
+		if (err) {
+			err = got_error_fmt(GOT_ERR_PARSE_CONFIG,
+			    "failed to parse secrets file %s: %s",
+			    secretspath, err->msg);
+			goto done;
+		}
+	}
+
+	if (gotd_parse_config(confpath, conf_fd, GOTD_PROC_GOTCTL,
+	    secrets, &gotd) != 0) {
+		/* Errors were already printed. Silence this one. */
+		err = got_error_msg(GOT_ERR_PARSE_CONFIG, "");
+		goto done;
+	}
+
+	if (no_action) {
+		fprintf(stderr, "configuration OK\n");
+		goto done;
+	}
+
+#ifndef PROFILE
+	if (pledge("stdio sendfd", NULL) == -1) {
+		err = got_error_from_errno("pledge");
+		goto done;
+	}
+#endif
+	if (secrets_fd != -1 && lseek(secrets_fd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", secretspath);
+		goto done;
+	}
+	if (lseek(conf_fd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", confpath);
+		goto done;
+	}
+
+	if (imsgbuf_init(&ibuf, gotd_sock) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&ibuf);
+
+	if (secrets_fd != -1) {
+		if (imsg_compose(&ibuf, GOTD_IMSG_RELOAD_SECRETS, 0, 0,
+		    secrets_fd, secretspath ? secretspath : GOTD_SECRETS_PATH,
+		    secretspath ?
+		    strlen(secretspath) : strlen(GOTD_SECRETS_PATH)) == -1) {
+			err = got_error_from_errno("imsg_compose "
+			    "RELOAD_SECRETS");
+			imsgbuf_clear(&ibuf);
+			goto done;
+		}
+		secrets_fd = -1;
+	} else {
+		if (imsg_compose(&ibuf, GOTD_IMSG_RELOAD_SECRETS, 0, 0, -1,
+		    NULL, 0) == -1) {
+			err = got_error_from_errno("imsg_compose "
+			    "RELOAD_SECRETS");
+			imsgbuf_clear(&ibuf);
+			goto done;
+		}
+	}
+
+	if (imsg_compose(&ibuf, GOTD_IMSG_RELOAD, 0, 0, conf_fd,
+	    confpath, strlen(confpath)) == -1) {
+		err = got_error_from_errno("imsg_compose RELOAD");
+		imsgbuf_clear(&ibuf);
+		goto done;
+
+	}
+	conf_fd = -1;
+
+	err = gotd_imsg_flush(&ibuf);
+	if (err)
+		goto done;
+#ifndef PROFILE
+	if (pledge("stdio", NULL) == -1) {
+		err = got_error_from_errno("pledge");
+		goto done;
+	}
+#endif
+	while (err == NULL) {
+		err = gotd_imsg_poll_recv(&imsg, &ibuf, 0);
+		if (err) {
+			if (err->code == GOT_ERR_EOF)
+				err = NULL;
+			break;
+		}
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			err = gotd_imsg_recv_error(NULL, &imsg);
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+
+	imsgbuf_clear(&ibuf);
+done:
+	free(confpath);
+	free(secretspath);
+	if (conf_fd != -1 && close(conf_fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (secrets_fd != -1 && close(secrets_fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+}
+
 static void
 list_commands(FILE *fp)
 {
@@ -279,37 +548,15 @@ usage(int hflag, int status)
 	exit(status);
 }
 
-static const struct got_error *
-apply_unveil(const char *unix_socket_path)
-{
-#ifdef PROFILE
-	if (unveil("gmon.out", "rwc") != 0)
-		return got_error_from_errno2("unveil", "gmon.out");
-#endif
-	if (unveil(unix_socket_path, "w") != 0)
-		return got_error_from_errno2("unveil", unix_socket_path);
-
-	if (unveil(NULL, NULL) != 0)
-		return got_error_from_errno("unveil");
-
-	return NULL;
-}
-
 static int
 connect_gotd(const char *socket_path)
 {
-	const struct got_error *error = NULL;
 	int gotd_sock = -1;
 	struct sockaddr_un sun;
 
-	error = apply_unveil(socket_path);
-	if (error)
-		errx(1, "%s", error->msg);
+	if (unveil(socket_path, "w") != 0)
+		err(1, "unveil %s", socket_path);
 
-#ifndef PROFILE
-	if (pledge("stdio unix", NULL) == -1)
-		err(1, "pledge");
-#endif
 	if ((gotd_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		err(1, "socket");
 
@@ -322,10 +569,9 @@ connect_gotd(const char *socket_path)
 		err(1, "connect: %s", socket_path);
 
 #ifndef PROFILE
-	if (pledge("stdio", NULL) == -1)
+	if (pledge("stdio rpath sendfd unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-
 	return gotd_sock;
 }
 
@@ -345,10 +591,9 @@ main(int argc, char *argv[])
 	setlocale(LC_CTYPE, "");
 
 #ifndef PROFILE
-	if (pledge("stdio unix unveil", NULL) == -1)
+	if (pledge("stdio rpath unix sendfd unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-
 	while ((ch = getopt_long(argc, argv, "+hf:V", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
@@ -389,13 +634,16 @@ main(int argc, char *argv[])
 
 		if (hflag)
 			cmd->cmd_usage();
-
+#ifdef PROFILE
+		if (unveil("gmon.out", "rwc") != 0)
+			err(1, "unveil", "gmon.out");
+#endif
 		gotd_sock = connect_gotd(socket_path);
 		if (gotd_sock == -1)
 			return 1;
 		error = cmd->cmd_main(argc, argv, gotd_sock);
 		close(gotd_sock);
-		if (error) {
+		if (error && error->msg[0] != '\0') {
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}

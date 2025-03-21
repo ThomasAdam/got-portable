@@ -64,6 +64,35 @@ Stop a running
 .Xr gotd 8
 instance.
 This operation requires root privileges.
+.It Cm reload Oo Fl c Ar config-file Oc Oo Fl n Oc Oo Fl s Ar secrets Oc
+Reload a running
+.Xr gotd 8
+instance.
+.Xr gotd 8
+will relaunch with an updated configuration read from the provided
+configuration files.
+The previous instance of
+.Xr gotd 8
+will continue to serve existing client connections and then exit.
+.Pp
+This operation requires root privileges.
+.Pp
+The options for
+.Cm gotctl reload
+are as follows:
+.Bl -tag -width Ds
+.It Fl f Ar config-file
+Set the path to the configuration file.
+If not specified, the file
+.Pa /etc/gotd.conf
+will be used.
+.It Fl n
+Only check the configuration files for validity.
+.It Fl s Ar secrets
+Set the path to the secrets file.
+If not specified, the file
+.Pa /etc/gotd-secrets.conf
+will be used if it exists.
 .El
 .Sh SEE ALSO
 .Xr got 1 ,

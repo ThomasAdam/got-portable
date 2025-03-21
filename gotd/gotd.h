@@ -65,6 +65,8 @@ enum gotd_procid {
 	GOTD_PROC_GITWRAPPER,
 	GOTD_PROC_NOTIFY,
 	GOTD_PROC_GOTSYS,
+	GOTD_PROC_RELOAD,
+	GOTD_PROC_GOTCTL,
 	GOTD_PROC_MAX,
 };
 
@@ -172,6 +174,7 @@ struct gotd {
 	int nrepos;
 	struct gotd_child_proc *listen_proc;
 	struct gotd_child_proc *notify_proc;
+	struct gotd_child_proc *reload_proc;
 	int notifications_enabled;
 	struct timeval request_timeout;
 	struct timeval auth_timeout;
@@ -195,6 +198,7 @@ enum gotd_imsg_type {
 	GOTD_IMSG_INFO_REPO,
 	GOTD_IMSG_INFO_CLIENT,
 	GOTD_IMSG_STOP,
+	GOTD_IMSG_RELOAD,
 
 	/* Request a list of references. */
 	GOTD_IMSG_LIST_REFS,
@@ -255,6 +259,12 @@ enum gotd_imsg_type {
 	GOTD_IMSG_CLIENT_SESSION_READY,
 	GOTD_IMSG_REPO_CHILD_READY,
 	GOTD_IMSG_CONNECT_REPO_CHILD,
+
+	/* Reloading. */
+	GOTD_IMSG_RELOAD_READY,
+	GOTD_IMSG_RELOAD_SECRETS,
+	GOTD_IMSG_GOTD_CONF,
+	GOTD_IMSG_HALT,
 
 	/* Auth child process. */
 	GOTD_IMSG_AUTH_READY,
@@ -636,8 +646,8 @@ struct gotd_imsg_notify {
 	/* Followed by username_len data bytes. */
 };
 
-int gotd_parse_config(const char *, enum gotd_procid, struct gotd_secrets *,
-    struct gotd *);
+int gotd_parse_config(const char *, int, enum gotd_procid,
+    struct gotd_secrets *, struct gotd *);
 struct gotd_repo *gotd_find_repo_by_name(const char *, struct gotd_repolist *);
 struct gotd_repo *gotd_find_repo_by_path(const char *, struct gotd *);
 struct gotd_uid_connection_limit *gotd_find_uid_connection_limit(
