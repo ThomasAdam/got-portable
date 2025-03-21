@@ -3442,9 +3442,14 @@ main(int argc, char **argv)
 					break;
 				}
 				gotd_socket = imsg_get_fd(&imsg);
-				if (gotd_socket != -1)
+				if (gotd_socket == -1) {
+					error = got_error(
+					    GOT_ERR_PRIVSEP_NO_FD);
 					break;
-				error = got_error(GOT_ERR_PRIVSEP_NO_FD);
+				}
+				if (fcntl(gotd_socket,
+				    F_SETFD, FD_CLOEXEC) == -1)
+					error = got_error_from_errno("fcntl");
 				break;
 			case GOTD_IMSG_RELOAD_SECRETS:
 				if (have_reload_secrets) {
