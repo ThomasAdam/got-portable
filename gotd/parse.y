@@ -62,7 +62,7 @@ static struct file {
 	int			 lineno;
 	int			 errors;
 } *file;
-struct file	*newfile(const char *, int, int);
+struct file	*newfile(const char *, int, int, int);
 static void	 closefile(struct file *);
 int		 check_file_secrecy(int, const char *);
 int		 yyparse(void);
@@ -1084,9 +1084,10 @@ check_file_secrecy(int fd, const char *fname)
 }
 
 struct file *
-newfile(const char *name, int secret, int required)
+newfile(const char *name, int conf_fd, int secret, int required)
 {
 	struct file *nfile;
+	int fd = -1;
 
 	nfile = calloc(1, sizeof(struct file));
 	if (nfile == NULL) {
@@ -1099,7 +1100,12 @@ newfile(const char *name, int secret, int required)
 		free(nfile);
 		return (NULL);
 	}
-	nfile->stream = fopen(nfile->name, "r");
+
+	fd = dup(conf_fd);
+	if (fd == -1)
+		return NULL;
+
+	nfile->stream = fdopen(fd, "r");
 	if (nfile->stream == NULL) {
 		if (required)
 			log_warn("open %s", nfile->name);
@@ -1126,7 +1132,7 @@ closefile(struct file *xfile)
 }
 
 int
-gotd_parse_config(const char *filename, enum gotd_procid proc_id,
+gotd_parse_config(const char *filename, int conf_fd, enum gotd_procid proc_id,
     struct gotd_secrets *secrets, struct gotd *env)
 {
 	struct sym *sym, *next;
@@ -1155,7 +1161,10 @@ gotd_parse_config(const char *filename, enum gotd_procid proc_id,
 	gotd->request_timeout.tv_sec = GOTD_DEFAULT_REQUEST_TIMEOUT;
 	gotd->request_timeout.tv_usec = 0;
 
-	file = newfile(filename, 0, require_config_file);
+	if (conf_fd == -1 && !require_config_file)
+		return 0;
+
+	file = newfile(filename, conf_fd, 0, require_config_file);
 	if (file == NULL)
 		return require_config_file ? -1 : 0;
 

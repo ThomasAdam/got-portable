@@ -27,6 +27,8 @@
 #include <err.h>
 #include <errno.h>
 #include <event.h>
+#include <fcntl.h>
+#include <imsg.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +106,7 @@ main(int argc, char *argv[])
 {
 	const struct got_error *error;
 	const char *confpath = NULL;
+	int conf_fd = -1;
 	char *command = NULL, *repo_name = NULL; /* for matching gotd.conf */
 	char *myserver = NULL;
 	const char *repo_path = NULL; /* as passed on the command line */
@@ -133,12 +136,13 @@ main(int argc, char *argv[])
 	 * checks whether repository paths exist on disk.
 	 * Parsing errors and warnings will be logged to stderr.
 	 * Upon failure we will run Git's native tooling so do not
-	 * bother checking for errors here.
+	 * bother checking for errors here, not even from open(2).
 	 */
 	confpath = getenv("GOTD_CONF_PATH");
 	if (confpath == NULL)
 		confpath = GOTD_CONF_PATH;
-	gotd_parse_config(confpath, GOTD_PROC_GITWRAPPER, NULL, &gotd);
+	conf_fd = open(confpath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	gotd_parse_config(confpath, conf_fd, GOTD_PROC_GITWRAPPER, NULL, &gotd);
 
 	error = apply_unveil(myserver);
 	if (error)
@@ -209,6 +213,8 @@ done:
 	free(repo_name);
 	free(myserver);
 	free(gitcommand);
+	if (conf_fd != -1 && close(conf_fd) && error == NULL)
+		error = got_error_from_errno("close");
 	if (error) {
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 		return 1;

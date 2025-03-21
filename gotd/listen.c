@@ -58,6 +58,7 @@ static struct gotd_listen_clients gotd_listen_clients[GOTD_CLIENT_TABLE_SIZE];
 static SIPHASH_KEY clients_hash_key;
 static volatile int listen_client_cnt;
 static int inflight;
+static int listener_halted;
 
 struct gotd_uid_connection_counter {
 	STAILQ_ENTRY(gotd_uid_connection_counter) entry;
@@ -215,6 +216,9 @@ disconnect(struct gotd_listen_client *client)
 	listen_client_cnt--;
 	if (close(client_fd) == -1)
 		return got_error_from_errno("close");
+
+	if (listener_halted && listen_client_cnt == 0)
+		listen_shutdown();
 
 	return NULL;
 }
@@ -543,6 +547,26 @@ listen_dispatch(int fd, short event, void *arg)
 			if (err)
 				log_warnx("disconnect: %s", err->msg);
 			break;
+		case GOTD_IMSG_HALT: {
+			uint32_t reload_client_id;
+			struct gotd_listen_client *client;
+
+			event_del(&gotd_listen.iev.ev);
+			evtimer_del(&gotd_listen.pause_ev);
+			listener_halted = 1;
+			log_debug("gotd reloading; stopped listening for "
+			    "connections");
+
+			if (imsg_get_data(&imsg, &reload_client_id,
+			    sizeof(reload_client_id)) == -1) {
+				err = got_error_from_errno("imsg-get_data");
+				break;
+			}
+			client = find_client(reload_client_id);
+			if (client)
+				disconnect(client);
+			break;
+		}
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
 			break;
@@ -556,7 +580,8 @@ listen_dispatch(int fd, short event, void *arg)
 	} else {
 		/* This pipe is dead. Remove its event handler */
 		event_del(&iev->ev);
-		event_loopexit(NULL);
+		if (!listener_halted)
+			event_loopexit(NULL);
 	}
 }
 
