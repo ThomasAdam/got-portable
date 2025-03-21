@@ -722,6 +722,11 @@ reload_gotd(struct gotd_client *client, struct imsg *imsg)
 	size_t datalen;
 	char *confpath = NULL;
 	struct gotd_child_proc *proc = NULL;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
 
 	if (client->euid != 0)
 		return got_error_set_errno(EPERM, "reload");
@@ -753,7 +758,7 @@ reload_gotd(struct gotd_client *client, struct imsg *imsg)
 
 	proc->type = GOTD_PROC_RELOAD;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK,
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, proc->pipe) == -1) {
 		err = got_error_from_errno("socketpair");
 		free(proc);
