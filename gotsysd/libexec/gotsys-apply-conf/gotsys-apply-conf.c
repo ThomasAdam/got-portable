@@ -100,9 +100,11 @@ start_child(pid_t *pid,
 static const struct got_error *
 connect_gotd(const char *socket_path)
 {
+	const struct got_error *err = NULL;
 	struct sockaddr_un sun;
 
-	if ((gotd_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+	gotd_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (gotd_sock == -1)
 		return got_error_from_errno("socket");
 
 	memset(&sun, 0, sizeof(sun));
@@ -112,10 +114,13 @@ connect_gotd(const char *socket_path)
 		return got_error_msg(GOT_ERR_NO_SPACE,
 		    "gotd socket path too long");
 	}
-	if (connect(gotd_sock, (struct sockaddr *)&sun, sizeof(sun)) == -1)
-		return got_error_from_errno2("connect", socket_path);
+	if (connect(gotd_sock, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
+		err = got_error_from_errno2("connect", socket_path);
+		close(gotd_sock);
+		gotd_sock = -1;
+	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -131,7 +136,7 @@ restart_gotd(void)
 	gotd_sock = -1;
 
 	/* TOOD: gotd_fetch flags from rc.conf.local and pass them in. */
-	err = start_child(&pid, GOTSYSD_PATH_PROG_GOTD, "-vvv", NULL);
+	err = start_child(&pid, GOTSYSD_PATH_PROG_GOTD, NULL, NULL);
 	if (err)
 		return err;
 
@@ -330,7 +335,6 @@ main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
-	int gotd_running = 0;
 #if 0
 	static int attached;
 
@@ -373,19 +377,20 @@ main(int argc, char *argv[])
 		    (errno != ENOENT && errno != ECONNREFUSED))
 			goto done;
 		err = NULL;
-	} else
-		gotd_running = 1;
-
-	if (imsgbuf_init(&gotd_iev.ibuf, gotd_sock) == -1) {
-		err = got_error_from_errno("imsgbuf_init");
-		goto done;
 	}
 
-	gotd_iev.handler = dispatch_gotd;
-	gotd_iev.events = EV_READ;
-	gotd_iev.handler_arg = NULL;
-	event_set(&gotd_iev.ev, gotd_iev.ibuf.fd, EV_READ, dispatch_gotd,
-	    &gotd_iev);
+	if (gotd_sock != -1) {
+		if (imsgbuf_init(&gotd_iev.ibuf, gotd_sock) == -1) {
+			err = got_error_from_errno("imsgbuf_init");
+			goto done;
+		}
+
+		gotd_iev.handler = dispatch_gotd;
+		gotd_iev.events = EV_READ;
+		gotd_iev.handler_arg = NULL;
+		event_set(&gotd_iev.ev, gotd_iev.ibuf.fd, EV_READ,
+		    dispatch_gotd, &gotd_iev);
+	}
 
 	gotsysd_iev.handler = dispatch_gotsysd;
 	gotsysd_iev.events = EV_READ;
@@ -393,13 +398,13 @@ main(int argc, char *argv[])
 	event_set(&gotsysd_iev.ev, gotsysd_iev.ibuf.fd, EV_READ,
 	    dispatch_gotsysd, &gotsysd_iev);
 
-	if (gotsysd_imsg_compose_event(&gotsysd_iev, GOTSYSD_IMSG_PROG_READY, 0,
-	    -1, NULL, 0) == -1) {
-		err = got_error_from_errno("gotsysd_imsg_compose_event");
+	if (gotsysd_imsg_compose_event(&gotsysd_iev,
+	    GOTSYSD_IMSG_PROG_READY, 0, -1, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg_compose PROG_READY");
 		goto done;
 	}
 
-	if (gotd_running) {
+	if (gotd_sock != -1) {
 		if (gotsysd_imsg_compose_event(&gotd_iev, GOTD_IMSG_STOP,
 		    0, -1, NULL, 0) == -1) {
 			err = got_error_from_errno("imsg_compose STOP");
