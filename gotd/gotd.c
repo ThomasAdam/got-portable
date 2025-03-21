@@ -1962,8 +1962,6 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 	} else if (fcntl(proc->pipe[1], F_SETFD, 0) == -1)
 		fatal("cannot fcntl stderr");
 
-	closefrom(STDERR_FILENO + 1);
-
 	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
 	argv[argc++] = "check";
 	argv[argc++] = "-f";
@@ -2012,8 +2010,6 @@ run_gotsys_apply(struct gotd_repo *repo)
 		log_debug("running gotsys apply (PID %d)", pid);
 		return;
 	}
-
-	closefrom(STDERR_FILENO + 1);
 
 	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
 	argv[argc++] = "apply";
