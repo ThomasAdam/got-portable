@@ -2125,7 +2125,6 @@ connect_session(struct gotd_client *client)
 	 * Further client requests will be handled by the session process.
 	 */
 	imsgbuf_clear(&client->iev.ibuf);
-	imsgbuf_clear(&client->iev.ibuf);
 	event_del(&client->iev.ev);
 	client->fd = -1; /* will be closed via copy in client->iev.ibuf.fd */
 
