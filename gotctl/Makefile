@@ -3,7 +3,7 @@
 .include "../got-version.mk"
 
 PROG=		gotctl
-SRCS=		gotctl.c error.c imsg.c object_qid.c path.c \
+SRCS=		gotctl.c error.c imsg.c gotd_imsg.c object_qid.c path.c \
 		pollfd.c hash.c parse.y log.c secrets.c reference_parse.c
 
 MAN =		${PROG}.8
