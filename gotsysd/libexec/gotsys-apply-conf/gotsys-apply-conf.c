@@ -21,6 +21,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <event.h>
 #include <imsg.h>
 #include <limits.h>
@@ -124,16 +125,12 @@ connect_gotd(const char *socket_path)
 }
 
 static const struct got_error *
-restart_gotd(void)
+start_gotd(void)
 {
 	const struct got_error *err;
 	pid_t pid;
 	int i;
 	const int maxwait = 10;
-
-	if (close(gotd_sock) == -1)
-		return got_error_from_errno("close");
-	gotd_sock = -1;
 
 	/* TOOD: gotd_fetch flags from rc.conf.local and pass them in. */
 	err = start_child(&pid, GOTSYSD_PATH_PROG_GOTD, NULL, NULL);
@@ -189,9 +186,6 @@ dispatch_gotd(int fd, short event, void *arg)
 			goto fatal;
 		}
 		if (n == 0) {	/* Connection closed. */
-			err = restart_gotd();
-			if (err)
-				warn("%s", err->msg);
 			err = send_done(&gotsysd_iev);
 			if (err)
 				warn("%s", err->msg);
@@ -330,17 +324,105 @@ apply_unveil(const char *unix_socket_path, const char *gotd_path)
 	return NULL;
 }
 
+__dead static void
+usage(void)
+{
+	/* TODO: add -f gotd-socket option */
+	fprintf(stderr, "usage: %s [-c config-file] [-s secrets]\n",
+	    getprogname());
+	exit(1);
+}
+
 int
 main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
+	char *confpath = NULL, *secretspath = NULL;
+	int ch, conf_fd = -1, secrets_fd = -1;
+
+	gotsysd_iev.ibuf.fd = -1;
+	gotd_iev.ibuf.fd = -1;
+
 #if 0
 	static int attached;
 
 	while (!attached)
 		sleep(1);
 #endif
+	while ((ch = getopt(argc, argv, "c:s:")) != -1) {
+		switch (ch) {
+		case 'c':
+			if (unveil(optarg, "r") != 0) {
+				err = got_error_from_errno("unveil");
+				goto done;
+			}
+			confpath = realpath(optarg, NULL);
+			if (confpath == NULL) {
+				err = got_error_from_errno2("realpath",
+				    optarg);
+				goto done;
+			}
+			break;
+		case 's':
+			if (unveil(optarg, "r") != 0) {
+				err = got_error_from_errno("unveil");
+				goto done;
+			}
+			secretspath = realpath(optarg, NULL);
+			if (secretspath == NULL) {
+				err = got_error_from_errno2("realpath",
+				    optarg);
+				goto done;
+			}
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	if (confpath == NULL) {
+		confpath = strdup(GOTD_CONF_PATH);
+		if (confpath == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	if (unveil(confpath, "r") == -1) {
+		err = got_error_from_errno2("unveil", confpath);
+		goto done;
+	}
+
+	if (unveil(secretspath ? secretspath : GOTD_SECRETS_PATH, "r") == -1) {
+		err = got_error_from_errno2("unveil",
+		    secretspath ? secretspath : GOTD_SECRETS_PATH);
+		goto done;
+	}
+
+	secrets_fd = open(secretspath ? secretspath : GOTD_SECRETS_PATH,
+	    O_RDONLY | O_NOFOLLOW);
+	if (secrets_fd == -1) {
+		if (secretspath != NULL || errno != ENOENT) {
+			err = got_error_from_errno2("open",
+			    secretspath ? secretspath : GOTD_SECRETS_PATH);
+			goto done;
+		}
+	} else if (secretspath == NULL) {
+		secretspath = strdup(GOTD_SECRETS_PATH);
+		if (secretspath == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
+	conf_fd = open(confpath, O_RDONLY | O_NOFOLLOW);
+	if (conf_fd == -1) {
+		err = got_error_from_errno2("open", confpath);
+		goto done;
+	}
+
 	event_init();
 
 	signal_set(&evsigint, SIGINT, sighdlr, NULL);
@@ -355,17 +437,16 @@ main(int argc, char *argv[])
 	signal_add(&evsigusr1, NULL);
 
 	if (imsgbuf_init(&gotsysd_iev.ibuf, GOTSYSD_FILENO_MSG_PIPE) == -1) {
-		warn("imsgbuf_init");
-		return 1;
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
 	}
 
 #ifndef PROFILE
-	if (pledge("stdio proc exec unix unveil", NULL) == -1) {
+	if (pledge("stdio proc exec unix sendfd unveil", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		goto done;
 	}
 #endif
-
 	/* TODO: make gotd socket path configurable -- pass via argv[1] */
 	err = apply_unveil(GOTD_UNIX_SOCKET, GOTSYSD_PATH_PROG_GOTD);
 	if (err)
@@ -380,16 +461,30 @@ main(int argc, char *argv[])
 	}
 
 	if (gotd_sock != -1) {
+#ifndef PROFILE
+		if (pledge("stdio sendfd", NULL) == -1) {
+			err = got_error_from_errno("pledge");
+			goto done;
+		}
+#endif
 		if (imsgbuf_init(&gotd_iev.ibuf, gotd_sock) == -1) {
 			err = got_error_from_errno("imsgbuf_init");
 			goto done;
 		}
+		imsgbuf_allow_fdpass(&gotd_iev.ibuf);
 
 		gotd_iev.handler = dispatch_gotd;
 		gotd_iev.events = EV_READ;
 		gotd_iev.handler_arg = NULL;
 		event_set(&gotd_iev.ev, gotd_iev.ibuf.fd, EV_READ,
 		    dispatch_gotd, &gotd_iev);
+	} else {
+#ifndef PROFILE
+		if (pledge("stdio proc exec", NULL) == -1) {
+			err = got_error_from_errno("pledge");
+			goto done;
+		}
+#endif
 	}
 
 	gotsysd_iev.handler = dispatch_gotsysd;
@@ -405,27 +500,54 @@ main(int argc, char *argv[])
 	}
 
 	if (gotd_sock != -1) {
-		if (gotsysd_imsg_compose_event(&gotd_iev, GOTD_IMSG_STOP,
-		    0, -1, NULL, 0) == -1) {
-			err = got_error_from_errno("imsg_compose STOP");
+		if (secrets_fd != -1) {
+			if (gotsysd_imsg_compose_event(&gotd_iev,
+			    GOTD_IMSG_RELOAD_SECRETS, 0, secrets_fd,
+			    secretspath, strlen(secretspath)) == -1) {
+				err = got_error_from_errno("imsg_compose "
+				    "RELOAD_SECRETS");
+				goto done;
+			}
+			secrets_fd = -1;
+		} else {
+			if (gotsysd_imsg_compose_event(&gotd_iev,
+			    GOTD_IMSG_RELOAD_SECRETS, 0, -1, NULL, 0) == -1) {
+				err = got_error_from_errno("imsg_compose "
+				    "RELOAD_SECRETS");
+				goto done;
+			}
+		}
+		if (gotsysd_imsg_compose_event(&gotd_iev, GOTD_IMSG_RELOAD,
+		    0, conf_fd, confpath, strlen(confpath)) == -1) {
+			err = got_error_from_errno("imsg_compose "
+			    "RELOAD");
 			goto done;
 		}
+		conf_fd = -1;
 
 		event_dispatch();
 	} else {
-		err = restart_gotd();
+		err = start_gotd();
 		if (err)
 			goto done;
 
 		err = send_done(&gotsysd_iev);
 	}
 done:
+	free(confpath);
+	free(secretspath);
 	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (conf_fd != -1 && close(conf_fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (secrets_fd != -1 && close(secrets_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err)
 		gotsysd_imsg_send_error(&gotsysd_iev.ibuf, 0, 0, err);
-	imsgbuf_clear(&gotsysd_iev.ibuf);
-	imsgbuf_clear(&gotd_iev.ibuf);
+	if (gotsysd_iev.ibuf.fd != -1)
+		imsgbuf_clear(&gotsysd_iev.ibuf);
+	if (gotd_iev.ibuf.fd != -1)
+		imsgbuf_clear(&gotd_iev.ibuf);
 	if (gotd_sock != -1 && close(gotd_sock) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
