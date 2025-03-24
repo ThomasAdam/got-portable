@@ -1167,26 +1167,16 @@ EOF
 		return 1
 	fi
 
-	# Unfortunately there are two different possible error messages
-	# depending on the order of server-side events.
-	cat > ${testroot}/stderr.expected1 <<EOF
-git-receive-pack: gotsys check failure
-got-send-pack: gotsys check failure
+	cat > ${testroot}/stderr.expected <<EOF
+git-receive-pack: gotsys.conf: line 3: syntax error
+got-send-pack: gotsys.conf: line 3: syntax error
 got: could not send pack file
 EOF
-	cat > ${testroot}/stderr.expected2 <<EOF
-git-receive-pack: gotsys: stdin: line 3: syntax error
-got-send-pack: gotsys: stdin: line 3: syntax error
-got: could not send pack file
-EOF
-	cmp -s $testroot/stderr.expected1 $testroot/stderr
-	ret1=$?
-	cmp -s $testroot/stderr.expected2 $testroot/stderr
-	ret2=$?
-	if [ $ret1 -ne 0 -a $ret2 -ne 0 ]; then
-		echo -n "unexpected error upon invalid gotsys.conf: " >&2
-		cat $testroot/stderr >&2
-		test_done "$testroot" "1"
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 

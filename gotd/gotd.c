@@ -105,6 +105,7 @@ struct gotd_client {
 	struct gotd_child_proc		*auth;
 	struct gotd_child_proc		*session;
 	struct gotd_child_proc		*gotsys;
+	int				 gotsys_conf_fd;
 	int				 required_auth;
 	int				 gotsys_error_sent;
 	struct timespec			 time_connected;
@@ -1068,6 +1069,7 @@ recv_connect(uint32_t *client_id, struct imsg *imsg)
 	client->iev.handler = gotd_request;
 	client->iev.events = EV_READ;
 	client->iev.handler_arg = client;
+	client->gotsys_conf_fd = -1;
 
 	event_set(&client->iev.ev, client->fd, EV_READ, gotd_request,
 	    &client->iev);
@@ -1107,7 +1109,8 @@ static const char *gotd_proc_names[GOTD_PROC_MAX] = {
 	"repo_write",
 	"gitwrapper",
 	"notify",
-	"gotsys",
+	"gotsys-check",
+	"gotsys-apply",
 	"reload",
 	"gotctl",
 };
@@ -1184,27 +1187,19 @@ gotsys_exit(struct gotd_child_proc *proc, int status)
 {
 	struct gotd_client *client;
 
-	log_debug("gotsys check (PID %d) %s", proc->pid,
+	log_debug("%s (PID %d) %s", gotd_proc_names[proc->type], proc->pid,
 	    WEXITSTATUS(status) == 0 ? "succeeded" : "failed"); 
 
 	client = find_client_by_proc_fd(proc->pipe[0]);
-	if (client == NULL)
+	if (client == NULL || client->session == NULL)
 		return NULL;
 
-	if (client->session == NULL)
-		return NULL;
-
-	if (WEXITSTATUS(status) == 0) {
-		if (gotd_imsg_compose_event(&client->session->iev,
-		    GOTD_IMSG_PACKFILE_VERIFIED, GOTD_PROC_GOTD,
-		    -1, NULL, 0) == -1)
-			return got_error_from_errno("imsg compose "
-			    "PACKFILE_VERIFIED");
-	} else if (!client->gotsys_error_sent && client->session != NULL) {
+	if (proc->type == GOTD_PROC_GOTSYS_CHECK &&
+	    WEXITSTATUS(status) != 0 && !client->gotsys_error_sent) {
 		const struct got_error *err;
 
-		err = got_error_msg(GOT_ERR_PARSE_CONFIG,
-		    "gotsys check failure");
+		err = got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "%s failure", gotd_proc_names[proc->type]);
 		if (gotd_imsg_send_error_event(&client->session->iev,
 		    GOTD_PROC_GOTD, client->id, err) == -1)
 			log_warn("imsg send error");
@@ -1263,7 +1258,8 @@ gotd_sighdlr(int sig, short event, void *arg)
 				    " signal %d", pid, WTERMSIG(status));
 			}
 
-			if (proc->type == GOTD_PROC_GOTSYS) {
+			if (proc->type == GOTD_PROC_GOTSYS_CHECK ||
+			    proc->type == GOTD_PROC_GOTSYS_APPLY) {
 				err = gotsys_exit(proc, status);
 				if (err)
 					log_warn("%s", err->msg);
@@ -2149,70 +2145,277 @@ connect_session(struct gotd_client *client)
 	return NULL;
 }
 
-static void
-gotd_read_gotsys_check_stderr(int fd, short event, void *arg)
+static const struct got_error *
+send_gotsys_check_req(struct gotd_imsgev *iev, struct gotd_client *client)
 {
 	const struct got_error *err = NULL;
-	struct gotd_child_proc *proc = arg;
-	struct gotd_client *client;
-	ssize_t n, i;
-	char buf[1024];
 
-	memset(buf, 0, sizeof(buf));
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_GOTSYS_CHECK,
+	    GOTD_PROC_GOTD, client->gotsys_conf_fd, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose GOTSYS_CHECK");
+		close(client->gotsys_conf_fd);
+		client->gotsys_conf_fd = -1;
+	}
 
-	log_debug("%s", __func__);
+	return err;
+}
+
+static void
+dispatch_gotsys_check(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_client *client = NULL;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
+	client = find_client_by_proc_fd(fd);
+	if (client == NULL) {
+		/* Can happen during process teardown. */
+		warnx("cannot find client for fd %d", fd);
+		shut = 1;
+		goto done;
+	}
+
+	if (client->gotsys == NULL)
+		fatalx("cannot find gotsys child process for fd %d", fd);
 
 	if (event & EV_READ) {
-		n = read(fd, buf, sizeof(buf) - 1 /* keep a trailing NUL */);
-		if (n == 0) /* stderr pipe closed */
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
 			goto done;
+		}
+	}
 
-		/* Deliver the 'gotsys check' error to the client session. */
-		for (i = 0; i < n; i++) {
-			if (!isprint(buf[i])) {
-				buf[i] = '\0';
+	if (event & EV_WRITE) {
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
+			log_warn("%s", err->msg);
+			goto done;
+		}
+	}
+
+	for (;;) {
+		const struct got_error *err = NULL;
+		int do_disconnect = 0;
+
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			err = gotd_imsg_recv_error(NULL, &imsg);
+			log_warnx("user %s: %s: %s",
+			    gotd_proc_names[client->gotsys->type],
+			    client->username, err->msg);
+			if (client->session != NULL &&
+			    gotd_imsg_send_error_event(&client->session->iev,
+			    GOTD_PROC_GOTD, client->id, err) == -1)
+				log_warn("imsg send error");
+			else
+				client->gotsys_error_sent = 1;
+			break;
+		case GOTD_IMSG_GOTSYS_READY:
+			if (client->gotsys_conf_fd == -1) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				do_disconnect = 1;
 				break;
 			}
+			err = send_gotsys_check_req(iev, client);
+			break;
+		case GOTD_IMSG_GOTSYS_CFG_OK:
+			if (client->session != NULL &&
+			    gotd_imsg_compose_event(&client->session->iev,
+			    GOTD_IMSG_PACKFILE_VERIFIED, GOTD_PROC_GOTD,
+			    -1, NULL, 0) == -1) {
+				err = got_error_from_errno("imsg compose "
+				    "PACKFILE_VERIFIED");
+				do_disconnect = 1;
+			}
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
 		}
-		err = got_error_msg(GOT_ERR_PARSE_CONFIG, buf);
-		log_warnx("gotsys check: %s", err->msg);
 
-		client = find_client_by_proc_fd(fd);
-		if (client == NULL) {
-			/* Can happen during process teardown. */
-			warnx("cannot find client for fd %d", fd);
-			goto done;
+		if (err) {
+			log_warnx("user %s: %s %s",
+			    gotd_proc_names[client->gotsys->type],
+			    client->username, err->msg);
 		}
 
-		if (client->session != NULL &&
-		    gotd_imsg_send_error_event(&client->session->iev,
-		    GOTD_PROC_GOTD, client->id, err) == -1)
-			log_warn("imsg send error");
-		else
-			client->gotsys_error_sent = 1;
+		if (do_disconnect) {
+			if (err)
+				disconnect_on_error(client, err);
+			else
+				disconnect(client);
+		}
+
+		imsg_free(&imsg);
 	}
 done:
-	event_del(&proc->iev.ev);
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+	}
 }
 
 static const struct got_error *
-run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
-    int content_fd)
+send_gotsys_apply_req(struct gotd_imsgev *iev)
 {
+	if (gotd_imsg_compose_event(iev, GOTD_IMSG_GOTSYS_APPLY,
+	    GOTD_PROC_GOTD, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg compose GOTSYS_APPLY");
+
+	return NULL;
+}
+
+static void
+client_session_notify(struct gotd_client *client)
+{
+	const struct got_error *err;
+
+	if (client->session == NULL)
+		return;
+
+	/*
+	 * session_write may now proceed to send notifications
+	 * and disconnect the client.
+	 */
+	if (gotd_imsg_compose_event(&client->session->iev,
+	    GOTD_IMSG_NOTIFY, GOTD_PROC_GOTD, -1, NULL, 0) == -1) {
+		err = got_error_from_errno("imsg compose NOTIFY");
+		if (err)
+			log_warnx("user %s: %s", client->username, err->msg);
+	}
+}
+
+static void
+dispatch_gotsys_apply(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct gotd_imsgev *iev = arg;
+	struct imsgbuf *ibuf = &iev->ibuf;
+	struct gotd_client *client = NULL;
+	ssize_t n;
+	int shut = 0;
+	struct imsg imsg;
+
+	client = find_client_by_proc_fd(fd);
+	if (client == NULL) {
+		/* Can happen during process teardown. */
+		warnx("cannot find client for fd %d", fd);
+		shut = 1;
+		goto done;
+	}
+
+	if (client->gotsys == NULL)
+		fatalx("cannot find gotsys child process for fd %d", fd);
+
+	if (event & EV_READ) {
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0) {
+			/* Connection closed. */
+			shut = 1;
+			goto done;
+		}
+	}
+
+	if (event & EV_WRITE) {
+		err = gotd_imsg_flush(ibuf);
+		if (err) {
+			log_warn("%s", err->msg);
+			goto done;
+		}
+	}
+
+	for (;;) {
+		const struct got_error *err = NULL;
+		int do_notify = 0;
+
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("%s: imsg_get error", __func__);
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTD_IMSG_ERROR:
+			err = gotd_imsg_recv_error(NULL, &imsg);
+			log_warnx("user %s: %s: %s",
+			    gotd_proc_names[client->gotsys->type],
+			    client->username, err->msg);
+			do_notify = 1;
+			break;
+		case GOTD_IMSG_GOTSYS_READY:
+			err = send_gotsys_apply_req(iev);
+			break;
+		case GOTD_IMSG_SYSCONF_STARTED:
+			do_notify = 1;
+			break;
+		default:
+			log_debug("unexpected imsg %d", imsg.hdr.type);
+			break;
+		}
+
+		if (err) {
+			log_warnx("user %s: %s %s",
+			    gotd_proc_names[client->gotsys->type],
+			    client->username, err->msg);
+		}
+
+		if (do_notify)
+			client_session_notify(client);
+
+		imsg_free(&imsg);
+	}
+done:
+	if (!shut) {
+		gotd_imsg_event_add(iev);
+	} else {
+		/* This pipe is dead. Remove its event handler */
+		event_del(&iev->ev);
+	}
+}
+
+static const struct got_error *
+run_gotsys(struct gotd_client *client, struct gotd_repo *repo,
+	void (*handler)(int, short, void *), enum gotd_procid proc_id)
+{
+	const struct got_error *err = NULL;
 	struct gotd_child_proc *proc;
-	const char	*argv[4];
-	int		 argc = 0;
-	pid_t		 pid;
-	int		 sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
+	pid_t pid;
+	const char *argv[4];
+	int argc = 0;
 
 #ifdef SOCK_CLOEXEC
 	sock_flags |= SOCK_CLOEXEC;
 #endif
 	proc = calloc(1, sizeof(*proc));
-	if (proc == NULL)
-		return got_error_from_errno("calloc");
+	if (proc == NULL) {
+		err = got_error_from_errno("calloc");
+		return err;
+	}
 
-	proc->type = GOTD_PROC_GOTSYS;
+	switch (proc_id) {
+	case GOTD_PROC_GOTSYS_CHECK:
+	case GOTD_PROC_GOTSYS_APPLY:
+		proc->type = proc_id;
+		break;
+	default:
+		free(proc);
+		return got_error(GOT_ERR_NOT_IMPL);
+	}
+
 	if (strlcpy(proc->repo_name, repo->name,
 	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
 		fatalx("repository name too long: %s", repo->name);
@@ -2226,11 +2429,20 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 		return got_error_from_errno("socketpair");
 	}
 
-	proc->iev.handler = gotd_read_gotsys_check_stderr;
+	if (imsgbuf_init(&proc->iev.ibuf, proc->pipe[0]) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		close(proc->pipe[0]);
+		close(proc->pipe[1]);
+		free(proc);
+		return err;
+	}
+	if (proc->type == GOTD_PROC_GOTSYS_CHECK)
+		imsgbuf_allow_fdpass(&proc->iev.ibuf);
+
+	proc->iev.handler = handler;
 	proc->iev.events = EV_READ;
 	proc->iev.handler_arg = NULL;
-	event_set(&proc->iev.ev, proc->pipe[0], EV_READ,
-	    gotd_read_gotsys_check_stderr, proc);
+	event_set(&proc->iev.ev, proc->pipe[0], EV_READ, handler, &proc->iev);
 	event_add(&proc->iev.ev, NULL);
 
 	TAILQ_INSERT_HEAD(&procs, proc, entry);
@@ -2247,26 +2459,24 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 		close(proc->pipe[1]);
 		proc->pipe[1] = -1;
 		client->gotsys = proc;
-		log_debug("running gotsys check (PID %d)", pid);
+		log_debug("running %s (PID %d)", gotd_proc_names[proc->type],
+		    pid);
 		return NULL;
 	}
 
-	if (content_fd != STDIN_FILENO) {
-		    if (dup2(content_fd, STDIN_FILENO) == -1)
-			fatal("cannot redirect stdin");
-	} else if (fcntl(content_fd, F_SETFD, 0) == -1)
-		fatal("cannot fcntl stdin");
-
-	if (proc->pipe[1] != STDERR_FILENO) {
-		if (dup2(proc->pipe[1], STDERR_FILENO) == -1)
-			fatal("cannot redirect stderr");
+	if (proc->pipe[1] != GOTD_FILENO_MSG_PIPE) {
+		if (dup2(proc->pipe[1], GOTD_FILENO_MSG_PIPE) == -1)
+			fatal("cannot setup imsg fd");
 	} else if (fcntl(proc->pipe[1], F_SETFD, 0) == -1)
-		fatal("cannot fcntl stderr");
+		fatal("cannot setup imsg fd");
 
-	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
-	argv[argc++] = "check";
-	argv[argc++] = "-f";
-	argv[argc++] = "-";
+	if (proc->type == GOTD_PROC_GOTSYS_CHECK) {
+		argv[argc++] = GOTD_PATH_PROG_GOTSYS_CHECK;
+	} else {
+		argv[argc++] = GOTD_PATH_PROG_GOTSYS_APPLY;
+		argv[argc++] = "-r";
+		argv[argc++] = repo->path;
+	}
 	argv[argc++] = NULL;
 
 	execvp(argv[0], (char * const *)argv);
@@ -2275,51 +2485,39 @@ run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
 	return NULL; 
 }
 
-static void
-run_gotsys_apply(struct gotd_repo *repo)
+static const struct got_error *
+run_gotsys_check(struct gotd_client *client, struct gotd_repo *repo,
+	struct imsg *imsg)
 {
-	struct gotd_child_proc *proc;
-	const char	*argv[4];
-	int		 argc = 0;
-	pid_t		 pid;
+	const struct got_error *err;
 
-	proc = calloc(1, sizeof(*proc));
-	if (proc == NULL) {
-		log_warn("calloc");
-		return;
-	}
-	proc->iev.ibuf.fd = -1;
-	TAILQ_INSERT_HEAD(&procs, proc, entry);
+	if (client->gotsys_conf_fd != -1)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
+	client->gotsys_conf_fd = imsg_get_fd(imsg);
+	if (client->gotsys_conf_fd == -1)
+		return got_error(GOT_ERR_PRIVSEP_NO_FD);
 
-	proc->type = GOTD_PROC_GOTSYS;
-	if (strlcpy(proc->repo_name, repo->name,
-	    sizeof(proc->repo_name)) >= sizeof(proc->repo_name))
-		fatalx("repository name too long: %s", repo->name);
-	if (strlcpy(proc->repo_path, repo->path, sizeof(proc->repo_path)) >=
-	    sizeof(proc->repo_path))
-		fatalx("repository path too long: %s", repo->path);
-
-	switch (pid = fork()) {
-	case -1:
-		fatal("cannot fork");
-	case 0:
-		break;
-	default:
-		proc->pid = pid;
-		log_debug("running gotsys apply (PID %d)", pid);
-		return;
+	if (fcntl(client->gotsys_conf_fd, F_SETFD, FD_CLOEXEC) == -1) {
+		err = got_error_from_errno("fcntl");
+		goto done;
 	}
 
-	argv[argc++] = GOTD_PATH_PROG_GOTSYS;
-	argv[argc++] = "apply";
-	argv[argc++] = "-r";
-	argv[argc++] = repo->path;
-	argv[argc++] = NULL;
+	err = run_gotsys(client, repo, dispatch_gotsys_check,
+	    GOTD_PROC_GOTSYS_CHECK);
+done:
+	if (err) {
+		close(client->gotsys_conf_fd);
+		client->gotsys_conf_fd = -1;
+	}
+	return err;
+}
 
-	execvp(argv[0], (char * const *)argv);
-	fatal("execvp");
+static const struct got_error *
+run_gotsys_apply(struct gotd_client *client, struct gotd_repo *repo)
+{
+	return run_gotsys(client, repo, dispatch_gotsys_apply,
+	    GOTD_PROC_GOTSYS_APPLY);
 }
 
 static const struct got_error *
@@ -2453,7 +2651,6 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 		uint32_t client_id = 0;
 		int do_disconnect = 0, do_start_repo_child = 0;
 		int do_gotsys_check = 0, refs_updated = 0;
-		int fd = -1;
 
 		if ((n = imsg_get(ibuf, &imsg)) == -1)
 			fatal("%s: imsg_get error", __func__);
@@ -2484,11 +2681,6 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 		case GOTD_IMSG_RUN_GOTSYS_CHECK:
 			if (client->state != GOTD_CLIENT_STATE_ACCESS_GRANTED) {
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			fd = imsg_get_fd(&imsg);
-			if (fd == -1) {
-				err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 				break;
 			}
 			do_gotsys_check = 1;
@@ -2550,9 +2742,12 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				repo = gotd_find_repo_by_name("gotsys.git",
 				    &gotd.repos);
 			if (repo) {
-				err = run_gotsys_check(client, repo, fd);
-				if (err)
+				err = run_gotsys_check(client, repo, &imsg);
+				if (err) {
+					log_warnx("user %s: %s",
+					    client->username, err->msg);
 					do_disconnect = 1;
+				}
 			}
 		}
 
@@ -2567,23 +2762,9 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				repo = gotd_find_repo_by_name(name,
 				    &gotd.repos);
 				if (repo != NULL)
-					run_gotsys_apply(repo);
-			}
-
-			/*
-			 * session_write may now proceed to send notifications
-			 * and disconnect the client.
-			 */
-			if (gotd_imsg_compose_event(iev, GOTD_IMSG_NOTIFY,
-			    GOTD_PROC_GOTD, -1, NULL, 0) == -1) {
-				err = got_error_from_errno("imsg compose "
-				    "NOTIFY");
-				if (err) {
-					log_warnx("uid %d: %s", client->euid,
-					    err->msg);
-					do_disconnect = 1;
-				}
-			}
+					run_gotsys_apply(client, repo);
+			} else
+				client_session_notify(client);
 		}
 
 		if (do_disconnect) {
@@ -2591,6 +2772,8 @@ gotd_dispatch_client_session(int fd, short event, void *arg)
 				disconnect_on_error(client, err);
 			else
 				disconnect(client);
+			imsg_free(&imsg);
+			return;
 		}
 
 		imsg_free(&imsg);
@@ -3169,10 +3352,13 @@ apply_unveil_none(void)
 }
 
 static void
-apply_unveil_selfexec(void)
+unveil_gotsys_and_self_exec(void)
 {
-	if (unveil(GOTD_PATH_PROG_GOTSYS, "x") == -1)
-		fatal("unveil %s", GOTD_PATH_PROG_GOTSYS);
+	if (unveil(GOTD_PATH_PROG_GOTSYS_CHECK, "x") == -1)
+		fatal("unveil %s", GOTD_PATH_PROG_GOTSYS_CHECK);
+
+	if (unveil(GOTD_PATH_PROG_GOTSYS_APPLY, "x") == -1)
+		fatal("unveil %s", GOTD_PATH_PROG_GOTSYS_APPLY);
 
 	if (unveil(gotd.argv0, "x") == -1)
 		fatal("unveil %s", gotd.argv0);
@@ -3760,7 +3946,7 @@ main(int argc, char **argv)
 		    gotd.notify_proc);
 	}
 
-	apply_unveil_selfexec();
+	unveil_gotsys_and_self_exec();
 
 	signal_set(&evsigint, SIGINT, gotd_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, gotd_sighdlr, NULL);
