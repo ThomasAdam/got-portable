@@ -730,6 +730,10 @@ reload_gotd(struct gotd_client *client, struct imsg *imsg)
 		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 		goto done;
 	}
+	if (fcntl(gotd_reload_conf_fd, F_SETFD, FD_CLOEXEC) == -1) {
+		err = got_error_from_errno("fcntl");
+		goto done;
+	}
 
 	/* TODO: parse provided config for verification */
 
@@ -857,6 +861,11 @@ recv_reload_secrets(struct imsg *imsg)
 	gotd_reload_secrets_fd = imsg_get_fd(imsg);
 	if (gotd_reload_secrets_fd == -1)
 		return NULL; /* no secrets being used */
+
+	if (fcntl(gotd_reload_secrets_fd, F_SETFD, FD_CLOEXEC) == -1) {
+		err = got_error_from_errno("fcntl");
+		goto done;
+	}
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen == 0) {
@@ -3599,6 +3608,9 @@ main(int argc, char **argv)
 				gotd_reload_conf_fd = imsg_get_fd(&imsg);
 				if (gotd_reload_conf_fd != -1)
 					break;
+				if (fcntl(gotd_reload_conf_fd,
+				    F_SETFD, FD_CLOEXEC) == -1)
+					error = got_error_from_errno("fcntl");
 				error = got_error(GOT_ERR_PRIVSEP_NO_FD);
 				break;
 			}
