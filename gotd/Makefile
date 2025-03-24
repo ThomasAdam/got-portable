@@ -11,7 +11,7 @@ BINDIR ?=	${PREFIX}/sbin
 PROG=		gotd
 SRCS=		gotd.c auth.c repo_read.c repo_write.c log.c privsep_stub.c \
 		listen.c imsg.c parse.y secrets.c pack_create.c ratelimit.c \
-		deltify.c \
+		deltify.c gotd_imsg.c \
 		bloom.c buf.c date.c deflate.c delta.c delta_cache.c error.c \
 		gitconfig.c gotconfig.c inflate.c lockfile.c murmurhash2.c \
 		object.c object_cache.c object_create.c object_idset.c \

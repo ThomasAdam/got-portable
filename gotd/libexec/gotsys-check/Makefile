@@ -4,8 +4,8 @@
 .include "../../..//got-version.mk"
 
 PROG=	gotsys-check
-SRCS=	gotsys-check.c error.c gotsys_conf.c hash.c imsg.c parse.y path.c \
-	pollfd.c reference_parse.c
+SRCS=	gotsys-check.c error.c gotd_imsg.c gotsys_conf.c hash.c parse.y \
+	path.c pollfd.c reference_parse.c
 
 NOMAN =	Yes
 
