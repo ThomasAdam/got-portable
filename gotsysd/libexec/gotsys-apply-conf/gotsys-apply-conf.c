@@ -132,7 +132,7 @@ start_gotd(void)
 	int i;
 	const int maxwait = 10;
 
-	/* TOOD: gotd_fetch flags from rc.conf.local and pass them in. */
+	/* TODO: gotd_fetch flags from rc.conf.local and pass them in. */
 	err = start_child(&pid, GOTSYSD_PATH_PROG_GOTD, NULL, NULL);
 	if (err)
 		return err;

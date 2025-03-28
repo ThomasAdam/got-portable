@@ -349,7 +349,7 @@ struct gotsysd_imsg_sysconf_authorized_keys_user {
 
 	/* Followed by name_len bytes. */
 
-	/* Followed by messages containining authorized keys. */
+	/* Followed by messages containing authorized keys. */
 };
 
 /* 

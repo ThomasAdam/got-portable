@@ -195,7 +195,7 @@ EOF
 	fi
 
 	# The user should have a home directory and ~/.ssh.
-	# TODO: stat ~ and ~/.ssh, then verify owership and permissions.
+	# TODO: stat ~ and ~/.ssh, then verify ownership and permissions.
 	ssh -q -i ${GOTSYSD_SSH_KEY} \
 		root@${VMIP} ls /home/${GOTSYSD_DEV_USER} \
 		> $testroot/stdout
@@ -1003,7 +1003,7 @@ EOF
 test_user_anonymous() {
 	local testroot=`test_init user_anonymous 1`
 
-	# An attempt to grant write permissions to anonymus is an error.
+	# An attempt to grant write permissions to anonymous is an error.
 	cat > ${testroot}/bad-gotsys.conf <<EOF
 repository "gotsys" {
 	permit rw anonymous
@@ -1013,7 +1013,7 @@ EOF
 		> $testroot/stdout  2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
-		echo "gotsys check suceeded unexpectedly" >&2
+		echo "gotsys check succeeded unexpectedly" >&2
 		test_done "$testroot" 1
 		return 1
 	fi
@@ -1061,7 +1061,7 @@ repository "foo" {
 	permit ro anonymous
 }
 EOF
-	(cd ${testroot}/wt && got commit -m "add anonymus user" >/dev/null)
+	(cd ${testroot}/wt && got commit -m "add anonymous user" >/dev/null)
 	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
 
 	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
@@ -1139,7 +1139,7 @@ EOF
 		> $testroot/stdout  2> $testroot/stderr
 	ret=$?
 	if [ $ret -eq 0 ]; then
-		echo "gotsys check suceeded unexpectedly" >&2
+		echo "gotsys check succeeded unexpectedly" >&2
 		test_done "$testroot" 1
 		return 1
 	fi

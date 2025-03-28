@@ -312,7 +312,7 @@ gotsys_conf_validate_name(const char *name, const char *type)
 	for (i = 0; i < len; i++) {
 		/*
 		 * On non-OpenBSD systems, isalnum(3) can suffer from
-		 * locale-dependent-behaviour syndrom.
+		 * locale-dependent-behaviour syndrome.
 		 * Prevent non-ASCII characters in a portable way.
 		 */
 		if (name[i] & 0x80)
@@ -426,7 +426,7 @@ validate_comment(const char *comment, size_t len)
 	for (i = 0; i < len; i++) {
 		/*
 		 * On non-OpenBSD systems, isalnum(3) can suffer from
-		 * locale-dependent-behaviour syndrom.
+		 * locale-dependent-behaviour syndrome.
 		 * Prevent non-ASCII characters in a portable way.
 		 */
 		if (comment[i] & 0x80)
