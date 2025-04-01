@@ -234,11 +234,9 @@ followed by repository-specific configuration directives inside curly braces:
 .Pp
 .Ic repository Ar name Brq ...
 .Pp
-If desired, the
-.Ar name
-may contain path-separators,
-.Dq / ,
-to expose repositories as part of a virtual client-visible directory hierarchy.
+Repository names may only contain alphabetic ASCII characters (a-z, A-Z),
+non-leading digits (0-9), non-leading hyphens (-),
+non-leading underscores (_), and non-leading periods (.).
 .Pp
 For each repository, access rules must be configured using the
 .Ic permit
