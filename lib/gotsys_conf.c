@@ -173,6 +173,8 @@ gotsys_repo_free(struct gotsys_repo *repo)
 		STAILQ_REMOVE_HEAD(&repo->notification_targets, entry);
 		gotsys_notification_target_free(target);
 	}
+
+	free(repo);
 }
 
 void
