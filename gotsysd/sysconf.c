@@ -546,13 +546,38 @@ static const struct got_error *
 create_repos(struct gotsysd_imsgev *iev)
 {
 	struct gotsys_repo *repo;
+	struct gotsysd_imsg_sysconf_repo_create ireq;
 
 	TAILQ_FOREACH(repo, &gotsysconf.repos, entry) {
-		if (gotsysd_imsg_compose_event(iev,
-		    GOTSYSD_IMSG_SYSCONF_REPO_CREATE, GOTSYSD_PROC_SYSCONF,
-		    -1, repo->name, strlen(repo->name)) == -1)
-			return got_error_from_errno("imsg compose "
+		struct ibuf *wbuf = NULL;
+		size_t len;
+
+		memset(&ireq, 0, sizeof(ireq));
+
+		ireq.name_len = strlen(repo->name);
+		if (repo->headref)
+			ireq.headref_len = strlen(repo->headref);
+
+		len = sizeof(ireq) + ireq.name_len + ireq.headref_len;
+		wbuf = imsg_create(&iev->ibuf,
+		    GOTSYSD_IMSG_SYSCONF_REPO_CREATE,
+		    GOTSYSD_PROC_SYSCONF, gotsysd_sysconf.pid, len);
+		if (wbuf == NULL)
+			return got_error_from_errno("imsg_create "
 			    "SYSCONF_REPO_CREATE");
+
+		if (imsg_add(wbuf, &ireq, sizeof(ireq)) == -1)
+			return got_error_from_errno("imsg_add "
+			    "SYSCONF_REPO_CREATE");
+		if (imsg_add(wbuf, repo->name, ireq.name_len) == -1)
+			return got_error_from_errno("imsg_add "
+			    "SYSCONF_REPO_CREATE");
+		if (ireq.headref_len > 0 &&
+		    imsg_add(wbuf, repo->headref, ireq.headref_len) == -1)
+			return got_error_from_errno("imsg_add "
+			    "SYSCONF_REPO_CREATE");
+		imsg_close(&iev->ibuf, wbuf);
+		gotsysd_imsg_event_add(iev);
 	}
 
 	if (gotsysd_imsg_compose_event(iev,

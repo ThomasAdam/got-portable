@@ -174,6 +174,9 @@ gotsys_repo_free(struct gotsys_repo *repo)
 		gotsys_notification_target_free(target);
 	}
 
+	free(repo->headref);
+	repo->headref = NULL;
+
 	free(repo);
 }
 

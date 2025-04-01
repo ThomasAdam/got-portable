@@ -40,6 +40,15 @@
 #include "got_path.h"
 #include "got_object.h"
 #include "got_repository.h"
+#include "got_reference.h"
+
+#include "got_lib_hash.h"
+#include "got_lib_delta.h"
+#include "got_lib_object.h"
+#include "got_lib_pack.h"
+#include "got_lib_object_cache.h"
+#include "got_lib_repository.h"
+#include "got_lib_lockfile.h"
 
 #include "gotsysd.h"
 #include "gotsys.h"
@@ -96,11 +105,103 @@ chmod_700_repo(const char *repo_name)
 }
 
 static const struct got_error *
+set_head_ref(int repos_dir_fd, const char *repo_name, const char *refname)
+{
+	const struct got_error *err = NULL;
+	char relpath[_POSIX_PATH_MAX];
+	struct got_lockfile *lf = NULL;
+	int ret, fd = -1;
+	struct stat sb;
+	char *content = NULL, *buf = NULL;
+	size_t content_len;
+	ssize_t w;
+
+	ret = snprintf(relpath, sizeof(relpath),
+	    "%s/%s", repo_name, GOT_HEAD_FILE);
+	if (ret == -1)
+		return got_error_from_errno("snprintf");
+	if ((size_t)ret >= sizeof(relpath)) {
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "repository path too long");
+	}
+
+	ret = asprintf(&content, "ref: %s\n", refname);
+	if (ret == -1)
+		return got_error_from_errno("asprintf");
+	content_len = ret;
+
+	err = got_lockfile_lock(&lf, relpath, repos_dir_fd);
+	if (err && (err->code != GOT_ERR_ERRNO || errno != ENOENT))
+		goto done;
+	err = NULL;
+	
+	fd = openat(repos_dir_fd, relpath,
+	    O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error_from_errno2("open", relpath);
+		goto done;
+	}
+
+	if (fstat(fd, &sb) == -1) {
+		err = got_error_from_errno2("stat", relpath);
+		goto done;
+	}
+
+	if (sb.st_size == content_len) {
+		ssize_t r;
+
+		buf = malloc(content_len);
+		if (buf == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+
+		r = read(fd, buf, content_len);
+		if (r == -1) {
+			err = got_error_from_errno2("read", relpath);
+			goto done;
+		}
+
+		if (r == content_len && memcmp(buf, content, content_len) == 0)
+			goto done; /* HEAD already has the desired content */
+	}
+
+	if (ftruncate(fd, 0L) == -1) {
+		err = got_error_from_errno2("ftruncate", relpath);
+		goto done;
+	}
+
+	w = write(fd, content, content_len);
+	if (w == -1)
+		err = got_error_from_errno("write");
+	else if (w != content_len) {
+		err = got_error_fmt(GOT_ERR_IO,
+		    "wrote %zd of %zu bytes to %s", w, content_len, relpath);
+	}
+done:
+	free(content);
+	free(buf);
+	if (lf) {
+		const struct got_error *unlock_err;
+
+		unlock_err = got_lockfile_unlock(lf, repos_dir_fd);
+		if (unlock_err && err == NULL)
+			err = unlock_err;
+	}
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+}
+
+static const struct got_error *
 create_repo(struct imsg *imsg)
 {
 	const struct got_error *err = NULL;
 	size_t datalen, namelen;
+	struct gotsysd_imsg_sysconf_repo_create param;
 	char *repo_name = NULL;
+	char *headref = NULL;
 	char *fullname = NULL;
 	char *abspath = NULL;
 
@@ -108,12 +209,38 @@ create_repo(struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen == 0 || datalen > NAME_MAX)
+	if (datalen < sizeof(param))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&param, imsg->data, sizeof(param));
+
+	if (datalen != sizeof(param) + param.name_len + param.headref_len ||
+	    param.name_len == 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	repo_name = strndup(imsg->data, datalen);
+	repo_name = strndup(imsg->data + sizeof(param), param.name_len);
 	if (repo_name == NULL)
 		return got_error_from_errno("strndup");
+	if (strlen(repo_name) != param.name_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	if (param.headref_len > 0) {
+		headref = strndup(imsg->data + sizeof(param) + param.name_len,
+		    param.headref_len);
+		if (headref == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(headref) != param.headref_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		if (!got_ref_name_is_valid(headref)) {
+			err = got_error_path(headref, GOT_ERR_BAD_REF_NAME);
+			goto done;
+		}
+	}
 
 	err = gotsys_conf_validate_repo_name(repo_name);
 	if (err)
@@ -137,12 +264,18 @@ create_repo(struct imsg *imsg)
 	}
 
 	if (mkdirat(repos_dir_fd, fullname, S_IRWXU) == -1) {
-		if (errno == EEXIST)
+		if (errno == EEXIST) {
 			err = chmod_700_repo(fullname);
-		else
+			if (err)
+				goto done;
+			if (headref) {
+				err = set_head_ref(repos_dir_fd, fullname,
+				    headref);
+			}
+		} else
 			err = got_error_from_errno2("mkdir", abspath);
 	} else
-		err = got_repo_init(abspath, NULL, GOT_HASH_SHA1);
+		err = got_repo_init(abspath, headref, GOT_HASH_SHA1);
 done:
 	free(repo_name);
 	free(fullname);
@@ -249,7 +382,7 @@ main(int argc, char **argv)
 	gotsys_conf_init(&gotsysconf);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr chown getpw id unveil",
+	if (pledge("stdio rpath wpath cpath fattr chown flock getpw id unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
@@ -286,7 +419,8 @@ main(int argc, char **argv)
 	warn("running as %s", username);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr chown unveil", NULL) == -1) {
+	if (pledge("stdio rpath wpath cpath fattr chown flock unveil",
+	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		goto done;
 	}

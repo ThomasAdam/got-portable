@@ -666,16 +666,23 @@ send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 	struct gotsys_access_rule *rule;
 	struct ibuf *wbuf = NULL;
 
+	memset(&irepo, 0, sizeof(irepo));
+
 	irepo.name_len = strlen(repo->name);
+	if (repo->headref)
+		irepo.headref_len = strlen(repo->headref);
 
 	wbuf = imsg_create(&iev->ibuf, GOTSYSD_IMSG_SYSCONF_REPO,
-	    0, 0, sizeof(irepo) + irepo.name_len);
+	    0, 0, sizeof(irepo) + irepo.name_len + irepo.headref_len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create SYSCONF_REPO");
 
 	if (imsg_add(wbuf, &irepo, sizeof(irepo)) == -1)
 		return got_error_from_errno("imsg_add SYSCONF_REPO");
 	if (imsg_add(wbuf, repo->name, irepo.name_len) == -1)
+		return got_error_from_errno("imsg_add SYSCONF_REPO");
+	if (repo->headref &&
+	    imsg_add(wbuf, repo->headref, irepo.headref_len) == -1)
 		return got_error_from_errno("imsg_add SYSCONF_REPO");
 
 	imsg_close(&iev->ibuf, wbuf);
@@ -727,7 +734,7 @@ gotsys_imsg_recv_repository(struct gotsys_repo **repo, struct imsg *imsg)
 	const struct got_error *err;
 	struct gotsysd_imsg_sysconf_repo irepo;
 	size_t datalen;
-	char *name = NULL;
+	char *name = NULL, *headref = NULL;
 
 	*repo = NULL;
 
@@ -736,7 +743,8 @@ gotsys_imsg_recv_repository(struct gotsys_repo **repo, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	
 	memcpy(&irepo, imsg->data, sizeof(irepo));
-	if (datalen != sizeof(irepo) + irepo.name_len)
+	if (datalen != sizeof(irepo) + irepo.name_len + irepo.headref_len ||
+	    irepo.name_len == 0)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	name = strndup(imsg->data + sizeof(irepo), irepo.name_len);
@@ -744,12 +752,31 @@ gotsys_imsg_recv_repository(struct gotsys_repo **repo, struct imsg *imsg)
 		return got_error_from_errno("strndup");
 	if (strlen(name) != irepo.name_len) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		free(name);
-		return err;
+		goto done;
+	}
+
+	if (irepo.headref_len > 0) {
+		headref = strndup(imsg->data + sizeof(irepo) + irepo.name_len,
+		    irepo.headref_len);
+		if (headref == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(headref) != irepo.headref_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
 	}
 
 	err = gotsys_conf_new_repo(repo, name);
+	if (err)
+		goto done;
+
+	(*repo)->headref = headref;
+done:
 	free(name);
+	if (err)
+		free(headref);
 	return err;
 }
 

@@ -4,7 +4,8 @@
 
 PROG=		gotsys-repo-create
 SRCS=		gotsys-repo-create.c error.c hash.c pollfd.c path.c \
-		imsg.c gotsys_conf.c gotsys_imsg.c repository_init.c
+		imsg.c gotsys_conf.c gotsys_imsg.c repository_init.c \
+		reference_parse.c lockfile.c
 
 CPPFLAGS = -I${.CURDIR}/../../../include -I${.CURDIR}/../../../lib \
 	-I${.CURDIR}/../../../gotsys -I${.CURDIR}/../../ -I${.CURDIR}

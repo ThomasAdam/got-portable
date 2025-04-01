@@ -251,6 +251,23 @@ If no rule matches, access to the repository is denied.
 .Pp
 The available repository configuration directives are as follows:
 .Bl -tag -width Ds
+.It Ic head Ar branch
+Point the repository's symbolic
+.Pa HEAD
+reference at the specified
+.Ar branch .
+If not specified,
+.Pa HEAD
+will point at the branch
+.Dq main ,
+regardless of whether this branch actually exists in the repository.
+.Pp
+If
+.Pa HEAD
+points at a non-existent branch then clients may fail to clone the repository
+because they rely on
+.Pa HEAD
+to determine which branch to fetch by default.
 .It Ic deny Ar identity
 Deny repository access to users with the username
 .Ar identity .
@@ -524,6 +541,7 @@ repository "openbsd/ports" {
 
 repository "secret" {
 	permit rw flan_hacker
+	head "refs/heads/private"
 .\"
 .\"	protect branch "main"
 .\"	protect tag namespace "refs/tags/"

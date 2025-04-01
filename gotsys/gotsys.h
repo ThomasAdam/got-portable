@@ -94,6 +94,7 @@ struct gotsys_repo {
 	TAILQ_ENTRY(gotsys_repo) entry;
 
 	char name[NAME_MAX];
+	char *headref;
 
 	struct gotsys_access_rule_list access_rules;
 

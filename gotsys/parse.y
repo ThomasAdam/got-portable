@@ -129,7 +129,7 @@ typedef struct {
 
 %token	ERROR USER GROUP REPOSITORY PERMIT DENY RO RW AUTHORIZED KEY
 %token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT PASSWORD
-%token	NOTIFY EMAIL FROM REPLY TO URL INSECURE HMAC
+%token	NOTIFY EMAIL FROM REPLY TO URL INSECURE HMAC HEAD
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -675,6 +675,65 @@ repoopts1	: PERMIT RO numberstring {
 		}
 		| protect
 		| notify
+		| HEAD STRING {
+			const struct got_error *err;
+			char *branchname = $2;
+
+			if (!got_ref_name_is_valid($2)) {
+				err = got_error_path($2, GOT_ERR_BAD_REF_NAME);
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
+			if (strncmp($2, "refs/heads/", 11) == 0) {
+				branchname += 11;
+			} else if (strncmp($2, "refs/", 5) == 0) {
+				err = got_error_fmt(GOT_ERR_BAD_REF_NAME,
+				    "HEAD branch must be in the "
+				    "\"refs/heads/\" reference namespace: %s",
+				    $2);
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
+			while (branchname[0] == '/')
+				branchname++;
+			got_path_strip_trailing_slashes(branchname);
+			if (strlen(branchname) == 0) {
+				err = got_error_path($2, GOT_ERR_BAD_REF_NAME);
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+			if (branchname[0] == '-') {
+				err = got_error_path(branchname,
+				    GOT_ERR_REF_NAME_MINUS);
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
+			if (strcmp(new_repo->name, "gotsys") == 0 ||
+			    strcmp(new_repo->name, "gotsys.git") == 0) {
+				err = got_error_msg(GOT_ERR_BAD_REF_NAME,
+				    "HEAD of the \"gotsys\" repository "
+				    "cannot be overridden");
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+
+			if (asprintf(&new_repo->headref, "refs/heads/%s",
+			    branchname) == -1) {
+				err = got_error_from_errno("asprintf");
+				yyerror("%s", err->msg);
+				free($2);
+				YYERROR;
+			}
+			free($2);
+		}
 		;
 
 repoopts2	: repoopts2 repoopts1 nl
@@ -740,6 +799,7 @@ lookup(char *s)
 		{ "email",			EMAIL },
 		{ "from",			FROM },
 		{ "group",			GROUP },
+		{ "head",			HEAD },
 		{ "hmac",			HMAC },
 		{ "insecure",			INSECURE },
 		{ "key",			KEY },
