@@ -118,11 +118,11 @@ struct got_tree_entry;
 struct got_reflist_head;
 
 enum imsg_type {
-	IMSG_CFG_SRV,
-	IMSG_CFG_SOCK,
-	IMSG_CFG_FD,
-	IMSG_CFG_DONE,
-	IMSG_CTL_START,
+	GOTWEBD_IMSG_CFG_SRV,
+	GOTWEBD_IMSG_CFG_SOCK,
+	GOTWEBD_IMSG_CFG_FD,
+	GOTWEBD_IMSG_CFG_DONE,
+	GOTWEBD_CTL_START,
 };
 
 struct imsgev {

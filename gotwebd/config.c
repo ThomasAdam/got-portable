@@ -68,17 +68,17 @@ int
 config_getcfg(struct gotwebd *env, struct imsg *imsg)
 {
 	/* nothing to do but tell gotwebd configuration is done */
-	if (sockets_compose_main(env, IMSG_CFG_DONE, NULL, 0) == -1)
-		fatal("sockets_compose_main IMSG_CFG_DONE");
+	if (sockets_compose_main(env, GOTWEBD_IMSG_CFG_DONE, NULL, 0) == -1)
+		fatal("sockets_compose_main GOTWEBD_IMSG_CFG_DONE");
 	return 0;
 }
 
 int
 config_setserver(struct gotwebd *env, struct server *srv)
 {
-	if (main_compose_sockets(env, IMSG_CFG_SRV, -1, srv, sizeof(*srv))
-	    == -1)
-		fatal("main_compose_sockets IMSG_CFG_SRV");
+	if (main_compose_sockets(env, GOTWEBD_IMSG_CFG_SRV,
+	    -1, srv, sizeof(*srv)) == -1)
+		fatal("main_compose_sockets GOTWEBD_IMSG_CFG_SRV");
 	return 0;
 }
 
@@ -112,9 +112,9 @@ config_setsock(struct gotwebd *env, struct socket *sock)
 	if (sockets_privinit(env, sock) == -1)
 		return -1;
 
-	if (main_compose_sockets(env, IMSG_CFG_SOCK, sock->fd,
+	if (main_compose_sockets(env, GOTWEBD_IMSG_CFG_SOCK, sock->fd,
 	    &sock->conf, sizeof(sock->conf)) == -1)
-		fatal("main_compose_sockets IMSG_CFG_SOCK");
+		fatal("main_compose_sockets GOTWEBD_IMSG_CFG_SOCK");
 
 	sock->fd = -1;
 	return 0;
@@ -173,8 +173,8 @@ config_setfd(struct gotwebd *env)
 			if (fd == -1)
 				fatal("got_opentemp");
 			if (imsg_compose_event(&env->iev_server[j],
-			    IMSG_CFG_FD, 0, -1, fd, NULL, 0) == -1)
-				fatal("imsg_compose_event IMSG_CFG_FD");
+			    GOTWEBD_IMSG_CFG_FD, 0, -1, fd, NULL, 0) == -1)
+				fatal("imsg_compose_event GOTWEBD_IMSG_CFG_FD");
 
 			if (imsgbuf_flush(&env->iev_server[j].ibuf) == -1)
 				fatal("imsgbuf_flush");

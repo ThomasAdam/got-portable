@@ -158,7 +158,7 @@ gotwebd_dispatch_sockets(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
-		case IMSG_CFG_DONE:
+		case GOTWEBD_IMSG_CFG_DONE:
 			gotwebd_configure_done(env);
 			break;
 		default:
@@ -456,8 +456,8 @@ gotwebd_configure(struct gotwebd *env)
 	if (config_setfd(env) == -1)
 		fatalx("%s: send priv_fd error", __func__);
 
-	if (main_compose_sockets(env, IMSG_CFG_DONE, -1, NULL, 0) == -1)
-		fatal("main_compose_sockets IMSG_CFG_DONE");
+	if (main_compose_sockets(env, GOTWEBD_IMSG_CFG_DONE, -1, NULL, 0) == -1)
+		fatal("main_compose_sockets GOTWEBD_IMSG_CFG_DONE");
 
 	return (0);
 }
@@ -472,8 +472,8 @@ gotwebd_configure_done(struct gotwebd *env)
 
 	env->gotwebd_reload--;
 	if (env->gotwebd_reload == 0 &&
-	    main_compose_sockets(env, IMSG_CTL_START, -1, NULL, 0) == -1)
-		fatal("main_compose_sockets IMSG_CTL_START");
+	    main_compose_sockets(env, GOTWEBD_CTL_START, -1, NULL, 0) == -1)
+		fatal("main_compose_sockets GOTWEBD_CTL_START");
 }
 
 void

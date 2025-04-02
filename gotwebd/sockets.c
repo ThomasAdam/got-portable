@@ -275,19 +275,19 @@ sockets_dispatch_main(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
-		case IMSG_CFG_SRV:
+		case GOTWEBD_IMSG_CFG_SRV:
 			config_getserver(env, &imsg);
 			break;
-		case IMSG_CFG_SOCK:
+		case GOTWEBD_IMSG_CFG_SOCK:
 			config_getsock(env, &imsg);
 			break;
-		case IMSG_CFG_FD:
+		case GOTWEBD_IMSG_CFG_FD:
 			config_getfd(env, &imsg);
 			break;
-		case IMSG_CFG_DONE:
+		case GOTWEBD_IMSG_CFG_DONE:
 			config_getcfg(env, &imsg);
 			break;
-		case IMSG_CTL_START:
+		case GOTWEBD_CTL_START:
 			sockets_launch();
 			break;
 		default:
