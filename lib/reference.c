@@ -206,6 +206,8 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	}
 	if (fstat(fileno(f), &sb) == -1) {
 		err = got_error_from_errno2("fstat", abspath);
+		if (lock)
+			got_lockfile_unlock(lf, -1);
 		goto done;
 	}
 	if (!S_ISREG(sb.st_mode)) {
