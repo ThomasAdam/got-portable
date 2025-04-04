@@ -208,15 +208,19 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		err = got_error_from_errno2("fstat", abspath);
 		goto done;
 	}
+	if (!S_ISREG(sb.st_mode)) {
+		err = got_error(GOT_ERR_NOT_REF);
+		if (lock)
+			got_lockfile_unlock(lf, -1);
+		goto done;
+	}
 
 	linelen = getline(&line, &linesize, f);
 	if (linelen == -1) {
 		if (feof(f))
 			err = NULL; /* ignore empty files (could be locks) */
 		else {
-			if (errno == EISDIR)
-				err = got_error(GOT_ERR_NOT_REF);
-			else if (ferror(f))
+			if (ferror(f))
 				err = got_ferror(f, GOT_ERR_IO);
 			else
 				err = got_error_from_errno2("getline", abspath);
