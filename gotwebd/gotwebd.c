@@ -198,7 +198,8 @@ gotwebd_sighdlr(int sig, short event, void *arg)
 		gotwebd_shutdown();
 		break;
 	default:
-		fatalx("unexpected signal");
+		log_warn("unexpected signal %d", sig);
+		break;
 	}
 }
 

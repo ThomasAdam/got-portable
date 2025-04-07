@@ -327,8 +327,8 @@ sockets_sighdlr(int sig, short event, void *arg)
 		sockets_shutdown();
 		break;
 	default:
-		log_info("SIGNAL: %d", sig);
-		fatalx("unexpected signal");
+		log_warn("unexpected signal %d", sig);
+		break;
 	}
 }
 
