@@ -26,6 +26,7 @@ gotd_SOURCES = gotd.c \
 	$(top_srcdir)/lib/diffreg.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/gitconfig.c \
+	$(top_srcdir)/lib/gotd_imsg.c \
 	$(top_srcdir)/lib/gotconfig.c \
 	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \

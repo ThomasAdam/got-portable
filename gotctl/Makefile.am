@@ -9,6 +9,7 @@ gotctl_SOURCES = gotctl.c \
 	$(top_srcdir)/gotd/parse.y \
 	$(top_srcdir)/gotd/secrets.c \
 	$(top_srcdir)/lib/error.c \
+	$(top_srcdir)/lib/gotd_imsg.c \
 	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/log.c \
 	$(top_srcdir)/lib/object_qid.c \

@@ -2396,6 +2396,7 @@ run_gotsys(struct gotd_client *client, struct gotd_repo *repo,
 	pid_t pid;
 	const char *argv[4];
 	int argc = 0;
+	int sock_flags = SOCK_STREAM|SOCK_NONBLOCK;
 
 #ifdef SOCK_CLOEXEC
 	sock_flags |= SOCK_CLOEXEC;

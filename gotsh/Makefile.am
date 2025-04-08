@@ -9,6 +9,7 @@ gotsh_SOURCES = gotsh.c \
 	$(top_srcdir)/lib/dial.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/gitproto.c \
+	$(top_srcdir)/lib/gotd_imsg.c \
 	$(top_srcdir)/lib/hash.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/object_qid.c \

@@ -14,8 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 #include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 
@@ -24,8 +25,6 @@
 #include <imsg.h>
 #include <limits.h>
 #include <poll.h>
-#include <sha1.h>
-#include <sha2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
