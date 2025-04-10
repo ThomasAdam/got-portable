@@ -215,6 +215,17 @@ unix_socket_listen(const char *unix_socket_path, uid_t uid, gid_t gid)
 	return fd;
 }
 
+static void
+clients_init(void)
+{
+	uint64_t slot;
+
+	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+
+	for (slot = 0; slot < nitems(gotd_clients); slot++)
+		STAILQ_INIT(&gotd_clients[slot]);
+}
+
 static uint64_t
 client_hash(uint32_t client_id)
 {
@@ -3696,14 +3707,14 @@ main(int argc, char **argv)
 
 	if (proc_id == GOTD_PROC_GOTD) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);
-		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+		clients_init();
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
 		gotd.pid = getpid();
 	} else if (proc_id == GOTD_PROC_RELOAD) {
 		snprintf(title, sizeof(title), "%s",
 		    gotd_proc_names[GOTD_PROC_GOTD]);
-		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+		clients_init();
 		gotd.pid = getpid();
 	} else if (proc_id == GOTD_PROC_LISTEN) {
 		snprintf(title, sizeof(title), "%s", gotd_proc_names[proc_id]);

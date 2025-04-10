@@ -67,6 +67,17 @@ static SIPHASH_KEY sessions_hash_key;
 
 static void gotd_notify_shutdown(void);
 
+static void
+sessions_init(void)
+{
+	uint64_t slot;
+
+	arc4random_buf(&sessions_hash_key, sizeof(sessions_hash_key));
+
+	for (slot = 0; slot < nitems(gotd_notify_sessions); slot++)
+		STAILQ_INIT(&gotd_notify_sessions[slot]);
+}
+
 static uint64_t
 session_hash(uint32_t session_id)
 {
@@ -649,7 +660,7 @@ notify_main(const char *title)
 	const struct got_error *err = NULL;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 
-	arc4random_buf(&sessions_hash_key, sizeof(sessions_hash_key));
+	sessions_init();
 
 	gotd_notify.title = title;
 	gotd_notify.pid = getpid();
