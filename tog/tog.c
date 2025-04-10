@@ -3195,26 +3195,6 @@ tog_worktree_status(struct tog_log_thread_args *ta)
 
 	RB_INIT(&paths);
 
-	if (wt == NULL) {
-		cwd = getcwd(NULL, 0);
-		if (cwd == NULL)
-			return got_error_from_errno("getcwd");
-
-		err = got_worktree_open(&wt, cwd, NULL);
-		if (err != NULL) {
-			if (err->code == GOT_ERR_NOT_WORKTREE) {
-				/*
-				 * Shouldn't happen; this routine should only
-				 * be called if tog is invoked in a worktree.
-				 */
-				wctx->active = 0;
-				err = NULL;
-			} else if (err->code == GOT_ERR_WORKTREE_BUSY)
-				err = NULL;	/* retry next redraw */
-			goto done;
-		}
-	}
-
 	err = got_pathlist_insert(NULL, &paths, "", NULL);
 	if (err != NULL)
 		goto done;
@@ -4089,13 +4069,6 @@ log_thread(void *arg)
 				goto done;
 			}
 			a->need_commit_marker = 0;
-			/*
-			 * The main thread did not close this
-			 * work tree yet. Close it now.
-			 */
-			got_worktree_close(a->worktree);
-			a->worktree = NULL;
-
 			if (*a->quit)
 				done = 1;
 		}
@@ -5387,11 +5360,6 @@ cmd_log(int argc, char *argv[])
 	    in_repo_path, log_branches, worktree);
 	if (error)
 		goto done;
-
-	if (worktree) {
-		/* The work tree will be closed by the log thread. */
-		worktree = NULL;
-	}
 
 	error = view_loop(view);
 
