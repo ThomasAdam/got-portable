@@ -219,6 +219,17 @@ start_child(enum gotsysd_procid proc_id, char *argv0, const char *confpath,
 	fatal("execvp");
 }
 
+static void
+clients_init(void)
+{
+	uint64_t slot;
+
+	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+
+	for (slot = 0; slot < nitems(gotsysd_clients); slot++)
+		STAILQ_INIT(&gotsysd_clients[slot]);
+}
+
 static uint64_t
 client_hash(uint32_t client_id)
 {
@@ -1759,7 +1770,7 @@ main(int argc, char **argv)
 		open_gotsysd_db();
 		snprintf(title, sizeof(title), "%s",
 		    gotsysd_proc_names[proc_id]);
-		arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+		clients_init();
 		if (daemonize && daemon(1, 0) == -1)
 			fatal("daemon");
 		gotsysd.pid = getpid();

@@ -105,6 +105,17 @@ listen_sighdlr(int sig, short event, void *arg)
 	}
 }
 
+static void
+clients_init(void)
+{
+	uint64_t slot;
+
+	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+
+	for (slot = 0; slot < nitems(gotsysd_listen_clients); slot++)
+		STAILQ_INIT(&gotsysd_listen_clients[slot]);
+}
+
 static uint64_t
 client_hash(uint32_t client_id)
 {
@@ -434,7 +445,7 @@ listen_main(const char *title, int gotsysd_socket)
 	struct gotsysd_imsgev iev;
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 
-	arc4random_buf(&clients_hash_key, sizeof(clients_hash_key));
+	clients_init();
 	arc4random_buf(&uid_hash_key, sizeof(uid_hash_key));
 
 	gotsysd_listen.title = title;
