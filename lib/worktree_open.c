@@ -295,7 +295,8 @@ got_worktree_open(struct got_worktree **worktree, const char *path,
 				if (err == NULL ||
 				    err->code == GOT_ERR_WORKTREE_BUSY)
 					break;
-				else {
+				else if (err->code != GOT_ERR_ERRNO ||
+				    errno != ENOENT) {
 					free(worktree_path);
 					return err;
 				}
