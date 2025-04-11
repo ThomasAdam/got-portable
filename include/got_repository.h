@@ -136,7 +136,18 @@ const struct got_error *got_repo_get_reference(struct got_reference **,
 /* Indicate whether this is a bare repositiry (contains no git working tree). */
 int got_repo_is_bare(struct got_repository *);
 
-/* Attempt to map an arbitrary path to a path within the repository. */
+/*
+ * Attempt to map an input path to a path within the repository.
+ *
+ * This is useful in cases where the input path might be an on-disk path
+ * found in a non-bare Git repository, e.g. when a tab-completed path to
+ * a versioned file in a non-bare Git repository is passed to commands
+ * such as 'got log' in absolute or relative form.
+ * In such cases, the corresponding repository-relative path is returned.
+ *
+ * If the input path is not located in a non-bare Git repository, the
+ * input path is made absolute but is otherwise returned as-is.
+ */
 const struct got_error *got_repo_map_path(char **, struct got_repository *,
     const char *);
 
