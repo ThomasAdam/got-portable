@@ -293,6 +293,10 @@ got_worktree_open(struct got_worktree **worktree, const char *path,
 				if (err == NULL ||
 				    err->code == GOT_ERR_WORKTREE_BUSY)
 					break;
+				else {
+					free(worktree_path);
+					return err;
+				}
 			}
 		} else
 			err = open_worktree(worktree, worktree_path, meta_dir);
