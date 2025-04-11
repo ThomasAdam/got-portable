@@ -3584,13 +3584,8 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 	const struct got_error *err;
 	struct got_repository *repo;
 	static char msg[512];
-	int *pack_fds = NULL;
 
-	err = got_repo_pack_fds_open(&pack_fds);
-	if (err)
-		return err;
-
-	err = got_repo_open(&repo, path, NULL, pack_fds);
+	err = got_repo_open(&repo, path, NULL, NULL);
 	if (err)
 		return orig_err;
 
@@ -3604,12 +3599,6 @@ wrap_not_worktree_error(const struct got_error *orig_err,
 		const struct got_error *close_err = got_repo_close(repo);
 		if (err == NULL)
 			err = close_err;
-	}
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (err == NULL)
-			err = pack_err;
 	}
 	return err;
 }
