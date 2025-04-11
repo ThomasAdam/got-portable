@@ -840,7 +840,6 @@ cmd_import(int argc, char *argv[])
 	struct got_pathlist_head ignores;
 	struct got_pathlist_entry *pe;
 	int preserve_logmsg = 0;
-	int *pack_fds = NULL;
 
 	RB_INIT(&ignores);
 
@@ -902,10 +901,7 @@ cmd_import(int argc, char *argv[])
 	error = get_gitconfig_path(&gitconfig_path);
 	if (error)
 		goto done;
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-	error = got_repo_open(&repo, repo_path, gitconfig_path, pack_fds);
+	error = got_repo_open(&repo, repo_path, gitconfig_path, NULL);
 	if (error)
 		goto done;
 
@@ -1040,12 +1036,6 @@ cmd_import(int argc, char *argv[])
 	printf("Created branch %s with commit %s\n",
 	    got_ref_get_name(branch_ref), id_str);
 done:
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
