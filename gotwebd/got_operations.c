@@ -338,7 +338,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 	struct got_repository *repo = t->repo;
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
-	char *in_repo_path = NULL, *repo_path = NULL, *file_path = NULL;
+	char *repo_path = NULL, *file_path = NULL;
 	int chk_next = 0;
 
 	if (limit == 0)
@@ -381,10 +381,6 @@ got_get_repo_commits(struct request *c, size_t limit)
 			goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, repo_path);
-	if (error)
-		goto done;
-
 	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
@@ -394,7 +390,7 @@ got_get_repo_commits(struct request *c, size_t limit)
 		if (error)
 			goto done;
 	} else {
-		error = got_commit_graph_open(&graph, in_repo_path, 0);
+		error = got_commit_graph_open(&graph, "/", 0);
 		if (error)
 			goto done;
 	}
@@ -455,7 +451,6 @@ got_get_repo_commits(struct request *c, size_t limit)
 	if (graph)
 		got_commit_graph_close(graph);
 	got_ref_list_free(&refs);
-	free(in_repo_path);
 	free(file_path);
 	free(repo_path);
 	free(id);
@@ -477,7 +472,7 @@ got_get_repo_tags(struct request *c, size_t limit)
 	struct querystring *qs = t->qs;
 	struct repo_dir *repo_dir = t->repo_dir;
 	struct got_tag_object *tag = NULL;
-	char *in_repo_path = NULL, *repo_path = NULL, *id_str = NULL;
+	char *repo_path = NULL, *id_str = NULL;
 	char *tag_commit = NULL, *tag_commit0 = NULL;
 	char *commit_msg = NULL, *commit_msg0 = NULL;
 	int chk_next = 0, chk_multi = 1, commit_found = 0;
@@ -521,10 +516,6 @@ got_get_repo_tags(struct request *c, size_t limit)
 			commit = NULL;
 		}
 	}
-
-	error = got_repo_map_path(&in_repo_path, repo, repo_path);
-	if (error)
-		goto done;
 
 	error = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags,
 	   repo);
@@ -682,7 +673,6 @@ got_get_repo_tags(struct request *c, size_t limit)
 		got_object_tag_close(tag);
 	got_ref_list_free(&refs);
 	free(commit_msg0);
-	free(in_repo_path);
 	free(repo_path);
 	free(id);
 	free(id_str);
@@ -703,28 +693,15 @@ got_output_repo_tree(struct request *c, char **readme,
 	struct got_reflist_head refs;
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te;
-	struct repo_dir *repo_dir = t->repo_dir;
 	const char *name;
 	mode_t mode;
-	char *escaped_name = NULL, *path = NULL;
+	char *escaped_name = NULL;
 	int nentries, i;
 
 	TAILQ_INIT(&refs);
 	*readme = NULL;
 
 	rc = TAILQ_FIRST(&t->repo_commits);
-
-	if (qs->folder != NULL) {
-		path = strdup(qs->folder);
-		if (path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else {
-		error = got_repo_map_path(&path, repo, repo_dir->path);
-		if (error)
-			goto done;
-	}
 
 	error = got_repo_match_object_id(&commit_id, NULL, rc->commit_id,
 	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
@@ -735,7 +712,8 @@ got_output_repo_tree(struct request *c, char **readme,
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&tree_id, repo, commit, path);
+	error = got_object_id_by_path(&tree_id, repo, commit,
+	    qs->folder ? qs->folder : "/");
 	if (error)
 		goto done;
 
@@ -764,7 +742,6 @@ got_output_repo_tree(struct request *c, char **readme,
 	}
  done:
 	free(escaped_name);
-	free(path);
 	got_ref_list_free(&refs);
 	if (commit)
 		got_object_commit_close(commit);
@@ -793,7 +770,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	struct got_object_id *commit_id = NULL;
 	struct got_object_id *blob_id = NULL;
 	struct got_reflist_head refs;
-	char *path = NULL, *in_repo_path = NULL;
+	char *path = NULL;
 	int obj_type;
 
 	TAILQ_INIT(&refs);
@@ -813,10 +790,6 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
-	if (error)
-		goto done;
-
 	if (commitstr == NULL)
 		commitstr = GOT_REF_HEAD;
 
@@ -829,7 +802,7 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&blob_id, repo, commit, in_repo_path);
+	error = got_object_id_by_path(&blob_id, repo, commit, path);
 	if (error)
 		goto done;
 
@@ -873,7 +846,6 @@ got_open_blob_for_output(struct got_blob_object **blob, int *fd,
 	}
 
 	got_ref_list_free(&refs);
-	free(in_repo_path);
 	free(commit_id);
 	free(blob_id);
 	free(path);
@@ -1012,7 +984,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	struct got_commit_object *commit = NULL;
 	struct got_reflist_head refs;
 	struct got_blob_object *blob = NULL;
-	char *path = NULL, *in_repo_path = NULL;
+	char *path = NULL;
 	struct blame_cb_args bca;
 	int i, obj_type, blobfd = -1, fd1 = -1, fd2 = -1;
 	off_t filesize;
@@ -1028,10 +1000,6 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
-	if (error)
-		goto done;
-
 	error = got_repo_match_object_id(&commit_id, NULL, qs->commit,
 	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (error)
@@ -1041,7 +1009,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, repo, commit, in_repo_path);
+	error = got_object_id_by_path(&obj_id, repo, commit, path);
 	if (error)
 		goto done;
 
@@ -1106,7 +1074,7 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 	if (error)
 		goto done;
 
-	error = got_blame(in_repo_path, commit_id, repo,
+	error = got_blame(path, commit_id, repo,
 	    GOT_DIFF_ALGORITHM_PATIENCE, got_gotweb_blame_cb, &bca, NULL, NULL,
 	    fd1, fd2, f1, f2);
 
@@ -1145,7 +1113,6 @@ got_output_file_blame(struct request *c, got_render_blame_line_cb cb)
 		got_object_commit_close(commit);
 	if (blob)
 		got_object_blob_close(blob);
-	free(in_repo_path);
 	free(commit_id);
 	free(obj_id);
 	free(path);
