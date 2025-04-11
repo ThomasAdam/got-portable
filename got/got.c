@@ -6836,7 +6836,6 @@ cmd_ref(int argc, char *argv[])
 	int ch, do_list = 0, do_delete = 0, sort_by_time = 0;
 	const char *obj_arg = NULL, *symref_target= NULL;
 	char *refname = NULL, *keyword_idstr = NULL;
-	int *pack_fds = NULL;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec "
@@ -6921,10 +6920,6 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd,
 		    GOT_WORKTREE_GOT_DIR);
@@ -6948,7 +6943,7 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path, NULL, pack_fds);
+	error = got_repo_open(&repo, repo_path, NULL, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -6994,12 +6989,6 @@ done:
 	}
 	if (worktree)
 		got_worktree_close(worktree);
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
-	}
 	free(cwd);
 	free(repo_path);
 	free(keyword_idstr);
