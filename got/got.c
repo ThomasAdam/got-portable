@@ -14770,7 +14770,6 @@ cmd_info(int argc, char *argv[])
 	char *cwd = NULL, *id_str = NULL;
 	struct got_pathlist_head paths;
 	char *uuidstr = NULL;
-	int *pack_fds = NULL;
 	int ch, show_files = 0;
 
 	RB_INIT(&paths);
@@ -14805,12 +14804,8 @@ cmd_info(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_pack_fds_open(&pack_fds);
-	if (error != NULL)
-		goto done;
-
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree), NULL,
-	    pack_fds);
+	    NULL);
 	if (error)
 		goto done;
 
@@ -14895,12 +14890,6 @@ done:
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
 			error = close_err;
-	}
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (error == NULL)
-			error = pack_err;
 	}
 	got_pathlist_free(&paths, GOT_PATHLIST_FREE_PATH);
 	free(cwd);
