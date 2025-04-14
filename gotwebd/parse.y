@@ -111,7 +111,7 @@ typedef struct {
 
 %}
 
-%token	LISTEN WWW_PATH SITE_NAME SITE_OWNER SITE_LINK LOGO
+%token	LISTEN WWW SITE_NAME SITE_OWNER SITE_LINK LOGO
 %token	LOGO_URL SHOW_REPO_OWNER SHOW_REPO_AGE SHOW_REPO_DESCRIPTION
 %token	MAX_REPOS_DISPLAY REPOS_PATH MAX_COMMITS_DISPLAY ON ERROR
 %token	SHOW_SITE_OWNER SHOW_REPO_CLONEURL PORT PREFORK RESPECT_EXPORTOK
@@ -198,7 +198,13 @@ main		: PREFORK NUMBER {
 			n = strlcpy(gotwebd->httpd_chroot, $2,
 			    sizeof(gotwebd->httpd_chroot));
 			if (n >= sizeof(gotwebd->httpd_chroot)) {
-				yyerror("%s: httpd_chroot truncated", __func__);
+				yyerror("chroot path too long: %s", $2);
+				free($2);
+				YYERROR;
+			}
+			if (gotwebd->httpd_chroot[0] != '/') {
+				yyerror("chroot path must be an absolute path: "
+				    "bad path %s", gotwebd->httpd_chroot);
 				free($2);
 				YYERROR;
 			}
@@ -241,6 +247,12 @@ main		: PREFORK NUMBER {
 				yyerror("user already specified");
 			free(gotwebd->user);
 			gotwebd->user = $2;
+		}
+		| WWW USER STRING {
+			if (gotwebd->www_user != NULL)
+				yyerror("www user already specified");
+			free(gotwebd->www_user);
+			gotwebd->www_user = $3;
 		}
 		;
 
@@ -468,6 +480,7 @@ lookup(char *s)
 		{ "summary_commits_display",	SUMMARY_COMMITS_DISPLAY },
 		{ "summary_tags_display",	SUMMARY_TAGS_DISPLAY },
 		{ "user",			USER },
+		{ "www",			WWW },
 	};
 	const struct keywords *p;
 
@@ -833,7 +846,18 @@ parse_config(const char *filename, struct gotwebd *env)
 
 	/* add the implicit listen on socket */
 	if (TAILQ_EMPTY(&gotwebd->addresses)) {
-		const char *path = D_HTTPD_CHROOT D_UNIX_SOCKET;
+		char path[_POSIX_PATH_MAX];
+
+		if (strlcpy(path, gotwebd->httpd_chroot, sizeof(path))
+		    >= sizeof(path)) {
+			yyerror("chroot path too long: %s",
+			    gotwebd->httpd_chroot);
+		}
+		if (strlcat(path, D_UNIX_SOCKET, sizeof(path))
+		    >= sizeof(path)) {
+			yyerror("chroot path too long: %s",
+			    gotwebd->httpd_chroot);
+		}
 		if (get_unix_addr(path) == -1)
 			yyerror("can't listen on %s", path);
 	}
@@ -859,10 +883,14 @@ conf_new_server(const char *name)
 	n = strlcpy(srv->name, name, sizeof(srv->name));
 	if (n >= sizeof(srv->name))
 		fatalx("%s: strlcpy", __func__);
-	n = strlcpy(srv->repos_path, D_GOTPATH,
+	n = strlcpy(srv->repos_path, gotwebd->httpd_chroot,
 	    sizeof(srv->repos_path));
 	if (n >= sizeof(srv->repos_path))
 		fatalx("%s: strlcpy", __func__);
+	n = strlcat(srv->repos_path, D_GOTPATH,
+	    sizeof(srv->repos_path));
+	if (n >= sizeof(srv->repos_path))
+		fatalx("%s: strlcat", __func__);
 	n = strlcpy(srv->site_name, D_SITENAME,
 	    sizeof(srv->site_name));
 	if (n >= sizeof(srv->site_name))

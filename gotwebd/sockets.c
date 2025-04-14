@@ -43,17 +43,14 @@
 #include <netdb.h>
 #include <poll.h>
 #include <pwd.h>
+#include <siphash.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "got_error.h"
-#include "got_opentemp.h"
 #include "got_reference.h"
-#include "got_repository.h"
-#include "got_privsep.h"
 
 #include "gotwebd.h"
 #include "log.h"
@@ -62,18 +59,17 @@
 #define SOCKS_BACKLOG 5
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
 
-volatile int client_cnt;
+static volatile int client_cnt;
 
 static struct timeval	timeout = { TIMEOUT_DEFAULT, 0 };
 
 static void	 sockets_sighdlr(int, short, void *);
 static void	 sockets_shutdown(void);
-static void	 sockets_launch(void);
+static void	 sockets_launch(struct gotwebd *);
 static void	 sockets_accept_paused(int, short, void *);
-static void	 sockets_rlimit(int);
 
 static void	 sockets_dispatch_main(int, short, void *);
-static int	 sockets_unix_socket_listen(struct gotwebd *, struct socket *);
+static int	 sockets_unix_socket_listen(struct gotwebd *, struct socket *, uid_t, gid_t);
 static int	 sockets_create_socket(struct address *);
 static int	 sockets_accept_reserve(int, struct sockaddr *, socklen_t *,
 		    int, volatile int *);
@@ -83,11 +79,93 @@ static struct socket *sockets_conf_new_socket(struct gotwebd *,
 
 int cgi_inflight = 0;
 
+/* Request hash table needs some spare room to avoid collisions. */
+struct requestlist requests[GOTWEBD_MAXCLIENTS * 4];
+static SIPHASH_KEY requests_hash_key;
+
+static void
+requests_init(void)
+{
+	int i;
+
+	arc4random_buf(&requests_hash_key, sizeof(requests_hash_key));
+
+	for (i = 0; i < nitems(requests); i++)
+		TAILQ_INIT(&requests[i]);
+}
+
+static uint64_t
+request_hash(uint32_t request_id)
+{
+	return SipHash24(&requests_hash_key, &request_id, sizeof(request_id));
+}
+
+static void
+add_request(struct request *c)
+{
+	uint64_t slot = request_hash(c->request_id) % nitems(requests);
+	TAILQ_INSERT_HEAD(&requests[slot], c, entry);
+	client_cnt++;
+}
+
+void
+sockets_del_request(struct request *c)
+{
+	uint64_t slot = request_hash(c->request_id) % nitems(requests);
+	TAILQ_REMOVE(&requests[slot], c, entry);
+	client_cnt--;
+}
+
+static struct request *
+find_request(uint32_t request_id)
+{
+	uint64_t slot;
+	struct request *c;
+
+	slot = request_hash(request_id) % nitems(requests);
+	TAILQ_FOREACH(c, &requests[slot], entry) {
+		if (c->request_id == request_id)
+			return c;
+	}
+
+	return NULL;
+}
+
+static void
+requests_purge(void)
+{
+	uint64_t slot;
+	struct request *c;
+
+	for (slot = 0; slot < nitems(requests); slot++) {
+		while (!TAILQ_EMPTY(&requests[slot])) {
+			c = TAILQ_FIRST(&requests[slot]);
+			fcgi_cleanup_request(c);
+		}
+	}
+}
+
+static uint32_t
+get_request_id(void)
+{
+	int duplicate = 0;
+	uint32_t id;
+
+	do {
+		id = arc4random();
+		duplicate = (find_request(id) != NULL);
+	} while (duplicate || id == 0);
+
+	return id;
+}
+
 void
 sockets(struct gotwebd *env, int fd)
 {
 	struct event	 sighup, sigint, sigusr1, sigchld, sigterm;
 	struct event_base *evb;
+
+	requests_init();
 
 	evb = event_init();
 
@@ -118,8 +196,7 @@ sockets(struct gotwebd *env, int fd)
 	signal_add(&sigterm, NULL);
 
 #ifndef PROFILE
-	if (pledge("stdio rpath inet recvfd proc exec sendfd unveil",
-	    NULL) == -1)
+	if (pledge("stdio inet recvfd sendfd", NULL) == -1)
 		fatal("pledge");
 #endif
 
@@ -190,11 +267,12 @@ sockets_conf_new_socket(struct gotwebd *env, int id, struct address *a)
 }
 
 static void
-sockets_launch(void)
+sockets_launch(struct gotwebd *env)
 {
 	struct socket *sock;
-	struct server *srv;
-	const struct got_error *error;
+
+	if (env->iev_gotweb == NULL)
+		fatal("gotweb process not connected");
 
 	TAILQ_FOREACH(sock, &gotwebd_env->sockets, entry) {
 		log_info("%s: configuring socket %d (%d)", __func__,
@@ -212,17 +290,12 @@ sockets_launch(void)
 		    sock->conf.id);
 	}
 
-	TAILQ_FOREACH(srv, &gotwebd_env->servers, entry) {
-		if (unveil(srv->repos_path, "r") == -1)
-			fatal("unveil %s", srv->repos_path);
-	}
+#ifndef PROFILE
+	if (pledge("stdio inet sendfd", NULL) == -1)
+		fatal("pledge");
+#endif
+	event_add(&env->iev_gotweb->ev, NULL);
 
-	error = got_privsep_unveil_exec_helpers();
-	if (error)
-		fatal("%s", error->msg);
-
-	if (unveil(NULL, NULL) == -1)
-		fatal("unveil");
 }
 
 void
@@ -243,6 +316,110 @@ sockets_purge(struct gotwebd *env)
 		TAILQ_REMOVE(&env->sockets, sock, entry);
 		free(sock);
 	}
+}
+
+static void
+request_done(struct imsg *imsg)
+{
+	struct request *c;
+	uint32_t request_id;
+	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+
+	if (datalen != sizeof(request_id)) {
+		log_warn("IMSG_REQ_DONE with bad data length");
+		return;
+	}
+
+	memcpy(&request_id, imsg->data, sizeof(request_id));
+
+	c = find_request(request_id);
+	if (c == NULL) {
+		log_warnx("no request to clean up found for ID '%d'",
+		    request_id);
+		return;
+	}
+
+	fcgi_create_end_record(c);
+	fcgi_cleanup_request(c);
+}
+
+static void
+server_dispatch_gotweb(int fd, short event, void *arg)
+{
+	struct imsgev		*iev = arg;
+	struct imsgbuf		*ibuf;
+	struct imsg		 imsg;
+	ssize_t			 n;
+	int			 shut = 0;
+
+	ibuf = &iev->ibuf;
+
+	if (event & EV_READ) {
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+	if (event & EV_WRITE) {
+		if (imsgbuf_write(ibuf) == -1)
+			fatal("imsgbuf_write");
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("imsg_get");
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTWEBD_IMSG_REQ_DONE:
+			request_done(&imsg);
+			break;
+		default:
+			fatalx("%s: unknown imsg type %d", __func__,
+			    imsg.hdr.type);
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut)
+		imsg_event_add(iev);
+	else {
+		/* This pipe is dead.  Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
+static void
+recv_gotweb_pipe(struct gotwebd *env, struct imsg *imsg)
+{
+	struct imsgev *iev;
+	int fd;
+
+	if (env->iev_gotweb != NULL) {
+		log_warn("gotweb pipe already received"); 
+		return;
+	}
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
+		fatalx("invalid gotweb pipe fd");
+
+	iev = calloc(1, sizeof(*iev));
+	if (iev == NULL)
+		fatal("calloc");
+
+	if (imsgbuf_init(&iev->ibuf, fd) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&iev->ibuf);
+
+	iev->handler = server_dispatch_gotweb;
+	iev->data = iev;
+	event_set(&iev->ev, fd, EV_READ, server_dispatch_gotweb, iev);
+
+	env->iev_gotweb = iev;
 }
 
 static void
@@ -281,14 +458,14 @@ sockets_dispatch_main(int fd, short event, void *arg)
 		case IMSG_CFG_SOCK:
 			config_getsock(env, &imsg);
 			break;
-		case IMSG_CFG_FD:
-			config_getfd(env, &imsg);
-			break;
-		case IMSG_CFG_DONE:
+		case GOTWEBD_IMSG_CFG_DONE:
 			config_getcfg(env, &imsg);
 			break;
-		case IMSG_CTL_START:
-			sockets_launch();
+		case GOTWEBD_IMSG_CTL_PIPE:
+			recv_gotweb_pipe(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CTL_START:
+			sockets_launch(env);
 			break;
 		default:
 			fatalx("%s: unknown imsg type %d", __func__,
@@ -354,6 +531,8 @@ sockets_shutdown(void)
 		free(h);
 	}
 
+	requests_purge();
+
 	imsgbuf_clear(&gotwebd_env->iev_parent->ibuf);
 	free(gotwebd_env->iev_parent);
 	free(gotwebd_env);
@@ -362,12 +541,12 @@ sockets_shutdown(void)
 }
 
 int
-sockets_privinit(struct gotwebd *env, struct socket *sock)
+sockets_privinit(struct gotwebd *env, struct socket *sock, uid_t uid, gid_t gid)
 {
 	if (sock->conf.af_type == AF_UNIX) {
 		log_info("%s: initializing unix socket %s", __func__,
 		    sock->conf.unix_socket_name);
-		sock->fd = sockets_unix_socket_listen(env, sock);
+		sock->fd = sockets_unix_socket_listen(env, sock, uid, gid);
 		if (sock->fd == -1)
 			return -1;
 	}
@@ -385,7 +564,8 @@ sockets_privinit(struct gotwebd *env, struct socket *sock)
 }
 
 static int
-sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
+sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock,
+    uid_t uid, gid_t gid)
 {
 	int u_fd = -1;
 	mode_t old_umask, mode;
@@ -430,8 +610,7 @@ sockets_unix_socket_listen(struct gotwebd *env, struct socket *sock)
 		return -1;
 	}
 
-	if (chown(sock->conf.unix_socket_name, env->pw->pw_uid,
-	    env->pw->pw_gid) == -1) {
+	if (chown(sock->conf.unix_socket_name, uid, gid) == -1) {
 		log_warn("%s: chown", __func__);
 		close(u_fd);
 		(void)unlink(sock->conf.unix_socket_name);
@@ -531,6 +710,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 	struct sockaddr_storage ss;
 	struct timeval backoff;
 	struct request *c = NULL;
+	uint8_t *buf = NULL;
 	socklen_t len;
 	int s;
 
@@ -567,28 +747,32 @@ sockets_socket_accept(int fd, short event, void *arg)
 
 	c = calloc(1, sizeof(struct request));
 	if (c == NULL) {
-		log_warn("%s", __func__);
+		log_warn("%s: calloc", __func__);
 		close(s);
 		cgi_inflight--;
 		return;
 	}
 
-	c->tp = template(c, &fcgi_write, c->outbuf, sizeof(c->outbuf));
-	if (c->tp == NULL) {
-		log_warn("%s", __func__);
+	buf = calloc(1, FCGI_RECORD_SIZE);
+	if (buf == NULL) {
+		log_warn("%s: calloc", __func__);
 		close(s);
 		cgi_inflight--;
 		free(c);
 		return;
 	}
 
+	c->buf = buf;
 	c->fd = s;
+	c->resp_fd = -1;
 	c->sock = sock;
 	memcpy(c->priv_fd, gotwebd_env->priv_fd, sizeof(c->priv_fd));
+	c->sock_id = sock->conf.id;
 	c->buf_pos = 0;
 	c->buf_len = 0;
 	c->request_started = 0;
 	c->sock->client_status = CLIENT_CONNECT;
+	c->request_id = get_request_id();
 
 	event_set(&c->ev, s, EV_READ|EV_PERSIST, fcgi_request, c);
 	event_add(&c->ev, NULL);
@@ -596,8 +780,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 	evtimer_set(&c->tmo, fcgi_timeout, c);
 	evtimer_add(&c->tmo, &timeout);
 
-	client_cnt++;
-
+	add_request(c);
 	return;
 err:
 	cgi_inflight--;
@@ -606,7 +789,7 @@ err:
 		free(c);
 }
 
-static void
+void
 sockets_rlimit(int maxfd)
 {
 	struct rlimit rl;

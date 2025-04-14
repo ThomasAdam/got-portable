@@ -85,24 +85,22 @@ can be configured via the
 .Xr gotwebd.conf 5
 configuration file.
 .It
-Git repositories must be created at a suitable location inside the
-web server's
-.Xr chroot 2
-environment.
-These repositories should
+Git repositories must be created.
+These repositories may reside anywhere in the filesystem and must
+be readable, but should
 .Em not
-be writable by the user ID shared between
+be writable, by the user
 .Nm
-and
-.Xr httpd 8 .
+runs as.
 The default location for repositories published by
 .Nm
 is
 .Pa /var/www/got/public .
 .It
-Git repositories served by
+If the Git repositories served by
 .Nm
-should be kept up-to-date with a mechanism such as
+do not receive changes from committers directly, they need to be kept
+up-to-date with a mechanism such as
 .Cm got fetch ,
 .Xr git-fetch 1 ,
 or
