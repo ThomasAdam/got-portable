@@ -1,9 +1,9 @@
 LDADD +=	-lz -lutil
 PREFIX ?=	/usr/local
 BINDIR ?=	${PREFIX}/sbin
+LIBEXECDIR ?=	${PREFIX}/libexec
 CHROOT_DIR ?=	/var/www
 GOTWEB_DIR =	/bin/gotwebd
-LIBEXECDIR =	${GOTWEB_DIR}/libexec
 HTTPD_DIR =	${CHROOT_DIR}/htdocs
 PROG_DIR =	${HTTPD_DIR}/${PROG}
 WWWUSR ?=	www
