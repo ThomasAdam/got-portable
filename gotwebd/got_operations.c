@@ -334,12 +334,10 @@ got_get_repo_commits(struct request *c, size_t limit)
 	struct got_reflist_head refs;
 	struct got_reference *ref = NULL;
 	struct repo_commit *repo_commit = NULL;
-	struct server *srv = c->srv;
 	struct transport *t = c->t;
 	struct got_repository *repo = t->repo;
 	struct querystring *qs = t->qs;
-	struct repo_dir *repo_dir = t->repo_dir;
-	char *repo_path = NULL, *file_path = NULL;
+	char *file_path = NULL;
 	int chk_next = 0;
 
 	if (limit == 0)
@@ -360,12 +358,6 @@ got_get_repo_commits(struct request *c, size_t limit)
 		if (asprintf(&file_path, "%s/%s", qs->folder ? qs->folder : "",
 		    qs->file) == -1)
 			return got_error_from_errno("asprintf");
-
-	if (asprintf(&repo_path, "%s/%s", srv->repos_path,
-	    repo_dir->name) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
 
 	if (qs->commit) {
 		error = got_repo_match_object_id_prefix(&id, qs->commit,
@@ -453,7 +445,6 @@ got_get_repo_commits(struct request *c, size_t limit)
 		got_commit_graph_close(graph);
 	got_ref_list_free(&refs);
 	free(file_path);
-	free(repo_path);
 	free(id);
 	return error;
 }
