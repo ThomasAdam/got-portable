@@ -44,15 +44,6 @@ For example:
 lan_addr = "192.168.0.1"
 listen on $lan_addr port 9090
 .Ed
-.Pp
-Paths mentioned in
-.Nm
-must be relative to
-.Pa /var/www ,
-the
-.Xr chroot 2
-environment of
-.Xr httpd 8 .
 .Sh GLOBAL CONFIGURATION
 The available global configuration directives are as follows:
 .Bl -tag -width Ds
@@ -64,6 +55,11 @@ environment of
 If not specified, it defaults to
 .Pa /var/www ,
 the home directory of the www user.
+Setting the
+.Ar path
+to
+.Pa /
+effectively disables chroot.
 .It Ic listen on Ar address Ic port Ar number
 Configure an address and port for incoming FastCGI connections.
 Valid
@@ -79,6 +75,11 @@ Configure a
 .Ux Ns -domain
 socket for incoming FastCGI connections.
 May be specified multiple times to build up a list of listening sockets.
+.Pp
+While the specified
+.Ar path
+must be absolute, it should usually point inside the web server's chroot
+directory such that the web server can access the socket.
 .It Ic prefork Ar number
 Run the specified number of server processes.
 .Xr gotwebd 8
@@ -87,6 +88,14 @@ runs 3 server processes by default.
 Set the
 .Ar user
 which will run
+.Xr gotwebd 8 .
+If not specified, the user _gotwebd will be used.
+.It Ic www user Ar user
+Set the
+.Ar user
+which runs
+.Xr httpd 8 .
+Needed to ensure that the web server can access UNIX-domain sockets created by
 .Xr gotwebd 8 .
 If not specified, the user www will be used.
 .El
@@ -123,10 +132,16 @@ Set the path to a custom Cascading Style Sheet (CSS) to be used.
 If this option is not specified then the default style sheet
 .Sq gotweb.css
 will be used.
+.Pp
+This path must be valid in the web server's URL space since browsers
+will attempt to fetch it.
 .It Ic logo Ar path
 Set the path to an image file containing a logo to be displayed.
 Defaults to
 .Sq got.png .
+.Pp
+This path must be valid in the web server's URL space since browsers
+will attempt to fetch it.
 .It Ic logo_url Ar url
 Set a hyperlink for the logo.
 Defaults to
@@ -141,9 +156,17 @@ Set to zero to show all the repositories without pagination.
 .It Ic repos_path Ar path
 Set the path to the directory which contains Git repositories that
 the server should publish.
+This path is absolute.
+Repositories can be served even if they reside outside the web server's
+chroot directory.
+.Pp
 Defaults to
 .Pa /got/public
-under the chroot.
+inside the web server's chroot directory.
+The
+.Cm chroot
+directive must be used before the server declaration in order to
+take effect.
 .It Ic respect_exportok Ar on | off
 Set whether to display the repository only if it contains the magic
 .Pa git-daemon-export-ok
@@ -221,6 +244,8 @@ listening socket.
 .Sh EXAMPLES
 A sample configuration:
 .Bd -literal -offset indent
+www user "www"   # www username needs quotes since www is a keyword
+
 server "localhost" {
 	site_name	"my public repos"
 	site_owner	"Flan Hacker"
@@ -231,13 +256,14 @@ server "localhost" {
 Another example, this time listening on a local port instead of the
 implicit
 .Ux
-socket.
+socket, and serving repositories located outside the web server's chroot:
 .Bd -literal -offset indent
 listen on 127.0.0.1 port 9000
 listen on ::1 port 9000
 
 server "localhost" {
-	site_name "my public repos"
+	site_name	"my public repos"
+	repos_path	"/var/git"
 }
 .Ed
 .Sh SEE ALSO

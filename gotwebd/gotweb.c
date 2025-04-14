@@ -33,6 +33,7 @@
 #include <imsg.h>
 #include <sha1.h>
 #include <sha2.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -142,11 +143,124 @@ gotweb_reply_file(struct request *c, const char *ctype, const char *file,
 	return gotweb_reply(c, 200, ctype, NULL);
 }
 
+static void
+free_request(struct request *c)
+{
+	if (c->fd != -1)
+		close(c->fd);
+	if (c->tp != NULL)
+		template_free(c->tp);
+	if (c->t != NULL)
+		gotweb_free_transport(c->t);
+	free(c->buf);
+	free(c->outbuf);
+	free(c);
+}
+
+static struct socket *
+gotweb_get_socket(int sock_id)
+{
+	struct socket *sock;
+
+	TAILQ_FOREACH(sock, &gotwebd_env->sockets, entry) {
+		if (sock->conf.id == sock_id)
+			return sock;
+	}
+
+	return NULL;
+}
+
+static struct request *
+recv_request(struct imsg *imsg)
+{
+	const struct got_error *error;
+	struct request *c;
+	struct server *srv;
+	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	int fd = -1;
+	uint8_t *outbuf = NULL;
+
+	if (datalen != sizeof(*c)) {
+		log_warnx("bad request size received over imsg");
+		return NULL;
+	}
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1) {
+		log_warnx("no client file descriptor");
+		return NULL;
+	}
+
+	c = calloc(1, sizeof(*c));
+	if (c == NULL) {
+		log_warn("calloc");
+		return NULL;
+	}
+
+	outbuf = calloc(1, GOTWEBD_CACHESIZE);
+	if (outbuf == NULL) {
+		log_warn("calloc");
+		free(c);
+		return NULL;
+	}
+
+	memcpy(c, imsg->data, sizeof(*c));
+
+	/* Non-NULL pointers, if any, are not from our address space. */
+	c->sock = NULL;
+	c->srv = NULL;
+	c->t = NULL;
+	c->tp = NULL;
+	c->buf = NULL;
+	c->outbuf = outbuf;
+
+	memset(&c->ev, 0, sizeof(c->ev));
+	memset(&c->tmo, 0, sizeof(c->tmo));
+
+	/* Use our own temporary file descriptors. */
+	memcpy(c->priv_fd, gotwebd_env->priv_fd, sizeof(c->priv_fd));
+
+	c->fd = fd;
+
+	c->tp = template(c, fcgi_write, c->outbuf, GOTWEBD_CACHESIZE);
+	if (c->tp == NULL) {
+		log_warn("gotweb init template");
+		free_request(c);
+		return NULL;
+	}
+
+	c->sock = gotweb_get_socket(c->sock_id);
+	if (c->sock == NULL) {
+		log_warn("socket id '%d' not found", c->sock_id);
+		free_request(c);
+		return NULL;
+	}
+
+	/* init the transport */
+	error = gotweb_init_transport(&c->t);
+	if (error) {
+		log_warnx("gotweb init transport: %s", error->msg);
+		free_request(c);
+		return NULL;
+	}
+
+	/* get the gotwebd server */
+	srv = gotweb_get_server(c->server_name);
+	if (srv == NULL) {
+		log_warnx("server '%s' not found", c->server_name);
+		free_request(c);
+		return NULL;
+	}
+	c->srv = srv;
+
+	return c;
+}
+
 void
 gotweb_process_request(struct request *c)
 {
 	const struct got_error *error = NULL;
-	struct server *srv = NULL;
+	struct server *srv = c->srv;;
 	struct querystring *qs = NULL;
 	struct repo_dir *repo_dir = NULL;
 	struct repo_commit *commit;
@@ -155,19 +269,6 @@ gotweb_process_request(struct request *c)
 	size_t len;
 	int r, binary = 0;
 
-	/* init the transport */
-	error = gotweb_init_transport(&c->t);
-	if (error) {
-		log_warnx("%s: %s", __func__, error->msg);
-		return;
-	}
-	/* get the gotwebd server */
-	srv = gotweb_get_server(c->server_name);
-	if (srv == NULL) {
-		log_warnx("%s: error server is NULL", __func__);
-		goto err;
-	}
-	c->srv = srv;
 	/* parse our querystring */
 	error = gotweb_init_querystring(&qs);
 	if (error) {
@@ -1296,4 +1397,273 @@ gotweb_render_age(struct template *tp, time_t committer_time)
 			return -1;
 	}
 	return 0;
+}
+
+static void
+gotweb_shutdown(void)
+{
+	imsgbuf_clear(&gotwebd_env->iev_parent->ibuf);
+	free(gotwebd_env->iev_parent);
+	free(gotwebd_env);
+
+	exit(0);
+}
+
+static void
+gotweb_sighdlr(int sig, short event, void *arg)
+{
+	switch (sig) {
+	case SIGHUP:
+		log_info("%s: ignoring SIGHUP", __func__);
+		break;
+	case SIGPIPE:
+		log_info("%s: ignoring SIGPIPE", __func__);
+		break;
+	case SIGUSR1:
+		log_info("%s: ignoring SIGUSR1", __func__);
+		break;
+	case SIGCHLD:
+		break;
+	case SIGINT:
+	case SIGTERM:
+		gotweb_shutdown();
+		break;
+	default:
+		log_warn("unhandled signal %d", sig);
+	}
+}
+
+static void
+gotweb_launch(struct gotwebd *env)
+{
+	struct server *srv;
+	const struct got_error *error;
+
+	if (env->iev_server == NULL)
+		fatal("server process not connected");
+
+#ifndef PROFILE
+	if (pledge("stdio rpath recvfd sendfd proc exec unveil", NULL) == -1)
+		fatal("pledge");
+#endif
+
+	TAILQ_FOREACH(srv, &gotwebd_env->servers, entry) {
+		if (unveil(srv->repos_path, "r") == -1)
+			fatal("unveil %s", srv->repos_path);
+	}
+
+	error = got_privsep_unveil_exec_helpers();
+	if (error)
+		fatalx("%s", error->msg);
+
+	if (unveil(NULL, NULL) == -1)
+		fatal("unveil");
+
+	event_add(&env->iev_server->ev, NULL);
+}
+
+static void
+send_request_done(struct imsgev *iev, int request_id)
+{
+	struct gotwebd		*env = gotwebd_env;
+
+	if (imsg_compose_event(env->iev_server, GOTWEBD_IMSG_REQ_DONE,
+	    GOTWEBD_PROC_GOTWEB, getpid(), -1,
+	    &request_id, sizeof(request_id)) == -1)
+		log_warn("imsg_compose_event");
+}
+
+static void
+gotweb_dispatch_server(int fd, short event, void *arg)
+{
+	struct imsgev		*iev = arg;
+	struct imsgbuf		*ibuf;
+	struct imsg		 imsg;
+	struct request		*c;
+	ssize_t			 n;
+	int			 shut = 0;
+
+	ibuf = &iev->ibuf;
+
+	if (event & EV_READ) {
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+	if (event & EV_WRITE) {
+		if (imsgbuf_write(ibuf) == -1)
+			fatal("imsgbuf_write");
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("imsg_get");
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTWEBD_IMSG_REQ_PROCESS:
+			c = recv_request(&imsg);
+			if (c) {
+				int request_id = c->request_id;
+				gotweb_process_request(c);
+				template_flush(c->tp);
+				free_request(c);
+				send_request_done(iev, request_id);
+			}
+			break;
+		default:
+			fatalx("%s: unknown imsg type %d", __func__,
+			    imsg.hdr.type);
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut)
+		imsg_event_add(iev);
+	else {
+		/* This pipe is dead.  Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
+static void
+recv_server_pipe(struct gotwebd *env, struct imsg *imsg)
+{
+	struct imsgev *iev;
+	int fd;
+
+	if (env->iev_server != NULL) {
+		log_warn("server pipe already received"); 
+		return;
+	}
+
+	fd = imsg_get_fd(imsg);
+	if (fd == -1)
+		fatalx("invalid server pipe fd");
+
+	iev = calloc(1, sizeof(*iev));
+	if (iev == NULL)
+		fatal("calloc");
+
+	if (imsgbuf_init(&iev->ibuf, fd) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&iev->ibuf);
+
+	iev->handler = gotweb_dispatch_server;
+	iev->data = iev;
+	event_set(&iev->ev, fd, EV_READ, gotweb_dispatch_server, iev);
+
+	env->iev_server = iev;
+}
+
+static void
+gotweb_dispatch_main(int fd, short event, void *arg)
+{
+	struct imsgev		*iev = arg;
+	struct imsgbuf		*ibuf;
+	struct imsg		 imsg;
+	struct gotwebd		*env = gotwebd_env;
+	ssize_t			 n;
+	int			 shut = 0;
+
+	ibuf = &iev->ibuf;
+
+	if (event & EV_READ) {
+		if ((n = imsgbuf_read(ibuf)) == -1)
+			fatal("imsgbuf_read error");
+		if (n == 0)	/* Connection closed */
+			shut = 1;
+	}
+	if (event & EV_WRITE) {
+		if (imsgbuf_write(ibuf) == -1)
+			fatal("imsgbuf_write");
+	}
+
+	for (;;) {
+		if ((n = imsg_get(ibuf, &imsg)) == -1)
+			fatal("imsg_get");
+		if (n == 0)	/* No more messages. */
+			break;
+
+		switch (imsg.hdr.type) {
+		case GOTWEBD_IMSG_CFG_SRV:
+			config_getserver(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CFG_FD:
+			config_getfd(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CFG_SOCK:
+			config_getsock(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CFG_DONE:
+			config_getcfg(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CTL_PIPE:
+			recv_server_pipe(env, &imsg);
+			break;
+		case GOTWEBD_IMSG_CTL_START:
+			gotweb_launch(env);
+			break;
+		default:
+			fatalx("%s: unknown imsg type %d", __func__,
+			    imsg.hdr.type);
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (!shut)
+		imsg_event_add(iev);
+	else {
+		/* This pipe is dead.  Remove its event handler */
+		event_del(&iev->ev);
+		event_loopexit(NULL);
+	}
+}
+
+void
+gotweb(struct gotwebd *env, int fd)
+{
+	struct event	 sighup, sigint, sigusr1, sigchld, sigterm;
+	struct event_base *evb;
+
+	evb = event_init();
+
+	sockets_rlimit(-1);
+
+	if ((env->iev_parent = malloc(sizeof(*env->iev_parent))) == NULL)
+		fatal("malloc");
+	if (imsgbuf_init(&env->iev_parent->ibuf, fd) == -1)
+		fatal("imsgbuf_init");
+	imsgbuf_allow_fdpass(&env->iev_parent->ibuf);
+	env->iev_parent->handler = gotweb_dispatch_main;
+	env->iev_parent->data = env->iev_parent;
+	event_set(&env->iev_parent->ev, fd, EV_READ, gotweb_dispatch_main,
+	    env->iev_parent);
+	event_add(&env->iev_parent->ev, NULL);
+
+	signal(SIGPIPE, SIG_IGN);
+
+	signal_set(&sighup, SIGHUP, gotweb_sighdlr, env);
+	signal_add(&sighup, NULL);
+	signal_set(&sigint, SIGINT, gotweb_sighdlr, env);
+	signal_add(&sigint, NULL);
+	signal_set(&sigusr1, SIGUSR1, gotweb_sighdlr, env);
+	signal_add(&sigusr1, NULL);
+	signal_set(&sigchld, SIGCHLD, gotweb_sighdlr, env);
+	signal_add(&sigchld, NULL);
+	signal_set(&sigterm, SIGTERM, gotweb_sighdlr, env);
+	signal_add(&sigterm, NULL);
+
+#ifndef PROFILE
+	if (pledge("stdio rpath recvfd sendfd proc exec unveil", NULL) == -1)
+		fatal("pledge");
+#endif
+	event_dispatch();
+	event_base_free(evb);
+	gotweb_shutdown();
 }

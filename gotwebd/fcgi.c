@@ -35,6 +35,8 @@
 #include "got_error.h"
 #include "got_reference.h"
 
+#include "got_lib_poll.h"
+
 #include "gotwebd.h"
 #include "log.h"
 #include "tmpl.h"
@@ -53,7 +55,7 @@ void	 dump_fcgi_end_request_body(const char *,
 	    struct fcgi_end_request_body *);
 
 extern int	 cgi_inflight;
-extern volatile int client_cnt;
+extern struct requestlist requests;
 
 void
 fcgi_request(int fd, short events, void *arg)
@@ -142,6 +144,7 @@ fcgi_parse_record(uint8_t *buf, size_t n, struct request *c)
 		    ntohs(h->content_len), c, ntohs(h->id));
 		break;
 	case FCGI_STDIN:
+		return 0;
 	case FCGI_ABORT_REQUEST:
 		fcgi_create_end_record(c);
 		fcgi_cleanup_request(c);
@@ -175,6 +178,89 @@ fcgi_parse_begin_request(uint8_t *buf, uint16_t n,
 	c->id = id;
 }
 
+static void
+fcgi_forward_response(int fd, short event, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct request *c = arg;
+	uint8_t outbuf[GOTWEBD_CACHESIZE];
+	ssize_t r;
+
+	if ((event & EV_READ) == 0)
+		return;
+
+	r = read(fd, outbuf, sizeof(outbuf));
+	if (r == 0)
+		return;
+
+	if (r == -1) {
+		log_warn("read response");
+	} else {
+		err = got_poll_write_full(c->fd, outbuf, r);
+		if (err) {
+			log_warnx("forward response: %s", err->msg);
+			fcgi_cleanup_request(c);
+			return;
+		}
+	}
+	
+	event_add(c->resp_event, NULL);
+}
+
+static void
+process_request(struct request *c)
+{
+	struct gotwebd *env = gotwebd_env;
+	int ret, i, pipe[2];
+	struct request ic;
+	struct event *resp_event = NULL;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1) {
+		log_warn("socketpair");
+		return;
+	}
+
+	memcpy(&ic, c, sizeof(ic));
+
+	/* Don't leak pointers from our address space to another process. */
+	ic.sock = NULL;
+	ic.srv = NULL;
+	ic.t = NULL;
+	ic.tp = NULL;
+	ic.buf = NULL;
+	ic.outbuf = NULL;
+
+	/* Other process will use its own set of temp files. */
+	for (i = 0; i < nitems(c->priv_fd); i++)
+		ic.priv_fd[i] = -1;
+	ic.fd = -1;
+	ic.resp_fd = -1;
+
+	resp_event = calloc(1, sizeof(*resp_event));
+	if (resp_event == NULL) {
+		log_warn("calloc");
+		close(pipe[0]);
+		close(pipe[1]);
+		return;
+	}
+
+	ret = imsg_compose_event(env->iev_gotweb, GOTWEBD_IMSG_REQ_PROCESS,
+	    GOTWEBD_PROC_SERVER, getpid(), pipe[0], &ic, sizeof(ic));
+	if (ret == -1) {
+		log_warn("imsg_compose_event");
+		close(pipe[0]);
+		close(pipe[1]);
+		free(resp_event);
+		return;
+	}
+
+	event_set(resp_event, pipe[1], EV_READ, fcgi_forward_response, c);
+	event_add(resp_event, NULL);
+
+	c->resp_fd = pipe[1];
+	c->resp_event = resp_event;
+}
+
 void
 fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 {
@@ -192,8 +278,7 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 	}
 
 	if (n == 0) {
-		gotweb_process_request(c);
-		template_flush(c->tp);
+		process_request(c);
 		return;
 	}
 
@@ -399,16 +484,28 @@ void
 fcgi_cleanup_request(struct request *c)
 {
 	cgi_inflight--;
-	client_cnt--;
 
-	evtimer_del(&c->tmo);
+	sockets_del_request(c);
+
+	if (evtimer_initialized(&c->tmo))
+		evtimer_del(&c->tmo);
 	if (event_initialized(&c->ev))
 		event_del(&c->ev);
 
-	close(c->fd);
-	template_free(c->tp);
+	if (c->fd != -1)
+		close(c->fd);
+	if (c->resp_fd != -1)
+		close(c->resp_fd);
+	if (c->tp != NULL)
+		template_free(c->tp);
 	if (c->t != NULL)
 		gotweb_free_transport(c->t);
+	if (c->resp_event) {
+		event_del(c->resp_event);
+		free(c->resp_event);
+	}
+	free(c->buf);
+	free(c->outbuf);
 	free(c);
 }
 

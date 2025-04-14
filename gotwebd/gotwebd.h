@@ -32,7 +32,11 @@
 #define GOTWEBD_CONF		 "/etc/gotwebd.conf"
 
 #ifndef GOTWEBD_DEFAULT_USER
-#define GOTWEBD_DEFAULT_USER	 "www"
+#define GOTWEBD_DEFAULT_USER	 "_gotwebd"
+#endif
+
+#ifndef GOTWEBD_WWW_USER
+#define GOTWEBD_WWW_USER	 "www"
 #endif
 
 #define GOTWEBD_MAXDESCRSZ	 1024
@@ -117,12 +121,21 @@ struct got_blob_object;
 struct got_tree_entry;
 struct got_reflist_head;
 
+enum gotwebd_proc_type {
+	GOTWEBD_PROC_PARENT,
+	GOTWEBD_PROC_SERVER,
+	GOTWEBD_PROC_GOTWEB,
+};
+
 enum imsg_type {
 	GOTWEBD_IMSG_CFG_SRV,
 	GOTWEBD_IMSG_CFG_SOCK,
 	GOTWEBD_IMSG_CFG_FD,
 	GOTWEBD_IMSG_CFG_DONE,
-	GOTWEBD_CTL_START,
+	GOTWEBD_IMSG_CTL_PIPE,
+	GOTWEBD_IMSG_CTL_START,
+	GOTWEBD_IMSG_REQ_PROCESS,
+	GOTWEBD_IMSG_REQ_DONE,
 };
 
 struct imsgev {
@@ -229,6 +242,7 @@ enum socket_priv_fds {
 
 struct template;
 struct request {
+	TAILQ_ENTRY(request)		entry;
 	struct socket			*sock;
 	struct server			*srv;
 	struct transport		*t;
@@ -239,12 +253,16 @@ struct request {
 	uint16_t			 id;
 	int				 fd;
 	int				 priv_fd[PRIV_FDS__MAX];
+	int				 resp_fd;
+	struct event			*resp_event;
+	int				 sock_id;
+	uint32_t			 request_id;
 
-	uint8_t				 buf[FCGI_RECORD_SIZE];
+	uint8_t				 *buf;
 	size_t				 buf_pos;
 	size_t				 buf_len;
 
-	uint8_t				 outbuf[GOTWEBD_CACHESIZE];
+	uint8_t				 *outbuf;
 
 	char				 querystring[MAX_QUERYSTRING];
 	char				 document_uri[MAX_DOCUMENT_URI];
@@ -253,6 +271,7 @@ struct request {
 
 	uint8_t				 request_started;
 };
+TAILQ_HEAD(requestlist, request);
 
 struct fcgi_begin_request_body {
 	uint16_t	role;
@@ -342,6 +361,7 @@ struct gotwebd {
 	int		 priv_fd[PRIV_FDS__MAX];
 
 	char		*user;
+	char		*www_user;
 	const char	*gotwebd_conffile;
 
 	int		 gotwebd_debug;
@@ -349,12 +369,12 @@ struct gotwebd {
 
 	struct imsgev	*iev_parent;
 	struct imsgev	*iev_server;
+	struct imsgev	*iev_gotweb;
 	size_t		 nserver;
 
-	struct passwd	*pw;
-
 	uint16_t	 prefork_gotwebd;
-	int		 gotwebd_reload;
+	int		 servers_pending;
+	int		 gotweb_pending;
 
 	int		 server_cnt;
 
@@ -430,18 +450,22 @@ typedef int (*got_render_blame_line_cb)(struct template *, const char *,
 /* gotwebd.c */
 void	 imsg_event_add(struct imsgev *);
 int	 imsg_compose_event(struct imsgev *, uint16_t, uint32_t,
-	    pid_t, int, const void *, uint16_t);
+	    pid_t, int, const void *, size_t);
 int	 main_compose_sockets(struct gotwebd *, uint32_t, int,
 	    const void *, uint16_t);
 int	 sockets_compose_main(struct gotwebd *, uint32_t,
+	    const void *, uint16_t);
+int	 main_compose_gotweb(struct gotwebd *, uint32_t, int,
 	    const void *, uint16_t);
 
 /* sockets.c */
 void sockets(struct gotwebd *, int);
 void sockets_parse_sockets(struct gotwebd *);
 void sockets_socket_accept(int, short, void *);
-int sockets_privinit(struct gotwebd *, struct socket *);
+int sockets_privinit(struct gotwebd *, struct socket *, uid_t, gid_t);
 void sockets_purge(struct gotwebd *);
+void sockets_rlimit(int);
+void sockets_del_request(struct request *);
 
 /* gotweb.c */
 void gotweb_index_navs(struct request *, struct gotweb_url *, int *,
@@ -455,6 +479,7 @@ void gotweb_free_repo_commit(struct repo_commit *);
 void gotweb_free_repo_tag(struct repo_tag *);
 void gotweb_process_request(struct request *);
 void gotweb_free_transport(struct transport *);
+void gotweb(struct gotwebd *, int);
 
 /* pages.tmpl */
 int	gotweb_render_page(struct template *, int (*)(struct template *));
@@ -507,7 +532,7 @@ const struct got_error *got_output_file_blame(struct request *,
 /* config.c */
 int config_setserver(struct gotwebd *, struct server *);
 int config_getserver(struct gotwebd *, struct imsg *);
-int config_setsock(struct gotwebd *, struct socket *);
+int config_setsock(struct gotwebd *, struct socket *, uid_t, gid_t);
 int config_getsock(struct gotwebd *, struct imsg *);
 int config_setfd(struct gotwebd *);
 int config_getfd(struct gotwebd *, struct imsg *);
