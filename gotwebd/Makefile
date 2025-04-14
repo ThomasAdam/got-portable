@@ -1,8 +1,6 @@
 .PATH:${.CURDIR}/../lib
 .PATH:${.CURDIR}/../template
 
-SUBDIR = libexec
-
 .include "../got-version.mk"
 .include "Makefile.inc"
 
