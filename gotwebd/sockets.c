@@ -339,7 +339,8 @@ request_done(struct imsg *imsg)
 		return;
 	}
 
-	fcgi_create_end_record(c);
+	if (c->client_status == CLIENT_REQUEST)
+		fcgi_create_end_record(c);
 	fcgi_cleanup_request(c);
 }
 
