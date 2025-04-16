@@ -1391,6 +1391,10 @@ gotweb_shutdown(void)
 {
 	imsgbuf_clear(&gotwebd_env->iev_parent->ibuf);
 	free(gotwebd_env->iev_parent);
+	if (gotwebd_env->iev_server) {
+		imsgbuf_clear(&gotwebd_env->iev_server->ibuf);
+		free(gotwebd_env->iev_server);
+	}
 	free(gotwebd_env);
 
 	exit(0);
