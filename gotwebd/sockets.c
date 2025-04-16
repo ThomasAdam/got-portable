@@ -339,7 +339,7 @@ request_done(struct imsg *imsg)
 		return;
 	}
 
-	if (c->sock->client_status == CLIENT_REQUEST)
+	if (c->client_status == CLIENT_REQUEST)
 		fcgi_create_end_record(c);
 	fcgi_cleanup_request(c);
 }
@@ -765,7 +765,7 @@ sockets_socket_accept(int fd, short event, void *arg)
 	c->buf_pos = 0;
 	c->buf_len = 0;
 	c->request_started = 0;
-	c->sock->client_status = CLIENT_CONNECT;
+	c->client_status = CLIENT_CONNECT;
 	c->request_id = get_request_id();
 
 	event_set(&c->ev, s, EV_READ, fcgi_request, c);
