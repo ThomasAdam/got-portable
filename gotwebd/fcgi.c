@@ -201,7 +201,7 @@ fcgi_forward_response(int fd, short event, void *arg)
 	if (r == -1) {
 		log_warn("read response");
 	} else {
-		err = got_poll_write_full(c->fd, outbuf, r);
+		err = got_poll_write_full_timeout(c->fd, outbuf, r, 1);
 		if (err) {
 			log_warnx("forward response: %s", err->msg);
 			fcgi_cleanup_request(c);
