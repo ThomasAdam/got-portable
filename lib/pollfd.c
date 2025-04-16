@@ -102,13 +102,19 @@ got_poll_read_full(int fd, size_t *len, void *buf, size_t bufsize,
 const struct got_error *
 got_poll_write_full(int fd, const void *buf, off_t len)
 {
+	return got_poll_write_full_timeout(fd, buf, len, INFTIM);
+}
+
+const struct got_error *
+got_poll_write_full_timeout(int fd, const void *buf, off_t len, int timeout)
+{
 	const struct got_error *err = NULL;
 	off_t wlen = 0;
 	ssize_t w = 0;
 
 	while (wlen != len) {
 		if (wlen > 0) {
-			err = got_poll_fd(fd, POLLOUT, INFTIM);
+			err = got_poll_fd(fd, POLLOUT, timeout);
 			if (err)
 				return err;
 		}
