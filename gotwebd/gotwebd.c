@@ -51,7 +51,7 @@ int	 main(int, char **);
 int	 gotwebd_configure(struct gotwebd *, uid_t, gid_t);
 void	 gotwebd_configure_done(struct gotwebd *);
 void	 gotwebd_sighdlr(int sig, short event, void *arg);
-void	 gotwebd_shutdown(void);
+void	 gotwebd_shutdown(int);
 void	 gotwebd_dispatch_server(int, short, void *);
 void	 gotwebd_dispatch_gotweb(int, short, void *);
 
@@ -271,7 +271,7 @@ gotwebd_sighdlr(int sig, short event, void *arg)
 		break;
 	case SIGTERM:
 	case SIGINT:
-		gotwebd_shutdown();
+		gotwebd_shutdown(0);
 		break;
 	default:
 		log_warn("unexpected signal %d", sig);
@@ -419,11 +419,11 @@ main(int argc, char **argv)
 
 	if (proc_type == GOTWEBD_PROC_PARENT) {
 		if (parse_config(env->gotwebd_conffile, env) == -1)
-			exit(1);
+			gotwebd_shutdown(1);
 
 		if (no_action) {
 			fprintf(stderr, "configuration OK\n");
-			exit(0);
+			gotwebd_shutdown(0);
 		}
 
 		if (env->user)
@@ -549,6 +549,7 @@ main(int argc, char **argv)
 
 	log_debug("%s gotwebd exiting", getprogname());
 
+	gotwebd_shutdown(0);
 	return (0);
 }
 
@@ -637,7 +638,7 @@ gotwebd_configure_done(struct gotwebd *env)
 }
 
 void
-gotwebd_shutdown(void)
+gotwebd_shutdown(int exit_code)
 {
 	struct gotwebd	*env = gotwebd_env;
 	pid_t		 pid;
@@ -690,5 +691,5 @@ gotwebd_shutdown(void)
 	free(gotwebd_env);
 
 	log_warnx("gotwebd terminating");
-	exit(0);
+	exit(exit_code);
 }

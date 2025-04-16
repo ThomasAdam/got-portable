@@ -1395,6 +1395,17 @@ gotweb_shutdown(void)
 		imsgbuf_clear(&gotwebd_env->iev_server->ibuf);
 		free(gotwebd_env->iev_server);
 	}
+
+	sockets_purge(gotwebd_env);
+
+	while (!TAILQ_EMPTY(&gotwebd_env->servers)) {
+		struct server *srv;
+
+		srv = TAILQ_FIRST(&gotwebd_env->servers);
+		TAILQ_REMOVE(&gotwebd_env->servers, srv, entry);
+		free(srv);
+	}
+
 	free(gotwebd_env);
 
 	exit(0);
