@@ -1238,6 +1238,7 @@ nextsep(char *s, char **t)
 	struct tm		 tm;
 	char			 buf[BUFSIZ], datebuf[64];
 	size_t			 r;
+	int			 w;
 
 	if (gmtime_r(&rc->committer_time, &tm) == NULL ||
 	    asctime_r(&tm, datebuf) == NULL)
@@ -1258,8 +1259,10 @@ date: {{ datebuf }} {{ " UTC" }} {{ "\n" }}
 		return (-1);
 	for (;;) {
 		r = fread(buf, 1, sizeof(buf), t->fp);
-		if (fcgi_write(c, buf, r) == -1 ||
-		    r != sizeof(buf))
+		if (r == 0)
+			break;
+		w = fcgi_write(c, buf, r);
+		if (w == -1)
 			break;
 	}
 !}
