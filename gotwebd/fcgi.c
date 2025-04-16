@@ -72,15 +72,19 @@ fcgi_request(int fd, short events, void *arg)
 		switch (errno) {
 		case EINTR:
 		case EAGAIN:
+			event_add(&c->ev, NULL);
 			return;
 		default:
 			goto fail;
 		}
 		break;
-
 	case 0:
-		log_info("closed connection");
-		goto fail;
+		if (c->sock->client_status == CLIENT_CONNECT) {
+			log_warnx("client %u closed connection too early",
+			    c->request_id);
+			goto fail;
+		}
+		return;
 	default:
 		break;
 	}
@@ -107,6 +111,7 @@ fcgi_request(int fd, short events, void *arg)
 		}
 	} while (parsed > 0 && c->buf_len > 0);
 
+	event_add(&c->ev, NULL);
 	return;
 fail:
 	fcgi_cleanup_request(c);
@@ -259,6 +264,7 @@ process_request(struct request *c)
 
 	c->resp_fd = pipe[1];
 	c->resp_event = resp_event;
+	c->sock->client_status = CLIENT_REQUEST;
 }
 
 void
