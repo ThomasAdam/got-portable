@@ -537,6 +537,7 @@ sockets_shutdown(void)
 
 	imsgbuf_clear(&gotwebd_env->iev_parent->ibuf);
 	free(gotwebd_env->iev_parent);
+	free(gotwebd_env->iev_gotweb);
 	free(gotwebd_env);
 
 	exit(0);
