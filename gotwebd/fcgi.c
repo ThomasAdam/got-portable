@@ -222,7 +222,8 @@ process_request(struct request *c)
 	struct request ic;
 	struct event *resp_event = NULL;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1) {
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    PF_UNSPEC, pipe) == -1) {
 		log_warn("socketpair");
 		return;
 	}
