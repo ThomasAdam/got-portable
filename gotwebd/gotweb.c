@@ -1556,6 +1556,7 @@ recv_server_pipe(struct gotwebd *env, struct imsg *imsg)
 	iev->handler = gotweb_dispatch_server;
 	iev->data = iev;
 	event_set(&iev->ev, fd, EV_READ, gotweb_dispatch_server, iev);
+	imsg_event_add(iev);
 
 	env->iev_server = iev;
 }
