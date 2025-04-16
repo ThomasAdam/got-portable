@@ -726,8 +726,10 @@ sockets_socket_accept(int fd, short event, void *arg)
 			return;
 		case EMFILE:
 		case ENFILE:
+			log_warn("accept");
 			event_del(&sock->ev);
-			evtimer_add(&sock->pause, &backoff);
+			if (!evtimer_pending(&sock->pause, NULL))
+				evtimer_add(&sock->pause, &backoff);
 			return;
 		default:
 			log_warn("%s: accept", __func__);
