@@ -81,7 +81,7 @@ fcgi_request(int fd, short events, void *arg)
 		}
 		break;
 	case 0:
-		if (c->sock->client_status == CLIENT_CONNECT) {
+		if (c->client_status == CLIENT_CONNECT) {
 			log_warnx("client %u closed connection too early",
 			    c->request_id);
 			goto fail;
@@ -265,7 +265,7 @@ process_request(struct request *c)
 
 	c->resp_fd = pipe[1];
 	c->resp_event = resp_event;
-	c->sock->client_status = CLIENT_REQUEST;
+	c->client_status = CLIENT_REQUEST;
 }
 
 void
@@ -414,7 +414,7 @@ send_response(struct request *c, int type, const uint8_t *data,
 	while (tot > 0) {
 		nw = writev(c->fd, iov, nitems(iov));
 		if (nw == 0) {
-			c->sock->client_status = CLIENT_DISCONNECT;
+			c->client_status = CLIENT_DISCONNECT;
 			break;
 		}
 		if (nw == -1) {
@@ -424,7 +424,7 @@ send_response(struct request *c, int type, const uint8_t *data,
 				continue;
 			}
 			log_warn("%s: write failure", __func__);
-			c->sock->client_status = CLIENT_DISCONNECT;
+			c->client_status = CLIENT_DISCONNECT;
 			return -1;
 		}
 
@@ -451,7 +451,7 @@ int
 fcgi_send_response(struct request *c, int type, const void *data,
     size_t len)
 {
-	if (c->sock->client_status == CLIENT_DISCONNECT)
+	if (c->client_status == CLIENT_DISCONNECT)
 		return -1;
 
 	while (len > FCGI_CONTENT_SIZE) {

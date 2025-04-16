@@ -270,6 +270,7 @@ struct request {
 	int				 https;
 
 	uint8_t				 request_started;
+	int				 client_status;
 };
 TAILQ_HEAD(requestlist, request);
 
@@ -347,8 +348,6 @@ struct socket {
 	struct event	 evt;
 	struct event	 ev;
 	struct event	 pause;
-
-	int		 client_status;
 };
 TAILQ_HEAD(socketlist, socket);
 
