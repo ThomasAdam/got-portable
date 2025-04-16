@@ -334,7 +334,7 @@ request_done(struct imsg *imsg)
 
 	c = find_request(request_id);
 	if (c == NULL) {
-		log_warnx("no request to clean up found for ID '%d'",
+		log_warnx("no request to clean up found for ID %u",
 		    request_id);
 		return;
 	}
