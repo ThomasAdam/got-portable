@@ -375,7 +375,7 @@ send_response(struct request *c, int type, const uint8_t *data,
 	struct timespec ts;
 	ssize_t nw;
 	size_t padded_len, tot;
-	int i, err = 0, th = 2000;
+	int i, err = 0, th = 20;
 
 	ts.tv_sec = 0;
 	ts.tv_nsec = 50;
