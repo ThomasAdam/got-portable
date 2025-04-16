@@ -256,7 +256,7 @@ recv_request(struct imsg *imsg)
 	return c;
 }
 
-void
+int
 gotweb_process_request(struct request *c)
 {
 	const struct got_error *error = NULL;
@@ -369,9 +369,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_blame);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_blame);
 	case BLOB:
 		if (binary) {
 			struct gotweb_url url = {
@@ -383,14 +382,12 @@ gotweb_process_request(struct request *c)
 				.file = qs->file,
 			};
 
-			gotweb_reply(c, 302, NULL, &url);
-			return;
+			return gotweb_reply(c, 302, NULL, &url);
 		}
 
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_blob);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_blob);
 	case BLOBRAW:
 		if (binary)
 			r = gotweb_reply_file(c, "application/octet-stream",
@@ -398,9 +395,9 @@ gotweb_process_request(struct request *c)
 		else
 			r = gotweb_reply(c, 200, "text/plain", NULL);
 		if (r == -1)
-			return;
+			return -1;
 		if (template_flush(c->tp) == -1)
-			return;
+			return -1;
 
 		for (;;) {
 			error = got_object_blob_read_block(&len, c->t->blob);
@@ -410,17 +407,16 @@ gotweb_process_request(struct request *c)
 				break;
 			buf = got_object_blob_get_read_buf(c->t->blob);
 			if (fcgi_write(c, buf, len) == -1)
-				break;
+				return -1;
 		}
-		return;
+		return 0;
 	case BRIEFS:
 		error = got_get_repo_commits(c, srv->max_commits_display);
 		if (error)
 			goto err;
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_briefs);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_briefs);
 	case COMMITS:
 		error = got_get_repo_commits(c, srv->max_commits_display);
 		if (error) {
@@ -428,9 +424,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_commits);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_commits);
 	case DIFF:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
@@ -443,9 +438,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_diff);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_diff);
 	case INDEX:
 		c->t->nrepos = scandir(srv->repos_path, &c->t->repos, NULL,
 		    alphasort);
@@ -456,9 +450,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_index);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_index);
 	case PATCH:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
@@ -471,18 +464,16 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/plain", NULL) == -1)
-			return;
-		gotweb_render_patch(c->tp);
-		return;
+			return -1;
+		return gotweb_render_patch(c->tp);
 	case RSS:
 		error = got_get_repo_tags(c, D_MAXSLCOMMDISP);
 		if (error)
 			goto err;
 		if (gotweb_reply_file(c, rss_ctype, repo_dir->name, ".rss")
 		    == -1)
-			return;
-		gotweb_render_rss(c->tp);
-		return;
+			return -1;
+		return gotweb_render_rss(c->tp);
 	case SUMMARY:
 		error = got_ref_list(&c->t->refs, c->t->repo, "refs/heads",
 		    got_ref_cmp_by_name, NULL);
@@ -512,9 +503,8 @@ gotweb_process_request(struct request *c)
 			}
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_summary);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_summary);
 	case TAG:
 		error = got_get_repo_tags(c, 1);
 		if (error) {
@@ -527,9 +517,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_tag);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_tag);
 	case TAGS:
 		error = got_get_repo_tags(c, srv->max_commits_display);
 		if (error) {
@@ -537,9 +526,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_tags);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_tags);
 	case TREE:
 		error = got_get_repo_commits(c, 1);
 		if (error) {
@@ -547,9 +535,8 @@ gotweb_process_request(struct request *c)
 			goto err;
 		}
 		if (gotweb_reply(c, 200, "text/html", NULL) == -1)
-			return;
-		gotweb_render_page(c->tp, gotweb_render_tree);
-		return;
+			return -1;
+		return gotweb_render_page(c->tp, gotweb_render_tree);
 	case ERR:
 	default:
 		error = got_error(GOT_ERR_BAD_QUERYSTRING);
@@ -558,8 +545,8 @@ gotweb_process_request(struct request *c)
 err:
 	c->t->error = error;
 	if (gotweb_reply(c, 400, "text/html", NULL) == -1)
-		return;
-	gotweb_render_page(c->tp, gotweb_render_error);
+		return -1;
+	return gotweb_render_page(c->tp, gotweb_render_error);
 }
 
 struct server *
@@ -1507,8 +1494,15 @@ gotweb_dispatch_server(int fd, short event, void *arg)
 			c = recv_request(&imsg);
 			if (c) {
 				int request_id = c->request_id;
-				gotweb_process_request(c);
-				template_flush(c->tp);
+				if (gotweb_process_request(c) == -1) {
+					log_warnx("request %u failed",
+					    request_id);
+				 } else {
+					if (template_flush(c->tp) == -1) {
+						log_warn("request %u flush",
+						    request_id);
+					}
+				}
 				free_request(c);
 				send_request_done(iev, request_id);
 			}
