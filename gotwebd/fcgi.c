@@ -358,6 +358,8 @@ fcgi_parse_params(uint8_t *buf, uint16_t n, struct request *c, uint16_t id)
 void
 fcgi_timeout(int fd, short events, void *arg)
 {
+	struct request *c = arg;
+	log_warnx("request %u has timed out", c->request_id);
 	fcgi_cleanup_request((struct request*) arg);
 }
 
