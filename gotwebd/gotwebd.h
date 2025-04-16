@@ -326,6 +326,7 @@ TAILQ_HEAD(serverlist, server);
 
 enum client_action {
 	CLIENT_CONNECT,
+	CLIENT_REQUEST,
 	CLIENT_DISCONNECT,
 };
 
