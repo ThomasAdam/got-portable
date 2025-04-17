@@ -454,10 +454,10 @@ sockets_dispatch_main(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
-		case IMSG_CFG_SRV:
+		case GOTWEBD_IMSG_CFG_SRV:
 			config_getserver(env, &imsg);
 			break;
-		case IMSG_CFG_SOCK:
+		case GOTWEBD_IMSG_CFG_SOCK:
 			config_getsock(env, &imsg);
 			break;
 		case GOTWEBD_IMSG_CFG_DONE:

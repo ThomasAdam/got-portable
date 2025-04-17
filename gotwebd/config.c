@@ -68,7 +68,7 @@ int
 config_getcfg(struct gotwebd *env, struct imsg *imsg)
 {
 	/* nothing to do but tell gotwebd configuration is done */
-	if (sockets_compose_main(env, IMSG_CFG_DONE, NULL, 0) == -1)
+	if (sockets_compose_main(env, GOTWEBD_IMSG_CFG_DONE, NULL, 0) == -1)
 		fatal("sockets_compose_main IMSG_CFG_DONE");
 	return 0;
 }
@@ -103,7 +103,7 @@ config_setsock(struct gotwebd *env, struct socket *sock, uid_t uid, gid_t gid)
 	if (sockets_privinit(env, sock, uid, gid) == -1)
 		return -1;
 
-	if (main_compose_sockets(env, IMSG_CFG_SOCK, sock->fd,
+	if (main_compose_sockets(env, GOTWEBD_IMSG_CFG_SOCK, sock->fd,
 	    &sock->conf, sizeof(sock->conf)) == -1)
 		fatal("main_compose_sockets IMSG_CFG_SOCK");
 

@@ -234,7 +234,7 @@ gotwebd_dispatch_gotweb(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
-		case IMSG_CFG_DONE:
+		case GOTWEBD_IMSG_CFG_DONE:
 			gotwebd_configure_done(env);
 			break;
 		default:
