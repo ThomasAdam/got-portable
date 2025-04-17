@@ -847,6 +847,7 @@ done:
 	free(default_id_str);
 	free(refname);
 	free(server_capabilities);
+	free(my_capabilities);
 	return err;
 }
 
