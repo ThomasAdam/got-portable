@@ -219,8 +219,13 @@ process_request(struct request *c)
 	int ret, i, pipe[2];
 	struct request ic;
 	struct event *resp_event = NULL;
+	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+#ifdef SOCK_CLOEXEC
+	sock_flags |= SOCK_CLOEXEC;
+#endif
+
+	if (socketpair(AF_UNIX, sock_flags,
 	    PF_UNSPEC, pipe) == -1) {
 		log_warn("socketpair");
 		return;
