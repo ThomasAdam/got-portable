@@ -524,10 +524,12 @@ if test x"$PLATFORM" = "xdarwin"; then
 		AC_MSG_NOTICE("Found GNU Bison as: $GNUBISON")
 		export YACC="${GNUBISON} -y"
 	fi
-	export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFIX}/opt/openssl@3/lib $LDFLAGS"
-	export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/ncurses/include -I${HOMEBREW_PREFIX}/opt/openssl@3/include $CPPFLAGS"
-	export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/ncurses/lib/pkgconfig"
-	export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${HOMEBREW_PREFIX}/opt/openssl@3/lib/pkgconfig"
+	#export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/ncurses/lib -L${HOMEBREW_PREFIX}/opt/openssl@3/lib $LDFLAGS"
+	#export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/ncurses/include -I${HOMEBREW_PREFIX}/opt/openssl@3/include $CPPFLAGS"
+	#export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/ncurses/lib/pkgconfig"
+	#export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${HOMEBREW_PREFIX}/opt/openssl@3/lib/pkgconfig"
+	#export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${HOMEBREW_PREFIX}/opt/libretls/3.8.1/lib/pkgconfig"
+	export PKG_CONFIG_PATH=$(find ${HOMEBREW_PREFIX}/Cellar -name 'pkgconfig' -type d | tr '\n' ':' | sed s/.$//)
 fi
 
 # Landlock detection.
