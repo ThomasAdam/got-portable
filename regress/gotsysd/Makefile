@@ -122,6 +122,7 @@ ${AUTOINSTALL_CONF}: ${GOTSYSD_VM_PASSWD_FILE} ${GOTSYSD_SSH_PUBKEY}
 	${UNPRIV} "echo -n 'Public ssh key for user = ' >> $@"
 	${UNPRIV} "cat ${GOTSYSD_SSH_PUBKEY} >> $@"
 	${UNPRIV} "echo Location of sets = http >> $@"
+	${UNPRIV} "echo Server directory = pub/OpenBSD/${GOTSYSD_OPENBSD_VERSION}/`uname -m` >> $@"
 	${UNPRIV} "echo HTTP Server = ${GOTSYSD_MIRROR} >> $@"
 
 ${INSTALL_SITE}:
