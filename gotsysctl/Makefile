@@ -18,6 +18,8 @@ DPADD = ${LIBUTIL} ${LIBEVENT}
 
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
+.else
+BINDIR = ${PREFIX}/sbin
 .endif
 
 realinstall:
