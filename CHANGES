@@ -1,3 +1,29 @@
+* got 0.111; 2025-04-22
+- introduce gotsysd: configure gotd servers by committing to gotsys.git repo
+- make gotd run 'gotsys check' on gotsys.conf commits before accepting them
+- make gotd run 'gotsys apply' when the gotsys.git repo receives changes
+- add a missing malloc failure check to gotd's repo_write process
+- make got clone/fetch work against Git servers which do not speak English
+- stop processing more messages upon error in gotd repo_write process
+- close file descriptors passed to gotd_imsg_compose_event() on failure
+- potential fix for use-after-free in lib/repository.c's match_packed_object()
+- make gotd return an informative error when the connection limit is exceeded
+- in gotctl info, display the time when a client connection was created
+- add reload support to gotd, triggered via 'gotctl reload', not via SIGHUP!
+- test S_ISREG in parse_ref_file() explicitly rather than via getline(3)
+- release ref-file lock when fstat fails in parse_ref_file()
+- do not treat unhandled signals as a fatal error in gotwebd
+- fix an edge case of tog spinning when 'B' is pressed in log view
+- stop using got_repo_map_path() in gotwebd to fix spurious realpath(3) errors
+- avoid creation of pack_fds array when not needed, saving file descriptors
+- gotwebd now runs as the _gotwebd user by default, rather than "www"
+- gotwebd can now serve repositories outside the /var/www chroot directory
+- the gotwebd.conf repos_path directive is no longer relative to the chroot
+- get rid of the gotwebd-specific libexec helpers in /var/www/bin/gotwebd
+- improve gotwebd behaviour when sending data to already disconnected clients 
+- plug some memory leaks in got-send-pack and got-fetch-pack
+- fix got-fetch-http performance when server sends chunked HTTP responses
+
 * got 0.110; 2025-02-20
 - fix an endless loop in got-read-pack (regression from 0.109)
 - change gotwebd diff algorithm from Myers to Patience diff
