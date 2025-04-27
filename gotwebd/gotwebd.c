@@ -357,12 +357,13 @@ main(int argc, char **argv)
 	struct event_base	*evb;
 	struct gotwebd		*env;
 	struct passwd		*pw;
-	int			 ch, i;
+	int			 ch, i, gotwebd_ngroups;
 	int			 no_action = 0;
 	int			 proc_type = GOTWEBD_PROC_PARENT;
 	const char		*conffile = GOTWEBD_CONF;
 	const char		*gotwebd_username = GOTWEBD_DEFAULT_USER;
 	const char		*www_username = GOTWEBD_WWW_USER;
+	gid_t			 gotwebd_groups[NGROUPS_MAX];
 	gid_t			 www_gid;
 	const char		*argv0;
 
@@ -440,6 +441,9 @@ main(int argc, char **argv)
 	pw = getpwnam(gotwebd_username);
 	if (pw == NULL)
 		fatalx("unknown user %s", gotwebd_username);
+	if (getgrouplist(gotwebd_username, pw->pw_gid, gotwebd_groups,
+	    &gotwebd_ngroups) == -1)
+		fatalx("too many groups for user %s", gotwebd_username);
 
 	/* check for root privileges */
 	if (geteuid())
@@ -469,7 +473,7 @@ main(int argc, char **argv)
 		setproctitle("gotweb");
 		log_procinit("gotweb");
 
-		if (setgroups(1, &pw->pw_gid) == -1 ||
+		if (setgroups(gotwebd_ngroups, gotwebd_groups) == -1 ||
 		    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) == -1 ||
 		    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1)
 			fatal("failed to drop privileges");
