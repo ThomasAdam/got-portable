@@ -607,7 +607,9 @@ done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *logmsg_path);
 	free(initial_content);
-	if (err) {
+
+	if (err && *logmsg_path) {
+		unlink(*logmsg_path);
 		free(*logmsg_path);
 		*logmsg_path = NULL;
 	}
