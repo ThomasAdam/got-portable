@@ -659,6 +659,99 @@ send_access_rule(struct gotsysd_imsgev *iev,
 }
 
 static const struct got_error *
+send_pathlist_elem(struct gotsysd_imsgev *iev, const char *refname,
+    int imsg_type)
+{
+	struct gotsysd_imsg_pathlist_elem ielem;
+	struct ibuf *wbuf = NULL;
+
+	memset(&ielem, 0, sizeof(ielem));
+	ielem.path_len = strlen(refname);
+
+	wbuf = imsg_create(&iev->ibuf, imsg_type, 0, 0,
+	    sizeof(ielem) + ielem.path_len);
+	if (wbuf == NULL)
+		return got_error_from_errno_fmt("imsg_create %d", imsg_type);
+
+	if (imsg_add(wbuf, &ielem, sizeof(ielem)) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+	if (imsg_add(wbuf, refname, ielem.path_len) == -1)
+		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
+
+	imsg_close(&iev->ibuf, wbuf);
+	return gotsysd_imsg_flush(&iev->ibuf);
+}
+
+static const struct got_error *
+send_protected_refs(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct gotsysd_imsg_pathlist ilist;
+
+	memset(&ilist, 0, sizeof(ilist));
+
+	ilist.nelem = repo->nprotected_tag_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotsysd_imsg_compose_event(iev,
+		    GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES,
+		    0, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_TAG_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->protected_tag_namespaces) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	ilist.nelem = repo->nprotected_branch_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotsysd_imsg_compose_event(iev,
+		    GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES,
+		    0, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_BRANCH_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->protected_branch_namespaces) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	ilist.nelem = repo->nprotected_branches;
+	if (ilist.nelem > 0) {
+		if (gotsysd_imsg_compose_event(iev,
+		    GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES,
+		    0, -1, &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "PROTECTED_BRANCH_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head, &repo->protected_branches) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_SYSCONF_PROTECTED_REFS_DONE, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("gotsysd_imsg_compose_event");
+
+	return NULL;
+}
+
+static const struct got_error *
 send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 {
 	const struct got_error *err;
@@ -694,7 +787,9 @@ send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 		return got_error_from_errno("gotsysd_imsg_compose_event");
 	}
 
-	/* TODO: send protected tags and branches */
+	err = send_protected_refs(iev, repo);
+	if (err)
+		return err;
 
 	/* TODO: send notification config */
 
@@ -821,5 +916,51 @@ gotsys_imsg_recv_access_rule(struct gotsys_access_rule **rule,
 	err = gotsys_conf_new_access_rule(rule, access, irule.authorization,
 	    identifier, users, groups);
 	free(identifier);
+	return err;
+}
+
+const struct got_error *
+gotsys_imsg_recv_pathlist(size_t *npaths, struct imsg *imsg)
+{
+	struct gotsysd_imsg_pathlist ilist;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(ilist))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&ilist, imsg->data, sizeof(ilist));
+
+	if (ilist.nelem == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	*npaths = ilist.nelem;
+	return NULL;
+}
+
+const struct got_error *
+gotsys_imsg_recv_pathlist_elem(struct imsg *imsg,
+    struct got_pathlist_head *paths)
+{
+	const struct got_error *err = NULL;
+	struct gotsysd_imsg_pathlist_elem ielem;
+	size_t datalen;
+	char *path;
+	struct got_pathlist_entry *pe;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(ielem))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&ielem, imsg->data, sizeof(ielem));
+
+	if (datalen != sizeof(ielem) + ielem.path_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	path = strndup(imsg->data + sizeof(ielem), ielem.path_len);
+	if (path == NULL)
+		return got_error_from_errno("strndup");
+
+	err = got_pathlist_insert(&pe, paths, path, NULL);
+	if (err || pe == NULL)
+		free(path);
 	return err;
 }

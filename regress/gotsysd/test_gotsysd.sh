@@ -1183,6 +1183,254 @@ EOF
 	test_done "$testroot" "0"
 }
 
+test_set_head() {
+	local testroot=`test_init set_head 1`
+
+	# An attempt to set the HEAD of gotsys.git is an error.
+	cat > ${testroot}/bad-gotsys.conf <<EOF
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+
+repository "gotsys" {
+	permit rw ${GOTSYSD_TEST_USER}
+	head "refs/heads/foo"
+}
+EOF
+	gotsys check -f ${testroot}/bad-gotsys.conf \
+		> $testroot/stdout  2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "gotsys check succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat > $testroot/stderr.expected <<EOF
+gotsys: ${testroot}/bad-gotsys.conf: line 8: HEAD of the "gotsys" repository cannot be overridden
+EOF
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	permit rw ${GOTSYSD_DEV_USER}
+	permit ro anonymous
+	head foo
+}
+EOF
+	(cd ${testroot}/wt && got commit -m "set foo as head" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create branch "foo" in foo.git.
+	got clone -q -i ${GOTSYSD_SSH_KEY} -b main \
+		${GOTSYSD_DEV_USER}@${VMIP}:foo.git $testroot/foo.git
+	got branch -r $testroot/foo.git -c main foo
+	got send -q -i ${GOTSYSD_SSH_KEY} -r $testroot/foo.git -b foo
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		return 1
+	fi
+
+	# The foo repository should now advertise refs/heads/foo as HEAD.
+	got clone -q -l anonymous@${VMIP}:foo.git | egrep '^HEAD:' \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone -l failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+test_protect_refs() {
+	local testroot=`test_init protect_refs 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	permit rw ${GOTSYSD_DEV_USER}
+	permit ro anonymous
+	head foo
+	protect branch foo
+	protect {
+		tag namespace "refs/tags"
+	}
+}
+EOF
+	(cd ${testroot}/wt && \
+		got commit -m "protect branch and tags" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a new commit on branch "foo" and send it.
+	got clone -q -i ${GOTSYSD_SSH_KEY} -b foo \
+		${GOTSYSD_DEV_USER}@${VMIP}:foo.git $testroot/foo.git
+	got checkout -q $testroot/foo.git $testroot/wt-foo > /dev/null
+	echo "tweak alpha" > $testroot/wt-foo/alpha
+	(cd $testroot/wt-foo && got commit -m 'change alpha' > /dev/null)
+	got send -q -i ${GOTSYSD_SSH_KEY} -r $testroot/foo.git -b foo
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		return 1
+	fi
+
+	# Attempt to rewrite the history of branch "foo".
+	(cd $testroot/wt-foo && got update -q -c :head:-1 > /dev/null)
+	(cd $testroot/wt-foo && got histedit -d > /dev/null)
+	got send -q -i ${GOTSYSD_SSH_KEY} -r $testroot/foo.git -b foo -f \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send succeeded unexpectedly" >&2
+		return 1
+	fi
+
+	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "gotsh: refs/heads/foo: reference is protected" \
+		> $testroot/stderr.expected
+	grep '^gotsh:' $testroot/stderr > $testroot/stderr.filtered
+	cmp -s $testroot/stderr.expected $testroot/stderr.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_user_add
 run_test test_user_mod
@@ -1192,3 +1440,5 @@ run_test test_group_del
 run_test test_repo_create
 run_test test_user_anonymous
 run_test test_bad_gotsysconf
+run_test test_set_head
+run_test test_protect_refs

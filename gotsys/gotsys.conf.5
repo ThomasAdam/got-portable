@@ -280,70 +280,70 @@ The special user
 can be used when public read-only access to repositories over SSH is desired.
 The anonymous user has an empty password, cannot use an SSH public key, and
 can only be granted read-only access.
-.\".It Ic protect Brq Ar ...
-.\"The
-.\".Cm protect
-.\"directive may be used to protect branches and tags in a repository
-.\"from being overwritten by potentially destructive client-side commands,
-.\"such as when
-.\".Cm got send -f
-.\"and
-.\".Cm git push -f
-.\"are used to change the history of a branch.
-.\".Pp
-.\"To build a set of protected branches and tags, multiple
-.\".Ic protect
-.\"directives may be specified per repository and
-.\"multiple
-.\".Ic protect
-.\"directive parameters may be specified within curly braces.
-.\".Pp
-.\"The available
-.\".Cm protect
-.\"parameters are as follows:
-.\".Bl -tag -width Ds
-.\".It Ic branch Ar name
-.\"Protect the named branch.
-.\"The branch may be created if it does not exist yet.
-.\"Attempts to delete the branch or change its history will be denied.
-.\".Pp
-.\"If the
-.\".Ar name
-.\"does not already begin with
-.\".Dq refs/heads/
-.\"it will be looked up in the
-.\".Dq refs/heads/
-.\"reference namespace.
-.\".It Ic branch Ic namespace Ar namespace
-.\"Protect the given reference namespace, assuming that references in
-.\"this namespace represent branches.
-.\"New branches may be created in the namespace.
-.\"Attempts to change the history of branches or delete them will be denied.
-.\".Pp
-.\"The
-.\".Ar namespace
-.\"argument must be absolute, starting with
-.\".Dq refs/ .
-.\".It Ic tag Ic namespace Ar namespace
-.\"Protect the given reference namespace, assuming that references in
-.\"this namespace represent tags.
-.\"New tags may be created in the namespace.
-.\"Attempts to change or delete existing tags will be denied.
-.\".Pp
-.\"The
-.\".Ar namespace
-.\"argument must be absolute, starting with
-.\".Dq refs/ .
-.\".El
-.\".Pp
-.\"The special reference namespaces
-.\".Dq refs/got/
-.\"and
-.\".Dq refs/remotes/
-.\"do not need to be listed in
-.\".Nm .
-.\"These namespaces are always protected and even attempts to create new
-.\"references in these namespaces will always be denied.
+.It Ic protect Brq Ar ...
+The
+.Cm protect
+directive may be used to protect branches and tags in a repository
+from being overwritten by potentially destructive client-side commands,
+such as when
+.Cm got send -f
+and
+.Cm git push -f
+are used to change the history of a branch.
+.Pp
+To build a set of protected branches and tags, multiple
+.Ic protect
+directives may be specified per repository and
+multiple
+.Ic protect
+directive parameters may be specified within curly braces.
+.Pp
+The available
+.Cm protect
+parameters are as follows:
+.Bl -tag -width Ds
+.It Ic branch Ar name
+Protect the named branch.
+The branch may be created if it does not exist yet.
+Attempts to delete the branch or change its history will be denied.
+.Pp
+If the
+.Ar name
+does not already begin with
+.Dq refs/heads/
+it will be looked up in the
+.Dq refs/heads/
+reference namespace.
+.It Ic branch Ic namespace Ar namespace
+Protect the given reference namespace, assuming that references in
+this namespace represent branches.
+New branches may be created in the namespace.
+Attempts to change the history of branches or delete them will be denied.
+.Pp
+The
+.Ar namespace
+argument must be absolute, starting with
+.Dq refs/ .
+.It Ic tag Ic namespace Ar namespace
+Protect the given reference namespace, assuming that references in
+this namespace represent tags.
+New tags may be created in the namespace.
+Attempts to change or delete existing tags will be denied.
+.Pp
+The
+.Ar namespace
+argument must be absolute, starting with
+.Dq refs/ .
+.El
+.Pp
+The special reference namespaces
+.Dq refs/got/
+and
+.Dq refs/remotes/
+do not need to be listed in
+.Nm .
+These namespaces are always protected and even attempts to create new
+references in these namespaces will always be denied.
 .\".It Ic notify Brq Ar ...
 .\"The
 .\".Ic notify

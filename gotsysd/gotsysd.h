@@ -178,6 +178,13 @@ enum gotsysd_imsg_type {
 	GOTSYSD_IMSG_SYSCONF_REPOS_DONE,
 	GOTSYSD_IMSG_SYSCONF_ACCESS_RULE,
 	GOTSYSD_IMSG_SYSCONF_ACCESS_RULES_DONE,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES_ELEM,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES_ELEM,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM,
+	GOTSYSD_IMSG_SYSCONF_PROTECTED_REFS_DONE,
 	GOTSYSD_IMSG_SYSCONF_PARSE_DONE,
 
 	/* Addition of users and groups. */
@@ -396,6 +403,36 @@ struct gotsysd_imsg_sysconf_access_rule {
 	/* Followed by identifier_len bytes. */
 };
 
+/*
+ * Structure for sending path lists over imsg. Used with:
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES
+ * GOTSYSD_IMSG_SYSCONF_NOTIFY_BRANCHES
+ * GOTSYSD_IMSG_SYSCONF_NOTIFY_REF_NAMESPACES
+ */
+struct gotsysd_imsg_pathlist {
+	size_t nelem;
+
+	/* Followed by nelem path list elements. */
+};
+
+/*
+ * Structure for a path list element. Used with:
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES_ELEM
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES_ELEM
+ * GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM
+ * GOTSYSD_IMSG_SYSCONF_NOTIFY_BRANCHES_ELEM
+ * GOTSYSD_IMSG_SYSCONF_NOTIFY_REF_NAMESPACES_ELEM
+ */
+struct gotsysd_imsg_pathlist_elem {
+	size_t path_len;
+	size_t data_len;
+
+	/* Followed by path_len bytes. */
+	/* Followed by data_len bytes. */
+};
+
 #ifndef GOT_LIBEXECDIR
 #define GOT_LIBEXECDIR /usr/libexec
 #endif
@@ -489,6 +526,7 @@ struct gotsys_authorized_keys_list;
 struct gotsys_repolist;
 struct gotsys_repo;
 struct gotsys_access_rule;
+struct got_pathlist_head;
 
 const struct got_error *gotsys_imsg_send_users(struct gotsysd_imsgev *,
     struct gotsys_userlist *, int, int, int);
@@ -513,6 +551,9 @@ const struct got_error *gotsys_imsg_recv_repository(struct gotsys_repo **,
 const struct got_error *gotsys_imsg_recv_access_rule(
     struct gotsys_access_rule **, struct imsg *, struct gotsys_userlist *,
     struct gotsys_grouplist *);
+const struct got_error *gotsys_imsg_recv_pathlist(size_t *, struct imsg *);
+const struct got_error *gotsys_imsg_recv_pathlist_elem(struct imsg *,
+    struct got_pathlist_head *);
 
 struct gotsys_uidset_element;
 struct gotsys_uidset;
