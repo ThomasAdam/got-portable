@@ -456,7 +456,7 @@ const struct got_error *got_worktree_histedit_complete(struct got_worktree *,
  */
 const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
     struct got_fileindex *, struct got_repository *, struct got_reference *,
-    struct got_object_id *, got_worktree_checkout_cb, void *);
+    struct got_object_id *, got_worktree_checkout_cb, void *, int);
 
 /* Get the path to this work tree's histedit script file. */
 const struct got_error *got_worktree_get_histedit_script_path(char **,
