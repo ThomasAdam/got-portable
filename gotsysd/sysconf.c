@@ -84,6 +84,8 @@ sysconf_shutdown(void)
 {
 	log_debug("%s: shutting down", gotsysd_sysconf.title);
 
+	gotsys_conf_clear(&gotsysconf);
+
 	exit(0);
 }
 
