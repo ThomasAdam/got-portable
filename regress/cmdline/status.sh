@@ -781,6 +781,61 @@ test_status_gitignore_comments() {
 	test_done "$testroot" "$ret"
 }
 
+test_status_multiple_gitignore_files() {
+	local testroot=`test_init status_multiple_gitignore_files`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	mkdir $testroot/wt/gamma/.abc/
+	echo "unversioned file" > $testroot/wt/gamma/.abc/goo
+	echo "unversioned file" > $testroot/wt/gamma/bar
+	mkdir $testroot/wt/gamma/zzz/
+	echo "unversioned file" > $testroot/wt/gamma/zzz/buzz
+	echo "unversioned file" > $testroot/wt/epsilon/boo
+	echo "unversioned file" > $testroot/wt/upsilon
+
+	echo '?  epsilon/boo' >> $testroot/stdout.expected
+	echo '?  foo' >> $testroot/stdout.expected
+	echo '?  gamma/.abc/goo' >> $testroot/stdout.expected
+	echo '?  gamma/bar' >> $testroot/stdout.expected
+	echo '?  gamma/zzz/buzz' >> $testroot/stdout.expected
+	echo '?  upsilon' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	echo "goo" > $testroot/wt/gamma/.abc/.gitignore
+	echo "bar" > $testroot/wt/gamma/.gitignore
+	echo "buzz" > $testroot/wt/gamma/zzz/.gitignore
+	echo "boo" > $testroot/wt/epsilon/.gitignore
+
+	echo '?  epsilon/.gitignore' > $testroot/stdout.expected
+	echo '?  foo' >> $testroot/stdout.expected
+	echo '?  gamma/.abc/.gitignore' >> $testroot/stdout.expected
+	echo '?  gamma/.gitignore' >> $testroot/stdout.expected
+	echo '?  gamma/zzz/.gitignore' >> $testroot/stdout.expected
+	echo '?  upsilon' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_status_status_code() {
 	local testroot=`test_init status_status_code`
 
@@ -1151,6 +1206,7 @@ run_test test_status_cvsignore
 run_test test_status_gitignore
 run_test test_status_gitignore_trailing_slashes
 run_test test_status_gitignore_comments
+run_test test_status_multiple_gitignore_files
 run_test test_status_status_code
 run_test test_status_suppress
 run_test test_status_empty_file
