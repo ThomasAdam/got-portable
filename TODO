@@ -91,8 +91,6 @@ gotadmin:
   exclude base.
 
 gotsysd:
-- allow setting the repository default branch (HEAD) via gotsys.conf
-- send protected branches/tags from gotsys-read-conf and apply during sysconf
 - add required notifications settings to gotsysd.conf (e.g. an smtp smarthost)
 - send notifications config from gotsys-read-conf and apply them during sysconf
 - add 'publish' support; can a chroot-less gotwebd serve gotd's repositories?
