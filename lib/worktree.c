@@ -8277,7 +8277,8 @@ const struct got_error *
 got_worktree_histedit_abort(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
     struct got_reference *branch, struct got_object_id *base_commit_id,
-    got_worktree_checkout_cb progress_cb, void *progress_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    int restore_working_files)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
@@ -8338,16 +8339,6 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_commit(&commit, repo,
-	    worktree->base_commit_id);
-	if (err)
-		goto done;
-
-	err = got_object_id_by_path(&tree_id, repo, commit,
-	    worktree->path_prefix);
-	if (err)
-		goto done;
-
 	err = delete_histedit_refs(worktree, repo);
 	if (err)
 		goto done;
@@ -8356,22 +8347,34 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	rfa.worktree = worktree;
-	rfa.fileindex = fileindex;
-	rfa.progress_cb = progress_cb;
-	rfa.progress_arg = progress_arg;
-	rfa.patch_cb = NULL;
-	rfa.patch_arg = NULL;
-	rfa.repo = repo;
-	rfa.unlink_added_files = 1;
-	rfa.added_files_to_unlink = &added_paths;
-	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 1, 0);
-	if (err)
-		goto sync;
+	if (restore_working_files) {
+		err = got_object_open_as_commit(&commit, repo,
+		    worktree->base_commit_id);
+		if (err)
+			goto done;
 
-	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
-	    repo, progress_cb, progress_arg, NULL, NULL);
+		err = got_object_id_by_path(&tree_id, repo, commit,
+		    worktree->path_prefix);
+		if (err)
+			goto done;
+
+		rfa.worktree = worktree;
+		rfa.fileindex = fileindex;
+		rfa.progress_cb = progress_cb;
+		rfa.progress_arg = progress_arg;
+		rfa.patch_cb = NULL;
+		rfa.patch_arg = NULL;
+		rfa.repo = repo;
+		rfa.unlink_added_files = 1;
+		rfa.added_files_to_unlink = &added_paths;
+		err = worktree_status(worktree, "", fileindex, repo,
+		    revert_file, &rfa, NULL, NULL, 1, 0);
+		if (err)
+			goto sync;
+
+		err = checkout_files(worktree, fileindex, "", tree_id, NULL,
+		    repo, progress_cb, progress_arg, NULL, NULL);
+	}
 sync:
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)

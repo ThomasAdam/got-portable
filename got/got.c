@@ -13151,7 +13151,7 @@ cmd_histedit(int argc, char *argv[])
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(branch));
 		error = got_worktree_histedit_abort(worktree, fileindex, repo,
-		    branch, base_commit_id, abort_progress, &upa);
+		    branch, base_commit_id, abort_progress, &upa, 1);
 		if (error)
 			goto done;
 		printf("Histedit of %s aborted\n",
@@ -13270,7 +13270,7 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    abort_progress, &upa);
+				    abort_progress, &upa, 0);
 				print_merge_progress_stats(&upa);
 				goto done;
 			}
@@ -13285,7 +13285,7 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    abort_progress, &upa);
+				    abort_progress, &upa, 0);
 				print_merge_progress_stats(&upa);
 				goto done;
 			}
@@ -13297,7 +13297,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error) {
 			got_worktree_histedit_abort(worktree, fileindex,
 			    repo, branch, base_commit_id,
-			    abort_progress, &upa);
+			    abort_progress, &upa, 0);
 			print_merge_progress_stats(&upa);
 			goto done;
 		}
