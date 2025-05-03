@@ -75,6 +75,10 @@ static struct gotsysd_sysconf {
 	uid_t uid_start;
 	uid_t uid_end;
 	int have_anonymous_user;
+	struct got_pathlist_head *protected_refs_cur;
+	size_t *nprotected_refs_cur;
+	size_t nprotected_refs_needed;
+	size_t nprotected_refs_received;
 } gotsysd_sysconf;
 
 static struct gotsys_conf gotsysconf;
@@ -152,6 +156,7 @@ sysconf_dispatch_libexec(int fd, short event, void *arg)
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct imsg imsg;
 	ssize_t n;
+	size_t npaths;
 	int shut = 0;
 
 	if (event & EV_READ) {
@@ -390,6 +395,104 @@ sysconf_dispatch_libexec(int fd, short event, void *arg)
 				break;
 			}
 			log_debug("done receiving access rules");
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.protected_refs_cur != NULL ||
+			    gotsysd_sysconf.nprotected_refs_needed != 0 ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			gotsysd_sysconf.protected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->protected_tag_namespaces;
+			gotsysd_sysconf.nprotected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->nprotected_tag_namespaces;
+			gotsysd_sysconf.nprotected_refs_needed = npaths;
+			gotsysd_sysconf.nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.protected_refs_cur != NULL ||
+			    gotsysd_sysconf.nprotected_refs_needed != 0 ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			gotsysd_sysconf.protected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->protected_branch_namespaces;
+			gotsysd_sysconf.nprotected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->nprotected_branch_namespaces;
+			gotsysd_sysconf.nprotected_refs_needed = npaths;
+			gotsysd_sysconf.nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.protected_refs_cur != NULL ||
+			    gotsysd_sysconf.nprotected_refs_needed != 0 ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			gotsysd_sysconf.protected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->protected_branches;
+			gotsysd_sysconf.nprotected_refs_cur =
+			    &gotsysd_sysconf.repo_cur->nprotected_branches;
+			gotsysd_sysconf.nprotected_refs_needed = npaths;
+			gotsysd_sysconf.nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM:
+			if (gotsysd_sysconf.protected_refs_cur == NULL ||
+			    gotsysd_sysconf.nprotected_refs_cur == NULL ||
+			    gotsysd_sysconf.nprotected_refs_needed == 0 ||
+			    gotsysd_sysconf.nprotected_refs_received >=
+			    gotsysd_sysconf.nprotected_refs_needed ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist_elem(&imsg,
+			    gotsysd_sysconf.protected_refs_cur);
+			if (err)
+				break;
+			if (++gotsysd_sysconf.nprotected_refs_received >=
+			    gotsysd_sysconf.nprotected_refs_needed) {
+				gotsysd_sysconf.protected_refs_cur = NULL;
+				*gotsysd_sysconf.nprotected_refs_cur =
+				    gotsysd_sysconf.nprotected_refs_received;
+				gotsysd_sysconf.nprotected_refs_needed = 0;
+				gotsysd_sysconf.nprotected_refs_received = 0;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_REFS_DONE:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.nprotected_refs_needed != 0 ||
+			    gotsysd_sysconf.protected_refs_cur != NULL ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+				break;
+			}
+			log_debug("done receiving protected refs");
 			gotsysd_sysconf.repo_cur = NULL;
 			break;
 		case GOTSYSD_IMSG_SYSCONF_REPOS_DONE:

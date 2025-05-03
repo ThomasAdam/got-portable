@@ -1334,6 +1334,7 @@ conf_protect_tag_namespace(struct gotsys_repo *repo, char *namespace)
 	if (conf_protect_ref_namespace(&new, &repo->protected_tag_namespaces,
 	    namespace) == -1)
 		return -1;
+	repo->nprotected_tag_namespaces++;
 
 	RB_FOREACH(pe, got_pathlist_head, &repo->protected_branch_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
@@ -1354,6 +1355,7 @@ conf_protect_branch_namespace(struct gotsys_repo *repo, char *namespace)
 	if (conf_protect_ref_namespace(&new,
 	    &repo->protected_branch_namespaces, namespace) == -1)
 		return -1;
+	repo->nprotected_branch_namespaces++;
 
 	RB_FOREACH(pe, got_pathlist_head, &repo->protected_tag_namespaces) {
 		if (strcmp(pe->path, new) == 0) {
@@ -1400,6 +1402,7 @@ conf_protect_branch(struct gotsys_repo *repo, char *branchname)
 			yyerror("duplicate protect branch %s", branchname);
 		return -1;
 	}
+	repo->nprotected_branches++;
 
 	return 0;
 }

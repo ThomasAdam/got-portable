@@ -99,8 +99,11 @@ struct gotsys_repo {
 	struct gotsys_access_rule_list access_rules;
 
 	struct got_pathlist_head protected_tag_namespaces;
+	size_t nprotected_tag_namespaces;
 	struct got_pathlist_head protected_branch_namespaces;
+	size_t nprotected_branch_namespaces;
 	struct got_pathlist_head protected_branches;
+	size_t nprotected_branches;
 
 	struct got_pathlist_head notification_refs;
 	struct got_pathlist_head notification_ref_namespaces;

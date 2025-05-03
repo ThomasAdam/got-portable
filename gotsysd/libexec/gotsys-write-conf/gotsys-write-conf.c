@@ -36,6 +36,7 @@
 #include "got_path.h"
 #include "got_opentemp.h"
 #include "got_object.h"
+#include "got_reference.h"
 
 #include "gotsysd.h"
 #include "gotsys.h"
@@ -43,6 +44,9 @@
 static struct gotsys_conf gotsysconf;
 static struct gotsys_userlist *users_cur;
 static struct gotsys_repo *repo_cur;
+static struct got_pathlist_head *protected_refs_cur;
+static size_t nprotected_refs_needed;
+static size_t nprotected_refs_received;
 static int gotd_conf_tmpfd = -1;
 static char *gotd_conf_tmppath;
 
@@ -138,6 +142,119 @@ write_access_rules(struct gotsys_access_rule_list *rules)
 }
 
 static const struct got_error *
+refname_is_valid(const char *refname)
+{
+	if (strncmp(refname, "refs/", 5) != 0) {
+		return got_error_fmt( GOT_ERR_BAD_REF_NAME,
+		    "reference name must begin with \"refs/\": %s", refname);
+	}
+
+	if (!got_ref_name_is_valid(refname))
+		return got_error_path(refname, GOT_ERR_BAD_REF_NAME);
+
+	return NULL;
+}
+
+static const struct got_error *
+write_protected_refs(struct gotsys_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	int ret;
+	const char *opening = "protect {";
+	const char *closing = "}";
+	char *namespace = NULL;
+
+	if (RB_EMPTY(&repo->protected_tag_namespaces) &&
+	    RB_EMPTY(&repo->protected_branch_namespaces) &&
+	    RB_EMPTY(&repo->protected_branches))
+		return NULL;
+
+	ret = dprintf(gotd_conf_tmpfd, "\t%s\n", opening);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 2 + strlen(opening))
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+
+	RB_FOREACH(pe, got_pathlist_head, &repo->protected_tag_namespaces) {
+		namespace = strdup(pe->path);
+		if (namespace == NULL)
+			return got_error_from_errno("strdup");
+
+		got_path_strip_trailing_slashes(namespace);
+		err = refname_is_valid(namespace);
+		if (err)
+			goto done;
+
+		ret = dprintf(gotd_conf_tmpfd, "\t\ttag namespace \"%s\"\n",
+		    namespace);
+		if (ret == -1) {
+			err = got_error_from_errno2("dprintf",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		if (ret != 19 + strlen(namespace)) {
+			err = got_error_fmt(GOT_ERR_IO, "short write to %s",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		free(namespace);
+		namespace = NULL;
+	}
+
+	RB_FOREACH(pe, got_pathlist_head, &repo->protected_branch_namespaces) {
+		namespace = strdup(pe->path);
+		if (namespace == NULL)
+			return got_error_from_errno("strdup");
+
+		got_path_strip_trailing_slashes(namespace);
+		err = refname_is_valid(namespace);
+		if (err)
+			goto done;
+
+		ret = dprintf(gotd_conf_tmpfd, "\t\tbranch namespace \"%s\"\n",
+		    namespace);
+		if (ret == -1) {
+			err = got_error_from_errno2("dprintf",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		if (ret != 22 + strlen(namespace)) {
+			err = got_error_fmt(GOT_ERR_IO, "short write to %s",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		free(namespace);
+		namespace = NULL;
+	}
+
+	RB_FOREACH(pe, got_pathlist_head, &repo->protected_branches) {
+		err = refname_is_valid(pe->path);
+		if (err)
+			return err;
+		ret = dprintf(gotd_conf_tmpfd, "\t\tbranch \"%s\"\n", pe->path);
+		if (ret == -1) {
+			return got_error_from_errno2("dprintf",
+			    gotd_conf_tmppath);
+		}
+		if (ret != 12 + strlen(pe->path))
+			return got_error_fmt(GOT_ERR_IO, "short write to %s",
+			    gotd_conf_tmppath);
+	}
+
+	ret = dprintf(gotd_conf_tmpfd, "\t%s\n", closing);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 2 + strlen(closing))
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+done:
+	free(namespace);
+	return NULL;
+}
+
+static const struct got_error *
 write_gotd_conf(void)
 {
 	const struct got_error *err = NULL;
@@ -211,6 +328,10 @@ write_gotd_conf(void)
 		if (err)
 			return err;
 
+		err = write_protected_refs(repo);
+		if (err)
+			return err;
+
 		ret = dprintf(gotd_conf_tmpfd, "}\n");
 		if (ret == -1)
 			return got_error_from_errno2("dprintf",
@@ -244,6 +365,7 @@ dispatch_event(int fd, short event, void *arg)
 	struct imsgbuf *ibuf = &iev->ibuf;
 	struct imsg imsg;
 	ssize_t n;
+	size_t npaths;
 	int shut = 0;
 	static int flush_and_exit;
 
@@ -387,6 +509,87 @@ dispatch_event(int fd, short event, void *arg)
 		}
 		case GOTSYSD_IMSG_SYSCONF_ACCESS_RULES_DONE:
 			if (repo_cur == NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES:
+			if (repo_cur == NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS ||
+			    protected_refs_cur != NULL ||
+			    nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			protected_refs_cur =
+			    &repo_cur->protected_tag_namespaces;
+			nprotected_refs_needed = npaths;
+			nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES:
+			if (repo_cur == NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS ||
+			    protected_refs_cur != NULL ||
+			    nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			protected_refs_cur =
+			    &repo_cur->protected_branch_namespaces;
+			nprotected_refs_needed = npaths;
+			nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES:
+			if (repo_cur == NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS ||
+			    protected_refs_cur != NULL ||
+			    nprotected_refs_needed != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			protected_refs_cur =
+			    &repo_cur->protected_branches;
+			nprotected_refs_needed = npaths;
+			nprotected_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCH_NAMESPACES_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM:
+			if (protected_refs_cur == NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS ||
+			    nprotected_refs_needed == 0 ||
+			    nprotected_refs_received >=
+			    nprotected_refs_needed) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			/* TODO: validate refname validity */
+			err = gotsys_imsg_recv_pathlist_elem(&imsg,
+			    protected_refs_cur);
+			if (err)
+				break;
+			if (++nprotected_refs_received >=
+			    nprotected_refs_needed) {
+				protected_refs_cur = NULL;
+				nprotected_refs_needed = 0;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_PROTECTED_REFS_DONE:
+			if (repo_cur == NULL ||
+			    nprotected_refs_needed != 0 ||
 			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
 				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
 				    "received unexpected imsg %d while in "

@@ -4,7 +4,8 @@
 
 PROG=		gotsys-write-conf
 SRCS=		gotsys-write-conf.c error.c path.c hash.c pollfd.c \
-		log.c imsg.c gotsys_conf.c gotsys_imsg.c opentemp.c
+		log.c imsg.c gotsys_conf.c gotsys_imsg.c opentemp.c \
+		reference_parse.c
 
 CPPFLAGS = -I${.CURDIR}/../../../include -I${.CURDIR}/../../../lib \
 	-I${.CURDIR}/../../../gotsys -I${.CURDIR}/../../ -I${.CURDIR}
