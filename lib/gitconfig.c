@@ -308,6 +308,7 @@ conf_parse(struct got_gitconfig *conf, int trans, char *buf, size_t sz)
 	}
 	if (cp != line)
 		log_print("conf_parse: last line unterminated, ignored.");
+	free(section);
 	return NULL;
 }
 
