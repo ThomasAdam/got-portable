@@ -78,7 +78,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg imsg, imsg_outfd;
 		FILE *f = NULL;
-		int fd = -1, outfd = -1;
+		int fd = -1, outfd = -1, finished = 0;
 		size_t size;
 		struct got_object *obj = NULL;
 		uint8_t *buf = NULL;
@@ -102,8 +102,11 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.hdr.type == GOT_IMSG_STOP)
-			break;
+		if (imsg.hdr.type == GOT_IMSG_STOP) {
+			finished = 1;
+			goto done;
+		}
+
 
 		if (imsg.hdr.type != GOT_IMSG_BLOB_REQUEST) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -202,9 +205,12 @@ done:
 
 		imsg_free(&imsg);
 		imsg_free(&imsg_outfd);
-		if (obj)
+		if (obj) {
 			got_object_close(obj);
-		if (err)
+			obj = NULL;
+		}
+
+		if (err || finished)
 			break;
 	}
 

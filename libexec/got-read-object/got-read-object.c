@@ -116,7 +116,7 @@ main(int argc, char *argv[])
 #endif
 
 	for (;;) {
-		int fd = -1, outfd = -1;
+		int fd = -1, outfd = -1, finished = 0;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -130,8 +130,10 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.hdr.type == GOT_IMSG_STOP)
-			break;
+		if (imsg.hdr.type == GOT_IMSG_STOP) {
+			finished = 1;
+			goto done;
+		}
 
 		if (imsg.hdr.type != GOT_IMSG_OBJECT_REQUEST &&
 		    imsg.hdr.type != GOT_IMSG_RAW_OBJECT_REQUEST) {
@@ -203,9 +205,11 @@ done:
 		if (fd != -1 && close(fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		imsg_free(&imsg);
-		if (obj)
+		if (obj) {
 			got_object_close(obj);
-		if (err)
+			obj = NULL;
+		}
+		if (err || finished)
 			break;
 	}
 
