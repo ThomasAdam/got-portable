@@ -523,7 +523,7 @@ main(int argc, char *argv[])
 
 	for (;;) {
 		struct imsg imsg;
-		int fd = -1;
+		int fd = -1, finished = 0;
 
 		memset(&imsg, 0, sizeof(imsg));
 
@@ -539,8 +539,10 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.hdr.type == GOT_IMSG_STOP)
-			break;
+		if (imsg.hdr.type == GOT_IMSG_STOP) {
+			finished = 1;
+			goto done;
+		}
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_GOTCONFIG_PARSE_REQUEST:
@@ -608,14 +610,14 @@ main(int argc, char *argv[])
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
-
+	done:
 		if (fd != -1) {
 			if (close(fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
 
 		imsg_free(&imsg);
-		if (err)
+		if (err || finished)
 			break;
 	}
 
