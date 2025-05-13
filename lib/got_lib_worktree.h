@@ -77,6 +77,13 @@ struct got_commitable {
 #define GOT_WORKTREE_UUID		"uuid"
 #define GOT_WORKTREE_HISTEDIT_SCRIPT	"histedit-script"
 
+/*
+ * When this version gets bumped, please consider adding a hash algo type
+ * indicator to the base-commit file, e.g. as a "sha1:" or "sha256:" prefix
+ * before the commit ID itself. At present, we can infer the hash algo via
+ * the commit ID string length or by reading the repository's Git config file,
+ * either of which is suboptimal.
+ */
 #define GOT_WORKTREE_FORMAT_VERSION	1
 
 #define GOT_WORKTREE_BASE_REF_PREFIX "refs/got/worktree/base"

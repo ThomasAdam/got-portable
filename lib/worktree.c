@@ -214,6 +214,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Record our base commit. */
+	/* TODO: This should be recording the hash algo type as well. */
 	err = got_object_id_str(&basestr, commit_id);
 	if (err)
 		goto done;
@@ -354,6 +355,7 @@ got_worktree_set_base_commit_id(struct got_worktree *worktree,
 	}
 
 	/* Record our base commit. */
+	/* TODO: This should be recording the hash algo type as well. */
 	err = got_object_id_str(&id_str, commit_id);
 	if (err)
 		goto done;
