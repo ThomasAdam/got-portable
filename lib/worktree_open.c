@@ -41,6 +41,7 @@
 
 #include "got_lib_worktree.h"
 #include "got_lib_gotconfig.h"
+#include "got_lib_hash.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -124,13 +125,18 @@ open_worktree(struct got_worktree **worktree, const char *path,
 	char *uuidstr = NULL;
 	char *path_lock = NULL;
 	char *base_commit_id_str = NULL;
+	struct got_object_id *base_commit_id = NULL;
 	int version, fd = -1;
 	const char *errstr;
-	struct got_repository *repo = NULL;
-	int *pack_fds = NULL;
 	uint32_t uuid_status;
+	enum got_hash_algorithm algo;
+	int have_algo;
 
 	*worktree = NULL;
+
+	base_commit_id = calloc(1, sizeof(*base_commit_id));
+	if (base_commit_id == NULL)
+		return got_error_from_errno("calloc");
 
 	if (asprintf(&path_meta, "%s/%s", path, meta_dir) == -1) {
 		err = got_error_from_errno("asprintf");
@@ -204,18 +210,30 @@ open_worktree(struct got_worktree **worktree, const char *path,
 		goto done;
 	}
 
-	err = got_repo_pack_fds_open(&pack_fds);
-	if (err)
-		goto done;
+	/* TODO: The base-commit file should indicate the hash algo type. */
+	switch (strlen(base_commit_id_str)) {
+	case SHA1_DIGEST_STRING_LENGTH - 1:
+		algo = GOT_HASH_SHA1;
+		have_algo = 1;
+		break;
+	case SHA256_DIGEST_STRING_LENGTH - 1:
+		algo = GOT_HASH_SHA256;
+		have_algo = 1;
+		break;
+	default:
+		have_algo = 0;
+		break;
+	}
 
-	err = got_repo_open(&repo, (*worktree)->repo_path, NULL, pack_fds);
-	if (err)
+	if (!have_algo ||
+	    !got_parse_object_id(base_commit_id, base_commit_id_str, algo)) {
+		err = got_error_fmt(GOT_ERR_BAD_OBJ_ID_STR,
+		    "%s/%s", meta_dir, GOT_WORKTREE_BASE_COMMIT);
 		goto done;
+	}
 
-	err = got_object_resolve_id_str(&(*worktree)->base_commit_id, repo,
-	    base_commit_id_str);
-	if (err)
-		goto done;
+	(*worktree)->base_commit_id = base_commit_id;
+	base_commit_id = NULL;
 
 	err = read_meta_file(&(*worktree)->head_ref_name, path_meta,
 	    GOT_WORKTREE_HEAD_REF);
@@ -241,20 +259,10 @@ open_worktree(struct got_worktree **worktree, const char *path,
 		goto done;
 	}
 done:
-	if (repo) {
-		const struct got_error *close_err = got_repo_close(repo);
-		if (err == NULL)
-			err = close_err;
-	}
-	if (pack_fds) {
-		const struct got_error *pack_err =
-		    got_repo_pack_fds_close(pack_fds);
-		if (err == NULL)
-			err = pack_err;
-	}
 	free(path_meta);
 	free(path_lock);
 	free(base_commit_id_str);
+	free(base_commit_id);
 	free(uuidstr);
 	free(formatstr);
 	if (err) {
