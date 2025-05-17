@@ -206,7 +206,7 @@ fcgi_forward_response(int fd, short event, void *arg)
 		if (err)
 			log_warnx("forward response: %s", err->msg);
 	}
-	
+
 	event_add(c->resp_event, NULL);
 }
 

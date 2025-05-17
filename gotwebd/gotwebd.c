@@ -566,7 +566,7 @@ connect_children(struct gotwebd *env)
 	for (i = 0; i < env->nserver; i++) {
 		iev1 = &env->iev_server[i];
 		iev2 = &env->iev_gotweb[i];
-	
+
 		if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
 			fatal("socketpair");
 

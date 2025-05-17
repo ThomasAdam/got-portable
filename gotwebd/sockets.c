@@ -400,7 +400,7 @@ recv_gotweb_pipe(struct gotwebd *env, struct imsg *imsg)
 	int fd;
 
 	if (env->iev_gotweb != NULL) {
-		log_warn("gotweb pipe already received"); 
+		log_warn("gotweb pipe already received");
 		return;
 	}
 
