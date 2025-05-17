@@ -717,10 +717,10 @@ gotweb_assign_querystring(struct querystring *qs, char *key, char *value)
 				if (strcmp(value, action_keys[a_cnt].name) != 0)
 					continue;
 				qs->action = action_keys[a_cnt].action;
-				goto qa_found;
+				break;
 			}
-			qs->action = ERR;
-qa_found:
+			if (a_cnt == nitems(action_keys))
+				qs->action = ERR;
 			break;
 		case COMMIT:
 			qs->commit = strdup(value);
