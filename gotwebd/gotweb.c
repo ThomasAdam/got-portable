@@ -1544,7 +1544,7 @@ recv_server_pipe(struct gotwebd *env, struct imsg *imsg)
 	int fd;
 
 	if (env->iev_server != NULL) {
-		log_warn("server pipe already received"); 
+		log_warn("server pipe already received");
 		return;
 	}
 
