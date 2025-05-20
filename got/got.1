@@ -964,6 +964,8 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl I
 Show unversioned files even if they match an ignore pattern.
+See
+.Sx Ignore Patterns .
 .It Fl S Ar status-codes
 Suppress the output of files with a modification status matching any of the
 single-character status codes contained in the
@@ -987,42 +989,6 @@ Cannot be used together with the
 .Fl S
 option.
 .El
-.Pp
-For compatibility with
-.Xr cvs 1
-and
-.Xr git 1 ,
-.Cm got status
-reads
-.Xr glob 7
-patterns from
-.Pa .cvsignore
-and
-.Pa .gitignore
-files in each traversed directory and will not display unversioned files
-which match these patterns.
-Ignore patterns which end with a slash,
-.Dq / ,
-will only match directories.
-As an extension to
-.Xr glob 7
-matching rules,
-.Cm got status
-supports consecutive asterisks,
-.Dq ** ,
-which will match an arbitrary amount of directories.
-Unlike
-.Xr cvs 1 ,
-.Cm got status
-only supports a single ignore pattern per line.
-Unlike
-.Xr git 1 ,
-.Cm got status
-does not support negated ignore patterns prefixed with
-.Dq \&! ,
-and gives no special significance to the location of path component separators,
-.Dq / ,
-in a pattern.
 .It Xo
 .Cm log
 .Op Fl bdPpRst
@@ -1904,9 +1870,9 @@ another repository.
 .Xc
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
-By default, files which match a
-.Cm got status
-ignore pattern will not be added.
+By default, files which match an ignore pattern will not be added.
+See
+.Sx Ignore Patterns .
 .Pp
 If a
 .Ar path
@@ -1932,9 +1898,9 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl I
-Add files even if they match a
-.Cm got status
-ignore pattern.
+Add files even if they match an ignore pattern.
+See
+.Xs Ignore Patterns .
 .It Fl R
 Permit recursion into directories.
 If this option is not specified,
@@ -3857,6 +3823,61 @@ If a
 argument corresponds to the work tree's root directory, display information
 for all tracked files.
 .El
+.Tg ignore
+.Ss Ignore Patterns
+.Cm got status
+and
+.Cm got add
+read patterns from
+.Pa .cvsignore
+and
+.Pa .gitignore
+files in each traversed directory and will not display or add unversioned files
+which match these patterns.
+The patterns are matched according to
+.Xr glob 7
+rules, with extensions to improve compatibility with
+.Xr cvs 1
+and
+.Xr git 1 .
+Patterns from each
+.Pa .cvsignore
+or
+.Pa .gitignore
+file are matched relative to the directory containing that file.
+If a pattern begins with two asterisks followed by a slash,
+.Dq **/ ,
+the remainder of the pattern will match at any directory at
+or below the directory containing
+.Pa .cvsignore
+or
+.Pa gitignore
+file.
+Two asterisks surrounded by slashes,
+.Dq /**/ ,
+in the middle of a pattern will match one directory or more.
+Patterns which end with a slash,
+.Dq / ,
+will only match directories, and any paths below matching directories will
+be ignored.
+.Pp
+Unlike
+.Xr cvs 1 ,
+.Nm
+only supports a single ignore pattern per line.
+Unlike
+.Xr git 1 ,
+.Nm
+does not support negated ignore patterns prefixed with
+.Dq \&! ,
+and does not match patterns at arbitrary depth relative to the
+.Pa .gitignore 
+file unless they begin with
+.Dq **/ .
+For better
+.Xr git 1
+compatibility, patterns beginning with a slash are matched as if the slash
+were not present.
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_IGNORE_GITCONFIG
 .It Ev GOT_AUTHOR
