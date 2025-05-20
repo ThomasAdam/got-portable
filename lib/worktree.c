@@ -3813,19 +3813,29 @@ match_path(const char *pattern, size_t pattern_len, const char *path,
     int flags)
 {
 	char buf[PATH_MAX];
+	const char *pat = pattern;
+	size_t len = pattern_len;
+
+	/*
+	 * For gitignore(7) compatibility, ignore leading slashes
+	 */
+	if (len > 0 && pat[0] == '/') {
+		pat++;
+		len--;
+	}
 
 	/*
 	 * Trailing slashes signify directories.
 	 * Append a * to make such patterns conform to fnmatch rules.
 	 */
-	if (pattern_len > 0 && pattern[pattern_len - 1] == '/') {
-		if (snprintf(buf, sizeof(buf), "%s*", pattern) >= sizeof(buf))
+	if (pat > 0 && pat[len - 1] == '/') {
+		if (snprintf(buf, sizeof(buf), "%s*", pat) >= sizeof(buf))
 			return FNM_NOMATCH; /* XXX */
 
 		return fnmatch(buf, path, flags);
 	}
 
-	return fnmatch(pattern, path, flags);
+	return fnmatch(pat, path, flags);
 }
 
 static int

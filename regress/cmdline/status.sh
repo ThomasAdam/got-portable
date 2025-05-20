@@ -654,6 +654,7 @@ test_status_gitignore() {
 	echo "unversioned file" > $testroot/wt/epsilon/boo
 	echo "unversioned file" > $testroot/wt/epsilon/moo
 	mkdir -p $testroot/wt/a/b/c/
+	echo "git would ignore this" > $testroot/wt/a/foo
 	echo "unversioned file" > $testroot/wt/a/b/c/foo
 	echo "unversioned file" > $testroot/wt/a/b/c/zoo
 	echo "foo" > $testroot/wt/.gitignore
@@ -663,6 +664,7 @@ test_status_gitignore() {
 	echo "**/zoo" >> $testroot/wt/.gitignore
 
 	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  a/foo' >> $testroot/stdout.expected
 	echo '?  foop' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 
@@ -675,6 +677,7 @@ test_status_gitignore() {
 	fi
 
 	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  a/foo' >> $testroot/stdout.expected
 	echo '?  foop' >> $testroot/stdout.expected
 	(cd $testroot/wt/gamma && got status > $testroot/stdout)
 
@@ -690,6 +693,7 @@ test_status_gitignore() {
 ?  .gitignore
 ?  a/b/c/foo
 ?  a/b/c/zoo
+?  a/foo
 ?  barp
 ?  epsilon/bar
 ?  epsilon/boo
@@ -704,6 +708,41 @@ EOF
 		test_done "$testroot" "1"
 		return 1
 	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_status_gitignore_leading_slashes() {
+	local testroot=`test_init status_gitignore_leading_slashes`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	echo "unversioned file" > $testroot/wt/epsilon/foo
+	echo "unversioned file" > $testroot/wt/epsilon/bar
+	mkdir -p $testroot/wt/nu
+	echo "unversioned file" > $testroot/wt/nu/baz
+	mkdir -p $testroot/wt/epsilon/nu
+	echo "unversioned file" > $testroot/wt/epsilon/nu/baz
+
+	echo "/foo" > $testroot/wt/.gitignore
+	echo "/nu" >> $testroot/wt/.gitignore
+
+	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  epsilon/bar' >> $testroot/stdout.expected
+	echo '?  epsilon/foo' >> $testroot/stdout.expected
+	echo '?  epsilon/nu/baz' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret=$?
@@ -1204,6 +1243,7 @@ run_test test_status_empty_dir_unversioned_file
 run_test test_status_many_paths
 run_test test_status_cvsignore
 run_test test_status_gitignore
+run_test test_status_gitignore_leading_slashes
 run_test test_status_gitignore_trailing_slashes
 run_test test_status_gitignore_comments
 run_test test_status_multiple_gitignore_files
