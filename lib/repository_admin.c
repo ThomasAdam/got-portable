@@ -1453,7 +1453,7 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 	sorted = calloc(npacks, sizeof(*sorted));
 	if (sorted == NULL)
 		return got_error_from_errno("calloc");
-	
+
 	err = got_object_id_str(&id_str, large_pack_hash);
 	if (err)
 		goto done;
