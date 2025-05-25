@@ -1279,8 +1279,8 @@ done:
 
 static const struct got_error *
 purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
-    int dry_run, int ignore_mtime, time_t max_mtime,
-    int *remove, off_t *size_before, off_t *size_after)
+    int dry_run, int ignore_mtime, time_t max_mtime, int *remove,
+    int has_unref_objects, off_t *size_before, off_t *size_after)
 {
 	static const char *ext[] = {".idx", ".pack", ".rev", ".bitmap",
 	    ".promisor", ".mtimes"};
@@ -1291,19 +1291,21 @@ purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
 	if (strlcpy(path, packidx_path, sizeof(path)) >= sizeof(path))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	/*
-	 * Do not delete pack files which are younger than our maximum
-	 * modification time threshold.  This prevents a race where a
-	 * new pack file which is being added to the repository
-	 * concurrently would be deleted.
-	 */
-	if (fstatat(got_repo_get_fd(repo), path, &sb, 0) == -1) {
-		if (errno == ENOENT)
-			return NULL;
-		return got_error_from_errno2("fstatat", path);
+	if (*remove && !ignore_mtime && has_unref_objects) {
+		/*
+		 * Do not delete pack files which contain unreferenced objects
+		 * and are younger than our modification time threshold.
+		 * This prevents a race where a new pack file which is being
+		 * added to the repository concurrently would be deleted.
+		 */
+		if (fstatat(got_repo_get_fd(repo), path, &sb, 0) == -1) {
+			if (errno == ENOENT)
+				return NULL;
+			return got_error_from_errno2("fstatat", path);
+		}
+		if (sb.st_mtime > max_mtime)
+			*remove = 0;
 	}
-	if (!ignore_mtime && sb.st_mtime > max_mtime)
-		*remove = 0;
 
 	/*
 	 * For compatibility with Git, if a matching .keep file exist
@@ -1351,9 +1353,9 @@ purge_redundant_pack(struct got_repository *repo, const char *packidx_path,
 }
 
 static const struct got_error *
-pack_is_redundant(int *redundant, struct got_repository *repo,
-    struct got_object_idset *traversed_ids,
-    const char *packidx_path, struct got_object_idset *idset)
+pack_is_redundant(int *redundant, int *unref_objects,
+    struct got_repository *repo, struct got_object_idset *traversed_ids,
+    struct got_packidx *large_packidx, const char *packidx_path)
 {
 	const struct got_error *err;
 	struct got_packidx *packidx;
@@ -1361,8 +1363,10 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 	struct got_object_id id;
 	size_t i, nobjects;
 	size_t digest_len = got_hash_digest_length(repo->algo);
+	int idx;
 
-	*redundant = 1;
+	*redundant = 0;
+	*unref_objects = 0;
 
 	err = got_repo_get_packidx(&packidx, packidx_path, repo);
 	if (err)
@@ -1376,18 +1380,24 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 		memcpy(&id.hash, pid, digest_len);
 		id.algo = repo->algo;
 
-		if (got_object_idset_contains(idset, &id))
-			continue;
+		/*
+		 * Pack files which contain unknown objects must be kept
+		 * if they meet our modification time threshold.
+		 */
+		if (*unref_objects == 0 &&
+		    !got_object_idset_contains(traversed_ids, &id))
+			*unref_objects = 1;
 
-		if (!got_object_idset_contains(traversed_ids, &id))
-			continue;
-
-		*redundant = 0;
-		err = got_object_idset_add(idset, &id, NULL);
-		if (err)
-			return err;
+		/*
+		 * A pack file is not redundant if any referenced object
+		 * it contains has no valid index in our large pack file,
+		 */
+		idx = got_packidx_get_object_idx(large_packidx, &id);
+		if (idx == -1 && got_object_idset_contains(traversed_ids, &id))
+			return NULL;
 	}
 
+	*redundant = 1;
 	return NULL;
 }
 
@@ -1416,18 +1426,19 @@ static const struct got_error *
 repo_purge_redundant_packfiles(struct got_repository *repo,
     struct got_object_idset *traversed_ids,
     off_t *size_before, off_t *size_after, int dry_run, int ignore_mtime,
-    time_t max_mtime, int nloose, int ncommits, int npurged,
+    time_t max_mtime, struct got_object_id *large_pack_hash,
+    int nloose, int ncommits, int npurged,
     struct got_ratelimit *rl,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct pack_info *pinfo, *sorted = NULL;
-	struct got_packidx *packidx;
-	struct got_object_idset *idset = NULL;
+	struct got_packidx *packidx, *large_packidx = NULL;
 	struct got_pathlist_entry *pe;
 	size_t i, npacks;
-	int remove, redundant_packs = 0;
+	int redundant_packs = 0, large_idxpath_len;
+	char *id_str = NULL, *large_idxpath = NULL;
 
 	npacks = 0;
 	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths)
@@ -1439,6 +1450,16 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 	sorted = calloc(npacks, sizeof(*sorted));
 	if (sorted == NULL)
 		return got_error_from_errno("calloc");
+	
+	err = got_object_id_str(&id_str, large_pack_hash);
+	if (err)
+		goto done;
+	large_idxpath_len = asprintf(&large_idxpath, "%s/pack-%s.idx",
+	    GOT_OBJECTS_PACK_DIR, id_str);
+	if (large_idxpath_len == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	i = 0;
 	RB_FOREACH(pe, got_pathlist_head, &repo->packidx_paths) {
@@ -1453,28 +1474,40 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 	}
 	qsort(sorted, npacks, sizeof(*sorted), pack_info_cmp);
 
-	idset = got_object_idset_alloc();
-	if (idset == NULL) {
-		err = got_error_from_errno("got_object_idset_alloc");
+	/*
+	 * Open the index of the large pack file we just created.
+	 * Any other pack file composed only of objects which are also
+	 * contained in our large pack is now redundant and can be purged.
+	 */
+	err = got_packidx_open(&large_packidx, got_repo_get_fd(repo),
+	    large_idxpath, 1, repo->algo);
+	if (err)
 		goto done;
-	}
 
 	for (i = 0; i < npacks; ++i) {
+		int is_redundant = 0, has_unref_objects = 0;
+
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
 				break;
 		}
 
-		err = pack_is_redundant(&remove, repo, traversed_ids,
-		    sorted[i].path, idset);
-		if (err)
-			goto done;
+		/* Do not delete the large pack file we just created. */
+		if (got_path_cmp(sorted[i].path, large_idxpath,
+		    sorted[i].path_len, large_idxpath_len) != 0) {
+			err = pack_is_redundant(&is_redundant,
+			    &has_unref_objects, repo, traversed_ids,
+			    large_packidx, sorted[i].path);
+			if (err)
+				goto done;
+		}
 		err = purge_redundant_pack(repo, sorted[i].path, dry_run,
-		    ignore_mtime, max_mtime, &remove, size_before, size_after);
+		    ignore_mtime, max_mtime, &is_redundant, has_unref_objects,
+		    size_before, size_after);
 		if (err)
 			goto done;
-		if (!remove)
+		if (!is_redundant)
 			continue;
 		err = report_cleanup_progress(progress_cb, progress_arg,
 		    rl, ncommits, nloose, npurged, ++redundant_packs);
@@ -1491,8 +1524,10 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 	}
  done:
 	free(sorted);
-	if (idset)
-		got_object_idset_free(idset);
+	if (large_packidx)
+		got_packidx_close(large_packidx);
+	free(large_idxpath);
+	free(id_str);
 	return err;
 }
 
@@ -1614,8 +1649,8 @@ got_repo_cleanup(struct got_repository *repo,
 
 	err = repo_purge_redundant_packfiles(repo, traversed_ids,
 	    pack_before, pack_after, dry_run, ignore_mtime, max_mtime,
-	    *nloose, *ncommits, npurged, &rl, progress_cb, progress_arg,
-	    cancel_cb, cancel_arg);
+	    &pack_hash, *nloose, *ncommits, npurged,
+	    &rl, progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
