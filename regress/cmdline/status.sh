@@ -736,7 +736,7 @@ test_status_gitignore_leading_slashes() {
 	echo "unversioned file" > $testroot/wt/epsilon/nu/baz
 
 	echo "/foo" > $testroot/wt/.gitignore
-	echo "/nu" >> $testroot/wt/.gitignore
+	echo "//////////////////////////nu" >> $testroot/wt/.gitignore
 
 	echo '?  .gitignore' > $testroot/stdout.expected
 	echo '?  epsilon/bar' >> $testroot/stdout.expected
