@@ -3817,9 +3817,9 @@ match_path(const char *pattern, size_t pattern_len, const char *path,
 	size_t len = pattern_len;
 
 	/*
-	 * For gitignore(7) compatibility, ignore leading slashes
+	 * For gitignore(5) compatibility, ignore leading slashes.
 	 */
-	if (len > 0 && pat[0] == '/') {
+	while (len > 0 && pat[0] == '/') {
 		pat++;
 		len--;
 	}
