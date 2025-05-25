@@ -1035,6 +1035,13 @@ load_commit_or_tag(int *ncommits, struct got_object_idset *traversed_ids,
 			id = got_object_tag_get_object_id(tag);
 			switch (obj_type) {
 			case GOT_OBJ_TYPE_COMMIT:
+				if (got_object_idset_contains(traversed_ids,
+				    id))
+					break;
+				err = got_object_idset_add(traversed_ids, id,
+				    NULL);
+				if (err)
+					goto done;
 				err = got_object_open_as_commit(&commit, repo,
 				    id);
 				if (err)
