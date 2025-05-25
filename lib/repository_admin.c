@@ -1393,6 +1393,7 @@ pack_is_redundant(int *redundant, struct got_repository *repo,
 
 struct pack_info {
 	const char	*path;
+	size_t		 path_len;
 	size_t		 nobjects;
 };
 
@@ -1404,7 +1405,8 @@ pack_info_cmp(const void *a, const void *b)
 	pa = a;
 	pb = b;
 	if (pa->nobjects == pb->nobjects)
-		return strcmp(pa->path, pb->path);
+		return got_path_cmp(pa->path, pb->path,
+		    pa->path_len, pb->path_len);
 	if (pa->nobjects > pb->nobjects)
 		return -1;
 	return 1;
@@ -1446,6 +1448,7 @@ repo_purge_redundant_packfiles(struct got_repository *repo,
 
 		pinfo = &sorted[i++];
 		pinfo->path = pe->path;
+		pinfo->path_len = pe->path_len;
 		pinfo->nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
 	}
 	qsort(sorted, npacks, sizeof(*sorted), pack_info_cmp);
