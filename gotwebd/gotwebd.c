@@ -356,7 +356,7 @@ main(int argc, char **argv)
 	struct event_base	*evb;
 	struct gotwebd		*env;
 	struct passwd		*pw;
-	int			 ch, i, gotwebd_ngroups;
+	int			 ch, i, gotwebd_ngroups = NGROUPS_MAX;
 	int			 no_action = 0;
 	int			 proc_type = GOTWEBD_PROC_PARENT;
 	const char		*conffile = GOTWEBD_CONF;
