@@ -612,28 +612,30 @@ gotsysd_parse_config(const char *filename, enum gotsysd_procid proc_id,
 	gotsysd->uid_end = GOTSYSD_UID_DEFAULT_END;
 
 	file = newfile(filename, 0, 0);
-	if (file == NULL)
-		return require_config_file ? -1 : 0;
+	if (file == NULL) {
+		if (require_config_file)
+			return -1;
+	} else {
+		yyparse();
+		errors = file->errors;
+		closefile(file);
 
-	yyparse();
-	errors = file->errors;
-	closefile(file);
-
-	/* Free macros and check which have not been used. */
-	TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
-		if ((gotsysd->verbosity > 1) && !sym->used)
-			fprintf(stderr, "warning: macro '%s' not used\n",
-			    sym->nam);
-		if (!sym->persist) {
-			free(sym->nam);
-			free(sym->val);
-			TAILQ_REMOVE(&symhead, sym, entry);
-			free(sym);
+		/* Free macros and check which have not been used. */
+		TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
+			if ((gotsysd->verbosity > 1) && !sym->used)
+				fprintf(stderr,
+				    "warning: macro '%s' not used\n", sym->nam);
+			if (!sym->persist) {
+				free(sym->nam);
+				free(sym->val);
+				TAILQ_REMOVE(&symhead, sym, entry);
+				free(sym);
+			}
 		}
-	}
 
-	if (errors)
-		return (-1);
+		if (errors)
+			return (-1);
+	}
 
 	if (proc_id == GOTSYSD_PROC_AUTH &&
 	    STAILQ_EMPTY(&gotsysd->access_rules)) {
