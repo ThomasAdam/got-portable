@@ -91,6 +91,7 @@ static struct gotd_session_write {
 	size_t num_notification_refs_received;
 	struct got_pathlist_head *notification_refs_cur;
 	struct gotd_notification_targets notification_targets;
+	int repo_child_packfd;
 } gotd_session;
 
 static struct gotd_session_client {
@@ -1263,9 +1264,6 @@ static const struct got_error *
 recv_packfile(struct gotd_session_client *client)
 {
 	const struct got_error *err = NULL;
-	struct gotd_imsg_recv_packfile ipack;
-	char *basepath = NULL, *pack_path = NULL, *idx_path = NULL;
-	int packfd = -1, idxfd = -1;
 	int pipe[2] = { -1, -1 };
 
 	if (client->packfile_path) {
@@ -1276,23 +1274,49 @@ recv_packfile(struct gotd_session_client *client)
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe) == -1)
 		return got_error_from_errno("socketpair");
 
-	/* Send pack pipe end 0 to repo child process. */
-	if (gotd_imsg_compose_event(&gotd_session.repo_child_iev,
-	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_SESSION_WRITE, pipe[0],
-	        NULL, 0) == -1) {
+	/*
+	 * Send pack data pipe end 0 to gotsh(1) (expects just an fd, no data).
+	 *
+	 * We will forward the other pipe end to the repo_write process only
+	 * once we have confirmation that gotsh(1) has received its end.
+	 */
+	if (gotd_imsg_compose_event(&client->iev,
+	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_GOTD, pipe[0], NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
 		goto done;
 	}
 	pipe[0] = -1;
 
-	/* Send pack pipe end 1 to gotsh(1) (expects just an fd, no data). */
-	if (gotd_imsg_compose_event(&client->iev,
-	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_SESSION_WRITE, pipe[1],
-	    NULL, 0) == -1) {
-		err = got_error_from_errno("imsg compose PACKFILE_PIPE");
-		goto done;
-	}
+	gotd_session.repo_child_packfd = pipe[1];
 	pipe[1] = -1;
+done:
+	if (pipe[0] != -1 && close(pipe[0]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (pipe[1] != -1 && close(pipe[1]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+}
+
+static const struct got_error *
+send_packfds_to_repo_child(void)
+{
+	const struct got_error *err = NULL;
+	struct gotd_session_client *client = &gotd_session_client;
+	char *basepath = NULL, *pack_path = NULL, *idx_path = NULL;
+	int packfd = -1, idxfd = -1;
+	struct gotd_imsg_recv_packfile ipack;
+
+	/*
+	 * gotsh(1) has received its end of the pack pipe.
+	 * Send pack pipe end 1 to repo child process.
+	 */
+	if (gotd_imsg_compose_event(
+	    &gotd_session.repo_child_iev,
+	    GOTD_IMSG_PACKFILE_PIPE, GOTD_PROC_SESSION_WRITE,
+	    gotd_session.repo_child_packfd, NULL, 0) == -1)
+		return got_error_from_errno("imsg compose PACKFILE_PIPE");
+
+	gotd_session.repo_child_packfd = -1;
 
 	if (asprintf(&basepath, "%s/%s/receiving-from-uid-%d.pack",
 	    got_repo_get_path(gotd_session.repo), GOT_OBJECTS_PACK_DIR,
@@ -1344,13 +1368,8 @@ recv_packfile(struct gotd_session_client *client)
 		goto done;
 	}
 	packfd = -1;
-
 done:
 	free(basepath);
-	if (pipe[0] != -1 && close(pipe[0]) == -1 && err == NULL)
-		err = got_error_from_errno("close");
-	if (pipe[1] != -1 && close(pipe[1]) == -1 && err == NULL)
-		err = got_error_from_errno("close");
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
@@ -1509,6 +1528,14 @@ session_dispatch_client(int fd, short events, void *arg)
 				    "unexpected client state");
 				break;
 			}
+			break;
+		case GOTD_IMSG_PACKFILE_READY:
+			if (gotd_session.state != GOTD_STATE_EXPECT_PACKFILE ||
+			    gotd_session.repo_child_packfd == -1) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = send_packfds_to_repo_child();
 			break;
 		default:
 			log_debug("unexpected imsg %d", imsg.hdr.type);
@@ -1986,6 +2013,7 @@ session_write_main(const char *title, const char *repo_path,
 	RB_INIT(&gotd_session.notification_refs);
 	RB_INIT(&gotd_session.notification_ref_namespaces);
 	STAILQ_INIT(&gotd_session.notification_targets);
+	gotd_session.repo_child_packfd = -1;
 
 	if (imsgbuf_init(&gotd_session.notifier_iev.ibuf, -1) == -1) {
 		err = got_error_from_errno("imsgbuf_init");

@@ -1081,7 +1081,7 @@ done:
 }
 
 static const struct got_error *
-recv_packfile(struct imsg *imsg, int infd)
+recv_packfile(struct imsg *imsg, struct imsgbuf *ibuf, int infd)
 {
 	const struct got_error *err = NULL;
 	size_t datalen;
@@ -1096,6 +1096,14 @@ recv_packfile(struct imsg *imsg, int infd)
 	packfd = imsg_get_fd(imsg);
 	if (packfd == -1)
 		return got_error(GOT_ERR_PRIVSEP_NO_FD);
+
+	if (imsg_compose(ibuf, GOTD_IMSG_PACKFILE_READY,
+	    0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose PACKFILE_READY");
+
+	err = gotd_imsg_flush(ibuf);
+	if (err)
+		return err;
 
 	while (!pack_done) {
 		ssize_t r = 0;
@@ -1341,7 +1349,7 @@ serve_write(int infd, int outfd, int gotd_sock, const char *repo_path,
 			err = gotd_imsg_recv_error(NULL, &imsg);
 			goto done;
 		case GOTD_IMSG_PACKFILE_PIPE:
-			err = recv_packfile(&imsg, infd);
+			err = recv_packfile(&imsg, &ibuf, infd);
 			if (err) {
 				if (err->code != GOT_ERR_EOF)
 					goto done;
