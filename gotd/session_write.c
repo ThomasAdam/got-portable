@@ -662,8 +662,6 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	if (notif == NULL)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
-	STAILQ_REMOVE(&notifications, notif, gotd_session_notif, entry);
-
 	if (notif->action != icontent.action || notif->fd == -1 ||
 	    strcmp(notif->refname, refname) != 0) {
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -746,9 +744,6 @@ forward_notification(struct gotd_session_client *client, struct imsg *imsg)
 	imsg_close(&iev->ibuf, wbuf);
 	gotd_imsg_event_add(iev);
 done:
-	if (notif->fd != -1)
-		close(notif->fd);
-	free(notif);
 	free(refname);
 	free(id_str);
 	return err;
@@ -984,6 +979,33 @@ recv_notification_content(struct imsg *imsg)
 	return NULL;
 }
 
+static const struct got_error *
+report_ref_updates(int do_notify)
+{
+	const struct got_error *err;
+	struct gotd_session_notif *notif;
+
+	err = send_refs_updated(&gotd_session.parent_iev);
+	if (err) {
+		log_warn("%s", err->msg);
+		return err;
+	}
+
+	if (do_notify) {
+		notif = STAILQ_FIRST(&notifications);
+		if (notif == NULL)
+			return NULL;
+
+		err = request_notification(notif);
+		if (err) {
+			log_warn("could not send notification: %s", err->msg);
+			return err;
+		}
+	}
+
+	return NULL;
+}
+
 static void
 session_dispatch_repo_child(int fd, short event, void *arg)
 {
@@ -1086,8 +1108,6 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			else
 				disconnect(client);
 		} else {
-			struct gotd_session_notif *notif;
-
 			if (do_packfile_verification) {
 				err = verify_packfile(iev);
 			} else if (do_content_verification) {
@@ -1110,27 +1130,17 @@ session_dispatch_repo_child(int fd, short event, void *arg)
 			if (do_ref_update && client->nref_updates > 0) {
 				client->nref_updates--;
 				if (client->nref_updates == 0) {
-					err = send_refs_updated(
-					    &gotd_session.parent_iev);
-					if (err) {
-						log_warn("%s", err->msg);
+					err = report_ref_updates(do_notify);
+					if (err)
 						shut = 1;
-					}
-				}
-			}
-
-			notif = STAILQ_FIRST(&notifications);
-			if (notif && do_notify) {
-				/* Request content for next notification. */
-				err = request_notification(notif);
-				if (err) {
-					log_warn("could not send notification: "
-					    "%s", err->msg);
-					shut = 1;
 				}
 			}
 		}
+
 		imsg_free(&imsg);
+
+		if (err)
+			break;
 	}
 done:
 	if (!shut) {
@@ -1668,6 +1678,14 @@ session_dispatch_notifier(int fd, short event, void *arg)
 				log_warn("unexpected imsg %d", imsg.hdr.type);
 				break;
 			}
+
+			/* First notification on our list has now been sent. */
+			notif = STAILQ_FIRST(&notifications);
+			STAILQ_REMOVE_HEAD(&notifications, entry);
+			if (notif->fd != -1)
+				close(notif->fd);
+			free(notif);
+
 			notif = STAILQ_FIRST(&notifications);
 			if (notif == NULL) {
 				disconnect(client);
