@@ -456,12 +456,15 @@ gotsys_imsg_send_authorized_keys(struct gotsysd_imsgev *iev,
 			    "authorized key too long: %s:", k->key);
 		}
 
-		commentlen = strlen(k->comment);
-		if (commentlen > GOTSYS_AUTHORIZED_KEY_MAXLEN) {
-			return got_error_fmt(GOT_ERR_NO_SPACE,
-			    "authorized key comment too long: %s:",
-			    k->comment);
-		}
+		if (k->comment) {
+			commentlen = strlen(k->comment);
+			if (commentlen > GOTSYS_AUTHORIZED_KEY_MAXLEN) {
+				return got_error_fmt(GOT_ERR_NO_SPACE,
+				    "authorized key comment too long: %s:",
+				    k->comment);
+			}
+		} else
+			commentlen = 0;
 
 		klen = typelen + datalen + commentlen;
 		if (klen > GOTSYS_AUTHORIZED_KEY_MAXLEN) {
@@ -481,7 +484,7 @@ gotsys_imsg_send_authorized_keys(struct gotsysd_imsgev *iev,
 
 		ikey.keytype_len = strlen(k->keytype);
 		ikey.keydata_len = strlen(k->key);
-		ikey.comment_len = strlen(k->comment);
+		ikey.comment_len = k->comment ? strlen(k->comment) : 0;
 
 		klen = ikey.keytype_len + ikey.keydata_len + ikey.comment_len;
 
@@ -512,7 +515,8 @@ gotsys_imsg_send_authorized_keys(struct gotsysd_imsgev *iev,
 		if (imsg_add(wbuf, k->key, ikey.keydata_len) == -1)
 			return got_error_from_errno_fmt("imsg_add %d",
 			    imsg_type);
-		if (imsg_add(wbuf, k->comment, ikey.comment_len) == -1)
+		if (ikey.comment_len > 0 &&
+		    imsg_add(wbuf, k->comment, ikey.comment_len) == -1)
 			return got_error_from_errno_fmt("imsg_add %d",
 			    imsg_type);
 

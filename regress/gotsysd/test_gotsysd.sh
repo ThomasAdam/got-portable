@@ -292,7 +292,8 @@ test_user_mod() {
 
 	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
 	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD}1234 | encrypt | tr -d '\n'`
-	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	# strip the optional ssh key comment for better test coverage
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY} | cut -d' ' -f 1,2`
 	cat > ${testroot}/wt/gotsys.conf <<EOF
 user ${GOTSYSD_TEST_USER} {
 	password "${crypted_vm_pw}" 
