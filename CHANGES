@@ -1,3 +1,11 @@
+* got 0.113; 2025-06-05
+- tweak 'got status' and 'got add' ignores handling for better git compatibility
+- improve redundant pack detection during 'gotadmin cleanup'
+- gotwebd: do not forget to initialize *ngroups argument for getgrouplist()
+- fix default access for root and _gotd when gotsysd runs without config file
+- fix bogus "unexpected privsep message" from gotsh during 'got send'
+- fix a race in gotd notification processing causing notify process to exit
+
 * got 0.112; 2025-05-14
 - remove /tmp/got-importmsg temp files when import commit message is left empty
 - rely on secondary _gotwebd groups if repos_path is not owned by _gotwebd group
