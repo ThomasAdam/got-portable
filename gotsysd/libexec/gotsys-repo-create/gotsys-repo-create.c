@@ -339,17 +339,18 @@ main(int argc, char **argv)
 		goto done;
 	}
 
-	if (gotd_gid != sb.st_gid) {
+	if (sb.st_mode & (S_IWGRP | S_IWOTH)) {
 		error = got_error_fmt(GOT_ERR_BAD_PATH,
-		    "directory is not owned by GID %u: %s",
-		    gotd_gid, repos_path);
+		    "directory must only be writable by user %s: %s",
+		    username, repos_path);
 		goto done;
 	}
 
-	if (sb.st_mode & (S_IRWXG | S_IRWXO)) {
+	if (sb.st_mode & (S_IROTH | S_IXOTH)) {
 		error = got_error_fmt(GOT_ERR_BAD_PATH,
-		    "directory must only be accessible/writable by user %s: %s",
-		    username, repos_path);
+		    "directory must not be world-readable: %s; "
+		    "chmod 750 %s or chmod 700 %s recommended",
+		    repos_path, repos_path, repos_path);
 		goto done;
 	}
 
