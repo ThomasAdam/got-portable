@@ -1002,6 +1002,68 @@ test_rebase_preserves_logmsg() {
 	test_done "$testroot" "$ret"
 }
 
+test_rebase_preserves_author_data() {
+	local testroot=`test_init rebase_preserves_author_data`
+
+	git -C $testroot/repo checkout -q -b newbranch
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	TZ=EST git_commit $testroot/repo -m "modified delta on newbranch"
+
+	sleep 1		# get a new timestamp
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	TZ=CET git_commit $testroot/repo -m "modified alpha on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && got cat $orig_commit1 $orig_commit2 | \
+		grep '^author ' > $testroot/author_data.expected)
+
+	git -C $testroot/repo checkout -q master
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sleep 1		# get a new timestamp
+	(cd $testroot/wt && got rebase newbranch > /dev/null \
+		2> $testroot/stderr)
+
+	git -C $testroot/repo checkout -q newbranch
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cat $new_commit1 $new_commit2 | \
+		grep '^author ' > $testroot/author_data)
+	# note: got deliberately clobbers the timezone to UTC, so expect that
+	ed -s $testroot/author_data.expected <<-EOF
+	,s/ [+-][0-9]\{4\}\$/ +0000/
+	w
+	EOF
+	cmp -s $testroot/author_data.expected $testroot/author_data
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/author_data.expected $testroot/author_data
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_rebase_no_commits_to_rebase() {
 	local testroot=`test_init rebase_no_commits_to_rebase`
 
@@ -2286,6 +2348,7 @@ run_test test_rebase_no_op_change
 run_test test_rebase_in_progress
 run_test test_rebase_path_prefix
 run_test test_rebase_preserves_logmsg
+run_test test_rebase_preserves_author_data
 run_test test_rebase_no_commits_to_rebase
 run_test test_rebase_forward
 run_test test_rebase_forward_path_prefix

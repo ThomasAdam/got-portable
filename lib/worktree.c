@@ -6470,8 +6470,8 @@ commit_worktree(struct got_object_id **new_commit_id,
     struct got_object_id *head_commit_id,
     struct got_object_id *parent_id2,
     struct got_worktree *worktree,
-    const char *author, const char *committer, char *diff_path,
-    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
+    const char *author, time_t author_time, const char *committer,
+    char *diff_path, got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -6559,8 +6559,10 @@ commit_worktree(struct got_object_id **new_commit_id,
 		nparents++;
 	}
 	timestamp = time(NULL);
+	if (committer == NULL)
+		author_time = timestamp;
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
-	    nparents, author, timestamp, committer, timestamp, logmsg, repo);
+	    nparents, author, author_time, committer, timestamp, logmsg, repo);
 	if (logmsg != NULL)
 		free(logmsg);
 	if (err)
@@ -6676,8 +6678,8 @@ check_non_staged_files(struct got_fileindex *fileindex,
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
-    const char *author, const char *committer, int allow_bad_symlinks,
-    int show_diff, int commit_conflicts,
+    const char *author, time_t author_time, const char *committer,
+    int allow_bad_symlinks, int show_diff, int commit_conflicts,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
@@ -6790,7 +6792,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, NULL, worktree, author, committer,
+	    head_commit_id, NULL, worktree, author, author_time, committer,
 	    (diff_path && cc_arg.diff_header_shown) ? diff_path : NULL,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
@@ -7438,6 +7440,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	/* NB: commit_worktree will call free(logmsg) */
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    NULL, worktree, got_object_commit_get_author(orig_commit),
+	    got_object_commit_get_author_time(orig_commit),
 	    committer ? committer :
 	    got_object_commit_get_committer(orig_commit), NULL,
 	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
@@ -8753,11 +8756,10 @@ done:
 const struct got_error *
 got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
-    const char *author, const char *committer, int allow_bad_symlinks,
-    struct got_object_id *branch_tip, const char *branch_name,
-    int allow_conflict, struct got_repository *repo,
+    const char *author, time_t author_time, const char *committer,
+    int allow_bad_symlinks, struct got_object_id *branch_tip,
+    const char *branch_name, int allow_conflict, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg)
-
 {
 	const struct got_error *err = NULL, *sync_err;
 	struct got_pathlist_head commitable_paths;
@@ -8810,8 +8812,9 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	mcm_arg.worktree = worktree;
 	mcm_arg.branch_name = branch_name;
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, branch_tip, worktree, author, committer, NULL,
-	    merge_commit_msg_cb, &mcm_arg, status_cb, status_arg, repo);
+	    head_commit_id, branch_tip, worktree, author, author_time,
+	    committer, NULL, merge_commit_msg_cb, &mcm_arg, status_cb,
+	    status_arg, repo);
 	if (err)
 		goto done;
 

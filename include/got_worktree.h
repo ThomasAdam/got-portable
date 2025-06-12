@@ -280,12 +280,14 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  * current base commit.
  * An author and a non-empty log message must be specified.
  * The name of the committer is optional (may be NULL).
+ * If a committer is given, a separate author timestamp can be specified
+ * which is ignored otherwise.
  * If a path to be committed contains a symlink which points outside
  * of the path space under version control, raise an error unless
  * committing of such paths is being forced by the caller.
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
-    struct got_worktree *, struct got_pathlist_head *, const char *,
+    struct got_worktree *, struct got_pathlist_head *, const char *, time_t,
     const char *, int, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
@@ -503,9 +505,9 @@ got_worktree_merge_branch(struct got_worktree *worktree,
 const struct got_error *
 got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
-    const char *author, const char *committer, int allow_bad_symlinks,
-    struct got_object_id *branch_tip, const char *branch_name,
-    int allow_conflict, struct got_repository *repo,
+    const char *author, time_t author_time, const char *committer,
+    int allow_bad_symlinks, struct got_object_id *branch_tip,
+    const char *branch_name, int allow_conflict, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg);
 
 /*
