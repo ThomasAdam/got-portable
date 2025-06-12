@@ -1050,7 +1050,6 @@ test_rebase_preserves_author_data() {
 
 	(cd $testroot/wt && got cat $new_commit1 $new_commit2 | \
 		grep '^author ' > $testroot/author_data)
-	# note: got deliberately clobbers the timezone to UTC, so expect that
 	ed -s $testroot/author_data.expected <<-EOF
 	,s/ [+-][0-9]\{4\}\$/ +0000/
 	w
