@@ -23,12 +23,14 @@
  * current base commit.
  * An author and a non-empty log message must be specified.
  * The name of the committer is optional (may be NULL).
+ * If a committer is given, a separate author timestamp can be specified
+ * which is ignored otherwise.
  * If a path to be committed contains a symlink which points outside
  * of the path space under version control, raise an error unless
  * committing of such paths is being forced by the caller.
  */
 const struct got_error *got_worktree_cvg_commit(struct got_object_id **,
-    struct got_worktree *, struct got_pathlist_head *, const char *,
+    struct got_worktree *, struct got_pathlist_head *, const char *, time_t,
     const char *, int, int, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, const char *, const char *, const char *,
     const char *, const char *, const char *, int,
