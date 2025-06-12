@@ -7934,11 +7934,8 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (author == NULL) {
-		/* got_worktree_cvg_commit() treats committer as optional */
+	if (author == NULL)
 		author = committer;
-		committer = NULL;	/* => author timestamp is ignored */
-	}
 
 	remote_name = GOT_SEND_DEFAULT_REMOTE_NAME;
 	worktree_conf = got_worktree_get_gotconfig(worktree);
@@ -8050,11 +8047,11 @@ cmd_commit(int argc, char *argv[])
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
 	cl_arg.repo_path = got_repo_get_path(repo);
 	cl_arg.dial_proto = proto;
-	error = got_worktree_cvg_commit(&id, worktree, &paths, author,
-	    time(NULL), committer, allow_bad_symlinks, show_diff,
-	    commit_conflicts, collect_commit_logmsg, &cl_arg, print_status,
-	    NULL, proto, host, port, server_path, jumphost, identity_file,
-	    verbosity, remote, check_cancelled, repo);
+	error = got_worktree_cvg_commit(&id, worktree, &paths, author, 0,
+	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
+	    collect_commit_logmsg, &cl_arg, print_status, NULL, proto, host,
+	    port, server_path, jumphost, identity_file, verbosity, remote,
+	    check_cancelled, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 		    cl_arg.logmsg_path != NULL)
