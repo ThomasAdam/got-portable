@@ -2226,8 +2226,8 @@ commit_worktree(struct got_object_id **new_commit_id,
     struct got_object_id *head_commit_id,
     struct got_object_id *parent_id2,
     struct got_worktree *worktree,
-    const char *author, const char *committer, char *diff_path,
-    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
+    const char *author, time_t author_time, const char *committer,
+    char *diff_path, got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -2312,8 +2312,10 @@ commit_worktree(struct got_object_id **new_commit_id,
 		nparents++;
 	}
 	timestamp = time(NULL);
+	if (committer == NULL)
+		author_time = timestamp;
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
-	    nparents, author, timestamp, committer, timestamp, logmsg, repo);
+	    nparents, author, author_time, committer, timestamp, logmsg, repo);
 	if (logmsg != NULL)
 		free(logmsg);
 	if (err)
@@ -2902,8 +2904,8 @@ done:
 const struct got_error *
 got_worktree_cvg_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
-    const char *author, const char *committer, int allow_bad_symlinks,
-    int show_diff, int commit_conflicts,
+    const char *author, time_t author_time, const char *committer,
+    int allow_bad_symlinks, int show_diff, int commit_conflicts,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     const char *proto, const char *host, const char *port,
@@ -3044,7 +3046,7 @@ got_worktree_cvg_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, NULL, worktree, author, committer,
+	    head_commit_id, NULL, worktree, author, author_time, committer,
 	    (diff_path && cc_arg.diff_header_shown) ? diff_path : NULL,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
