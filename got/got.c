@@ -9663,11 +9663,8 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (author == NULL) {
-		/* got_worktree_commit() treats committer as the optional one */
+	if (author == NULL)
 		author = committer;
-		committer = NULL;	/* => author timestamp is ignored */
-	}
 
 	if (logmsg == NULL || strlen(logmsg) == 0) {
 		error = get_editor(&editor);
@@ -9717,7 +9714,7 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 11;
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	error = got_worktree_commit(&id, worktree, &paths, author, time(NULL),
+	error = got_worktree_commit(&id, worktree, &paths, author, 0,
 	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {

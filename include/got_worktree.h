@@ -280,8 +280,8 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  * current base commit.
  * An author and a non-empty log message must be specified.
  * The name of the committer is optional (may be NULL).
- * If a committer is given, a separate author timestamp can be specified
- * which is ignored otherwise.
+ * An optional author timestamp can be specified. The current time will
+ * be used if the specified timestamp is 0.
  * If a path to be committed contains a symlink which points outside
  * of the path space under version control, raise an error unless
  * committing of such paths is being forced by the caller.

@@ -6559,7 +6559,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 		nparents++;
 	}
 	timestamp = time(NULL);
-	if (committer == NULL)
+	if (author_time == 0)
 		author_time = timestamp;
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
 	    nparents, author, author_time, committer, timestamp, logmsg, repo);
