@@ -9661,8 +9661,11 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (author == NULL)
+	if (author == NULL) {
+		/* got_worktree_commit() treats committer as the optional one */
 		author = committer;
+		committer = NULL;	/* => author timestamp is ignored */
+	}
 
 	if (logmsg == NULL || strlen(logmsg) == 0) {
 		error = get_editor(&editor);
@@ -9712,8 +9715,8 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 11;
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	error = got_worktree_commit(&id, worktree, &paths, author, committer,
-	    allow_bad_symlinks, show_diff, commit_conflicts,
+	error = got_worktree_commit(&id, worktree, &paths, author, time(NULL),
+	    committer, allow_bad_symlinks, show_diff, commit_conflicts,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
@@ -13958,7 +13961,7 @@ cmd_merge(int argc, char *argv[])
 		goto done;
 	} else {
 		error = got_worktree_merge_commit(&merge_commit_id, worktree,
-		    fileindex, author, NULL, 1, branch_tip, branch_name,
+		    fileindex, author, 0, NULL, 1, branch_tip, branch_name,
 		    allow_conflict, repo, continue_merge ? print_status : NULL,
 		    NULL);
 		if (error)
