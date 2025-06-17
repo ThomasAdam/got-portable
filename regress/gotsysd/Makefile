@@ -31,6 +31,7 @@ GOTSYSD_UID=600	# /usr/ports/infrastructure/db/user.list
 GOTSYS_CONF=gotsys.conf
 GOT_CONF=got.conf
 GOTSYS_REPO=gotsys.git
+GOTWEBD_UID=593	# /usr/ports/infrastructure/db/user.list
 
 GOTSYSD_TEST_USER?=${DOAS_USER}
 .if empty(GOTSYSD_TEST_USER)
@@ -206,7 +207,7 @@ setup_test_vm: start_test_vm ${GOTD_CONF} ${GOTSYSD_CONF} ${GOTSYS_CONF} ${GOT_C
 	${UNPRIV} "${GOTSYSD_SSH_CMD} ${GOTSYSD_TEST_USER}@$${VMIP} \
 		mkdir -p src/got bin"; \
 	${UNPRIV} "${GOTSYSD_SCP_CMD} -r \
-		${.CURDIR}/../../{Makefile*,cvg,got*,git*,lib*,include,tog} \
+		${.CURDIR}/../../{Makefile*,cvg,got*,git*,lib*,include,tog,template} \
 		${GOTSYSD_TEST_USER}@$${VMIP}:src/got/"; \
 	${UNPRIV} "${GOTSYSD_SCP_CMD} build-got.sh \
 		${GOTSYSD_TEST_USER}@$${VMIP}:bin/"; \
@@ -214,7 +215,7 @@ setup_test_vm: start_test_vm ${GOTD_CONF} ${GOTSYSD_CONF} ${GOTSYS_CONF} ${GOT_C
 		./bin/build-got.sh"; \
 	${UNPRIV} "${GOTSYSD_SSH_CMD} root@$${VMIP} \
 		make -C /home/${GOTSYSD_TEST_USER}/src/got -- GOT_RELEASE=Yes \
-		DEBUG=\\'-Oo -g\\' sysd-install server-install install"; \
+		DEBUG=\\'-Oo -g\\' sysd-install server-install webd-install install"; \
 	${UNPRIV} "${GOTSYSD_SSH_CMD} -- root@$${VMIP} \
 		ln -s gitwrapper /usr/local/bin/git-upload-pack"; \
 	${UNPRIV} "${GOTSYSD_SSH_CMD} -- root@$${VMIP} \
@@ -255,6 +256,11 @@ setup_test_vm: start_test_vm ${GOTD_CONF} ${GOTSYSD_CONF} ${GOTSYS_CONF} ${GOT_C
 		${GOTSYSD_CONF} root@$${VMIP}:/etc/gotsysd.conf"; \
 	${UNPRIV} "${GOTSYSD_SSH_CMD} root@$${VMIP} \
 		/usr/local/sbin/gotsysd -vvv"; \
+	${UNPRIV} "${GOTSYSD_SSH_CMD} root@$${VMIP} \
+		groupadd -g ${GOTWEBD_UID} _gotwebd"; \
+	${UNPRIV} "${GOTSYSD_SSH_CMD} root@$${VMIP} \
+		useradd -d /nonexistent -s /sbin/nologin \
+		-u ${GOTWEBD_UID} -g ${GOTWEBD_UID} _gotwebd"; \
 	
 stop_test_vm: ensure_root
 	@vmctl stop ${GOTSYSD_VM_NAME}
