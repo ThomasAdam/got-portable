@@ -14,5 +14,5 @@ for d in got* git* lib*; do
 	fi
 done
 
-echo "Building gotsysd, gotd, and got:"
-make -s GOT_RELEASE=Yes DEBUG="-O0 -g" sysd server all
+echo "Building gotsysd, gotd, gotwebd, and got:"
+make -s GOT_RELEASE=Yes DEBUG="-O0 -g" sysd server webd all
