@@ -44,7 +44,6 @@ gotsys_imsg_send_users(struct gotsysd_imsgev *iev,
     struct gotsys_userlist *users, int imsg_type, int imsg_done_type,
     int send_passwords)
 {
-	const struct got_error *err;
 	struct gotsys_user *u;
 	size_t totlen, remain, mlen;
 	const size_t maxmesg  = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
@@ -90,9 +89,7 @@ gotsys_imsg_send_users(struct gotsysd_imsgev *iev,
 
 		if (wbuf != NULL && mlen + sizeof(iuser) + ulen > maxmesg) {
 			imsg_close(&iev->ibuf, wbuf);
-			err = gotsysd_imsg_flush(&iev->ibuf);
-			if (err)
-				return err;
+			gotsysd_imsg_event_add(iev);
 			wbuf = NULL;
 			mlen = 0;
 		}
@@ -122,9 +119,7 @@ gotsys_imsg_send_users(struct gotsysd_imsgev *iev,
 	}
 
 	imsg_close(&iev->ibuf, wbuf);
-	err = gotsysd_imsg_flush(&iev->ibuf);
-	if (err)
-		return err;
+	gotsysd_imsg_event_add(iev);
 
 	if (gotsysd_imsg_compose_event(iev, imsg_done_type, 0,
 	    -1, NULL, 0) == -1)
@@ -288,9 +283,6 @@ gotsys_imsg_send_groups(struct gotsysd_imsgev *iev,
 		}
 
 		imsg_close(&iev->ibuf, wbuf);
-		err = gotsysd_imsg_flush(&iev->ibuf);
-		if (err)
-			return err;
 
 		err = gotsys_imsg_send_users(iev, &g->members,
 		    imsg_group_members_type,
@@ -424,7 +416,6 @@ const struct got_error *
 gotsys_imsg_send_authorized_keys(struct gotsysd_imsgev *iev,
     struct gotsys_authorized_keys_list *keys, int imsg_type)
 {
-	const struct got_error *err;
 	struct gotsys_authorized_key *k;
 	size_t totlen, remain, mlen;
 	const size_t maxmesg  = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
@@ -490,11 +481,9 @@ gotsys_imsg_send_authorized_keys(struct gotsysd_imsgev *iev,
 
 		if (wbuf != NULL && mlen + sizeof(ikey) + klen > maxmesg) {
 			imsg_close(&iev->ibuf, wbuf);
-			err = gotsysd_imsg_flush(&iev->ibuf);
-			if (err)
-				return err;
 			wbuf = NULL;
 			mlen = 0;
+			gotsysd_imsg_event_add(iev);
 		}
 
 		if (wbuf == NULL) {
@@ -659,7 +648,8 @@ send_access_rule(struct gotsysd_imsgev *iev,
 		return got_error_from_errno("imsg_add SYSCONF_ACCESS_FULE");
 
 	imsg_close(&iev->ibuf, wbuf);
-	return gotsysd_imsg_flush(&iev->ibuf);
+	gotsysd_imsg_event_add(iev);
+	return NULL;
 }
 
 static const struct got_error *
@@ -683,7 +673,8 @@ send_pathlist_elem(struct gotsysd_imsgev *iev, const char *refname,
 		return got_error_from_errno_fmt("imsg_add %d", imsg_type);
 
 	imsg_close(&iev->ibuf, wbuf);
-	return gotsysd_imsg_flush(&iev->ibuf);
+	gotsysd_imsg_event_add(iev);
+	return NULL;
 }
 
 static const struct got_error *
@@ -783,9 +774,6 @@ send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 		return got_error_from_errno("imsg_add SYSCONF_REPO");
 
 	imsg_close(&iev->ibuf, wbuf);
-	err = gotsysd_imsg_flush(&iev->ibuf);
-	if (err)
-		return err;
 
 	STAILQ_FOREACH(rule, &repo->access_rules, entry) {
 		err = send_access_rule(iev, rule);
