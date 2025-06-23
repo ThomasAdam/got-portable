@@ -222,7 +222,6 @@ dispatch_event(int fd, short event, void *arg)
 		} else if (imsgbuf_queuelen(ibuf) == 0 &&
 		    userhome_state == USERHOME_STATE_DONE) {
 			event_del(&iev->ev);
-			event_loopexit(NULL);
 			return;
 		}
 	}
