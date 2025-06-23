@@ -106,6 +106,8 @@ free_proc(struct gotsysd_helper_proc *proc)
 		close(proc->iev.ibuf.fd);
 	}
 
+	if (proc->fd != -1)
+		close(proc->fd);
 	free(proc);
 }
 
@@ -754,13 +756,13 @@ start_helper_child(const char *argv0, const char *argv1, const char *argv2,
 	const struct got_error *err = NULL;
 	struct gotsysd_helper_proc *proc;
 	struct timeval tv = { 5, 0 };
-	int fd = -1;
 
 	proc = calloc(1, sizeof(*proc));
 	if (proc == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
+	proc->fd = -1;
 
 	log_debug("starting %s", argv0);
 
@@ -773,8 +775,8 @@ start_helper_child(const char *argv0, const char *argv1, const char *argv2,
 	proc->type = imsg->hdr.type;
 	switch (proc->type) {
 	case GOTSYSD_IMSG_START_PROG_READ_CONF:
-		fd = imsg_get_fd(imsg);
-		if (fd == -1) {
+		proc->fd = imsg_get_fd(imsg);
+		if (proc->fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
@@ -783,7 +785,7 @@ start_helper_child(const char *argv0, const char *argv1, const char *argv2,
 		break;
 	}
 
-	proc->pid = start_child(argv0, argv1, argv2, proc->pipe[1], fd);
+	proc->pid = start_child(argv0, argv1, argv2, proc->pipe[1], proc->fd);
 	proc->pipe[1] = -1;
 	strlcpy(proc->progname, argv0, sizeof(proc->progname));
 
@@ -811,8 +813,11 @@ start_helper_child(const char *argv0, const char *argv1, const char *argv2,
 	evtimer_set(&proc->startup_tmo, proc_startup_timeout, proc);
 	evtimer_add(&proc->startup_tmo, &tv);
 done:
-	if (err)
+	if (err) {
+		if (proc->fd != -1)
+			close(proc->fd);
 		free(proc);
+	}
 	return err;
 }
 
