@@ -199,7 +199,6 @@ dispatch_gotd(int fd, short event, void *arg)
 			goto fatal;
 		} else if (imsgbuf_queuelen(ibuf) == 0 && flush_and_exit) {
 			event_del(&iev->ev);
-			event_loopexit(NULL);
 			return;
 		}
 	}
@@ -267,7 +266,6 @@ dispatch_gotsysd(int fd, short event, void *arg)
 
 		if (imsgbuf_queuelen(ibuf) == 0 && flush_and_exit) {
 			event_del(&iev->ev);
-			event_loopexit(NULL);
 			return;
 		}
 	}
