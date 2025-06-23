@@ -150,13 +150,10 @@ dispatch_event(int fd, short event, void *arg)
 	}
 
 	if (event & EV_WRITE) {
-		err = gotsysd_imsg_flush(ibuf);
-		if (err) {
-			warn("%s", err->msg);
+		if (imsgbuf_flush(ibuf) == -1) {
+			warn("imsgbuf_flush");
 			goto fatal;
-		}
-
-		if (imsgbuf_queuelen(ibuf) == 0 && flush_and_exit) {
+		} else if (imsgbuf_queuelen(ibuf) == 0 && flush_and_exit) {
 			event_del(&iev->ev);
 			event_loopexit(NULL);
 			return;
