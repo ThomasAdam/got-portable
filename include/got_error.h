@@ -196,6 +196,7 @@
 #define GOT_ERR_GROUP_EXISTS	179
 #define GOT_ERR_AUTHORIZED_KEY	180
 #define GOT_ERR_CONNECTION_LIMIT 190
+#define GOT_ERR_ON_SERVER_SIDE	191
 
 struct got_error {
         int code;

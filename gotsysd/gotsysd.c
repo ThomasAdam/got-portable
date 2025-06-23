@@ -62,6 +62,7 @@ struct gotsysd_child_proc {
 	int				 pipe[2];
 	struct gotsysd_imsgev		 iev;
 	struct event			 tmo;
+	uint32_t			 client_id;
 
 	TAILQ_ENTRY(gotsysd_child_proc)	 entry;
 };
@@ -70,6 +71,7 @@ static TAILQ_HEAD(gotsysd_procs, gotsysd_child_proc) procs;
 enum gotsysd_client_state {
 	GOTSYSD_CLIENT_STATE_NEW = -1,
 	GOTSYSD_CLIENT_STATE_ACCESS_GRANTED = 1,
+	GOTSYSD_CLIENT_STATE_SYSCONF_STARTED,
 };
 
 struct gotsysd_client {
@@ -257,6 +259,29 @@ find_client(uint32_t client_id)
 	}
 
 	return NULL;
+}
+
+static void
+client_sysconf_done(uint32_t client_id, int exit_status)
+{
+	struct gotsysd_client *client;
+	int imsg_code;
+
+	client = find_client(client_id);
+	if (client == NULL)
+		return;
+
+	if (client->state != GOTSYSD_CLIENT_STATE_SYSCONF_STARTED)
+		return;
+
+	if (exit_status == 0)
+	    imsg_code = GOTSYSD_IMSG_SYSCONF_SUCCESS;
+	else
+	    imsg_code = GOTSYSD_IMSG_SYSCONF_FAILURE;
+
+	if (gotsysd_imsg_compose_event(&client->iev, imsg_code,
+	    GOTSYSD_PROC_GOTSYSD, -1, NULL, 0) == -1)
+		log_warn("imsg compose %d", imsg_code);
 }
 
 static void
@@ -535,7 +560,8 @@ done:
 }
 
 static const struct got_error *
-start_sysconf_child(int sysconf_fd, struct got_object_id *commit_id)
+start_sysconf_child(int sysconf_fd, struct got_object_id *commit_id,
+    uint32_t client_id)
 {
 	const struct got_error *err = NULL;
 	struct gotsysd_child_proc *proc;
@@ -556,6 +582,7 @@ start_sysconf_child(int sysconf_fd, struct got_object_id *commit_id)
 	evtimer_set(&proc->tmo, kill_proc_timeout, proc);
 
 	proc->type = GOTSYSD_PROC_SYSCONF;
+	proc->client_id = client_id;
 
 	log_debug("running system configuration tasks for gotsys.conf from "
 	    "gotsys.git commit %s", commit_id_str);
@@ -607,7 +634,7 @@ sysconf_cmd_timeout(int fd, short ev, void *d)
 
 	STAILQ_REMOVE_HEAD(&gotsysd.sysconf_pending, entry);
 	
-	err = start_sysconf_child(cmd->fd, &cmd->commit_id);
+	err = start_sysconf_child(cmd->fd, &cmd->commit_id, cmd->client_id);
 	if (err) {
 		log_warn("could not start sysconf child process: %s",
 		    err->msg);
@@ -650,7 +677,8 @@ run_sysconf(struct gotsysd_client *client, struct imsg *imsg)
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	if (gotsysd.sysconf_proc == NULL) {
-		err = start_sysconf_child(sysconf_fd, &sysconf_cmd.commit_id);
+		err = start_sysconf_child(sysconf_fd, &sysconf_cmd.commit_id,
+		    client->id);
 		if (err) {
 			close(sysconf_fd);
 			return err;
@@ -672,6 +700,7 @@ run_sysconf(struct gotsysd_client *client, struct imsg *imsg)
 		cmd->fd = sysconf_fd;
 		memcpy(&cmd->commit_id, &sysconf_cmd.commit_id,
 		    sizeof(cmd->commit_id));
+		cmd->client_id = client->id;
 		STAILQ_INSERT_TAIL(&gotsysd.sysconf_pending, cmd, entry);
 		evtimer_add(&gotsysd.sysconf_tmo, &tv);
 	}
@@ -681,7 +710,8 @@ run_sysconf(struct gotsysd_client *client, struct imsg *imsg)
 	    GOTSYSD_IMSG_SYSCONF_STARTED,
 	    GOTSYSD_PROC_GOTSYSD, -1, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg compose SYSCONF_STARTED");
-	}
+	} else
+		client->state = GOTSYSD_CLIENT_STATE_SYSCONF_STARTED;
 
 	return NULL;
 }
@@ -1563,6 +1593,11 @@ gotsysd_sighdlr(int sig, short event, void *arg)
 			if (WIFSIGNALED(status)) {
 				log_warnx("child PID %d terminated with"
 				    " signal %d", pid, WTERMSIG(status));
+			}
+
+			if (proc->type == GOTSYSD_PROC_SYSCONF) {
+				client_sysconf_done(proc->client_id,
+				    WEXITSTATUS(status));
 			}
 
 			if (proc == gotsysd.sysconf_proc) {
