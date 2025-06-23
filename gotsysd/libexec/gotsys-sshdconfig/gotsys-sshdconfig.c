@@ -151,7 +151,7 @@ dispatch_event(int fd, short event, void *arg)
 			goto fatal;
 		}
 
-		if (flush_and_exit) {
+		if (imsgbuf_queuelen(ibuf) == 0 && flush_and_exit) {
 			event_del(&iev->ev);
 			event_loopexit(NULL);
 			return;

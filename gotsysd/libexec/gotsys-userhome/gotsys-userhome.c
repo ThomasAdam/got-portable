@@ -222,7 +222,8 @@ dispatch_event(int fd, short event, void *arg)
 			goto fatal;
 		}
 
-		if (userhome_state == USERHOME_STATE_DONE) {
+		if (imsgbuf_queuelen(ibuf) == 0 &&
+		    userhome_state == USERHOME_STATE_DONE) {
 			event_del(&iev->ev);
 			event_loopexit(NULL);
 			return;

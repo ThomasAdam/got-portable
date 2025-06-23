@@ -156,7 +156,8 @@ dispatch_event(int fd, short event, void *arg)
 			goto fatal;
 		}
 
-		if (rmkeys_state == RMKEYS_STATE_DONE) {
+		if (imsgbuf_queuelen(ibuf) == 0 &&
+		    rmkeys_state == RMKEYS_STATE_DONE) {
 			event_del(&iev->ev);
 			event_loopexit(NULL);
 			return;
