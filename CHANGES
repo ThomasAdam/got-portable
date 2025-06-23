@@ -1,3 +1,12 @@
+* got 0.114; 2025-06-23
+- preserve author timestamps when rebasing commits
+- stop running ssh with -q by default; -q hides host key fingerprint errors
+- fix gotsys-read-conf crash when ssh key comments are missing in gotsys.conf
+- relax repository path permission checks in gotsys-repo-create
+- add gotsys apply -w option which waits until sysconf has been run
+- fix gotsysd getting stuck due to missing final messages from libexec helpers
+- plug a file descriptor leak in the gotsysd libexec process
+
 * got 0.113; 2025-06-05
 - tweak 'got status' and 'got add' ignores handling for better git compatibility
 - improve redundant pack detection during 'gotadmin cleanup'
