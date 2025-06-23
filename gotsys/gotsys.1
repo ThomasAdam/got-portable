@@ -47,7 +47,7 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width Ds
-.It Cm apply Oo Fl c Ar commit Oc Oo Fl f Ar socket Oc Oo Fl r Ar repository-path Oc Oo Ar file Oc
+.It Cm apply Oo Fl c Ar commit Oc Oo Fl f Ar socket Oc Oo Fl r Ar repository-path Oc  Oo Fl w Oc Oo Ar file Oc
 Trigger system configuration tasks based on the
 .Xr gotsys.conf 5
 configuration
@@ -119,6 +119,10 @@ Use the repository at the specified path.
 If not specified, the repository path
 .Pa /git/gotsys.git
 will be used.
+.It Fl w
+Wait until
+.Xr gotsysd 8
+is done trying to apply the configuration and report the result.
 .El
 .It Cm check Oo Fl q Oc Oo Fl f Ar file Oc 
 Read a

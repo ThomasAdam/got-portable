@@ -91,6 +91,7 @@ struct gotsysd_pending_sysconf_cmd {
 	STAILQ_ENTRY(gotsysd_pending_sysconf_cmd) entry;
 	int fd;
 	struct got_object_id commit_id;
+	uint32_t client_id;
 };
 STAILQ_HEAD(gotsysd_pending_sysconf_cmd_list,
     gotsysd_pending_sysconf_cmd);
@@ -140,11 +141,12 @@ enum gotsysd_imsg_type {
 	GOTSYSD_IMSG_INFO,
 	GOTSYSD_IMSG_CMD_SYSCONF,
 	GOTSYSD_IMSG_SYSCONF_STARTED,
+	GOTSYSD_IMSG_SYSCONF_SUCCESS,
+	GOTSYSD_IMSG_SYSCONF_FAILURE,
 
 	/* Internal sysconf messages. */
 	GOTSYSD_IMSG_SYSCONF_READY,
 	GOTSYSD_IMSG_SYSCONF_FD,
-	GOTSYSD_IMSG_SYSCONF_SUCCESS,
 
 	/* Child processes management. */
 	GOTSYSD_IMSG_CONNECT_PROC,

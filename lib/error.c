@@ -247,6 +247,7 @@ static const struct got_error got_errors[] = {
 	{ GOT_ERR_GROUP_EXISTS, "group already exists" },
 	{ GOT_ERR_AUTHORIZED_KEY, "no authorized key found" },
 	{ GOT_ERR_CONNECTION_LIMIT, "connection limit exceeded" },
+	{ GOT_ERR_ON_SERVER_SIDE, "see server-side logs for error details" },
 };
 
 static struct got_custom_error {

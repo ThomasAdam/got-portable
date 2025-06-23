@@ -164,7 +164,7 @@ __dead static void
 usage_apply(void)
 {
 	fprintf(stderr, "usage: %s apply [-f socket] [-r repository] "
-	    "[-c commit] [filename]", getprogname());
+	    "[-c commit] [-w] [filename]", getprogname());
 	exit(1);
 }
 
@@ -230,7 +230,7 @@ cmd_apply(int argc, char *argv[])
 	const char *filename = GOTSYSD_SYSCONF_FILENAME;
 	const char *socket_path = GOTSYSD_UNIX_SOCKET;
 	struct got_commit_object *commit = NULL;
-	int ch, ret, fd = -1, sysconf_fd = -1, gotsysd_sock = -1;
+	int ch, ret, fd = -1, sysconf_fd = -1, gotsysd_sock = -1, wait = 0;
 	FILE *sysconf_file = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct gotsysd_imsg_cmd_sysconf sysconf_cmd;
@@ -239,7 +239,7 @@ cmd_apply(int argc, char *argv[])
 
 	memset(&ibuf, 0, sizeof(ibuf));
 
-	while ((ch = getopt(argc, argv, "f:c:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "f:c:r:w")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
@@ -255,6 +255,9 @@ cmd_apply(int argc, char *argv[])
 				goto done;
 			}
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'w':
+			wait = 1;
 			break;
 		default:
 			usage_apply();
@@ -369,38 +372,48 @@ cmd_apply(int argc, char *argv[])
 		goto done;
 	}
 #endif
-	n = imsgbuf_read(&ibuf);
-	if (n == -1) {
-		err = got_error_from_errno("imsgbuf_read");
-		goto done;
-	}
-	if (n == 0) {
-		err = got_error(GOT_ERR_EOF);
-		goto done;
-	}
+	do {
+		n = imsgbuf_read(&ibuf);
+		if (n == -1) {
+			err = got_error_from_errno("imsgbuf_read");
+			goto done;
+		}
+		if (n == 0) {
+			err = got_error(GOT_ERR_EOF);
+			goto done;
+		}
 
-	n = imsg_get(&ibuf, &imsg);
-	if (n == -1) {
-		err = got_error_from_errno("imsg_get");
-		goto done;
-	}
-	if (n == 0) {
-		err = got_error(GOT_ERR_PRIVSEP_READ);
-		goto done;
-	}
+		n = imsg_get(&ibuf, &imsg);
+		if (n == -1) {
+			err = got_error_from_errno("imsg_get");
+			goto done;
+		}
+		if (n == 0) {
+			err = got_error(GOT_ERR_PRIVSEP_READ);
+			goto done;
+		}
 
-	switch (imsg.hdr.type) {
-	case GOTSYSD_IMSG_ERROR:
-		err = recv_error(&imsg);
-		break;
-	case GOTSYSD_IMSG_SYSCONF_STARTED:
-		break;
-	default:
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-		break;
-	}
+		switch (imsg.hdr.type) {
+		case GOTSYSD_IMSG_ERROR:
+			err = recv_error(&imsg);
+			break;
+		case GOTSYSD_IMSG_SYSCONF_STARTED:
+			break;
+		case GOTSYSD_IMSG_SYSCONF_SUCCESS:
+			printf("sysconf success\n");
+			wait = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_FAILURE:
+			err = got_error_fmt(GOT_ERR_ON_SERVER_SIDE,
+			    "sysconf failure");
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
 
-	imsg_free(&imsg);
+		imsg_free(&imsg);
+	} while (err == NULL && wait);
 done:
 	imsgbuf_clear(&ibuf);
 	free(repo_path);
