@@ -173,8 +173,6 @@ dispatch_event(int fd, short event, void *arg)
 
 		switch (imsg.hdr.type) {
 		case GOTSYSD_IMSG_SYSCONF_INSTALL_AUTHORIZED_KEYS:
-			if (ignore_user)
-				break;
 			err = gotsys_imsg_recv_authorized_keys(&imsg,
 			    &authorized_keys);
 			break;
