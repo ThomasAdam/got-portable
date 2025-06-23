@@ -494,7 +494,8 @@ dispatch_event(int fd, short event, void *arg)
 			goto fatal;
 		}
 
-		if (groupadd_state == GROUPADD_STATE_DONE) {
+		if (imsgbuf_queuelen(ibuf) == 0 &&
+		    groupadd_state == GROUPADD_STATE_DONE) {
 			event_del(&iev->ev);
 			event_loopexit(NULL);
 			return;
