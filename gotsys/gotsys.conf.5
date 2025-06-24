@@ -25,13 +25,15 @@ provides system configuration information to
 .Xr gotsysd 8 .
 .Pp
 .Nm
-allows remote administrators to configure aspects of Git repository
-services without having shell access to the Git server's operating system.
+allows remote administrators to configure aspects of Git repositories
+hosted by
+.Xr gotd 8
+without having shell access to the Git server's operating system.
 Remote administrators merely need to be granted write access to a
 special-purpose
 .Em system repository
-hosted by
-.Xr gotd 8
+called
+.Pa gotsys.git
 in order to configure Git repository services.
 .Pp
 The file format is line-based, with one configuration directive per line.
