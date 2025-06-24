@@ -69,36 +69,6 @@ sighdlr(int sig, short event, void *arg)
 }
 
 static const struct got_error *
-start_child(pid_t *pid,
-    const char *argv0, const char *argv1, const char *argv2)
-{
-	const char	*argv[4];
-	int		 argc = 0;
-
-	switch (*pid = fork()) {
-	case -1:
-		return got_error_from_errno("fork");
-	case 0:
-		break;
-	default:
-		return NULL;
-	}
-
-	argv[argc++] = argv0;
-	if (argv1 != NULL)
-		argv[argc++] = argv1;
-	if (argv2 != NULL)
-		argv[argc++] = argv2;
-	argv[argc++] = NULL;
-
-	execvp(argv0, (char * const *)argv);
-	err(1, "execvp: %s", argv0);
-
-	/* NOTREACHED */
-	return NULL;
-}
-
-static const struct got_error *
 connect_gotd(const char *socket_path)
 {
 	const struct got_error *err = NULL;
@@ -122,38 +92,6 @@ connect_gotd(const char *socket_path)
 	}
 
 	return err;
-}
-
-static const struct got_error *
-start_gotd(void)
-{
-	const struct got_error *err;
-	pid_t pid;
-	int i;
-	const int maxwait = 10;
-
-	/* TODO: gotd_fetch flags from rc.conf.local and pass them in. */
-	err = start_child(&pid, GOTSYSD_PATH_PROG_GOTD, NULL, NULL);
-	if (err)
-		return err;
-
-	sleep(1);
-
-	for (i = 0; i < maxwait; i++) {
-		err = connect_gotd(GOTD_UNIX_SOCKET);
-		if (err == NULL)
-			break;
-		if (err->code != GOT_ERR_ERRNO ||
-		    (errno != ENOENT && errno != ECONNREFUSED))
-			return err;
-		sleep(1);
-	}
-
-	if (i == maxwait)
-		return got_error_fmt(GOT_ERR_TIMEOUT,
-		    "gotd failed to restart within %d seconds", maxwait);
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -305,13 +243,10 @@ fatal:
 }
 
 static const struct got_error *
-apply_unveil(const char *unix_socket_path, const char *gotd_path)
+apply_unveil(const char *unix_socket_path)
 {
 	if (unveil(unix_socket_path, "w") != 0)
 		return got_error_from_errno2("unveil w", unix_socket_path);
-
-	if (unveil(gotd_path, "x") != 0)
-		return got_error_from_errno2("unveil x", unix_socket_path);
 
 	if (unveil(NULL, NULL) != 0)
 		return got_error_from_errno("unveil");
@@ -437,50 +372,36 @@ main(int argc, char *argv[])
 	}
 
 #ifndef PROFILE
-	if (pledge("stdio proc exec unix sendfd unveil", NULL) == -1) {
+	if (pledge("stdio unix sendfd unveil", NULL) == -1) {
 		err = got_error_from_errno("pledge");
 		goto done;
 	}
 #endif
 	/* TODO: make gotd socket path configurable -- pass via argv[1] */
-	err = apply_unveil(GOTD_UNIX_SOCKET, GOTSYSD_PATH_PROG_GOTD);
+	err = apply_unveil(GOTD_UNIX_SOCKET);
 	if (err)
 		goto done;
 
 	err = connect_gotd(GOTD_UNIX_SOCKET);
-	if (err) {
-		if (err->code != GOT_ERR_ERRNO ||
-		    (errno != ENOENT && errno != ECONNREFUSED))
-			goto done;
-		err = NULL;
-	}
-
-	if (gotd_sock != -1) {
+	if (err)
+		goto done;
 #ifndef PROFILE
-		if (pledge("stdio sendfd", NULL) == -1) {
-			err = got_error_from_errno("pledge");
-			goto done;
-		}
-#endif
-		if (imsgbuf_init(&gotd_iev.ibuf, gotd_sock) == -1) {
-			err = got_error_from_errno("imsgbuf_init");
-			goto done;
-		}
-		imsgbuf_allow_fdpass(&gotd_iev.ibuf);
-
-		gotd_iev.handler = dispatch_gotd;
-		gotd_iev.events = EV_READ;
-		gotd_iev.handler_arg = NULL;
-		event_set(&gotd_iev.ev, gotd_iev.ibuf.fd, EV_READ,
-		    dispatch_gotd, &gotd_iev);
-	} else {
-#ifndef PROFILE
-		if (pledge("stdio proc exec", NULL) == -1) {
-			err = got_error_from_errno("pledge");
-			goto done;
-		}
-#endif
+	if (pledge("stdio sendfd", NULL) == -1) {
+		err = got_error_from_errno("pledge");
+		goto done;
 	}
+#endif
+	if (imsgbuf_init(&gotd_iev.ibuf, gotd_sock) == -1) {
+		err = got_error_from_errno("imsgbuf_init");
+		goto done;
+	}
+	imsgbuf_allow_fdpass(&gotd_iev.ibuf);
+
+	gotd_iev.handler = dispatch_gotd;
+	gotd_iev.events = EV_READ;
+	gotd_iev.handler_arg = NULL;
+	event_set(&gotd_iev.ev, gotd_iev.ibuf.fd, EV_READ,
+	    dispatch_gotd, &gotd_iev);
 
 	gotsysd_iev.handler = dispatch_gotsysd;
 	gotsysd_iev.events = EV_READ;
@@ -494,40 +415,32 @@ main(int argc, char *argv[])
 		goto done;
 	}
 
-	if (gotd_sock != -1) {
-		if (secrets_fd != -1) {
-			if (gotsysd_imsg_compose_event(&gotd_iev,
-			    GOTD_IMSG_RELOAD_SECRETS, 0, secrets_fd,
-			    secretspath, strlen(secretspath)) == -1) {
-				err = got_error_from_errno("imsg_compose "
-				    "RELOAD_SECRETS");
-				goto done;
-			}
-			secrets_fd = -1;
-		} else {
-			if (gotsysd_imsg_compose_event(&gotd_iev,
-			    GOTD_IMSG_RELOAD_SECRETS, 0, -1, NULL, 0) == -1) {
-				err = got_error_from_errno("imsg_compose "
-				    "RELOAD_SECRETS");
-				goto done;
-			}
-		}
-		if (gotsysd_imsg_compose_event(&gotd_iev, GOTD_IMSG_RELOAD,
-		    0, conf_fd, confpath, strlen(confpath)) == -1) {
+	if (secrets_fd != -1) {
+		if (gotsysd_imsg_compose_event(&gotd_iev,
+		    GOTD_IMSG_RELOAD_SECRETS, 0, secrets_fd,
+		    secretspath, strlen(secretspath)) == -1) {
 			err = got_error_from_errno("imsg_compose "
-			    "RELOAD");
+			    "RELOAD_SECRETS");
 			goto done;
 		}
-		conf_fd = -1;
-
-		event_dispatch();
+		secrets_fd = -1;
 	} else {
-		err = start_gotd();
-		if (err)
+		if (gotsysd_imsg_compose_event(&gotd_iev,
+		    GOTD_IMSG_RELOAD_SECRETS, 0, -1, NULL, 0) == -1) {
+			err = got_error_from_errno("imsg_compose "
+			    "RELOAD_SECRETS");
 			goto done;
-
-		err = send_done(&gotsysd_iev);
+		}
 	}
+	if (gotsysd_imsg_compose_event(&gotd_iev, GOTD_IMSG_RELOAD,
+	    0, conf_fd, confpath, strlen(confpath)) == -1) {
+		err = got_error_from_errno("imsg_compose "
+		    "RELOAD");
+		goto done;
+	}
+	conf_fd = -1;
+
+	event_dispatch();
 done:
 	free(confpath);
 	free(secretspath);
