@@ -1050,13 +1050,18 @@ got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
     struct got_object_idset *set, struct got_object_idset *skip,
     struct got_repository *repo)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	struct got_object_id_queue ids;
-	struct got_object_qid *qid;
-	struct got_commit_object *commit;
+	struct got_object_qid *qid = NULL;
+	struct got_commit_object *commit = NULL;
 	const struct got_object_id_queue *parents;
+	struct got_object_idset *traversed;
 
 	STAILQ_INIT(&ids);
+
+	traversed = got_object_idset_alloc();
+	if (traversed == NULL)
+		return got_error_from_errno("got_object_idset_alloc");
 
 	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
@@ -1078,10 +1083,17 @@ got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
 				    got_object_idset_contains(skip, &pid->id))
 					continue;
 
+				if (got_object_idset_contains(traversed,
+				    &pid->id))
+					continue;
 				err = got_pack_queue_commit_id(&ids, &pid->id,
 				    color, repo);
 				if (err)
 					break;
+				err = got_object_idset_add(traversed,
+				    &pid->id, NULL);
+				if (err)
+					goto done;
 			}
 		}
 		got_object_commit_close(commit);
@@ -1103,12 +1115,13 @@ got_pack_repaint_parent_commits(struct got_object_id *commit_id, int color,
 		got_object_qid_free(qid);
 		qid = NULL;
 	}
-
+done:
 	if (commit)
 		got_object_commit_close(commit);
 	if (qid)
 		got_object_qid_free(qid);
 	got_object_id_queue_free(&ids);
+	got_object_idset_free(traversed);
 
 	return err;
 }
