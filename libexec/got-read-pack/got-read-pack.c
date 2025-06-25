@@ -1688,12 +1688,17 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
     struct got_pack *pack, struct got_packidx *packidx,
     struct got_object_cache *objcache)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	const struct got_object_id_queue *parents;
-	struct got_commit_object *commit;
+	struct got_commit_object *commit = NULL;
 	struct got_object_id_queue repaint;
+	struct got_object_idset *traversed;
 
 	STAILQ_INIT(&repaint);
+
+	traversed = got_object_idset_alloc();
+	if (traversed == NULL)
+		return got_error_from_errno("got_object_idset_alloc");
 
 	err = open_commit(&commit, pack, packidx, commit_idx, commit_id,
 	    objcache);
@@ -1722,8 +1727,15 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 				    got_object_idset_contains(skip, &pid->id))
 					continue;
 
+				if (got_object_idset_contains(traversed,
+				    &pid->id))
+					continue;
 				err = queue_commit_id(&repaint, &pid->id,
 				    color);
+				if (err)
+					goto done;
+				err = got_object_idset_add(traversed,
+				    &pid->id, NULL);
 				if (err)
 					goto done;
 			}
@@ -1793,6 +1805,7 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	got_object_id_queue_free(&repaint);
+	got_object_idset_free(traversed);
 
 	return err;
 }
