@@ -106,10 +106,10 @@ write_access_rules(struct gotsys_access_rule_list *rules)
 
 		switch (rule->access) {
 		case GOTSYS_ACCESS_DENIED:
-			access = "deny";
+			access = "deny ";
 			break;
 		case GOTSYS_ACCESS_PERMITTED:
-			access = "permit";
+			access = "permit ";
 			break;
 		default:
 			return got_error_fmt(GOT_ERR_PARSE_CONFIG,
@@ -118,20 +118,18 @@ write_access_rules(struct gotsys_access_rule_list *rules)
 		}
 
 		if (rule->authorization & GOTSYS_AUTH_WRITE)
-			authorization = "rw";
+			authorization = "rw ";
 		else if (rule->authorization & GOTSYS_AUTH_READ)
-			authorization = "ro";
+			authorization = "ro ";
 		else
-			return got_error_fmt(GOT_ERR_PARSE_CONFIG,
-			    "unknown access rule authorization flags 0x%x",
-			    rule->authorization);
+			authorization = "";
 
-		ret = dprintf(gotd_conf_tmpfd, "\t%s %s %s\n",
+		ret = dprintf(gotd_conf_tmpfd, "\t%s%s%s\n",
 		    access, authorization, rule->identifier);
 		if (ret == -1)
 			return got_error_from_errno2("dprintf",
 			    gotd_conf_tmppath);
-		if (ret != 3 + strlen(access) + strlen(authorization) +
+		if (ret != 1 + strlen(access) + strlen(authorization) +
 		    strlen(rule->identifier) + 1) {
 			return got_error_fmt(GOT_ERR_IO,
 			    "short write to %s", gotd_conf_tmppath);
