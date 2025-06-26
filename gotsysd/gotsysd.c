@@ -1530,6 +1530,8 @@ gotsysd_shutdown(void)
 	if (gotsysd.db_commit_fd != -1)
 		close(gotsysd.db_commit_fd);
 
+	free(gotsysd.global_repo_access_rules);
+
 	log_info("terminating");
 	exit(0);
 }
@@ -1930,7 +1932,8 @@ main(int argc, char **argv)
 #endif
 		apply_unveil_none();
 
-		sysconf_main(title, gotsysd.uid_start, gotsysd.uid_end);
+		sysconf_main(title, gotsysd.uid_start, gotsysd.uid_end,
+		    gotsysd.global_repo_access_rules);
 		/* NOTREACHED */
 		break;
 	default:

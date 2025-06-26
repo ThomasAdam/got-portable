@@ -112,6 +112,7 @@ struct gotsysd {
 	int sysconf_fd;
 	char *sysconf_commit_id_str;
 	struct gotsysd_access_rule_list access_rules;
+	struct gotsys_access_rule_list *global_repo_access_rules;
 	struct event sysconf_tmo;
 	struct gotsysd_pending_sysconf_cmd_list sysconf_pending;
 
@@ -178,6 +179,8 @@ enum gotsysd_imsg_type {
 	GOTSYSD_IMSG_SYSCONF_AUTHORIZED_KEYS_DONE,
 	GOTSYSD_IMSG_SYSCONF_REPO,
 	GOTSYSD_IMSG_SYSCONF_REPOS_DONE,
+	GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULE,
+	GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULES_DONE,
 	GOTSYSD_IMSG_SYSCONF_ACCESS_RULE,
 	GOTSYSD_IMSG_SYSCONF_ACCESS_RULES_DONE,
 	GOTSYSD_IMSG_SYSCONF_PROTECTED_TAG_NAMESPACES,
@@ -555,6 +558,8 @@ const struct got_error *gotsys_imsg_recv_authorized_keys_user(char **,
     struct imsg *);
 const struct got_error *gotsys_imsg_recv_authorized_keys(struct imsg *,
     struct gotsys_authorized_keys_list *); 
+const struct got_error *gotsys_imsg_send_access_rule(struct gotsysd_imsgev *,
+    struct gotsys_access_rule *, int);
 const struct got_error *gotsys_imsg_send_repositories(struct gotsysd_imsgev *,
     struct gotsys_repolist *);
 const struct got_error *gotsys_imsg_recv_repository(struct gotsys_repo **,

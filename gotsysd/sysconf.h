@@ -14,4 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-void sysconf_main(const char *, uid_t, uid_t);
+void sysconf_main(const char *, uid_t, uid_t, struct gotsys_access_rule_list *);

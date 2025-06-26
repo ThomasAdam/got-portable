@@ -50,6 +50,7 @@
 
 #include "log.h"
 #include "gotsysd.h"
+#include "gotsys.h"
 
 #ifndef GOTD_USER
 #define GOTD_USER "_gotd"
@@ -95,6 +96,8 @@ static struct gotsysd		*gotsysd;
 static enum gotsysd_procid	gotsysd_proc_id;
 
 static void conf_new_access_rule(enum gotsysd_access, char *);
+static const struct got_error *conf_new_repo_access_rule(enum gotsys_access,
+    int, const char *);
 
 typedef struct {
 	union {
@@ -108,6 +111,7 @@ typedef struct {
 %}
 
 %token	ERROR LISTEN ON USER GOTD DIRECTORY REPOSITORY UID RANGE PERMIT
+%token	DENY RO RW
 
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -230,6 +234,42 @@ main		: LISTEN ON STRING {
 			} else
 				free($2);
 		}
+		| REPOSITORY DENY numberstring {
+			const struct got_error *err;
+
+			err = conf_new_repo_access_rule(GOTSYS_ACCESS_DENIED,
+			    0, $3);
+			if (err) {
+				yyerror("%s", err->msg);
+				free($3);
+				YYERROR;
+			}
+			free($3);
+		}
+		| REPOSITORY PERMIT RO numberstring {
+			const struct got_error *err;
+
+			err = conf_new_repo_access_rule(GOTSYS_ACCESS_PERMITTED,
+			    GOTSYS_AUTH_READ, $4);
+			if (err) {
+				yyerror("%s", err->msg);
+				free($4);
+				YYERROR;
+			}
+			free($4);
+		}
+		| REPOSITORY PERMIT RW numberstring {
+			const struct got_error *err;
+
+			err = conf_new_repo_access_rule(GOTSYS_ACCESS_PERMITTED,
+			    GOTSYS_AUTH_READ | GOTSYS_AUTH_WRITE, $4);
+			if (err) {
+				yyerror("%s", err->msg);
+				free($4);
+				YYERROR;
+			}
+			free($4);
+		}
 		;
 
 %%
@@ -266,6 +306,7 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
+		{ "deny",			DENY },
 		{ "directory",			DIRECTORY },
 		{ "gotd",			GOTD },
 		{ "listen",			LISTEN },
@@ -273,6 +314,8 @@ lookup(char *s)
 		{ "permit",			PERMIT },
 		{ "range",			RANGE },
 		{ "repository",			REPOSITORY },
+		{ "ro",				RO },
+		{ "rw",				RW },
 		{ "uid",			UID },
 		{ "user",			USER },
 	};
@@ -577,6 +620,7 @@ gotsysd_parse_config(const char *filename, enum gotsysd_procid proc_id,
 {
 	struct sym *sym, *next;
 	int require_config_file = 0;
+	struct gotsys_access_rule_list *global_repo_access_rules;
 
 	memset(pgotsysd, 0, sizeof(*pgotsysd));
 
@@ -584,6 +628,16 @@ gotsysd_parse_config(const char *filename, enum gotsysd_procid proc_id,
 	gotsysd_proc_id = proc_id;
 
 	STAILQ_INIT(&gotsysd->access_rules);
+
+	global_repo_access_rules = malloc(sizeof(*global_repo_access_rules));
+	if (global_repo_access_rules == NULL) {
+		fprintf(stderr, "%s: malloc: %s\n", __func__,
+		    strerror(errno));
+		return -1;
+	}
+	gotsysd->global_repo_access_rules = global_repo_access_rules;
+	STAILQ_INIT(gotsysd->global_repo_access_rules);
+	global_repo_access_rules = NULL;
 
 	/* Apply default values. */
 	if (strlcpy(gotsysd->unix_socket_path, GOTSYSD_UNIX_SOCKET,
@@ -739,4 +793,34 @@ conf_new_access_rule(enum gotsysd_access access, char *identifier)
 	rule->identifier = identifier;
 
 	STAILQ_INSERT_TAIL(&gotsysd->access_rules, rule, entry);
+}
+
+static const struct got_error *
+conf_new_repo_access_rule(enum gotsys_access access, int authorization,
+    const char *identifier)
+{
+	const struct got_error *err;
+	struct gotsys_access_rule *rule;
+	const char *name = identifier;
+
+	if (strcmp(name, "*") != 0) {
+		if (name[0] == ':') {
+			name++;
+			err = gotsys_conf_validate_name(name, "group");
+			if (err)
+				return err;
+		} else {
+			err = gotsys_conf_validate_name(name, "user");
+			if (err)
+				return err;
+		}
+	}
+
+	err = gotsys_conf_new_access_rule(&rule, access, authorization,
+	    identifier, NULL, NULL);
+	if (err)
+		return err;
+
+	STAILQ_INSERT_TAIL(gotsysd->global_repo_access_rules, rule, entry);
+	return NULL;
 }

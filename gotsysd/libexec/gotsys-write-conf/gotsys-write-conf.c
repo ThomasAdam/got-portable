@@ -49,6 +49,7 @@ static size_t nprotected_refs_needed;
 static size_t nprotected_refs_received;
 static int gotd_conf_tmpfd = -1;
 static char *gotd_conf_tmppath;
+static struct gotsys_access_rule_list global_repo_access_rules;
 
 enum writeconf_state {
 	WRITECONF_STATE_EXPECT_USERS,
@@ -96,13 +97,88 @@ send_done(struct gotsysd_imsgev *iev)
 }
 
 static const struct got_error *
+write_access_rule(const char *access, const char * authorization,
+    const char *identifier)
+{
+	int ret;
+
+	ret = dprintf(gotd_conf_tmpfd, "\t%s%s%s\n",
+	    access, authorization, identifier);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 1 + strlen(access) + strlen(authorization) +
+	    strlen(identifier) + 1) {
+		return got_error_fmt(GOT_ERR_IO,
+		    "short write to %s", gotd_conf_tmppath);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+write_global_access_rules(void)
+{
+	const struct got_error *err;
+	struct gotsys_access_rule *rule;
+
+	STAILQ_FOREACH(rule, &global_repo_access_rules, entry) {
+		const char *access, *authorization;
+
+		switch (rule->access) {
+		case GOTSYS_ACCESS_DENIED:
+			access = "deny ";
+			break;
+		case GOTSYS_ACCESS_PERMITTED:
+			access = "permit ";
+			break;
+		default:
+			return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+			    "access rule with unknown access flag %d",
+			    rule->access);
+		}
+
+		if (rule->authorization & GOTSYS_AUTH_WRITE)
+			authorization = "rw ";
+		else if (rule->authorization & GOTSYS_AUTH_READ)
+			authorization = "ro ";
+		else
+			authorization = "";
+	
+		if (strcmp(rule->identifier, "*") == 0) {
+			struct gotsys_user *user;
+
+			STAILQ_FOREACH(user, &gotsysconf.users, entry) {
+				/*
+				 * Anonymous read access must be enabled
+				 * explicitly, not via *.
+				 */
+				if (rule->access == GOTSYS_ACCESS_PERMITTED &&
+				    strcmp(user->name, "anonymous") == 0)
+					continue;
+				err = write_access_rule(access, authorization,
+				    user->name);
+				if (err)
+					return err;
+			}
+		} else {
+			err = write_access_rule(access, authorization,
+			    rule->identifier);
+			if (err)
+				return err;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 write_access_rules(struct gotsys_access_rule_list *rules)
 {
+	const struct got_error *err;
 	struct gotsys_access_rule *rule;
 
 	STAILQ_FOREACH(rule, rules, entry) {
 		const char *access, *authorization;
-		int ret;
 
 		switch (rule->access) {
 		case GOTSYS_ACCESS_DENIED:
@@ -124,16 +200,10 @@ write_access_rules(struct gotsys_access_rule_list *rules)
 		else
 			authorization = "";
 
-		ret = dprintf(gotd_conf_tmpfd, "\t%s%s%s\n",
-		    access, authorization, rule->identifier);
-		if (ret == -1)
-			return got_error_from_errno2("dprintf",
-			    gotd_conf_tmppath);
-		if (ret != 1 + strlen(access) + strlen(authorization) +
-		    strlen(rule->identifier) + 1) {
-			return got_error_fmt(GOT_ERR_IO,
-			    "short write to %s", gotd_conf_tmppath);
-		}
+		err = write_access_rule(access, authorization,
+		    rule->identifier);
+		if (err)
+			return err;
 	}
 
 	return NULL;
@@ -326,6 +396,10 @@ write_gotd_conf(void)
 		if (err)
 			return err;
 
+		err = write_global_access_rules();
+		if (err)
+			return err;
+
 		err = write_protected_refs(repo);
 		if (err)
 			return err;
@@ -481,6 +555,32 @@ dispatch_event(int fd, short event, void *arg)
 			repo_cur = repo;
 			break;
 		}
+		case GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULE: {
+			struct gotsys_access_rule *rule;
+			if (writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+			err = gotsys_imsg_recv_access_rule(&rule, &imsg,
+			    NULL, NULL);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(&global_repo_access_rules, rule,
+			    entry);
+			break;
+		}
+		case GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULES_DONE:
+			if (writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+			break;
 		case GOTSYSD_IMSG_SYSCONF_ACCESS_RULE: {
 			struct gotsys_access_rule_list *rules;
 			struct gotsys_access_rule *rule;
@@ -647,6 +747,7 @@ main(int argc, char *argv[])
 	while (!attached)
 		sleep(1);
 #endif
+	STAILQ_INIT(&global_repo_access_rules);
 	gotsys_conf_init(&gotsysconf);
 
 	event_init();
