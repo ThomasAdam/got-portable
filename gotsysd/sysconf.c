@@ -79,6 +79,7 @@ static struct gotsysd_sysconf {
 	size_t *nprotected_refs_cur;
 	size_t nprotected_refs_needed;
 	size_t nprotected_refs_received;
+	struct gotsys_access_rule_list *global_repo_access_rules;
 } gotsysd_sysconf;
 
 static struct gotsys_conf gotsysconf;
@@ -704,6 +705,7 @@ static const struct got_error *
 send_gotsysconf(struct gotsysd_imsgev *iev)
 {
 	const struct got_error *err;
+	struct gotsys_access_rule *rule;
 
 	err = gotsys_imsg_send_users(iev, &gotsysconf.users,
 	    GOTSYSD_IMSG_SYSCONF_WRITE_CONF_USERS,
@@ -718,6 +720,18 @@ send_gotsysconf(struct gotsysd_imsgev *iev)
 	    GOTSYSD_IMSG_SYSCONF_WRITE_CONF_GROUPS_DONE);
 	if (err)
 		return err;
+
+	STAILQ_FOREACH(rule, gotsysd_sysconf.global_repo_access_rules, entry) {
+		err = gotsys_imsg_send_access_rule(iev, rule,
+		    GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULE);
+		if (err)
+			return err;
+	}
+
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_SYSCONF_GLOBAL_ACCESS_RULES_DONE, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("gotsysd_imsg_compose_event");
 
 	err = gotsys_imsg_send_repositories(iev, &gotsysconf.repos);
 	if (err)
@@ -1209,7 +1223,8 @@ sysconf_dispatch(int fd, short event, void *arg)
 }
 
 void
-sysconf_main(const char *title, uid_t uid_start, uid_t uid_end)
+sysconf_main(const char *title, uid_t uid_start, uid_t uid_end,
+    struct gotsys_access_rule_list *global_repo_access_rules)
 {
 	struct event evsigint, evsigterm, evsighup, evsigusr1;
 	struct gotsysd_imsgev *iev = &gotsysd_sysconf.parent_iev;
@@ -1224,6 +1239,7 @@ sysconf_main(const char *title, uid_t uid_start, uid_t uid_end)
 	gotsysd_sysconf.state = SYSCONF_STATE_EXPECT_PARSING_SUCCESS;
 	gotsysd_sysconf.uid_start = uid_start;
 	gotsysd_sysconf.uid_end = uid_end;
+	gotsysd_sysconf.global_repo_access_rules = global_repo_access_rules;
 
 	signal_set(&evsigint, SIGINT, sysconf_sighdlr, NULL);
 	signal_set(&evsigterm, SIGTERM, sysconf_sighdlr, NULL);

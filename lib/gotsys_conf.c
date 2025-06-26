@@ -721,14 +721,16 @@ gotsys_conf_new_access_rule(struct gotsys_access_rule **rule,
 			return got_error_fmt(GOT_ERR_PARSE_CONFIG,
 			    "empty group name in access rule");
 
-		STAILQ_FOREACH(group, groups, entry) {
-			if (strcmp(group->name, name) == 0)
-				break;
-		}
-		if (group == NULL) {
-			return got_error_fmt(GOT_ERR_PARSE_CONFIG,
-			    "reference to undeclared group '%s' via "
-			    "access rule", name);
+		if (groups) {
+			STAILQ_FOREACH(group, groups, entry) {
+				if (strcmp(group->name, name) == 0)
+					break;
+			}
+			if (group == NULL) {
+				return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+				    "reference to undeclared group '%s' via "
+				    "access rule", name);
+			}
 		}
 	} else if (strcmp(name, "anonymous") == 0) {
 		if (access == GOTSYS_ACCESS_PERMITTED &&
@@ -737,7 +739,7 @@ gotsys_conf_new_access_rule(struct gotsys_access_rule **rule,
 			    "the \"anonymous\" user must not have write "
 			    "permission");
 		}
-	} else {
+	} else if (users) {
 		struct gotsys_user *user = NULL;
 
 		STAILQ_FOREACH(user, users, entry) {

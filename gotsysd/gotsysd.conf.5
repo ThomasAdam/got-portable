@@ -91,6 +91,76 @@ user.
 If not specified, the path
 .Pa /git
 will be used.
+.It Ic repository Ic deny Ar identity
+Deny repository access to users with the username
+.Ar identity .
+.Pp
+Access rules set in
+.Nm
+apply to all repositories and override conflicting per-repository access
+rules specified in
+.Xr gotsys.conf 5 .
+.Pp
+Group names may be matched by prepending a colon
+.Pq Sq \&:
+to
+.Ar identity .
+.Pp
+The special user
+.Ar identity
+.Dq *
+(an asterisk) can be used to match all users, including the
+.Dq anonymous
+user.
+.Pp
+Multiple access rules can be specified, and the last matching rule
+determines the action taken.
+If no rule matches, the per-repository rules specified in
+.Xr gotsys.conf 5
+will take effect.
+.It Ic repository Ic permit Ar mode Ar identity
+Permit repository access to users with the username
+.Ar identity .
+.Pp
+Access rules set in
+.Nm
+apply to all repositories and override conflicting per-repository access
+rules specified in
+.Xr gotsys.conf 5 .
+.Pp
+The
+.Ar mode
+argument must be set to either
+.Ic ro
+for read-only access,
+or
+.Ic rw
+for read-write access.
+Group names may be matched by prepending a colon
+.Pq Sq \&:
+to
+.Ar identity .
+.Pp
+The special user
+.Ar identity
+.Dq anonymous
+can be used when public read-only access to repositories over SSH is desired.
+The anonymous user has an empty password, cannot use an SSH public key, and
+can only be granted read-only access.
+.Pp
+The special user
+.Ar identity
+.Dq *
+(an asterisk) can be used to match all users, except the
+.Dq anonymous
+user.
+Read-only anonymous access must be enabled explicitly.
+.Pp
+Multiple access rules can be specified, and the last matching rule
+determines the action taken.
+If no rule matches, the per-repository rules specified in
+.Xr gotsys.conf 5
+will take effect.
 .It Ic uid range Ar start Ar end
 Set the start and end (inclusive) of the range from which
 .Xr gotsysd 8
@@ -128,6 +198,29 @@ gotd user _gotd
 listen on "/var/run/gotsysd.sock"
 repository directory "/git"
 uid range 5000 5999
+.Ed
+.Pp
+Regardless of what
+.Xr gotsys.conf 5
+says, allow the user account
+.Dq backup-user
+to read any repository:
+.Bd -literal -offset indent
+repository permit ro backup-user
+.Ed
+.Pp
+Regardless of what
+.Xr gotsys.conf 5
+says, make all repositories read-only:
+.Bd -literal -offset indent
+repository permit ro "*"
+.Ed
+.Pp
+Regardless of what
+.Xr gotsys.conf 5
+says, make all repositories inaccessible:
+.Bd -literal -offset indent
+repository deny "*"
 .Ed
 .Sh SEE ALSO
 .Xr got 1 ,

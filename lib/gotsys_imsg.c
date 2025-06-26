@@ -616,9 +616,9 @@ done:
 	return err;
 }
 
-static const struct got_error *
-send_access_rule(struct gotsysd_imsgev *iev,
-    struct gotsys_access_rule *rule)
+const struct got_error *
+gotsys_imsg_send_access_rule(struct gotsysd_imsgev *iev,
+    struct gotsys_access_rule *rule, int imsg_type)
 {
 	struct gotsysd_imsg_sysconf_access_rule irule;
 	struct ibuf *wbuf = NULL;
@@ -637,7 +637,7 @@ send_access_rule(struct gotsysd_imsgev *iev,
 	irule.authorization = rule->authorization;
 	irule.identifier_len = strlen(rule->identifier);
 
-	wbuf = imsg_create(&iev->ibuf, GOTSYSD_IMSG_SYSCONF_ACCESS_RULE,
+	wbuf = imsg_create(&iev->ibuf, imsg_type,
 	    0, 0, sizeof(irule) + irule.identifier_len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create SYSCONF_ACCESS_RULE");
@@ -769,7 +769,8 @@ send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 	imsg_close(&iev->ibuf, wbuf);
 
 	STAILQ_FOREACH(rule, &repo->access_rules, entry) {
-		err = send_access_rule(iev, rule);
+		err = gotsys_imsg_send_access_rule(iev, rule,
+		    GOTSYSD_IMSG_SYSCONF_ACCESS_RULE);
 		if (err)
 			return err;
 	}

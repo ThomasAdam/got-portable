@@ -1534,6 +1534,174 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_override_access_rules() {
+	local testroot=`test_init override_access_rules 1`
+
+	# Override gotsys.conf access rules which deny access to foo.git.
+	echo "repository permit ro ${GOTSYSD_DEV_USER}" | \
+		ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+		'cat >> /etc/gotsysd.conf'
+
+	# Restart gotsysd (XXX need a better way to do this...)
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'pkill -xf /usr/local/sbin/gotsysd'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} '/usr/local/sbin/gotsysd -vvv'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'gotsys apply -w' > /dev/null
+
+	# Cloning repository foo should now succeed.
+	got clone -q -i ${GOTSYSD_SSH_KEY} -b foo \
+		${GOTSYSD_DEV_USER}@${VMIP}:foo.git $testroot/foo.git \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# gotsys.git access should now be read-only.
+	got clone -q -i ${GOTSYSD_SSH_KEY} \
+		${GOTSYSD_DEV_USER}@${VMIP}:gotsys.git $testroot/gotsys2.git \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+	got checkout -q $testroot/gotsys2.git $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	deny ${GOTSYSD_DEV_USER}
+	permit ro anonymous
+	head foo
+	protect branch foo
+	protect {
+		tag namespace "refs/tags"
+	}
+}
+repository "bar" {
+	permit rw ${GOTSYSD_DEV_USER}
+}
+EOF
+	(cd ${testroot}/wt && \
+		got commit -m "add bar.git repository" >/dev/null)
+	local commit_id=`git_show_head $testroot/gotsys2.git`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/gotsys2.git \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "gotsh: gotsys.git: Permission denied" > $testroot/stderr.expected
+	grep '^gotsh:' $testroot/stderr > $testroot/stderr.filtered
+	cmp -s $testroot/stderr.expected $testroot/stderr.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_override_all_user_access() {
+	local testroot=`test_init override_all_user_access 1`
+
+	# Override gotsys.conf access rules which deny access to foo.git.
+	echo 'repository deny "*"' | \
+		ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+		'cat >> /etc/gotsysd.conf'
+
+	# Restart gotsysd (XXX need a better way to do this...)
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'pkill -xf /usr/local/sbin/gotsysd'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} '/usr/local/sbin/gotsysd -vvv'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'gotsys apply -w' > /dev/null
+
+	# Cloning any repository as any user should now fail.
+	for user in ${GOTSYSD_TEST_USER} ${GOTSYSD_DEV_USER} anonymous; do
+		got clone -q -i ${GOTSYSD_SSH_KEY} -b foo \
+			${user}@${VMIP}:foo.git $testroot/foo-${user}.git \
+			> $testroot/stdout 2> $testroot/stderr
+		ret=$?
+		if [ $ret -eq 0 ]; then
+			echo "got clone succeeded unexpectedly" >&2
+			test_done "$testroot" 1
+			return 1
+		fi
+
+		echo "got-fetch-pack: foo: Permission denied" \
+			> $testroot/stderr.expected
+		grep '^got-fetch-pack:' $testroot/stderr \
+			> $testroot/stderr.filtered
+		cmp -s $testroot/stderr.expected $testroot/stderr.filtered
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stderr.expected \
+				$testroot/stderr.filtered
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		got clone -q -i ${GOTSYSD_SSH_KEY} \
+			${user}@${VMIP}:gotsys.git \
+			$testroot/gotsys-${user}.git \
+			> $testroot/stdout 2> $testroot/stderr
+		ret=$?
+		if [ $ret -eq 0 ]; then
+			echo "got clone succeeded unexpectedly" >&2
+			test_done "$testroot" 1
+			return 1
+		fi
+
+		echo "got-fetch-pack: gotsys.git: Permission denied" \
+			> $testroot/stderr.expected
+		grep '^got-fetch-pack:' $testroot/stderr \
+			> $testroot/stderr.filtered
+		cmp -s $testroot/stderr.expected $testroot/stderr.filtered
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			diff -u $testroot/stderr.expected \
+				$testroot/stderr.filtered
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_user_add
 run_test test_user_mod
@@ -1546,3 +1714,5 @@ run_test test_bad_gotsysconf
 run_test test_set_head
 run_test test_protect_refs
 run_test test_deny_access
+run_test test_override_access_rules
+run_test test_override_all_user_access
