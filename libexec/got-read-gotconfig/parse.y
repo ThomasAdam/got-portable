@@ -791,19 +791,19 @@ gotconfig_parse(struct gotconfig **conf, const char *filename, int *fd)
 static void
 free_fetch_config(struct fetch_config *fetch_config)
 {
-	free(remote->fetch_config->repository);
-	free(remote->fetch_config->server);
-	free(remote->fetch_config->protocol);
-	free(remote->fetch_config);
+	free(fetch_config->repository);
+	free(fetch_config->server);
+	free(fetch_config->protocol);
+	free(fetch_config);
 }
 
 static void
 free_send_config(struct send_config *send_config)
 {
-	free(remote->send_config->repository);
-	free(remote->send_config->server);
-	free(remote->send_config->protocol);
-	free(remote->send_config);
+	free(send_config->repository);
+	free(send_config->server);
+	free(send_config->protocol);
+	free(send_config);
 }
 
 void
