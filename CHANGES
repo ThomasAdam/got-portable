@@ -1,3 +1,11 @@
+* got 0.115; 2025-06-27
+- make errors reported by gotsys-apply-conf actually visible
+- stop trying to start gotd from gotsys-apply-conf if gotd is not running
+- fix infinite loop in got_pack_repaint_parent_commits() and got-read-pack
+- fix creation of gotd.conf deny rules in gotsys-write-conf
+- add support for global repository access rules to gotsysd.conf
+- fix segfault due to double-free in got-read-gotconfig
+
 * got 0.114; 2025-06-23
 - preserve author timestamps when rebasing commits
 - stop running ssh with -q by default; -q hides host key fingerprint errors
