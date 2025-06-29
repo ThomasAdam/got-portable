@@ -60,7 +60,7 @@
  * so packed-refs files we write contain a minimal header which disables all
  * packed-refs "traits" supported by Git.
  */
-#define GOT_PACKED_REFS_HEADER	"# pack-refs with:"
+#define GOT_PACKED_REFS_HEADER	"# pack-refs with: "
 
 /* A symbolic reference. */
 struct got_symref {
