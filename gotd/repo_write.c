@@ -841,6 +841,7 @@ copy_ref_delta(int infd, int outfd, off_t *outsize, BUF *buf, size_t *buf_pos,
 		return err;
 
 	*buf_pos += SHA1_DIGEST_LENGTH;
+	*outsize += SHA1_DIGEST_LENGTH;
 	return NULL;
 }
 
