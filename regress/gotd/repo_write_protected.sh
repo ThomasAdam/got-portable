@@ -306,6 +306,51 @@ test_modify_protected_branch() {
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 
+	# Put the tip commit back.
+	got ref -r $testroot/repo-clone -c $commit_id refs/heads/main
+
+	# Try adding a new commit to 'main' while sending an empty pack file.
+	# First, create a new branch 'bar' and send it.
+	got branch -r $testroot/repo-clone -c $commit_id bar > /dev/null
+	(cd $testroot/wt && got up -q -b bar > /dev/null)
+	echo "change beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'change beta' > /dev/null)
+	got send -q -r $testroot/repo-clone  -b bar
+	# Now merge branch 'bar' into 'main' and send the 'main' branch.
+	# Because the server already has the revelant commit, we will send
+	# an empty pack file during our second send operation.
+	# This would cause a bogus 'reference is protected' error.
+	(cd $testroot/wt && got up -q -b main > /dev/null)
+	(cd $testroot/wt && got merge bar > /dev/null)
+	local commit_id=`git_show_head $testroot/repo-clone`
+	got send -q -r $testroot/repo-clone -b main
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Verify that the send operation worked fine.
+	got clone -l ${GOTD_TEST_REPO_URL} | grep '^refs/heads/' \
+		> $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got clone -l failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	local commit_id_foo=`git_show_branch_head $testroot/repo-clone foo`
+	echo "refs/heads/bar: $commit_id" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id_foo" >> $testroot/stdout.expected
+	echo "refs/heads/main: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
 	test_done "$testroot" $ret
 }
 
