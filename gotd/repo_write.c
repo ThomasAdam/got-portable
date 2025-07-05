@@ -471,7 +471,8 @@ protect_require_yca(struct got_object_id *tip_id,
 			break;
 		}
 
-		if (got_object_idset_num_elements(traversed_set) >=
+		if (max_commits_to_traverse > 0 &&
+		    got_object_idset_num_elements(traversed_set) >=
 		    max_commits_to_traverse)
 			break;
 
@@ -1542,17 +1543,26 @@ protect_refs_from_moving(void)
 
 		RB_FOREACH(pe, got_pathlist_head,
 		    &repo_write.protected_branch_namespaces) {
-			err = protect_ref_namespace(refname, pe->path);
+			if (strcmp(pe->path, refname) != 0)
+				continue;
+
+			err = protect_require_yca(&ref_update->new_id, 0,
+			    NULL, NULL, ref_update->ref);
 			if (err)
 				return err;
+			break;
 		}
 
 		RB_FOREACH(pe, got_pathlist_head,
 		    &repo_write.protected_branches) {
-			if (strcmp(refname, pe->path) == 0) {
-				return got_error_fmt(GOT_ERR_REF_PROTECTED,
-				    "%s", refname);
-			}
+			if (strcmp(pe->path, refname) != 0)
+				continue;
+
+			err = protect_require_yca(&ref_update->new_id, 0,
+			    NULL, NULL, ref_update->ref);
+			if (err)
+				return err;
+			break;
 		}
 	}
 
