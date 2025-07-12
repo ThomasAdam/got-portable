@@ -1628,7 +1628,7 @@ cmd_clone(int argc, char *argv[])
 	const char *jumphost = NULL, *identity_file = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int bflag = 0, list_refs_only = 0;
-	int *pack_fds = NULL;
+	int *pack_fds = NULL, have_head_ref = 0;
 
 	RB_INIT(&refs);
 	RB_INIT(&symrefs);
@@ -1895,6 +1895,7 @@ cmd_clone(int argc, char *argv[])
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
+		have_head_ref = 1;
 
 		if (mirror_references)
 			continue;
@@ -1933,7 +1934,7 @@ cmd_clone(int argc, char *argv[])
 		if (error)
 			goto done;
 	}
-	if (pe == NULL) {
+	if (!have_head_ref) {
 		/*
 		 * We failed to set the HEAD reference. If we asked for
 		 * a set of wanted branches use the first of one of those
@@ -1957,6 +1958,7 @@ cmd_clone(int argc, char *argv[])
 			got_ref_close(target_ref);
 			if (error)
 				goto done;
+			have_head_ref = 1;
 			break;
 		}
 
@@ -1964,7 +1966,7 @@ cmd_clone(int argc, char *argv[])
 		 * If we have no HEAD ref yet, set it to the first branch
 		 * which was fetched.
 		 */
-		if (pe == NULL) {
+		if (!have_head_ref) {
 			RB_FOREACH(pe, got_pathlist_head, &refs) {
 				const char *refname = pe->path;
 				struct got_reference *target_ref;
