@@ -1960,6 +1960,37 @@ cmd_clone(int argc, char *argv[])
 			break;
 		}
 
+		/*
+		 * If we have no HEAD ref yet, set it to the first branch
+		 * which was fetched.
+		 */
+		if (pe == NULL) {
+			RB_FOREACH(pe, got_pathlist_head, &refs) {
+				const char *refname = pe->path;
+				struct got_reference *target_ref;
+
+				if (strncmp("refs/heads/", refname, 11) != 0)
+					continue;
+
+				error = got_ref_open(&target_ref, repo,
+				    refname, 0);
+				if (error) {
+					if (error->code == GOT_ERR_NOT_REF) {
+						error = NULL;
+						continue;
+					}
+					goto done;
+				}
+
+				error = create_symref(GOT_REF_HEAD, target_ref,
+				    verbosity, repo);
+				got_ref_close(target_ref);
+				if (error)
+					goto done;
+				break;
+			}
+		}
+
 		if (!fpa.configs_created && pe != NULL) {
 			error = create_config_files(fpa.config_info.proto,
 			    fpa.config_info.host, fpa.config_info.port,
