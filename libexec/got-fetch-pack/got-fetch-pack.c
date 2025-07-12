@@ -351,6 +351,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	char *id_str = NULL, *default_id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	const char *default_branch = NULL;
+	char *free_default_branch = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0, have_sidebands = 0;
@@ -435,6 +436,14 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					default_branch = symref_target;
 					break;
 				}
+				if (default_branch == NULL) {
+					default_id_str = strdup(id_str);
+					if (default_id_str == NULL) {
+						err = got_error_from_errno(
+						    "strdup");
+						goto done;
+					}
+				}
 			}
 			if (default_branch)
 				continue;
@@ -453,6 +462,17 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				err = got_error_from_errno("strdup");
 				goto done;
 			}
+		}
+		/* If no symrefs is given, go for first matching id_str */
+		if (default_branch == NULL && default_id_str &&
+		    strncmp(refname, "refs/heads/", 11) == 0 &&
+		    strcmp(id_str, default_id_str) == 0) {
+			free_default_branch = strdup(refname);
+			if (free_default_branch == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+			default_branch = free_default_branch;
 		}
 
 		if (list_refs_only || strncmp(refname, "refs/tags/", 10) == 0) {
@@ -846,6 +866,7 @@ done:
 	free(have);
 	free(want);
 	free(id_str);
+	free(free_default_branch);
 	free(default_id_str);
 	free(refname);
 	free(server_capabilities);
