@@ -503,7 +503,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					goto done;
 				nref++;
 				found_branch = 1;
-			} else if (chattygot) {
+			} else if (chattygot && (default_branch == NULL ||
+			    strcmp(default_branch, refname) != 0)) {
 				fprintf(stderr, "%s: ignoring %s\n",
 				    getprogname(), refname);
 			}
