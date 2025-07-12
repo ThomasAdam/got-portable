@@ -436,14 +436,6 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					default_branch = symref_target;
 					break;
 				}
-				if (default_branch == NULL) {
-					default_id_str = strdup(id_str);
-					if (default_id_str == NULL) {
-						err = got_error_from_errno(
-						    "strdup");
-						goto done;
-					}
-				}
 			}
 			if (default_branch)
 				continue;
@@ -454,6 +446,14 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				    getprogname(), refname);
 			}
 			continue;
+		}
+		if (default_branch == NULL &&
+		    strcmp(refname, GOT_REF_HEAD) == 0) {
+			default_id_str = strdup(id_str);
+			if (default_id_str == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
 		if (default_branch && default_id_str == NULL &&
 		    strcmp(refname, default_branch) == 0) {
