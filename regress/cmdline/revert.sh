@@ -1865,6 +1865,213 @@ test_revert_patch_binary() {
 	test_done "$testroot" 0
 }
 
+test_revert_staged_file() {
+	local testroot=`test_init revert_staged_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "line 0" > $testroot/wt/epsilon/zeta
+	for i in `seq 1 10`; do
+		echo "line $i" >> $testroot/wt/epsilon/zeta
+	done
+
+	(cd $testroot/wt && got commit -m 'make zeta a multi-line file' \
+		> /dev/null)
+	local commit_id=`git_show_head $testroot/repo`
+
+	sed -i -e 's/line 0/line 0a/' $testroot/wt/epsilon/zeta
+	sed -i -e 's/line 4/line 4a/' $testroot/wt/epsilon/zeta
+	sed -i -e 's/line 6/line 6a/' $testroot/wt/epsilon/zeta
+
+	# stage line 0 and line 6
+	printf "y\n" > $testroot/patchscript
+	for i in `seq 1 5`; do
+		printf "n\n" >> $testroot/patchscript
+	done
+	printf "y\n" >> $testroot/patchscript
+	for i in `seq 7 10`; do
+		printf "n\n" >> $testroot/patchscript
+	done
+
+	(cd $testroot/wt && got stage > /dev/null)
+
+	echo ' M epsilon/zeta' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blobid_zeta=$(get_blob_id $testroot/repo epsilon zeta)
+	stageid_zeta=$(cd $testroot/wt && got stage -l epsilon/zeta | cut -d' ' -f 1)
+
+	(cd $testroot/wt && got revert epsilon/zeta > $testroot/stdout)
+
+	echo -n '' > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M epsilon/zeta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-eof >$testroot/stdout.expected
+	diff -s $testroot/wt
+	path + $testroot/wt (staged changes)
+	commit - $commit_id
+	blob - $blobid_zeta
+	blob + $stageid_zeta
+	--- epsilon/zeta
+	+++ epsilon/zeta
+	@@ -1,10 +1,10 @@
+	-line 0
+	+line 0a
+	 line 1
+	 line 2
+	 line 3
+	-line 4
+	+line 4a
+	 line 5
+	-line 6
+	+line 6a
+	 line 7
+	 line 8
+	 line 9
+	eof
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+test_revert_partially_staged_file() {
+	local testroot=`test_init revert_partially_staged_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "line 0" > $testroot/wt/epsilon/zeta
+	for i in `seq 1 10`; do
+		echo "line $i" >> $testroot/wt/epsilon/zeta
+	done
+
+	(cd $testroot/wt && got commit -m 'make zeta a multi-line file' \
+		> /dev/null)
+	local commit_id=`git_show_head $testroot/repo`
+
+	sed -i -e 's/line 0/line 0a/' $testroot/wt/epsilon/zeta
+	sed -i -e 's/line 4/line 4a/' $testroot/wt/epsilon/zeta
+	sed -i -e 's/line 6/line 6a/' $testroot/wt/epsilon/zeta
+
+	# stage line 0 and line 6
+	printf "y\n" > $testroot/patchscript
+	for i in `seq 1 5`; do
+		printf "n\n" >> $testroot/patchscript
+	done
+	printf "y\n" >> $testroot/patchscript
+	for i in `seq 7 10`; do
+		printf "n\n" >> $testroot/patchscript
+	done
+
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p > /dev/null)
+
+	echo 'MM epsilon/zeta' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blobid_zeta=$(get_blob_id $testroot/repo epsilon zeta)
+	stageid_zeta=$(cd $testroot/wt && got stage -l epsilon/zeta | \
+		cut -d' ' -f 1)
+
+	(cd $testroot/wt && got revert epsilon/zeta > $testroot/stdout)
+
+	echo 'R  epsilon/zeta' > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M epsilon/zeta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat <<-eof >$testroot/stdout.expected
+	diff -s $testroot/wt
+	path + $testroot/wt (staged changes)
+	commit - $commit_id
+	blob - $blobid_zeta
+	blob + $stageid_zeta
+	--- epsilon/zeta
+	+++ epsilon/zeta
+	@@ -1,4 +1,4 @@
+	-line 0
+	+line 0a
+	 line 1
+	 line 2
+	 line 3
+	eof
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_revert_basic
 run_test test_revert_rm
@@ -1885,3 +2092,5 @@ run_test test_revert_symlink
 run_test test_revert_patch_symlink
 run_test test_revert_umask
 run_test test_revert_patch_binary
+run_test test_revert_staged_file
+run_test test_revert_partially_staged_file
