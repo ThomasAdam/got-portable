@@ -5386,11 +5386,21 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 					goto done;
 				}
 			}
-			err = got_fileindex_entry_update(ie,
-			    a->worktree->root_fd, relpath,
-			    &blob->id, &ie->commit, 0);
-			if (err)
-				goto done;
+			if (staged_status == GOT_STATUS_ADD ||
+			    staged_status == GOT_STATUS_MODIFY) {
+				got_fileindex_entry_get_blob_id(&id, ie);
+				err = got_fileindex_entry_update(ie,
+				    a->worktree->root_fd, relpath, &id,
+				    &ie->commit, 0);
+				if (err)
+					goto done;
+			} else {
+				err = got_fileindex_entry_update(ie,
+				    a->worktree->root_fd, relpath, &blob->id,
+				    &ie->commit, 0);
+				if (err)
+					goto done;
+			}
 		} else {
 			int is_bad_symlink = 0;
 			if (te && S_ISLNK(te->mode)) {
@@ -5408,11 +5418,22 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			}
 			if (err)
 				goto done;
-			err = got_fileindex_entry_update(ie,
-			    a->worktree->root_fd, relpath,
-			    &blob->id, &ie->commit, 0);
-			if (err)
-				goto done;
+
+			if (staged_status == GOT_STATUS_ADD ||
+			    staged_status == GOT_STATUS_MODIFY) {
+				got_fileindex_entry_get_blob_id(&id, ie);
+				err = got_fileindex_entry_update(ie,
+				    a->worktree->root_fd, relpath, &id,
+				    &ie->commit, 0);
+				if (err)
+					goto done;
+			} else {
+				err = got_fileindex_entry_update(ie,
+				    a->worktree->root_fd, relpath, &blob->id,
+				    &ie->commit, 0);
+				if (err)
+					goto done;
+			}
 			if (is_bad_symlink) {
 				got_fileindex_entry_filetype_set(ie,
 				    GOT_FILEIDX_MODE_BAD_SYMLINK);
