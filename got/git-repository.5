@@ -113,7 +113,7 @@ tip commit of a branch.
 Because references may point to arbitrary object IDs, their use
 is not limited to branches.
 .Pp
-The name is a UTF-8 string with the following disallowed characters:
+The name is a non-empty UTF-8 string with the following disallowed characters:
 .Sq \ \&
 (space),
 \(a~ (tilde),
@@ -123,6 +123,10 @@ The name is a UTF-8 string with the following disallowed characters:
 * (asterisk),
 [ (opening square bracket),
 \\ (backslash).
+The name may not be the string
+.Dq @ ,
+may not begin with a / (slash), and may not begin or end
+with a \. (period).
 Additionally, the name may not contain the two-character sequences
 //, .. , and @{.
 .Pp
