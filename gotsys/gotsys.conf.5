@@ -486,18 +486,6 @@ references in these namespaces will always be denied.
 .\"This JSON format is documented in
 .\".Xr gotd 8 .
 .\".El
-.\".It Ic publish
-.\"The
-.\".Ic publish
-.\"directive controls whether this repository will be published
-.\"via a web frontend for public browsing.
-.\".Pp
-.\"If not set, the repository can only be accessed via
-.\".Xr ssh 1 .
-.\"The repository can still be made publicly available over SSH
-.\"with the
-.\".Dq anonymous
-.\"read-only user account.
 .El
 .Sh EXAMPLES
 .Bd -literal -offset indent
@@ -516,8 +504,6 @@ user flan_squee {
 }
 
 repository "src" {
-.\"	publish
-.\"
 	permit rw :developers
 	permit ro anonymous
 .\"
@@ -526,8 +512,6 @@ repository "src" {
 }
 
 repository "openbsd/ports" {
-.\"	publish
-.\"
 	permit rw :porters
 	permit ro anonymous
 	deny flan_hacker
