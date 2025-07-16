@@ -76,7 +76,6 @@ int		 lookup(char *);
 int		 lgetc(int);
 int		 lungetc(int);
 int		 findeol(void);
-static char	*port_sprintf(int);
 
 TAILQ_HEAD(symhead, sym)	 symhead = TAILQ_HEAD_INITIALIZER(symhead);
 struct sym {
@@ -128,7 +127,7 @@ typedef struct {
 %}
 
 %token	ERROR USER GROUP REPOSITORY PERMIT DENY RO RW AUTHORIZED KEY
-%token	PROTECT NAMESPACE BRANCH TAG REFERENCE RELAY PORT PASSWORD
+%token	PROTECT NAMESPACE BRANCH TAG REFERENCE PORT PASSWORD
 %token	NOTIFY EMAIL FROM REPLY TO URL INSECURE HMAC HEAD
 
 %token	<v.string>	STRING
@@ -381,158 +380,6 @@ notifyflags	: BRANCH STRING {
 			free($3);
 			free($5);
 			free($8);
-		}
-		| EMAIL TO STRING RELAY STRING {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    NULL, $5, NULL)) {
-				free($3);
-				free($5);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-		}
-		| EMAIL FROM STRING TO STRING RELAY STRING {
-			if (conf_notify_email(new_repo, $3, $5,
-			    NULL, $7, NULL)) {
-				free($3);
-				free($5);
-				free($7);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($7);
-		}
-		| EMAIL TO STRING REPLY TO STRING RELAY STRING {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    $6, $8, NULL)) {
-				free($3);
-				free($6);
-				free($8);
-				YYERROR;
-			}
-			free($3);
-			free($6);
-			free($8);
-		}
-		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING {
-			if (conf_notify_email(new_repo, $3, $5,
-			    $8, $10, NULL)) {
-				free($3);
-				free($5);
-				free($8);
-				free($10);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($8);
-			free($10);
-		}
-		| EMAIL TO STRING RELAY STRING PORT STRING {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    NULL, $5, $7)) {
-				free($3);
-				free($5);
-				free($7);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($7);
-		}
-		| EMAIL FROM STRING TO STRING RELAY STRING PORT STRING {
-			if (conf_notify_email(new_repo, $3, $5,
-			    NULL, $7, $9)) {
-				free($3);
-				free($5);
-				free($7);
-				free($9);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($7);
-			free($9);
-		}
-		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    $6, $8, $10)) {
-				free($3);
-				free($6);
-				free($8);
-				free($10);
-				YYERROR;
-			}
-			free($3);
-			free($6);
-			free($8);
-			free($10);
-		}
-		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT STRING {
-			if (conf_notify_email(new_repo, $3, $5,
-			    $8, $10, $12)) {
-				free($3);
-				free($5);
-				free($8);
-				free($10);
-				free($12);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($8);
-			free($10);
-			free($12);
-		}
-		| EMAIL TO STRING RELAY STRING PORT NUMBER {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    NULL, $5, port_sprintf($7))) {
-				free($3);
-				free($5);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-		}
-		| EMAIL FROM STRING TO STRING RELAY STRING PORT NUMBER {
-			if (conf_notify_email(new_repo, $3, $5,
-			    NULL, $7, port_sprintf($9))) {
-				free($3);
-				free($5);
-				free($7);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($7);
-		}
-		| EMAIL TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (conf_notify_email(new_repo, NULL, $3,
-			    $6, $8, port_sprintf($10))) {
-				free($3);
-				free($6);
-				free($8);
-				YYERROR;
-			}
-			free($3);
-			free($6);
-			free($8);
-		}
-		| EMAIL FROM STRING TO STRING REPLY TO STRING RELAY STRING PORT NUMBER {
-			if (conf_notify_email(new_repo, $3, $5,
-			    $8, $10, port_sprintf($12))) {
-				free($3);
-				free($5);
-				free($8);
-				free($10);
-				YYERROR;
-			}
-			free($3);
-			free($5);
-			free($8);
-			free($10);
 		}
 		| URL STRING {
 			if (conf_notify_http(new_repo, $2, NULL, NULL, 0,
@@ -810,7 +657,6 @@ lookup(char *s)
 		{ "port",			PORT },
 		{ "protect",			PROTECT },
 		{ "reference",			REFERENCE },
-		{ "relay",			RELAY },
 		{ "reply",			REPLY },
 		{ "repository",			REPOSITORY },
 		{ "ro",				RO },
@@ -1785,19 +1631,4 @@ symget(const char *nam)
 		}
 	}
 	return (NULL);
-}
-
-static char *
-port_sprintf(int p)
-{
-	static char portno[32];
-	int n;
-
-	n = snprintf(portno, sizeof(portno), "%lld", (long long)p);
-	if (n < 0 || (size_t)n >= sizeof(portno)) {
-		yyerror("port number too long: %lld", (long long)p);
-		return NULL;
-	}
-
-	return portno;
 }
