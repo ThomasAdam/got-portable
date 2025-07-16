@@ -255,6 +255,30 @@ Multiple access rules can be specified, and the last matching rule
 determines the action taken.
 If no rule matches, access to the repository is denied.
 .Pp
+Reference and branch names specified in
+.Nm
+are non-empty UTF-8 strings with the following disallowed characters:
+.Sq \ \&
+(space, tab, formfeed, newline, carriage return),
+\(a~ (tilde),
+\(a^ (caret),
+: (colon),
+? (question mark),
+* (asterisk),
+[ (opening square bracket),
+\\ (backslash),
+" (double quote),
+\' (single quote),
+{ (opening curly brace),
+} (closing curly brace),
+= (equal sign).
+The name may not be the string
+.Dq @ ,
+may not begin with a / (slash), and may not begin or end
+with a \. (period).
+Additionally, the name may not contain the two-character sequences
+//, .. , and @{.
+.Pp
 The available repository configuration directives are as follows:
 .Bl -tag -width Ds
 .It Ic deny Ar identity
