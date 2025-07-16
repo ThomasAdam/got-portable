@@ -1184,6 +1184,91 @@ EOF
 	test_done "$testroot" "0"
 }
 
+test_bad_ref_in_gotsysconf() {
+	local testroot=`test_init bad_ref_in_gotsysconf 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+
+	# An attempt to send an invalid gotsys.conf file
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	permit rw ${GOTSYSD_DEV_USER}
+	permit ro anonymous
+	protect branch 'mai"n'
+}
+EOF
+	gotsys check -f ${testroot}/wt/gotsys.conf \
+		> $testroot/stdout  2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "gotsys check succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	echo "gotsys: ${testroot}/wt/gotsys.conf: line 18: invalid reference name: refs/heads/mai\"n" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd ${testroot}/wt && got commit -m "commit a bad gotsys.conf" \
+		>/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO} \
+		> $testroot/stdout 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got send succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	cat > ${testroot}/stderr.expected <<EOF
+git-receive-pack: gotsys.conf: line 18: invalid reference name: refs/heads/mai"n
+got-send-pack: gotsys.conf: line 18: invalid reference name: refs/heads/mai"n
+got: could not send pack file
+EOF
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 test_set_head() {
 	local testroot=`test_init set_head 1`
 
@@ -1711,6 +1796,7 @@ run_test test_group_del
 run_test test_repo_create
 run_test test_user_anonymous
 run_test test_bad_gotsysconf
+run_test test_bad_ref_in_gotsysconf
 run_test test_set_head
 run_test test_protect_refs
 run_test test_deny_access
