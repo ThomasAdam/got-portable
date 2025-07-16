@@ -121,6 +121,7 @@ struct gotsys_conf {
 void gotsys_conf_init(struct gotsys_conf *);
 const struct got_error *gotsys_conf_parse(const char *, struct gotsys_conf *,
     int *);
+int gotsys_ref_name_is_valid(char *);
 void gotsys_authorized_key_free(struct gotsys_authorized_key *);
 void gotsys_authorized_keys_list_purge(struct gotsys_authorized_keys_list *);
 void gotsys_user_free(struct gotsys_user *);

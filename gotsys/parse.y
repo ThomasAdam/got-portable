@@ -1122,6 +1122,33 @@ conf_user_authorized_key(char *keytype, char *keydata, char *comment,
 	return NULL;
 }
 
+/*
+ * Reference name restrictions specific to gotsys.conf.
+ * Exclude symbols which could be used to escape from strings and write
+ * arbitrary gotd.conf snippets. Also exclude whitespace because newlines
+ * are relevant to the parser.
+ */
+int
+gotsys_ref_name_is_valid(char *refname)
+{
+	const char *s;
+	const char forbidden[] = { '\'', '"', '{' , '}', '=' };
+	size_t i;
+
+	s = refname;
+	while (*s) {
+		for (i = 0; i < nitems(forbidden); i++) {
+			if (*s == forbidden[i])
+				return 0;
+		}
+		if (isspace((unsigned char)s[0]))
+			return 0;
+		s++;
+	}
+
+	return 1;
+}
+
 static int
 refname_is_valid(char *refname)
 {
@@ -1131,7 +1158,8 @@ refname_is_valid(char *refname)
 		return 0;
 	}
 
-	if (!got_ref_name_is_valid(refname)) {
+	if (!got_ref_name_is_valid(refname) ||
+	    !gotsys_ref_name_is_valid(refname)) {
 		yyerror("invalid reference name: %s", refname);
 		return 0;
 	}
