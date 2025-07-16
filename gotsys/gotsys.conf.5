@@ -506,8 +506,8 @@ repository "src" {
 	permit rw :developers
 	permit ro anonymous
 .\"
-.\"	protect branch "main"
-.\"	protect tag namespace "refs/tags/"
+	protect branch "main"
+	protect tag namespace "refs/tags/"
 }
 
 repository "openbsd/ports" {
@@ -517,10 +517,10 @@ repository "openbsd/ports" {
 	permit ro anonymous
 	deny flan_hacker
 
-.\"	protect {
-.\"		branch "main"
-.\"		tag namespace "refs/tags/"
-.\"	}
+	protect {
+		branch "main"
+		tag namespace "refs/tags/"
+	}
 .\"
 .\"	notify {
 .\"		branch "main"
@@ -531,9 +531,10 @@ repository "openbsd/ports" {
 
 repository "secret" {
 	permit rw flan_hacker
-.\"
-.\"	protect branch "main"
-.\"	protect tag namespace "refs/tags/"
+	head "refs/heads/private"
+
+	protect branch "private"
+	protect tag namespace "refs/tags/"
 }
 .Ed
 .Sh SEE ALSO
