@@ -1072,7 +1072,7 @@ int
 gotsys_ref_name_is_valid(char *refname)
 {
 	const char *s;
-	const char forbidden[] = { '\'', '"', '{' , '}', '=' };
+	const char forbidden[] = { '\'', '"', '{' , '}', '=', '$', '#' };
 	size_t i;
 
 	s = refname;
