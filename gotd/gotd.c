@@ -638,6 +638,17 @@ halt_listener(struct gotd_imsgev *iev)
 }
 
 static void
+reload_reset(void)
+{
+	/* Clear state such that reloading again will work. */
+	close(gotd_reload_conf_fd);
+	gotd_reload_conf_fd = -1;
+	close(gotd_reload_secrets_fd);
+	gotd_reload_secrets_fd = -1;
+	have_reload_secrets = 0;
+}
+
+static void
 gotd_dispatch_reload(int fd, short event, void *arg)
 {
 	const struct got_error *err = NULL;
@@ -698,6 +709,7 @@ gotd_dispatch_reload(int fd, short event, void *arg)
 			kill_proc(gotd.reload_proc, 0);
 			gotd.reload_proc = NULL;
 			imsg_free(&imsg);
+			reload_reset();
 			return;
 		}
 
@@ -3685,12 +3697,7 @@ main(int argc, char **argv)
 		imsgbuf_clear(&ibuf);
 		close(GOTD_FILENO_MSG_PIPE);
 
-		/* Clear state such that reloading again will work. */
-		close(gotd_reload_conf_fd);
-		gotd_reload_conf_fd = -1;
-		close(gotd_reload_secrets_fd);
-		gotd_reload_secrets_fd = -1;
-		have_reload_secrets = 0;
+		reload_reset();
 	}
 
 	gotd.argv0 = argv0;
