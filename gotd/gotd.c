@@ -609,7 +609,10 @@ send_reload_config(struct gotd_imsgev *iev)
 	}
 
 	if (imsg_compose(&iev->ibuf, GOTD_IMSG_RELOAD_SECRETS,
-	    GOTD_PROC_GOTD, gotd.pid, gotd_reload_secrets_fd, NULL, 0) == -1) {
+	    GOTD_PROC_GOTD, gotd.pid, gotd_reload_secrets_fd,
+	    gotd_reload_secrets_path ? gotd_reload_secrets_path : NULL,
+	    gotd_reload_secrets_path ? strlen(gotd_reload_secrets_path) : 0)
+	    == -1) {
 		err = got_error_from_errno("imsg compose RELOAD_SECRETS");
 		goto done;
 	}
