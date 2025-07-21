@@ -1603,8 +1603,12 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return err;
 		if (ftruncate(repo->packs[i].basefd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
+		if (lseek(repo->packs[i].basefd, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("lseek");
 		if (ftruncate(repo->packs[i].accumfd, 0L) == -1)
 			return got_error_from_errno("ftruncate");
+		if (lseek(repo->packs[i].accumfd, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("lseek");
 	}
 
 	if (i != 0) {

@@ -333,6 +333,8 @@ write_gotd_conf(void)
 
 	if (ftruncate(gotd_conf_tmpfd, 0) == -1)
 		return got_error_from_errno("ftruncate");
+	if (lseek(gotd_conf_tmpfd, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("lseek");
 
 	if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
 		return got_error_from_errno("clock_gettime");

@@ -96,6 +96,100 @@ chmod_700_repo(const char *repo_name)
 }
 
 static const struct got_error *
+set_head_ref(int repos_dir_fd, const char *repo_name, const char *refname)
+{
+	const struct got_error *err = NULL;
+	char relpath[_POSIX_PATH_MAX];
+	struct got_lockfile *lf = NULL;
+	int ret, fd = -1;
+	struct stat sb;
+	char *content = NULL, *buf = NULL;
+	size_t content_len;
+	ssize_t w;
+
+	ret = snprintf(relpath, sizeof(relpath),
+	    "%s/%s", repo_name, GOT_HEAD_FILE);
+	if (ret == -1)
+		return got_error_from_errno("snprintf");
+	if ((size_t)ret >= sizeof(relpath)) {
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "repository path too long");
+	}
+
+	ret = asprintf(&content, "ref: %s\n", refname);
+	if (ret == -1)
+		return got_error_from_errno("asprintf");
+	content_len = ret;
+
+	err = got_lockfile_lock(&lf, relpath, repos_dir_fd);
+	if (err && (err->code != GOT_ERR_ERRNO || errno != ENOENT))
+		goto done;
+	err = NULL;
+	
+	fd = openat(repos_dir_fd, relpath,
+	    O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error_from_errno2("open", relpath);
+		goto done;
+	}
+
+	if (fstat(fd, &sb) == -1) {
+		err = got_error_from_errno2("stat", relpath);
+		goto done;
+	}
+
+	if (sb.st_size == content_len) {
+		ssize_t r;
+
+		buf = malloc(content_len);
+		if (buf == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+
+		r = read(fd, buf, content_len);
+		if (r == -1) {
+			err = got_error_from_errno2("read", relpath);
+			goto done;
+		}
+
+		if (r == content_len && memcmp(buf, content, content_len) == 0)
+			goto done; /* HEAD already has the desired content */
+	}
+
+	if (ftruncate(fd, 0L) == -1) {
+		err = got_error_from_errno2("ftruncate", relpath);
+		goto done;
+	}
+	if (lseek(fd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", relpath);
+		goto done;
+	}
+
+	w = write(fd, content, content_len);
+	if (w == -1)
+		err = got_error_from_errno("write");
+	else if (w != content_len) {
+		err = got_error_fmt(GOT_ERR_IO,
+		    "wrote %zd of %zu bytes to %s", w, content_len, relpath);
+	}
+done:
+	free(content);
+	free(buf);
+	if (lf) {
+		const struct got_error *unlock_err;
+
+		unlock_err = got_lockfile_unlock(lf, repos_dir_fd);
+		if (unlock_err && err == NULL)
+			err = unlock_err;
+	}
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+}
+
+static const struct got_error *
 create_repo(struct imsg *imsg)
 {
 	const struct got_error *err = NULL;

@@ -232,6 +232,8 @@ request_gotsys_conf(struct gotd_imsgev *iev)
 
 	if (ftruncate(gotd_session.content_fd, 0L) == -1)
 		return got_error_from_errno("ftruncate");
+	if (lseek(gotd_session.content_fd, 0L, SEEK_SET) == -1)
+		return got_error_from_errno("lseek");
 	
 	len = sizeof(content_req) + strlen(refname) + strlen(path);
 	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_PACKFILE_GET_CONTENT,
