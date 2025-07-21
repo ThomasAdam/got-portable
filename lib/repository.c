@@ -395,6 +395,8 @@ got_repo_temp_fds_get(int *fd, int *idx, struct got_repository *repo)
 		if (repo->tempfiles[i] != -1) {
 			if (ftruncate(repo->tempfiles[i], 0L) == -1)
 				return got_error_from_errno("ftruncate");
+			if (lseek(repo->tempfiles[i], 0L, SEEK_SET) == -1)
+				return got_error_from_errno("lseek");
 			*fd = repo->tempfiles[i];
 			*idx = i;
 			repo->tempfile_use_mask |= (1 << i);
