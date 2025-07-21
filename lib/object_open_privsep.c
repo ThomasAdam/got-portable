@@ -847,7 +847,7 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	if (err)
 		return err;
 
-	if (lseek(outfd, SEEK_SET, 0) == -1)
+	if (lseek(outfd, 0L, SEEK_SET) == -1)
 		err = got_error_from_errno("lseek");
 
 	return err;
@@ -893,7 +893,7 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	if (err)
 		return err;
 
-	if (lseek(outfd, SEEK_SET, 0) == -1)
+	if (lseek(outfd, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("lseek");
 
 	return err;
@@ -946,7 +946,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		err = got_error_from_errno("ftruncate");
 		goto done;
 	}
-	if (lseek(outfd, SEEK_SET, 0) == -1) {
+	if (lseek(outfd, 0L, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
 		goto done;
 	}

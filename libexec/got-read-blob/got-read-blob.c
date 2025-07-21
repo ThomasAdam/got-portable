@@ -167,7 +167,7 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
-		if (lseek(fd, SEEK_SET, 0) == -1) {
+		if (lseek(fd, 0L, SEEK_SET) == -1) {
 			err = got_error_from_errno("lseek");
 			goto done;
 		}

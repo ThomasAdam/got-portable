@@ -257,14 +257,14 @@ got_object_read_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	memset(&csum, 0, sizeof(csum));
 	csum.output_ctx = &ctx;
 
-	if (lseek(infd, SEEK_SET, 0) == -1)
+	if (lseek(infd, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("lseek");
 
 	err = got_object_read_header(&obj, infd);
 	if (err)
 		return err;
 
-	if (lseek(infd, SEEK_SET, 0) == -1)
+	if (lseek(infd, 0L, SEEK_SET) == -1)
 		return got_error_from_errno("lseek");
 
 	if (obj->size + obj->hdrlen <= max_in_mem_size) {
