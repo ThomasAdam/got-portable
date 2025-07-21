@@ -519,7 +519,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile,
 
 done:
 	if (err == NULL) {
-		if (lseek(outfd, SEEK_SET, 0) == -1)
+		if (lseek(outfd, 0L, SEEK_SET) == -1)
 			err = got_error_from_errno("lseek");
 	}
 	got_inflate_end(&zb);
