@@ -171,6 +171,10 @@ set_head_ref(int repos_dir_fd, const char *repo_name, const char *refname)
 		err = got_error_from_errno2("ftruncate", relpath);
 		goto done;
 	}
+	if (lseek(fd, 0L, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", relpath);
+		goto done;
+	}
 
 	w = write(fd, content, content_len);
 	if (w == -1)
