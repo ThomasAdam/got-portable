@@ -320,7 +320,7 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 		}
 	}
 
-	if (*outsize != result_size)
+	if (err == NULL && *outsize != result_size)
 		err = got_error_msg(GOT_ERR_BAD_DELTA,
 		    "delta application result size mismatch");
 	return err;
@@ -387,12 +387,12 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 		}
 	}
 
-	if (*outsize != result_size)
+	if (err == NULL && *outsize != result_size)
 		err = got_error_msg(GOT_ERR_BAD_DELTA,
 		    "delta application result size mismatch");
 
 	if (memstream != NULL) {
-		if (fclose(memstream) == EOF)
+		if (fclose(memstream) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 		if (err == NULL) {
 			size_t n;
