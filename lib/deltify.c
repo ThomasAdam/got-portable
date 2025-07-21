@@ -504,7 +504,7 @@ stretchblk(FILE *basefile, off_t base_offset0, struct got_delta_block *block,
 	    SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
-	while (buf_equal && *blocklen < (1 << 24) - 1) {
+	while (buf_equal && *blocklen < GOT_DELTIFY_STRETCHMAX - 1) {
 		base_r = fread(basebuf, 1, sizeof(basebuf), basefile);
 		if (base_r == 0) {
 			if (ferror(basefile))
@@ -522,6 +522,8 @@ stretchblk(FILE *basefile, off_t base_offset0, struct got_delta_block *block,
 				buf_equal = 0;
 				break;
 			}
+			if (*blocklen >= GOT_DELTIFY_STRETCHMAX)
+				break;
 			(*blocklen)++;
 		}
 	}
@@ -558,6 +560,8 @@ stretchblk_file_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
 				buf_equal = 0;
 				break;
 			}
+			if (*blocklen >= GOT_DELTIFY_STRETCHMAX)
+				break;
 			(*blocklen)++;
 		}
 	}
@@ -598,6 +602,8 @@ stretchblk_mem_file(FILE *basefile, off_t base_offset0,
 				buf_equal = 0;
 				break;
 			}
+			if (*blocklen >= GOT_DELTIFY_STRETCHMAX)
+				break;
 			(*blocklen)++;
 		}
 	}
@@ -629,7 +635,7 @@ stretchblk_mem_mem(uint8_t *basedata, off_t base_offset0, off_t basefile_size,
 	p = data + fileoffset;
 	q = basedata + base_offset;
 	maxlen = MIN(basefile_size - base_offset, filesize - fileoffset);
-	for (i = 0; i < maxlen && *blocklen < (1 << 24) - 1; i++) {
+	for (i = 0; i < maxlen && *blocklen < GOT_DELTIFY_STRETCHMAX - 1; i++) {
 		if (p[i] != q[i])
 			break;
 		(*blocklen)++;
