@@ -7,7 +7,8 @@ REGRESS_TARGETS=test_repo_read test_repo_read_group \
 	test_repo_write_protected test_repo_write_readonly \
 	test_email_notification test_http_notification \
 	test_git_interop test_email_and_http_notification \
-	test_http_notification_hmac test_connection_limit
+	test_http_notification_hmac test_connection_limit \
+	test_large_loose_objects
 NOOBJ=Yes
 CLEANFILES=gotd.conf gotd-secrets.conf
 
@@ -252,6 +253,10 @@ prepare_test_repo_empty: ensure_root
 	@chown ${GOTD_USER} "${GOTD_TEST_REPO}"
 	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) sh ./prepare_test_repo.sh 1'
 
+prepare_large_loose_objects: ensure_root prepare_test_repo
+	@su -m ${GOTD_USER} -c 'env $(GOTD_TEST_ENV) \
+		sh ./prepare_large_loose_objects.sh'
+
 test_repo_read: prepare_test_repo start_gotd_ro
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./repo_read.sh'
@@ -348,6 +353,11 @@ test_git_interop: prepare_test_repo start_gotd_rw
 test_connection_limit: prepare_test_repo start_gotd_connection_limit
 	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
 		'env $(GOTD_TEST_ENV) sh ./connection_limit.sh'
+	@$(GOTD_STOP_CMD) 2>/dev/null
+
+test_large_loose_objects: prepare_large_loose_objects start_gotd_ro
+	@-$(GOTD_TRAP); su ${GOTD_TEST_USER} -c \
+		'env $(GOTD_TEST_ENV) sh ./large_loose_objects.sh'
 	@$(GOTD_STOP_CMD) 2>/dev/null
 
 .include <bsd.regress.mk>

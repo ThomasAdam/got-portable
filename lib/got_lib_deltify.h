@@ -45,6 +45,7 @@ enum {
 	GOT_DELTIFY_MINCHUNK	= 32,
 	GOT_DELTIFY_MAXCHUNK	= 8192,
 	GOT_DELTIFY_SPLITMASK	= (1 << 8) - 1,
+	GOT_DELTIFY_STRETCHMAX	= (1 << 24) - 1,
 };
 
 const struct got_error *got_deltify_init(struct got_delta_table **dt, FILE *f,
