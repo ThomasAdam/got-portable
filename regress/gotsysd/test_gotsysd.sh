@@ -1104,6 +1104,101 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_user_anonymous_remove() {
+	local testroot=`test_init user_anonymous_remove 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+}
+repository "foo" {
+	permit rw ${GOTSYSD_DEV_USER}
+}
+EOF
+	(cd ${testroot}/wt && got commit -m "remove anonymous user" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Repository foo should no longer be readable anonymously.
+	env SSH_ASKPASS="/usr/bin/true" SSH_ASKPASS_REQUIRE=force \
+		got clone anonymous@${VMIP}:foo.git \
+		$testroot/foo-anonclone.git > /dev/null 2> $testroot/stderr
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "got clone succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	printf "Permission denied, please try again.\r\n" \
+		> $testroot/stderr.expected
+	printf "Permission denied, please try again.\r\n" \
+		>> $testroot/stderr.expected
+	printf "anonymous@${VMIP}: Permission denied (publickey,password,keyboard-interactive).\r\n" \
+		>> $testroot/stderr.expected
+	echo "got-fetch-pack: unexpected end of file" \
+		>> $testroot/stderr.expected
+	echo "got: unexpected end of file" >> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_bad_gotsysconf() {
 	local testroot=`test_init bad_gotsysconf 1`
 
@@ -1795,6 +1890,7 @@ run_test test_group_add
 run_test test_group_del
 run_test test_repo_create
 run_test test_user_anonymous
+run_test test_user_anonymous_remove
 run_test test_bad_gotsysconf
 run_test test_bad_ref_in_gotsysconf
 run_test test_set_head
