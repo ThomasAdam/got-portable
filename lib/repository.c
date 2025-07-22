@@ -388,6 +388,7 @@ got_repo_temp_fds_set(struct got_repository *repo, int *temp_fds)
 const struct got_error *
 got_repo_temp_fds_get(int *fd, int *idx, struct got_repository *repo)
 {
+	const struct got_error *err = NULL;
 	int i;
 
 	*fd = -1;
@@ -397,10 +398,9 @@ got_repo_temp_fds_get(int *fd, int *idx, struct got_repository *repo)
 		if (repo->tempfile_use_mask & (1 << i))
 			continue;
 		if (repo->tempfiles[i] != -1) {
-			if (ftruncate(repo->tempfiles[i], 0L) == -1)
-				return got_error_from_errno("ftruncate");
-			if (lseek(repo->tempfiles[i], 0L, SEEK_SET) == -1)
-				return got_error_from_errno("lseek");
+			err = got_opentemp_truncatefd(repo->tempfiles[i]);
+			if (err)
+				return err;
 			*fd = repo->tempfiles[i];
 			*idx = i;
 			repo->tempfile_use_mask |= (1 << i);
@@ -1604,14 +1604,12 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 		err = got_pack_close(&repo->packs[i]);
 		if (err)
 			return err;
-		if (ftruncate(repo->packs[i].basefd, 0L) == -1)
-			return got_error_from_errno("ftruncate");
-		if (lseek(repo->packs[i].basefd, 0L, SEEK_SET) == -1)
-			return got_error_from_errno("lseek");
-		if (ftruncate(repo->packs[i].accumfd, 0L) == -1)
-			return got_error_from_errno("ftruncate");
-		if (lseek(repo->packs[i].accumfd, 0L, SEEK_SET) == -1)
-			return got_error_from_errno("lseek");
+		err = got_opentemp_truncatefd(repo->packs[i].basefd);
+		if (err)
+			return err;
+		err = got_opentemp_truncatefd(repo->packs[i].accumfd);
+		if (err)
+			return err;
 	}
 
 	if (i != 0) {

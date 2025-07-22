@@ -32,6 +32,7 @@
 #include "got_object.h"
 #include "got_repository.h"
 #include "got_path.h"
+#include "got_opentemp.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_hash.h"
@@ -172,11 +173,9 @@ wrap_fd(FILE **f, int wrapped_fd)
 	const struct got_error *err = NULL;
 	int fd;
 
-	if (ftruncate(wrapped_fd, 0L) == -1)
-		return got_error_from_errno("ftruncate");
-
-	if (lseek(wrapped_fd, 0L, SEEK_SET) == -1)
-		return got_error_from_errno("lseek");
+	err = got_opentemp_truncatefd(wrapped_fd);
+	if (err)
+		return err;
 
 	fd = dup(wrapped_fd);
 	if (fd == -1)
@@ -758,14 +757,9 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
-	if (ftruncate(outfd, 0L) == -1) {
-		err = got_error_from_errno("ftruncate");
+	err = got_opentemp_truncatefd(outfd);
+	if (err)
 		goto done;
-	}
-	if (lseek(outfd, 0L, SEEK_SET) == -1) {
-		err = got_error_from_errno("lseek");
-		goto done;
-	}
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {

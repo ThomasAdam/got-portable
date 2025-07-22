@@ -331,10 +331,9 @@ write_gotd_conf(void)
 	char repo_path[_POSIX_PATH_MAX];
 	struct timespec now;
 
-	if (ftruncate(gotd_conf_tmpfd, 0) == -1)
-		return got_error_from_errno("ftruncate");
-	if (lseek(gotd_conf_tmpfd, 0L, SEEK_SET) == -1)
-		return got_error_from_errno("lseek");
+	err = got_opentemp_truncatefd(gotd_conf_tmpfd);
+	if (err)
+		return err;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
 		return got_error_from_errno("clock_gettime");
