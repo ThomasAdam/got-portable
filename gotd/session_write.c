@@ -223,6 +223,7 @@ recv_packfile_received(int *pack_empty, struct imsg *imsg)
 static const struct got_error *
 request_gotsys_conf(struct gotd_imsgev *iev)
 {
+	const struct got_error *err = NULL;
 	struct gotd_imsg_packfile_get_content content_req;
 	const char *refname = "refs/heads/main";
 	const char *path = "gotsys.conf";
@@ -230,10 +231,9 @@ request_gotsys_conf(struct gotd_imsgev *iev)
 	size_t len;
 	int fd = -1;
 
-	if (ftruncate(gotd_session.content_fd, 0L) == -1)
-		return got_error_from_errno("ftruncate");
-	if (lseek(gotd_session.content_fd, 0L, SEEK_SET) == -1)
-		return got_error_from_errno("lseek");
+	err = got_opentemp_truncatefd(gotd_session.content_fd);
+	if (err)
+		return err;
 	
 	len = sizeof(content_req) + strlen(refname) + strlen(path);
 	wbuf = imsg_create(&iev->ibuf, GOTD_IMSG_PACKFILE_GET_CONTENT,

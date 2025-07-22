@@ -38,6 +38,7 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+#include "got_opentemp.h"
 
 #include "gotwebd.h"
 #include "log.h"
@@ -57,12 +58,7 @@ got_gotweb_closefile(FILE *f)
 {
 	const struct got_error *err = NULL;
 
-	if (fseek(f, 0, SEEK_SET) == -1)
-		err = got_error_from_errno("fseek");
-
-	if (ftruncate(fileno(f), 0) == -1 && err == NULL)
-		err = got_error_from_errno("ftruncate");
-
+	err = got_opentemp_truncate(f);
 	if (fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 

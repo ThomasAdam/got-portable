@@ -942,14 +942,9 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
-	if (ftruncate(outfd, 0L) == -1) {
-		err = got_error_from_errno("ftruncate");
+	err = got_opentemp_truncatefd(outfd);
+	if (err)
 		goto done;
-	}
-	if (lseek(outfd, 0L, SEEK_SET) == -1) {
-		err = got_error_from_errno("lseek");
-		goto done;
-	}
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {
