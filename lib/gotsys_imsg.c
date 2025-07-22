@@ -747,6 +747,259 @@ send_protected_refs(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 }
 
 static const struct got_error *
+send_notification_target_email(struct gotsysd_imsgev *iev,
+    const char *repo_name, struct gotsys_notification_target *target)
+{
+	struct gotsysd_imsg_notitfication_target_email itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	if (target->conf.email.sender)
+		itarget.sender_len = strlen(target->conf.email.sender);
+	if (target->conf.email.recipient)
+		itarget.recipient_len = strlen(target->conf.email.recipient);
+	if (target->conf.email.responder)
+		itarget.responder_len = strlen(target->conf.email.responder);
+	if (target->conf.email.hostname)
+		itarget.hostname_len = strlen(target->conf.email.hostname);
+	if (target->conf.email.port)
+		itarget.port_len = strlen(target->conf.email.port);
+	itarget.repo_name_len = strlen(repo_name);
+
+	wbuf = imsg_create(&iev->ibuf,
+	    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_EMAIL,
+	    0, 0, sizeof(itarget) + itarget.sender_len + itarget.recipient_len +
+	    itarget.responder_len + itarget.hostname_len + itarget.port_len +
+	    itarget.repo_name_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+	if (target->conf.email.sender) {
+		if (imsg_add(wbuf, target->conf.email.sender,
+		    itarget.sender_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+
+	if (target->conf.email.recipient) {
+		if (imsg_add(wbuf, target->conf.email.recipient,
+		    itarget.recipient_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.responder) {
+		if (imsg_add(wbuf, target->conf.email.responder,
+		    itarget.responder_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.hostname) {
+		if (imsg_add(wbuf, target->conf.email.hostname,
+		    itarget.hostname_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (target->conf.email.port) {
+		if (imsg_add(wbuf, target->conf.email.port,
+		    itarget.port_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_EMAIL");
+		}
+	}
+	if (imsg_add(wbuf, repo_name, itarget.repo_name_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_EMAIL");
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	gotsysd_imsg_event_add(iev);
+	return NULL;
+}
+
+static const struct got_error *
+send_notification_target_http(struct gotsysd_imsgev *iev, const char *repo_name,
+    struct gotsys_notification_target *target)
+{
+	struct gotsysd_imsg_notitfication_target_http itarget;
+	struct ibuf *wbuf = NULL;
+
+	memset(&itarget, 0, sizeof(itarget));
+
+	itarget.tls = target->conf.http.tls;
+	itarget.hostname_len = strlen(target->conf.http.hostname);
+	itarget.port_len = strlen(target->conf.http.port);
+	itarget.path_len = strlen(target->conf.http.path);
+	if (target->conf.http.user)
+		itarget.user_len = strlen(target->conf.http.user);
+	if (target->conf.http.password)
+		itarget.password_len = strlen(target->conf.http.password);
+	if (target->conf.http.hmac_secret)
+		itarget.hmac_len = strlen(target->conf.http.hmac_secret);
+	itarget.repo_name_len = strlen(repo_name);
+
+	wbuf = imsg_create(&iev->ibuf,
+	    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_HTTP,
+	    0, 0, sizeof(itarget) + itarget.hostname_len + itarget.port_len +
+	    itarget.path_len + itarget.user_len + itarget.password_len +
+	    itarget.hmac_len + itarget.repo_name_len);
+	if (wbuf == NULL) {
+		return got_error_from_errno("imsg_create "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (imsg_add(wbuf, &itarget, sizeof(itarget)) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.hostname,
+	    itarget.hostname_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.port,
+	    itarget.port_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+	if (imsg_add(wbuf, target->conf.http.path,
+	    itarget.path_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	if (target->conf.http.user) {
+		if (imsg_add(wbuf, target->conf.http.user, itarget.user_len) == -1)
+			return got_error_from_errno("imsg_add NOTIFICATION_TARGET_HTTP");
+	}
+	if (target->conf.http.password) {
+		if (imsg_add(wbuf, target->conf.http.password,
+		    itarget.password_len) == -1)
+			return got_error_from_errno("imsg_add NOTIFICATION_TARGET_HTTP");
+	}
+	if (target->conf.http.hmac_secret) {
+		if (imsg_add(wbuf, target->conf.http.hmac_secret,
+		    itarget.hmac_len) == -1) {
+			return got_error_from_errno("imsg_add "
+			    "NOTIFICATION_TARGET_HTTP");
+		}
+	}
+	if (imsg_add(wbuf, repo_name, itarget.repo_name_len) == -1) {
+		return got_error_from_errno("imsg_add "
+		    "NOTIFICATION_TARGET_HTTP");
+	}
+
+	imsg_close(&iev->ibuf, wbuf);
+	gotsysd_imsg_event_add(iev);
+	return NULL;
+}
+
+static const struct got_error *
+send_notification_target(struct gotsysd_imsgev *iev, const char *repo_name,
+    struct gotsys_notification_target *target)
+{
+	const struct got_error *err = NULL;
+
+	switch (target->type) {
+	case GOTSYS_NOTIFICATION_VIA_EMAIL:
+		err = send_notification_target_email(iev, repo_name, target);
+		break;
+	case GOTSYS_NOTIFICATION_VIA_HTTP:
+		err = send_notification_target_http(iev, repo_name, target);
+		break;
+	default:
+		break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+send_notification_targets(struct gotsysd_imsgev *iev, const char *repo_name,
+    struct gotsys_notification_targets *targets)
+{
+	const struct got_error *err = NULL;
+	struct gotsys_notification_target *target;
+
+	STAILQ_FOREACH(target, targets, entry) {
+		err = send_notification_target(iev, repo_name, target);
+		if (err)
+			return err;
+	}
+
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGETS_DONE, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("gotsysd_imsg_compose_event");
+
+	return NULL;
+}
+
+static const struct got_error *
+send_notification_config(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct gotsysd_imsg_pathlist ilist;
+
+	memset(&ilist, 0, sizeof(ilist));
+
+	ilist.nelem = repo->num_notification_refs;
+	if (ilist.nelem > 0) {
+		if (gotsysd_imsg_compose_event(iev,
+		    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS, 0, -1,
+		    &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "NOTIFICATION_REFS");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head, &repo->notification_refs) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_DONE, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("gotsysd_imsg_compose_event");
+
+	ilist.nelem = repo->num_notification_ref_namespaces;
+	if (ilist.nelem > 0) {
+		if (gotsysd_imsg_compose_event(iev,
+		    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES, 0, -1,
+		    &ilist, sizeof(ilist)) == -1) {
+			return got_error_from_errno("imsg compose "
+			    "NOTIFICATION_REF_NAMESPACES");
+		}
+
+		RB_FOREACH(pe, got_pathlist_head,
+		    &repo->notification_ref_namespaces) {
+			err = send_pathlist_elem(iev, pe->path,
+			    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_ELEM);
+			if (err)
+				return err;
+		}
+	}
+
+	if (gotsysd_imsg_compose_event(iev,
+	    GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_DONE, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("gotsysd_imsg_compose_event");
+
+	return send_notification_targets(iev, repo->name, &repo->notification_targets);
+}
+
+static const struct got_error *
 send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 {
 	const struct got_error *err;
@@ -791,7 +1044,9 @@ send_repo(struct gotsysd_imsgev *iev, struct gotsys_repo *repo)
 	if (err)
 		return err;
 
-	/* TODO: send notification config */
+	err = send_notification_config(iev, repo);
+	if (err)
+		return err;
 
 	return NULL;
 }
@@ -982,5 +1237,271 @@ gotsys_imsg_recv_pathlist_elem(struct imsg *imsg,
 	err = got_pathlist_insert(&pe, paths, path, NULL);
 	if (err || pe == NULL)
 		free(path);
+	return err;
+}
+
+const struct got_error *
+gotsys_imsg_recv_notification_target_email(char **repo_name,
+    struct gotsys_notification_target **new_target, struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	struct gotsysd_imsg_notitfication_target_email itarget;
+	struct gotsys_notification_target *target;
+	size_t datalen;
+
+	if (repo_name)
+		*repo_name = NULL;
+	*new_target = NULL;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(itarget))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&itarget, imsg->data, sizeof(itarget));
+
+	if (datalen != sizeof(itarget) + itarget.sender_len +
+	    itarget.recipient_len + itarget.responder_len +
+	    itarget.hostname_len + itarget.port_len + itarget.repo_name_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (itarget.recipient_len == 0 || itarget.repo_name_len == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	target = calloc(1, sizeof(*target));
+	if (target == NULL)
+		return got_error_from_errno("calloc");
+
+	target->type = GOTSYS_NOTIFICATION_VIA_EMAIL;
+
+	if (itarget.sender_len) {
+		target->conf.email.sender = strndup(imsg->data +
+		    sizeof(itarget), itarget.sender_len);
+		if (target->conf.email.sender == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.email.sender) != itarget.sender_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	target->conf.email.recipient = strndup(imsg->data + sizeof(itarget) +
+	    itarget.sender_len, itarget.recipient_len);
+	if (target->conf.email.recipient == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	if (strlen(target->conf.email.recipient) != itarget.recipient_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	
+	if (itarget.responder_len) {
+		target->conf.email.responder = strndup(imsg->data +
+		    sizeof(itarget) + itarget.sender_len +
+		    itarget.recipient_len, itarget.responder_len);
+		if (target->conf.email.responder == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.email.responder) !=
+		    itarget.responder_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (itarget.hostname_len) {
+		target->conf.email.hostname = strndup(imsg->data +
+		    sizeof(itarget) + itarget.sender_len +
+		    itarget.recipient_len + itarget.responder_len,
+		    itarget.hostname_len);
+		if (target->conf.email.hostname == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.email.hostname) !=
+		    itarget.hostname_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (itarget.port_len) {
+		target->conf.email.port = strndup(imsg->data +
+		    sizeof(itarget) + itarget.sender_len +
+		    itarget.recipient_len + itarget.responder_len +
+		    itarget.hostname_len, itarget.port_len);
+		if (target->conf.email.port == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.email.port) != itarget.port_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (repo_name) {
+		*repo_name = strndup(imsg->data +
+		    sizeof(itarget) + itarget.sender_len +
+		    itarget.recipient_len + itarget.responder_len +
+		    itarget.hostname_len + itarget.port_len,
+		    itarget.repo_name_len);
+		if (*repo_name == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(*repo_name) != itarget.repo_name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			free(*repo_name);
+			*repo_name = NULL;
+			goto done;
+		}
+	}
+
+	*new_target = target;
+done:
+	if (err)
+		gotsys_notification_target_free(target);
+	return err;
+}
+
+const struct got_error *
+gotsys_imsg_recv_notification_target_http(char **repo_name,
+    struct gotsys_notification_target **new_target, struct imsg *imsg)
+{
+	const struct got_error *err = NULL;
+	struct gotsysd_imsg_notitfication_target_http itarget;
+	struct gotsys_notification_target *target;
+	size_t datalen;
+
+	if (repo_name)
+		*repo_name = NULL;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(itarget))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&itarget, imsg->data, sizeof(itarget));
+
+	if (datalen != sizeof(itarget) + itarget.hostname_len +
+	    itarget.port_len + itarget.path_len + itarget.user_len +
+	    itarget.password_len + itarget.hmac_len + itarget.repo_name_len)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	if (itarget.hostname_len == 0 || itarget.port_len == 0 ||
+	    itarget.path_len == 0 || itarget.repo_name_len == 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	target = calloc(1, sizeof(*target));
+	if (target == NULL)
+		return got_error_from_errno("calloc");
+
+	target->type = GOTSYS_NOTIFICATION_VIA_HTTP;
+
+	target->conf.http.tls = itarget.tls;
+
+	target->conf.http.hostname = strndup(imsg->data +
+	    sizeof(itarget), itarget.hostname_len);
+	if (target->conf.http.hostname == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	if (strlen(target->conf.http.hostname) != itarget.hostname_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	target->conf.http.port = strndup(imsg->data + sizeof(itarget) +
+	    itarget.hostname_len, itarget.port_len);
+	if (target->conf.http.port == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	if (strlen(target->conf.http.port) != itarget.port_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	
+	target->conf.http.path = strndup(imsg->data +
+	    sizeof(itarget) + itarget.hostname_len + itarget.port_len,
+	    itarget.path_len);
+	if (target->conf.http.path == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+	if (strlen(target->conf.http.path) != itarget.path_len) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	if (itarget.user_len) {
+		target->conf.http.user = strndup(imsg->data +
+		    sizeof(itarget) + itarget.hostname_len +
+		    itarget.port_len + itarget.path_len,
+		    itarget.user_len);
+		if (target->conf.http.user == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.http.user) != itarget.user_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (itarget.password_len) {
+		target->conf.http.password = strndup(imsg->data +
+		    sizeof(itarget) + itarget.hostname_len +
+		    itarget.port_len + itarget.path_len + itarget.user_len,
+		    itarget.password_len);
+		if (target->conf.http.password == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.http.password) !=
+		    itarget.password_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (itarget.hmac_len) {
+		target->conf.http.hmac_secret = strndup(imsg->data +
+		    sizeof(itarget) + itarget.hostname_len +
+		    itarget.port_len + itarget.path_len +
+		    itarget.user_len + itarget.password_len,
+		    itarget.hmac_len);
+		if (target->conf.http.hmac_secret == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(target->conf.http.hmac_secret) != itarget.hmac_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+	}
+
+	if (repo_name) {
+		*repo_name = strndup(imsg->data +
+		    sizeof(itarget) + itarget.hostname_len +
+		    itarget.port_len + itarget.path_len +
+		    itarget.user_len + itarget.password_len +
+		    itarget.hmac_len, itarget.repo_name_len);
+		if (*repo_name == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (strlen(*repo_name) != itarget.repo_name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			free(*repo_name);
+			*repo_name = NULL;
+			goto done;
+		}
+	}
+		
+	*new_target = target;
+done:
+	if (err)
+		gotsys_notification_target_free(target);
 	return err;
 }

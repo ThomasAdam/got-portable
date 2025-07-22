@@ -106,7 +106,9 @@ struct gotsys_repo {
 	size_t nprotected_branches;
 
 	struct got_pathlist_head notification_refs;
+	size_t num_notification_refs;
 	struct got_pathlist_head notification_ref_namespaces;
+	size_t num_notification_ref_namespaces;
 	struct gotsys_notification_targets notification_targets;
 };
 TAILQ_HEAD(gotsys_repolist, gotsys_repo);

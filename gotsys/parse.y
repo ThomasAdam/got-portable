@@ -1315,6 +1315,8 @@ conf_notify_branch(struct gotsys_repo *repo, char *branchname)
 	}
 	if (pe == NULL)
 		free(refname);
+	else
+		repo->num_notification_refs++;
 
 	return 0;
 }
@@ -1344,8 +1346,67 @@ conf_notify_ref_namespace(struct gotsys_repo *repo, char *namespace)
 	}
 	if (pe == NULL)
 		free(s);
+	else
+		repo->num_notification_ref_namespaces++;
 
 	return 0;
+}
+
+static int
+email_address_is_valid(const char *s)
+{
+	const char allowed[] = {
+	    '!', '%', '&', '*', '+', '-', '/', '?',
+	    '^', '_', '`', '.', '{', '|', '}', '~'
+	};
+	size_t i, j, len = strlen(s);
+	char *at;
+	ptrdiff_t local_len;
+	size_t domain_len;
+
+	if (s[0] == '\0' || s[0] == '.')
+		return 0;
+
+	at = strchr(s, '@');
+	if (at == NULL)
+		return 0;
+
+	local_len = at - s;
+	if (local_len == 0 || local_len > 64)
+		return 0;
+	
+	for (i = 0; i < local_len; i++) {
+		if (isalnum(s[i]))
+			continue;
+
+		for (j = 0; j < nitems(allowed); j++) {
+			if (s[i] == allowed[j])
+				break;
+		}
+		if (j < nitems(allowed))
+			continue;
+
+		return 0;
+	}
+
+	if (s[local_len - 1] == '.')
+		return 0;
+
+	if (s[local_len + 1] == '-' || s[len - 1] == '-')
+		return 0;
+
+	domain_len = len - local_len;
+	if (domain_len == 0 || domain_len > 255)
+		return 0;
+
+	for (i = local_len + 1; i < domain_len; i++) {
+		if (isalnum(s[i]) || s[i] == '.' || s[i] == '-')
+			continue;
+
+		return 0;
+	}
+
+	return 1;
 }
 
 static int
@@ -1371,11 +1432,20 @@ conf_notify_email(struct gotsys_repo *repo, char *sender, char *recipient,
 	}
 	target->type = GOTSYS_NOTIFICATION_VIA_EMAIL;
 	if (sender) {
+		if (!email_address_is_valid(sender)) {
+			yyerror("invalid email address: %s", sender);
+			goto free_target;
+		}
 		target->conf.email.sender = strdup(sender);
 		if (target->conf.email.sender == NULL) {
 			yyerror("strdup: %s", strerror(errno));
 			goto free_target;
 		}
+	}
+
+	if (!email_address_is_valid(recipient)) {
+		yyerror("invalid email address: %s", recipient);
+		goto free_target;
 	}
 	target->conf.email.recipient = strdup(recipient);
 	if (target->conf.email.recipient == NULL) {
@@ -1383,6 +1453,10 @@ conf_notify_email(struct gotsys_repo *repo, char *sender, char *recipient,
 		goto free_target;
 	}
 	if (responder) {
+		if (!email_address_is_valid(responder)) {
+			yyerror("invalid email address: %s", responder);
+			goto free_target;
+		}
 		target->conf.email.responder = strdup(responder);
 		if (target->conf.email.responder == NULL) {
 			yyerror("strdup: %s", strerror(errno));
@@ -1412,18 +1486,97 @@ free_target:
 	return -1;
 }
 
+static inline int
+should_urlencode(int c)
+{
+	if (c <= ' ' || c >= 127)
+		return 1;
+
+	switch (c) {
+		/* gen-delim */
+	case ':':
+	case '/':
+	case '?':
+	case '#':
+	case '[':
+	case ']':
+	case '@':
+		/* sub-delims */
+	case '!':
+	case '$':
+	case '&':
+	case '\'':
+	case '(':
+	case ')':
+	case '*':
+	case '+':
+	case ',':
+	case ';':
+	case '=':
+		/* needed because the URLs are embedded into gotd.conf */
+	case '\"':
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static char *
+urlencode(const char *str)
+{
+	const char *s;
+	char *escaped;
+	size_t i, len;
+	int a, b;
+
+	len = 0;
+	for (s = str; *s; ++s) {
+		len++;
+		if (len == 1 && *s == '/')
+			continue;
+		if (should_urlencode(*s))
+			len += 2;
+	}
+
+	escaped = calloc(1, len + 1);
+	if (escaped == NULL)
+		return NULL;
+
+	i = 0;
+	for (s = str; *s; ++s) {
+		if (i == 0 && *s == '/') {
+			escaped[i++] = *s;
+			continue;
+		}
+		if (should_urlencode(*s)) {
+			a = (*s & 0xF0) >> 4;
+			b = (*s & 0x0F);
+
+			escaped[i++] = '%';
+			escaped[i++] = a <= 9 ? ('0' + a) : ('7' + a);
+			escaped[i++] = b <= 9 ? ('0' + b) : ('7' + b);
+		} else
+			escaped[i++] = *s;
+	}
+
+	return escaped;
+}
+
 static const struct got_error *
 parse_url(char **proto, char **host, char **port,
     char **request_path, const char *url)
 {
 	const struct got_error *err = NULL;
 	char *s, *p, *q;
+	size_t i, host_len;
 
 	*proto = *host = *port = *request_path = NULL;
 
 	p = strstr(url, "://");
-	if (!p)
-		return got_error(GOT_ERR_PARSE_URI);
+	if (!p) {
+		return got_error_msg(GOT_ERR_PARSE_URI,
+		    "no protocol specified");
+	}
 
 	*proto = strndup(url, p - url);
 	if (*proto == NULL) {
@@ -1433,10 +1586,8 @@ parse_url(char **proto, char **host, char **port,
 	s = p + 3;
 
 	p = strstr(s, "/");
-	if (p == NULL) {
-		err = got_error(GOT_ERR_PARSE_URI);
-		goto done;
-	}
+	if (p == NULL)
+		p = (char *)&url[strlen(url) - 1];
 
 	q = memchr(s, ':', p - s);
 	if (q) {
@@ -1458,6 +1609,17 @@ parse_url(char **proto, char **host, char **port,
 			err = got_error(GOT_ERR_PARSE_URI);
 			goto done;
 		}
+		if (strcmp(*port, "http") != 0 &&
+		    strcmp(*port, "https") != 0) {
+			const char *errstr;
+
+			(void)strtonum(*port, 1, USHRT_MAX, &errstr);
+			if (errstr != NULL) {
+				err = got_error_fmt(GOT_ERR_PARSE_URI,
+				    "port number '%s' is %s", *port, errstr);
+				goto done;
+			}
+		}
 	} else {
 		*host = strndup(s, p - s);
 		if (*host == NULL) {
@@ -1465,21 +1627,34 @@ parse_url(char **proto, char **host, char **port,
 			goto done;
 		}
 		if ((*host)[0] == '\0') {
-			err = got_error(GOT_ERR_PARSE_URI);
+			err = got_error_msg(GOT_ERR_PARSE_URI,
+			    "hostname cannot be empty");
 			goto done;
 		}
 	}
 
+	host_len = strlen(*host);
+	for (i = 0; i < host_len; i++) {
+		if (isalnum((*host)[i]) ||
+		    (*host)[i] == '.' || (*host)[i] == '-')
+			continue;
+		err = got_error_fmt(GOT_ERR_PARSE_URI,
+		    "invalid hostname: %s", *host);
+		goto done;
+
+	}
+
 	while (p[0] == '/' && p[1] == '/')
 		p++;
-	*request_path = strdup(p);
-	if (*request_path == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
-	}
-	if ((*request_path)[0] == '\0') {
-		err = got_error(GOT_ERR_PARSE_URI);
-		goto done;
+	if (p[0] == '\0') {
+		*request_path = strdup("/");
+		if (*request_path == NULL) {
+			err = got_error_from_errno("strdup");
+		}
+	} else {
+		*request_path = urlencode(p);
+		if (*request_path == NULL)
+			err = got_error_from_errno("calloc");
 	}
 done:
 	if (err) {
@@ -1493,6 +1668,68 @@ done:
 		*request_path = NULL;
 	}
 	return err;
+}
+
+static int
+basic_auth_user_is_valid(const char *s)
+{
+	size_t i, len;
+
+	if (s[0] == '\0')
+		return 0;
+
+	len = strlen(s);
+	for (i = 0; i < len; i++) {
+		if (s[i] & 0x80)
+			return 0;
+
+		if (isalnum(s[i]) ||
+		    (i > 0 && s[i] == '-') ||
+		    (i > 0 && s[i] == '_') ||
+		    (i > 0 && s[i] == '.'))
+			continue;
+
+		return 0;
+	}
+
+	return 1;
+}
+
+static int
+basic_auth_password_is_valid(const char *s)
+{
+	size_t i, len;
+
+	if (s[0] == '\0')
+		return 0;
+
+	len = strlen(s);
+	for (i = 0; i < len; i++) {
+		if (s[i] & 0x80)
+			return 0;
+		if (iscntrl(s[i]))
+			return 0;
+		if (s[i] == '"')
+			return 0;
+
+	}
+
+	return 1;
+}
+
+static int
+validate_hmac_secret(const char *s, size_t len)
+{
+	static const u_int8_t base64chars[] =
+	    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		if (strchr(base64chars, s[i]) == NULL)
+			return 0;
+	}
+
+	return 1;
 }
 
 static int
@@ -1573,9 +1810,34 @@ conf_notify_http(struct gotsys_repo *repo, char *url, char *user,
 	path = NULL;
 
 	if (user) {
+		if (user[0] == '\0') {
+			yyerror("%s: basic auth user names cannot be empty",
+			    url);
+			goto done;
+		}
+		if (!basic_auth_user_is_valid(user)) {
+			yyerror("%s: basic auth user names may only "
+			    "contain alphabetic ASCII characters,  "
+			    "non-leading digits, non-leading hyphens, "
+			    "non-leading underscores, or non-leading "
+			    "periods", url);
+			goto done;
+		}
 		target->conf.http.user = strdup(user);
 		if (target->conf.http.user == NULL) {
 			yyerror("strdup: %s", strerror(errno));
+			goto done;
+		}
+		if (password[0] == '\0') {
+			yyerror("%s: basic auth passwords cannot be empty",
+			    url);
+			goto done;
+		}
+		if (!basic_auth_password_is_valid(user)) {
+			yyerror("%s: passwords for basic auth may only "
+			    "contain ASCII characters, excluding control "
+			    "characters and the \" (double quote) character",
+			    url);
 			goto done;
 		}
 		target->conf.http.password = strdup(password);
@@ -1586,6 +1848,16 @@ conf_notify_http(struct gotsys_repo *repo, char *url, char *user,
  	}
 
 	if (hmac_secret) {
+		if (hmac_secret[9] == '\0') {
+			yyerror("hmac secrets cannot be empty");
+			goto done;
+		}
+		if (!validate_hmac_secret(hmac_secret, strlen(hmac_secret))) {
+			yyerror("hmac secrets must be base64-encoded; use "
+			    "'openssl rand -base64 32' output instead of: %s",
+			    hmac_secret);
+			goto done;
+		}
 		target->conf.http.hmac_secret = strdup(hmac_secret);
 		if (target->conf.http.hmac_secret == NULL) {
 			yyerror("strdup: %s", strerror(errno));
