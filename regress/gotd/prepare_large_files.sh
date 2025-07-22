@@ -28,6 +28,6 @@ for i in 2 3; do
        (cd "$test_tree" && got add "$test_tree/large_file$i" > /dev/null)
 done
 
-(cd "$test_tree" && got commit -m "add large objects" "$test_tree" > /dev/null)
+(cd "$test_tree" && got commit -m "add large files" "$test_tree" > /dev/null)
 
 rm -r "$test_tree"
