@@ -26,12 +26,16 @@ GOTSYSD_VM_PASSWORD?=gameoftrees
 GOTSYSD_VM_PASSWD_FILE=gotsysd_vm_passwd
 GOTD_CONF=gotd.conf
 GOTD_UID=501	# /usr/ports/infrastructure/db/user.list
+GOTD_USER=_gotd
 GOTSYSD_CONF=gotsysd.conf
 GOTSYSD_UID=600	# /usr/ports/infrastructure/db/user.list
 GOTSYS_CONF=gotsys.conf
 GOT_CONF=got.conf
 GOTSYS_REPO=gotsys.git
 GOTWEBD_UID=593	# /usr/ports/infrastructure/db/user.list
+GOTSYSD_TEST_SMTP_PORT=2525
+GOTSYSD_TEST_HTTP_PORT=8000
+GOTSYSD_TEST_HMAC_SECRET!=openssl rand -base64 32
 
 GOTSYSD_TEST_USER?=${DOAS_USER}
 .if empty(GOTSYSD_TEST_USER)
@@ -55,7 +59,11 @@ GOTSYSD_TEST_ENV=GOTSYSD_TEST_ROOT=${GOTSYSD_TEST_ROOT} \
 	GOTSYSD_SSH_PUBKEY=${GOTSYSD_SSH_PUBKEY} \
 	GOTSYS_REPO=${GOTSYS_REPO} \
 	HOME=$(GOTSYSD_TEST_USER_HOME) \
-	PATH=$(GOTSYSD_TEST_USER_HOME)/bin:$(PATH)
+	PATH=$(GOTSYSD_TEST_USER_HOME)/bin:$(PATH) \
+	GOTD_USER=${GOTD_USER} \
+	GOTSYSD_TEST_SMTP_PORT=${GOTSYSD_TEST_SMTP_PORT} \
+	GOTSYSD_TEST_HTTP_PORT=${GOTSYSD_TEST_HTTP_PORT} \
+	GOTSYSD_TEST_HMAC_SECRET=${GOTSYSD_TEST_HMAC_SECRET}
 
 
 UNPRIV=su -m ${GOTSYSD_TEST_USER} -c
@@ -270,6 +278,8 @@ test_gotsysd:
 	VMID=`vmctl status ${GOTSYSD_VM_NAME} | tail -n1 | \
 		awk '{print $$1}'`; \
 	VMIP="100.64.$$VMID.3"; \
-	${UNPRIV} "env ${GOTSYSD_TEST_ENV} VMIP=$${VMIP} sh ./test_gotsysd.sh"
+	GWIP="100.64.$$VMID.2"; \
+	${UNPRIV} "env ${GOTSYSD_TEST_ENV} VMIP=$${VMIP} GWIP=$${GWIP} \
+		sh ./test_gotsysd.sh"
 
 .include <bsd.regress.mk>

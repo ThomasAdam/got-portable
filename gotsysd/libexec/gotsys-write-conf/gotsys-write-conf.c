@@ -49,7 +49,13 @@ static size_t nprotected_refs_needed;
 static size_t nprotected_refs_received;
 static int gotd_conf_tmpfd = -1;
 static char *gotd_conf_tmppath;
+static int gotd_secrets_tmpfd = -1;
+static char *gotd_secrets_tmppath;
 static struct gotsys_access_rule_list global_repo_access_rules;
+static struct got_pathlist_head *notif_refs_cur;
+static size_t *num_notif_refs_cur;
+static size_t num_notif_refs_needed;
+static size_t num_notif_refs_received;
 
 enum writeconf_state {
 	WRITECONF_STATE_EXPECT_USERS,
@@ -323,6 +329,349 @@ done:
 }
 
 static const struct got_error *
+write_notification_target_email(struct gotsys_notification_target *target)
+{
+	char sender[128];
+	char recipient[128];
+	char responder[128];
+	int ret = 0;
+
+	if (target->conf.email.sender) {
+		ret = snprintf(sender, sizeof(sender), " from \"%s\"",
+		    target->conf.email.sender);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(sender)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "notification email sender too long");
+		}
+	} else
+		sender[0] = '\0';
+
+	ret = snprintf(recipient, sizeof(recipient), " to \"%s\"",
+	    target->conf.email.recipient);
+	if (ret == -1)
+		return got_error_from_errno("snprintf");
+	if ((size_t)ret >= sizeof(recipient)) {
+		return got_error_msg(GOT_ERR_NO_SPACE,
+		    "notification email recipient too long");
+	}
+
+	if (target->conf.email.responder) {
+		ret = snprintf(responder, sizeof(responder), " reply to \"%s\"",
+		    target->conf.email.responder);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(responder)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "notification email responder too long");
+		}
+	} else
+		responder[0] = '\0';
+
+	ret = dprintf(gotd_conf_tmpfd, "\t\temail%s%s%s\n",
+	    sender, recipient, responder);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 8 + strlen(sender) + strlen(recipient) + strlen(responder)) {
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+write_notification_target_http(struct gotsys_notification_target *target,
+    int idx)
+{
+	char proto[16];
+	char port[16];
+	char label[16];
+	char auth[128];
+	char insecure[16];
+	char hmac[128];
+	int ret = 0;
+
+	insecure[0] = '\0';
+
+	if (target->conf.http.tls) {
+		if (strlcpy(proto, "https://", sizeof(proto)) >=
+		    sizeof(proto)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "http notification protocol too long");
+		}
+	} else {
+		if (strlcpy(proto, "http://", sizeof(proto)) >=
+		    sizeof(proto)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "http notification protocol too long");
+		}
+
+		if (target->conf.http.user && target->conf.http.password) {
+			if (strlcpy(insecure, " insecure", sizeof(insecure)) >=
+			    sizeof(insecure)) {
+				return got_error_msg(GOT_ERR_NO_SPACE, "http "
+				    "notification insecure keyword too long");
+			}
+		}
+	}
+
+	if (target->conf.http.port) {
+		ret = snprintf(port, sizeof(port), ":%s",
+		    target->conf.http.port);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(port)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "notification http port too long");
+		}
+	} else
+		port[0] = '\0';
+
+	if (target->conf.http.user && target->conf.http.password) {
+		ret = snprintf(label, sizeof(label), "basic%d", idx);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(label)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "basic auth label too long");
+		}
+
+		ret = snprintf(auth, sizeof(auth), " auth %s", label);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(label)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "http notification auth too long");
+		}
+	} else
+		auth[0] = '\0';
+
+	if (target->conf.http.hmac_secret) {
+		ret = snprintf(label, sizeof(label), "hmac%d", idx);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(label)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "notification http hmac label too long");
+		}
+
+		ret = snprintf(hmac, sizeof(hmac), " hmac %s", label);
+		if (ret == -1)
+			return got_error_from_errno("snprintf");
+		if ((size_t)ret >= sizeof(label)) {
+			return got_error_msg(GOT_ERR_NO_SPACE,
+			    "http notification hmac too long");
+		}
+	} else
+		hmac[0] = '\0';
+
+	ret = dprintf(gotd_conf_tmpfd, "\t\turl \"%s%s%s/%s\"%s%s%s\n",
+		proto, target->conf.http.hostname, port,
+		target->conf.http.path, auth, insecure, hmac);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 10 + strlen(proto) + strlen(target->conf.http.hostname) +
+	    strlen(port) + strlen(target->conf.http.path) + strlen(auth) +
+	    strlen(insecure) + strlen(hmac)) {
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+write_notification_targets(struct gotsys_repo *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct gotsys_notification_target *target;
+	const char *opening = "notify {";
+	const char *closing = "}";
+	char *namespace = NULL;
+	int ret = 0, i;
+
+	if (STAILQ_EMPTY(&repo->notification_targets))
+		return NULL;
+
+	ret = dprintf(gotd_conf_tmpfd, "\t%s\n", opening);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 2 + strlen(opening))
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+
+	RB_FOREACH(pe, got_pathlist_head, &repo->notification_refs) {
+		err = refname_is_valid(pe->path);
+		if (err)
+			return err;
+		ret = dprintf(gotd_conf_tmpfd, "\t\tbranch \"%s\"\n", pe->path);
+		if (ret == -1) {
+			return got_error_from_errno2("dprintf",
+			    gotd_conf_tmppath);
+		}
+		if (ret != 12 + strlen(pe->path))
+			return got_error_fmt(GOT_ERR_IO, "short write to %s",
+			    gotd_conf_tmppath);
+	}
+
+	RB_FOREACH(pe, got_pathlist_head, &repo->notification_ref_namespaces) {
+		namespace = strdup(pe->path);
+		if (namespace == NULL)
+			return got_error_from_errno("strdup");
+
+		got_path_strip_trailing_slashes(namespace);
+		err = refname_is_valid(namespace);
+		if (err)
+			goto done;
+
+		ret = dprintf(gotd_conf_tmpfd,
+		    "\t\treference namespace \"%s\"\n", namespace);
+		if (ret == -1) {
+			err = got_error_from_errno2("dprintf",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		if (ret != 25 + strlen(namespace)) {
+			err = got_error_fmt(GOT_ERR_IO, "short write to %s",
+			    gotd_conf_tmppath);
+			goto done;
+		}
+		free(namespace);
+		namespace = NULL;
+	}
+
+	i = 0;
+	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		i++;
+		switch (target->type) {
+		case GOTSYS_NOTIFICATION_VIA_EMAIL:
+			err = write_notification_target_email(target);
+			break;
+		case GOTSYS_NOTIFICATION_VIA_HTTP:
+			err = write_notification_target_http(target, i);
+			break;
+		default:
+			break;
+		}
+	}
+
+	ret = dprintf(gotd_conf_tmpfd, "\t%s\n", closing);
+	if (ret == -1)
+		return got_error_from_errno2("dprintf", gotd_conf_tmppath);
+	if (ret != 2 + strlen(closing))
+		return got_error_fmt(GOT_ERR_IO, "short write to %s",
+		    gotd_conf_tmppath);
+done:
+	free(namespace);
+	return err;
+}
+
+static const struct got_error *
+write_repo_secrets(off_t *written, struct gotsys_repo *repo)
+{
+	struct gotsys_notification_target *target;
+	char label[32];
+	int ret = 0, i = 0;
+	size_t len;
+
+	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		if (target->type != GOTSYS_NOTIFICATION_VIA_HTTP)
+			continue;
+
+		if (target->conf.http.user == NULL &&
+		    target->conf.http.password == NULL &&
+		    target->conf.http.hmac_secret == NULL)
+			continue;
+
+		i++;
+
+		if (target->conf.http.user && target->conf.http.password) {
+			ret = snprintf(label, sizeof(label), "basic%d", i);
+			if (ret == -1)
+				return got_error_from_errno("snprintf");
+			if ((size_t)ret >= sizeof(label)) {
+				return got_error_msg(GOT_ERR_NO_SPACE,
+				    "basic auth label too long");
+			}
+
+			ret = dprintf(gotd_secrets_tmpfd,
+			    "auth %s user \"%s\" password \"%s\"\n", label,
+			    target->conf.http.user, target->conf.http.password);
+			if (ret == -1)
+				return got_error_from_errno2("dprintf",
+				    gotd_secrets_tmppath);
+			len = strlen(label) +
+			    strlen(target->conf.http.user) +
+			    strlen(target->conf.http.password);
+			if (ret != 26 + len) {
+				return got_error_fmt(GOT_ERR_IO,
+				    "short write to %s", gotd_secrets_tmppath);
+			}
+			*written += ret;
+		}
+
+		if (target->conf.http.hmac_secret) {
+			ret = snprintf(label, sizeof(label), "hmac%d", i);
+			if (ret == -1)
+				return got_error_from_errno("snprintf");
+			if ((size_t)ret >= sizeof(label)) {
+				return got_error_msg(GOT_ERR_NO_SPACE,
+				    "hmac secret label too long");
+			}
+			ret = dprintf(gotd_secrets_tmpfd, "hmac %s \"%s\"\n",
+			    label, target->conf.http.hmac_secret);
+			if (ret == -1)
+				return got_error_from_errno2("dprintf",
+				    gotd_secrets_tmppath);
+			len = strlen(label) +
+			    strlen(target->conf.http.hmac_secret);
+			if (ret != 9 + len) {
+				return got_error_fmt(GOT_ERR_IO,
+				    "short write to %s", gotd_secrets_tmppath);
+			}
+			*written += ret;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+prepare_gotd_secrets(void)
+{
+	const struct got_error *err = NULL;
+	struct gotsys_repo *repo;
+	off_t written = 0;
+
+	if (ftruncate(gotd_secrets_tmpfd, 0) == -1)
+		return got_error_from_errno("ftruncate");
+
+	TAILQ_FOREACH(repo, &gotsysconf.repos, entry) {
+		err = write_repo_secrets(&written, repo);
+		if (err)
+			return err;
+	}
+
+	if (written == 0) {
+		if (unlink(gotd_secrets_tmppath) == -1) {
+			return got_error_from_errno2("unlink",
+			    gotd_secrets_tmppath);
+		}
+		free(gotd_secrets_tmppath);
+		gotd_secrets_tmppath = NULL;
+
+		if (close(gotd_secrets_tmpfd) == -1)
+			return got_error_from_errno("close");
+		gotd_secrets_tmpfd = -1;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 write_gotd_conf(void)
 {
 	const struct got_error *err = NULL;
@@ -405,6 +754,10 @@ write_gotd_conf(void)
 		if (err)
 			return err;
 
+		err = write_notification_targets(repo);
+		if (err)
+			return err;
+
 		ret = dprintf(gotd_conf_tmpfd, "}\n");
 		if (ret == -1)
 			return got_error_from_errno2("dprintf",
@@ -413,6 +766,21 @@ write_gotd_conf(void)
 			return got_error_fmt(GOT_ERR_IO,
 			    "short write to %s", gotd_conf_tmppath);
 		}
+	}
+
+	if (gotd_secrets_tmppath != NULL && gotd_secrets_tmpfd != -1) {
+		if (fchmod(gotd_secrets_tmpfd, 0600) == -1) {
+			return got_error_from_errno_fmt("chmod 0600 %s",
+			    gotd_secrets_tmppath);
+		}
+			
+		if (rename(gotd_secrets_tmppath, GOTD_SECRETS_PATH) == -1) {
+			return got_error_from_errno_fmt("rename %s to %s",
+			    gotd_conf_tmppath, GOTD_SECRETS_PATH);
+		}
+
+		free(gotd_secrets_tmppath);
+		gotd_secrets_tmppath = NULL;
 	}
 
 	if (fchmod(gotd_conf_tmpfd, 0644) == -1) {
@@ -692,7 +1060,133 @@ dispatch_event(int fd, short event, void *arg)
 				    writeconf_state);
 				break;
 			}
-			repo_cur = NULL;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS:
+			if (repo_cur == NULL ||
+			    notif_refs_cur != NULL ||
+			    num_notif_refs_needed != 0 ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			notif_refs_cur = &repo_cur->notification_refs;
+			num_notif_refs_cur = &repo_cur->num_notification_refs;
+			num_notif_refs_needed = npaths;
+			num_notif_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES:
+			if (repo_cur == NULL ||
+			    notif_refs_cur != NULL ||
+			    num_notif_refs_needed != 0 ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			notif_refs_cur =
+			    &repo_cur->notification_ref_namespaces;
+			num_notif_refs_cur =
+			    &repo_cur->num_notification_ref_namespaces;
+			num_notif_refs_needed = npaths;
+			num_notif_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_ELEM:
+			if (notif_refs_cur == NULL ||
+			    num_notif_refs_cur == NULL ||
+			    num_notif_refs_needed == 0 ||
+			    num_notif_refs_received >=
+			    num_notif_refs_needed ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist_elem(&imsg,
+			    notif_refs_cur);
+			if (err)
+				break;
+			if (++num_notif_refs_received >=
+			    num_notif_refs_needed) {
+				notif_refs_cur = NULL;
+				*num_notif_refs_cur = num_notif_refs_received;
+				num_notif_refs_needed = 0;
+				num_notif_refs_received = 0;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_DONE:
+			if (repo_cur == NULL ||
+			    num_notif_refs_needed != 0 ||
+			    notif_refs_cur != NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_DONE:
+			if (repo_cur == NULL ||
+			    num_notif_refs_needed != 0 ||
+			    notif_refs_cur != NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_EMAIL: {
+			struct gotsys_notification_target *target;
+
+			if (repo_cur == NULL ||
+			    num_notif_refs_needed != 0 ||
+			    notif_refs_cur != NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+
+			err = gotsys_imsg_recv_notification_target_email(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(&repo_cur->notification_targets,
+			    target, entry);
+			break;
+		}
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_HTTP: {
+			struct gotsys_notification_target *target;
+
+			if (repo_cur == NULL ||
+			    num_notif_refs_needed != 0 ||
+			    notif_refs_cur != NULL ||
+			    writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    writeconf_state);
+				break;
+			}
+
+			err = gotsys_imsg_recv_notification_target_http(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(&repo_cur->notification_targets,
+			    target, entry);
+			break;
+		}
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGETS_DONE:
 			break;
 		case GOTSYSD_IMSG_SYSCONF_REPOS_DONE:
 			if (writeconf_state != WRITECONF_STATE_EXPECT_REPOS) {
@@ -704,6 +1198,9 @@ dispatch_event(int fd, short event, void *arg)
 			}
 			repo_cur = NULL;
 			writeconf_state = WRITECONF_STATE_WRITE_CONF;
+			err = prepare_gotd_secrets();
+			if (err)
+				break;
 			err = write_gotd_conf();
 			if (err)
 				break;
@@ -774,6 +1271,10 @@ main(int argc, char *argv[])
 	    GOTD_CONF_PATH, "");
 	if (err)
 		goto done;
+	err = got_opentemp_named_fd(&gotd_secrets_tmppath, &gotd_secrets_tmpfd,
+	    GOTD_CONF_PATH, "");
+	if (err)
+		goto done;
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr chown unveil", NULL) == -1) {
 		err = got_error_from_errno("pledge");
@@ -785,8 +1286,18 @@ main(int argc, char *argv[])
 		goto done;
 	}
 
+	if (unveil(gotd_secrets_tmppath, "rwc") == -1) {
+		err = got_error_from_errno2("unveil rwc", gotd_secrets_tmppath);
+		goto done;
+	}
+
 	if (unveil(GOTD_CONF_PATH, "rwc") == -1) {
 		err = got_error_from_errno2("unveil rwc", GOTD_CONF_PATH);
+		goto done;
+	}
+
+	if (unveil(GOTD_SECRETS_PATH, "rwc") == -1) {
+		err = got_error_from_errno2("unveil rwc", GOTD_SECRETS_PATH);
 		goto done;
 	}
 
@@ -811,9 +1322,16 @@ done:
 	if (gotd_conf_tmppath && unlink(gotd_conf_tmppath) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", gotd_conf_tmppath);
 	free(gotd_conf_tmppath);
+	if (gotd_secrets_tmppath && unlink(gotd_secrets_tmppath) == -1 &&
+	    err == NULL)
+		err = got_error_from_errno2("unlink", gotd_secrets_tmppath);
+	free(gotd_secrets_tmppath);
 	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (gotd_conf_tmpfd != -1 && close(gotd_conf_tmpfd) == -1 &&
+	    err == NULL)
+		err = got_error_from_errno("close");
+	if (gotd_secrets_tmpfd != -1 && close(gotd_secrets_tmpfd) == -1 &&
 	    err == NULL)
 		err = got_error_from_errno("close");
 	if (err)

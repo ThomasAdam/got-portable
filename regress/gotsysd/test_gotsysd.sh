@@ -1879,6 +1879,482 @@ test_override_all_user_access() {
 		fi
 	done
 
+	# Undo gotsys.conf override
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'rm -f /etc/gotsysd.conf'
+
+	# Restart gotsysd (XXX need a better way to do this...)
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'pkill -xf /usr/local/sbin/gotsysd'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} '/usr/local/sbin/gotsysd -vvv'
+	sleep 1
+	ssh -q -i ${GOTSYSD_SSH_KEY} root@${VMIP} 'gotsys apply -w' > /dev/null
+
+	test_done "$testroot" "$ret"
+}
+
+# flan:password encoded in base64
+AUTH="ZmxhbjpwYXNzd29yZA=="
+
+test_http_notification() {
+	local testroot=`test_init http_notification 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+
+	notify url "http://${GWIP}:${GOTSYSD_TEST_HTTP_PORT}/" user flan password "password" insecure
+}
+EOF
+	(cd ${testroot}/wt && got commit -m "send http notifications" \
+		>/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+
+	notify url "http://${GWIP}:${GOTSYSD_TEST_HTTP_PORT}/" user flan password "password" insecure
+}
+EOF
+
+	(cd ${testroot}/wt && got commit -m "whitespace changes" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+	local author_time=`git_show_author_time $testroot/${GOTSYS_REPO}`
+
+	timeout 5 ./http-server -a $AUTH -l "$GWIP" \
+	    -p "$GOTSYSD_TEST_HTTP_PORT" > $testroot/stdout &
+
+	sleep 1 # server starts up
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	wait %1 # wait for the http "server"
+
+	echo -n > "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"type":"commit",
+		"short":false,
+		"repo":"gotsys.git",
+		"authenticated_user":"${GOTSYSD_TEST_USER}",
+		"id":"$commit_id",
+		"author":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"committer":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"date":$author_time,
+		"short_message":"whitespace changes",
+		"message":"whitespace changes\n",
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"gotsys.conf",
+				"added":2,
+				"removed":0
+			}],
+			"total":{
+				"added":1,
+				"removed":2
+			}
+		}
+	}]}
+	.
+	,j
+	w
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+test_http_notification_hmac() {
+	local testroot=`test_init http_notification_hmac 1`
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+
+	notify url "http://${GWIP}:${GOTSYSD_TEST_HTTP_PORT}/" user flan password "password" insecure hmac "${GOTSYSD_TEST_HMAC_SECRET}"
+}
+EOF
+
+	(cd ${testroot}/wt && got commit -m "add hmac" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+	notify url "http://${GWIP}:${GOTSYSD_TEST_HTTP_PORT}/" user flan password "password" insecure hmac "${GOTSYSD_TEST_HMAC_SECRET}"
+}
+EOF
+
+	(cd ${testroot}/wt && got commit -m "whitespace changes" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+	local author_time=`git_show_author_time $testroot/${GOTSYS_REPO}`
+
+	timeout 5 ./http-server -a $AUTH -l "$GWIP" \
+	    -p "$GOTSYSD_TEST_HTTP_PORT" -s "$GOTSYSD_TEST_HMAC_SECRET" \
+	    > $testroot/stdout &
+
+	sleep 1 # server starts up
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	wait %1 # wait for the http "server"
+
+	echo -n > "$testroot/stdout.expected"
+	ed -s "$testroot/stdout.expected" <<-EOF
+	a
+	{"notifications":[{
+		"type":"commit",
+		"short":false,
+		"repo":"gotsys.git",
+		"authenticated_user":"${GOTSYSD_TEST_USER}",
+		"id":"$commit_id",
+		"author":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"committer":{
+			"full":"$GOT_AUTHOR",
+			"name":"$GIT_AUTHOR_NAME",
+			"mail":"$GIT_AUTHOR_EMAIL",
+			"user":"$GOT_AUTHOR_11"
+		},
+		"date":$author_time,
+		"short_message":"whitespace changes",
+		"message":"whitespace changes\n",
+		"diffstat":{
+			"files":[{
+				"action":"modified",
+				"file":"gotsys.conf",
+				"added":0,
+				"removed":3
+			}],
+			"total":{
+				"added":1,
+				"removed":0
+			}
+		}
+	}]}
+	.
+	,j
+	w
+	EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+test_email_notification() {
+	local testroot=`test_init email_notification 1`
+
+	# Need to smtpd in the test VM since we will be using port 25
+	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+		'/etc/rc.d/smtpd stop' > /dev/null
+
+	got checkout -q $testroot/${GOTSYS_REPO} $testroot/wt >/dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	crypted_vm_pw=`echo ${GOTSYSD_VM_PASSWORD} | encrypt | tr -d '\n'`
+	crypted_pw=`echo ${GOTSYSD_DEV_PASSWORD} | encrypt | tr -d '\n'`
+	sshkey=`cat ${GOTSYSD_SSH_PUBKEY}`
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+	notify email to "${GOTSYSD_TEST_USER}@example.com"
+}
+EOF
+	(cd ${testroot}/wt && got commit -m "send email notifications" \
+		>/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# Wait for gotsysd to apply the new configuration.
+	echo "$commit_id" > $testroot/stdout.expected
+	for i in 1 2 3 4 5; do
+		sleep 1
+		ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+			cat /var/db/gotsysd/commit > $testroot/stdout
+		if cmp -s $testroot/stdout.expected $testroot/stdout; then
+			break;
+		fi
+	done
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "gotsysd failed to apply configuration" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > ${testroot}/wt/gotsys.conf <<EOF
+group slackers
+
+user ${GOTSYSD_TEST_USER} {
+	password "${crypted_vm_pw}" 
+	authorized key ${sshkey}
+}
+
+user ${GOTSYSD_DEV_USER} {
+	password "${crypted_pw}" 
+	authorized key ${sshkey}
+}
+
+repository gotsys.git {
+	permit rw ${GOTSYSD_TEST_USER}
+	permit rw ${GOTSYSD_DEV_USER}
+
+	notify email to "${GOTSYSD_TEST_USER}@example.com"
+}
+EOF
+	(cd ${testroot}/wt && got commit -m "whitespace changes" >/dev/null)
+	local commit_id=`git_show_head $testroot/${GOTSYS_REPO}`
+	local author_time=`git_show_author_time $testroot/${GOTSYS_REPO}`
+
+	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+		'printf "220\r\n250\r\n250\r\n250\r\n354\r\n250\r\n221\r\n" \
+		| timeout 5 nc -l 25' > $testroot/stdout &
+
+	sleep 1 # server starts up
+
+	got send -q -i ${GOTSYSD_SSH_KEY} -r ${testroot}/${GOTSYS_REPO}
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got send failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	wait %1 # wait for ssh / nc -l
+
+	short_commit_id=`trim_obj_id 12 $commit_id`
+	HOSTNAME=`ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} hostname`
+	printf "HELO localhost\r\n" > $testroot/stdout.expected
+	printf "MAIL FROM:<${GOTD_USER}@${HOSTNAME}>\r\n" \
+		>> $testroot/stdout.expected
+	printf "RCPT TO:<${GOTSYSD_TEST_USER}@example.com>\r\n" \
+		>> $testroot/stdout.expected
+	printf "DATA\r\n" >> $testroot/stdout.expected
+	printf "From: ${GOTD_USER}@${HOSTNAME}\r\n" >> $testroot/stdout.expected
+	printf "To: ${GOTSYSD_TEST_USER}@example.com\r\n" \
+		>> $testroot/stdout.expected
+	printf "Subject: $GOTSYS_REPO: " >> $testroot/stdout.expected
+	printf "${GOTSYSD_TEST_USER} changed refs/heads/main: $short_commit_id\r\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf "commit $commit_id\n" >> $testroot/stdout.expected
+	printf "from: $GOT_AUTHOR\n" >> $testroot/stdout.expected
+	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	printf "date: $d\n" >> $testroot/stdout.expected
+	printf "messagelen: 20\n" >> $testroot/stdout.expected
+	printf " \n" >> $testroot/stdout.expected
+	printf " whitespace changes\n \n" >> $testroot/stdout.expected
+	printf " M  gotsys.conf  |  3+  0-\n\n"  >> $testroot/stdout.expected
+	printf "1 file changed, 3 insertions(+), 0 deletions(-)\n\n" \
+		>> $testroot/stdout.expected
+	printf "\r\n" >> $testroot/stdout.expected
+	printf ".\r\n" >> $testroot/stdout.expected
+	printf "QUIT\r\n" >> $testroot/stdout.expected
+
+	grep -v ^Date $testroot/stdout > $testroot/stdout.filtered
+	cmp -s $testroot/stdout.expected $testroot/stdout.filtered
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout.filtered
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Restart smtpd 
+	ssh -i ${GOTSYSD_SSH_KEY} root@${VMIP} \
+		'/etc/rc.d/smtpd start' > /dev/null
+
 	test_done "$testroot" "$ret"
 }
 
@@ -1898,3 +2374,6 @@ run_test test_protect_refs
 run_test test_deny_access
 run_test test_override_access_rules
 run_test test_override_all_user_access
+run_test test_http_notification
+run_test test_http_notification_hmac
+run_test test_email_notification

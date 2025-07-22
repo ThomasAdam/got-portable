@@ -1,0 +1,129 @@
+#!/usr/bin/env perl
+#
+# Copyright (c) 2024 Omar Polo <op@openbsd.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use v5.36;
+use IPC::Open2;
+use Getopt::Long qw(:config bundling no_getopt_compat);
+use Digest;
+use Digest::HMAC;
+
+my $auth;
+my $address;
+my $port = 8000;
+my $hmac_secret;
+my $hmac_signature;
+my $hmac;
+
+GetOptions("a:s" => \$auth, "l:s" => \$address, "p:i" => \$port, "s:s" => \$hmac_secret)
+    or die("usage: $0 [-a auth] [-l address] [-p port] [-s hmac_secret]\n");
+
+my $pid = open2(my $out, my $in, 'nc', '-l', $address, $port);
+
+my $clen;
+while (<$out>) {
+	local $/ = "\r\n";
+	chomp;
+
+	last if /^$/;
+
+	if (m/^POST/) {
+		die "bad http request" unless m,^POST / HTTP/1.1$,;
+		next;
+	}
+
+	if (m/^Host:/) {
+		die "bad Host header" unless /^Host: $address:$port$/;
+		next;
+	}
+
+	if (m/^Content-Type/) {
+		die "bad content-type header"
+		    unless m,Content-Type: application/json$,;
+		next;
+	}
+
+	if (m/^Content-Length/) {
+		die "double content-length" if defined $clen;
+		die "bad content-length header"
+		    unless m/Content-Length: (\d+)$/;
+		$clen = $1;
+		next;
+	}
+
+	if (m/Connection/) {
+		die "bad connection header"
+		    unless m/Connection: close$/;
+		next;
+	}
+
+	if (m/Authorization/) {
+		die "bad authorization header"
+		    unless m/Authorization: basic (.*)$/;
+		my $t = $1;
+		die "wrong authorization; got $t want $auth"
+		    if not defined($auth) or $auth ne $t;
+		next;
+	}
+
+	if (m/X-Gotd-Signature/) {
+		die "bad hmac signature header"
+		    unless m/X-Gotd-Signature: sha256=(.*)$/;
+		$hmac_signature = $1;
+		next;
+	}
+}
+
+die "no Content-Length header" unless defined $clen;
+
+if (defined $hmac_signature) {
+	die "no Hmac secret provided" unless defined $hmac_secret;
+	my $sha256 = Digest->new("SHA-256");
+	$hmac = Digest::HMAC->new($hmac_secret, $sha256);
+}
+
+while ($clen != 0) {
+	my $len = $clen;
+	$len = 512 if $clen > 512;
+
+	my $r = read($out, my $buf, $len);
+	$clen -= $r;
+
+	if (defined $hmac) {
+		$hmac->add($buf);
+	}
+
+	print $buf;
+}
+say "";
+
+if (defined $hmac) {
+	my $digest = $hmac->hexdigest;
+	if ($digest ne $hmac_signature) {
+		print "bad hmac signature: expected: $hmac_signature, actual: $digest";
+		die
+	}
+}
+
+print $in "HTTP/1.1 200 OK\r\n";
+print $in "Content-Length: 0\r\n";
+print $in "Connection: close\r\n";
+print $in "\r\n";
+
+close $in;
+close $out;
+
+waitpid($pid, 0);
+exit $? >> 8;

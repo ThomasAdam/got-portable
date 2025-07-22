@@ -376,127 +376,241 @@ do not need to be listed in
 .Nm .
 These namespaces are always protected and even attempts to create new
 references in these namespaces will always be denied.
-.\".It Ic notify Brq Ar ...
-.\"The
-.\".Ic notify
-.\"directive enables notifications about new commits or tags
-.\"added to the repository.
-.\".Pp
-.\"The default content of email notifications looks similar to the output of the
-.\".Cm got log -d
-.\"command.
-.\".Pp
-.\"Notifications via HTTP require a HTTP or HTTPS server which is accepting
-.\"POST requests with or without HTTP Basic authentication.
-.\"Depending on the use case a custom server-side CGI script may be required
-.\"for the processing of notifications.
-.\"HTTP notifications can achieve functionality
-.\"similar to Git's server-side post-receive hook script
-.\"by triggering arbitrary post-commit actions via the HTTP server.
-.\".Pp
-.\"The
-.\".Ic notify
-.\"directive expects parameters which must be enclosed in curly braces.
-.\"The available parameters are as follows:
-.\".Bl -tag -width Ds
-.\".It Ic branch Ar name
-.\"Send notifications about commits to the named branch.
-.\"The
-.\".Ar name
-.\"will be looked up in the
-.\".Dq refs/heads/
-.\"reference namespace.
-.\"This directive may be specified multiple times to build a list of
-.\"branches to send notifications for.
-.\"If neither a
-.\".Ic branch
-.\"nor a
-.\".Ic reference namespace
-.\"are specified then changes to any reference will trigger notifications.
-.\".It Ic reference Ic namespace Ar namespace
-.\"Send notifications about commits or tags within a reference namespace.
-.\"This directive may be specified multiple times to build a list of
-.\"namespaces to send notifications for.
-.\"If neither a
-.\".Ic branch
-.\"nor a
-.\".Ic reference namespace
-.\"are specified then changes to any reference will trigger notifications.
-.\".It Ic email Ic to Ar recipient Oo Ic reply to Ar responder Oc
-.\"Send notifications via email to the specified
-.\".Ar recipient .
-.\"This directive may be specified multiple times to build a list of
-.\"recipients to send notifications to.
-.\".Pp
-.\"The
-.\".Ar recipient
-.\"must be an email addresses that accepts mail.
-.\".Pp
-.\"If a
-.\".Ar responder
-.\"is specified via the
-.\".Ic reply to
-.\"directive, the
-.\".Ar responder
-.\"will be used as the Reply-to address.
-.\"Setting the Reply-to header can be useful if replies should go to a
-.\"mailing list instead of the
-.\".Ar sender ,
-.\"for example.
-.\".It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc Oo Ic hmac Ar secret Oc
-.\"Send notifications via HTTP.
-.\"This directive may be specified multiple times to build a list of
-.\"HTTP servers to send notifications to.
-.\".Pp
-.\"The notification will be sent as a POST request to the given
-.\".Ar URL ,
-.\"which must be a valid HTTP URL and begin with either
-.\".Dq http://
-.\"or
-.\".Dq https:// .
-.\"If HTTPS is used, sending of notifications will only succeed if
-.\"no TLS errors occur.
-.\".Pp
-.\"The optional
-.\".Ic user
-.\"and
-.\".Ic password
-.\"directives enable HTTP Basic authentication.
-.\"If used, both a
-.\".Ar user
-.\"and a
-.\".Ar password
-.\"must be specified.
-.\"The
-.\".Ar password
-.\"must not be an empty string.
-.\"Unless the
-.\".Ic insecure
-.\"option is specified the notification target
-.\".Ar URL
-.\"must be a
-.\".Dq https://
-.\"URL to avoid leaking of authentication credentials.
-.\".Pp
-.\"If a
-.\".Ic hmac
-.\".Ar secret
-.\"is provided, the request body will be signed using HMAC, allowing the
-.\"receiver to verify the notification message's authenticity and integrity.
-.\"The signature uses HMAC-SHA256 and will be sent in the HTTP header
-.\".Dq X-Gotd-Signature .
-.\"Suitable secrets can be generated with
-.\".Xr openssl 1
-.\"as follows:
-.\".Pp
-.\".Dl $ openssl rand -base64 32
-.\".Pp
-.\"The request body contains a JSON object with a
-.\".Dq notifications
-.\"property containing an array of notification objects.
-.\"This JSON format is documented in
-.\".Xr gotd 8 .
-.\".El
+.It Ic notify Brq Ar ...
+The
+.Ic notify
+directive enables notifications about new commits or tags
+added to the repository.
+.Pp
+The default content of email notifications looks similar to the output of the
+.Cm got log -d
+command.
+.Pp
+Notifications via HTTP require a HTTP or HTTPS server which is accepting
+POST requests with or without HTTP Basic authentication.
+Depending on the use case a custom server-side CGI script may be required
+for the processing of notifications.
+HTTP notifications can achieve functionality
+similar to Git's server-side post-receive hook script
+by triggering arbitrary post-commit actions via the HTTP server.
+.Pp
+The
+.Ic notify
+directive expects parameters which must be enclosed in curly braces.
+The available parameters are as follows:
+.Bl -tag -width Ds
+.It Ic branch Ar name
+Send notifications about commits to the named branch.
+The
+.Ar name
+will be looked up in the
+.Dq refs/heads/
+reference namespace.
+This directive may be specified multiple times to build a list of
+branches to send notifications for.
+If neither a
+.Ic branch
+nor a
+.Ic reference namespace
+are specified then changes to any reference will trigger notifications.
+.It Ic reference Ic namespace Ar namespace
+Send notifications about commits or tags within a reference namespace.
+This directive may be specified multiple times to build a list of
+namespaces to send notifications for.
+If neither a
+.Ic branch
+nor a
+.Ic reference namespace
+are specified then changes to any reference will trigger notifications.
+.It Ic email Ic to Ar recipient Oo Ic reply to Ar responder Oc
+Send notifications via email to the specified
+.Ar recipient .
+This directive may be specified multiple times to build a list of
+recipients to send notifications to.
+.Pp
+The
+.Ar recipient
+must be an email address that accepts mail.
+.Pp
+If a
+.Ar responder
+is specified via the
+.Ic reply to
+directive, the
+.Ar responder
+will be used as the Reply-to address.
+Setting the Reply-to header can be useful if replies should go to a
+mailing list, for example.
+.It Ic url Ar URL Oo Ic user Ar user Ic password Ar password Oo Ic insecure Oc Oc Oo Ic hmac Ar secret Oc
+Send notifications via HTTP.
+This directive may be specified multiple times to build a list of
+HTTP servers to send notifications to.
+.Pp
+The notification will be sent as a POST request to the given
+.Ar URL ,
+which must be a valid HTTP URL and begin with either
+.Dq http://
+or
+.Dq https:// .
+If HTTPS is used, sending of notifications will only succeed if
+no TLS errors occur.
+.Pp
+The optional
+.Ic user
+and
+.Ic password
+directives enable HTTP Basic authentication.
+If used, both a
+.Ar user
+and a
+.Ar password
+must be specified.
+The
+.Ar password
+must not be an empty string.
+Unless the
+.Ic insecure
+option is specified the notification target
+.Ar URL
+must be a
+.Dq https://
+URL to avoid leaking of authentication credentials.
+.Pp
+If a
+.Ic hmac
+.Ar secret
+is provided, the request body will be signed using HMAC, allowing the
+receiver to verify the notification message's authenticity and integrity.
+The signature uses HMAC-SHA256 and will be sent in the HTTP header
+.Dq X-Gotd-Signature .
+Suitable secrets can be generated with
+.Xr openssl 1
+as follows:
+.Pp
+.Dl $ openssl rand -base64 32
+.Pp
+The request body contains a JSON object with a
+.Dq notifications
+property containing an array of notification objects.
+The following notification object properties are always present:
+.Bl -tag -width authenticated_user
+.It Dv repo
+The repository name as a string.
+.It Dv authenticated_user
+The committer's user account as authenticated by
+.Xr gotd 8
+as a string.
+.It Dv type
+The notification object type as a string.
+.El
+.Pp
+Each notification object carries additional type-specific properties.
+The types and their type-specific properties are:
+.Bl -tag -width Ds
+.It Dv commit
+The commit notification object has the following fields.
+Except where noted, all are optional.
+.Bl -tag -width Ds
+.It Dv short
+Boolean, indicates whether the object has all the fields set.
+When several commits are batched in a single send operation, not all of
+the fields are available for each commit object.
+.It Dv id
+The commit ID as string, may be abbreviated.
+.It Dv committer
+An object with the committer information with the following fields:
+.Pp
+.Bl -tag -compact -width Ds
+.It Dv full
+Committer's full name.
+.It Dv name
+Committer's name.
+.It Dv mail
+Committer's mail address.
+.It Dv user
+Committer's username.
+This is the only field guaranteed to be set.
+.El
+.It Dv author
+An object with the author information.
+Has the same fields as the
+.Sq committer
+but may be unset.
+.It Dv date
+Number, representing the number of seconds since the Epoch in UTC.
+.It Dv short_message
+The first line of the commit message.
+This field is always set.
+.It Dv message
+The complete commit message, may be unset.
+.It Dv diffstat
+An object with the summarized changes, may be unset.
+Contains a
+.Sq files
+field with an array of objects describing the changes per-file and a
+.Sq total
+field with the cumulative changes.
+The changes per-file contains the following fields:
+.Pp
+.Bl -tag -compact -width removed
+.It Dv action
+A string describing the action, can be
+.Dq added ,
+.Dq deleted ,
+.Dq modified ,
+.Dq mode changed ,
+or
+.Dq unknown .
+.It Dv file
+The file path.
+.It Dv added
+The number of lines added.
+.It Dv removed
+The number of lines removed.
+.El
+.Pp
+The
+.Sq total
+object contains two fields:
+.Sq added
+and
+.Sq removed
+which are the number of added and removed lines respectively.
+.El
+.It Dv branch-deleted
+The branch deleted notifications has the following fields, all guaranteed
+to be set:
+.Bl -tag -width Ds
+.It Dv ref
+The removed branch reference.
+.It Dv id
+The hash of the commit pointed by the deleted branch.
+.El
+.It Dv tag
+The tag notification has the following fields, all guaranteed to be set:
+.Bl -tag -width Ds
+.It tag
+The tag reference.
+.It tagger
+The user information, with the same format of the
+.Sq committer
+field for the
+.Sq commit
+notification but with all the field guaranteed to be set.
+.It Dv date
+Number, representing the number of seconds since the Epoch in UTC.
+.It Dv object
+The object being tagged.
+It contains the fields
+.Sq type
+with the object type and
+.Sq id
+with the object id being tagged.
+.It Dv message
+The tag message.
+.El
+.El
+.El
 .El
 .Sh EXAMPLES
 .Bd -literal -offset indent
@@ -531,12 +645,12 @@ repository "openbsd/ports" {
 		branch "main"
 		tag namespace "refs/tags/"
 	}
-.\"
-.\"	notify {
-.\"		branch "main"
-.\"		reference namespace "refs/tags/"
-.\"		email to openbsd-ports-changes@example.com
-.\"	}
+
+	notify {
+		branch "main"
+		reference namespace "refs/tags/"
+		email to openbsd-ports-changes@example.com
+	}
 }
 
 repository "secret" {

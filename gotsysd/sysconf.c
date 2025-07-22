@@ -80,6 +80,10 @@ static struct gotsysd_sysconf {
 	size_t nprotected_refs_needed;
 	size_t nprotected_refs_received;
 	struct gotsys_access_rule_list *global_repo_access_rules;
+	struct got_pathlist_head *notif_refs_cur;
+	size_t *num_notif_refs_cur;
+	size_t num_notif_refs_needed;
+	size_t num_notif_refs_received;
 } gotsysd_sysconf;
 
 static struct gotsys_conf gotsysconf;
@@ -494,7 +498,147 @@ sysconf_dispatch_libexec(int fd, short event, void *arg)
 				break;
 			}
 			log_debug("done receiving protected refs");
-			gotsysd_sysconf.repo_cur = NULL;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			gotsysd_sysconf.notif_refs_cur =
+			    &gotsysd_sysconf.repo_cur->notification_refs;
+			gotsysd_sysconf.num_notif_refs_cur =
+			    &gotsysd_sysconf.repo_cur->num_notification_refs;
+			gotsysd_sysconf.num_notif_refs_needed = npaths;
+			gotsysd_sysconf.num_notif_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist(&npaths, &imsg);
+			if (err)
+				break;
+			gotsysd_sysconf.notif_refs_cur =
+			    &gotsysd_sysconf.repo_cur->notification_ref_namespaces;
+			gotsysd_sysconf.num_notif_refs_cur =
+			    &gotsysd_sysconf.repo_cur->num_notification_ref_namespaces;
+			gotsysd_sysconf.num_notif_refs_needed = npaths;
+			gotsysd_sysconf.num_notif_refs_received = 0;
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_ELEM:
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_ELEM:
+			if (gotsysd_sysconf.notif_refs_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed == 0 ||
+			    gotsysd_sysconf.num_notif_refs_received >=
+			    gotsysd_sysconf.num_notif_refs_needed ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = gotsys_imsg_recv_pathlist_elem(&imsg,
+			    gotsysd_sysconf.notif_refs_cur);
+			if (err)
+				break;
+			if (++gotsysd_sysconf.num_notif_refs_received >=
+			    gotsysd_sysconf.num_notif_refs_needed) {
+				gotsysd_sysconf.notif_refs_cur = NULL;
+				*gotsysd_sysconf.num_notif_refs_cur =
+				    gotsysd_sysconf.num_notif_refs_received;
+				gotsysd_sysconf.num_notif_refs_needed = 0;
+				gotsysd_sysconf.num_notif_refs_received = 0;
+			}
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_DONE:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+				break;
+			}
+			log_debug("done receiving notification refs");
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_DONE:
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+				break;
+			}
+			log_debug("done receiving notification ref namespaces");
+			break;
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_EMAIL: {
+			struct gotsys_notification_target *target;
+
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+				break;
+			}
+
+			err = gotsys_imsg_recv_notification_target_email(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(
+			    &gotsysd_sysconf.repo_cur->notification_targets,
+			    target, entry);
+			break;
+		}
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_HTTP: {
+			struct gotsys_notification_target *target;
+
+			if (gotsysd_sysconf.repo_cur == NULL ||
+			    gotsysd_sysconf.num_notif_refs_needed != 0 ||
+			    gotsysd_sysconf.notif_refs_cur != NULL ||
+			    gotsysd_sysconf.state !=
+			    SYSCONF_STATE_EXPECT_REPOS) {
+				err = got_error_fmt(GOT_ERR_PRIVSEP_MSG,
+				    "received unexpected imsg %d while in "
+				    "state %d\n", imsg.hdr.type,
+				    gotsysd_sysconf.state);
+				break;
+			}
+
+			err = gotsys_imsg_recv_notification_target_http(NULL,
+			    &target, &imsg);
+			if (err)
+				break;
+			STAILQ_INSERT_TAIL(
+			    &gotsysd_sysconf.repo_cur->notification_targets,
+			    target, entry);
+			break;
+		}
+		case GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGETS_DONE:
 			break;
 		case GOTSYSD_IMSG_SYSCONF_REPOS_DONE:
 			if (gotsysd_sysconf.state !=

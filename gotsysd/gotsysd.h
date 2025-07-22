@@ -31,6 +31,10 @@
 #define GOTD_CONF_PATH	"/etc/gotd.conf"
 #endif
 
+#ifndef GOTD_SECRETS_PATH
+#define GOTD_SECRETS_PATH "/etc/gotd-secrets.conf"
+#endif
+
 #ifndef GOTSYSD_PATH_GOTSH
 #define GOTSYSD_PATH_GOTSH		"/usr/local/bin/gotsh"
 #endif
@@ -190,6 +194,15 @@ enum gotsysd_imsg_type {
 	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES,
 	GOTSYSD_IMSG_SYSCONF_PROTECTED_BRANCHES_ELEM,
 	GOTSYSD_IMSG_SYSCONF_PROTECTED_REFS_DONE,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_ELEM,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REFS_DONE,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_ELEM,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_REF_NAMESPACES_DONE,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_EMAIL,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGET_HTTP,
+	GOTSYSD_IMSG_SYSCONF_NOTIFICATION_TARGETS_DONE,
 	GOTSYSD_IMSG_SYSCONF_PARSE_DONE,
 
 	/* Addition of users and groups. */
@@ -438,6 +451,38 @@ struct gotsysd_imsg_pathlist_elem {
 	/* Followed by data_len bytes. */
 };
 
+/* Structure for GOTSYSD_IMSG_NOTIFICATION_TARGET_EMAIL. */
+struct gotsysd_imsg_notitfication_target_email {
+	size_t sender_len;
+	size_t recipient_len;
+	size_t responder_len;
+	size_t hostname_len;
+	size_t port_len;
+	size_t repo_name_len;
+
+	/*
+	 * Followed by sender_len + responder_len + responder_len +
+	 * hostname_len + port_len + repo_name_len bytes.
+	 */
+};
+
+/* Structure for GOTD_IMSG_NOTIFICATION_TARGET_HTTP. */
+struct gotsysd_imsg_notitfication_target_http {
+	int tls;
+	size_t hostname_len;
+	size_t port_len;
+	size_t path_len;
+	size_t user_len;
+	size_t password_len;
+	size_t hmac_len;
+	size_t repo_name_len;
+
+	/*
+	 * Followed by hostname_len + port_len + path_len + user_len + password_len +
+	 * hmac_len + repo_name_len bytes.
+	 */
+};
+
 #ifndef GOT_LIBEXECDIR
 #define GOT_LIBEXECDIR /usr/libexec
 #endif
@@ -531,6 +576,7 @@ struct gotsys_authorized_keys_list;
 struct gotsys_repolist;
 struct gotsys_repo;
 struct gotsys_access_rule;
+struct gotsys_notification_target;
 struct got_pathlist_head;
 
 const struct got_error *gotsys_imsg_send_users(struct gotsysd_imsgev *,
@@ -561,6 +607,10 @@ const struct got_error *gotsys_imsg_recv_access_rule(
 const struct got_error *gotsys_imsg_recv_pathlist(size_t *, struct imsg *);
 const struct got_error *gotsys_imsg_recv_pathlist_elem(struct imsg *,
     struct got_pathlist_head *);
+const struct got_error *gotsys_imsg_recv_notification_target_email(char **,
+    struct gotsys_notification_target **, struct imsg *);
+const struct got_error *gotsys_imsg_recv_notification_target_http(char **,
+    struct gotsys_notification_target **, struct imsg *);
 
 struct gotsys_uidset_element;
 struct gotsys_uidset;
