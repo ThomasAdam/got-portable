@@ -38,6 +38,7 @@
 #include <sha1.h>
 #include <sha2.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
