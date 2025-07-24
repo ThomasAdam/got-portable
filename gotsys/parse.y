@@ -1721,7 +1721,7 @@ basic_auth_password_is_valid(const char *s)
 static int
 validate_hmac_secret(const char *s, size_t len)
 {
-	static const u_int8_t base64chars[] =
+	static const uint8_t base64chars[] =
 	    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 	size_t i;
 
