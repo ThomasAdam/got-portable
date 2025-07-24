@@ -795,7 +795,7 @@ top:
 				yyerror("string too long");
 				return (findeol());
 			}
-			if (isalnum(c) || c == '_') {
+			if (isalnum((unsigned char)c) || c == '_') {
 				*p++ = c;
 				continue;
 			}
@@ -895,12 +895,13 @@ nodigits:
 	}
 
 #define allowed_in_string(x) \
-	(isalnum(x) || (ispunct(x) && x != '(' && x != ')' && \
+	(isalnum((unsigned char)x) || \
+	(ispunct((unsigned char)x) && x != '(' && x != ')' && \
 	x != '{' && x != '}' && \
 	x != '!' && x != '=' && x != '#' && \
 	x != ','))
 
-	if (isalnum(c) || c == ':' || c == '_') {
+	if (isalnum((unsigned char)c) || c == ':' || c == '_') {
 		do {
 			*p++ = c;
 			if ((unsigned)(p-buf) >= sizeof(buf)) {
@@ -1376,7 +1377,7 @@ email_address_is_valid(const char *s)
 		return 0;
 	
 	for (i = 0; i < local_len; i++) {
-		if (isalnum(s[i]))
+		if (isalnum((unsigned char)s[i]))
 			continue;
 
 		for (j = 0; j < nitems(allowed); j++) {
@@ -1400,7 +1401,7 @@ email_address_is_valid(const char *s)
 		return 0;
 
 	for (i = local_len + 1; i < domain_len; i++) {
-		if (isalnum(s[i]) || s[i] == '.' || s[i] == '-')
+		if (isalnum((unsigned char)s[i]) || s[i] == '.' || s[i] == '-')
 			continue;
 
 		return 0;
@@ -1635,7 +1636,7 @@ parse_url(char **proto, char **host, char **port,
 
 	host_len = strlen(*host);
 	for (i = 0; i < host_len; i++) {
-		if (isalnum((*host)[i]) ||
+		if (isalnum((unsigned char)(*host)[i]) ||
 		    (*host)[i] == '.' || (*host)[i] == '-')
 			continue;
 		err = got_error_fmt(GOT_ERR_PARSE_URI,
@@ -1683,7 +1684,7 @@ basic_auth_user_is_valid(const char *s)
 		if (s[i] & 0x80)
 			return 0;
 
-		if (isalnum(s[i]) ||
+		if (isalnum((unsigned char)s[i]) ||
 		    (i > 0 && s[i] == '-') ||
 		    (i > 0 && s[i] == '_') ||
 		    (i > 0 && s[i] == '.'))
@@ -1707,7 +1708,7 @@ basic_auth_password_is_valid(const char *s)
 	for (i = 0; i < len; i++) {
 		if (s[i] & 0x80)
 			return 0;
-		if (iscntrl(s[i]))
+		if (iscntrl((unsigned char)s[i]))
 			return 0;
 		if (s[i] == '"')
 			return 0;
