@@ -1588,7 +1588,7 @@ parse_url(char **proto, char **host, char **port,
 
 	p = strstr(s, "/");
 	if (p == NULL)
-		p = (char *)&url[strlen(url) - 1];
+		p = strchr(s, '\0');
 
 	q = memchr(s, ':', p - s);
 	if (q) {
