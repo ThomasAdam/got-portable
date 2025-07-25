@@ -422,6 +422,8 @@
 /regress/gotd/http-server
 /regress/gotd/http_notification.sh
 /regress/gotd/http_notification_hmac.sh
+/regress/gotd/large_files.sh
+/regress/gotd/prepare_large_files.sh
 /regress/gotd/prepare_test_repo.sh
 /regress/gotd/repo_read.sh
 /regress/gotd/repo_read_access_denied.sh
@@ -438,6 +440,7 @@
 /regress/gotsysd/README
 /regress/gotsysd/build-got.sh
 /regress/gotsysd/common.sh
+/regress/gotsysd/http-server
 /regress/gotsysd/test_gotsysd.sh
 /regress/gotwebd
 /regress/gotwebd/Makefile
