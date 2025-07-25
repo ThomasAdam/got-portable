@@ -1,3 +1,17 @@
+* got 0.116; 2025-07-25
+- make our pack-refs header format align with the expectations of git 2.50.0
+- fix bogus "bad offset in pack file" errors wrongly raised by gotd
+- fix gotd branch protection rejecting commits that already exist on server
+- pick a default branch to clone when the server does not advertise HEAD symref
+- do not clobber changes staged via stage -p during "got revert"
+- enforce additional restrictions on reference names specified in gotsys.conf
+- change gotwebd favicons to show the smiley fish only
+- fix gotd reload when /etc/gotd-secrets.conf is used
+- fix bogus "raw object has unexpected size" errors during deltification
+- fix bug in delta block stretch size calculation resulting in invalid deltas
+- fix gotsysd behaviour when the anonymous user is removed from gotsys.conf
+- add support for email and http/json notifications to gotsysd and gotsys.conf
+
 * got 0.115; 2025-06-27
 - make errors reported by gotsys-apply-conf actually visible
 - stop trying to start gotd from gotsys-apply-conf if gotd is not running
