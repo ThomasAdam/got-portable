@@ -418,11 +418,15 @@ done:
 	if (authorized_keys_tmpfd != -1 &&
 	    close(authorized_keys_tmpfd) == -1 && error == NULL)
 		error = got_error_from_errno2("close", authorized_keys_tmppath);
-	free(authorized_keys_tmppath);
-	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && error == NULL)
-		error = got_error_from_errno("close");
-	if (error)
+	if (error) {
 		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, error);
+		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+	}
+	free(authorized_keys_tmppath);
+	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && error == NULL) {
+		error = got_error_from_errno("close");
+		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+	}
 	imsgbuf_clear(&iev.ibuf);
 	return error ? 1 : 0;
 }

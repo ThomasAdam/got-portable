@@ -1326,8 +1326,6 @@ done:
 	    err == NULL)
 		err = got_error_from_errno2("unlink", gotd_secrets_tmppath);
 	free(gotd_secrets_tmppath);
-	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL)
-		err = got_error_from_errno("close");
 	if (gotd_conf_tmpfd != -1 && close(gotd_conf_tmpfd) == -1 &&
 	    err == NULL)
 		err = got_error_from_errno("close");
@@ -1336,6 +1334,10 @@ done:
 		err = got_error_from_errno("close");
 	if (err)
 		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
+	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
+		err = got_error_from_errno("close");
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+	}
 	imsgbuf_clear(&iev.ibuf);
 	return err ? 1 : 0;
 }

@@ -970,10 +970,6 @@ main(int argc, char **argv)
 	event_dispatch();
 done:
 	gotsys_userlist_purge(&adduser_users);
-	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
-		err = got_error_from_errno("close");
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
-	}
 #if 0
 	if (mp_db_temp && fclose(mp_db_temp) == EOF && err == NULL) {
 		err = got_error_from_errno2("fclose", mp_db_temp_path);
@@ -1007,6 +1003,10 @@ done:
 	free(smp_db_temp_path);
 #endif
 	free(group_temp_path);
+	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
+		err = got_error_from_errno("close");
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+	}
 	imsgbuf_clear(&iev.ibuf);
 	return err ? 1 : 0;
 }

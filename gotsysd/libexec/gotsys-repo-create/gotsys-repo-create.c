@@ -496,13 +496,17 @@ main(int argc, char **argv)
 
 	event_dispatch();
 done:
+	if (error)
+		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, error);
 	if (repos_dir_fd != -1 && close(repos_dir_fd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
-	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && error == NULL)
-		error = got_error_from_errno("close");
 	if (error) {
-		warnx("%s", error->msg);
+		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, error);
+	}
+	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && error == NULL) {
+		error = got_error_from_errno("close");
+		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 	}
 	imsgbuf_clear(&iev.ibuf);
 	return error ? 1 : 0;

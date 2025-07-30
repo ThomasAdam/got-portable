@@ -686,21 +686,18 @@ main(int argc, char **argv)
 
 	event_dispatch();
 done:
+	if (group_temp && fclose(group_temp) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", group_temp_path);
+	if (group_temp_path && unlink(group_temp_path) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", group_temp_path);
+	if (err) {
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
+	}
 	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
 		err = got_error_from_errno("close");
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 	}
-
-	if (group_temp && fclose(group_temp) == EOF && err == NULL) {
-		err = got_error_from_errno2("fclose", group_temp_path);
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
-	}
-
-	if (group_temp_path && unlink(group_temp_path) == -1 && err == NULL) {
-		err = got_error_from_errno2("unlink", group_temp_path);
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
-	}
-
 	free(group_temp_path);
 	imsgbuf_clear(&iev.ibuf);
 	return err ? 1 : 0;
