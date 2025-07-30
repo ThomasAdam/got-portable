@@ -26,6 +26,7 @@
 #include <sha2.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "got_error.h"
@@ -266,7 +267,7 @@ done:
 	imsgbuf_clear(&iev.ibuf);
 	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
 		err = got_error_from_errno("close");
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 	}
 	return err ? 1 : 0;
 }

@@ -306,5 +306,7 @@ main(int argc, char **argv)
 done:
 	gotsys_userlist_purge(&gotsysconf_users);
 	imsgbuf_clear(&iev.ibuf);
+	if (err)
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 	return err ? 1 : 0;
 }

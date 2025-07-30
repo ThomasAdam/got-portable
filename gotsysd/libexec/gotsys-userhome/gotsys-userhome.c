@@ -364,7 +364,7 @@ main(int argc, char **argv)
 done:
 	if (close(GOTSYSD_FILENO_MSG_PIPE) == -1 && err == NULL) {
 		err = got_error_from_errno("close");
-		gotsysd_imsg_send_error(&iev.ibuf, 0, 0, err);
+		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 	}
 	imsgbuf_clear(&iev.ibuf);
 	return err ? 1 : 0;
