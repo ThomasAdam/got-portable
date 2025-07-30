@@ -578,6 +578,7 @@ write_repo_secrets(off_t *written, struct gotsys_repo *repo)
 	size_t len;
 
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
+		i++;
 		if (target->type != GOTSYS_NOTIFICATION_VIA_HTTP)
 			continue;
 
@@ -585,8 +586,6 @@ write_repo_secrets(off_t *written, struct gotsys_repo *repo)
 		    target->conf.http.password == NULL &&
 		    target->conf.http.hmac_secret == NULL)
 			continue;
-
-		i++;
 
 		if (target->conf.http.user && target->conf.http.password) {
 			ret = snprintf(label, sizeof(label), "basic%d", i);
