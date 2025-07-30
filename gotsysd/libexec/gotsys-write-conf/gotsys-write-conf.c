@@ -483,7 +483,7 @@ write_notification_target_http(struct gotsys_notification_target *target,
 }
 
 static const struct got_error *
-write_notification_targets(struct gotsys_repo *repo)
+write_notification_targets(struct gotsys_repo *repo, int *auth_idx)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
@@ -491,7 +491,7 @@ write_notification_targets(struct gotsys_repo *repo)
 	const char *opening = "notify {";
 	const char *closing = "}";
 	char *namespace = NULL;
-	int ret = 0, i;
+	int ret = 0;
 
 	if (STAILQ_EMPTY(&repo->notification_targets))
 		return NULL;
@@ -543,15 +543,14 @@ write_notification_targets(struct gotsys_repo *repo)
 		namespace = NULL;
 	}
 
-	i = 0;
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
-		i++;
+		(*auth_idx)++;
 		switch (target->type) {
 		case GOTSYS_NOTIFICATION_VIA_EMAIL:
 			err = write_notification_target_email(target);
 			break;
 		case GOTSYS_NOTIFICATION_VIA_HTTP:
-			err = write_notification_target_http(target, i);
+			err = write_notification_target_http(target, *auth_idx);
 			break;
 		default:
 			break;
@@ -570,15 +569,16 @@ done:
 }
 
 static const struct got_error *
-write_repo_secrets(off_t *written, struct gotsys_repo *repo)
+write_repo_secrets(off_t *written, struct gotsys_repo *repo,
+    int *auth_idx)
 {
 	struct gotsys_notification_target *target;
 	char label[32];
-	int ret = 0, i = 0;
+	int ret = 0;
 	size_t len;
 
 	STAILQ_FOREACH(target, &repo->notification_targets, entry) {
-		i++;
+		(*auth_idx)++;
 		if (target->type != GOTSYS_NOTIFICATION_VIA_HTTP)
 			continue;
 
@@ -588,7 +588,8 @@ write_repo_secrets(off_t *written, struct gotsys_repo *repo)
 			continue;
 
 		if (target->conf.http.user && target->conf.http.password) {
-			ret = snprintf(label, sizeof(label), "basic%d", i);
+			ret = snprintf(label, sizeof(label), "basic%d",
+			    *auth_idx);
 			if (ret == -1)
 				return got_error_from_errno("snprintf");
 			if ((size_t)ret >= sizeof(label)) {
@@ -613,7 +614,8 @@ write_repo_secrets(off_t *written, struct gotsys_repo *repo)
 		}
 
 		if (target->conf.http.hmac_secret) {
-			ret = snprintf(label, sizeof(label), "hmac%d", i);
+			ret = snprintf(label, sizeof(label), "hmac%d",
+			    *auth_idx);
 			if (ret == -1)
 				return got_error_from_errno("snprintf");
 			if ((size_t)ret >= sizeof(label)) {
@@ -639,7 +641,7 @@ write_repo_secrets(off_t *written, struct gotsys_repo *repo)
 }
 
 static const struct got_error *
-prepare_gotd_secrets(void)
+prepare_gotd_secrets(int *auth_idx)
 {
 	const struct got_error *err = NULL;
 	struct gotsys_repo *repo;
@@ -649,7 +651,7 @@ prepare_gotd_secrets(void)
 		return got_error_from_errno("ftruncate");
 
 	TAILQ_FOREACH(repo, &gotsysconf.repos, entry) {
-		err = write_repo_secrets(&written, repo);
+		err = write_repo_secrets(&written, repo, auth_idx);
 		if (err)
 			return err;
 	}
@@ -671,7 +673,7 @@ prepare_gotd_secrets(void)
 }
 
 static const struct got_error *
-write_gotd_conf(void)
+write_gotd_conf(int *auth_idx)
 {
 	const struct got_error *err = NULL;
 	struct gotsys_repo *repo;
@@ -753,7 +755,7 @@ write_gotd_conf(void)
 		if (err)
 			return err;
 
-		err = write_notification_targets(repo);
+		err = write_notification_targets(repo, auth_idx);
 		if (err)
 			return err;
 
@@ -806,7 +808,7 @@ dispatch_event(int fd, short event, void *arg)
 	struct imsg imsg;
 	ssize_t n;
 	size_t npaths;
-	int shut = 0;
+	int shut = 0, auth_idx;
 	static int flush_and_exit;
 
 	if (event & EV_READ) {
@@ -1197,10 +1199,12 @@ dispatch_event(int fd, short event, void *arg)
 			}
 			repo_cur = NULL;
 			writeconf_state = WRITECONF_STATE_WRITE_CONF;
-			err = prepare_gotd_secrets();
+			auth_idx = 0;
+			err = prepare_gotd_secrets(&auth_idx);
 			if (err)
 				break;
-			err = write_gotd_conf();
+			auth_idx = 0;
+			err = write_gotd_conf(&auth_idx);
 			if (err)
 				break;
 			writeconf_state = WRITECONF_STATE_DONE;
