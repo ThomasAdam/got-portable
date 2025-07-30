@@ -1709,6 +1709,11 @@ repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
 		struct got_object_qid *pid, *qid;
 		int idx;
 
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			goto done;
+		}
+
 		parents = got_object_commit_get_parent_ids(commit);
 		if (parents) {
 			STAILQ_FOREACH(pid, parents, entry) {
