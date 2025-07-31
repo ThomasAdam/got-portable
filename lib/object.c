@@ -22,6 +22,7 @@
 #include <sys/uio.h>
 #include <sys/mman.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -373,7 +374,7 @@ const struct got_error *
 got_object_blob_is_binary(int *binary, struct got_blob_object *blob)
 {
 	const struct got_error *err;
-	size_t hdrlen, len;
+	size_t hdrlen, len, i;
 
 	*binary = 0;
 	hdrlen = got_object_blob_get_hdrlen(blob);
@@ -385,7 +386,13 @@ got_object_blob_is_binary(int *binary, struct got_blob_object *blob)
 	if (err)
 		return err;
 
-	*binary = memchr(blob->read_buf, '\0', len) != NULL;
+	for (i = 0; i < len; ++i) {
+		if (iscntrl((unsigned char)blob->read_buf[i]) &&
+		    !isspace((unsigned char)blob->read_buf[i])) {
+			*binary = 1;
+			break;
+		}
+	}
 
 	if (fseeko(blob->f, hdrlen, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
