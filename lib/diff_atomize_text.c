@@ -43,7 +43,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 	unsigned int array_size_estimate = d->len / 50;
 	unsigned int pow2 = 1;
 	bool ignore_whitespace = (d->diff_flags & DIFF_FLAG_IGNORE_WHITESPACE);
-	bool embedded_nul = false;
+	bool isbinary = false;
 
 	while (array_size_estimate >>= 1)
 		pow2++;
@@ -72,8 +72,9 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 					    || !isspace((unsigned char)buf[i]))
 						hash = diff_atom_hash_update(
 						    hash, buf[i]);
-					if (buf[i] == '\0')
-						embedded_nul = true;
+					if (iscntrl((unsigned char)buf[i]) &&
+					    !isspace((unsigned char)buf[i]))
+						isbinary = true;
 					line_end++;
 				} else
 					eol = buf[i];
@@ -115,8 +116,8 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 			return errno;
 	}
 
-	/* File are considered binary if they contain embedded '\0' bytes. */
-	if (embedded_nul)
+	/* File are considered binary if they contain control bytes. */
+	if (isbinary)
 		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
 
 	return DIFF_RC_OK;
@@ -128,7 +129,7 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 	const uint8_t *pos = d->data;
 	const uint8_t *end = pos + d->len;
 	bool ignore_whitespace = (d->diff_flags & DIFF_FLAG_IGNORE_WHITESPACE);
-	bool embedded_nul = false;
+	bool isbinary = false;
 	unsigned int array_size_estimate = d->len / 50;
 	unsigned int pow2 = 1;
 	while (array_size_estimate >>= 1)
@@ -144,8 +145,9 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 			if (!ignore_whitespace
 			    || !isspace((unsigned char)*line_end))
 				hash = diff_atom_hash_update(hash, *line_end);
-			if (*line_end == '\0')
-				embedded_nul = true;
+			if (iscntrl((unsigned char)*line_end) &&
+			    !isspace((unsigned char)*line_end))
+				isbinary = true;
 			line_end++;
 		}
 
@@ -174,8 +176,8 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 		pos = line_end;
 	}
 
-	/* File are considered binary if they contain embedded '\0' bytes. */
-	if (embedded_nul)
+	/* File are considered binary if they contain embedded control bytes. */
+	if (isbinary)
 		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
 
 	return DIFF_RC_OK;
