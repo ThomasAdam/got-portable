@@ -449,21 +449,23 @@ int
 fcgi_send_response(struct request *c, int type, const void *data,
     size_t len)
 {
+	size_t		 avail;
+
 	if (c->client_status == CLIENT_DISCONNECT)
 		return -1;
 
-	while (len > FCGI_CONTENT_SIZE) {
-		if (send_response(c, type, data, len) == -1)
-			return -1;
+	while (len > 0) {
+		avail = len;
+		if (avail > FCGI_CONTENT_SIZE)
+			avail = FCGI_CONTENT_SIZE;
 
-		data += FCGI_CONTENT_SIZE;
-		len -= FCGI_CONTENT_SIZE;
+		if (send_response(c, type, data, avail) == -1)
+			return -1;
+		data += avail;
+		len -= avail;
 	}
 
-	if (len == 0)
-		return 0;
-
-	return send_response(c, type, data, len);
+	return 0;
 }
 
 int
