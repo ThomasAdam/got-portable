@@ -7402,6 +7402,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = 0;
 	cc_arg.commit_conflicts = allow_conflict;
+	cc_arg.allow_bad_symlinks = 1; /* preserve bad symlinks across merges */
 	/*
 	 * If possible get the status of individual files directly to
 	 * avoid crawling the entire work tree once per rebased commit.

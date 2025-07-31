@@ -2902,6 +2902,98 @@ EOF
 	test_done "$testroot" 0
 }
 
+test_histedit_preserve_bad_link() {
+	local testroot=`test_init histedit_preserve_bad_link`
+	local orig_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "file outside worktree" > $testroot/external_file
+	ln -sf $testroot/external_file $testroot/wt/bad_link
+
+	(cd $testroot/wt && got add bad_link && \
+		got commit -S -m 'add bad link') >/dev/null 2>&1
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local old_commit1=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got update -c $orig_commit \
+		>/dev/null 2>&1)
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "got update failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+ed -s "\$1" <<-EOF
+	,s/.*/add really bad link/
+	w
+	EOF
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" \
+		got histedit -m > $testroot/stdout \
+			2>$testroot/stderr)
+
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "histedit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local old_commit2=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 12 $old_commit1`
+	local short_old_commit2=`trim_obj_id 12 $old_commit2`
+
+	echo "A  bad_link" > $testroot/stdout.expected
+	echo "$short_old_commit1 -> $short_old_commit2: add really bad link" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/external_file $testroot/wt/bad_link
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "contents of linked file and external file do not match" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	bad_link_path=$(readlink $testroot/wt/bad_link)
+	if [ "$bad_link_path" != "$testroot/external_file" ]; then
+		echo "link was not preserved" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -2931,3 +3023,4 @@ run_test test_histedit_mesg_filemode_change
 run_test test_histedit_drop_only
 run_test test_histedit_conflict_revert
 run_test test_histedit_no_eof_newline
+run_test test_histedit_preserve_bad_link
