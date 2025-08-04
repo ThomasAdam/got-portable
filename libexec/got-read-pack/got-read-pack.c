@@ -1681,141 +1681,6 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 }
 
 static const struct got_error *
-repaint_parent_commits(struct got_object_id *commit_id, int commit_idx,
-    int color, struct got_object_idset *set, struct got_object_idset *skip,
-    struct got_object_id_queue *ids, int *nids,
-    struct got_object_id_queue *painted, int *npainted,
-    struct got_pack *pack, struct got_packidx *packidx,
-    struct got_object_cache *objcache)
-{
-	const struct got_error *err = NULL;
-	const struct got_object_id_queue *parents;
-	struct got_commit_object *commit = NULL;
-	struct got_object_id_queue repaint;
-	struct got_object_idset *traversed;
-
-	STAILQ_INIT(&repaint);
-
-	traversed = got_object_idset_alloc();
-	if (traversed == NULL)
-		return got_error_from_errno("got_object_idset_alloc");
-
-	err = open_commit(&commit, pack, packidx, commit_idx, commit_id,
-	    objcache);
-	if (err)
-		return err;
-
-	while (commit) {
-		struct got_object_qid *pid, *qid;
-		int idx;
-
-		if (sigint_received) {
-			err = got_error(GOT_ERR_CANCELLED);
-			goto done;
-		}
-
-		parents = got_object_commit_get_parent_ids(commit);
-		if (parents) {
-			STAILQ_FOREACH(pid, parents, entry) {
-				idx = got_packidx_get_object_idx(packidx,
-				    &pid->id);
-				/*
-				 * No need to traverse parents which are not in
-				 * the pack file, are already in the desired
-				 * set, or are marked for skipping already.
-				 */
-				if (idx == -1)
-					continue;
-				if (got_object_idset_contains(set, &pid->id))
-					continue;
-				if (set != skip &&
-				    got_object_idset_contains(skip, &pid->id))
-					continue;
-
-				if (got_object_idset_contains(traversed,
-				    &pid->id))
-					continue;
-				err = queue_commit_id(&repaint, &pid->id,
-				    color);
-				if (err)
-					goto done;
-				err = got_object_idset_add(traversed,
-				    &pid->id, NULL);
-				if (err)
-					goto done;
-			}
-		}
-		got_object_commit_close(commit);
-		commit = NULL;
-
-		pid = STAILQ_FIRST(&repaint);
-		if (pid == NULL)
-			break;
-
-		err = paint_commit(pid, color);
-		if (err)
-			break;
-
-		err = got_object_idset_add(set, &pid->id, NULL);
-		if (err)
-			break;
-
-		STAILQ_REMOVE_HEAD(&repaint, entry);
-
-		/* Insert or replace this commit on the painted list. */
-		STAILQ_FOREACH(qid, painted, entry) {
-			if (got_object_id_cmp(&qid->id, &pid->id) != 0)
-				continue;
-			err = paint_commit(qid, color);
-			if (err)
-				goto done;
-			got_object_qid_free(pid);
-			pid = qid;
-			break;
-		}
-		if (qid == NULL) {
-			STAILQ_INSERT_TAIL(painted, pid, entry);
-			(*npainted)++;
-		}
-
-		/*
-		 * In case this commit is on the caller's list of
-		 * pending commits to traverse, repaint it there.
-		 */
-		STAILQ_FOREACH(qid, ids, entry) {
-			if (got_object_id_cmp(&qid->id, &pid->id) != 0)
-				continue;
-			err = paint_commit(qid, color);
-			if (err)
-				goto done;
-			break;
-		}
-
-		idx = got_packidx_get_object_idx(packidx, &pid->id);
-		if (idx == -1) {
-			/*
-			 * Should not happen because we only queue
-			 * parents which exist in our pack file.
-			 */
-			err = got_error(GOT_ERR_NO_OBJ);
-			break;
-		}
-
-		err = open_commit(&commit, pack, packidx, idx, &pid->id,
-		    objcache);
-		if (err)
-			break;
-	}
-done:
-	if (commit)
-		got_object_commit_close(commit);
-	got_object_id_queue_free(&repaint);
-	got_object_idset_free(traversed);
-
-	return err;
-}
-
-static const struct got_error *
 paint_commits(struct got_object_id_queue *ids, int *nids,
     struct got_object_idset *keep, struct got_object_idset *drop,
     struct got_object_idset *skip, struct got_pack *pack,
@@ -1881,12 +1746,6 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 				    NULL);
 				if (err)
 					goto done;
-				err = repaint_parent_commits(&qid->id, idx,
-				    COLOR_SKIP, skip, skip, ids, nids,
-				    &painted, &npainted, pack, packidx,
-				    objcache);
-				if (err)
-					goto done;
 				break;
 			}
 			if (!got_object_idset_contains(keep, &qid->id)) {
@@ -1903,12 +1762,6 @@ paint_commits(struct got_object_id_queue *ids, int *nids,
 					goto done;
 				err = got_object_idset_add(skip, &qid->id,
 				    NULL);
-				if (err)
-					goto done;
-				err = repaint_parent_commits(&qid->id, idx,
-				    COLOR_SKIP, skip, skip, ids, nids,
-				    &painted, &npainted, pack, packidx,
-				    objcache);
 				if (err)
 					goto done;
 				break;
