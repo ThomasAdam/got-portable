@@ -1059,7 +1059,10 @@ got_pack_queue_commit_id(struct got_object_id_queue *ids,
 	if (err)
 		return err;
 
-	STAILQ_INSERT_TAIL(ids, qid, entry);
+	if (color == COLOR_KEEP)
+		STAILQ_INSERT_TAIL(ids, qid, entry);
+	else	
+		STAILQ_INSERT_HEAD(ids, qid, entry);
 	return got_pack_paint_commit(qid, color);
 }
 
@@ -1211,21 +1214,21 @@ findtwixt(struct got_object_id ***res, int *nres, int *ncolored,
 		goto done;
 	}
 
-	for (i = 0; i < nhead; i++) {
-		struct got_object_id *id = head[i];
-		if (id == NULL)
-			continue;
-		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
-		if (err)
-			goto done;
-		nqueued++;
-	}
-
 	for (i = 0; i < ntail; i++) {
 		struct got_object_id *id = tail[i];
 		if (id == NULL)
 			continue;
 		err = queue_commit_or_tag_id(id, COLOR_DROP, &ids, repo);
+		if (err)
+			goto done;
+		nqueued++;
+	}
+
+	for (i = 0; i < nhead; i++) {
+		struct got_object_id *id = head[i];
+		if (id == NULL)
+			continue;
+		err = queue_commit_or_tag_id(id, COLOR_KEEP, &ids, repo);
 		if (err)
 			goto done;
 		nqueued++;
