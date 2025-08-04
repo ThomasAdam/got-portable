@@ -79,93 +79,11 @@ static struct socket *sockets_conf_new_socket(struct gotwebd *,
 
 int cgi_inflight = 0;
 
-/* Request hash table needs some spare room to avoid collisions. */
-struct requestlist requests[GOTWEBD_MAXCLIENTS * 4];
-static SIPHASH_KEY requests_hash_key;
-
-static void
-requests_init(void)
-{
-	int i;
-
-	arc4random_buf(&requests_hash_key, sizeof(requests_hash_key));
-
-	for (i = 0; i < nitems(requests); i++)
-		TAILQ_INIT(&requests[i]);
-}
-
-static uint64_t
-request_hash(uint32_t request_id)
-{
-	return SipHash24(&requests_hash_key, &request_id, sizeof(request_id));
-}
-
-static void
-add_request(struct request *c)
-{
-	uint64_t slot = request_hash(c->request_id) % nitems(requests);
-	TAILQ_INSERT_HEAD(&requests[slot], c, entry);
-	client_cnt++;
-}
-
-void
-sockets_del_request(struct request *c)
-{
-	uint64_t slot = request_hash(c->request_id) % nitems(requests);
-	TAILQ_REMOVE(&requests[slot], c, entry);
-	client_cnt--;
-}
-
-static struct request *
-find_request(uint32_t request_id)
-{
-	uint64_t slot;
-	struct request *c;
-
-	slot = request_hash(request_id) % nitems(requests);
-	TAILQ_FOREACH(c, &requests[slot], entry) {
-		if (c->request_id == request_id)
-			return c;
-	}
-
-	return NULL;
-}
-
-static void
-requests_purge(void)
-{
-	uint64_t slot;
-	struct request *c;
-
-	for (slot = 0; slot < nitems(requests); slot++) {
-		while (!TAILQ_EMPTY(&requests[slot])) {
-			c = TAILQ_FIRST(&requests[slot]);
-			fcgi_cleanup_request(c);
-		}
-	}
-}
-
-static uint32_t
-get_request_id(void)
-{
-	int duplicate = 0;
-	uint32_t id;
-
-	do {
-		id = arc4random();
-		duplicate = (find_request(id) != NULL);
-	} while (duplicate || id == 0);
-
-	return id;
-}
-
 void
 sockets(struct gotwebd *env, int fd)
 {
 	struct event	 sighup, sigint, sigusr1, sigchld, sigterm;
 	struct event_base *evb;
-
-	requests_init();
 
 	evb = event_init();
 
@@ -298,52 +216,6 @@ sockets_launch(struct gotwebd *env)
 
 }
 
-void
-sockets_purge(struct gotwebd *env)
-{
-	struct socket *sock, *tsock;
-
-	/* shutdown and remove sockets */
-	TAILQ_FOREACH_SAFE(sock, &env->sockets, entry, tsock) {
-		if (event_initialized(&sock->ev))
-			event_del(&sock->ev);
-		if (evtimer_initialized(&sock->evt))
-			evtimer_del(&sock->evt);
-		if (evtimer_initialized(&sock->pause))
-			evtimer_del(&sock->pause);
-		if (sock->fd != -1)
-			close(sock->fd);
-		TAILQ_REMOVE(&env->sockets, sock, entry);
-		free(sock);
-	}
-}
-
-static void
-request_done(struct imsg *imsg)
-{
-	struct request *c;
-	uint32_t request_id;
-	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-
-	if (datalen != sizeof(request_id)) {
-		log_warn("IMSG_REQ_DONE with bad data length");
-		return;
-	}
-
-	memcpy(&request_id, imsg->data, sizeof(request_id));
-
-	c = find_request(request_id);
-	if (c == NULL) {
-		log_warnx("no request to clean up found for ID %u",
-		    request_id);
-		return;
-	}
-
-	if (c->client_status == CLIENT_REQUEST)
-		fcgi_create_end_record(c);
-	fcgi_cleanup_request(c);
-}
-
 static void
 server_dispatch_gotweb(int fd, short event, void *arg)
 {
@@ -373,9 +245,6 @@ server_dispatch_gotweb(int fd, short event, void *arg)
 			break;
 
 		switch (imsg.hdr.type) {
-		case GOTWEBD_IMSG_REQ_DONE:
-			request_done(&imsg);
-			break;
 		default:
 			fatalx("%s: unknown imsg type %d", __func__,
 			    imsg.hdr.type);
@@ -514,8 +383,6 @@ sockets_sighdlr(int sig, short event, void *arg)
 static void
 sockets_shutdown(void)
 {
-	sockets_purge(gotwebd_env);
-
 	/* clean servers */
 	while (!TAILQ_EMPTY(&gotwebd_env->servers)) {
 		struct server *srv;
@@ -532,8 +399,6 @@ sockets_shutdown(void)
 		TAILQ_REMOVE(&gotwebd_env->addresses, h, entry);
 		free(h);
 	}
-
-	requests_purge();
 
 	imsgbuf_clear(&gotwebd_env->iev_parent->ibuf);
 	free(gotwebd_env->iev_parent);
@@ -770,7 +635,6 @@ sockets_socket_accept(int fd, short event, void *arg)
 
 	c->buf = buf;
 	c->fd = s;
-	c->resp_fd = -1;
 	c->sock = sock;
 	memcpy(c->priv_fd, gotwebd_env->priv_fd, sizeof(c->priv_fd));
 	c->sock_id = sock->conf.id;
@@ -778,7 +642,6 @@ sockets_socket_accept(int fd, short event, void *arg)
 	c->buf_len = 0;
 	c->request_started = 0;
 	c->client_status = CLIENT_CONNECT;
-	c->request_id = get_request_id();
 
 	event_set(&c->ev, s, EV_READ, fcgi_request, c);
 	event_add(&c->ev, NULL);
@@ -786,7 +649,6 @@ sockets_socket_accept(int fd, short event, void *arg)
 	evtimer_set(&c->tmo, fcgi_timeout, c);
 	evtimer_add(&c->tmo, &timeout);
 
-	add_request(c);
 	return;
 err:
 	cgi_inflight--;

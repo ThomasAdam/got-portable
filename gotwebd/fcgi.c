@@ -101,6 +101,17 @@ fcgi_request(int fd, short events, void *arg)
 	 */
 	do {
 		parsed = fcgi_parse_record(c->buf + c->buf_pos, c->buf_len, c);
+
+		/*
+		 * When we start to actually process the entry, we
+		 * send the request to the gotweb process, so we're
+		 * done.
+		 */
+		if (c->client_status == CLIENT_REQUEST) {
+			fcgi_cleanup_request(c);
+			return;
+		}
+
 		if (parsed != 0) {
 			c->buf_pos += parsed;
 			c->buf_len -= parsed;
@@ -186,50 +197,11 @@ fcgi_parse_begin_request(uint8_t *buf, uint16_t n,
 }
 
 static void
-fcgi_forward_response(int fd, short event, void *arg)
-{
-	const struct got_error *err = NULL;
-	struct request *c = arg;
-	uint8_t outbuf[GOTWEBD_CACHESIZE];
-	ssize_t r;
-
-	if ((event & EV_READ) == 0)
-		return;
-
-	r = read(fd, outbuf, sizeof(outbuf));
-	if (r == 0)
-		return;
-
-	if (r == -1) {
-		log_warn("read response");
-		return;
-	} else {
-		err = got_poll_write_full_timeout(c->fd, outbuf, r, 1);
-		if (err)
-			log_warnx("forward response: %s", err->msg);
-	}
-
-	event_add(c->resp_event, NULL);
-}
-
-static void
 process_request(struct request *c)
 {
 	struct gotwebd *env = gotwebd_env;
-	int ret, i, pipe[2];
+	int ret, i;
 	struct request ic;
-	struct event *resp_event = NULL;
-	int sock_flags = SOCK_STREAM | SOCK_NONBLOCK;
-
-#ifdef SOCK_CLOEXEC
-	sock_flags |= SOCK_CLOEXEC;
-#endif
-
-	if (socketpair(AF_UNIX, sock_flags,
-	    PF_UNSPEC, pipe) == -1) {
-		log_warn("socketpair");
-		return;
-	}
 
 	memcpy(&ic, c, sizeof(ic));
 
@@ -245,31 +217,15 @@ process_request(struct request *c)
 	for (i = 0; i < nitems(c->priv_fd); i++)
 		ic.priv_fd[i] = -1;
 	ic.fd = -1;
-	ic.resp_fd = -1;
-
-	resp_event = calloc(1, sizeof(*resp_event));
-	if (resp_event == NULL) {
-		log_warn("calloc");
-		close(pipe[0]);
-		close(pipe[1]);
-		return;
-	}
 
 	ret = imsg_compose_event(env->iev_gotweb, GOTWEBD_IMSG_REQ_PROCESS,
-	    GOTWEBD_PROC_SERVER, getpid(), pipe[0], &ic, sizeof(ic));
+	    GOTWEBD_PROC_SERVER, -1, c->fd, &ic, sizeof(ic));
 	if (ret == -1) {
 		log_warn("imsg_compose_event");
-		close(pipe[0]);
-		close(pipe[1]);
-		free(resp_event);
-		return;
+		close(c->fd);
 	}
+	c->fd = -1;
 
-	event_set(resp_event, pipe[1], EV_READ, fcgi_forward_response, c);
-	event_add(resp_event, NULL);
-
-	c->resp_fd = pipe[1];
-	c->resp_event = resp_event;
 	c->client_status = CLIENT_REQUEST;
 }
 
@@ -501,8 +457,6 @@ fcgi_cleanup_request(struct request *c)
 {
 	cgi_inflight--;
 
-	sockets_del_request(c);
-
 	if (evtimer_initialized(&c->tmo))
 		evtimer_del(&c->tmo);
 	if (event_initialized(&c->ev))
@@ -510,8 +464,6 @@ fcgi_cleanup_request(struct request *c)
 
 	if (c->fd != -1)
 		close(c->fd);
-	if (c->resp_fd != -1)
-		close(c->resp_fd);
 	if (c->tp != NULL)
 		template_free(c->tp);
 	if (c->t != NULL)
