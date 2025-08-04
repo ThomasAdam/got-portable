@@ -143,20 +143,6 @@ gotweb_reply_file(struct request *c, const char *ctype, const char *file,
 	return gotweb_reply(c, 200, ctype, NULL);
 }
 
-static void
-free_request(struct request *c)
-{
-	if (c->fd != -1)
-		close(c->fd);
-	if (c->tp != NULL)
-		template_free(c->tp);
-	if (c->t != NULL)
-		gotweb_free_transport(c->t);
-	free(c->buf);
-	free(c->outbuf);
-	free(c);
-}
-
 static struct socket *
 gotweb_get_socket(int sock_id)
 {
@@ -225,14 +211,14 @@ recv_request(struct imsg *imsg)
 	c->tp = template(c, fcgi_write, c->outbuf, GOTWEBD_CACHESIZE);
 	if (c->tp == NULL) {
 		log_warn("gotweb init template");
-		free_request(c);
+		fcgi_cleanup_request(c);
 		return NULL;
 	}
 
 	c->sock = gotweb_get_socket(c->sock_id);
 	if (c->sock == NULL) {
 		log_warn("socket id '%d' not found", c->sock_id);
-		free_request(c);
+		fcgi_cleanup_request(c);
 		return NULL;
 	}
 
@@ -240,7 +226,7 @@ recv_request(struct imsg *imsg)
 	error = gotweb_init_transport(&c->t);
 	if (error) {
 		log_warnx("gotweb init transport: %s", error->msg);
-		free_request(c);
+		fcgi_cleanup_request(c);
 		return NULL;
 	}
 
@@ -248,7 +234,7 @@ recv_request(struct imsg *imsg)
 	srv = gotweb_get_server(c->server_name);
 	if (srv == NULL) {
 		log_warnx("server '%s' not found", c->server_name);
-		free_request(c);
+		fcgi_cleanup_request(c);
 		return NULL;
 	}
 	c->srv = srv;
@@ -1396,8 +1382,6 @@ gotweb_shutdown(void)
 		free(gotwebd_env->iev_server);
 	}
 
-	sockets_purge(gotwebd_env);
-
 	while (!TAILQ_EMPTY(&gotwebd_env->servers)) {
 		struct server *srv;
 
@@ -1465,17 +1449,6 @@ gotweb_launch(struct gotwebd *env)
 }
 
 static void
-send_request_done(struct imsgev *iev, int request_id)
-{
-	struct gotwebd		*env = gotwebd_env;
-
-	if (imsg_compose_event(env->iev_server, GOTWEBD_IMSG_REQ_DONE,
-	    GOTWEBD_PROC_GOTWEB, getpid(), -1,
-	    &request_id, sizeof(request_id)) == -1)
-		log_warn("imsg_compose_event");
-}
-
-static void
 gotweb_dispatch_server(int fd, short event, void *arg)
 {
 	struct imsgev		*iev = arg;
@@ -1518,8 +1491,9 @@ gotweb_dispatch_server(int fd, short event, void *arg)
 						    request_id);
 					}
 				}
-				free_request(c);
-				send_request_done(iev, request_id);
+
+				fcgi_create_end_record(c);
+				fcgi_cleanup_request(c);
 			}
 			break;
 		default:

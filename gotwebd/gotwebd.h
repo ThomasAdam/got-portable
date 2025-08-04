@@ -135,7 +135,6 @@ enum imsg_type {
 	GOTWEBD_IMSG_CTL_PIPE,
 	GOTWEBD_IMSG_CTL_START,
 	GOTWEBD_IMSG_REQ_PROCESS,
-	GOTWEBD_IMSG_REQ_DONE,
 };
 
 struct imsgev {
@@ -253,7 +252,6 @@ struct request {
 	uint16_t			 id;
 	int				 fd;
 	int				 priv_fd[PRIV_FDS__MAX];
-	int				 resp_fd;
 	struct event			*resp_event;
 	int				 sock_id;
 	uint32_t			 request_id;
@@ -463,9 +461,7 @@ void sockets(struct gotwebd *, int);
 void sockets_parse_sockets(struct gotwebd *);
 void sockets_socket_accept(int, short, void *);
 int sockets_privinit(struct gotwebd *, struct socket *, uid_t, gid_t);
-void sockets_purge(struct gotwebd *);
 void sockets_rlimit(int);
-void sockets_del_request(struct request *);
 
 /* gotweb.c */
 void gotweb_index_navs(struct request *, struct gotweb_url *, int *,
