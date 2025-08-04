@@ -1673,7 +1673,10 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 		return err;
 
 	memcpy(&qid->id, id, sizeof(qid->id));
-	STAILQ_INSERT_TAIL(ids, qid, entry);
+	if (color == COLOR_KEEP)
+		STAILQ_INSERT_TAIL(ids, qid, entry);
+	else
+		STAILQ_INSERT_HEAD(ids, qid, entry);
 	return paint_commit(qid, color);
 }
 
